@@ -102,7 +102,7 @@ function RoleRedirect() {
   const [waited, setWaited] = React.useState(false)
 
   useEffect(() => {
-    const timer = setTimeout(() => setWaited(true), 5000)
+    const timer = setTimeout(() => setWaited(true), 3000)
     return () => clearTimeout(timer)
   }, [])
 
@@ -117,27 +117,16 @@ function RoleRedirect() {
     navigate(defaultPath(profile.role), { replace: true })
   }, [session, profile, loading, navigate])
 
+  // Auto sign-out if profile can't be loaded (profiles table missing or RLS blocking)
+  useEffect(() => {
+    if (waited && session && !profile && !loading) {
+      signOut()
+    }
+  }, [waited, session, profile, loading, signOut])
+
   if (loading) return <Spinner />
   if (!session) return <Navigate to="/login" replace />
   if (profile?.status === 'disabled') return <DisabledAccount signOut={signOut} />
-
-  // Profile null after waiting = SQL migration not run or RLS blocking
-  if (!profile && waited) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#faf9f7] p-4">
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-8 text-center max-w-sm w-full">
-          <div className="text-3xl mb-4">⚠️</div>
-          <h2 className="font-black text-[#141414] mb-2">Setup incomplete</h2>
-          <p className="text-sm text-gray-500 mb-6">
-            The database profiles table is missing. Please run the SQL migration in Supabase.
-          </p>
-          <button onClick={signOut} className="w-full bg-[#141414] text-white rounded-xl py-3 font-bold text-sm hover:bg-black transition-colors">
-            Sign out
-          </button>
-        </div>
-      </div>
-    )
-  }
 
   return <Spinner />
 }
