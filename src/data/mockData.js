@@ -10,7 +10,7 @@ export const categories = [
 
 export const menuItems = [
   {
-    id: 'm1', category_id: 'kebab',
+    id: 'm1', category_id: 'kebab', sort_order: 1,
     name_uz: 'ZAR KEBAB', name_ru: 'ZAR KEBAB', name_en: 'ZAR KEBAB',
     description_uz: 'Maxsus ZAR kebab', description_ru: 'Фирменный ZAR кебаб', description_en: 'Our signature ZAR kebab',
     price: 80000,
@@ -18,7 +18,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm2', category_id: 'kebab',
+    id: 'm2', category_id: 'kebab', sort_order: 2,
     name_uz: 'Lula kebab', name_ru: 'Люля-кебаб', name_en: 'Lula kebab',
     description_uz: "Mol go'shtidan", description_ru: 'Из говядины', description_en: 'Beef minced kebab',
     price: 24000,
@@ -26,7 +26,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm3', category_id: 'kebab',
+    id: 'm3', category_id: 'kebab', sort_order: 3,
     name_uz: "Shashlik mol go'shti", name_ru: 'Шашлык из говядины', name_en: 'Shashlik beef',
     description_uz: "Mol go'shtidan shashlik", description_ru: 'Шашлык из говядины на мангале', description_en: 'Beef shashlik on the grill',
     price: 25000,
@@ -34,7 +34,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm4', category_id: 'kebab',
+    id: 'm4', category_id: 'kebab', sort_order: 4,
     name_uz: 'Shashlik tovuq', name_ru: 'Шашлык из курицы', name_en: 'Shashlik chicken',
     description_uz: "Tovuq go'shtidan shashlik", description_ru: 'Шашлык из курицы', description_en: 'Chicken shashlik',
     price: 22000,
@@ -42,7 +42,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm5', category_id: 'main',
+    id: 'm5', category_id: 'main', sort_order: 5,
     name_uz: 'Chiroqchi', name_ru: 'Чироқчи', name_en: 'Chiroqchi',
     description_uz: 'Maxsus chiroqchi taomi', description_ru: 'Фирменное блюдо Чироқчи', description_en: 'Special Chiroqchi dish',
     price: 17000,
@@ -50,7 +50,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm6', category_id: 'main',
+    id: 'm6', category_id: 'main', sort_order: 6,
     name_uz: "Do'lma", name_ru: 'Долма', name_en: 'Dolma',
     description_uz: "An'anaviy do'lma", description_ru: 'Традиционная долма', description_en: 'Traditional dolma',
     price: 25000,
@@ -58,7 +58,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm7', category_id: 'first',
+    id: 'm7', category_id: 'first', sort_order: 7,
     name_uz: "Lag'mon", name_ru: 'Лагман', name_en: 'Lagman',
     description_uz: "Uyda tayyorlangan lag'mon", description_ru: 'Домашний лагман', description_en: 'Homemade lagman noodle soup',
     price: 32000,
@@ -66,7 +66,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm8', category_id: 'first',
+    id: 'm8', category_id: 'first', sort_order: 8,
     name_uz: 'Chechevitsa', name_ru: 'Чечевица', name_en: 'Lentil Soup',
     description_uz: 'Yasmiq sho\'rva', description_ru: 'Суп из чечевицы', description_en: 'Traditional lentil soup',
     price: 25000,
@@ -74,7 +74,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm9', category_id: 'salads',
+    id: 'm9', category_id: 'salads', sort_order: 9,
     name_uz: 'Achichuk salat', name_ru: 'Салат Ачичук', name_en: 'Achichuk salad',
     description_uz: 'Pomidor va piyozdan', description_ru: 'Из помидоров и лука', description_en: 'Tomato and onion salad',
     price: 15000,
@@ -82,7 +82,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm10', category_id: 'salads',
+    id: 'm10', category_id: 'salads', sort_order: 10,
     name_uz: 'Yapon salati', name_ru: 'Японский салат', name_en: 'Japanese salad',
     description_uz: 'Yapon uslubidagi salat', description_ru: 'Салат в японском стиле', description_en: 'Japanese style salad',
     price: 25000,
@@ -90,7 +90,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm11', category_id: 'drinks',
+    id: 'm11', category_id: 'drinks', sort_order: 11,
     name_uz: 'Choy', name_ru: 'Чай', name_en: 'Tea',
     description_uz: 'Issiq choy', description_ru: 'Горячий чай', description_en: 'Hot tea',
     price: 8000,
@@ -98,7 +98,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm12', category_id: 'drinks',
+    id: 'm12', category_id: 'drinks', sort_order: 12,
     name_uz: 'Coca-Cola', name_ru: 'Кока-Кола', name_en: 'Coca-Cola',
     description_uz: '0.5L shisha', description_ru: '0.5L бутылка', description_en: '0.5L bottle',
     price: 12000,
@@ -106,7 +106,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm13', category_id: 'drinks',
+    id: 'm13', category_id: 'drinks', sort_order: 13,
     name_uz: 'Sok', name_ru: 'Сок', name_en: 'Juice',
     description_uz: 'Tabiiy meva sharbati', description_ru: 'Натуральный фруктовый сок', description_en: 'Natural fruit juice',
     price: 20000,
@@ -114,7 +114,7 @@ export const menuItems = [
     available: true,
   },
   {
-    id: 'm14', category_id: 'bread',
+    id: 'm14', category_id: 'bread', sort_order: 14,
     name_uz: 'Non', name_ru: 'Лепёшка', name_en: 'Flatbread',
     description_uz: 'Tandirda pishirilgan non', description_ru: 'Лепёшка из тандыра', description_en: 'Freshly baked tandoor flatbread',
     price: 5000,
