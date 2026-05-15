@@ -99,17 +99,11 @@ function ProtectedRoute({ children, roles }) {
 function RoleRedirect() {
   const { session, profile, loading, signOut } = useAuth()
   const navigate = useNavigate()
-  const [waited, setWaited] = React.useState(false)
-
-  useEffect(() => {
-    const timer = setTimeout(() => setWaited(true), 10000)
-    return () => clearTimeout(timer)
-  }, [])
 
   useEffect(() => {
     if (loading) return
     if (!session) { navigate('/login', { replace: true }); return }
-    if (!profile) return
+    if (!profile) return  // still loading profile in background
 
     if (profile.status === 'disabled') return
     if (profile.status === 'pending')  { navigate('/pending-approval', { replace: true }); return }
@@ -117,17 +111,11 @@ function RoleRedirect() {
     navigate(defaultPath(profile.role), { replace: true })
   }, [session, profile, loading, navigate])
 
-  // Auto sign-out if profile can't be loaded (profiles table missing or RLS blocking)
-  useEffect(() => {
-    if (waited && session && !profile && !loading) {
-      signOut()
-    }
-  }, [waited, session, profile, loading, signOut])
-
   if (loading) return <Spinner />
   if (!session) return <Navigate to="/login" replace />
   if (profile?.status === 'disabled') return <DisabledAccount signOut={signOut} />
 
+  // Session exists, waiting for profile to load from Supabase
   return <Spinner />
 }
 

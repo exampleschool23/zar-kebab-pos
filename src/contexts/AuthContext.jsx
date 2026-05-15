@@ -4,67 +4,70 @@ import { supabase, getProfile } from '../lib/supabase'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [session, setSession]   = useState(null)
+  const [profile, setProfile]   = useState(null)
+  const [loading, setLoading]   = useState(true)  // true only until session is known
 
   async function loadProfile(userId) {
-    console.log('[AuthContext] loadProfile', userId)
-    const data = await getProfile(userId)
-    console.log('[AuthContext] profile result', data)
-    setProfile(data)
-    return data
+    console.log('[Auth] loadProfile', userId)
+    try {
+      const data = await getProfile(userId)
+      console.log('[Auth] profile', data)
+      setProfile(data)
+      return data
+    } catch (e) {
+      console.error('[Auth] loadProfile error', e)
+      setProfile(null)
+    }
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      console.log('[AuthContext] initial getSession', { userId: session?.user?.id, error: error?.message })
+    // Step 1: get the current session — sets loading=false as soon as we know
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('[Auth] getSession', { userId: session?.user?.id, error: error?.message })
       setSession(session)
-      if (session?.user) await loadProfile(session.user.id)
-      setLoading(false)
+      setLoading(false)  // unblock routing immediately
+      if (session?.user) loadProfile(session.user.id)  // load profile in background
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthContext] onAuthStateChange', event, { userId: session?.user?.id })
+    // Step 2: keep in sync when auth state changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] stateChange', event, session?.user?.id)
       setSession(session)
+      setLoading(false)
       if (session?.user) {
-        await loadProfile(session.user.id)
+        loadProfile(session.user.id)
       } else {
         setProfile(null)
       }
-      setLoading(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
   async function signInWithEmail(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    return { data, error }
+    return supabase.auth.signInWithPassword({ email, password })
   }
 
   async function signUpWithEmail(email, password, fullName) {
-    const { data, error } = await supabase.auth.signUp({
+    return supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } },
     })
-    return { data, error }
   }
 
   async function signInWithGoogle() {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    return supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
-    return { data, error }
   }
 
   async function resetPassword(email) {
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    return supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback`,
     })
-    return { data, error }
   }
 
   async function signOut() {
@@ -74,20 +77,14 @@ export function AuthProvider({ children }) {
   }
 
   async function refreshProfile() {
-    if (session?.user) return await loadProfile(session.user.id)
+    if (session?.user) return loadProfile(session.user.id)
   }
 
   return (
     <AuthContext.Provider value={{
-      session,
-      profile,
-      loading,
-      signInWithEmail,
-      signUpWithEmail,
-      signInWithGoogle,
-      resetPassword,
-      signOut,
-      refreshProfile,
+      session, profile, loading,
+      signInWithEmail, signUpWithEmail, signInWithGoogle,
+      resetPassword, signOut, refreshProfile,
     }}>
       {children}
     </AuthContext.Provider>
