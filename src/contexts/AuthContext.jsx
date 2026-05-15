@@ -4,35 +4,30 @@ import { supabase, getProfile } from '../lib/supabase'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [session, setSession]   = useState(null)
-  const [profile, setProfile]   = useState(null)
-  const [loading, setLoading]   = useState(true)  // true only until session is known
+  const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   async function loadProfile(userId) {
-    console.log('[Auth] loadProfile', userId)
     try {
       const data = await getProfile(userId)
-      console.log('[Auth] profile', data)
       setProfile(data)
       return data
-    } catch (e) {
-      console.error('[Auth] loadProfile error', e)
+    } catch {
       setProfile(null)
     }
   }
 
   useEffect(() => {
-    // Step 1: get the current session — sets loading=false as soon as we know
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log('[Auth] getSession', { userId: session?.user?.id, error: error?.message })
-      setSession(session)
-      setLoading(false)  // unblock routing immediately
-      if (session?.user) loadProfile(session.user.id)  // load profile in background
-    })
+    // Hard timeout — if Supabase hangs refreshing a stale token, unblock routing
+    const hardTimeout = setTimeout(() => {
+      setLoading(false)
+    }, 4000)
 
-    // Step 2: keep in sync when auth state changes (login, logout, token refresh)
+    // onAuthStateChange fires INITIAL_SESSION immediately from localStorage —
+    // this is the fastest path and handles 99% of cases
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[Auth] stateChange', event, session?.user?.id)
+      clearTimeout(hardTimeout)
       setSession(session)
       setLoading(false)
       if (session?.user) {
@@ -42,7 +37,18 @@ export function AuthProvider({ children }) {
       }
     })
 
-    return () => subscription.unsubscribe()
+    // getSession as a backup (also triggers token refresh if needed)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(hardTimeout)
+      setSession(session)
+      setLoading(false)
+      if (session?.user) loadProfile(session.user.id)
+    })
+
+    return () => {
+      clearTimeout(hardTimeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function signInWithEmail(email, password) {

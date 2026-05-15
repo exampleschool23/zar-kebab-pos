@@ -99,23 +99,44 @@ function ProtectedRoute({ children, roles }) {
 function RoleRedirect() {
   const { session, profile, loading, signOut } = useAuth()
   const navigate = useNavigate()
+  const [profileTimeout, setProfileTimeout] = React.useState(false)
 
   useEffect(() => {
     if (loading) return
     if (!session) { navigate('/login', { replace: true }); return }
-    if (!profile) return  // still loading profile in background
-
+    if (!profile) return
     if (profile.status === 'disabled') return
-    if (profile.status === 'pending')  { navigate('/pending-approval', { replace: true }); return }
-
+    if (profile.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
     navigate(defaultPath(profile.role), { replace: true })
   }, [session, profile, loading, navigate])
+
+  // If session exists but profile never loads, show a retry option
+  useEffect(() => {
+    if (!session || profile || loading) return
+    const t = setTimeout(() => setProfileTimeout(true), 6000)
+    return () => clearTimeout(t)
+  }, [session, profile, loading])
 
   if (loading) return <Spinner />
   if (!session) return <Navigate to="/login" replace />
   if (profile?.status === 'disabled') return <DisabledAccount signOut={signOut} />
 
-  // Session exists, waiting for profile to load from Supabase
+  if (profileTimeout) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#faf9f7] p-4">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-8 text-center max-w-sm w-full">
+          <div className="text-3xl mb-4">⚠️</div>
+          <h2 className="font-black text-[#141414] mb-2">Could not load your profile</h2>
+          <p className="text-sm text-gray-500 mb-6">There was a problem connecting to the database.</p>
+          <button onClick={signOut}
+            className="w-full bg-[#141414] text-white rounded-xl py-3 font-bold text-sm hover:bg-black transition-colors">
+            Sign out and try again
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return <Spinner />
 }
 
@@ -125,6 +146,7 @@ function AppRoutes() {
       <ProfileSync />
       <Routes>
         {/* Public */}
+        <Route path="/"              element={<RoleRedirect />} />
         <Route path="/login"         element={<Login />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
