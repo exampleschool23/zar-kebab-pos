@@ -139,37 +139,46 @@ export default function AdminMenu() {
                 <p>No items in this category</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
                 {filteredItems.map(item => (
                   <div
                     key={item.id}
-                    className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 hover:shadow-sm transition-shadow"
+                    className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col"
                   >
+                    {/* Image */}
                     {item.image_url ? (
-                      <img src={item.image_url} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                      <img src={item.image_url} alt={getItemName(item, lang)} className="w-full h-44 object-cover" />
                     ) : (
-                      <div className="w-14 h-14 rounded-xl bg-orange-50 flex items-center justify-center text-2xl flex-shrink-0">🍖</div>
+                      <div className="w-full h-44 bg-orange-50 flex items-center justify-center">
+                        <UtensilsCrossed size={32} className="text-orange-200" />
+                      </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-gray-900 truncate">{getItemName(item, lang)}</p>
-                      <p className="text-[#ff5a00] font-bold text-sm mt-0.5">{formatCurrency(item.price)}</p>
-                      <span className={`text-[10px] font-semibold ${item.available ? 'text-green-500' : 'text-red-400'}`}>
+
+                    {/* Info */}
+                    <div className="p-4 flex flex-col flex-1">
+                      <p className="font-bold text-gray-900 text-sm leading-snug mb-0.5">{getItemName(item, lang)}</p>
+                      <p className="text-[#ff5a00] font-black text-sm mb-2">{formatCurrency(item.price)}</p>
+                      <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit ${
+                        item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
+                      }`}>
                         {item.available ? 'Available' : 'Hidden'}
                       </span>
-                    </div>
-                    <div className="flex gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => openEditItem(item)}
-                        className="p-2 rounded-xl hover:bg-orange-50 text-gray-300 hover:text-[#ff5a00] transition-colors"
-                      >
-                        <Edit2 size={15} />
-                      </button>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        className="p-2 rounded-xl hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
+                        <button
+                          onClick={() => openEditItem(item)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] transition-colors text-xs font-semibold"
+                        >
+                          <Edit2 size={13} /> Edit
+                        </button>
+                        <button
+                          onClick={() => deleteItem(item.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-500 transition-colors text-xs font-semibold"
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
