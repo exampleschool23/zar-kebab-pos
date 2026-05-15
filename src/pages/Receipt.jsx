@@ -7,7 +7,8 @@ import { ArrowLeft, Printer } from 'lucide-react'
 const L = {
   uz: {
     orderAmount: 'Buyurtma summasi',
-    service:     'Xizmat 20%',
+    loyalty:     'Sodiqlik chegirmasi',
+    service:     'Xizmat',
     total:       "To'lovga jami",
     scan:        'Instagram uchun skanerlang',
     table:       'Stol',
@@ -20,7 +21,8 @@ const L = {
   },
   ru: {
     orderAmount: 'Сумма заказа',
-    service:     'Обслуживание 20%',
+    loyalty:     'Скидка лояльности',
+    service:     'Обслуживание',
     total:       'Итого к оплате',
     scan:        'Сканируйте для Instagram',
     table:       'Стол',
@@ -33,7 +35,8 @@ const L = {
   },
   en: {
     orderAmount: 'Order amount',
-    service:     'Service 20%',
+    loyalty:     'Loyalty discount',
+    service:     'Service',
     total:       'Total to pay',
     scan:        'Scan for Instagram',
     table:       'Table',
@@ -173,8 +176,14 @@ export default function Receipt() {
               <span>{labels.orderAmount}</span>
               <span>{formatCurrency(order.subtotal)}</span>
             </div>
+            {order.loyalty_discount_pct > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a' }}>
+                <span>{labels.loyalty} ({order.loyalty_discount_pct}%)</span>
+                <span>− {formatCurrency(order.loyalty_discount_amount)}</span>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>{labels.service}</span>
+              <span>{labels.service} ({Math.round((order.service_fee / (order.discounted_subtotal || order.subtotal)) * 100)}%)</span>
               <span>{formatCurrency(order.service_fee)}</span>
             </div>
             <div style={{

@@ -110,16 +110,20 @@ function reducer(state, action) {
         orders: state.orders.map(o => o.table_id === action.payload ? { ...o, status: 'needs_bill' } : o),
       }
 
-    case 'MARK_ORDER_PAID':
+    case 'MARK_ORDER_PAID': {
+      // payload can be a string tableId (legacy) or { tableId, loyalty }
+      const tableId = typeof action.payload === 'string' ? action.payload : action.payload.tableId
+      const loyalty = typeof action.payload === 'object' ? action.payload.loyalty : null
       return {
         ...state,
-        tables: state.tables.map(t => t.id === action.payload ? { ...t, status: 'available' } : t),
+        tables: state.tables.map(t => t.id === tableId ? { ...t, status: 'available' } : t),
         orders: state.orders.map(o =>
-          o.table_id === action.payload && o.payment_status !== 'paid'
-            ? { ...o, status: 'paid', payment_status: 'paid' }
+          o.table_id === tableId && o.payment_status !== 'paid'
+            ? { ...o, status: 'paid', payment_status: 'paid', ...(loyalty || {}) }
             : o
         ),
       }
+    }
 
     case 'ADD_TABLE':
       return { ...state, tables: [...state.tables, action.payload] }
