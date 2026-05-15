@@ -102,7 +102,7 @@ function RoleRedirect() {
   const [waited, setWaited] = React.useState(false)
 
   useEffect(() => {
-    const timer = setTimeout(() => setWaited(true), 3000)
+    const timer = setTimeout(() => setWaited(true), 10000)
     return () => clearTimeout(timer)
   }, [])
 
