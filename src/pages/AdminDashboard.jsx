@@ -4,10 +4,12 @@ import { useApp } from '../store/AppContext'
 import { t } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import LanguageSwitcher from '../components/LanguageSwitcher'
-import { UtensilsCrossed, LogOut, BookOpen, Table2, BarChart2, ChefHat } from 'lucide-react'
+import { UtensilsCrossed, LogOut, BookOpen, Table2, BarChart2, ChefHat, Users } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function AdminDashboard() {
   const { state, dispatch } = useApp()
+  const { signOut } = useAuth()
   const navigate = useNavigate()
   const lang = state.lang
 
@@ -28,6 +30,7 @@ export default function AdminDashboard() {
     { label: t(lang, 'tables'),  icon: Table2,    path: '/admin/tables'  },
     { label: t(lang, 'reports'), icon: BarChart2, path: '/admin/reports' },
     { label: t(lang, 'kitchen'), icon: ChefHat,   path: '/kitchen'       },
+    { label: 'Team',             icon: Users,     path: '/admin/users'   },
   ]
 
   return (
@@ -44,7 +47,7 @@ export default function AdminDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
-          <button onClick={() => dispatch({ type: 'LOGOUT' })} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
+          <button onClick={signOut} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
             <LogOut size={18} className="text-gray-400" />
           </button>
         </div>
