@@ -1,35 +1,68 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
 import { t } from '../lib/i18n'
-import LanguageSwitcher from '../components/LanguageSwitcher'
-import { UtensilsCrossed, LogOut } from 'lucide-react'
+import AppShell from '../components/AppShell'
+import StatusBadge from '../components/StatusBadge'
+import { formatCurrency } from '../lib/formatCurrency'
+import { RefreshCw } from 'lucide-react'
 
-function statusColors(status) {
-  if (status === 'available') return 'bg-green-50 border-green-200 hover:border-green-400'
-  if (status === 'occupied')  return 'bg-orange-50 border-orange-200 hover:border-orange-400'
-  if (status === 'needs_bill') return 'bg-red-50 border-red-200 hover:border-red-400'
-  return 'bg-gray-50 border-gray-200'
+function elapsedSince(isoString) {
+  if (!isoString) return null
+  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 60000)
+  if (diff < 1) return '< 1 min'
+  if (diff < 60) return `${diff} min`
+  return `${Math.floor(diff / 60)}h ${diff % 60}m`
 }
 
-function statusDot(status) {
-  if (status === 'available')  return 'bg-green-400'
-  if (status === 'occupied')   return 'bg-orange-400'
-  if (status === 'needs_bill') return 'bg-red-400 animate-pulse'
-  return 'bg-gray-400'
-}
+function TableCard({ table, order, onClick }) {
+  const elapsed = order ? elapsedSince(order.created_at) : null
 
-function statusLabel(status, lang) {
-  if (status === 'available')  return t(lang, 'available')
-  if (status === 'occupied')   return t(lang, 'occupied')
-  if (status === 'needs_bill') return t(lang, 'needsBill')
-  return status
+  const borderColor =
+    table.status === 'available'  ? 'border-green-200 hover:border-green-400' :
+    table.status === 'occupied'   ? 'border-orange-200 hover:border-orange-400' :
+    table.status === 'needs_bill' ? 'border-red-200 hover:border-red-400' :
+    'border-gray-200'
+
+  return (
+    <button
+      onClick={onClick}
+      className={`bg-white border-2 ${borderColor} rounded-2xl p-4 text-left transition-all active:scale-95 hover:shadow-md w-full`}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <span className="font-black text-gray-900 text-base">{table.name}</span>
+        <StatusBadge status={table.status} />
+      </div>
+
+      {order && (
+        <>
+          <p className="text-[#ff5a00] font-bold text-sm">{formatCurrency(order.total)}</p>
+          {elapsed && (
+            <p className="text-xs text-gray-400 mt-0.5">{elapsed} ago</p>
+          )}
+        </>
+      )}
+      {!order && table.status === 'available' && (
+        <p className="text-xs text-gray-400">Tap to start order</p>
+      )}
+    </button>
+  )
 }
 
 export default function WaiterTables() {
   const { state, dispatch } = useApp()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const lang = state.lang
+
+  const waiterName = profile?.full_name || state.user?.name || 'Waiter'
+
+  function getTableOrder(tableId) {
+    return state.orders.find(
+      o => o.table_id === tableId && o.payment_status !== 'paid'
+    )
+  }
 
   function handleTable(table) {
     dispatch({ type: 'SET_TABLE', payload: table.id })
@@ -37,47 +70,53 @@ export default function WaiterTables() {
     navigate(`/waiter/order/${table.id}`)
   }
 
+  function handleRefresh() {
+    // In a real app this would re-fetch; here it's a no-op visual cue
+  }
+
   return (
-    <div className="min-h-screen bg-orange-50 w-full max-w-full overflow-x-hidden">
-      <header className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 bg-brand rounded-xl flex items-center justify-center shadow-md shadow-orange-200">
-            <UtensilsCrossed size={18} className="text-white" />
-          </div>
+    <AppShell title={t(lang, 'tables')}>
+      <div className="p-5 max-w-4xl mx-auto">
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="font-black text-gray-900 leading-tight">Zar Kebab</p>
-            <p className="text-xs text-gray-400">{t(lang, 'waiter')}</p>
+            <h2 className="text-2xl font-black text-gray-900">{t(lang, 'tables')}</h2>
+            <p className="text-sm text-gray-400 mt-0.5">Welcome back, {waiterName}</p>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <LanguageSwitcher />
           <button
-            onClick={() => dispatch({ type: 'LOGOUT' })}
-            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+            onClick={handleRefresh}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
           >
-            <LogOut size={18} className="text-gray-400" />
+            <RefreshCw size={15} />
+            Refresh
           </button>
         </div>
-      </header>
 
-      <main className="p-4 max-w-2xl mx-auto">
-        <h2 className="text-xl font-black text-gray-900 mb-4">{t(lang, 'tables')}</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {state.tables.map(table => (
-            <button
-              key={table.id}
-              onClick={() => handleTable(table)}
-              className={`${statusColors(table.status)} border-2 rounded-2xl p-4 text-left transition-all active:scale-95 hover:shadow-md`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${statusDot(table.status)}`} />
-                <span className="font-bold text-base text-gray-900">{table.name}</span>
-              </div>
-              <p className="text-xs text-gray-500 pl-4">{statusLabel(table.status, lang)}</p>
-            </button>
+        {/* Status legend */}
+        <div className="flex gap-4 mb-5 flex-wrap">
+          {[
+            { status: 'available',  label: 'Available'  },
+            { status: 'occupied',   label: 'Occupied'   },
+            { status: 'needs_bill', label: 'Needs Bill' },
+          ].map(({ status, label }) => (
+            <div key={status} className="flex items-center gap-1.5">
+              <StatusBadge status={status} />
+            </div>
           ))}
         </div>
-      </main>
-    </div>
+
+        {/* Table grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {state.tables.map(table => (
+            <TableCard
+              key={table.id}
+              table={table}
+              order={getTableOrder(table.id)}
+              onClick={() => handleTable(table)}
+            />
+          ))}
+        </div>
+      </div>
+    </AppShell>
   )
 }

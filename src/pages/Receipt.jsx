@@ -49,18 +49,21 @@ const L = {
 export default function Receipt() {
   const { orderId } = useParams()
   const navigate = useNavigate()
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   const lang = state.lang
   const labels = L[lang] || L.en
 
   const order = state.orders.find(o => o.id === orderId)
+
   if (!order) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400">
-        <div className="text-center">
+      <div className="min-h-screen bg-[#faf7f0] flex items-center justify-center">
+        <div className="text-center text-gray-400">
           <p className="text-4xl mb-2">🧾</p>
           <p>Order not found</p>
-          <button onClick={() => navigate(-1)} className="mt-4 text-brand font-semibold">← Back</button>
+          <button onClick={() => navigate(-1)} className="mt-4 text-[#ff5a00] font-semibold hover:underline">
+            ← Back
+          </button>
         </div>
       </div>
     )
@@ -72,24 +75,33 @@ export default function Receipt() {
 
   return (
     <div className="min-h-screen bg-gray-100 w-full max-w-full overflow-x-hidden">
-      {/* Top bar (hidden on print) */}
+      {/* Top bar — hidden when printing */}
       <div className="print:hidden sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 font-medium text-sm">
-          <ArrowLeft size={17} /> Back
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-gray-600 font-medium text-sm hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft size={17} />
+          Back
         </button>
-        <div className="flex items-center gap-1 text-xs text-gray-400">
+        <div className="flex items-center gap-1">
           {['uz', 'ru', 'en'].map(l => (
-            <span
+            <button
               key={l}
-              className={`px-2 py-1 rounded font-bold uppercase ${lang === l ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}
+              onClick={() => dispatch({ type: 'SET_LANG', payload: l })}
+              className={`px-2 py-1 rounded-lg text-xs font-bold uppercase transition-colors ${
+                lang === l
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
             >
               {l}
-            </span>
+            </button>
           ))}
         </div>
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-xl font-bold text-sm hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-black transition-colors"
         >
           <Printer size={15} />
           Print
@@ -97,7 +109,7 @@ export default function Receipt() {
       </div>
 
       {/* Receipt */}
-      <div className="flex justify-center p-6 print:p-0 print-area">
+      <div className="flex justify-center p-6 print:p-0">
         <div
           className="bg-white shadow-xl print:shadow-none"
           style={{
@@ -165,7 +177,11 @@ export default function Receipt() {
               <span>{labels.service}</span>
               <span>{formatCurrency(order.service_fee)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '13px', borderTop: '1px solid #333', paddingTop: '6px', marginTop: '4px' }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              fontWeight: 900, fontSize: '13px',
+              borderTop: '1px solid #333', paddingTop: '6px', marginTop: '4px',
+            }}>
               <span>{labels.total}</span>
               <span>{formatCurrency(order.total)}</span>
             </div>
@@ -186,7 +202,10 @@ export default function Receipt() {
           </div>
 
           {/* Footer */}
-          <div style={{ marginTop: '12px', borderTop: '1px dashed #999', paddingTop: '8px', textAlign: 'center', color: '#aaa', fontSize: '9px' }}>
+          <div style={{
+            marginTop: '12px', borderTop: '1px dashed #999', paddingTop: '8px',
+            textAlign: 'center', color: '#aaa', fontSize: '9px',
+          }}>
             {labels.thankyou}
           </div>
         </div>

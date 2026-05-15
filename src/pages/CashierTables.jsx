@@ -2,76 +2,83 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { t } from '../lib/i18n'
-import LanguageSwitcher from '../components/LanguageSwitcher'
-import { LogOut, Receipt } from 'lucide-react'
+import { formatCurrency } from '../lib/formatCurrency'
+import AppShell from '../components/AppShell'
+import StatusBadge from '../components/StatusBadge'
+import { Receipt, CreditCard } from 'lucide-react'
 
-function statusColors(s) {
-  if (s === 'occupied')   return 'bg-orange-50 border-orange-200 hover:border-orange-400'
-  if (s === 'needs_bill') return 'bg-red-50 border-red-200 hover:border-red-400'
-  return 'bg-gray-50 border-gray-200'
-}
-
-function statusDot(s) {
-  if (s === 'occupied')   return 'bg-orange-400'
-  if (s === 'needs_bill') return 'bg-red-400 animate-pulse'
-  return 'bg-gray-300'
+function elapsedSince(isoString) {
+  if (!isoString) return null
+  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 60000)
+  if (diff < 1) return '< 1 min'
+  if (diff < 60) return `${diff} min`
+  return `${Math.floor(diff / 60)}h ${diff % 60}m`
 }
 
 export default function CashierTables() {
-  const { state, dispatch } = useApp()
+  const { state } = useApp()
   const navigate = useNavigate()
   const lang = state.lang
 
   const activeTables = state.tables.filter(t => ['occupied', 'needs_bill'].includes(t.status))
 
-  return (
-    <div className="min-h-screen bg-orange-50 w-full max-w-full overflow-x-hidden">
-      <header className="bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 bg-brand rounded-xl flex items-center justify-center shadow-md shadow-orange-200">
-            <Receipt size={18} className="text-white" />
-          </div>
-          <div>
-            <p className="font-black text-gray-900 leading-tight">Zar Kebab</p>
-            <p className="text-xs text-gray-400">{t(lang, 'cashier')}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <LanguageSwitcher />
-          <button onClick={() => dispatch({ type: 'LOGOUT' })} className="p-2 rounded-xl hover:bg-gray-100 transition-colors">
-            <LogOut size={18} className="text-gray-400" />
-          </button>
-        </div>
-      </header>
+  function getTableOrder(tableId) {
+    return state.orders.find(
+      o => o.table_id === tableId && o.payment_status !== 'paid'
+    )
+  }
 
-      <main className="p-4 max-w-2xl mx-auto">
-        <h2 className="text-xl font-black text-gray-900 mb-4">{t(lang, 'tables')}</h2>
+  return (
+    <AppShell title={t(lang, 'tables')}>
+      <div className="p-5 max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-black text-gray-900">{t(lang, 'tables')}</h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              {activeTables.length} table{activeTables.length !== 1 ? 's' : ''} with active orders
+            </p>
+          </div>
+        </div>
 
         {activeTables.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
-            <p className="text-5xl mb-3">💳</p>
-            <p className="font-medium">{t(lang, 'noOrders')}</p>
+          <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+            <CreditCard size={48} className="mb-3 opacity-20" />
+            <p className="font-semibold">{t(lang, 'noOrders')}</p>
+            <p className="text-sm mt-1 opacity-60">No tables need payment right now</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {activeTables.map(table => (
-              <button
-                key={table.id}
-                onClick={() => navigate(`/cashier/bill/${table.id}`)}
-                className={`${statusColors(table.status)} border-2 rounded-2xl p-4 text-left transition-all active:scale-95 hover:shadow-md`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${statusDot(table.status)}`} />
-                  <span className="font-bold text-base text-gray-900">{table.name}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {activeTables.map(table => {
+              const order = getTableOrder(table.id)
+              const elapsed = order ? elapsedSince(order.created_at) : null
+              return (
+                <div
+                  key={table.id}
+                  className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="font-black text-gray-900 text-base">{table.name}</span>
+                    <StatusBadge status={table.status} />
+                  </div>
+                  {order && (
+                    <p className="text-[#ff5a00] font-black text-lg mb-1">{formatCurrency(order.total)}</p>
+                  )}
+                  {elapsed && (
+                    <p className="text-xs text-gray-400 mb-3">{elapsed} ago</p>
+                  )}
+                  <button
+                    onClick={() => navigate(`/cashier/bill/${table.id}`)}
+                    className="w-full flex items-center justify-center gap-1.5 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-sm shadow-orange-200 active:scale-95"
+                  >
+                    <Receipt size={14} />
+                    Open Bill
+                  </button>
                 </div>
-                <p className="text-xs text-gray-500 pl-4">
-                  {table.status === 'needs_bill' ? t(lang, 'needsBill') : t(lang, 'occupied')}
-                </p>
-              </button>
-            ))}
+              )
+            })}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }
