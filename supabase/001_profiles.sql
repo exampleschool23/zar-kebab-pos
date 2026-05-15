@@ -24,39 +24,40 @@ create policy "Users: read own profile"
   on public.profiles for select
   using (auth.uid() = id);
 
--- 4. Admin/owner can read ALL profiles
+-- 4. Helper function — used by admin policies to avoid infinite recursion
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid()
+      and role in ('owner', 'admin')
+      and status = 'active'
+  )
+$$;
+
+-- 5. Admin/owner can read ALL profiles
 create policy "Admin: read all profiles"
   on public.profiles for select
-  using (
-    exists (
-      select 1 from public.profiles
-      where id = auth.uid()
-        and role in ('owner', 'admin')
-        and status = 'active'
-    )
-  );
+  using (public.is_admin());
 
--- 5. Users can update their own non-sensitive fields (name, phone only)
+-- 6. Users can update their own non-sensitive fields (name, phone only)
 create policy "Users: update own safe fields"
   on public.profiles for update
   using (auth.uid() = id)
   with check (
-    -- cannot change own role or status
     role   = (select role   from public.profiles where id = auth.uid()) and
     status = (select status from public.profiles where id = auth.uid())
   );
 
--- 6. Admin/owner can update any profile (role, status, etc.)
+-- 7. Admin/owner can update any profile (role, status, etc.)
 create policy "Admin: update any profile"
   on public.profiles for update
-  using (
-    exists (
-      select 1 from public.profiles
-      where id = auth.uid()
-        and role in ('owner', 'admin')
-        and status = 'active'
-    )
-  );
+  using (public.is_admin());
 
 -- 7. Trigger: auto-create profile when user signs up
 create or replace function public.handle_new_user()
