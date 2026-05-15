@@ -1,7 +1,9 @@
 import React from 'react'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import { t } from '../lib/i18n'
-import { UtensilsCrossed, Clock, ChefHat, CheckCircle2 } from 'lucide-react'
+import { UtensilsCrossed, Clock, ChefHat, CheckCircle2, ArrowLeft } from 'lucide-react'
 
 function itemStatusStyle(s) {
   if (s === 'new')       return 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
@@ -20,7 +22,10 @@ function elapsedSince(isoString) {
 
 export default function Kitchen() {
   const { state, dispatch } = useApp()
+  const { profile } = useAuth()
+  const navigate = useNavigate()
   const lang = state.lang
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
 
   const activeOrders = state.orders.filter(o =>
     ['sent_to_kitchen', 'preparing'].includes(o.status)
@@ -35,6 +40,14 @@ export default function Kitchen() {
       {/* Dark kitchen header */}
       <header className="bg-[#1f2937] border-b border-gray-700 px-5 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            >
+              <ArrowLeft size={17} className="text-white" />
+            </button>
+          )}
           <div className="w-9 h-9 bg-[#ff5a00] rounded-xl flex items-center justify-center shadow-md">
             <ChefHat size={18} className="text-white" />
           </div>
