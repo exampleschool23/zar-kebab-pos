@@ -17,6 +17,19 @@ function loadSettings() {
   } catch { return {} }
 }
 
+function loadInitialLang() {
+  try {
+    if (!localStorage.getItem('zk_default_lang_ru_applied')) {
+      localStorage.setItem('zk_lang', 'ru')
+      localStorage.setItem('zk_default_lang_ru_applied', '1')
+      return 'ru'
+    }
+    return localStorage.getItem('zk_lang') || 'ru'
+  } catch {
+    return 'ru'
+  }
+}
+
 function makeLocalId(prefix) {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -27,7 +40,7 @@ function makeLocalId(prefix) {
 }
 
 const initialState = {
-  lang:           localStorage.getItem('zk_lang') || 'ru',
+  lang:           loadInitialLang(),
   settings:       { ...DEFAULT_SETTINGS, ...loadSettings() },
   user:           null,
   tables:         [],

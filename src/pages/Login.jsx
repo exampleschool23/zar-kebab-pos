@@ -1,6 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useApp } from '../store/AppContext'
+import { t } from '../lib/i18n'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 import { Utensils, Eye, EyeOff, Loader2, ShieldCheck, LayoutDashboard, Users } from 'lucide-react'
 
 function GoogleIcon() {
@@ -15,14 +18,16 @@ function GoogleIcon() {
 }
 
 const FEATURES = [
-  { icon: LayoutDashboard, text: 'Real-time order management' },
-  { icon: Users,           text: 'Multi-role team access'     },
-  { icon: ShieldCheck,     text: 'Secure role-based access'   },
+  { icon: LayoutDashboard, key: 'authFeatureOrders'   },
+  { icon: Users,           key: 'authFeatureRoles'    },
+  { icon: ShieldCheck,     key: 'authFeatureSecurity' },
 ]
 
 export default function Login() {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuth()
+  const { state } = useApp()
   const navigate = useNavigate()
+  const lang = state.lang || 'ru'
 
   const [mode, setMode]           = useState('signin') // 'signin' | 'signup' | 'forgot'
   const [email, setEmail]         = useState('')
@@ -33,8 +38,36 @@ export default function Login() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError]         = useState('')
   const [info, setInfo]           = useState('')
+  const [resetCooldownUntil, setResetCooldownUntil] = useState(() => {
+    return Number(localStorage.getItem('zk_reset_cooldown_until') || 0)
+  })
 
   function clearMessages() { setError(''); setInfo('') }
+
+  useEffect(() => {
+    if (resetCooldownSeconds() <= 0) return
+    const timer = setInterval(() => {
+      if (resetCooldownSeconds() <= 0) {
+        localStorage.removeItem('zk_reset_cooldown_until')
+        setResetCooldownUntil(0)
+        clearInterval(timer)
+      } else {
+        setResetCooldownUntil(Number(localStorage.getItem('zk_reset_cooldown_until') || 0))
+      }
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [resetCooldownUntil])
+
+  function resetCooldownSeconds() {
+    return Math.max(0, Math.ceil((resetCooldownUntil - Date.now()) / 1000))
+  }
+
+  function startResetCooldown(seconds = 65) {
+    const until = Date.now() + seconds * 1000
+    localStorage.setItem('zk_reset_cooldown_until', String(until))
+    setResetCooldownUntil(until)
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -42,19 +75,31 @@ export default function Login() {
     setLoading(true)
 
     if (mode === 'forgot') {
+      const cooldown = resetCooldownSeconds()
+      if (cooldown > 0) {
+        setLoading(false)
+        return setError(t(lang, 'waitBeforeReset').replace('{seconds}', cooldown))
+      }
+
       const { error } = await resetPassword(email)
       setLoading(false)
-      if (error) return setError(error.message)
-      setInfo('Password reset link sent. Check your email.')
+      if (error) {
+        if (error.message?.toLowerCase().includes('email rate limit')) {
+          return setError(t(lang, 'resetEmailLimit'))
+        }
+        return setError(error.message)
+      }
+      startResetCooldown()
+      setInfo(t(lang, 'resetLinkSent'))
       return
     }
 
     if (mode === 'signup') {
-      if (!fullName.trim()) { setLoading(false); return setError('Full name is required.') }
+      if (!fullName.trim()) { setLoading(false); return setError(t(lang, 'fullNameRequired')) }
       const { error } = await signUpWithEmail(email, password, fullName)
       setLoading(false)
       if (error) return setError(error.message)
-      setInfo('Account created. Please check your email to confirm, then sign in.')
+      setInfo(t(lang, 'accountCreated'))
       setMode('signin')
       return
     }
@@ -62,7 +107,7 @@ export default function Login() {
     // signin
     const { error } = await signInWithEmail(email, password)
     setLoading(false)
-    if (error) return setError('Invalid email or password.')
+    if (error) return setError(t(lang, 'invalidCredentials'))
     // AuthContext handles profile load → App.jsx redirects
   }
 
@@ -75,13 +120,18 @@ export default function Login() {
   }
 
   const titles = {
-    signin: { heading: 'Sign in to your workspace', sub: 'Access your restaurant dashboard' },
-    signup: { heading: 'Create your account',       sub: 'Join your restaurant team'        },
-    forgot: { heading: 'Reset your password',       sub: 'We\'ll send a link to your email' },
+    signin: { heading: t(lang, 'loginTitle'), sub: t(lang, 'loginSubtitle') },
+    signup: { heading: t(lang, 'signupTitle'), sub: t(lang, 'signupSubtitle') },
+    forgot: { heading: t(lang, 'forgotTitle'), sub: t(lang, 'forgotSubtitle') },
   }
 
+  const resetCooldown = mode === 'forgot' ? resetCooldownSeconds() : 0
+
   return (
-    <div className="min-h-screen flex w-full max-w-full overflow-x-hidden bg-[#faf9f7]">
+    <div className="relative min-h-screen flex w-full max-w-full overflow-x-hidden bg-[#faf9f7]">
+      <div className="fixed bottom-4 left-4 z-20 no-print">
+        <LanguageSwitcher />
+      </div>
 
       {/* ── Left panel (desktop only) ── */}
       <div className="hidden lg:flex flex-col justify-between w-[420px] flex-shrink-0 bg-[#141414] px-12 py-14 text-white">
@@ -95,25 +145,25 @@ export default function Login() {
           </div>
 
           <h1 className="text-3xl font-black leading-snug mb-3">
-            Restaurant POS &<br />Order Management
+            {t(lang, 'authHeroTitle')}
           </h1>
           <p className="text-[#888] text-sm leading-relaxed mb-12">
-            A complete point-of-sale system for your restaurant team — from waiters to kitchen to cashier.
+            {t(lang, 'authHeroSubtitle')}
           </p>
 
           <div className="space-y-5">
-            {FEATURES.map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-3">
+            {FEATURES.map(({ icon: Icon, key }) => (
+              <div key={key} className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#ff5a00]/10 flex items-center justify-center flex-shrink-0">
                   <Icon size={15} className="text-[#ff5a00]" />
                 </div>
-                <span className="text-sm text-[#ccc]">{text}</span>
+                <span className="text-sm text-[#ccc]">{t(lang, key)}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="text-[#444] text-xs">© {new Date().getFullYear()} Zar Kebab. All rights reserved.</p>
+        <p className="text-[#444] text-xs">© {new Date().getFullYear()} Zar Kebab.</p>
       </div>
 
       {/* ── Right panel ── */}
@@ -160,12 +210,12 @@ export default function Login() {
                     ? <Loader2 size={16} className="animate-spin" />
                     : <GoogleIcon />
                   }
-                  Continue with Google
+                  {t(lang, 'continueWithGoogle')}
                 </button>
 
                 <div className="flex items-center gap-3 my-5">
                   <div className="flex-1 h-px bg-gray-100" />
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">or</span>
+                  <span className="text-xs text-gray-400 uppercase tracking-wider">{t(lang, 'or')}</span>
                   <div className="flex-1 h-px bg-gray-100" />
                 </div>
               </>
@@ -175,12 +225,12 @@ export default function Login() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === 'signup' && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">Full name</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t(lang, 'fullName')}</label>
                   <input
                     type="text"
                     value={fullName}
                     onChange={e => { setFullName(e.target.value); clearMessages() }}
-                    placeholder="Your full name"
+                    placeholder={t(lang, 'fullNamePlaceholder')}
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
                   />
@@ -188,12 +238,12 @@ export default function Login() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Email address</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t(lang, 'emailAddress')}</label>
                 <input
                   type="email"
                   value={email}
                   onChange={e => { setEmail(e.target.value); clearMessages() }}
-                  placeholder="you@example.com"
+                  placeholder={t(lang, 'emailPlaceholder')}
                   required
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
                 />
@@ -201,7 +251,7 @@ export default function Login() {
 
               {mode !== 'forgot' && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">Password</label>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t(lang, 'password')}</label>
                   <div className="relative">
                     <input
                       type={showPass ? 'text' : 'password'}
@@ -230,20 +280,24 @@ export default function Login() {
                     onClick={() => { setMode('forgot'); clearMessages() }}
                     className="text-xs text-[#ff5a00] hover:underline font-medium"
                   >
-                    Forgot password?
+                    {t(lang, 'forgotPassword')}
                   </button>
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || resetCooldown > 0}
                 className="w-full bg-[#ff5a00] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#cc4800] transition-colors disabled:opacity-60 shadow-lg shadow-orange-100 flex items-center justify-center gap-2 mt-1"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}
-                {mode === 'signin' && 'Sign in'}
-                {mode === 'signup' && 'Create account'}
-                {mode === 'forgot' && 'Send reset link'}
+                {mode === 'signin' && t(lang, 'signIn')}
+                {mode === 'signup' && t(lang, 'createAccount')}
+                {mode === 'forgot' && (
+                  resetCooldown > 0
+                    ? t(lang, 'tryAgainIn').replace('{seconds}', resetCooldown)
+                    : t(lang, 'sendResetLink')
+                )}
               </button>
             </form>
 
@@ -251,30 +305,30 @@ export default function Login() {
             <div className="mt-6 text-center text-sm text-gray-400">
               {mode === 'signin' && (
                 <>
-                  Don't have an account?{' '}
+                  {t(lang, 'noAccount')}{' '}
                   <button onClick={() => { setMode('signup'); clearMessages() }} className="text-[#ff5a00] font-semibold hover:underline">
-                    Create one
+                    {t(lang, 'createAccount')}
                   </button>
                 </>
               )}
               {mode === 'signup' && (
                 <>
-                  Already have an account?{' '}
+                  {t(lang, 'haveAccount')}{' '}
                   <button onClick={() => { setMode('signin'); clearMessages() }} className="text-[#ff5a00] font-semibold hover:underline">
-                    Sign in
+                    {t(lang, 'signIn')}
                   </button>
                 </>
               )}
               {mode === 'forgot' && (
                 <button onClick={() => { setMode('signin'); clearMessages() }} className="text-[#ff5a00] font-semibold hover:underline">
-                  ← Back to sign in
+                  ← {t(lang, 'backToSignIn')}
                 </button>
               )}
             </div>
           </div>
 
           <p className="text-center text-xs text-gray-300 mt-6">
-            Secure access for restaurant teams
+            {t(lang, 'secureAccess')}
           </p>
         </div>
       </div>

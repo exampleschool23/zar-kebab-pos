@@ -8,6 +8,7 @@ import { defaultPath as roleDefaultPath, PAGE_ACCESS } from './lib/permissions'
 
 import Login          from './pages/Login'
 import AuthCallback   from './pages/AuthCallback'
+import ResetPassword  from './pages/ResetPassword'
 import PendingApproval from './pages/PendingApproval'
 import WaiterTables   from './pages/WaiterTables'
 import WaiterOrder    from './pages/WaiterOrder'
@@ -147,6 +148,7 @@ function AppRoutes() {
         <Route path="/"              element={<RoleRedirect />} />
         <Route path="/login"         element={<Login />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
 
         {/* Waiter — tables & order flow only; no kitchen or cashier */}

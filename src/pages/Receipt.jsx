@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { getItemName } from '../lib/i18n'
 import { ArrowLeft, Printer } from 'lucide-react'
@@ -462,6 +462,7 @@ function TotalRow({ label, value, color }) {
 export function TableReceipt() {
   const { tableId } = useParams()
   const navigate    = useNavigate()
+  const location    = useLocation()
   const { state, dispatch } = useApp()
   const lang     = state.lang
   const labels   = L[lang] || L.en
@@ -513,7 +514,12 @@ export function TableReceipt() {
   if (!data) return <NotFound onBack={() => navigate(-1)} />
 
   return (
-    <ReceiptShell lang={lang} dispatch={dispatch} onBack={() => navigate(-1)} autoPrint={settings.autoPrint}>
+    <ReceiptShell
+      lang={lang}
+      dispatch={dispatch}
+      onBack={() => navigate(-1)}
+      autoPrint={settings.autoPrint || new URLSearchParams(location.search).get('print') === '1'}
+    >
       <ReceiptPaper
         {...data}
         dateStr={formatDate(data.createdAt)}
@@ -530,6 +536,7 @@ export function TableReceipt() {
 export default function Receipt() {
   const { orderId } = useParams()
   const navigate    = useNavigate()
+  const location    = useLocation()
   const { state, dispatch } = useApp()
   const lang     = state.lang
   const labels   = L[lang] || L.en
@@ -598,7 +605,12 @@ export default function Receipt() {
   if (!data) return <NotFound onBack={() => navigate(-1)} />
 
   return (
-    <ReceiptShell lang={lang} dispatch={dispatch} onBack={() => navigate(-1)} autoPrint={settings.autoPrint}>
+    <ReceiptShell
+      lang={lang}
+      dispatch={dispatch}
+      onBack={() => navigate(-1)}
+      autoPrint={settings.autoPrint || new URLSearchParams(location.search).get('print') === '1'}
+    >
       <ReceiptPaper
         {...data}
         dateStr={formatDate(data.createdAt)}

@@ -42,6 +42,10 @@ export default function AuthCallback() {
       if (session) {
         clearTimeout(giveUp)
         subscription.unsubscribe()
+        if (event === 'PASSWORD_RECOVERY') {
+          navigate('/reset-password', { replace: true })
+          return
+        }
         navigate('/', { replace: true })
       }
     })

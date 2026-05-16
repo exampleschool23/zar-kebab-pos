@@ -1,7 +1,9 @@
 import React, { useMemo, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingBag, DollarSign, Package, Receipt,
   Clock, ArrowUpRight, ArrowDownRight, Users, Loader2,
+  Printer, ChevronRight, CreditCard,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -50,6 +52,12 @@ const L = {
     staffPerf:      'Xodimlar faolligi',
     noStaff:        "Xodimlar ma'lumoti yo'q",
     recentOrders:   "So'nggi buyurtmalar",
+    recentOrdersSub:'Hisoblarni tez chop eting va to‘langan buyurtmalarni ko‘ring',
+    needBillCount:  n => `${n} hisob kerak`,
+    needsBillSection:'HISOB KERAK',
+    paidSection:    "TO'LANGAN",
+    printBill:      'Chop etish',
+    view:           "Ko'rish",
     noOrders:       "Buyurtma yo'q",
     table:          'Stol',
     pcs:            'ta',
@@ -100,6 +108,12 @@ const L = {
     staffPerf:      'Активность персонала',
     noStaff:        'Данных о персонале нет',
     recentOrders:   'Последние заказы',
+    recentOrdersSub:'Быстро печатайте счета и проверяйте оплаченные заказы',
+    needBillCount:  n => `${n} требуют счёт`,
+    needsBillSection:'НУЖЕН СЧЁТ',
+    paidSection:    'ОПЛАЧЕНЫ',
+    printBill:      'Печать счёта',
+    view:           'Открыть',
     noOrders:       'Нет заказов',
     table:          'Стол',
     pcs:            'шт',
@@ -150,6 +164,12 @@ const L = {
     staffPerf:      'Staff Performance',
     noStaff:        'No staff data yet',
     recentOrders:   'Recent Orders',
+    recentOrdersSub:'Quickly print bills and review paid orders',
+    needBillCount:  n => `${n} Need Bill`,
+    needsBillSection:'NEEDS BILL',
+    paidSection:    'PAID',
+    printBill:      'Print Bill',
+    view:           'View',
     noOrders:       'No orders yet',
     table:          'Table',
     pcs:            'pcs',
@@ -237,6 +257,99 @@ function OrderBadge({ status, lang }) {
   )
 }
 
+function RecentStatusPill({ status, lang }) {
+  const l = L[lang] || L.en
+  const isNeedsBill = status === 'needs_bill'
+  return (
+    <span className={`text-[11px] font-black px-2.5 py-1 rounded-full border whitespace-nowrap ${
+      isNeedsBill
+        ? 'bg-[#FFF1F1] text-[#B42318] border-[#FFCDCA]'
+        : 'bg-[#EEF7F1] text-[#157347] border-[#CDEBD6]'
+    }`}>
+      {isNeedsBill ? l.needsBill : l.paid}
+    </span>
+  )
+}
+
+function RecentSectionHeader({ title, count, urgent }) {
+  return (
+    <div className="flex items-center justify-between px-1 pt-1 mb-2">
+      <p className="text-[11px] font-black tracking-[0.24em] text-[#8EA0BB]">
+        {title}
+      </p>
+      <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#8EA0BB]">
+        {count}
+      </span>
+    </div>
+  )
+}
+
+function RecentOrderRow({ order, lang, methodLabel, onPrintBill, onView }) {
+  const l = L[lang] || L.en
+  const isNeedsBill = order.status === 'needs_bill'
+  const shortId = String(order.id).slice(-4).toUpperCase()
+
+  return (
+    <div className={`rounded-2xl border px-3 py-3 transition-all ${
+      isNeedsBill
+        ? 'bg-[#FFF8F8] border-[#FFD6D3]'
+        : 'bg-white border-[#EDF1F5] hover:bg-[#FAFBFC]'
+    }`}>
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+          isNeedsBill ? 'bg-white text-[#EF3D32]' : 'bg-[#FFF7ED] text-[#FF5A00]'
+        }`}>
+          <Receipt size={14} />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-base font-black text-[#1F2937] leading-none">#{shortId}</p>
+            <p className="text-sm text-[#718096] truncate max-w-[90px]">{order.table_name || l.table}</p>
+            <RecentStatusPill status={isNeedsBill ? 'needs_bill' : 'paid'} lang={lang} />
+          </div>
+
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#8EA0BB] min-w-0">
+            <Clock size={13} className="flex-shrink-0" />
+            <span className="whitespace-nowrap">{elapsedSince(getOrderDate(order) || order.created_at)}</span>
+            {methodLabel && (
+              <>
+                <CreditCard size={13} className="ml-0.5 flex-shrink-0" />
+                <span className="truncate font-semibold text-[#63738A]">{methodLabel}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          <p className="text-[15px] font-black text-[#111827] tabular-nums whitespace-nowrap">
+            {formatCurrency(getOrderTotal(order))}
+          </p>
+          {isNeedsBill ? (
+            <button
+              type="button"
+              onClick={() => onPrintBill(order)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0F3B2E] text-white text-[12px] font-black hover:bg-[#0A2A20] active:scale-[0.98] transition-all shadow-[0_3px_8px_rgba(15,59,46,0.22)]"
+            >
+              <Printer size={13} />
+              {l.printBill}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onView(order)}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[#7B8AA4] text-xs font-semibold hover:text-[#0F3B2E] transition-colors"
+            >
+              {l.view}
+              <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const PAYMENT_COLORS = {
   cash:     '#16A34A',
   card:     '#7C3AED',
@@ -290,6 +403,7 @@ function DonutChart({ slices }) {
 export default function AdminDashboard() {
   const { state }   = useApp()
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const lang = state.lang
   const l    = L[lang] || L.en
 
@@ -545,12 +659,34 @@ export default function AdminDashboard() {
       .sort((a, b) => b.revenue - a.revenue)
   }, [paidOrders, staffProfiles])
 
-  // ── Recent orders (latest 8, not grouped) ─────────────────────────────────
-  const recentOrders = useMemo(() => {
-    return [...state.orders]
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 8)
+  // ── Recent orders: action-needed bills first, paid history second ─────────
+  const recentOrderGroups = useMemo(() => {
+    const grouped = groupOrdersBySession(state.orders)
+      .filter(o => o.status === 'needs_bill' || isPaidOrder(o))
+      .sort((a, b) => new Date(getOrderDate(b) || b.created_at) - new Date(getOrderDate(a) || a.created_at))
+
+    const needsBill = grouped.filter(o => o.status === 'needs_bill')
+    const paid = grouped.filter(o => o.status !== 'needs_bill' && isPaidOrder(o))
+    const visibleNeedsBill = needsBill.slice(0, 8)
+    const visiblePaid = paid.slice(0, Math.max(0, 8 - visibleNeedsBill.length))
+
+    return { needsBill: visibleNeedsBill, paid: visiblePaid, needsBillTotal: needsBill.length }
   }, [state.orders])
+
+  const recentOrdersCount = recentOrderGroups.needsBill.length + recentOrderGroups.paid.length
+
+  function getMethodLabel(order) {
+    const method = (order.payment_method || '').toLowerCase()
+    return { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr }[method] || ''
+  }
+
+  function printRecentBill(order) {
+    navigate(`/receipt/table/${order.table_id}?print=1`)
+  }
+
+  function viewRecentOrder(order) {
+    navigate(`/receipt/${order.id}`)
+  }
 
   // ── KPI badges ────────────────────────────────────────────────────────────
   function pctBadge(change) {
@@ -807,37 +943,57 @@ export default function AdminDashboard() {
           </div>
 
           {/* Recent Orders */}
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-            <h3 className="font-black text-[#1F2937] text-base mb-3">{l.recentOrders}</h3>
-            {recentOrders.length === 0 ? (
+          <div className="bg-white rounded-[24px] border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.05)] p-5">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="min-w-0">
+                <h3 className="font-black text-[#1F2937] text-xl leading-tight">{l.recentOrders}</h3>
+                <p className="text-sm text-[#8EA0BB] mt-2 leading-snug">{l.recentOrdersSub}</p>
+              </div>
+              <div className="w-20 h-16 rounded-2xl bg-[#0F3B2E] text-white flex flex-col items-center justify-center shadow-[0_6px_14px_rgba(15,59,46,0.18)] flex-shrink-0">
+                <span className="text-xl font-black leading-none">{recentOrderGroups.needsBillTotal}</span>
+                <span className="text-[10px] font-bold tracking-wider uppercase text-[#C9DCD5] mt-1">{l.needsBill}</span>
+              </div>
+            </div>
+
+            {recentOrdersCount === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noOrders}</p>
             ) : (
-              <div className="space-y-2 max-h-[420px] overflow-y-auto">
-                {recentOrders.map(order => {
-                  const shortId = String(order.id).slice(-4).toUpperCase()
-                  const method  = (order.payment_method || '').toLowerCase()
-                  const methodLabel = { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr }[method] || ''
-                  return (
-                    <div key={order.id} className="flex items-center gap-2.5 py-1.5 border-b border-[#F9FAFB] last:border-0">
-                      <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
-                        <ShoppingBag size={12} className="text-[#ff5a00]" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                          <p className="text-xs font-bold text-[#1F2937]">#{shortId}</p>
-                          <p className="text-xs text-[#6B7280]">{order.table_name}</p>
-                          <OrderBadge status={order.status} lang={lang} />
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-[#9CA3AF]">
-                          <Clock size={9} />
-                          {elapsedSince(order.created_at)}
-                          {methodLabel && <span className="ml-1 font-semibold">{methodLabel}</span>}
-                        </div>
-                      </div>
-                      <p className="text-xs font-black text-[#1F2937] flex-shrink-0">{formatCurrency(getOrderTotal(order))}</p>
+              <div className="space-y-4 max-h-[520px] overflow-y-auto pr-0.5">
+                {recentOrderGroups.needsBill.length > 0 && (
+                  <div>
+                    <RecentSectionHeader title={l.needsBillSection} count={recentOrderGroups.needsBill.length} urgent />
+                    <div className="space-y-2.5">
+                    {recentOrderGroups.needsBill.map(order => (
+                      <RecentOrderRow
+                        key={order.id}
+                        order={order}
+                        lang={lang}
+                        methodLabel={getMethodLabel(order)}
+                        onPrintBill={printRecentBill}
+                        onView={viewRecentOrder}
+                      />
+                    ))}
                     </div>
-                  )
-                })}
+                  </div>
+                )}
+
+                {recentOrderGroups.paid.length > 0 && (
+                  <div>
+                    <RecentSectionHeader title={l.paidSection} count={recentOrderGroups.paid.length} />
+                    <div className="space-y-2.5">
+                    {recentOrderGroups.paid.map(order => (
+                      <RecentOrderRow
+                        key={order.id}
+                        order={order}
+                        lang={lang}
+                        methodLabel={getMethodLabel(order)}
+                        onPrintBill={printRecentBill}
+                        onView={viewRecentOrder}
+                      />
+                    ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

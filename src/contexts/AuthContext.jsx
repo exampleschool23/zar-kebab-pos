@@ -72,7 +72,7 @@ export function AuthProvider({ children }) {
 
   async function resetPassword(email) {
     return supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      redirectTo: `${window.location.origin}/reset-password`,
     })
   }
 
