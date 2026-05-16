@@ -207,16 +207,16 @@ function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight }) 
           <Icon size={18} className={highlight ? 'text-[#DC2626]' : 'text-[#6B7280]'} />
         </div>
         {badge && (
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap ${badge.cls}`}>
-            {badge.up !== null && (badge.up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />)}
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap ${badge.cls}`}>
+            {badge.up !== null && (badge.up ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />)}
             {badge.text}
           </span>
         )}
       </div>
       <div>
         <p className={`font-black text-2xl leading-none mb-1 truncate ${highlight ? 'text-[#DC2626]' : 'text-[#1F2937]'}`}>{value}</p>
-        <p className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wider">{label}</p>
-        {sub && <p className={`text-[11px] mt-0.5 ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
+        <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider">{label}</p>
+        {sub && <p className={`text-xs mt-0.5 ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
       </div>
     </div>
   )
@@ -235,7 +235,7 @@ function OrderBadge({ status, lang }) {
   }
   const c = map[status] || map.new
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${c.cls}`}>{c.label}</span>
+    <span className={`text-xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${c.cls}`}>{c.label}</span>
   )
 }
 
@@ -364,12 +364,13 @@ export default function AdminDashboard() {
       const yesterday = yesterdayStr()
       const todayPaid = paidOrders.filter(o => localDateStr(o.created_at) === today)
       const yestPaid  = paidOrders.filter(o => localDateStr(o.created_at) === yesterday)
-      const bars = Array.from({ length: 24 }, (_, h) => ({
+      const currentHour = now.getHours()
+      const bars = Array.from({ length: currentHour + 1 }, (_, h) => ({
         label:   `${h}:00`,
         revenue: todayPaid
           .filter(o => new Date(o.created_at).getHours() === h)
           .reduce((s, o) => s + getOrderTotal(o), 0),
-        isToday: new Date().getHours() === h,
+        isToday: h === currentHour,
       }))
       return {
         chartBars: bars,
@@ -566,10 +567,10 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="mb-6 flex items-start justify-between flex-wrap gap-2">
           <div>
-            <h2 className="font-black text-[#1F2937] text-xl leading-tight">{l.greeting(displayName)}</h2>
-            <p className="text-sm text-[#6B7280] mt-0.5">{l.subtitle}</p>
+            <h2 className="font-black text-[#1F2937] text-2xl leading-tight">{l.greeting(displayName)}</h2>
+            <p className="text-sm text-[#6B7280] mt-1">{l.subtitle}</p>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-[#6B7280] bg-white border border-gray-200 px-3 py-2 rounded-xl">
+          <div className="flex items-center gap-2 text-xs text-[#6B7280] bg-white border border-gray-200 px-3 py-2 rounded-xl">
             <Clock size={13} />
             {lastUpdated}
           </div>
@@ -614,13 +615,13 @@ export default function AdminDashboard() {
           />
         </div>
 
-        {/* ── Main grid: Left 2/3 + Right 1/3 ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/* ── Main grid: Left 2/3 + Right 1/3 — items-start prevents height stretching ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 lg:items-start">
 
           {/* Revenue Statistics — left 2 cols */}
           <div className="lg:col-span-2 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h3 className="font-black text-[#1F2937] text-[14px]">{l.revenueStats}</h3>
+              <h3 className="font-bold text-[#1F2937] text-base">{l.revenueStats}</h3>
               <div className="flex gap-1">
                 {[
                   { key: 'today',  label: l.today    },
@@ -631,7 +632,7 @@ export default function AdminDashboard() {
                   <button
                     key={tab.key}
                     onClick={() => setPeriod(tab.key)}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                       period === tab.key
                         ? 'bg-[#ff5a00] text-white'
                         : 'bg-gray-100 text-[#6B7280] hover:bg-gray-200'
@@ -643,37 +644,38 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Bar chart */}
-            <div className="flex items-end gap-[2px] h-32 mb-2" style={{ overflowX: chartBars.length > 16 ? 'auto' : 'visible' }}>
-              {chartBars.map((bar, i) => {
-                const pct = Math.round((bar.revenue / chartMax) * 100)
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative min-w-[8px]">
-                    {bar.revenue > 0 && (
-                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#1F2937] text-white text-[8px] font-semibold px-1 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                        {formatCurrency(bar.revenue)}
-                      </div>
-                    )}
-                    <div className="w-full flex items-end" style={{ height: '104px' }}>
+            {/* Bar chart — fixed 160px, bars use h-full so they fill it properly */}
+            <div className="relative h-40 mb-1">
+              <div className="flex items-end gap-[3px] h-full">
+                {chartBars.map((bar, i) => {
+                  const pct = Math.round((bar.revenue / chartMax) * 100)
+                  return (
+                    <div key={i} className="flex-1 flex items-end h-full group relative min-w-[6px]">
+                      {bar.revenue > 0 && (
+                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-[#1F2937] text-white text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          {formatCurrency(bar.revenue)}
+                        </div>
+                      )}
                       <div
-                        className={`w-full rounded-t transition-all min-h-[2px] ${
+                        className={`w-full rounded-t-md transition-all ${
                           bar.isToday ? 'bg-[#ff5a00]' : bar.revenue > 0 ? 'bg-[#FED7AA] group-hover:bg-[#FDBA74]' : 'bg-[#F3F4F6]'
                         }`}
-                        style={{ height: `${Math.max(pct, 2)}%` }}
+                        style={{ height: `${Math.max(pct, 3)}%` }}
                       />
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
-            {/* X-axis labels: show max 8 evenly distributed */}
-            <div className="flex gap-[2px] mb-4">
+
+            {/* X-axis labels — show max 10 evenly, rest hidden */}
+            <div className="flex gap-[3px] mb-4">
               {chartBars.map((bar, i) => {
-                const show = chartBars.length <= 8 || i % Math.ceil(chartBars.length / 8) === 0
+                const show = chartBars.length <= 10 || i % Math.ceil(chartBars.length / 10) === 0
                 return (
-                  <p key={i} className={`flex-1 text-center text-[9px] font-semibold truncate min-w-[8px] ${
+                  <p key={i} className={`flex-1 text-center text-[10px] font-semibold truncate min-w-[6px] ${
                     bar.isToday ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'
-                  } ${!show ? 'opacity-0' : ''}`}>
+                  } ${!show ? 'opacity-0 pointer-events-none' : ''}`}>
                     {bar.label}
                   </p>
                 )
@@ -683,22 +685,22 @@ export default function AdminDashboard() {
             {/* Period comparison */}
             <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[#F3F4F6]">
               <div>
-                <p className="text-[10px] text-[#9CA3AF] mb-0.5">{l.prevPeriod}</p>
-                <p className="font-black text-[#1F2937] text-[13px]">{formatCurrency(previousPeriodTotal)}</p>
+                <p className="text-xs text-[#9CA3AF] mb-1">{l.prevPeriod}</p>
+                <p className="font-bold text-[#1F2937] text-sm">{formatCurrency(previousPeriodTotal)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-[#9CA3AF] mb-0.5">{l.thisPeriod}</p>
-                <p className="font-black text-[#1F2937] text-[13px]">{formatCurrency(currentPeriodTotal)}</p>
+                <p className="text-xs text-[#9CA3AF] mb-1">{l.thisPeriod}</p>
+                <p className="font-bold text-[#1F2937] text-sm">{formatCurrency(currentPeriodTotal)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-[#9CA3AF] mb-0.5">{l.growth}</p>
+                <p className="text-xs text-[#9CA3AF] mb-1">{l.growth}</p>
                 {periodGrowth !== null ? (
-                  <p className={`font-black text-[13px] flex items-center gap-0.5 ${periodGrowth >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                    {periodGrowth >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+                  <p className={`font-bold text-sm flex items-center gap-0.5 ${periodGrowth >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                    {periodGrowth >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
                     {periodGrowth > 0 ? '+' : ''}{periodGrowth}%
                   </p>
                 ) : (
-                  <p className="font-black text-[#9CA3AF] text-[13px]">—</p>
+                  <p className="font-bold text-[#9CA3AF] text-sm">—</p>
                 )}
               </div>
             </div>
@@ -709,7 +711,7 @@ export default function AdminDashboard() {
 
             {/* Payment Methods */}
             <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.paymentMethods}</h3>
+              <h3 className="font-black text-[#1F2937] text-base mb-4">{l.paymentMethods}</h3>
               {paymentMethods.length === 0 ? (
                 <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noData}</p>
               ) : (
@@ -724,8 +726,8 @@ export default function AdminDashboard() {
                     {paymentMethods.map(p => (
                       <div key={p.key} className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
-                        <span className="text-[11px] text-[#6B7280] flex-1 truncate">{p.label}</span>
-                        <span className="text-[11px] font-bold text-[#1F2937] flex-shrink-0">{p.pct}%</span>
+                        <span className="text-xs text-[#6B7280] flex-1 truncate">{p.label}</span>
+                        <span className="text-xs font-bold text-[#1F2937] flex-shrink-0">{p.pct}%</span>
                       </div>
                     ))}
                   </div>
@@ -734,8 +736,8 @@ export default function AdminDashboard() {
             </div>
 
             {/* Recent Orders */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 flex-1">
-              <h3 className="font-black text-[#1F2937] text-[14px] mb-3">{l.recentOrders}</h3>
+            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+              <h3 className="font-black text-[#1F2937] text-base mb-3">{l.recentOrders}</h3>
               {recentOrders.length === 0 ? (
                 <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noOrders}</p>
               ) : (
@@ -751,17 +753,17 @@ export default function AdminDashboard() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                            <p className="text-[11px] font-bold text-[#1F2937]">#{shortId}</p>
-                            <p className="text-[11px] text-[#6B7280]">{order.table_name}</p>
+                            <p className="text-xs font-bold text-[#1F2937]">#{shortId}</p>
+                            <p className="text-xs text-[#6B7280]">{order.table_name}</p>
                             <OrderBadge status={order.status} lang={lang} />
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] text-[#9CA3AF]">
-                            <Clock size={8} />
+                          <div className="flex items-center gap-1 text-xs text-[#9CA3AF]">
+                            <Clock size={9} />
                             {elapsedSince(order.created_at)}
                             {methodLabel && <span className="ml-1 font-semibold">{methodLabel}</span>}
                           </div>
                         </div>
-                        <p className="text-[11px] font-black text-[#1F2937] flex-shrink-0">{formatCurrency(getOrderTotal(order))}</p>
+                        <p className="text-xs font-black text-[#1F2937] flex-shrink-0">{formatCurrency(getOrderTotal(order))}</p>
                       </div>
                     )
                   })}
@@ -772,11 +774,11 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── Bottom 3-col: Category / Best-selling / Staff ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:items-start">
 
           {/* Sales by Category */}
           <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-            <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.salesByCategory}</h3>
+            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.salesByCategory}</h3>
             {salesByCategory.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
             ) : (
@@ -784,10 +786,10 @@ export default function AdminDashboard() {
                 {salesByCategory.map(cat => (
                   <div key={cat.name}>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-[12px] font-semibold text-[#1F2937] truncate flex-1 mr-2">{cat.name}</p>
+                      <p className="text-sm font-semibold text-[#1F2937] truncate flex-1 mr-2">{cat.name}</p>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <p className="text-[11px] font-bold text-[#1F2937]">{formatCurrency(cat.revenue)}</p>
-                        <p className="text-[10px] text-[#9CA3AF] w-8 text-right">{cat.pct}%</p>
+                        <p className="text-xs font-bold text-[#1F2937]">{formatCurrency(cat.revenue)}</p>
+                        <p className="text-xs text-[#9CA3AF] w-8 text-right">{cat.pct}%</p>
                       </div>
                     </div>
                     <div className="h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
@@ -801,14 +803,14 @@ export default function AdminDashboard() {
 
           {/* Best-selling */}
           <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-            <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.bestSelling}</h3>
+            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.bestSelling}</h3>
             {bestSelling.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
             ) : (
               <div className="space-y-2">
                 {bestSelling.map((item, i) => (
                   <div key={item.menuItemId || i} className="flex items-center gap-2.5 py-1.5 border-b border-[#F9FAFB] last:border-0">
-                    <span className="w-5 text-center text-[11px] font-black text-[#9CA3AF] flex-shrink-0">
+                    <span className="w-5 text-center text-xs font-black text-[#9CA3AF] flex-shrink-0">
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
                     </span>
                     {item.image_url ? (
@@ -817,10 +819,10 @@ export default function AdminDashboard() {
                       <div className="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-semibold text-[#1F2937] truncate">{item.name}</p>
-                      <p className="text-[10px] text-[#9CA3AF]">{item.qty} {l.pcs}</p>
+                      <p className="text-sm font-semibold text-[#1F2937] truncate">{item.name}</p>
+                      <p className="text-xs text-[#9CA3AF]">{item.qty} {l.pcs}</p>
                     </div>
-                    <p className="text-[11px] font-black text-[#1F2937] flex-shrink-0">{formatCurrency(item.revenue)}</p>
+                    <p className="text-xs font-black text-[#1F2937] flex-shrink-0">{formatCurrency(item.revenue)}</p>
                   </div>
                 ))}
               </div>
@@ -829,28 +831,28 @@ export default function AdminDashboard() {
 
           {/* Staff Performance */}
           <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-            <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.staffPerf}</h3>
+            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.staffPerf}</h3>
             {staffPerformance.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noStaff}</p>
             ) : (
               <div className="space-y-3">
                 <div className="grid grid-cols-4 gap-1 mb-1">
-                  <p className="text-[9px] font-bold text-[#9CA3AF] uppercase col-span-1">Staff</p>
-                  <p className="text-[9px] font-bold text-[#9CA3AF] uppercase text-right">Orders</p>
-                  <p className="text-[9px] font-bold text-[#9CA3AF] uppercase text-right">Revenue</p>
-                  <p className="text-[9px] font-bold text-[#9CA3AF] uppercase text-right">Items</p>
+                  <p className="text-xs font-bold text-[#9CA3AF] uppercase col-span-1">Staff</p>
+                  <p className="text-xs font-bold text-[#9CA3AF] uppercase text-right">Orders</p>
+                  <p className="text-xs font-bold text-[#9CA3AF] uppercase text-right">Revenue</p>
+                  <p className="text-xs font-bold text-[#9CA3AF] uppercase text-right">Items</p>
                 </div>
                 {staffPerformance.map(s => (
                   <div key={s.name} className="grid grid-cols-4 gap-1 items-center">
                     <div className="col-span-1 flex items-center gap-1.5 min-w-0">
                       <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#6B7280] text-[9px] font-black">{(s.name || '?')[0].toUpperCase()}</span>
+                        <span className="text-[#6B7280] text-[10px] font-black">{(s.name || '?')[0].toUpperCase()}</span>
                       </div>
-                      <p className="text-[11px] font-semibold text-[#1F2937] truncate">{s.name.split(' ')[0]}</p>
+                      <p className="text-xs font-semibold text-[#1F2937] truncate">{s.name.split(' ')[0]}</p>
                     </div>
-                    <p className="text-[11px] font-bold text-[#1F2937] text-right">{s.orders}</p>
-                    <p className="text-[10px] font-bold text-[#1F2937] text-right">{formatCurrency(s.revenue)}</p>
-                    <p className="text-[11px] font-bold text-[#1F2937] text-right">{s.items}</p>
+                    <p className="text-xs font-bold text-[#1F2937] text-right">{s.orders}</p>
+                    <p className="text-xs font-bold text-[#1F2937] text-right">{formatCurrency(s.revenue)}</p>
+                    <p className="text-xs font-bold text-[#1F2937] text-right">{s.items}</p>
                   </div>
                 ))}
               </div>
@@ -859,7 +861,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[10px] text-[#9CA3AF] mt-6">
+        <p className="text-center text-xs text-[#9CA3AF] mt-6">
           {l.footer} • {lang === 'uz' ? 'Oxirgi yangilanish' : lang === 'ru' ? 'Последнее обновление' : 'Last updated'}: {lastUpdated}
         </p>
 
