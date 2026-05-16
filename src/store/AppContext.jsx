@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react'
-import { tables as initialTables, menuItems as initialMenuItems, categories as initialCategories, mockOrders } from '../data/mockData'
 import { loadPOSData, writeToSupabase, subscribeToRealtime } from '../lib/db'
 
 const AppContext = createContext(null)
@@ -22,12 +21,13 @@ const initialState = {
   lang:           localStorage.getItem('zk_lang') || 'uz',
   settings:       { ...DEFAULT_SETTINGS, ...loadSettings() },
   user:           null,
-  tables:         initialTables,
-  menuItems:      initialMenuItems,
-  categories:     initialCategories,
-  orders:         mockOrders,
+  tables:         [],
+  menuItems:      [],
+  categories:     [],
+  orders:         [],
   cart:           [],
   currentTableId: null,
+  loaded:         false,
 }
 
 function reducer(state, action) {
@@ -63,6 +63,9 @@ function reducer(state, action) {
 
     case 'SET_MENU_ITEMS':
       return { ...state, menuItems: action.payload }
+
+    case 'SET_LOADED':
+      return { ...state, loaded: true }
 
     // ── Cart ──────────────────────────────────────────────────────────────────
     case 'ADD_TO_CART': {
@@ -284,6 +287,7 @@ export function AppProvider({ children }) {
         dispatch({ type: 'SET_CATEGORIES', payload: categories })
         dispatch({ type: 'SET_MENU_ITEMS', payload: menuItems })
         dispatch({ type: 'SET_ORDERS',     payload: orders })
+        dispatch({ type: 'SET_LOADED' })
         unsubscribe = subscribeToRealtime(dispatch)
       })
       .catch(err => console.error('[db] initial load failed:', err))

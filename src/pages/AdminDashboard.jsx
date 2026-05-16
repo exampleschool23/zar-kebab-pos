@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import {
-  TrendingUp, ShoppingBag, Table2, UtensilsCrossed, Users,
-  Clock, ChevronRight, ArrowUpRight, ArrowDownRight,
+  TrendingUp, ShoppingBag, DollarSign, Package, Receipt,
+  Clock, ArrowUpRight, ArrowDownRight, Users, Loader2,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -12,135 +12,175 @@ import AppShell from '../components/AppShell'
 // ── Localisation ──────────────────────────────────────────────────────────────
 const L = {
   uz: {
-    greeting:       (n) => `Xush kelibsiz, ${n}! 👋`,
+    greeting:       n => `Xush kelibsiz, ${n}! 👋`,
     subtitle:       "Bugun Zar Kebab'da nima bo'layotganini ko'rishingiz mumkin.",
     todayRevenue:   'Bugungi daromad',
-    orders:         'Buyurtmalar',
-    totalTables:    'Jami stollar',
-    menuItems:      'Menyu elementlari',
-    activeStaff:    'Xodimlar',
+    ordersToday:    'Bugungi buyurtmalar',
+    avgOrder:       "O'rtacha buyurtma",
+    itemsSold:      'Sotilgan taomlar',
+    activeBills:    'Faol hisoblar',
+    needAttention:  'DIQQAT TALAB QILADI',
     yesterday:      'Kecha',
-    tableStatus:    'Stollar holati',
-    viewAll:        "Barchasini ko'rish",
-    available:      "Bo'sh",
-    occupied:       'Band',
-    needsBill:      'Hisob kerak',
-    orderStats:     'Buyurtmalar statistikasi',
-    total:          'Jami',
-    recentOrders:   "So'nggi buyurtmalar",
-    noRecentOrders: 'Hali buyurtmalar yo\'q',
-    revenue7:       'Daromad statistikasi',
+    vsYesterday:    'kechaga nisbatan',
+    revenueStats:   'Daromad statistikasi',
+    today:          'Bugun',
     days7:          '7 kun',
-    weekTotal:      'Haftalik jami',
+    thisMonth:      'Bu oy',
+    thisYear:       'Bu yil',
+    prevPeriod:     'Oldingi davr',
+    thisPeriod:     'Bu davr',
+    growth:         'O\'sish',
+    paymentMethods: "To'lov usullari",
+    cash:           'Naqd',
+    card:           'Karta',
+    terminal:       'Terminal',
+    qr:             'QR Kod',
+    unknown:        "Noma'lum",
+    salesByCategory:'Kategoriya bo\'yicha savdo',
     bestSelling:    "Eng ko'p sotilgan taomlar",
-    noSales:        'Savdo ma\'lumotlari yo\'q',
-    staffActivity:  'Xodimlar faolligi',
-    noStaff:        'Xodimlar ma\'lumotlari yuklanmagan',
+    noSales:        "Savdo ma'lumotlari yo'q",
+    staffPerf:      'Xodimlar faolligi',
+    noStaff:        "Xodimlar ma'lumoti yo'q",
+    recentOrders:   "So'nggi buyurtmalar",
+    noOrders:       "Buyurtma yo'q",
+    table:          'Stol',
+    pcs:            'ta',
+    orders:         'buyurtma',
+    revenue:        'Daromad',
+    avgOrderShort:  "O'rtacha",
+    items:          'taom',
+    paid:           "To'langan",
     new:            'Yangi',
     preparing:      'Tayyorlanmoqda',
+    needsBill:      'Hisob kerak',
     ready:          'Tayyor',
     cancelled:      'Bekor',
-    needsBillBadge: 'Hisob kerak',
-    paid:           "To'langan",
     active:         'Faol',
-    ordersUnit:     'buyurtma',
-    pcs:            'ta',
-    revenue:        'Daromad',
-    categories:     'kategoriya',
-    activeTables:   'faol',
-    noOrders:       'Buyurtma yo\'q',
-    vsYesterday:    'kechaga nisbatan',
-    totalStaff:     'jami',
+    total:          'Jami',
+    footer:         'Barcha ma\'lumotlar to\'langan buyurtmalarga asoslangan',
+    loading:        'Yuklanmoqda...',
+    noData:         "Ma'lumot yo'q",
   },
   ru: {
-    greeting:       (n) => `Добро пожаловать, ${n}! 👋`,
+    greeting:       n => `Добро пожаловать, ${n}! 👋`,
     subtitle:       'Вот что сегодня происходит в Zar Kebab.',
     todayRevenue:   'Доход сегодня',
-    orders:         'Заказы',
-    totalTables:    'Всего столов',
-    menuItems:      'Позиций меню',
-    activeStaff:    'Сотрудники',
+    ordersToday:    'Заказы сегодня',
+    avgOrder:       'Средний заказ',
+    itemsSold:      'Продано блюд',
+    activeBills:    'Активные счета',
+    needAttention:  'ТРЕБУЕТ ВНИМАНИЯ',
     yesterday:      'Вчера',
-    tableStatus:    'Статус столов',
-    viewAll:        'Смотреть все',
-    available:      'Свободен',
-    occupied:       'Занят',
-    needsBill:      'Нужен счёт',
-    orderStats:     'Статистика заказов',
-    total:          'Всего',
-    recentOrders:   'Последние заказы',
-    noRecentOrders: 'Заказов пока нет',
-    revenue7:       'Статистика дохода',
+    vsYesterday:    'vs вчера',
+    revenueStats:   'Статистика дохода',
+    today:          'Сегодня',
     days7:          '7 дней',
-    weekTotal:      'Итого за неделю',
+    thisMonth:      'Этот месяц',
+    thisYear:       'Этот год',
+    prevPeriod:     'Предыдущий период',
+    thisPeriod:     'Этот период',
+    growth:         'Рост',
+    paymentMethods: 'Способы оплаты',
+    cash:           'Наличные',
+    card:           'Карта',
+    terminal:       'Терминал',
+    qr:             'QR Код',
+    unknown:        'Неизвестно',
+    salesByCategory:'Продажи по категориям',
     bestSelling:    'Самые продаваемые',
     noSales:        'Данных о продажах нет',
-    staffActivity:  'Активность персонала',
-    noStaff:        'Данные о персонале не загружены',
+    staffPerf:      'Активность персонала',
+    noStaff:        'Данных о персонале нет',
+    recentOrders:   'Последние заказы',
+    noOrders:       'Нет заказов',
+    table:          'Стол',
+    pcs:            'шт',
+    orders:         'заказов',
+    revenue:        'Доход',
+    avgOrderShort:  'Средний',
+    items:          'блюд',
+    paid:           'Оплачен',
     new:            'Новый',
     preparing:      'Готовится',
+    needsBill:      'Нужен счёт',
     ready:          'Готово',
     cancelled:      'Отменён',
-    needsBillBadge: 'Нужен счёт',
-    paid:           'Оплачен',
     active:         'Активен',
-    ordersUnit:     'заказов',
-    pcs:            'шт',
-    revenue:        'Доход',
-    categories:     'категорий',
-    activeTables:   'активных',
-    noOrders:       'Нет заказов',
-    vsYesterday:    'vs вчера',
-    totalStaff:     'всего',
+    total:          'Всего',
+    footer:         'Все данные основаны на оплаченных заказах',
+    loading:        'Загрузка...',
+    noData:         'Нет данных',
   },
   en: {
-    greeting:       (n) => `Welcome back, ${n}! 👋`,
+    greeting:       n => `Welcome back, ${n}! 👋`,
     subtitle:       "Here's what's happening at Zar Kebab today.",
     todayRevenue:   "Today's Revenue",
-    orders:         'Orders',
-    totalTables:    'Total Tables',
-    menuItems:      'Menu Items',
-    activeStaff:    'Staff',
+    ordersToday:    'Orders Today',
+    avgOrder:       'Avg Order Value',
+    itemsSold:      'Items Sold',
+    activeBills:    'Active Bills',
+    needAttention:  'NEED ATTENTION',
     yesterday:      'Yesterday',
-    tableStatus:    'Table Status',
-    viewAll:        'View all',
-    available:      'Available',
-    occupied:       'Occupied',
-    needsBill:      'Needs Bill',
-    orderStats:     'Order Statistics',
-    total:          'Total',
-    recentOrders:   'Recent Orders',
-    noRecentOrders: 'No recent orders yet',
-    revenue7:       'Revenue Statistics',
-    days7:          '7 days',
-    weekTotal:      'Weekly total',
+    vsYesterday:    'vs yesterday',
+    revenueStats:   'Revenue Statistics',
+    today:          'Today',
+    days7:          '7 Days',
+    thisMonth:      'This Month',
+    thisYear:       'This Year',
+    prevPeriod:     'Previous Period',
+    thisPeriod:     'This Period',
+    growth:         'Growth',
+    paymentMethods: 'Payment Methods',
+    cash:           'Cash',
+    card:           'Card',
+    terminal:       'Terminal',
+    qr:             'QR Code',
+    unknown:        'Unknown',
+    salesByCategory:'Sales by Category',
     bestSelling:    'Best-Selling Dishes',
     noSales:        'No sales data yet',
-    staffActivity:  'Staff Activity',
-    noStaff:        'Staff data will appear after users are connected',
+    staffPerf:      'Staff Performance',
+    noStaff:        'No staff data yet',
+    recentOrders:   'Recent Orders',
+    noOrders:       'No orders yet',
+    table:          'Table',
+    pcs:            'pcs',
+    orders:         'orders',
+    revenue:        'Revenue',
+    avgOrderShort:  'Avg',
+    items:          'items',
+    paid:           'Paid',
     new:            'New',
     preparing:      'Preparing',
+    needsBill:      'Needs Bill',
     ready:          'Ready',
     cancelled:      'Cancelled',
-    needsBillBadge: 'Needs Bill',
-    paid:           'Paid',
     active:         'Active',
-    ordersUnit:     'orders',
-    pcs:            'pcs',
-    revenue:        'Revenue',
-    categories:     'categories',
-    activeTables:   'active',
-    noOrders:       'No orders',
-    vsYesterday:    'vs yesterday',
-    totalStaff:     'total',
+    total:          'Total',
+    footer:         'All data is based on paid orders',
+    loading:        'Loading...',
+    noData:         'No data yet',
   },
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function dateKey(isoOrDate) {
-  return new Date(isoOrDate).toDateString()
+function isPaid(o) {
+  return o.payment_status === 'paid' || o.status === 'paid'
 }
+
+function getOrderTotal(o) {
+  if (o.total && Number(o.total) > 0) return Number(o.total)
+  return (o.items || []).reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
+}
+
+function localDateStr(d) {
+  const dt = d instanceof Date ? d : new Date(d)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+
+function todayStr()     { return localDateStr(new Date()) }
+function yesterdayStr() { const d = new Date(); d.setDate(d.getDate() - 1); return localDateStr(d) }
 
 function elapsedSince(iso) {
   if (!iso) return ''
@@ -150,89 +190,33 @@ function elapsedSince(iso) {
   return `${Math.floor(diff / 60)}h ${diff % 60}m`
 }
 
-function last7DayKeys() {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - (6 - i))
-    return d.toDateString()
-  })
-}
-
-function shortDay(dateString) {
-  return new Date(dateString).toLocaleDateString('en', { weekday: 'short' })
+function shortLabel(ds, mode) {
+  const d = new Date(ds + 'T12:00:00')
+  if (mode === 'today')  return `${ds.slice(11, 16)}` // hour label passed in directly
+  if (mode === 'year')   return d.toLocaleDateString('en', { month: 'short' })
+  return d.toLocaleDateString('en', { weekday: 'short', day: 'numeric' })
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-const ROLE_LABELS = {
-  owner:       { uz: 'Egasi',      ru: 'Владелец',      en: 'Owner'       },
-  admin:       { uz: 'Admin',      ru: 'Администратор', en: 'Admin'       },
-  waiter:      { uz: 'Ofitsiant',  ru: 'Официант',      en: 'Waiter'      },
-  cashier:     { uz: 'Kassir',     ru: 'Кассир',        en: 'Cashier'     },
-  kitchen:     { uz: 'Oshxona',    ru: 'Кухня',         en: 'Kitchen'     },
-  stakeholder: { uz: 'Stakeholder', ru: 'Стейкхолдер',  en: 'Stakeholder' },
-}
-
-function KpiCard({ icon: Icon, label, value, sub, subColor, iconBg, iconColor, badge }) {
+function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 flex flex-col gap-3 min-w-0">
+    <div className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 min-w-0 ${highlight ? 'border-red-200' : 'border-[#E5E7EB]'}`}>
       <div className="flex items-start justify-between gap-2">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-          <Icon size={18} className={iconColor} />
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${highlight ? 'bg-red-50' : 'bg-gray-50'}`}>
+          <Icon size={18} className={highlight ? 'text-[#DC2626]' : 'text-[#6B7280]'} />
         </div>
         {badge && (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap ${badge.cls}`}>
-            {badge.up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+            {badge.up !== null && (badge.up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />)}
             {badge.text}
           </span>
         )}
       </div>
       <div>
-        <p className="font-black text-[#1F2937] text-2xl leading-none mb-1 truncate">{value}</p>
+        <p className={`font-black text-2xl leading-none mb-1 truncate ${highlight ? 'text-[#DC2626]' : 'text-[#1F2937]'}`}>{value}</p>
         <p className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wider">{label}</p>
-        {sub !== undefined && (
-          <p className={`text-[11px] mt-0.5 ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function TableChip({ table, lang }) {
-  const l = L[lang] || L.en
-  const cfg = {
-    available:  { bg: 'bg-green-50',  border: 'border-green-100',  text: 'text-[#16A34A]', dot: 'bg-[#16A34A]', label: l.available  },
-    occupied:   { bg: 'bg-orange-50', border: 'border-orange-100', text: 'text-[#ff5a00]', dot: 'bg-[#ff5a00]', label: l.occupied   },
-    needs_bill: { bg: 'bg-red-50',    border: 'border-red-100',    text: 'text-[#DC2626]', dot: 'bg-[#DC2626]', label: l.needsBill  },
-  }
-  const c = cfg[table.status] || cfg.available
-  return (
-    <div className={`${c.bg} border ${c.border} rounded-xl p-2.5 flex flex-col items-center gap-1 min-w-[58px]`}>
-      <p className={`font-black text-sm leading-none ${c.text}`}>
-        {table.name.replace(/table\s*/i, '').trim() || table.name}
-      </p>
-      <div className="flex items-center gap-1">
-        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.dot}`} />
-        <p className={`text-[9px] font-semibold ${c.text} truncate max-w-[52px]`}>{c.label}</p>
-      </div>
-    </div>
-  )
-}
-
-function OrderStatusBar({ label, count, total, colorClass }) {
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2 w-32 flex-shrink-0">
-        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colorClass}`} />
-        <span className="text-[12px] text-[#6B7280] font-medium truncate">{label}</span>
-      </div>
-      <div className="flex-1 bg-[#F3F4F6] rounded-full h-2">
-        <div className={`h-2 rounded-full transition-all ${colorClass}`} style={{ width: `${pct}%` }} />
-      </div>
-      <div className="flex items-center gap-1 w-16 justify-end flex-shrink-0">
-        <span className="text-[12px] font-bold text-[#1F2937]">{count}</span>
-        <span className="text-[10px] text-[#9CA3AF]">({pct}%)</span>
+        {sub && <p className={`text-[11px] mt-0.5 ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
       </div>
     </div>
   )
@@ -241,80 +225,66 @@ function OrderStatusBar({ label, count, total, colorClass }) {
 function OrderBadge({ status, lang }) {
   const l = L[lang] || L.en
   const map = {
-    sent_to_kitchen: { cls: 'bg-blue-50 text-blue-600 border-blue-100',      label: l.new            },
-    new:             { cls: 'bg-blue-50 text-blue-600 border-blue-100',      label: l.new            },
-    preparing:       { cls: 'bg-orange-50 text-[#ff5a00] border-orange-100', label: l.preparing      },
-    needs_bill:      { cls: 'bg-red-50 text-[#DC2626] border-red-100',       label: l.needsBillBadge },
-    ready:           { cls: 'bg-green-50 text-[#16A34A] border-green-100',   label: l.ready          },
-    paid:            { cls: 'bg-gray-100 text-[#6B7280] border-gray-200',    label: l.paid           },
-    cancelled:       { cls: 'bg-gray-100 text-[#6B7280] border-gray-200',    label: l.cancelled      },
+    sent_to_kitchen: { cls: 'bg-blue-50 text-blue-600 border-blue-100',      label: l.new       },
+    new:             { cls: 'bg-blue-50 text-blue-600 border-blue-100',      label: l.new       },
+    preparing:       { cls: 'bg-orange-50 text-[#ff5a00] border-orange-100', label: l.preparing },
+    needs_bill:      { cls: 'bg-red-50 text-[#DC2626] border-red-100',       label: l.needsBill },
+    ready:           { cls: 'bg-green-50 text-[#16A34A] border-green-100',   label: l.ready     },
+    paid:            { cls: 'bg-gray-100 text-[#6B7280] border-gray-200',    label: l.paid      },
+    cancelled:       { cls: 'bg-gray-100 text-[#6B7280] border-gray-200',    label: l.cancelled },
   }
   const c = map[status] || map.new
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${c.cls}`}>
-      {c.label}
-    </span>
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${c.cls}`}>{c.label}</span>
   )
 }
 
-// Pure-CSS bar chart from real 7-day data
-function RevenueChart({ weekData, lang }) {
-  const l = L[lang] || L.en
-  const maxVal = Math.max(...weekData.map(d => d.revenue), 1)
-  const weekTotal = weekData.reduce((s, d) => s + d.revenue, 0)
-  const todayKey  = new Date().toDateString()
+const PAYMENT_COLORS = {
+  cash:     '#16A34A',
+  card:     '#7C3AED',
+  terminal: '#2563EB',
+  qr:       '#D97706',
+  unknown:  '#D1D5DB',
+}
 
+function DonutChart({ slices }) {
+  const total = slices.reduce((s, x) => s + x.value, 0)
+  if (total === 0) return (
+    <svg viewBox="0 0 36 36" className="w-28 h-28">
+      <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F3F4F6" strokeWidth="3.8" />
+    </svg>
+  )
+  const circ = 2 * Math.PI * 15.9
+  let offset = 0
   return (
-    <div>
-      <div className="flex items-end gap-1.5 h-28">
-        {weekData.map((d, i) => {
-          const pct    = Math.round((d.revenue / maxVal) * 100)
-          const isToday = d.dateKey === todayKey
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-              <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-[#1F2937] text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                {d.revenue > 0 ? `${(d.revenue / 1000).toFixed(0)}K` : '0'}
-              </div>
-              <div className="w-full flex items-end" style={{ height: '96px' }}>
-                <div
-                  className={`w-full rounded-t-lg transition-all min-h-[3px] ${
-                    isToday ? 'bg-[#ff5a00]' : d.revenue > 0 ? 'bg-[#FED7AA] group-hover:bg-[#FDBA74]' : 'bg-[#F3F4F6]'
-                  }`}
-                  style={{ height: `${Math.max(pct, 3)}%` }}
-                />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex gap-1.5 mt-2">
-        {weekData.map((d, i) => (
-          <p key={i} className={`flex-1 text-center text-[10px] font-semibold ${
-            d.dateKey === todayKey ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'
-          }`}>
-            {shortDay(d.dateKey)}
-          </p>
-        ))}
-      </div>
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#F3F4F6]">
-        <p className="text-[11px] text-[#6B7280]">{l.weekTotal}</p>
-        <p className="text-[13px] font-black text-[#1F2937]">{formatCurrency(weekTotal)}</p>
-      </div>
-    </div>
+    <svg viewBox="0 0 36 36" className="w-28 h-28 -rotate-90">
+      {slices.map((seg, i) => {
+        const dash = (seg.value / total) * circ
+        const el = (
+          <circle key={i} cx="18" cy="18" r="15.9" fill="none"
+            stroke={seg.color} strokeWidth="3.8"
+            strokeDasharray={`${dash} ${circ - dash}`}
+            strokeDashoffset={-offset}
+          />
+        )
+        offset += dash
+        return el
+      })}
+    </svg>
   )
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const { state }  = useApp()
+  const { state }   = useApp()
   const { profile } = useAuth()
   const lang = state.lang
   const l    = L[lang] || L.en
 
   const displayName = profile?.full_name || state.user?.name || 'Admin'
 
-  // ── Staff: fetch real profiles from Supabase ──────────────────────────────
-  const [staffProfiles, setStaffProfiles] = useState(null) // null = loading, [] = empty
+  const [period, setPeriod]           = useState('7days')
+  const [staffProfiles, setStaffProfiles] = useState(null)
 
   useEffect(() => {
     getAllProfiles()
@@ -322,428 +292,577 @@ export default function AdminDashboard() {
       .catch(() => setStaffProfiles([]))
   }, [])
 
-  // ── Date keys ─────────────────────────────────────────────────────────────
-  const todayKey     = new Date().toDateString()
-  const yesterdayKey = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toDateString() })()
+  // ── Core derived sets ─────────────────────────────────────────────────────
+  const paidOrders = useMemo(() => state.orders.filter(isPaid), [state.orders])
 
-  // ── Revenue KPI ───────────────────────────────────────────────────────────
-  const { todayRevenue, yesterdayRevenue, revenueChange } = useMemo(() => {
-    const paidOrders = state.orders.filter(o => o.payment_status === 'paid')
-    const today = paidOrders
-      .filter(o => dateKey(o.created_at) === todayKey)
-      .reduce((s, o) => s + (o.total || 0), 0)
-    const yesterday = paidOrders
-      .filter(o => dateKey(o.created_at) === yesterdayKey)
-      .reduce((s, o) => s + (o.total || 0), 0)
-    const change = yesterday > 0
-      ? Math.round(((today - yesterday) / yesterday) * 100)
-      : null
-    return { todayRevenue: today, yesterdayRevenue: yesterday, revenueChange: change }
-  }, [state.orders, todayKey, yesterdayKey])
+  const menuItemMap = useMemo(
+    () => Object.fromEntries(state.menuItems.map(m => [m.id, m])),
+    [state.menuItems]
+  )
 
-  // ── Orders KPI ────────────────────────────────────────────────────────────
-  const { todayOrderCount, activeOrderCount } = useMemo(() => {
-    const todayAll  = state.orders.filter(o => dateKey(o.created_at) === todayKey)
-    const active    = state.orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled')
-    return { todayOrderCount: todayAll.length, activeOrderCount: active.length }
-  }, [state.orders, todayKey])
-
-  // ── Table stats ───────────────────────────────────────────────────────────
-  const tableStats = useMemo(() => ({
-    total:     state.tables.length,
-    available: state.tables.filter(t => t.status === 'available').length,
-    occupied:  state.tables.filter(t => t.status === 'occupied').length,
-    needsBill: state.tables.filter(t => t.status === 'needs_bill').length,
-  }), [state.tables])
-
-  // ── Menu KPI ──────────────────────────────────────────────────────────────
-  const realCategoryCount = useMemo(
-    () => state.categories.filter(c => c.id !== 'all').length,
+  const categoryMap = useMemo(
+    () => Object.fromEntries(state.categories.filter(c => c.id !== 'all').map(c => [c.id, c])),
     [state.categories]
   )
 
-  // ── Order status breakdown ────────────────────────────────────────────────
-  const statusCounts = useMemo(() => {
-    const active = state.orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled')
-    return {
-      new:       active.filter(o => ['sent_to_kitchen', 'new'].includes(o.status)).length,
-      preparing: active.filter(o => o.status === 'preparing').length,
-      ready:     active.filter(o => o.status === 'ready').length,
-      cancelled: state.orders.filter(o => o.status === 'cancelled').length,
-    }
-  }, [state.orders])
-  const totalStatusCount = Object.values(statusCounts).reduce((a, b) => a + b, 0)
+  // ── KPI: Today's revenue & orders ─────────────────────────────────────────
+  const {
+    todayRevenue, yesterdayRevenue, revenueChange,
+    todayOrderCount, yesterdayOrderCount, orderChange,
+    avgOrderValue, avgYesterday, avgChange,
+    itemsSoldToday,
+  } = useMemo(() => {
+    const today     = todayStr()
+    const yesterday = yesterdayStr()
 
-  // ── Recent orders — grouped by table session (same as cashier) ────────────
-  const recentOrders = useMemo(() => {
-    const byTable = {}
-    state.orders.forEach(o => {
-      const isPaid = o.payment_status === 'paid' || o.status === 'paid' || o.status === 'completed'
-      const key = isPaid
-        ? `${o.table_id}::${(o.paid_at || o.created_at || '').slice(0, 16)}`
-        : o.table_id
-      if (!byTable[key]) {
-        byTable[key] = { ...o, items: [...(o.items || [])], _total: Number(o.total) || 0 }
-      } else {
-        byTable[key].items  = [...byTable[key].items, ...(o.items || [])]
-        byTable[key]._total += Number(o.total) || 0
-        if (new Date(o.created_at) > new Date(byTable[key].created_at)) {
-          byTable[key].created_at = o.created_at
+    const todayPaid = paidOrders.filter(o => localDateStr(o.created_at) === today)
+    const yestPaid  = paidOrders.filter(o => localDateStr(o.created_at) === yesterday)
+    const todayAll  = state.orders.filter(o => localDateStr(o.created_at) === today)
+    const yestAll   = state.orders.filter(o => localDateStr(o.created_at) === yesterday)
+
+    const todayRevenue     = todayPaid.reduce((s, o) => s + getOrderTotal(o), 0)
+    const yesterdayRevenue = yestPaid.reduce((s, o) => s + getOrderTotal(o), 0)
+    const revenueChange    = yesterdayRevenue > 0
+      ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
+      : null
+
+    const todayOrderCount     = todayAll.length
+    const yesterdayOrderCount = yestAll.length
+    const orderChange         = yesterdayOrderCount > 0
+      ? Math.round(((todayOrderCount - yesterdayOrderCount) / yesterdayOrderCount) * 100)
+      : null
+
+    const avgOrderValue = todayPaid.length > 0 ? Math.round(todayRevenue / todayPaid.length) : 0
+    const avgYesterday  = yestPaid.length  > 0 ? Math.round(yesterdayRevenue / yestPaid.length) : 0
+    const avgChange     = avgYesterday > 0
+      ? Math.round(((avgOrderValue - avgYesterday) / avgYesterday) * 100)
+      : null
+
+    const itemsSoldToday = todayPaid
+      .flatMap(o => o.items || [])
+      .reduce((s, i) => s + (Number(i.quantity) || 1), 0)
+
+    return {
+      todayRevenue, yesterdayRevenue, revenueChange,
+      todayOrderCount, yesterdayOrderCount, orderChange,
+      avgOrderValue, avgYesterday, avgChange,
+      itemsSoldToday,
+    }
+  }, [paidOrders, state.orders])
+
+  const activeBills = useMemo(
+    () => state.tables.filter(t => t.status === 'needs_bill').length,
+    [state.tables]
+  )
+
+  // ── Revenue chart & period comparison ─────────────────────────────────────
+  const { chartBars, currentPeriodTotal, previousPeriodTotal } = useMemo(() => {
+    const now = new Date()
+
+    if (period === 'today') {
+      const today = todayStr()
+      const yesterday = yesterdayStr()
+      const todayPaid = paidOrders.filter(o => localDateStr(o.created_at) === today)
+      const yestPaid  = paidOrders.filter(o => localDateStr(o.created_at) === yesterday)
+      const bars = Array.from({ length: 24 }, (_, h) => ({
+        label:   `${h}:00`,
+        revenue: todayPaid
+          .filter(o => new Date(o.created_at).getHours() === h)
+          .reduce((s, o) => s + getOrderTotal(o), 0),
+        isToday: new Date().getHours() === h,
+      }))
+      return {
+        chartBars: bars,
+        currentPeriodTotal:  todayPaid.reduce((s, o) => s + getOrderTotal(o), 0),
+        previousPeriodTotal: yestPaid.reduce((s, o) => s + getOrderTotal(o), 0),
+      }
+    }
+
+    if (period === '7days') {
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (6 - i)); return localDateStr(d)
+      })
+      const prev = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (13 - i)); return localDateStr(d)
+      })
+      const todayDs = todayStr()
+      const bars = days.map(ds => ({
+        label:   new Date(ds + 'T12:00:00').toLocaleDateString('en', { weekday: 'short', day: 'numeric' }),
+        revenue: paidOrders.filter(o => localDateStr(o.created_at) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
+        isToday: ds === todayDs,
+      }))
+      const prevTotal = prev.reduce((s, ds) =>
+        s + paidOrders.filter(o => localDateStr(o.created_at) === ds).reduce((s2, o) => s2 + getOrderTotal(o), 0), 0)
+      return {
+        chartBars: bars,
+        currentPeriodTotal:  bars.reduce((s, b) => s + b.revenue, 0),
+        previousPeriodTotal: prevTotal,
+      }
+    }
+
+    if (period === 'month') {
+      const year  = now.getFullYear()
+      const month = now.getMonth()
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      const todayDs = todayStr()
+      const bars = Array.from({ length: daysInMonth }, (_, i) => {
+        const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
+        return {
+          label:   String(i + 1),
+          revenue: paidOrders.filter(o => localDateStr(o.created_at) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
+          isToday: ds === todayDs,
         }
-        const priority = ['needs_bill', 'preparing', 'sent_to_kitchen', 'delivered', 'paid']
-        for (const p of priority) {
-          if (byTable[key].status === p) break
-          if (o.status === p) { byTable[key].status = p; break }
-        }
+      })
+      // Previous month
+      const prevMonth     = month === 0 ? 11 : month - 1
+      const prevYear      = month === 0 ? year - 1 : year
+      const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate()
+      const prevTotal = Array.from({ length: daysInPrevMonth }, (_, i) => {
+        const ds = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
+        return paidOrders.filter(o => localDateStr(o.created_at) === ds).reduce((s, o) => s + getOrderTotal(o), 0)
+      }).reduce((s, v) => s + v, 0)
+      return {
+        chartBars: bars,
+        currentPeriodTotal:  bars.reduce((s, b) => s + b.revenue, 0),
+        previousPeriodTotal: prevTotal,
+      }
+    }
+
+    // year
+    const year = now.getFullYear()
+    const todayDs = todayStr()
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const bars = Array.from({ length: 12 }, (_, m) => {
+      const prefix = `${year}-${String(m + 1).padStart(2, '0')}-`
+      return {
+        label:   monthNames[m],
+        revenue: paidOrders.filter(o => localDateStr(o.created_at).startsWith(prefix)).reduce((s, o) => s + getOrderTotal(o), 0),
+        isToday: localDateStr(new Date()).startsWith(prefix),
       }
     })
-    return Object.values(byTable)
-      .map(o => ({ ...o, total: o._total }))
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 5)
-  }, [state.orders])
+    return {
+      chartBars: bars,
+      currentPeriodTotal:  bars.reduce((s, b) => s + b.revenue, 0),
+      previousPeriodTotal: 0, // prior year data not loaded
+    }
+  }, [paidOrders, period])
 
-  // ── 7-day revenue chart from real paid orders ─────────────────────────────
-  const weekData = useMemo(() => {
-    const days = last7DayKeys()
-    const paidOrders = state.orders.filter(o => o.payment_status === 'paid')
-    return days.map(dk => ({
-      dateKey: dk,
-      revenue: paidOrders
-        .filter(o => dateKey(o.created_at) === dk)
-        .reduce((s, o) => s + (o.total || 0), 0),
-    }))
-  }, [state.orders])
+  const periodGrowth = useMemo(() => {
+    if (previousPeriodTotal === 0) return null
+    return Math.round(((currentPeriodTotal - previousPeriodTotal) / previousPeriodTotal) * 100)
+  }, [currentPeriodTotal, previousPeriodTotal])
 
-  // ── Best-selling: computed from real order items ──────────────────────────
-  const bestSelling = useMemo(() => {
-    const totals = {} // menu_item_id → { name, qty, revenue, menuItemId }
-    state.orders.forEach(order => {
-      ;(order.items || []).forEach(item => {
-        const key = item.menu_item_id || item.name
-        if (!totals[key]) {
-          totals[key] = { menuItemId: item.menu_item_id, name: item.name, qty: 0, revenue: 0 }
-        }
-        totals[key].qty     += item.quantity || 1
-        totals[key].revenue += (item.price || 0) * (item.quantity || 1)
+  // ── Payment methods breakdown ─────────────────────────────────────────────
+  const paymentMethods = useMemo(() => {
+    const KNOWN = { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr }
+    const map = {}
+    paidOrders.forEach(o => {
+      const raw    = (o.payment_method || '').toLowerCase().trim()
+      const key    = ['cash','card','terminal','qr'].includes(raw) ? raw : 'unknown'
+      const amount = getOrderTotal(o)
+      map[key] = (map[key] || 0) + amount
+    })
+    const total = Object.values(map).reduce((s, v) => s + v, 0)
+    return Object.entries(map)
+      .map(([key, amount]) => ({
+        key,
+        label:  KNOWN[key] || l.unknown,
+        amount,
+        pct:    total > 0 ? Math.round((amount / total) * 100) : 0,
+        color:  PAYMENT_COLORS[key] || PAYMENT_COLORS.unknown,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+  }, [paidOrders, l])
+
+  // ── Sales by category ─────────────────────────────────────────────────────
+  const salesByCategory = useMemo(() => {
+    const map = {}
+    paidOrders.forEach(o => {
+      ;(o.items || []).forEach(item => {
+        const mi    = menuItemMap[item.menu_item_id]
+        const cat   = mi ? categoryMap[mi.category_id] : null
+        const name  = cat
+          ? (cat[`name_${lang}`] || cat.name_en || cat.name_uz || 'Other')
+          : 'Other'
+        const rev = (Number(item.price) || 0) * (Number(item.quantity) || 1)
+        if (!map[name]) map[name] = { name, revenue: 0, qty: 0 }
+        map[name].revenue += rev
+        map[name].qty     += Number(item.quantity) || 1
       })
     })
-    // Enrich with menuItems image
-    const menuItemMap = Object.fromEntries(state.menuItems.map(m => [m.id, m]))
-    return Object.values(totals)
+    const rows  = Object.values(map).sort((a, b) => b.revenue - a.revenue)
+    const total = rows.reduce((s, r) => s + r.revenue, 0)
+    return rows.map(r => ({ ...r, pct: total > 0 ? Math.round((r.revenue / total) * 100) : 0 }))
+  }, [paidOrders, menuItemMap, categoryMap, lang])
+
+  // ── Best-selling dishes ───────────────────────────────────────────────────
+  const bestSelling = useMemo(() => {
+    const map = {}
+    paidOrders.forEach(o => {
+      ;(o.items || []).forEach(item => {
+        const key = item.menu_item_id || item.name
+        if (!map[key]) map[key] = { menuItemId: item.menu_item_id, name: item.name, qty: 0, revenue: 0 }
+        map[key].qty     += Number(item.quantity) || 1
+        map[key].revenue += (Number(item.price) || 0) * (Number(item.quantity) || 1)
+      })
+    })
+    return Object.values(map)
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 5)
-      .map(row => ({
-        ...row,
-        image_url: menuItemMap[row.menuItemId]?.image_url || '',
-      }))
-  }, [state.orders, state.menuItems])
+      .map(row => ({ ...row, image_url: menuItemMap[row.menuItemId]?.image_url || '' }))
+  }, [paidOrders, menuItemMap])
 
-  // ── Staff activity: profiles + order count by waiter_name ────────────────
-  const staffActivity = useMemo(() => {
-    if (!staffProfiles || staffProfiles.length === 0) return []
-    // Count orders per waiter_name (case-insensitive match against full_name)
-    const ordersByName = {}
-    state.orders.forEach(o => {
-      if (o.waiter_name) {
-        const key = o.waiter_name.toLowerCase()
-        ordersByName[key] = (ordersByName[key] || 0) + 1
-      }
+  // ── Staff performance ─────────────────────────────────────────────────────
+  const staffPerformance = useMemo(() => {
+    const map = {}
+    paidOrders.forEach(o => {
+      const name = o.waiter_name || 'Unknown'
+      if (!map[name]) map[name] = { name, orders: 0, revenue: 0, items: 0 }
+      map[name].orders++
+      map[name].revenue += getOrderTotal(o)
+      map[name].items   += (o.items || []).reduce((s, i) => s + (Number(i.quantity) || 1), 0)
     })
-    return staffProfiles
-      .filter(p => p.status === 'active')
-      .map(p => ({
-        id:       p.id,
-        name:     p.full_name || p.email || 'Unknown',
-        role:     p.role || 'staff',
-        initial:  (p.full_name || p.email || '?')[0].toUpperCase(),
-        orders:   ordersByName[(p.full_name || '').toLowerCase()] || 0,
-        status:   p.status,
-      }))
-      .sort((a, b) => b.orders - a.orders)
-      .slice(0, 5)
-  }, [staffProfiles, state.orders])
+    return Object.values(map)
+      .map(s => ({ ...s, avgOrder: s.orders > 0 ? Math.round(s.revenue / s.orders) : 0 }))
+      .sort((a, b) => b.revenue - a.revenue)
+  }, [paidOrders])
 
-  // ── Revenue badge ─────────────────────────────────────────────────────────
-  const revenueBadge = revenueChange !== null
-    ? {
-        text: `${revenueChange > 0 ? '+' : ''}${revenueChange}% ${l.vsYesterday}`,
-        cls:  revenueChange >= 0 ? 'bg-green-50 text-[#16A34A]' : 'bg-red-50 text-[#DC2626]',
-        up:   revenueChange >= 0,
-      }
-    : null
+  // ── Recent orders (latest 8, not grouped) ─────────────────────────────────
+  const recentOrders = useMemo(() => {
+    return [...state.orders]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0, 8)
+  }, [state.orders])
 
-  // ── Donut chart segments ──────────────────────────────────────────────────
-  const donutSegments = [
-    { count: statusCounts.new,       color: '#3B82F6' },
-    { count: statusCounts.preparing, color: '#ff5a00' },
-    { count: statusCounts.ready,     color: '#16A34A' },
-    { count: statusCounts.cancelled, color: '#D1D5DB' },
-  ]
+  // ── KPI badges ────────────────────────────────────────────────────────────
+  function pctBadge(change) {
+    if (change === null) return null
+    return {
+      text: `${change > 0 ? '+' : ''}${change}%`,
+      cls:  change >= 0 ? 'bg-green-50 text-[#16A34A]' : 'bg-red-50 text-[#DC2626]',
+      up:   change >= 0,
+    }
+  }
+
+  const chartMax = Math.max(...chartBars.map(b => b.revenue), 1)
+  const now      = new Date()
+  const lastUpdated = `${now.getDate().toString().padStart(2,'0')}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
+
+  if (!state.loaded) {
+    return (
+      <AppShell title="Dashboard">
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <Loader2 size={28} className="animate-spin text-[#ff5a00]" />
+          <p className="text-sm text-gray-400">{l.loading}</p>
+        </div>
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell title={l.greeting(displayName)}>
-      <div className="p-5 xl:p-6 max-w-[1400px] mx-auto">
+      <div className="p-5 xl:p-6 max-w-[1500px] mx-auto">
 
-        {/* Page header */}
-        <div className="mb-6">
-          <h2 className="font-black text-[#1F2937] text-xl leading-tight">{l.greeting(displayName)}</h2>
-          <p className="text-sm text-[#6B7280] mt-0.5">{l.subtitle}</p>
+        {/* Header */}
+        <div className="mb-6 flex items-start justify-between flex-wrap gap-2">
+          <div>
+            <h2 className="font-black text-[#1F2937] text-xl leading-tight">{l.greeting(displayName)}</h2>
+            <p className="text-sm text-[#6B7280] mt-0.5">{l.subtitle}</p>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-[#6B7280] bg-white border border-gray-200 px-3 py-2 rounded-xl">
+            <Clock size={13} />
+            {lastUpdated}
+          </div>
         </div>
 
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
             label={l.todayRevenue}
             value={formatCurrency(todayRevenue)}
             sub={`${l.yesterday}: ${formatCurrency(yesterdayRevenue)}`}
-            badge={revenueBadge}
-            iconBg="bg-green-50"
-            iconColor="text-[#16A34A]"
+            badge={pctBadge(revenueChange)}
           />
           <KpiCard
             icon={ShoppingBag}
-            label={l.orders}
+            label={l.ordersToday}
             value={todayOrderCount}
-            sub={`${activeOrderCount} ${l.activeTables}`}
-            subColor={activeOrderCount > 0 ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'}
-            iconBg="bg-orange-50"
-            iconColor="text-[#ff5a00]"
+            sub={`${l.yesterday}: ${yesterdayOrderCount}`}
+            badge={pctBadge(orderChange)}
           />
           <KpiCard
-            icon={Table2}
-            label={l.totalTables}
-            value={tableStats.total}
-            sub={`${tableStats.available} ${l.available}`}
-            subColor="text-[#16A34A]"
-            iconBg="bg-blue-50"
-            iconColor="text-blue-600"
+            icon={DollarSign}
+            label={l.avgOrder}
+            value={formatCurrency(avgOrderValue)}
+            sub={`${l.yesterday}: ${formatCurrency(avgYesterday)}`}
+            badge={pctBadge(avgChange)}
           />
           <KpiCard
-            icon={UtensilsCrossed}
-            label={l.menuItems}
-            value={state.menuItems.length}
-            sub={`${realCategoryCount} ${l.categories}`}
-            iconBg="bg-purple-50"
-            iconColor="text-purple-600"
+            icon={Package}
+            label={l.itemsSold}
+            value={itemsSoldToday}
+            sub={todayStr()}
           />
           <KpiCard
-            icon={Users}
-            label={l.activeStaff}
-            value={staffProfiles === null ? '…' : staffProfiles.filter(p => p.status === 'active').length}
-            sub={staffProfiles === null ? '' : `${staffProfiles.length} ${l.totalStaff}`}
-            iconBg="bg-pink-50"
-            iconColor="text-pink-600"
+            icon={Receipt}
+            label={l.activeBills}
+            value={activeBills}
+            sub={activeBills > 0 ? l.needAttention : '—'}
+            subColor={activeBills > 0 ? 'text-[#DC2626] font-semibold' : 'text-[#9CA3AF]'}
+            highlight={activeBills > 0}
           />
         </div>
 
-        {/* ── Main grid ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* ── Main grid: Left 2/3 + Right 1/3 ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
-          {/* LEFT (2 cols) */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
-
-            {/* Table status */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                <h3 className="font-black text-[#1F2937] text-[14px]">{l.tableStatus}</h3>
-                <div className="flex items-center gap-3 text-[10px] text-[#6B7280]">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-                    {l.available} ({tableStats.available})
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-[#ff5a00]" />
-                    {l.occupied} ({tableStats.occupied})
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
-                    {l.needsBill} ({tableStats.needsBill})
-                  </span>
-                </div>
+          {/* Revenue Statistics — left 2 cols */}
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h3 className="font-black text-[#1F2937] text-[14px]">{l.revenueStats}</h3>
+              <div className="flex gap-1">
+                {[
+                  { key: 'today',  label: l.today    },
+                  { key: '7days',  label: l.days7    },
+                  { key: 'month',  label: l.thisMonth },
+                  { key: 'year',   label: l.thisYear  },
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setPeriod(tab.key)}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                      period === tab.key
+                        ? 'bg-[#ff5a00] text-white'
+                        : 'bg-gray-100 text-[#6B7280] hover:bg-gray-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-              {state.tables.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noOrders}</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {state.tables.map(table => (
-                    <TableChip key={table.id} table={table} lang={lang} />
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* Revenue chart */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-[#1F2937] text-[14px]">{l.revenue7}</h3>
-                <span className="text-[11px] text-[#6B7280] bg-gray-50 px-2 py-1 rounded-lg font-semibold">{l.days7}</span>
-              </div>
-              <RevenueChart weekData={weekData} lang={lang} />
-            </div>
-
-            {/* Best-selling */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.bestSelling}</h3>
-              {bestSelling.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
-              ) : (
-                <div className="space-y-1">
-                  {bestSelling.map((item, i) => (
-                    <div key={item.menuItemId || i} className="flex items-center gap-3 py-2 border-b border-[#F3F4F6] last:border-0">
-                      <span className="w-6 text-center text-[12px] font-black text-[#9CA3AF] flex-shrink-0">
-                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
-                      </span>
-                      {item.image_url ? (
-                        <img
-                          src={item.image_url}
-                          alt={item.name}
-                          className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-xl bg-gray-100 flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-[#1F2937] truncate">{item.name}</p>
-                        <p className="text-[11px] text-[#9CA3AF]">{item.qty} {l.pcs}</p>
+            {/* Bar chart */}
+            <div className="flex items-end gap-[2px] h-32 mb-2" style={{ overflowX: chartBars.length > 16 ? 'auto' : 'visible' }}>
+              {chartBars.map((bar, i) => {
+                const pct = Math.round((bar.revenue / chartMax) * 100)
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative min-w-[8px]">
+                    {bar.revenue > 0 && (
+                      <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#1F2937] text-white text-[8px] font-semibold px-1 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                        {formatCurrency(bar.revenue)}
                       </div>
-                      <p className="text-[13px] font-black text-[#1F2937] flex-shrink-0">{formatCurrency(item.revenue)}</p>
+                    )}
+                    <div className="w-full flex items-end" style={{ height: '104px' }}>
+                      <div
+                        className={`w-full rounded-t transition-all min-h-[2px] ${
+                          bar.isToday ? 'bg-[#ff5a00]' : bar.revenue > 0 ? 'bg-[#FED7AA] group-hover:bg-[#FDBA74]' : 'bg-[#F3F4F6]'
+                        }`}
+                        style={{ height: `${Math.max(pct, 2)}%` }}
+                      />
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                )
+              })}
+            </div>
+            {/* X-axis labels: show max 8 evenly distributed */}
+            <div className="flex gap-[2px] mb-4">
+              {chartBars.map((bar, i) => {
+                const show = chartBars.length <= 8 || i % Math.ceil(chartBars.length / 8) === 0
+                return (
+                  <p key={i} className={`flex-1 text-center text-[9px] font-semibold truncate min-w-[8px] ${
+                    bar.isToday ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'
+                  } ${!show ? 'opacity-0' : ''}`}>
+                    {bar.label}
+                  </p>
+                )
+              })}
+            </div>
+
+            {/* Period comparison */}
+            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[#F3F4F6]">
+              <div>
+                <p className="text-[10px] text-[#9CA3AF] mb-0.5">{l.prevPeriod}</p>
+                <p className="font-black text-[#1F2937] text-[13px]">{formatCurrency(previousPeriodTotal)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[#9CA3AF] mb-0.5">{l.thisPeriod}</p>
+                <p className="font-black text-[#1F2937] text-[13px]">{formatCurrency(currentPeriodTotal)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[#9CA3AF] mb-0.5">{l.growth}</p>
+                {periodGrowth !== null ? (
+                  <p className={`font-black text-[13px] flex items-center gap-0.5 ${periodGrowth >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                    {periodGrowth >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+                    {periodGrowth > 0 ? '+' : ''}{periodGrowth}%
+                  </p>
+                ) : (
+                  <p className="font-black text-[#9CA3AF] text-[13px]">—</p>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* RIGHT col */}
+          {/* Payment Methods + Recent Orders — right col */}
           <div className="flex flex-col gap-4">
 
-            {/* Order statistics */}
+            {/* Payment Methods */}
             <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-[#1F2937] text-[14px]">{l.orderStats}</h3>
-                <span className="text-[11px] text-[#6B7280] font-semibold">{l.total}: {totalStatusCount}</span>
-              </div>
-
-              {/* SVG donut */}
-              <div className="flex items-center justify-center mb-4">
-                <div className="relative w-28 h-28">
-                  <svg viewBox="0 0 36 36" className="w-28 h-28 -rotate-90">
-                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F3F4F6" strokeWidth="3" />
-                    {(() => {
-                      const circumference = 2 * Math.PI * 15.9
-                      let offset = 0
-                      return donutSegments.map((seg, i) => {
-                        const pct  = totalStatusCount > 0 ? seg.count / totalStatusCount : 0
-                        const dash = pct * circumference
-                        const el   = (
-                          <circle key={i} cx="18" cy="18" r="15.9" fill="none"
-                            stroke={seg.color} strokeWidth="3"
-                            strokeDasharray={`${dash} ${circumference - dash}`}
-                            strokeDashoffset={-offset}
-                          />
-                        )
-                        offset += dash
-                        return el
-                      })
-                    })()}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <p className="font-black text-[#1F2937] text-xl leading-none">{totalStatusCount}</p>
-                    <p className="text-[9px] text-[#9CA3AF] font-semibold">{l.total}</p>
+              <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.paymentMethods}</h3>
+              {paymentMethods.length === 0 ? (
+                <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noData}</p>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div className="relative flex-shrink-0">
+                    <DonutChart slices={paymentMethods.map(p => ({ value: p.amount, color: p.color }))} />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <p className="font-black text-[#1F2937] text-xs leading-none">{formatCurrency(paymentMethods.reduce((s, p) => s + p.amount, 0)).split(' ')[0]}</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-1.5 min-w-0">
+                    {paymentMethods.map(p => (
+                      <div key={p.key} className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
+                        <span className="text-[11px] text-[#6B7280] flex-1 truncate">{p.label}</span>
+                        <span className="text-[11px] font-bold text-[#1F2937] flex-shrink-0">{p.pct}%</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-2.5">
-                <OrderStatusBar label={l.new}       count={statusCounts.new}       total={totalStatusCount} colorClass="bg-blue-500"    />
-                <OrderStatusBar label={l.preparing} count={statusCounts.preparing} total={totalStatusCount} colorClass="bg-[#ff5a00]"   />
-                <OrderStatusBar label={l.ready}     count={statusCounts.ready}     total={totalStatusCount} colorClass="bg-[#16A34A]"   />
-                <OrderStatusBar label={l.cancelled} count={statusCounts.cancelled} total={totalStatusCount} colorClass="bg-gray-300"    />
-              </div>
+              )}
             </div>
 
-            {/* Recent orders */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.recentOrders}</h3>
+            {/* Recent Orders */}
+            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 flex-1">
+              <h3 className="font-black text-[#1F2937] text-[14px] mb-3">{l.recentOrders}</h3>
               {recentOrders.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noRecentOrders}</p>
+                <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noOrders}</p>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {recentOrders.map(order => {
-                    const items    = order.items || []
-                    const summary  = items.slice(0, 2).map(i => i.name).join(', ')
-                    const more     = items.length > 2 ? ` +${items.length - 2}` : ''
+                    const shortId = String(order.id).slice(-4).toUpperCase()
+                    const method  = (order.payment_method || '').toLowerCase()
+                    const methodLabel = { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr }[method] || ''
                     return (
-                      <div key={order.id} className="flex items-start gap-3 py-2 border-b border-[#F3F4F6] last:border-0">
-                        <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <ShoppingBag size={14} className="text-[#ff5a00]" />
+                      <div key={order.id} className="flex items-center gap-2.5 py-1.5 border-b border-[#F9FAFB] last:border-0">
+                        <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                          <ShoppingBag size={12} className="text-[#ff5a00]" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                            <p className="text-[13px] font-bold text-[#1F2937]">{order.table_name}</p>
+                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                            <p className="text-[11px] font-bold text-[#1F2937]">#{shortId}</p>
+                            <p className="text-[11px] text-[#6B7280]">{order.table_name}</p>
                             <OrderBadge status={order.status} lang={lang} />
                           </div>
-                          <p className="text-[11px] text-[#9CA3AF] truncate">{summary}{more}</p>
-                          <p className="text-[10px] text-[#9CA3AF] flex items-center gap-1 mt-0.5">
-                            <Clock size={9} />{elapsedSince(order.created_at)}
-                          </p>
+                          <div className="flex items-center gap-1 text-[10px] text-[#9CA3AF]">
+                            <Clock size={8} />
+                            {elapsedSince(order.created_at)}
+                            {methodLabel && <span className="ml-1 font-semibold">{methodLabel}</span>}
+                          </div>
                         </div>
-                        <p className="text-[12px] font-black text-[#1F2937] flex-shrink-0">{formatCurrency(order.total)}</p>
+                        <p className="text-[11px] font-black text-[#1F2937] flex-shrink-0">{formatCurrency(getOrderTotal(order))}</p>
                       </div>
                     )
                   })}
                 </div>
               )}
             </div>
-
-            {/* Staff activity */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-[#1F2937] text-[14px]">{l.staffActivity}</h3>
-                {staffProfiles !== null && staffProfiles.length > 0 && (
-                  <span className="text-[11px] text-[#6B7280] font-semibold">{staffProfiles.length} {l.totalStaff}</span>
-                )}
-              </div>
-
-              {staffProfiles === null ? (
-                /* Loading */
-                <div className="space-y-3">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="flex items-center gap-3 animate-pulse">
-                      <div className="w-8 h-8 rounded-xl bg-gray-100 flex-shrink-0" />
-                      <div className="flex-1 space-y-1.5">
-                        <div className="h-2.5 bg-gray-100 rounded w-2/3" />
-                        <div className="h-2 bg-gray-100 rounded w-1/2" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : staffActivity.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-6 leading-snug">{l.noStaff}</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {staffActivity.map(staff => (
-                    <div key={staff.id} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#6B7280] text-xs font-black">{staff.initial}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-bold text-[#1F2937] truncate">{staff.name}</p>
-                        <p className="text-[10px] text-[#9CA3AF]">{(ROLE_LABELS[staff.role]?.[lang] || ROLE_LABELS[staff.role]?.en) ?? staff.role} · {staff.orders} {l.ordersUnit}</p>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-green-50 text-[#16A34A] border-green-100">
-                        {l.active}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
           </div>
         </div>
+
+        {/* ── Bottom 3-col: Category / Best-selling / Staff ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          {/* Sales by Category */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+            <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.salesByCategory}</h3>
+            {salesByCategory.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
+            ) : (
+              <div className="space-y-3">
+                {salesByCategory.map(cat => (
+                  <div key={cat.name}>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[12px] font-semibold text-[#1F2937] truncate flex-1 mr-2">{cat.name}</p>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <p className="text-[11px] font-bold text-[#1F2937]">{formatCurrency(cat.revenue)}</p>
+                        <p className="text-[10px] text-[#9CA3AF] w-8 text-right">{cat.pct}%</p>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
+                      <div className="h-full bg-[#ff5a00] rounded-full" style={{ width: `${cat.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Best-selling */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+            <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.bestSelling}</h3>
+            {bestSelling.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
+            ) : (
+              <div className="space-y-2">
+                {bestSelling.map((item, i) => (
+                  <div key={item.menuItemId || i} className="flex items-center gap-2.5 py-1.5 border-b border-[#F9FAFB] last:border-0">
+                    <span className="w-5 text-center text-[11px] font-black text-[#9CA3AF] flex-shrink-0">
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
+                    </span>
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} className="w-9 h-9 rounded-xl object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-[#1F2937] truncate">{item.name}</p>
+                      <p className="text-[10px] text-[#9CA3AF]">{item.qty} {l.pcs}</p>
+                    </div>
+                    <p className="text-[11px] font-black text-[#1F2937] flex-shrink-0">{formatCurrency(item.revenue)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Staff Performance */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+            <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.staffPerf}</h3>
+            {staffPerformance.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noStaff}</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-4 gap-1 mb-1">
+                  <p className="text-[9px] font-bold text-[#9CA3AF] uppercase col-span-1">Staff</p>
+                  <p className="text-[9px] font-bold text-[#9CA3AF] uppercase text-right">Orders</p>
+                  <p className="text-[9px] font-bold text-[#9CA3AF] uppercase text-right">Revenue</p>
+                  <p className="text-[9px] font-bold text-[#9CA3AF] uppercase text-right">Items</p>
+                </div>
+                {staffPerformance.map(s => (
+                  <div key={s.name} className="grid grid-cols-4 gap-1 items-center">
+                    <div className="col-span-1 flex items-center gap-1.5 min-w-0">
+                      <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[#6B7280] text-[9px] font-black">{(s.name || '?')[0].toUpperCase()}</span>
+                      </div>
+                      <p className="text-[11px] font-semibold text-[#1F2937] truncate">{s.name.split(' ')[0]}</p>
+                    </div>
+                    <p className="text-[11px] font-bold text-[#1F2937] text-right">{s.orders}</p>
+                    <p className="text-[10px] font-bold text-[#1F2937] text-right">{formatCurrency(s.revenue)}</p>
+                    <p className="text-[11px] font-bold text-[#1F2937] text-right">{s.items}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-[10px] text-[#9CA3AF] mt-6">
+          {l.footer} • {lang === 'uz' ? 'Oxirgi yangilanish' : lang === 'ru' ? 'Последнее обновление' : 'Last updated'}: {lastUpdated}
+        </p>
+
       </div>
     </AppShell>
   )

@@ -2,10 +2,8 @@ import { supabase } from './supabase'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
-function sevenDaysAgo() {
-  const d = new Date()
-  d.setDate(d.getDate() - 7)
-  return d.toISOString()
+function startOfYear() {
+  return new Date(new Date().getFullYear(), 0, 1).toISOString()
 }
 
 export async function loadPOSData() {
@@ -24,7 +22,7 @@ export async function loadPOSData() {
       .from('orders')
       .select('*, items:order_items(*)')
       .eq('payment_status', 'paid')
-      .gte('created_at', sevenDaysAgo())
+      .gte('created_at', startOfYear())
       .order('created_at', { ascending: false }),
   ])
 
@@ -50,7 +48,7 @@ export function subscribeToRealtime(dispatch) {
         .from('orders')
         .select('*, items:order_items(*)')
         .eq('payment_status', 'paid')
-        .gte('created_at', sevenDaysAgo())
+        .gte('created_at', startOfYear())
         .order('created_at', { ascending: false }),
     ])
     const combined = [...(unpaid.data || []), ...(paid.data || [])]
