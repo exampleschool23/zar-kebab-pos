@@ -7,7 +7,7 @@ export const PAGE_ACCESS = {
   menu:      ['owner', 'admin'],
   kitchen:   ['owner', 'admin', 'kitchen'],
   cashier:   ['owner', 'admin', 'cashier'],
-  team:      ['owner', 'admin'],
+  team:      ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder'],
   reports:   ['owner', 'admin', 'cashier', 'stakeholder'],
   settings:  ['owner', 'admin'],
 }
@@ -17,11 +17,30 @@ export function canViewPage(role, page) {
 }
 
 export function canEditMenu(role)          { return ['owner', 'admin'].includes(role) }
-export function canManageTeam(role)        { return ['owner', 'admin'].includes(role) }
+export function canManageSettings(role)    { return ['owner', 'admin'].includes(role) }
 export function canUseKitchenActions(role) { return ['owner', 'admin', 'kitchen'].includes(role) }
 export function canUseCashierActions(role) { return ['owner', 'admin', 'cashier'].includes(role) }
-export function canManageSettings(role)    { return ['owner', 'admin'].includes(role) }
 export function isReadOnlyUser(role)       { return role === 'stakeholder' }
+
+/**
+ * Returns whether `viewerRole` can change the role/status of a user who currently has `targetRole`.
+ * - owner   → can edit anyone except themselves (handled separately)
+ * - admin   → can edit non-owner users only
+ * - others  → view-only, no edits
+ */
+export function canEditTeamMember(viewerRole, targetRole) {
+  if (viewerRole === 'owner') return true
+  if (viewerRole === 'admin') return targetRole !== 'owner'
+  return false
+}
+
+/** Roles the viewer is allowed to assign. Owner can assign any role; admin cannot assign owner. */
+export function assignableRoles(viewerRole) {
+  const all = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder']
+  if (viewerRole === 'owner') return all
+  if (viewerRole === 'admin') return all.filter(r => r !== 'owner')
+  return []
+}
 
 export function defaultPath(role) {
   if (['owner', 'admin', 'stakeholder'].includes(role)) return '/admin'

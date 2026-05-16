@@ -4,7 +4,8 @@ import { useApp } from '../store/AppContext'
 import { getAllProfiles, updateProfile } from '../lib/supabase'
 import AppShell from '../components/AppShell'
 import StatusBadge from '../components/StatusBadge'
-import { Search, RefreshCw, UserCircle2, Loader2 } from 'lucide-react'
+import { canEditTeamMember, assignableRoles } from '../lib/permissions'
+import { Search, RefreshCw, UserCircle2, Loader2, Eye } from 'lucide-react'
 
 const ROLES    = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder']
 const STATUSES = ['pending', 'active', 'disabled']
@@ -81,8 +82,12 @@ const L = {
 export default function AdminUsers() {
   const { profile: myProfile } = useAuth()
   const { state } = useApp()
-  const lang = state.lang
-  const l = L[lang] || L.en
+  const lang   = state.lang
+  const l      = L[lang] || L.en
+  const myRole = myProfile?.role || 'waiter'
+
+  // Roles the current viewer is allowed to assign in dropdowns
+  const allowedRoles = assignableRoles(myRole)
 
   const [users, setUsers]               = useState([])
   const [loading, setLoading]           = useState(true)
@@ -101,6 +106,13 @@ export default function AdminUsers() {
   useEffect(() => { loadUsers() }, [])
 
   async function handleChange(userId, field, value) {
+    const target = users.find(u => u.id === userId)
+    // Guard: prevent removing/disabling the last active owner
+    if (target?.role === 'owner') {
+      const activeOwners = users.filter(u => u.role === 'owner' && u.status !== 'disabled')
+      if (field === 'role'   && value !== 'owner'    && activeOwners.length <= 1) return
+      if (field === 'status' && value === 'disabled' && activeOwners.length <= 1) return
+    }
     setSaving(userId)
     await updateProfile(userId, { [field]: value })
     setUsers(u => u.map(x => x.id === userId ? { ...x, [field]: value } : x))
@@ -119,6 +131,19 @@ export default function AdminUsers() {
   return (
     <AppShell title={l.title}>
       <div className="p-5 max-w-5xl mx-auto">
+
+        {/* Read-only notice for non-editors */}
+        {!['owner', 'admin'].includes(myRole) && (
+          <div className="flex items-center gap-2.5 mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-2xl text-sm text-blue-700">
+            <Eye size={15} className="flex-shrink-0" />
+            <span className="font-medium">
+              {lang === 'uz' ? 'Faqat ko\'rish huquqi — rollarni o\'zgartirib bo\'lmaydi.'
+               : lang === 'ru' ? 'Только просмотр — изменение ролей недоступно.'
+               : 'View-only access — you cannot change roles or account statuses.'}
+            </span>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2 mb-5">
           <div className="relative flex-1">
@@ -187,8 +212,13 @@ export default function AdminUsers() {
             {/* Rows */}
             <div className="divide-y divide-gray-50">
               {filtered.map(user => {
-                const isMe     = user.id === myProfile?.id
-                const isSaving = saving === user.id
+                const isMe       = user.id === myProfile?.id
+                const isSaving   = saving === user.id
+                // Can this viewer edit this specific user's role/status?
+                const canEdit    = !isMe && canEditTeamMember(myRole, user.role)
+                const roleLabel  = (ROLE_LABELS[user.role]?.[lang] || ROLE_LABELS[user.role]?.en) ?? user.role
+                const statusLabel = (STATUS_LABELS[user.status]?.[lang] || STATUS_LABELS[user.status]?.en) ?? user.status
+
                 return (
                   <div
                     key={user.id}
@@ -226,29 +256,41 @@ export default function AdminUsers() {
                       <StatusBadge status={user.status} />
                     </div>
 
-                    {/* Role selector */}
-                    <select
-                      value={user.role || 'waiter'}
-                      disabled={isMe || isSaving}
-                      onChange={e => handleChange(user.id, 'role', e.target.value)}
-                      className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] disabled:opacity-50 disabled:cursor-not-allowed w-full"
-                    >
-                      {ROLES.map(r => (
-                        <option key={r} value={r}>{(ROLE_LABELS[r]?.[lang] || ROLE_LABELS[r]?.en) ?? r}</option>
-                      ))}
-                    </select>
+                    {/* Role — editable select or read-only badge */}
+                    {canEdit ? (
+                      <select
+                        value={user.role || 'waiter'}
+                        disabled={isSaving}
+                        onChange={e => handleChange(user.id, 'role', e.target.value)}
+                        className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                      >
+                        {allowedRoles.map(r => (
+                          <option key={r} value={r}>{(ROLE_LABELS[r]?.[lang] || ROLE_LABELS[r]?.en) ?? r}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className={`inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold border ${ROLE_BADGE[user.role] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                        {roleLabel}
+                      </span>
+                    )}
 
-                    {/* Status selector */}
-                    <select
-                      value={user.status || 'pending'}
-                      disabled={isMe || isSaving}
-                      onChange={e => handleChange(user.id, 'status', e.target.value)}
-                      className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] disabled:opacity-50 disabled:cursor-not-allowed w-full"
-                    >
-                      {STATUSES.map(s => (
-                        <option key={s} value={s}>{(STATUS_LABELS[s]?.[lang] || STATUS_LABELS[s]?.en) ?? s}</option>
-                      ))}
-                    </select>
+                    {/* Account status — editable select or read-only label */}
+                    {canEdit ? (
+                      <select
+                        value={user.status || 'pending'}
+                        disabled={isSaving}
+                        onChange={e => handleChange(user.id, 'status', e.target.value)}
+                        className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] disabled:opacity-50 disabled:cursor-not-allowed w-full"
+                      >
+                        {STATUSES.map(s => (
+                          <option key={s} value={s}>{(STATUS_LABELS[s]?.[lang] || STATUS_LABELS[s]?.en) ?? s}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                        {statusLabel}
+                      </span>
+                    )}
 
                     {/* Loading indicator */}
                     <div className="flex items-center justify-center">
