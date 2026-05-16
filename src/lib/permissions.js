@@ -38,7 +38,7 @@ export function canEditTeamMember(viewerRole, targetRole) {
 export function assignableRoles(viewerRole) {
   const all = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder']
   if (viewerRole === 'owner') return all
-  if (viewerRole === 'admin') return all.filter(r => r !== 'owner')
+  if (viewerRole === 'admin') return all.filter(r => r !== 'owner' && r !== 'stakeholder')
   return []
 }
 
