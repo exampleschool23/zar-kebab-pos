@@ -1,16 +1,32 @@
-import React, { createContext, useContext, useReducer } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react'
 import { tables as initialTables, menuItems as initialMenuItems, categories as initialCategories, mockOrders } from '../data/mockData'
+import { loadPOSData, writeToSupabase, subscribeToRealtime } from '../lib/db'
 
 const AppContext = createContext(null)
 
+const DEFAULT_SETTINGS = {
+  restaurantName: 'Zar Kebab',
+  serviceRate:    20,   // percent (0–100)
+  receiptFooter:  'Thank you for visiting!',
+  autoPrint:      false,
+}
+
+function loadSettings() {
+  try {
+    const s = localStorage.getItem('zk_settings')
+    return s ? JSON.parse(s) : {}
+  } catch { return {} }
+}
+
 const initialState = {
-  lang: localStorage.getItem('zk_lang') || 'uz',
-  user: null,
-  tables: initialTables,
-  menuItems: initialMenuItems,
-  categories: initialCategories,
-  orders: mockOrders,
-  cart: [],
+  lang:           localStorage.getItem('zk_lang') || 'uz',
+  settings:       { ...DEFAULT_SETTINGS, ...loadSettings() },
+  user:           null,
+  tables:         initialTables,
+  menuItems:      initialMenuItems,
+  categories:     initialCategories,
+  orders:         mockOrders,
+  cart:           [],
   currentTableId: null,
 }
 
@@ -19,6 +35,12 @@ function reducer(state, action) {
     case 'SET_LANG':
       localStorage.setItem('zk_lang', action.payload)
       return { ...state, lang: action.payload }
+
+    case 'SET_SETTINGS': {
+      const next = { ...state.settings, ...action.payload }
+      localStorage.setItem('zk_settings', JSON.stringify(next))
+      return { ...state, settings: next }
+    }
 
     case 'LOGIN':
       return { ...state, user: action.payload }
@@ -29,6 +51,20 @@ function reducer(state, action) {
     case 'SET_TABLE':
       return { ...state, currentTableId: action.payload }
 
+    // ── Supabase hydration ────────────────────────────────────────────────────
+    case 'SET_TABLES':
+      return { ...state, tables: action.payload }
+
+    case 'SET_ORDERS':
+      return { ...state, orders: action.payload }
+
+    case 'SET_CATEGORIES':
+      return { ...state, categories: action.payload }
+
+    case 'SET_MENU_ITEMS':
+      return { ...state, menuItems: action.payload }
+
+    // ── Cart ──────────────────────────────────────────────────────────────────
     case 'ADD_TO_CART': {
       const existing = state.cart.find(i => i.menu_item_id === action.payload.menu_item_id)
       if (existing) {
@@ -67,13 +103,16 @@ function reducer(state, action) {
     case 'CLEAR_CART':
       return { ...state, cart: [] }
 
+    // ── Orders ────────────────────────────────────────────────────────────────
     case 'SEND_TO_KITCHEN': {
       const table = state.tables.find(t => t.id === state.currentTableId)
       if (!table || state.cart.length === 0) return state
-      const subtotal = state.cart.reduce((s, i) => s + i.price * i.quantity, 0)
-      const service_fee = Math.round(subtotal * 0.2)
+      const orderId     = action._orderId || ('o' + Date.now())
+      const subtotal    = state.cart.reduce((s, i) => s + i.price * i.quantity, 0)
+      const svcRate     = (state.settings?.serviceRate ?? 20) / 100
+      const service_fee = Math.round(subtotal * svcRate)
       const newOrder = {
-        id: 'o' + Date.now(),
+        id: orderId,
         table_id: state.currentTableId,
         table_name: table.name,
         waiter_name: state.user?.name || 'Waiter',
@@ -103,6 +142,18 @@ function reducer(state, action) {
       }
     }
 
+    case 'CONFIRM_ORDER_DELIVERED': {
+      const tableId = action.payload
+      return {
+        ...state,
+        orders: state.orders.map(o =>
+          o.table_id === tableId && o.payment_status !== 'paid'
+            ? { ...o, status: 'delivered', items: o.items.map(i => ({ ...i, status: 'served' })) }
+            : o
+        ),
+      }
+    }
+
     case 'MARK_TABLE_NEEDS_BILL':
       return {
         ...state,
@@ -111,20 +162,21 @@ function reducer(state, action) {
       }
 
     case 'MARK_ORDER_PAID': {
-      // payload can be a string tableId (legacy) or { tableId, loyalty }
-      const tableId = typeof action.payload === 'string' ? action.payload : action.payload.tableId
-      const loyalty = typeof action.payload === 'object' ? action.payload.loyalty : null
+      const tableId        = typeof action.payload === 'string' ? action.payload : action.payload.tableId
+      const loyalty        = typeof action.payload === 'object' ? action.payload.loyalty : null
+      const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
       return {
         ...state,
         tables: state.tables.map(t => t.id === tableId ? { ...t, status: 'available' } : t),
         orders: state.orders.map(o =>
           o.table_id === tableId && o.payment_status !== 'paid'
-            ? { ...o, status: 'paid', payment_status: 'paid', ...(loyalty || {}) }
+            ? { ...o, status: 'paid', payment_status: 'paid', payment_method, ...(loyalty || {}) }
             : o
         ),
       }
     }
 
+    // ── Tables management ─────────────────────────────────────────────────────
     case 'ADD_TABLE':
       return { ...state, tables: [...state.tables, action.payload] }
 
@@ -134,6 +186,7 @@ function reducer(state, action) {
     case 'DELETE_TABLE':
       return { ...state, tables: state.tables.filter(t => t.id !== action.payload) }
 
+    // ── Menu items management ─────────────────────────────────────────────────
     case 'ADD_MENU_ITEM': {
       const maxItemOrder = state.menuItems.length > 0
         ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0))
@@ -164,6 +217,7 @@ function reducer(state, action) {
       }
     }
 
+    // ── Categories management ─────────────────────────────────────────────────
     case 'ADD_CATEGORY': {
       const realCats = state.categories.filter(c => c.id !== 'all')
       const maxCatOrder = realCats.length > 0
@@ -202,7 +256,46 @@ function reducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
-  return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>
+
+  // Always-current state reference for async callbacks (avoids stale closures)
+  const stateRef = useRef(state)
+  useEffect(() => { stateRef.current = state }, [state])
+
+  // dbDispatch: optimistic local update + async Supabase write
+  function dbDispatch(action) {
+    // Pre-inject a stable orderId so reducer and Supabase writer share it
+    const enriched = action.type === 'SEND_TO_KITCHEN'
+      ? { ...action, _orderId: 'o' + Date.now() }
+      : action
+
+    dispatch(enriched)
+    writeToSupabase(enriched, stateRef.current).catch(err =>
+      console.error('[db] write failed:', action.type, err)
+    )
+  }
+
+  // Load from Supabase on mount + subscribe to realtime
+  useEffect(() => {
+    let unsubscribe = () => {}
+
+    loadPOSData()
+      .then(({ tables, categories, menuItems, orders }) => {
+        dispatch({ type: 'SET_TABLES',     payload: tables })
+        dispatch({ type: 'SET_CATEGORIES', payload: categories })
+        dispatch({ type: 'SET_MENU_ITEMS', payload: menuItems })
+        dispatch({ type: 'SET_ORDERS',     payload: orders })
+        unsubscribe = subscribeToRealtime(dispatch)
+      })
+      .catch(err => console.error('[db] initial load failed:', err))
+
+    return () => unsubscribe()
+  }, [])
+
+  return (
+    <AppContext.Provider value={{ state, dispatch: dbDispatch }}>
+      {children}
+    </AppContext.Provider>
+  )
 }
 
 export function useApp() {

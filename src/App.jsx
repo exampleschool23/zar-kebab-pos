@@ -13,15 +13,16 @@ import WaiterOrder    from './pages/WaiterOrder'
 import Kitchen        from './pages/Kitchen'
 import CashierTables  from './pages/CashierTables'
 import CashierBill    from './pages/CashierBill'
-import Receipt        from './pages/Receipt'
+import Receipt, { TableReceipt } from './pages/Receipt'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminMenu      from './pages/AdminMenu'
 import AdminTables    from './pages/AdminTables'
 import AdminUsers     from './pages/AdminUsers'
 import Reports        from './pages/Reports'
+import AdminSettings  from './pages/AdminSettings'
 
 function defaultPath(role) {
-  if (role === 'owner' || role === 'admin') return '/admin'
+  if (role === 'owner' || role === 'admin' || role === 'stakeholder') return '/admin'
   if (role === 'waiter')  return '/waiter/tables'
   if (role === 'cashier') return '/cashier/tables'
   if (role === 'kitchen') return '/kitchen'
@@ -174,10 +175,13 @@ function AppRoutes() {
         <Route path="/receipt/:orderId" element={
           <ProtectedRoute roles={['cashier', 'admin', 'owner']}><Receipt /></ProtectedRoute>
         } />
+        <Route path="/receipt/table/:tableId" element={
+          <ProtectedRoute roles={['cashier', 'admin', 'owner']}><TableReceipt /></ProtectedRoute>
+        } />
 
-        {/* Admin */}
+        {/* Admin — stakeholder gets Dashboard + Reports only */}
         <Route path="/admin" element={
-          <ProtectedRoute roles={['admin', 'owner']}><AdminDashboard /></ProtectedRoute>
+          <ProtectedRoute roles={['admin', 'owner', 'stakeholder']}><AdminDashboard /></ProtectedRoute>
         } />
         <Route path="/admin/menu" element={
           <ProtectedRoute roles={['admin', 'owner']}><AdminMenu /></ProtectedRoute>
@@ -189,7 +193,10 @@ function AppRoutes() {
           <ProtectedRoute roles={['admin', 'owner']}><AdminUsers /></ProtectedRoute>
         } />
         <Route path="/admin/reports" element={
-          <ProtectedRoute roles={['admin', 'owner']}><Reports /></ProtectedRoute>
+          <ProtectedRoute roles={['admin', 'owner', 'stakeholder']}><Reports /></ProtectedRoute>
+        } />
+        <Route path="/admin/settings" element={
+          <ProtectedRoute roles={['admin', 'owner']}><AdminSettings /></ProtectedRoute>
         } />
 
         {/* Catch-all: redirect based on role */}

@@ -1,9 +1,23 @@
 import React, { useState, useMemo } from 'react'
+import {
+  DndContext, closestCenter, PointerSensor, TouchSensor,
+  useSensor, useSensors, DragOverlay,
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable,
+  rectSortingStrategy, verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useApp } from '../store/AppContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import AppShell from '../components/AppShell'
-import { Plus, Edit2, Trash2, X, UtensilsCrossed, ChevronUp, ChevronDown } from 'lucide-react'
+import {
+  Plus, Edit2, Trash2, X, UtensilsCrossed,
+  Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
+} from 'lucide-react'
+
+// ── Shared primitives ─────────────────────────────────────────────────────────
 
 function Modal({ title, onClose, children }) {
   return (
@@ -37,21 +51,252 @@ function Field({ label, type = 'text', value, onChange, placeholder }) {
   )
 }
 
-function OrderBtn({ onClick, disabled, icon: Icon }) {
+function OrangeBtn({ onClick, icon: Icon, children, small }) {
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
-      className={`w-7 h-7 flex items-center justify-center rounded-lg border transition-colors ${
-        disabled
-          ? 'border-gray-100 text-gray-200 cursor-not-allowed'
-          : 'border-gray-200 text-gray-400 hover:border-orange-300 hover:text-[#ff5a00]'
+      className={`flex items-center gap-1.5 bg-[#ff5a00] text-white rounded-xl font-bold hover:bg-[#cc4800] transition-colors shadow-sm shadow-orange-200 whitespace-nowrap ${
+        small ? 'px-3 py-1.5 text-xs' : 'px-4 py-2.5 text-sm'
       }`}
     >
-      <Icon size={12} />
+      {Icon && <Icon size={small ? 13 : 15} />}
+      {children}
     </button>
   )
 }
+
+// ── Drag handle ───────────────────────────────────────────────────────────────
+
+function DragHandle({ listeners, attributes }) {
+  return (
+    <button
+      {...listeners}
+      {...attributes}
+      className="flex-shrink-0 p-1 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors cursor-grab active:cursor-grabbing touch-none"
+      tabIndex={-1}
+    >
+      <GripVertical size={15} />
+    </button>
+  )
+}
+
+// ── Sortable grid card ────────────────────────────────────────────────────────
+
+function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging: _isDragging }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.35 : 1,
+    zIndex:  isDragging ? 10 : undefined,
+  }
+
+  const cat = categories.find(c => c.id === item.category_id)
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all flex flex-col group"
+    >
+      {/* Drag handle strip at top of image */}
+      <div className="relative">
+        {item.image_url ? (
+          <img src={item.image_url} alt={getItemName(item, lang)} className="w-full h-[130px] object-cover" />
+        ) : (
+          <div className="w-full h-[130px] bg-orange-50 flex items-center justify-center">
+            <UtensilsCrossed size={28} className="text-orange-200" />
+          </div>
+        )}
+        {/* Drag handle overlay */}
+        <button
+          {...listeners}
+          {...attributes}
+          className="absolute top-2 left-2 p-1 rounded-lg bg-white/80 backdrop-blur-sm text-gray-400 hover:text-gray-700 hover:bg-white transition-colors cursor-grab active:cursor-grabbing touch-none shadow-sm"
+          tabIndex={-1}
+        >
+          <GripVertical size={14} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="p-3 flex flex-col flex-1">
+        <p className="font-black text-gray-900 text-[13px] leading-snug line-clamp-2 mb-0.5">
+          {getItemName(item, lang)}
+        </p>
+        {cat && (
+          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-1">
+            {getCategoryName(cat, lang)}
+          </p>
+        )}
+        <p className="text-[#ff5a00] font-black text-sm mb-2">{formatCurrency(item.price)}</p>
+        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit mb-3 ${
+          item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
+        }`}>
+          {item.available
+            ? (lang === 'uz' ? 'Mavjud' : lang === 'ru' ? 'Доступно' : 'Available')
+            : (lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто'  : 'Hidden')}
+        </span>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-gray-50">
+          <button
+            onClick={() => onEdit(item)}
+            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-[11px] font-semibold"
+          >
+            <Edit2 size={11} />
+            {lang === 'uz' ? 'Tahrirl' : lang === 'ru' ? 'Ред.' : 'Edit'}
+          </button>
+          <button
+            onClick={() => onDelete(item.id)}
+            className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Sortable list row ─────────────────────────────────────────────────────────
+
+function SortableItemRow({ item, lang, onEdit, onDelete, categories }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.35 : 1,
+    zIndex:  isDragging ? 10 : undefined,
+  }
+
+  const cat = categories.find(c => c.id === item.category_id)
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
+    >
+      <DragHandle listeners={listeners} attributes={attributes} />
+      {item.image_url ? (
+        <img src={item.image_url} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+          <UtensilsCrossed size={18} className="text-orange-200" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-gray-900 text-sm truncate">{getItemName(item, lang)}</p>
+        {cat && <p className="text-xs text-gray-400">{getCategoryName(cat, lang)}</p>}
+      </div>
+      <p className="text-[#ff5a00] font-black text-sm flex-shrink-0">{formatCurrency(item.price)}</p>
+      <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ${
+        item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
+      }`}>
+        {item.available
+          ? (lang === 'uz' ? 'Mavjud' : lang === 'ru' ? 'Доступно' : 'Available')
+          : (lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто'  : 'Hidden')}
+      </span>
+      <div className="flex gap-1.5 flex-shrink-0">
+        <button
+          onClick={() => onEdit(item)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold"
+        >
+          <Edit2 size={12} />
+          {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Редакт.' : 'Edit'}
+        </button>
+        <button
+          onClick={() => onDelete(item.id)}
+          className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Sortable category row ─────────────────────────────────────────────────────
+
+// Shared grid template — header and every row must use the same string exactly.
+const CAT_GRID = 'grid grid-cols-[20px_52px_1fr_110px_90px_160px] items-center gap-4 px-5'
+
+function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, sortIndex }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.35 : 1,
+    zIndex:  isDragging ? 10 : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`${CAT_GRID} py-4 hover:bg-gray-50/60 transition-colors border-b border-gray-100 last:border-0`}
+    >
+      {/* col 1 – drag handle */}
+      <DragHandle listeners={listeners} attributes={attributes} />
+
+      {/* col 2 – image */}
+      {cat.image_url ? (
+        <img src={cat.image_url} alt="" className="w-12 h-12 rounded-xl object-cover" />
+      ) : (
+        <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center">
+          <Tag size={18} className="text-orange-300" />
+        </div>
+      )}
+
+      {/* col 3 – name + count */}
+      <div className="min-w-0">
+        <p className="font-bold text-gray-900 text-sm truncate">{getCategoryName(cat, lang)}</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {lang === 'uz' ? `${itemCount} ta element` :
+           lang === 'ru' ? `${itemCount} позиций` :
+           `${itemCount} item${itemCount !== 1 ? 's' : ''}`}
+        </p>
+      </div>
+
+      {/* col 4 – status */}
+      <div>
+        <span className="text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full bg-green-50 text-green-600 whitespace-nowrap">
+          {lang === 'uz' ? 'Faol' : lang === 'ru' ? 'Активно' : 'Active'}
+        </span>
+      </div>
+
+      {/* col 5 – sort order (centred) */}
+      <div className="flex justify-center">
+        <span className="text-sm font-black text-gray-600 w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100">
+          {sortIndex}
+        </span>
+      </div>
+
+      {/* col 6 – actions */}
+      <div className="flex gap-1.5 justify-end">
+        <button
+          onClick={() => onEdit(cat)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold"
+        >
+          <Edit2 size={12} />
+          {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Ред.' : 'Edit'}
+        </button>
+        <button
+          onClick={() => onDelete(cat.id)}
+          className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const blankItem = {
   id: '', category_id: '',
@@ -62,16 +307,28 @@ const blankItem = {
 
 const blankCat = { id: '', name_uz: '', name_ru: '', name_en: '', image_url: '', sort_order: '' }
 
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function AdminMenu() {
   const { state, dispatch } = useApp()
   const lang = state.lang
 
-  const [tab, setTab] = useState('items')
-  const [itemModal, setItemModal] = useState(null)
-  const [catModal,  setCatModal]  = useState(null)
-  const [form,    setForm]    = useState(blankItem)
-  const [catForm, setCatForm] = useState(blankCat)
-  const [activeCat, setActiveCat] = useState('all')
+  const [tab,        setTab]        = useState('items')
+  const [itemModal,  setItemModal]  = useState(null)
+  const [catModal,   setCatModal]   = useState(null)
+  const [form,       setForm]       = useState(blankItem)
+  const [catForm,    setCatForm]    = useState(blankCat)
+  const [search,     setSearch]     = useState('')
+  const [filterCat,  setFilterCat]  = useState('all')
+  const [filterAvail,setFilterAvail]= useState('all')
+  const [gridView,   setGridView]   = useState(true)
+  const [activeId,   setActiveId]   = useState(null) // drag overlay
+
+  // Sensors: pointer (mouse/trackpad) + touch
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor,   { activationConstraint: { delay: 200, tolerance: 6 } }),
+  )
 
   // ── Sorted data ────────────────────────────────────────────────────────────
   const sortedCategories = useMemo(() =>
@@ -83,18 +340,31 @@ export default function AdminMenu() {
     [sortedCategories]
   )
 
+  const sortedItems = useMemo(() =>
+    [...state.menuItems].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
+    [state.menuItems]
+  )
+
   const filteredItems = useMemo(() => {
-    const items = activeCat === 'all'
-      ? state.menuItems
-      : state.menuItems.filter(i => i.category_id === activeCat)
-    return [...items].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
-  }, [state.menuItems, activeCat])
+    return sortedItems.filter(item => {
+      const matchCat    = filterCat === 'all' || item.category_id === filterCat
+      const matchAvail  = filterAvail === 'all' || (filterAvail === 'available' ? item.available : !item.available)
+      const q           = search.trim().toLowerCase()
+      const matchSearch = !q || getItemName(item, lang).toLowerCase().includes(q)
+      return matchCat && matchAvail && matchSearch
+    })
+  }, [sortedItems, filterCat, filterAvail, search, lang])
+
+  const itemCountByCat = useMemo(() => {
+    const m = {}
+    state.menuItems.forEach(i => { m[i.category_id] = (m[i.category_id] || 0) + 1 })
+    return m
+  }, [state.menuItems])
 
   // ── Item CRUD ──────────────────────────────────────────────────────────────
   function openNewItem() {
     const maxOrder = state.menuItems.length > 0
-      ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0))
-      : 0
+      ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
     setForm({ ...blankItem, id: 'i' + Date.now(), sort_order: maxOrder + 1 })
     setItemModal('new')
   }
@@ -110,18 +380,11 @@ export default function AdminMenu() {
   function deleteItem(id) {
     if (window.confirm('Delete this item?')) dispatch({ type: 'DELETE_MENU_ITEM', payload: id })
   }
-  function moveItem(item, direction) {
-    const idx = filteredItems.findIndex(i => i.id === item.id)
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= filteredItems.length) return
-    dispatch({ type: 'REORDER_MENU_ITEM', payload: { idA: item.id, idB: filteredItems[swapIdx].id } })
-  }
 
   // ── Category CRUD ──────────────────────────────────────────────────────────
   function openNewCat() {
     const maxOrder = realSortedCats.length > 0
-      ? Math.max(...realSortedCats.map(c => c.sort_order ?? 0))
-      : 0
+      ? Math.max(...realSortedCats.map(c => c.sort_order ?? 0)) : 0
     setCatForm({ ...blankCat, id: 'c' + Date.now(), sort_order: maxOrder + 1 })
     setCatModal('new')
   }
@@ -138,177 +401,460 @@ export default function AdminMenu() {
     if (id === 'all') return
     if (window.confirm('Delete category?')) dispatch({ type: 'DELETE_CATEGORY', payload: id })
   }
-  function moveCat(cat, direction) {
-    const idx = realSortedCats.findIndex(c => c.id === cat.id)
-    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (swapIdx < 0 || swapIdx >= realSortedCats.length) return
-    dispatch({ type: 'REORDER_CATEGORY', payload: { idA: cat.id, idB: realSortedCats[swapIdx].id } })
-  }
 
   function setF(key)  { return e => setForm(f => ({ ...f, [key]: e.target.value })) }
   function setCF(key) { return e => setCatForm(f => ({ ...f, [key]: e.target.value })) }
 
+  // ── DnD handlers ──────────────────────────────────────────────────────────
+
+  function handleItemDragEnd(event) {
+    const { active, over } = event
+    setActiveId(null)
+    if (!over || active.id === over.id) return
+    dispatch({ type: 'REORDER_MENU_ITEM', payload: { idA: active.id, idB: over.id } })
+  }
+
+  function handleCatDragEnd(event) {
+    const { active, over } = event
+    setActiveId(null)
+    if (!over || active.id === over.id) return
+    dispatch({ type: 'REORDER_CATEGORY', payload: { idA: active.id, idB: over.id } })
+  }
+
+  // Overlay item for drag ghost
+  const activeItem = activeId ? filteredItems.find(i => i.id === activeId) : null
+  const activeCat  = activeId ? realSortedCats.find(c => c.id === activeId) : null
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AppShell title={t(lang, 'menu')}>
-      {/* Tabs — flush against header, no top gap */}
-      <div className="flex bg-white border-b border-gray-100 sticky top-[52px] z-10">
-        {[['items', t(lang, 'menuItems')], ['categories', t(lang, 'categories')]].map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex-1 py-3 text-sm font-bold transition-colors border-b-2 ${
-              tab === key ? 'text-[#ff5a00] border-[#ff5a00]' : 'text-gray-400 border-transparent hover:text-gray-600'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <div className="min-h-screen bg-[#faf9f7]">
 
-      <div className="px-5 pt-3 pb-6 max-w-4xl mx-auto">
-        {/* ── Menu Items tab ── */}
-        {tab === 'items' && (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              {/* Category filter pills */}
-              <div className="flex gap-2 overflow-x-auto scrollbar-none pb-0.5 flex-1 mr-4">
-                {sortedCategories.map(cat => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setActiveCat(cat.id)}
-                    className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                      activeCat === cat.id
-                        ? 'bg-[#ff5a00] text-white'
-                        : 'bg-white border border-gray-200 text-gray-500 hover:border-orange-200'
-                    }`}
-                  >
-                    {getCategoryName(cat, lang)}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={openNewItem}
-                className="flex-shrink-0 bg-[#ff5a00] text-white rounded-xl px-4 py-2.5 text-sm font-bold flex items-center gap-1.5 hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200"
-              >
-                <Plus size={15} /> {t(lang, 'addItem')}
-              </button>
+        {/* Page header */}
+        <div className="bg-white border-b border-gray-100 px-6 pt-5 pb-0">
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-2xl font-black text-gray-900">{t(lang, 'menu')}</h1>
+            <p className="text-sm text-gray-400 mt-0.5 mb-4">
+              {lang === 'uz' ? 'Menyu elementlari va kategoriyalarini boshqaring' :
+               lang === 'ru' ? 'Управляйте позициями меню и категориями' :
+               'Manage your menu items and categories'}
+            </p>
+            <div className="flex gap-0">
+              {[['items', t(lang, 'menuItems')], ['categories', t(lang, 'categories')]].map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setTab(key)}
+                  className={`px-8 py-3 text-sm font-bold transition-all border-b-2 ${
+                    tab === key ? 'text-[#ff5a00] border-[#ff5a00]' : 'text-gray-400 border-transparent hover:text-gray-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+          </div>
+        </div>
 
-            {filteredItems.length === 0 ? (
-              <div className="text-center py-16 text-gray-400">
-                <UtensilsCrossed size={40} className="mx-auto mb-3 opacity-20" />
-                <p>No items in this category</p>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+
+          {/* ══ Menu Items tab ═══════════════════════════════════════════════ */}
+          {tab === 'items' && (
+            <>
+              {/* Toolbar row 1: search + availability + grid toggle + add */}
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder={lang === 'uz' ? 'Menyu elementlarini qidirish...' :
+                                 lang === 'ru' ? 'Поиск позиций меню...' : 'Search menu items...'}
+                    className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all shadow-sm"
+                  />
+                </div>
+                <select
+                  value={filterAvail}
+                  onChange={e => setFilterAvail(e.target.value)}
+                  className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] shadow-sm cursor-pointer"
+                >
+                  <option value="all">
+                    {lang === 'uz' ? 'Mavjudlik' : lang === 'ru' ? 'Доступность' : 'Availability'}
+                  </option>
+                  <option value="available">
+                    {lang === 'uz' ? 'Mavjud' : lang === 'ru' ? 'Доступно' : 'Available'}
+                  </option>
+                  <option value="hidden">
+                    {lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden'}
+                  </option>
+                </select>
+                <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                  <button
+                    onClick={() => setGridView(true)}
+                    className={`p-2.5 transition-colors ${gridView ? 'bg-[#ff5a00] text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <LayoutGrid size={15} />
+                  </button>
+                  <button
+                    onClick={() => setGridView(false)}
+                    className={`p-2.5 transition-colors ${!gridView ? 'bg-[#ff5a00] text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    <List size={15} />
+                  </button>
+                </div>
+                <OrangeBtn onClick={openNewItem} icon={Plus}>{t(lang, 'addItem')}</OrangeBtn>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
-                {filteredItems.map((item, idx) => {
-                  const isFirst = idx === 0
-                  const isLast  = idx === filteredItems.length - 1
+
+              {/* Toolbar row 2: category squares */}
+              <div className="flex gap-2 overflow-x-auto pb-2 mb-2" style={{ scrollbarWidth: 'none' }}>
+                {/* "All" square */}
+                {[
+                  { id: 'all', label: lang === 'uz' ? 'Hammasi' : lang === 'ru' ? 'Все' : 'All', image_url: null },
+                  ...realSortedCats.map(c => ({ id: c.id, label: getCategoryName(c, lang), image_url: c.image_url })),
+                ].map(cat => {
+                  const active = filterCat === cat.id
                   return (
-                    <div
-                      key={item.id}
-                      className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col"
+                    <button
+                      key={cat.id}
+                      onClick={() => setFilterCat(cat.id)}
+                      className={`flex-shrink-0 flex flex-col items-center justify-end rounded-2xl border-2 transition-all active:scale-95 overflow-hidden
+                        ${active
+                          ? 'border-[#ff5a00] shadow-md shadow-orange-100'
+                          : 'border-gray-200 hover:border-orange-300 bg-white hover:shadow-sm'
+                        }`}
+                      style={{ width: '88px', height: '88px' }}
                     >
-                      {/* Image */}
-                      {item.image_url ? (
-                        <img src={item.image_url} alt={getItemName(item, lang)} className="w-full h-44 object-cover" />
-                      ) : (
-                        <div className="w-full h-44 bg-orange-50 flex items-center justify-center">
-                          <UtensilsCrossed size={32} className="text-orange-200" />
-                        </div>
-                      )}
-
-                      {/* Info */}
-                      <div className="p-4 flex flex-col flex-1">
-                        <p className="font-bold text-gray-900 text-sm leading-snug mb-0.5">{getItemName(item, lang)}</p>
-                        <p className="text-[#ff5a00] font-black text-sm mb-2">{formatCurrency(item.price)}</p>
-                        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit ${
-                          item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
-                        }`}>
-                          {item.available ? 'Available' : 'Hidden'}
-                        </span>
-
-                        {/* Actions: order controls + edit/delete */}
-                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-50">
-                          {/* ↑ ↓ */}
-                          <div className="flex gap-1">
-                            <OrderBtn icon={ChevronUp}   onClick={() => moveItem(item, 'up')}   disabled={isFirst} />
-                            <OrderBtn icon={ChevronDown} onClick={() => moveItem(item, 'down')} disabled={isLast} />
-                          </div>
-                          {/* edit / delete */}
-                          <button
-                            onClick={() => openEditItem(item)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] transition-colors text-xs font-semibold"
+                      {/* Image or coloured background */}
+                      <div className="relative w-full h-full flex flex-col items-center justify-end">
+                        {cat.id === 'all' ? (
+                          <>
+                            <div className={`absolute inset-0 ${active ? 'bg-[#fff1e8]' : 'bg-gray-50'}`} />
+                            <div className="absolute inset-0 flex items-center justify-center pb-5">
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${active ? 'bg-[#ff5a00]/15' : 'bg-orange-100'}`}>
+                                <LayoutGrid size={18} className={active ? 'text-[#ff5a00]' : 'text-orange-400'} />
+                              </div>
+                            </div>
+                          </>
+                        ) : cat.image_url ? (
+                          <img
+                            src={cat.image_url}
+                            alt={cat.label}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className={`absolute inset-0 ${active ? 'bg-[#fff1e8]' : 'bg-gray-50'}`} />
+                        )}
+                        {/* Label overlay */}
+                        <div className={`relative z-10 w-full px-1.5 py-1.5 text-center
+                          ${cat.image_url && cat.id !== 'all'
+                            ? 'bg-black/45 backdrop-blur-[1px]'
+                            : ''
+                          }`}
+                        >
+                          <span className={`text-[11px] font-bold leading-tight block
+                            ${cat.image_url && cat.id !== 'all'
+                              ? 'text-white'
+                              : active ? 'text-[#ff5a00]' : 'text-gray-700'
+                            }`}
+                            style={{ wordBreak: 'break-word', hyphens: 'auto' }}
                           >
-                            <Edit2 size={12} /> Edit
-                          </button>
-                          <button
-                            onClick={() => deleteItem(item.id)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-red-300 hover:text-red-500 transition-colors text-xs font-semibold"
-                          >
-                            <Trash2 size={12} /> Delete
-                          </button>
+                            {cat.label}
+                          </span>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
-            )}
-          </>
-        )}
 
-        {/* ── Categories tab ── */}
-        {tab === 'categories' && (
-          <>
-            <div className="flex justify-end mb-3">
-              <button
-                onClick={openNewCat}
-                className="bg-[#ff5a00] text-white rounded-xl px-4 py-2.5 text-sm font-bold flex items-center gap-1.5 hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200"
-              >
-                <Plus size={15} /> {t(lang, 'addCategory')}
-              </button>
-            </div>
-            <div className="space-y-2">
-              {realSortedCats.map((cat, idx) => {
-                const isFirst = idx === 0
-                const isLast  = idx === realSortedCats.length - 1
-                return (
-                  <div key={cat.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
-                    {cat.image_url ? (
-                      <img src={cat.image_url} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+              {/* Hint */}
+              {filteredItems.length > 1 && (
+                <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+                  <GripVertical size={12} />
+                  {lang === 'uz' ? 'Tartiblash uchun sudrang' : lang === 'ru' ? 'Перетащите для сортировки' : 'Drag to reorder'}
+                </p>
+              )}
+
+              {filteredItems.length === 0 ? (
+                <div className="bg-white border border-gray-100 rounded-2xl py-20 text-center shadow-sm">
+                  <UtensilsCrossed size={40} className="mx-auto mb-3 text-gray-200" />
+                  {search || filterCat !== 'all' || filterAvail !== 'all' ? (
+                    // Filters are active — just tell user to adjust them, no Add button
+                    <>
+                      <p className="text-gray-500 font-semibold mb-1">
+                        {lang === 'uz' ? 'Natija topilmadi' : lang === 'ru' ? 'Ничего не найдено' : 'No results found'}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {lang === 'uz' ? 'Filtrni tozalang yoki boshqa qidiruv kiriting' : lang === 'ru' ? 'Попробуйте другой фильтр или запрос' : 'Try adjusting your filters or search'}
+                      </p>
+                    </>
+                  ) : (
+                    // Truly empty — no items exist yet
+                    <>
+                      <p className="text-gray-500 font-semibold mb-1">
+                        {lang === 'uz' ? 'Menyu elementlari yo\'q' : lang === 'ru' ? 'Нет позиций меню' : 'No menu items yet'}
+                      </p>
+                      <p className="text-sm text-gray-400 mb-5">
+                        {lang === 'uz' ? 'Birinchi elementni qo\'shing' : lang === 'ru' ? 'Добавьте первую позицию' : 'Add your first item'}
+                      </p>
+                      <OrangeBtn onClick={openNewItem} icon={Plus}>{t(lang, 'addItem')}</OrangeBtn>
+                    </>
+                  )}
+                </div>
+              ) : (() => {
+                // Show grouped sections when "All" is selected with no active filters
+                const showGrouped = filterCat === 'all' && !search && filterAvail === 'all'
+
+                // Build category sections for grouped view
+                const sections = showGrouped
+                  ? realSortedCats
+                      .map(cat => ({
+                        cat,
+                        items: filteredItems.filter(i => i.category_id === cat.id),
+                      }))
+                      .filter(s => s.items.length > 0)
+                  : null
+
+                // Uncategorised items (no matching category)
+                const uncategorised = showGrouped
+                  ? filteredItems.filter(i => !realSortedCats.some(c => c.id === i.category_id))
+                  : []
+
+                const DragGhost = () => activeItem ? (
+                  <div className="bg-white rounded-2xl border-2 border-[#ff5a00]/40 shadow-2xl opacity-95 w-44 rotate-2">
+                    {activeItem.image_url ? (
+                      <img src={activeItem.image_url} alt="" className="w-full h-[100px] object-cover rounded-t-2xl" />
                     ) : (
-                      <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-xl flex-shrink-0">🍽️</div>
+                      <div className="w-full h-[100px] bg-orange-50 rounded-t-2xl flex items-center justify-center">
+                        <UtensilsCrossed size={24} className="text-orange-200" />
+                      </div>
                     )}
-                    <p className="flex-1 font-bold text-sm text-gray-900">{getCategoryName(cat, lang)}</p>
-                    <p className="text-xs text-gray-400 mr-1">
-                      {state.menuItems.filter(i => i.category_id === cat.id).length} items
-                    </p>
-                    {/* ↑ ↓ */}
-                    <div className="flex gap-1 flex-shrink-0">
-                      <OrderBtn icon={ChevronUp}   onClick={() => moveCat(cat, 'up')}   disabled={isFirst} />
-                      <OrderBtn icon={ChevronDown} onClick={() => moveCat(cat, 'down')} disabled={isLast} />
-                    </div>
-                    {/* divider */}
-                    <div className="w-px h-5 bg-gray-100 flex-shrink-0" />
-                    {/* edit / delete */}
-                    <div className="flex gap-1 flex-shrink-0">
-                      <button onClick={() => openEditCat(cat)} className="p-2 rounded-xl hover:bg-orange-50 text-gray-300 hover:text-[#ff5a00] transition-colors">
-                        <Edit2 size={14} />
-                      </button>
-                      <button onClick={() => deleteCat(cat.id)} className="p-2 rounded-xl hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
-                        <Trash2 size={14} />
-                      </button>
+                    <div className="p-2.5">
+                      <p className="font-black text-gray-900 text-[12px] truncate">{getItemName(activeItem, lang)}</p>
+                      <p className="text-[#ff5a00] font-black text-xs">{formatCurrency(activeItem.price)}</p>
                     </div>
                   </div>
+                ) : null
+
+                return (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={e => setActiveId(e.active.id)}
+                    onDragEnd={handleItemDragEnd}
+                    onDragCancel={() => setActiveId(null)}
+                  >
+                    <SortableContext
+                      items={filteredItems.map(i => i.id)}
+                      strategy={gridView ? rectSortingStrategy : verticalListSortingStrategy}
+                    >
+                      {showGrouped ? (
+                        // ── Grouped by category ──────────────────────────────
+                        <div className="space-y-8">
+                          {sections.map(({ cat, items: catItems }) => (
+                            <div key={cat.id}>
+                              {/* Section header */}
+                              <div className="flex items-center gap-3 mb-3">
+                                {cat.image_url && (
+                                  <img src={cat.image_url} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
+                                )}
+                                <h3 className="text-base font-black text-gray-800">
+                                  {getCategoryName(cat, lang)}
+                                </h3>
+                                <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                                  {catItems.length}
+                                </span>
+                                <div className="flex-1 h-px bg-gray-100" />
+                              </div>
+
+                              {gridView ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                  {catItems.map(item => (
+                                    <SortableItemCard
+                                      key={item.id}
+                                      item={item}
+                                      lang={lang}
+                                      onEdit={openEditItem}
+                                      onDelete={deleteItem}
+                                      categories={realSortedCats}
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                                  {catItems.map(item => (
+                                    <SortableItemRow
+                                      key={item.id}
+                                      item={item}
+                                      lang={lang}
+                                      onEdit={openEditItem}
+                                      onDelete={deleteItem}
+                                      categories={realSortedCats}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Uncategorised items (edge case) */}
+                          {uncategorised.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-3 mb-3">
+                                <h3 className="text-base font-black text-gray-500">
+                                  {lang === 'uz' ? 'Kategoriyasiz' : lang === 'ru' ? 'Без категории' : 'Uncategorised'}
+                                </h3>
+                                <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                                  {uncategorised.length}
+                                </span>
+                                <div className="flex-1 h-px bg-gray-100" />
+                              </div>
+                              {gridView ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                  {uncategorised.map(item => (
+                                    <SortableItemCard key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                                  {uncategorised.map(item => (
+                                    <SortableItemRow key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        // ── Flat grid (specific category or active filter) ────
+                        gridView ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                            {filteredItems.map(item => (
+                              <SortableItemCard key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                            {filteredItems.map(item => (
+                              <SortableItemRow key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
+                            ))}
+                          </div>
+                        )
+                      )}
+                    </SortableContext>
+
+                    <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
+                      <DragGhost />
+                    </DragOverlay>
+                  </DndContext>
                 )
-              })}
-            </div>
-          </>
-        )}
+              })()}
+
+              {filteredItems.length > 0 && (
+                <p className="text-xs text-gray-400 text-center mt-4">
+                  {lang === 'uz' ? `${filteredItems.length} ta element` :
+                   lang === 'ru' ? `Итого: ${filteredItems.length} позиций` :
+                   `Total ${filteredItems.length} item${filteredItems.length !== 1 ? 's' : ''}`}
+                </p>
+              )}
+            </>
+          )}
+
+          {/* ══ Categories tab ═══════════════════════════════════════════════ */}
+          {tab === 'categories' && (
+            <>
+              <div className="flex justify-end mb-5">
+                <OrangeBtn onClick={openNewCat} icon={Plus}>{t(lang, 'addCategory')}</OrangeBtn>
+              </div>
+
+              {realSortedCats.length === 0 ? (
+                <div className="bg-white border border-gray-100 rounded-2xl py-20 text-center shadow-sm">
+                  <FolderOpen size={40} className="mx-auto mb-3 text-gray-200" />
+                  <p className="text-gray-500 font-semibold mb-1">
+                    {lang === 'uz' ? 'Kategoriyalar yo\'q' : lang === 'ru' ? 'Нет категорий' : 'No categories yet'}
+                  </p>
+                  <p className="text-sm text-gray-400 mb-5">
+                    {lang === 'uz' ? 'Birinchi kategoriyani qo\'shing' :
+                     lang === 'ru' ? 'Добавьте первую категорию' : 'Add your first category'}
+                  </p>
+                  <OrangeBtn onClick={openNewCat} icon={Plus}>{t(lang, 'addCategory')}</OrangeBtn>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+                    <GripVertical size={12} />
+                    {lang === 'uz' ? 'Tartiblash uchun sudrang' : lang === 'ru' ? 'Перетащите для сортировки' : 'Drag to reorder'}
+                  </p>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={e => setActiveId(e.active.id)}
+                    onDragEnd={handleCatDragEnd}
+                    onDragCancel={() => setActiveId(null)}
+                  >
+                    <SortableContext
+                      items={realSortedCats.map(c => c.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                        {/* Header — must use the same CAT_GRID template as the rows */}
+                        <div className={`${CAT_GRID} py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wide`}>
+                          <span />
+                          <span />
+                          <span>{lang === 'uz' ? 'Nomi' : lang === 'ru' ? 'Название' : 'Name'}</span>
+                          <span>{lang === 'uz' ? 'Holat' : lang === 'ru' ? 'Статус' : 'Status'}</span>
+                          <span className="text-center">{lang === 'uz' ? 'Tartib' : lang === 'ru' ? 'Порядок' : 'Sort Order'}</span>
+                          <span className="text-right">{lang === 'uz' ? 'Amallar' : lang === 'ru' ? 'Действия' : 'Actions'}</span>
+                        </div>
+
+                        {realSortedCats.map((cat, idx) => (
+                          <SortableCatRow
+                            key={cat.id}
+                            cat={cat}
+                            lang={lang}
+                            itemCount={itemCountByCat[cat.id] || 0}
+                            onEdit={openEditCat}
+                            onDelete={deleteCat}
+                            sortIndex={idx + 1}
+                          />
+                        ))}
+
+                        {/* Footer */}
+                        <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-400 text-center">
+                          {lang === 'uz' ? `Jami ${realSortedCats.length} ta kategoriya` :
+                           lang === 'ru' ? `Всего категорий: ${realSortedCats.length}` :
+                           `Total ${realSortedCats.length} categor${realSortedCats.length !== 1 ? 'ies' : 'y'}`}
+                        </div>
+                      </div>
+                    </SortableContext>
+
+                    {/* Drag overlay ghost */}
+                    <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
+                      {activeCat && (
+                        <div className="bg-white border-2 border-[#ff5a00]/40 rounded-2xl shadow-2xl flex items-center gap-4 px-5 py-4 opacity-95">
+                          {activeCat.image_url ? (
+                            <img src={activeCat.image_url} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+                              <Tag size={18} className="text-orange-300" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-bold text-gray-900 text-sm">{getCategoryName(activeCat, lang)}</p>
+                            <p className="text-xs text-gray-400">{itemCountByCat[activeCat.id] || 0} items</p>
+                          </div>
+                        </div>
+                      )}
+                    </DragOverlay>
+                  </DndContext>
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
-      {/* ── Item modal ── */}
+      {/* ── Item modal ──────────────────────────────────────────────────────── */}
       {itemModal && (
         <Modal title={itemModal === 'new' ? t(lang, 'addItem') : t(lang, 'editItem')} onClose={() => setItemModal(null)}>
           <div className="space-y-3">
@@ -356,9 +902,12 @@ export default function AdminMenu() {
         </Modal>
       )}
 
-      {/* ── Category modal ── */}
+      {/* ── Category modal ──────────────────────────────────────────────────── */}
       {catModal && (
-        <Modal title={catModal === 'new' ? t(lang, 'addCategory') : 'Edit Category'} onClose={() => setCatModal(null)}>
+        <Modal
+          title={catModal === 'new' ? t(lang, 'addCategory') : (lang === 'uz' ? 'Kategoriyani tahrirlash' : lang === 'ru' ? 'Редактировать категорию' : 'Edit Category')}
+          onClose={() => setCatModal(null)}
+        >
           <div className="space-y-3">
             <Field label={t(lang, 'nameUz')} value={catForm.name_uz} onChange={setCF('name_uz')} />
             <Field label={t(lang, 'nameRu')} value={catForm.name_ru} onChange={setCF('name_ru')} />
