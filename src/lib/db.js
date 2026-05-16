@@ -159,19 +159,42 @@ export async function writeToSupabase(action, state) {
       const loyalty        = typeof action.payload === 'object' ? action.payload.loyalty : null
       const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
 
-      // Only include columns that exist in the DB schema
-      const orderUpdate = {
-        status:         'paid',
-        payment_status: 'paid',
-        ...(payment_method              ? { payment_method }              : {}),
-        ...(loyalty?.total              ? { total: loyalty.total }        : {}),
-        ...(loyalty?.service_fee        ? { service_fee: loyalty.service_fee } : {}),
-      }
-      await supabase
+      const paidAt  = new Date().toISOString()
+      const discPct = loyalty?.loyalty_discount_pct || 0
+
+      // Fetch each unpaid order so we can write correct proportional values per round.
+      // Writing the combined total to every row then summing in Reports caused double-counting.
+      const { data: unpaidOrders } = await supabase
         .from('orders')
-        .update(orderUpdate)
+        .select('id, subtotal')
         .eq('table_id', tableId)
         .eq('payment_status', 'unpaid')
+
+      if (unpaidOrders?.length) {
+        const combinedSubtotal   = unpaidOrders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0)
+        const combinedAfterDisc  = combinedSubtotal * (1 - discPct / 100)
+        // Derive service rate from what CashierBill computed; fall back to 20 %
+        const serviceRate = combinedAfterDisc > 0 && loyalty?.service_fee
+          ? loyalty.service_fee / combinedAfterDisc
+          : 0.2
+
+        for (const o of unpaidOrders) {
+          const sub     = Number(o.subtotal) || 0
+          const discAmt = Math.round(sub * discPct / 100)
+          const afterDisc = sub - discAmt
+          const svcFee  = Math.round(afterDisc * serviceRate)
+          await supabase.from('orders').update({
+            status:         'paid',
+            payment_status: 'paid',
+            paid_at:        paidAt,
+            total:          afterDisc + svcFee,
+            service_fee:    svcFee,
+            ...(payment_method ? { payment_method }                              : {}),
+            ...(discPct        ? { loyalty_discount_pct:    discPct }            : {}),
+            ...(discAmt        ? { loyalty_discount_amount: discAmt }            : {}),
+          }).eq('id', o.id)
+        }
+      }
 
       await supabase
         .from('restaurant_tables')

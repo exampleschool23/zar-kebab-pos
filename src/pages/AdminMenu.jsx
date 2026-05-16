@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef } from 'react'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, DragOverlay,
@@ -15,7 +15,9 @@ import AppShell from '../components/AppShell'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
+  ImagePlus, Loader2,
 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -47,6 +49,68 @@ function Field({ label, type = 'text', value, onChange, placeholder }) {
         placeholder={placeholder}
         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
       />
+    </div>
+  )
+}
+
+function ImageUploadField({ label, value, onChange }) {
+  const fileRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const input = e.target
+    setUploading(true)
+    try {
+      const ext  = file.name.split('.').pop()
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      // Create bucket if it doesn't exist yet
+      const { data: buckets } = await supabase.storage.listBuckets()
+      if (!buckets?.find(b => b.name === 'menu-images')) {
+        await supabase.storage.createBucket('menu-images', { public: true })
+      }
+
+      const { error: uploadError } = await supabase.storage.from('menu-images').upload(path, file, { upsert: true })
+      if (uploadError) {
+        alert('Upload failed: ' + uploadError.message)
+        return
+      }
+      const { data } = supabase.storage.from('menu-images').getPublicUrl(path)
+      onChange({ target: { value: data.publicUrl } })
+    } catch (err) {
+      alert('Upload error: ' + err.message)
+    } finally {
+      setUploading(false)
+      input.value = ''
+    }
+  }
+
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 font-semibold mb-1.5">{label}</label>
+      <div className="flex gap-2 items-start">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="flex-shrink-0 flex items-center gap-1.5 border-2 border-dashed border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-500 hover:border-[#ff5a00] hover:text-[#ff5a00] transition-colors disabled:opacity-50"
+        >
+          {uploading ? <Loader2 size={15} className="animate-spin" /> : <ImagePlus size={15} />}
+          {uploading ? 'Uploading…' : 'Upload'}
+        </button>
+        <input
+          type="text"
+          value={value}
+          onChange={onChange}
+          placeholder="https://..."
+          className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
+        />
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      </div>
+      {value && (
+        <img src={value} alt="preview" className="mt-2 h-20 w-20 object-cover rounded-xl border border-gray-200" />
+      )}
     </div>
   )
 }
@@ -878,7 +942,7 @@ export default function AdminMenu() {
             <Field label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} />
             <Field label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} />
             <Field label={`${t(lang, 'price')} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="25000" />
-            <Field label={t(lang, 'imageUrl')} value={form.image_url} onChange={setF('image_url')} placeholder="https://..." />
+            <ImageUploadField label={t(lang, 'imageUrl')} value={form.image_url} onChange={setF('image_url')} />
             <Field label="Sort order" type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
             <div className="flex items-center gap-2 pt-1">
               <input
@@ -912,7 +976,7 @@ export default function AdminMenu() {
             <Field label={t(lang, 'nameUz')} value={catForm.name_uz} onChange={setCF('name_uz')} />
             <Field label={t(lang, 'nameRu')} value={catForm.name_ru} onChange={setCF('name_ru')} />
             <Field label={t(lang, 'nameEn')} value={catForm.name_en} onChange={setCF('name_en')} />
-            <Field label={t(lang, 'imageUrl')} value={catForm.image_url} onChange={setCF('image_url')} placeholder="https://..." />
+            <ImageUploadField label={t(lang, 'imageUrl')} value={catForm.image_url} onChange={setCF('image_url')} />
             <Field label="Sort order" type="number" value={catForm.sort_order} onChange={setCF('sort_order')} placeholder="1" />
             <div className="flex gap-2 pt-2">
               <button onClick={() => setCatModal(null)} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">

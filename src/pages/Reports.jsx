@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
+import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import AppShell from '../components/AppShell'
@@ -43,14 +44,17 @@ function getPaymentMethod(o) {
   return o.payment_method || null
 }
 
-/** Total revenue for one order — tries stored total first, falls back to calculation */
+/** Total revenue for one order, derived from stored components so multi-round grouping stays accurate */
 function getOrderTotal(o) {
+  const sub  = Number(o.subtotal)  || 0
+  const svc  = Number(o.service_fee) || 0
+  const disc = Number(o.loyalty_discount_amount) || Number(o.discount_amount) || 0
+  if (sub > 0) return sub + svc - disc
+  // Legacy/single orders without subtotal — fall back to stored total
   if (o.total != null && Number(o.total) > 0) return Number(o.total)
-  const items    = getOrderItems(o)
-  const subtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
-  const service  = o.service_amount != null ? Number(o.service_amount) : Math.round(subtotal * 0.2)
-  const discount = o.discount_amount != null ? Number(o.discount_amount) : 0
-  return subtotal + service - discount
+  const items = getOrderItems(o)
+  const itemsSum = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
+  return Math.round(itemsSum * 1.2)
 }
 
 /** Convert any ISO/date string to local YYYY-MM-DD */
@@ -93,21 +97,33 @@ function addDays(isoDate, n) {
 function groupOrdersBySession(orders) {
   const map = {}
   orders.forEach(o => {
-    const anchor = (getOrderDate(o) || '').slice(0, 16)
+    // When paid_at is set, all orders for a table are stamped at the same instant
+    // → minute-level key merges them precisely.
+    // When paid_at is null (legacy data), fall back to day-level so that multiple
+    // rounds at the same table on the same day still appear as one session.
+    const anchor = o.paid_at
+      ? o.paid_at.slice(0, 16)
+      : (o.created_at || '').slice(0, 10)
     const key    = `${o.table_id}::${anchor}`
     if (!map[key]) {
       map[key] = {
         ...o,
-        items:       [...getOrderItems(o)],
-        total:       Number(o.total) || 0,
-        subtotal:    Number(o.subtotal) || 0,
-        _orderCount: 1,
+        items:                    [...getOrderItems(o)],
+        total:                    Number(o.total)                    || 0,
+        subtotal:                 Number(o.subtotal)                 || 0,
+        service_fee:              Number(o.service_fee)              || 0,
+        loyalty_discount_amount:  Number(o.loyalty_discount_amount)  || 0,
+        _orderCount:  1,
+        _mergedIds:   [o.id],
       }
     } else {
       const s = map[key]
-      s.items       = [...s.items, ...getOrderItems(o)]
-      s.total       = (s.total || 0) + (Number(o.total) || 0)
-      s.subtotal    = (s.subtotal || 0) + (Number(o.subtotal) || 0)
+      s.items                   = [...s.items, ...getOrderItems(o)]
+      s.total                   = (s.total                   || 0) + (Number(o.total)                   || 0)
+      s.subtotal                = (s.subtotal                || 0) + (Number(o.subtotal)                || 0)
+      s.service_fee             = (s.service_fee             || 0) + (Number(o.service_fee)             || 0)
+      s.loyalty_discount_amount = (s.loyalty_discount_amount || 0) + (Number(o.loyalty_discount_amount) || 0)
+      s._mergedIds    = [...(s._mergedIds || []), o.id]
       s._orderCount += 1
       if (!s.payment_method && o.payment_method) s.payment_method = o.payment_method
       // Keep earliest created_at, latest paid_at
@@ -141,11 +157,11 @@ const STATUS_CFG = {
 }
 
 const PAY_CFG = {
-  cash:     { label: 'Cash',     cls: 'bg-green-50 text-green-700',   Icon: Banknote,     bar: '#16A34A' },
-  card:     { label: 'Card',     cls: 'bg-blue-50 text-blue-700',     Icon: CreditCard,   bar: '#2563EB' },
-  terminal: { label: 'Terminal', cls: 'bg-purple-50 text-purple-700', Icon: Monitor,      bar: '#7C3AED' },
-  qr:       { label: 'QR Code',  cls: 'bg-pink-50 text-pink-700',     Icon: QrCode,       bar: '#DB2777' },
-  unknown:  { label: 'Unknown',  cls: 'bg-gray-50 text-gray-600',     Icon: HelpCircle,   bar: '#9CA3AF' },
+  cash:     { label: { uz: 'Naqd',      ru: 'Наличные',   en: 'Cash'     }, cls: 'bg-green-50 text-green-700',   Icon: Banknote,   bar: '#16A34A' },
+  card:     { label: { uz: 'Karta',     ru: 'Карта',      en: 'Card'     }, cls: 'bg-blue-50 text-blue-700',     Icon: CreditCard, bar: '#2563EB' },
+  terminal: { label: { uz: 'Terminal',  ru: 'Терминал',   en: 'Terminal' }, cls: 'bg-purple-50 text-purple-700', Icon: Monitor,    bar: '#7C3AED' },
+  qr:       { label: { uz: 'QR Kod',    ru: 'QR Код',     en: 'QR Code'  }, cls: 'bg-pink-50 text-pink-700',     Icon: QrCode,     bar: '#DB2777' },
+  unknown:  { label: { uz: "Noma'lum",  ru: 'Неизвестно', en: 'Unknown'  }, cls: 'bg-gray-50 text-gray-600',     Icon: HelpCircle, bar: '#9CA3AF' },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,14 +188,14 @@ function StatusBadge({ status, lang }) {
   )
 }
 
-function PayBadge({ method }) {
+function PayBadge({ method, lang }) {
   const key = (method || '').toLowerCase()
   const cfg = PAY_CFG[key] || PAY_CFG.unknown
   const { Icon } = cfg
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.cls}`}>
       <Icon size={10} />
-      {cfg.label}
+      {cfg.label[lang] || cfg.label.en}
     </span>
   )
 }
@@ -207,12 +223,16 @@ function ProgressBar({ pct, color = '#ff5a00' }) {
   )
 }
 
-function EmptyState({ label }) {
+function EmptyState({ label, lang }) {
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-2xl py-20 text-center shadow-sm">
       <BarChart2 size={36} className="mx-auto mb-3 text-gray-200" />
-      <p className="text-[#6B7280] font-semibold">{label || 'No data for this period'}</p>
-      <p className="text-[12px] text-[#9CA3AF] mt-1">Try selecting a different date or removing filters</p>
+      <p className="text-[#6B7280] font-semibold">
+        {label || (lang === 'uz' ? "Bu davr uchun ma'lumot yo'q" : lang === 'ru' ? 'Нет данных за этот период' : 'No data for this period')}
+      </p>
+      <p className="text-[12px] text-[#9CA3AF] mt-1">
+        {lang === 'uz' ? 'Boshqa sana yoki filterni tanlang' : lang === 'ru' ? 'Выберите другую дату или уберите фильтры' : 'Try selecting a different date or removing filters'}
+      </p>
     </div>
   )
 }
@@ -279,13 +299,22 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
   const maxQty = items[0]?.quantity || 1
   const maxRev = items[0]?.revenue  || 1
 
-  if (items.length === 0) return <EmptyState />
+  const s = {
+    sortBy:   { uz: 'Saralash:',  ru: 'Сортировка:', en: 'Sort by:' },
+    units:    { uz: 'Dona',       ru: 'Кол-во',      en: 'Units Sold' },
+    revenue:  { uz: 'Daromad',    ru: 'Выручка',     en: 'Revenue' },
+    product:  { uz: 'Mahsulot',   ru: 'Продукт',     en: 'Product' },
+    category: { uz: 'Kategoriya', ru: 'Категория',   en: 'Category' },
+    sold:     { uz: 'Sotilgan',   ru: 'Продано',     en: 'Sold' },
+  }
+
+  if (items.length === 0) return <EmptyState lang={lang} />
 
   return (
     <div>
       {/* Sort toggle */}
       <div className="flex items-center justify-end gap-2 mb-4">
-        <span className="text-[12px] text-[#9CA3AF]">Sort by:</span>
+        <span className="text-[12px] text-[#9CA3AF]">{s.sortBy[lang] || s.sortBy.en}</span>
         {['quantity', 'revenue'].map(k => (
           <button
             key={k}
@@ -294,7 +323,7 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
               sortBy === k ? 'bg-[#ff5a00] text-white' : 'bg-gray-100 text-[#6B7280] hover:bg-gray-200'
             }`}
           >
-            {k === 'quantity' ? 'Units Sold' : 'Revenue'}
+            {k === 'quantity' ? (s.units[lang] || s.units.en) : (s.revenue[lang] || s.revenue.en)}
           </button>
         ))}
       </div>
@@ -303,8 +332,8 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
         <div className="bg-white rounded-2xl overflow-hidden min-w-[520px]">
         {/* Header */}
         <div className="hidden md:grid grid-cols-[32px_48px_1fr_120px_80px_110px] gap-3 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
-          <span>#</span><span></span><span>Product</span><span>Category</span>
-          <span className="text-center">Sold</span><span className="text-right">Revenue</span>
+          <span>#</span><span></span><span>{s.product[lang] || s.product.en}</span><span>{s.category[lang] || s.category.en}</span>
+          <span className="text-center">{s.sold[lang] || s.sold.en}</span><span className="text-right">{s.revenue[lang] || s.revenue.en}</span>
         </div>
 
         {items.slice(0, 20).map((item, i) => (
@@ -370,7 +399,7 @@ function ByCategoryTab({ orders, categories, menuItemMap, lang }) {
       .sort((a, b) => b.revenue - a.revenue)
   }, [orders, categories, menuItemMap, lang])
 
-  if (data.length === 0) return <EmptyState />
+  if (data.length === 0) return <EmptyState lang={lang} />
 
   const maxRev = data[0]?.revenue || 1
   return (
@@ -395,7 +424,7 @@ function ByCategoryTab({ orders, categories, menuItemMap, lang }) {
             <div className="flex items-center justify-between mb-1">
               <p className="font-semibold text-sm text-[#1F2937]">{d.label}</p>
               <div className="flex items-center gap-3">
-                <span className="text-[11px] text-[#9CA3AF]">{d.qty} items · {d.pct}%</span>
+                <span className="text-[11px] text-[#9CA3AF]">{d.qty} {lang === 'uz' ? 'dona' : lang === 'ru' ? 'шт.' : 'items'} · {d.pct}%</span>
                 <span className="font-bold text-sm text-[#ff5a00]">{formatCurrency(d.revenue)}</span>
               </div>
             </div>
@@ -427,7 +456,7 @@ function ByHourTab({ orders, lang }) {
   }, [orders])
 
   const activeHours = hours.filter(h => h.count > 0)
-  if (activeHours.length === 0) return <EmptyState />
+  if (activeHours.length === 0) return <EmptyState lang={lang} />
 
   const maxRev = Math.max(...hours.map(h => h.revenue), 1)
   const peak   = hours[peakIdx]
@@ -508,7 +537,7 @@ function PaymentMethodsTab({ orders, lang }) {
     return { data: rows, totalRevenue: total }
   }, [orders])
 
-  if (data.length === 0) return <EmptyState />
+  if (data.length === 0) return <EmptyState lang={lang} />
 
   return (
     <div className="space-y-4">
@@ -523,7 +552,7 @@ function PaymentMethodsTab({ orders, lang }) {
                 <span className={`w-8 h-8 rounded-xl flex items-center justify-center ${cfg.cls}`}>
                   <Icon size={14} />
                 </span>
-                <span className="font-bold text-[13px] text-[#1F2937]">{cfg.label}</span>
+                <span className="font-bold text-[13px] text-[#1F2937]">{cfg.label[lang] || cfg.label.en}</span>
               </div>
               <p className="font-black text-xl text-[#ff5a00]">{formatCurrency(d.revenue)}</p>
               <p className="text-[11px] text-[#9CA3AF] mt-0.5">{d.count} {lang === 'uz' ? 'ta' : lang === 'ru' ? 'зак.' : 'orders'} · {d.pct}%</p>
@@ -536,7 +565,7 @@ function PaymentMethodsTab({ orders, lang }) {
       {/* Detailed breakdown */}
       <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50">
-          <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Breakdown</p>
+          <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">{lang === 'uz' ? 'Tafsilot' : lang === 'ru' ? 'Детали' : 'Breakdown'}</p>
         </div>
         {data.map(d => {
           const cfg = PAY_CFG[d.method] || PAY_CFG.unknown
@@ -548,14 +577,14 @@ function PaymentMethodsTab({ orders, lang }) {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between mb-1">
-                  <p className="font-semibold text-sm text-[#1F2937]">{cfg.label}</p>
+                  <p className="font-semibold text-sm text-[#1F2937]">{cfg.label[lang] || cfg.label.en}</p>
                   <p className="font-bold text-sm text-[#ff5a00]">{formatCurrency(d.revenue)}</p>
                 </div>
                 <ProgressBar pct={d.pct} color={cfg.bar} />
               </div>
               <div className="text-right flex-shrink-0 min-w-[60px]">
                 <p className="text-[12px] font-bold text-[#1F2937]">{d.pct}%</p>
-                <p className="text-[11px] text-[#9CA3AF]">{d.count} orders</p>
+                <p className="text-[11px] text-[#9CA3AF]">{d.count} {lang === 'uz' ? 'ta' : lang === 'ru' ? 'зак.' : 'orders'}</p>
               </div>
             </div>
           )
@@ -591,7 +620,7 @@ function WaiterPerformanceTab({ orders, lang }) {
       .sort((a, b) => b.revenue - a.revenue)
   }, [orders])
 
-  if (data.length === 0) return <EmptyState />
+  if (data.length === 0) return <EmptyState lang={lang} />
 
   const maxRev = data[0]?.revenue || 1
 
@@ -600,11 +629,11 @@ function WaiterPerformanceTab({ orders, lang }) {
     <div className="bg-white rounded-2xl overflow-hidden min-w-[640px]">
       {/* Header */}
       <div className="hidden md:grid grid-cols-[32px_1fr_80px_140px_140px_80px] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
-        <span>#</span><span>Waiter</span>
-        <span className="text-center">Orders</span>
-        <span className="text-right">Revenue</span>
-        <span className="text-right">Avg Order</span>
-        <span className="text-center">Items</span>
+        <span>#</span><span>{lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант' : 'Waiter'}</span>
+        <span className="text-center">{lang === 'uz' ? 'Brt.' : lang === 'ru' ? 'Зак.' : 'Orders'}</span>
+        <span className="text-right">{lang === 'uz' ? 'Daromad' : lang === 'ru' ? 'Выручка' : 'Revenue'}</span>
+        <span className="text-right">{lang === 'uz' ? "O'rtacha" : lang === 'ru' ? 'Ср. чек' : 'Avg Order'}</span>
+        <span className="text-center">{lang === 'uz' ? 'Dona' : lang === 'ru' ? 'Блюд' : 'Items'}</span>
       </div>
 
       {data.map((d, i) => (
@@ -645,9 +674,9 @@ function WaiterPerformanceTab({ orders, lang }) {
               <p className="font-black text-[#ff5a00]">{formatCurrency(d.revenue)}</p>
             </div>
             <div className="flex gap-4 text-[12px] text-[#6B7280]">
-              <span>{d.orders} orders</span>
-              <span>avg {formatCurrency(d.avg)}</span>
-              <span>{d.items} items</span>
+              <span>{d.orders} {lang === 'uz' ? 'brt.' : lang === 'ru' ? 'зак.' : 'orders'}</span>
+              <span>{lang === 'uz' ? "o'rt." : lang === 'ru' ? 'ср.' : 'avg'} {formatCurrency(d.avg)}</span>
+              <span>{d.items} {lang === 'uz' ? 'dona' : lang === 'ru' ? 'шт.' : 'items'}</span>
             </div>
             <ProgressBar pct={Math.round(d.revenue / maxRev * 100)} />
           </div>
@@ -663,15 +692,36 @@ function WaiterPerformanceTab({ orders, lang }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
+  const [fetchedItems, setFetchedItems] = useState(null)
+
+  useEffect(() => {
+    if (!order) return
+    setFetchedItems(null)
+    const ids = order._mergedIds?.length ? order._mergedIds : [order.id]
+    supabase
+      .from('order_items')
+      .select('*')
+      .in('order_id', ids)
+      .then(({ data }) => { if (data?.length) setFetchedItems(data) })
+  }, [order?.id])
+
   if (!order) return null
 
-  const items      = getOrderItems(order)
-  const subtotal   = order.subtotal || items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
-  const discPct    = order.loyalty_discount_pct   || order.discount_percent   || 0
-  const discAmt    = order.loyalty_discount_amount || order.discount_amount    || 0
-  const servicePct = order.service_percent != null ? order.service_percent : 20
-  const serviceAmt = order.service_amount  != null ? Number(order.service_amount) : Math.round(subtotal * servicePct / 100)
-  const total      = getOrderTotal(order)
+  const items    = fetchedItems || getOrderItems(order)
+  const itemsSum = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
+  const subtotal = itemsSum || (Number(order.subtotal) || 0)
+  // Re-derive discAmt from the stored percentage so it's always consistent with subtotal
+  const discPct  = order.loyalty_discount_pct || order.discount_percent || 0
+  const discAmt  = discPct > 0
+    ? Math.round(subtotal * discPct / 100)
+    : (Number(order.loyalty_discount_amount) || Number(order.discount_amount) || 0)
+  const afterDisc    = Math.max(0, subtotal - discAmt)
+  // Use accumulated service_fee from grouping (now correctly proportional per round)
+  const serviceAmt   = Number(order.service_fee) > 0
+    ? Number(order.service_fee)
+    : Math.round(afterDisc * 0.2)
+  const servicePct   = afterDisc > 0 ? Math.round((serviceAmt / afterDisc) * 100) : 20
+  const total        = afterDisc + serviceAmt
   const received   = order.amount_received || 0
   const change     = order.change_amount   || (received > 0 ? Math.max(0, received - total) : 0)
   const orderNum   = order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '—'
@@ -683,10 +733,10 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
       <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E7EB] flex-shrink-0 bg-white">
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="font-black text-[#1F2937] text-base flex items-center gap-1.5">
-            Order {orderNum}
+            {lang === 'uz' ? 'Buyurtma' : lang === 'ru' ? 'Заказ' : 'Order'} {orderNum}
             {sessionCnt > 1 && (
               <span className="text-[10px] font-black bg-orange-100 text-[#ff5a00] rounded-md px-1.5 py-0.5 leading-none">
-                {sessionCnt} rounds
+                {sessionCnt} {lang === 'uz' ? 'tur' : lang === 'ru' ? 'раунд' : 'rounds'}
               </span>
             )}
           </span>
@@ -703,12 +753,12 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
         {/* Order meta */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: 'Table',    value: order.table_name || '—' },
-            { label: 'Waiter',   value: order.waiter_name || '—' },
-            { label: 'Payment',  value: <PayBadge method={order.payment_method} /> },
-            { label: 'Created',  value: fmtDate(order.created_at) },
-            { label: 'Paid At',  value: fmtDate(order.paid_at) },
-            { label: 'Status',   value: <StatusBadge status={order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')} lang={lang} /> },
+            { label: lang === 'uz' ? 'Stol'      : lang === 'ru' ? 'Стол'      : 'Table',    value: order.table_name || '—' },
+            { label: lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант'  : 'Waiter',   value: order.waiter_name || '—' },
+            { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PayBadge method={order.payment_method} lang={lang} /> },
+            { label: lang === 'uz' ? 'Yaratildi' : lang === 'ru' ? 'Создан'    : 'Created',  value: fmtDate(order.created_at) },
+            { label: lang === 'uz' ? "To'landi"  : lang === 'ru' ? 'Оплачен'   : 'Paid At',  value: fmtDate(order.paid_at) },
+            { label: lang === 'uz' ? 'Holat'     : lang === 'ru' ? 'Статус'    : 'Status',   value: <StatusBadge status={order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')} lang={lang} /> },
           ].map(({ label, value }) => (
             <div key={label} className="bg-gray-50 rounded-xl p-3">
               <p className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wide mb-1">{label}</p>
@@ -720,7 +770,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
         {/* Items */}
         <div>
           <p className="text-xs font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">
-            Ordered Items ({items.length})
+            {lang === 'uz' ? 'Buyurtma qilingan' : lang === 'ru' ? 'Заказанные блюда' : 'Ordered Items'} ({items.length})
           </p>
           <div className="space-y-3">
             {items.map((item, i) => {
@@ -740,7 +790,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
                     <p className="font-bold text-sm text-[#1F2937] truncate">{item.name || mi?.name_en || 'Item'}</p>
                     {item.notes && <p className="text-[11px] text-[#9CA3AF]">{item.notes}</p>}
                     <p className="text-[11px] text-[#6B7280] mt-0.5">
-                      Qty {item.quantity} × {formatCurrency(item.price || 0)}
+                      {lang === 'uz' ? 'Dona' : lang === 'ru' ? 'Кол' : 'Qty'} {item.quantity} × {formatCurrency(item.price || 0)}
                     </p>
                   </div>
                   <p className="font-bold text-sm text-[#1F2937] flex-shrink-0">
@@ -754,18 +804,18 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
 
         {/* Payment summary */}
         <div>
-          <p className="text-xs font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">Payment Summary</p>
+          <p className="text-xs font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">{lang === 'uz' ? "To'lov xulosasi" : lang === 'ru' ? 'Итог оплаты' : 'Payment Summary'}</p>
           <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
-            <SummaryRow label="Subtotal"                                      value={formatCurrency(subtotal)}   />
+            <SummaryRow label={lang === 'uz' ? 'Jami' : lang === 'ru' ? 'Подитог' : 'Subtotal'}                                      value={formatCurrency(subtotal)}   />
             {discAmt > 0 && (
-              <SummaryRow label={`Discount (${discPct}%)`}                    value={`− ${formatCurrency(discAmt)}`} valueClass="text-green-600" />
+              <SummaryRow label={`${lang === 'uz' ? 'Chegirma' : lang === 'ru' ? 'Скидка' : 'Discount'} (${discPct}%)`}              value={`− ${formatCurrency(discAmt)}`} valueClass="text-green-600" />
             )}
-            <SummaryRow label={`Service (${servicePct}%)`}                    value={formatCurrency(serviceAmt)} />
+            <SummaryRow label={`${lang === 'uz' ? 'Xizmat' : lang === 'ru' ? 'Сервис' : 'Service'} (${servicePct}%)`}               value={formatCurrency(serviceAmt)} />
             <div className="border-t border-dashed border-gray-200 pt-2.5">
-              <SummaryRow label="Total to Pay"                                 value={formatCurrency(total)} bold />
+              <SummaryRow label={lang === 'uz' ? "To'lash kerak" : lang === 'ru' ? 'К оплате' : 'Total to Pay'}                      value={formatCurrency(total)} bold />
             </div>
-            {received > 0 && <SummaryRow label="Amount Received"              value={formatCurrency(received)} />}
-            {received > 0 && <SummaryRow label="Change"                       value={formatCurrency(change)} valueClass="text-green-600" />}
+            {received > 0 && <SummaryRow label={lang === 'uz' ? 'Qabul qilindi' : lang === 'ru' ? 'Получено' : 'Amount Received'}    value={formatCurrency(received)} />}
+            {received > 0 && <SummaryRow label={lang === 'uz' ? 'Qaytim' : lang === 'ru' ? 'Сдача' : 'Change'}                       value={formatCurrency(change)} valueClass="text-green-600" />}
           </div>
         </div>
       </div>
@@ -773,14 +823,14 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
       {/* Footer actions */}
       <div className="flex-shrink-0 px-5 py-4 border-t border-[#E5E7EB] bg-white grid grid-cols-2 gap-2">
         <button
-          onClick={() => navigate(`/receipt/table/${order.table_id}`)}
+          onClick={() => navigate(`/receipt/${order.id}`)}
           className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#E5E7EB] text-[12px] font-bold text-[#6B7280] hover:border-[#ff5a00] hover:text-[#ff5a00] hover:bg-orange-50 transition-colors"
         >
           <Eye size={14} />
           {lang === 'uz' ? 'Chek' : lang === 'ru' ? 'Чек' : 'View Check'}
         </button>
         <button
-          onClick={() => { navigate(`/receipt/table/${order.table_id}`); setTimeout(() => window.print(), 800) }}
+          onClick={() => { navigate(`/receipt/${order.id}`); setTimeout(() => window.print(), 800) }}
           className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#E5E7EB] text-[12px] font-bold text-[#6B7280] hover:border-[#ff5a00] hover:text-[#ff5a00] hover:bg-orange-50 transition-colors"
         >
           <Printer size={14} />
@@ -829,23 +879,31 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
         </div>
         <select value={filterPay} onChange={e => { setFilterPay(e.target.value); resetPage() }}
           className="bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm text-[#6B7280] focus:outline-none cursor-pointer">
-          <option value="all">All Payments</option>
-          <option value="cash">Cash</option><option value="card">Card</option>
-          <option value="terminal">Terminal</option><option value="qr">QR Code</option>
+          <option value="all">{lang === 'uz' ? "Barcha to'lovlar" : lang === 'ru' ? 'Все методы' : 'All Payments'}</option>
+          <option value="cash">{lang === 'uz' ? 'Naqd' : lang === 'ru' ? 'Наличные' : 'Cash'}</option>
+          <option value="card">{lang === 'uz' ? 'Karta' : lang === 'ru' ? 'Карта' : 'Card'}</option>
+          <option value="terminal">Terminal</option>
+          <option value="qr">{lang === 'uz' ? 'QR Kod' : lang === 'ru' ? 'QR Код' : 'QR Code'}</option>
         </select>
       </div>
 
       {pageOrders.length === 0 ? (
-        <EmptyState label="No orders found" />
+        <EmptyState label={lang === 'uz' ? 'Buyurtmalar topilmadi' : lang === 'ru' ? 'Заказы не найдены' : 'No orders found'} lang={lang} />
       ) : (
         <div className="w-full overflow-x-auto rounded-2xl border border-[#E5E7EB] shadow-sm">
         <div className="bg-white rounded-2xl overflow-hidden min-w-[1050px]">
           {/* Desktop header */}
           <div className="hidden lg:grid grid-cols-[80px_90px_130px_150px_90px_110px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
-            <span>Order ID</span><span>Table</span><span>Waiter</span>
-            <span>Date & Time</span><span>Status</span><span>Payment</span>
-            <span className="text-center">Disc%</span><span className="text-center">Serv%</span>
-            <span className="text-right">Total</span><span className="text-center">Action</span>
+            <span>{lang === 'uz' ? 'Buyurtma' : lang === 'ru' ? 'Заказ' : 'Order ID'}</span>
+            <span>{lang === 'uz' ? 'Stol' : lang === 'ru' ? 'Стол' : 'Table'}</span>
+            <span>{lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант' : 'Waiter'}</span>
+            <span>{lang === 'uz' ? 'Sana va vaqt' : lang === 'ru' ? 'Дата и время' : 'Date & Time'}</span>
+            <span>{lang === 'uz' ? 'Holat' : lang === 'ru' ? 'Статус' : 'Status'}</span>
+            <span>{lang === 'uz' ? "To'lov" : lang === 'ru' ? 'Оплата' : 'Payment'}</span>
+            <span className="text-center">{lang === 'uz' ? 'Chegirma' : lang === 'ru' ? 'Скидка' : 'Disc%'}</span>
+            <span className="text-center">{lang === 'uz' ? 'Xizmat' : lang === 'ru' ? 'Серв.' : 'Serv%'}</span>
+            <span className="text-right">{lang === 'uz' ? 'Jami' : lang === 'ru' ? 'Итого' : 'Total'}</span>
+            <span className="text-center">{lang === 'uz' ? 'Amal' : lang === 'ru' ? 'Действие' : 'Action'}</span>
           </div>
 
           <div className="divide-y divide-[#F9FAFB]">
@@ -874,7 +932,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                     <span className="text-sm text-[#6B7280] truncate">{(order.waiter_name || '—').split(' ')[0]}</span>
                     <span className="text-[12px] text-[#6B7280]">{fmtDate(getOrderDate(order))}</span>
                     <span><StatusBadge status={status} lang={lang} /></span>
-                    <span><PayBadge method={order.payment_method} /></span>
+                    <span><PayBadge method={order.payment_method} lang={lang} /></span>
                     <span className="text-center text-sm text-[#6B7280]">{discPct}%</span>
                     <span className="text-center text-sm text-[#6B7280]">{servicePct}%</span>
                     <span className="text-right font-black text-sm text-[#ff5a00]">{formatCurrency(getOrderTotal(order))}</span>
@@ -887,7 +945,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                             : 'border-[#E5E7EB] text-[#6B7280] hover:border-[#ff5a00] hover:text-[#ff5a00] hover:bg-orange-50'
                         }`}
                       >
-                        {isSelected ? 'Close' : 'Details'}
+                        {isSelected ? (lang === 'uz' ? 'Yopish' : lang === 'ru' ? 'Закрыть' : 'Close') : (lang === 'uz' ? 'Batafsil' : lang === 'ru' ? 'Детали' : 'Details')}
                       </button>
                     </div>
                   </div>
@@ -901,11 +959,11 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                       </div>
                       <p className="text-sm font-medium text-[#1F2937]">{order.table_name} · {(order.waiter_name || '').split(' ')[0]}</p>
                       <p className="text-[11px] text-[#9CA3AF] mt-0.5">{fmtDate(getOrderDate(order))}</p>
-                      <div className="mt-1.5"><PayBadge method={order.payment_method} /></div>
+                      <div className="mt-1.5"><PayBadge method={order.payment_method} lang={lang} /></div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
                       <span className="font-black text-[#ff5a00] text-base">{formatCurrency(getOrderTotal(order))}</span>
-                      <button className="px-2.5 py-1 rounded-xl border border-[#E5E7EB] text-[11px] font-bold text-[#6B7280]">Details</button>
+                      <button className="px-2.5 py-1 rounded-xl border border-[#E5E7EB] text-[11px] font-bold text-[#6B7280]">{lang === 'uz' ? 'Batafsil' : lang === 'ru' ? 'Детали' : 'Details'}</button>
                     </div>
                   </div>
                 </div>
@@ -916,7 +974,10 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
           {/* Pagination */}
           <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-t border-gray-100">
             <p className="text-xs text-[#9CA3AF]">
-              {filtered.length === 0 ? 'No orders' : `Showing ${Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length} orders`}
+              {filtered.length === 0
+                ? (lang === 'uz' ? "Buyurtma yo'q" : lang === 'ru' ? 'Нет заказов' : 'No orders')
+                : `${lang === 'uz' ? "Ko'rsatilmoqda" : lang === 'ru' ? 'Показано' : 'Showing'} ${Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–${Math.min(page * PAGE_SIZE, filtered.length)} ${lang === 'uz' ? 'dan' : lang === 'ru' ? 'из' : 'of'} ${filtered.length} ${lang === 'uz' ? 'ta buyurtma' : lang === 'ru' ? 'заказов' : 'orders'}`
+              }
             </p>
             <div className="flex items-center gap-1">
               <PageBtn disabled={page <= 1}           onClick={() => setPage(p => p - 1)}><ChevronLeft  size={14} /></PageBtn>
@@ -1089,7 +1150,7 @@ export default function Reports() {
 
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <KpiCard icon={DollarSign}  iconCls="bg-green-50 text-green-600"   label={l.totalRev}  value={formatCurrency(kpiRevenue)} sub={`${kpiOrders} paid orders`} />
+              <KpiCard icon={DollarSign}  iconCls="bg-green-50 text-green-600"   label={l.totalRev}  value={formatCurrency(kpiRevenue)} sub={`${kpiOrders} ${lang === 'uz' ? "ta to'langan" : lang === 'ru' ? 'оплаченных' : 'paid orders'}`} />
               <KpiCard icon={ShoppingBag} iconCls="bg-orange-50 text-[#ff5a00]"  label={l.numOrders} value={kpiOrders} />
               <KpiCard icon={BarChart2}   iconCls="bg-blue-50 text-blue-600"     label={l.avgOrder}  value={formatCurrency(kpiAvg)} />
               <KpiCard icon={Package}     iconCls="bg-purple-50 text-purple-600" label={l.itemsSold} value={kpiItemsSold} />

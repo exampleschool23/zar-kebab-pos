@@ -496,12 +496,22 @@ export default function Receipt() {
     const order = state.orders.find(o => o.id === orderId)
     if (!order) return null
 
-    const siblings  = state.orders.filter(
-      o => o.table_id === order.table_id && o.payment_status !== 'paid'
-    )
-    const allOrders = siblings.length > 0 ? siblings : [order]
-    const allItems  = allOrders.flatMap(o => o.items || [])
+    // For paid orders: find all rounds from the same session (same table + paid_at minute).
+    // For unpaid orders: find all active rounds for the table.
+    const allOrders = order.payment_status === 'paid' && order.paid_at
+      ? state.orders.filter(
+          o => o.table_id === order.table_id &&
+               o.payment_status === 'paid' &&
+               o.paid_at?.slice(0, 16) === order.paid_at.slice(0, 16)
+        )
+      : (() => {
+          const siblings = state.orders.filter(
+            o => o.table_id === order.table_id && o.payment_status !== 'paid'
+          )
+          return siblings.length > 0 ? siblings : [order]
+        })()
 
+    const allItems = allOrders.flatMap(o => o.items || [])
     const map = {}
     allItems.forEach(item => {
       const key = item.menu_item_id || item.name
@@ -513,11 +523,12 @@ export default function Receipt() {
       name: (menuItemMap[item.menu_item_id] && getItemName(menuItemMap[item.menu_item_id], lang)) || item.name,
     }))
 
-    const loyaltyPct = order.loyalty_discount_pct   || 0
-    const loyaltyAmt = order.loyalty_discount_amount || 0
-    const subtotal   = items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0)
+    const loyaltyPct = order.loyalty_discount_pct || 0
+    // Sum the per-round discount amounts written by MARK_ORDER_PAID
+    const loyaltyAmt = allOrders.reduce((s, o) => s + (Number(o.loyalty_discount_amount) || 0), 0)
+    const subtotal   = allOrders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0) || items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0)
+    const serviceFee = allOrders.reduce((s, o) => s + (Number(o.service_fee) || 0), 0)
     const afterDisc  = subtotal - loyaltyAmt
-    const serviceFee = Math.round(afterDisc * svcRate)
     const table      = state.tables.find(t => t.id === order.table_id)
 
     return {
@@ -530,7 +541,7 @@ export default function Receipt() {
       serviceRate: settings.serviceRate ?? 20,
       loyaltyPct,
       loyaltyAmt,
-      total: order.total || (afterDisc + serviceFee),
+      total: afterDisc + serviceFee,
     }
   }, [state.orders, state.tables, orderId, svcRate, settings.serviceRate, menuItemMap, lang])
 
