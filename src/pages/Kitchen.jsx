@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  UtensilsCrossed, Clock, CheckCircle2, AlertCircle, Volume2, ArrowLeft,
-  Bell, MoreHorizontal, ChefHat, Loader2,
+  UtensilsCrossed, Clock, CheckCircle2, AlertCircle, ArrowLeft,
+  Bell, ChefHat, Loader2,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -81,9 +81,6 @@ function KitchenHeader({ lang, onLangChange }) {
             </button>
           ))}
         </div>
-        <button className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 hover:border-[#ff5a00]/40 hover:text-[#ff5a00] text-gray-400 transition-colors">
-          <Volume2 size={16} />
-        </button>
       </div>
     </header>
   )
@@ -145,8 +142,8 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
           ? 'bg-[#f0fdf4] border-[#bbf7d0]'
           : 'bg-white border-gray-100 shadow-sm'
     }`}>
-      {/* Thumbnail */}
-      <div className="w-[76px] h-[76px] rounded-xl overflow-hidden flex-shrink-0 bg-orange-50 border border-gray-100">
+      {/* Thumbnail — 64px mobile, 80px tablet+ */}
+      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden flex-shrink-0 bg-orange-50 border border-gray-100">
         {menuItem?.image_url ? (
           <img src={menuItem.image_url} alt={title} className="w-full h-full object-cover" loading="lazy" />
         ) : (
@@ -158,19 +155,19 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        {/* Title + qty + badge */}
-        <div className="flex items-start justify-between gap-2 mb-0.5">
-          <div className="flex items-baseline gap-2 min-w-0 flex-1">
-            <p className="font-black text-[14px] text-[#1F2937] leading-snug line-clamp-1">{title}</p>
-            <span className="font-black text-[13px] text-[#ff5a00] flex-shrink-0">×{item.quantity}</span>
-          </div>
-          <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap transition-all duration-300 ${STATUS_BADGE[item.status] || STATUS_BADGE.new}`}>
+        {/* Qty + status badge row */}
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="font-black text-sm text-[#ff5a00]">×{item.quantity}</span>
+          <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-300 ${STATUS_BADGE[item.status] || STATUS_BADGE.new}`}>
             {statusLabel(item.status, lang)}
           </span>
         </div>
 
+        {/* Title — full width, wraps freely */}
+        <p className="font-bold text-base text-[#1F2937] leading-tight whitespace-normal break-words line-clamp-3 mb-1">{title}</p>
+
         {desc && (
-          <p className="text-[11px] text-[#6B7280] line-clamp-1 leading-snug mb-1.5">{desc}</p>
+          <p className="text-xs text-[#6B7280] line-clamp-2 leading-snug mb-1.5">{desc}</p>
         )}
 
         {item.notes && (
@@ -185,7 +182,7 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
           <button
             onClick={() => handleMark('preparing')}
             disabled={busy}
-            className={`w-full py-2 rounded-xl text-[12px] font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
+            className={`w-full py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
               busy
                 ? 'bg-orange-300 text-white cursor-not-allowed'
                 : 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-sm shadow-orange-200'
@@ -200,7 +197,7 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
           <button
             onClick={() => handleMark('ready')}
             disabled={busy}
-            className={`w-full py-2 rounded-xl text-[12px] font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
+            className={`w-full py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
               busy
                 ? 'bg-green-200 text-green-500 cursor-not-allowed border border-green-200'
                 : 'bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0] hover:bg-[#16A34A] hover:text-white'
@@ -212,7 +209,7 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
         )}
 
         {isReady && (
-          <div className={`flex items-center gap-1.5 text-[#16A34A] text-[12px] font-black mt-0.5 transition-all duration-300 ${flash ? 'scale-105' : ''}`}>
+          <div className={`flex items-center gap-1.5 text-[#16A34A] text-sm font-black mt-0.5 transition-all duration-300 ${flash ? 'scale-105' : ''}`}>
             <CheckCircle2 size={15} />
             {statusLabel('ready', lang)}
           </div>
@@ -261,38 +258,33 @@ function OrderCard({ order, menuItemMap, lang, onMark }) {
       <div className={`px-4 py-3 border-b ${
         allReady ? 'bg-[#F0FDF4] border-[#BBF7D0]' : 'bg-gray-50 border-[#F3F4F6]'
       }`}>
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div>
-            <h3 className="font-black text-[#1F2937] text-xl leading-tight">{order.table_name}</h3>
-            <p className="text-[11px] text-[#6B7280] font-medium mt-0.5">
-              {waiterLabel}: {order.waiter_name}
-            </p>
-            {elapsed && (
-              <div className="flex items-center gap-1 mt-1 text-[#6B7280] text-[10px] font-medium">
-                <Clock size={10} />
-                {elapsed}
-              </div>
-            )}
-          </div>
-          <button className="p-1.5 rounded-xl hover:bg-white text-[#9CA3AF] hover:text-gray-600 transition-colors flex-shrink-0">
-            <MoreHorizontal size={16} />
-          </button>
+        <div className="mb-2">
+          <h3 className="font-black text-[#1F2937] text-xl leading-tight">{order.table_name}</h3>
+          <p className="text-xs text-[#6B7280] font-medium mt-0.5">
+            {waiterLabel}: {order.waiter_name}
+          </p>
+          {elapsed && (
+            <div className="flex items-center gap-1 mt-1 text-[#6B7280] text-xs font-medium">
+              <Clock size={11} />
+              {elapsed}
+            </div>
+          )}
         </div>
 
         {/* Status summary chips */}
         <div className="flex flex-wrap gap-1.5 mb-2.5">
           {newCount > 0 && (
-            <span className="px-2.5 py-1 bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE] text-[10px] font-bold rounded-full">
+            <span className="px-2.5 py-1 bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE] text-xs font-bold rounded-full">
               {newCount} {statusLabel('new', lang)}
             </span>
           )}
           {preparingCount > 0 && (
-            <span className="px-2.5 py-1 bg-[#FFF1E8] text-[#FF5A00] border border-[#FDBA74] text-[10px] font-bold rounded-full">
+            <span className="px-2.5 py-1 bg-[#FFF1E8] text-[#FF5A00] border border-[#FDBA74] text-xs font-bold rounded-full">
               {preparingCount} {statusLabel('preparing', lang)}
             </span>
           )}
           {readyCount > 0 && (
-            <span className="px-2.5 py-1 bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0] text-[10px] font-bold rounded-full">
+            <span className="px-2.5 py-1 bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0] text-xs font-bold rounded-full">
               {readyCount} {statusLabel('ready', lang)}
             </span>
           )}
@@ -304,15 +296,15 @@ function OrderCard({ order, menuItemMap, lang, onMark }) {
             <button
               onClick={() => handleBulk('new', 'preparing')}
               disabled={bulkBusy}
-              className={`flex-1 py-1.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] ${
+              className={`flex-1 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] ${
                 bulkBusy
                   ? 'bg-orange-200 text-orange-400 cursor-not-allowed'
                   : 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-sm shadow-orange-100'
               }`}
             >
               {bulkBusy
-                ? <Loader2 size={12} className="animate-spin" />
-                : <ChefHat size={12} />}
+                ? <Loader2 size={13} className="animate-spin" />
+                : <ChefHat size={13} />}
               {markAllLabel.preparing}
             </button>
           )}
@@ -320,15 +312,15 @@ function OrderCard({ order, menuItemMap, lang, onMark }) {
             <button
               onClick={() => handleBulk('preparing', 'ready')}
               disabled={bulkBusy}
-              className={`flex-1 py-1.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] ${
+              className={`flex-1 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] ${
                 bulkBusy
                   ? 'bg-green-100 text-green-400 cursor-not-allowed'
                   : 'bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0] hover:bg-[#16A34A] hover:text-white'
               }`}
             >
               {bulkBusy
-                ? <Loader2 size={12} className="animate-spin text-green-400" />
-                : <CheckCircle2 size={12} />}
+                ? <Loader2 size={13} className="animate-spin text-green-400" />
+                : <CheckCircle2 size={13} />}
               {markAllLabel.ready}
             </button>
           )}
@@ -484,7 +476,7 @@ export default function Kitchen() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
               {activeOrders.map(order => (
                 <OrderCard
                   key={order.id}

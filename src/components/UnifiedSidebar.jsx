@@ -119,10 +119,10 @@ export default function UnifiedSidebar({ onClose }) {
   }
 
   return (
-    <aside className="w-[220px] h-full bg-white border-r border-[#E5E7EB] flex flex-col flex-shrink-0">
+    <aside className="w-[220px] h-full bg-white border-r border-[#E5E7EB] flex flex-col flex-shrink-0 overflow-hidden">
 
       {/* Brand */}
-      <div className="px-5 py-5 border-b border-[#E5E7EB] flex items-center gap-3 flex-shrink-0">
+      <div className="px-4 py-4 border-b border-[#E5E7EB] flex items-center gap-3 flex-shrink-0">
         <div className="w-10 h-10 bg-[#ff5a00] rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm shadow-orange-200">
           <UtensilsCrossed size={18} className="text-white" />
         </div>
@@ -139,8 +139,8 @@ export default function UnifiedSidebar({ onClose }) {
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+      {/* Nav — flex-1 so it grows, overflow-y-auto so it scrolls internally if needed */}
+      <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto min-h-0">
         {visibleNav.map(item => {
           const Icon   = item.icon
           const active = item.key === current
@@ -148,7 +148,7 @@ export default function UnifiedSidebar({ onClose }) {
             <button
               key={item.key}
               onClick={() => handleNav(item)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all text-left ${
                 active
                   ? 'bg-[#fff1e8] text-[#ff5a00]'
                   : 'text-[#6B7280] hover:text-[#1F2937] hover:bg-gray-50'
@@ -162,8 +162,8 @@ export default function UnifiedSidebar({ onClose }) {
       </nav>
 
       {/* Language switcher */}
-      <div className="px-4 pb-3 flex-shrink-0">
-        <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider mb-2 font-semibold">
+      <div className="px-4 pb-2 flex-shrink-0">
+        <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wider mb-1.5 font-semibold">
           {lang === 'uz' ? 'Til' : lang === 'ru' ? 'Язык' : 'Language'}
         </p>
         <div className="flex gap-1">
@@ -171,7 +171,7 @@ export default function UnifiedSidebar({ onClose }) {
             <button
               key={l}
               onClick={() => dispatch({ type: 'SET_LANG', payload: l })}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors ${
+              className={`flex-1 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors ${
                 lang === l
                   ? 'bg-[#ff5a00] text-white'
                   : 'bg-gray-100 text-[#6B7280] hover:bg-gray-200'
@@ -184,9 +184,9 @@ export default function UnifiedSidebar({ onClose }) {
       </div>
 
       {/* User + logout */}
-      <div className="px-4 py-4 border-t border-[#E5E7EB] flex-shrink-0">
-        <div className="flex items-center gap-3 mb-3 px-1">
-          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+      <div className="px-4 py-3 border-t border-[#E5E7EB] flex-shrink-0">
+        <div className="flex items-center gap-2.5 mb-2 px-1">
+          <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
             <span className="text-[#6B7280] text-xs font-black">{initial}</span>
           </div>
           <div className="flex-1 min-w-0">
@@ -196,7 +196,7 @@ export default function UnifiedSidebar({ onClose }) {
         </div>
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors text-left"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors text-left"
         >
           <LogOut size={15} className="flex-shrink-0" />
           {lang === 'uz' ? 'Chiqish' : lang === 'ru' ? 'Выйти' : 'Logout'}
