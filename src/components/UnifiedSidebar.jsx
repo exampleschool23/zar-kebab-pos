@@ -6,64 +6,65 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
+import { PAGE_ACCESS } from '../lib/permissions'
 
-// ── Nav definition ─────────────────────────────────────────────────────────────
+// ── Nav definition — roles come from PAGE_ACCESS to stay in sync ───────────────
 const NAV = [
   {
     key: 'dashboard',
     icon: LayoutDashboard,
     labels: { uz: 'Dashboard', ru: 'Dashboard', en: 'Dashboard' },
     path: '/admin',
-    roles: ['admin', 'owner', 'stakeholder'],
+    roles: PAGE_ACCESS.dashboard,
   },
   {
     key: 'tables',
     icon: Table2,
     labels: { uz: 'Stollar', ru: 'Столы', en: 'Tables' },
     path: '/waiter/tables',
-    roles: ['admin', 'owner', 'waiter', 'cashier'],
+    roles: PAGE_ACCESS.tables,
   },
   {
     key: 'menu',
     icon: BookOpen,
     labels: { uz: 'Menyu', ru: 'Меню', en: 'Menu' },
     path: '/admin/menu',
-    roles: ['admin', 'owner'],
+    roles: PAGE_ACCESS.menu,
   },
   {
     key: 'kitchen',
     icon: ChefHat,
     labels: { uz: 'Oshxona', ru: 'Кухня', en: 'Kitchen' },
     path: '/kitchen',
-    roles: ['admin', 'owner', 'kitchen', 'cashier', 'waiter'],
+    roles: PAGE_ACCESS.kitchen,
   },
   {
     key: 'cashier',
     icon: Receipt,
     labels: { uz: 'Kassir', ru: 'Кассир', en: 'Cashier' },
     path: '/cashier/tables',
-    roles: ['admin', 'owner', 'cashier', 'waiter'],
+    roles: PAGE_ACCESS.cashier,
   },
   {
     key: 'team',
     icon: Users,
     labels: { uz: 'Jamoa', ru: 'Команда', en: 'Team' },
     path: '/admin/users',
-    roles: ['admin', 'owner'],
+    roles: PAGE_ACCESS.team,
   },
   {
     key: 'reports',
     icon: BarChart2,
     labels: { uz: 'Hisobotlar', ru: 'Отчёты', en: 'Reports' },
     path: '/admin/reports',
-    roles: ['admin', 'owner', 'stakeholder'],
+    roles: PAGE_ACCESS.reports,
   },
   {
     key: 'settings',
     icon: Settings,
     labels: { uz: 'Sozlamalar', ru: 'Настройки', en: 'Settings' },
     path: '/admin/settings',
-    roles: ['admin', 'owner'],
+    roles: PAGE_ACCESS.settings,
   },
 ]
 

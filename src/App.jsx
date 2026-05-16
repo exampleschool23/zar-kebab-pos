@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppProvider, useApp } from './store/AppContext'
+import { defaultPath as roleDefaultPath, PAGE_ACCESS } from './lib/permissions'
 
 import Login          from './pages/Login'
 import AuthCallback   from './pages/AuthCallback'
@@ -22,11 +23,7 @@ import Reports        from './pages/Reports'
 import AdminSettings  from './pages/AdminSettings'
 
 function defaultPath(role) {
-  if (role === 'owner' || role === 'admin' || role === 'stakeholder') return '/admin'
-  if (role === 'waiter')  return '/waiter/tables'
-  if (role === 'cashier') return '/cashier/tables'
-  if (role === 'kitchen') return '/kitchen'
-  return '/pending-approval'
+  return roleDefaultPath(role)
 }
 
 // Syncs the Supabase profile into AppContext so POS pages keep working
@@ -152,51 +149,51 @@ function AppRoutes() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
 
-        {/* Waiter */}
+        {/* Waiter — tables & order flow only; no kitchen or cashier */}
         <Route path="/waiter/tables" element={
-          <ProtectedRoute roles={['waiter', 'admin', 'owner']}><WaiterTables /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.tables}><WaiterTables /></ProtectedRoute>
         } />
         <Route path="/waiter/order/:tableId" element={
-          <ProtectedRoute roles={['waiter', 'admin', 'owner']}><WaiterOrder /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></ProtectedRoute>
         } />
 
-        {/* Kitchen */}
+        {/* Kitchen — kitchen role + admin/owner only */}
         <Route path="/kitchen" element={
-          <ProtectedRoute roles={['kitchen', 'admin', 'owner']}><Kitchen /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.kitchen}><Kitchen /></ProtectedRoute>
         } />
 
-        {/* Cashier */}
+        {/* Cashier — cashier + admin/owner; waiters and kitchen are redirected */}
         <Route path="/cashier/tables" element={
-          <ProtectedRoute roles={['cashier', 'admin', 'owner']}><CashierTables /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.cashier}><CashierTables /></ProtectedRoute>
         } />
         <Route path="/cashier/bill/:tableId" element={
-          <ProtectedRoute roles={['cashier', 'admin', 'owner']}><CashierBill /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></ProtectedRoute>
         } />
         <Route path="/receipt/:orderId" element={
-          <ProtectedRoute roles={['cashier', 'admin', 'owner']}><Receipt /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.cashier}><Receipt /></ProtectedRoute>
         } />
         <Route path="/receipt/table/:tableId" element={
-          <ProtectedRoute roles={['cashier', 'admin', 'owner']}><TableReceipt /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.cashier}><TableReceipt /></ProtectedRoute>
         } />
 
-        {/* Admin — stakeholder gets Dashboard + Reports only */}
+        {/* Dashboard — admin, owner, cashier, stakeholder */}
         <Route path="/admin" element={
-          <ProtectedRoute roles={['admin', 'owner', 'stakeholder']}><AdminDashboard /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.dashboard}><AdminDashboard /></ProtectedRoute>
         } />
         <Route path="/admin/menu" element={
-          <ProtectedRoute roles={['admin', 'owner']}><AdminMenu /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.menu}><AdminMenu /></ProtectedRoute>
         } />
         <Route path="/admin/tables" element={
-          <ProtectedRoute roles={['admin', 'owner']}><AdminTables /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.menu}><AdminTables /></ProtectedRoute>
         } />
         <Route path="/admin/users" element={
-          <ProtectedRoute roles={['admin', 'owner']}><AdminUsers /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.team}><AdminUsers /></ProtectedRoute>
         } />
         <Route path="/admin/reports" element={
-          <ProtectedRoute roles={['admin', 'owner', 'stakeholder']}><Reports /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.reports}><Reports /></ProtectedRoute>
         } />
         <Route path="/admin/settings" element={
-          <ProtectedRoute roles={['admin', 'owner']}><AdminSettings /></ProtectedRoute>
+          <ProtectedRoute roles={PAGE_ACCESS.settings}><AdminSettings /></ProtectedRoute>
         } />
 
         {/* Catch-all: redirect based on role */}

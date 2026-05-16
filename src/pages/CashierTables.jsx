@@ -2,8 +2,8 @@ import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Receipt, CreditCard, Menu as MenuIcon, Clock, Users, Search,
-  RefreshCw, ChevronDown, Table2, Banknote, Monitor, QrCode,
-  UtensilsCrossed, ArrowUpDown, X,
+  ChevronDown, Table2, Banknote, Monitor, QrCode,
+  UtensilsCrossed, ArrowUpDown, X, HelpCircle,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../lib/formatCurrency'
@@ -44,7 +44,6 @@ const L = {
     allStatus:       'Barcha holat',
     occupied:        'Band',
     needsBillBadge:  'Hisob kerak',
-    refresh:         'Yangilash',
     newestFirst:     'Yangi avval',
     oldestFirst:     'Eski avval',
     highestAmt:      "Yuqori summa",
@@ -61,6 +60,8 @@ const L = {
     noPayData:       "To'lov ma'lumotlari yo'q",
     waitingKitchen:  'Oshxona tayyorlayapti',
     waitingKitchenSub: 'Ofitsiant hisob so\'rashini kuting',
+    payments:        n => `${n} ta to'lov`,
+    ofTodayRev:      'bugungi daromaddan',
   },
   ru: {
     title:           'Кассир',
@@ -80,7 +81,6 @@ const L = {
     allStatus:       'Все статусы',
     occupied:        'Занят',
     needsBillBadge:  'Нужен счёт',
-    refresh:         'Обновить',
     newestFirst:     'Сначала новые',
     oldestFirst:     'Сначала старые',
     highestAmt:      'Высокая сумма',
@@ -97,6 +97,8 @@ const L = {
     noPayData:       'Нет данных об оплате',
     waitingKitchen:  'Готовится на кухне',
     waitingKitchenSub: 'Ожидайте запроса счёта от официанта',
+    payments:        n => `${n} платёж${n === 1 ? '' : n < 5 ? 'а' : 'ей'}`,
+    ofTodayRev:      'от дневной выручки',
   },
   en: {
     title:           'Cashier',
@@ -116,7 +118,6 @@ const L = {
     allStatus:       'All Status',
     occupied:        'Occupied',
     needsBillBadge:  'Needs Bill',
-    refresh:         'Refresh',
     newestFirst:     'Newest First',
     oldestFirst:     'Oldest First',
     highestAmt:      'Highest Amount',
@@ -130,17 +131,20 @@ const L = {
     noActiveSub:     'No tables need payment right now',
     infoBar:         'Select a table bill to view order details, process payment and print receipt.',
     viewAllTables:   'View All Tables',
-    noPayData:       'No payment data yet',
+    noPayData:       'No payments today yet',
     waitingKitchen:  'Waiting for kitchen',
     waitingKitchenSub: 'Waiter must request the bill first',
+    payments:        n => `${n} payment${n === 1 ? '' : 's'}`,
+    ofTodayRev:      "of today's revenue",
   },
 }
 
 const PAY_METHOD_CONFIG = [
-  { key: 'cash',     icon: Banknote,    labelEn: 'Cash',     labelUz: 'Naqd',     labelRu: 'Наличные' },
-  { key: 'card',     icon: CreditCard,  labelEn: 'Card',     labelUz: 'Karta',    labelRu: 'Карта'    },
-  { key: 'terminal', icon: Monitor,     labelEn: 'Terminal', labelUz: 'Terminal', labelRu: 'Терминал' },
-  { key: 'qr',       icon: QrCode,      labelEn: 'QR Code',  labelUz: 'QR Code',  labelRu: 'QR Код'   },
+  { key: 'cash',     icon: Banknote,    color: '#16A34A', labelEn: 'Cash',     labelUz: 'Naqd',      labelRu: 'Наличные'    },
+  { key: 'card',     icon: CreditCard,  color: '#7C3AED', labelEn: 'Card',     labelUz: 'Karta',     labelRu: 'Карта'       },
+  { key: 'terminal', icon: Monitor,     color: '#2563EB', labelEn: 'Terminal', labelUz: 'Terminal',  labelRu: 'Терминал'    },
+  { key: 'qr',       icon: QrCode,      color: '#D97706', labelEn: 'QR Code',  labelUz: 'QR Code',   labelRu: 'QR Код'      },
+  { key: 'unknown',  icon: HelpCircle,  color: '#9CA3AF', labelEn: 'Unknown',  labelUz: "Noma'lum",  labelRu: 'Неизвестно'  },
 ]
 
 const SORT_OPTIONS = (l) => [
@@ -331,7 +335,6 @@ export default function CashierTables() {
   const [filterWaiter,setFilterWaiter]= useState('all')
   const [filterStatus,setFilterStatus]= useState('all')
   const [sortKey,     setSortKey]     = useState('newest')
-  const [refreshKey,  setRefreshKey]  = useState(0)
 
   const today = new Date().toDateString()
 
@@ -365,7 +368,7 @@ export default function CashierTables() {
       }
     })
     return Object.values(grouped)
-  }, [state.orders, refreshKey])
+  }, [state.orders])
 
   const paidTodayOrders = useMemo(() =>
     state.orders.filter(o =>
@@ -382,13 +385,16 @@ export default function CashierTables() {
   }, [paidTodayOrders])
   const todayRevenue   = paidTodayOrders.reduce((s, o) => s + (o.total || 0), 0)
 
-  // Payment method breakdown
+  // Payment method breakdown — tracks { amount, count } per method
   const payMethodTotals = useMemo(() => {
-    const map = { cash: 0, card: 0, terminal: 0, qr: 0, other: 0 }
+    const KNOWN = ['cash', 'card', 'terminal', 'qr']
+    const map = {}
     paidTodayOrders.forEach(o => {
-      const m = o.payment_method
-      if (m && m in map && m !== 'other') map[m] += o.total || 0
-      else map.other += o.total || 0
+      const raw = (o.payment_method || '').toLowerCase().trim()
+      const key = KNOWN.includes(raw) ? raw : 'unknown'
+      if (!map[key]) map[key] = { amount: 0, count: 0 }
+      map[key].amount += o.total || 0
+      map[key].count++
     })
     return map
   }, [paidTodayOrders])
@@ -507,8 +513,8 @@ export default function CashierTables() {
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-5">
 
-          {/* ── KPI cards ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+          {/* ── KPI cards — 4 columns ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <KpiCard
               label={l.activeBills}
               value={activeBills.length}
@@ -545,42 +551,81 @@ export default function CashierTables() {
               iconBg="bg-blue-50"
               iconColor="text-blue-600"
             />
+          </div>
 
-            {/* Payment methods card */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 col-span-2 lg:col-span-1">
-              <p className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wider mb-3">{l.payMethods}</p>
-              <div className="space-y-2">
-                {PAY_METHOD_CONFIG.map(pm => {
-                  const Icon = pm.icon
-                  const amount = payMethodTotals[pm.key] || 0
-                  const label = lang === 'uz' ? pm.labelUz : lang === 'ru' ? pm.labelRu : pm.labelEn
-                  return (
-                    <div key={pm.key} className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Icon size={13} className="text-[#9CA3AF] flex-shrink-0" />
-                        <span className="text-[12px] text-[#6B7280]">{label}</span>
+          {/* ── Payment Methods Today — full-width breakdown card ── */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 mb-5">
+            <h3 className="font-black text-[#1F2937] text-[14px] mb-4">{l.payMethods}</h3>
+            {paidTodayOrders.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-3">{l.noPayData}</p>
+            ) : (
+              <div>
+                {/* Header row */}
+                <div className="hidden sm:grid grid-cols-[1fr_120px_200px_60px] gap-4 px-2 pb-2 border-b border-[#F3F4F6] mb-2">
+                  <p className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
+                    {lang === 'uz' ? "To'lov usuli" : lang === 'ru' ? 'Способ оплаты' : 'Method'}
+                  </p>
+                  <p className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider text-right">
+                    {lang === 'uz' ? 'Soni' : lang === 'ru' ? 'Кол-во' : 'Payments'}
+                  </p>
+                  <p className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider text-right">
+                    {lang === 'uz' ? 'Summa' : lang === 'ru' ? 'Сумма' : 'Amount'}
+                  </p>
+                  <p className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider text-right">%</p>
+                </div>
+
+                <div className="space-y-1">
+                  {PAY_METHOD_CONFIG.map(pm => {
+                    const data  = payMethodTotals[pm.key]
+                    if (!data || data.count === 0) return null
+                    const Icon  = pm.icon
+                    const label = lang === 'uz' ? pm.labelUz : lang === 'ru' ? pm.labelRu : pm.labelEn
+                    const pct   = todayRevenue > 0 ? Math.round((data.amount / todayRevenue) * 100) : 0
+                    return (
+                      <div key={pm.key} className="py-2">
+                        <div className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_120px_200px_60px] gap-2 sm:gap-4 items-center px-2">
+                          {/* Method */}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: pm.color + '18' }}>
+                              <Icon size={15} style={{ color: pm.color }} />
+                            </div>
+                            <span className="text-[13px] font-semibold text-[#1F2937] truncate">{label}</span>
+                          </div>
+                          {/* Count */}
+                          <p className="text-[12px] text-[#9CA3AF] text-right sm:text-right hidden sm:block">
+                            {l.payments(data.count)}
+                          </p>
+                          {/* Amount */}
+                          <p className="text-[13px] font-bold text-[#1F2937] text-right whitespace-nowrap">
+                            {formatCurrency(data.amount)}
+                          </p>
+                          {/* Percentage */}
+                          <p className="text-[12px] font-bold text-right hidden sm:block" style={{ color: pm.color }}>
+                            {pct}%
+                          </p>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="mx-2 mt-1.5 h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${pct}%`, background: pm.color }}
+                          />
+                        </div>
                       </div>
-                      <span className={`text-[12px] font-bold ${amount > 0 ? 'text-[#1F2937]' : 'text-[#9CA3AF]'}`}>
-                        {formatCurrency(amount)}
-                      </span>
-                    </div>
-                  )
-                })}
-                {payMethodTotals.other > 0 && (
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <UtensilsCrossed size={13} className="text-[#9CA3AF] flex-shrink-0" />
-                      <span className="text-[12px] text-[#6B7280]">
-                        {lang === 'uz' ? 'Boshqa' : lang === 'ru' ? 'Другое' : 'Other'}
-                      </span>
-                    </div>
-                    <span className="text-[12px] font-bold text-[#1F2937]">
-                      {formatCurrency(payMethodTotals.other)}
-                    </span>
-                  </div>
-                )}
+                    )
+                  })}
+                </div>
+
+                {/* Total */}
+                <div className="mt-3 pt-3 border-t border-[#F3F4F6] flex items-center justify-between px-2">
+                  <p className="text-[12px] font-semibold text-[#9CA3AF]">
+                    {lang === 'uz' ? 'Jami' : lang === 'ru' ? 'Итого' : 'Total'}
+                    {' · '}{paidTodayOrders.length} {l.payments(paidTodayOrders.length)}
+                  </p>
+                  <p className="text-[14px] font-black text-[#1F2937]">{formatCurrency(todayRevenue)}</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* ── Active Bills section ── */}
@@ -625,15 +670,6 @@ export default function CashierTables() {
               onChange={setFilterStatus}
               options={statusOptions}
             />
-
-            {/* Refresh */}
-            <button
-              onClick={() => setRefreshKey(k => k + 1)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#E5E7EB] rounded-xl text-[13px] text-[#6B7280] font-medium hover:bg-gray-50 transition-colors"
-            >
-              <RefreshCw size={14} />
-              <span className="hidden sm:inline">{l.refresh}</span>
-            </button>
 
             {/* Sort */}
             <div className="flex items-center gap-1.5">
