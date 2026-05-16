@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Search, ShoppingCart, Plus, Minus, UtensilsCrossed,
   Menu as MenuIcon, LayoutGrid, X, CheckCircle2, Clock,
-  ChefHat, Receipt, Loader2, ArrowLeft,
+  ChefHat, Receipt, Loader2, ArrowLeft, LogOut,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -561,7 +561,10 @@ export default function WaiterOrder() {
   const { tableId }         = useParams()
   const navigate            = useNavigate()
   const { state, dispatch } = useApp()
+  const { profile, signOut } = useAuth()
   const lang                = state.lang
+  const role                = (profile?.role || state.user?.role || '').toLowerCase()
+  const shouldShowSidebar   = !['kitchen', 'waiter'].includes(role)
   const [search,        setSearch]       = useState('')
   const [activeCategory,setCategory]     = useState('all')
   const [cartOpen,      setCartOpen]     = useState(false)
@@ -680,6 +683,11 @@ export default function WaiterOrder() {
     setDetailItem(null)
   }
 
+  function handleSignOut() {
+    dispatch({ type: 'LOGOUT' })
+    signOut?.()
+  }
+
   if (!table) {
     return (
       <div className="min-h-screen bg-[#FAF7F0] flex items-center justify-center">
@@ -707,12 +715,14 @@ export default function WaiterOrder() {
     <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
 
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
+      {shouldShowSidebar && (
       <div className="hidden lg:block flex-shrink-0 h-full">
         <UnifiedSidebar />
       </div>
+      )}
 
       {/* ── Mobile sidebar overlay ───────────────────────────────────────── */}
-      {sidebarOpen && (
+      {shouldShowSidebar && sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
           <div className="relative z-10 h-full">
@@ -742,7 +752,7 @@ export default function WaiterOrder() {
           {/* Mobile hamburger */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-1 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0"
+            className={`lg:hidden p-2 -ml-1 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0 ${shouldShowSidebar ? '' : 'hidden'}`}
           >
             <MenuIcon size={20} className="text-[#6B7280]" />
           </button>
@@ -784,6 +794,28 @@ export default function WaiterOrder() {
               </span>
             )}
           </button>
+          {!shouldShowSidebar && (
+            <div className="flex items-center gap-1.5">
+              {['uz', 'ru', 'en'].map(l => (
+                <button
+                  key={l}
+                  onClick={() => dispatch({ type: 'SET_LANG', payload: l })}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors ${
+                    lang === l ? 'bg-[#ff5a00] text-white' : 'bg-gray-100 text-[#6B7280] hover:bg-gray-200'
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+              <button
+                onClick={handleSignOut}
+                className="p-2 rounded-xl text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors"
+                title={lang === 'uz' ? 'Chiqish' : lang === 'ru' ? 'Выйти' : 'Logout'}
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Category row */}

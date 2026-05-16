@@ -15,6 +15,11 @@ function serviceRatePctFromSettings(settings) {
   return Math.round(serviceRateFromSettings(settings) * 100)
 }
 
+function normalizeOrderType(value) {
+  const raw = String(value || '').toLowerCase()
+  return raw.includes('take') || raw.includes('away') ? 'take_away' : 'dine_in'
+}
+
 export async function loadPOSData() {
   const [tablesRes, categoriesRes, menuItemsRes, unpaidRes, paidRes] = await Promise.all([
     supabase.from('restaurant_tables').select('*').order('id'),
@@ -46,7 +51,17 @@ export async function loadPOSData() {
 // ── Realtime subscription ─────────────────────────────────────────────────────
 
 export function subscribeToRealtime(dispatch) {
+  let ordersReloadTimer = null
+  let ordersReloadInFlight = false
+  let ordersReloadQueued = false
+
   async function reloadOrders() {
+    if (ordersReloadInFlight) {
+      ordersReloadQueued = true
+      return
+    }
+
+    ordersReloadInFlight = true
     const [unpaid, paid] = await Promise.all([
       supabase
         .from('orders')
@@ -62,6 +77,23 @@ export function subscribeToRealtime(dispatch) {
     ])
     const combined = [...(unpaid.data || []), ...(paid.data || [])]
     dispatch({ type: 'SET_ORDERS', payload: combined })
+    ordersReloadInFlight = false
+
+    if (ordersReloadQueued) {
+      ordersReloadQueued = false
+      scheduleReloadOrders()
+    }
+  }
+
+  function scheduleReloadOrders() {
+    if (ordersReloadTimer) clearTimeout(ordersReloadTimer)
+    ordersReloadTimer = setTimeout(() => {
+      ordersReloadTimer = null
+      reloadOrders().catch(err => {
+        ordersReloadInFlight = false
+        console.error('[db] realtime orders reload failed:', err)
+      })
+    }, 250)
   }
 
   async function reloadTables() {
@@ -71,12 +103,15 @@ export function subscribeToRealtime(dispatch) {
 
   const channel = supabase
     .channel('pos-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, reloadOrders)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, reloadOrders)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleReloadOrders)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, reloadTables)
     .subscribe()
 
-  return () => supabase.removeChannel(channel)
+  return () => {
+    if (ordersReloadTimer) clearTimeout(ordersReloadTimer)
+    supabase.removeChannel(channel)
+  }
 }
 
 // ── Writers ───────────────────────────────────────────────────────────────────
@@ -90,7 +125,9 @@ export async function writeToSupabase(action, state) {
       const table    = state.tables.find(t => t.id === tableId)
       if (!table || state.cart.length === 0) return
 
-      const items = action._items || state.cart.map(i => ({ ...i, status: 'new' }))
+      const orderType = normalizeOrderType(action.payload?.orderType)
+      const items = action._items || state.cart.map(i => ({ ...i, status: 'new', order_type: orderType }))
+      console.log('Send to kitchen payload', { orderId, tableId, orderType, items })
       const addedSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
       const { data: existingOrder } = await supabase
         .from('orders')
@@ -104,15 +141,17 @@ export async function writeToSupabase(action, state) {
       const service_fee = Math.round(subtotal * serviceRatePct / 100)
 
       if (existingOrder) {
-        await supabase.from('orders').update({
+        const { data: updatedOrder, error: orderUpdateError } = await supabase.from('orders').update({
           status: 'sent_to_kitchen',
           subtotal,
           service_fee,
           service_rate_pct: serviceRatePct,
           total: subtotal + service_fee,
-        }).eq('id', orderId)
+        }).eq('id', orderId).select('*').maybeSingle()
+        if (orderUpdateError) throw orderUpdateError
+        console.log('Created order', updatedOrder || { id: orderId, status: 'sent_to_kitchen' })
       } else {
-        await supabase.from('orders').insert({
+        const { data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert({
           id:             orderId,
           table_id:       tableId,
           table_name:     table.name,
@@ -123,7 +162,9 @@ export async function writeToSupabase(action, state) {
           service_fee,
           service_rate_pct: serviceRatePct,
           total:          subtotal + service_fee,
-        })
+        }).select('*').maybeSingle()
+        if (orderInsertError) throw orderInsertError
+        console.log('Created order', createdOrder)
       }
 
       const rows = items.map(i => ({
@@ -135,8 +176,14 @@ export async function writeToSupabase(action, state) {
         quantity:     i.quantity,
         notes:        i.notes || '',
         status:       'new',
+        order_type:   normalizeOrderType(i.order_type || orderType),
       }))
-      await supabase.from('order_items').insert(rows)
+      const { data: insertedItems, error: itemInsertError } = await supabase
+        .from('order_items')
+        .insert(rows)
+        .select('*')
+      if (itemInsertError) throw itemInsertError
+      console.log('Created kitchen items', insertedItems || rows)
 
       await supabase
         .from('restaurant_tables')
@@ -149,7 +196,8 @@ export async function writeToSupabase(action, state) {
       const { orderId, orderItemId, menuItemId, status } = action.payload
       let query = supabase.from('order_items').update({ status }).eq('order_id', orderId)
       query = orderItemId ? query.eq('id', orderItemId) : query.eq('menu_item_id', menuItemId)
-      await query
+      const { error } = await query
+      if (error) throw error
       break
     }
 

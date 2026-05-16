@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   UtensilsCrossed, Clock, CheckCircle2, AlertCircle, ArrowLeft,
-  Bell, ChefHat, Loader2,
+  Bell, ChefHat, Loader2, LogOut,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -40,10 +40,16 @@ function statusLabel(status, lang) {
 // ── Sidebar ────────────────────────────────────────────────────────────────────
 // ── Header ─────────────────────────────────────────────────────────────────────
 function KitchenHeader({ lang, onLangChange }) {
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth()
+  const { dispatch } = useApp()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
   const title = lang === 'uz' ? 'Oshxona Displey' : lang === 'ru' ? 'Дисплей кухни' : 'Kitchen Display'
+
+  function handleSignOut() {
+    dispatch({ type: 'LOGOUT' })
+    signOut?.()
+  }
 
   return (
     <header className="flex-shrink-0 bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between shadow-sm">
@@ -81,6 +87,15 @@ function KitchenHeader({ lang, onLangChange }) {
             </button>
           ))}
         </div>
+        {!isAdmin && (
+          <button
+            onClick={handleSignOut}
+            className="p-2 rounded-xl text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+            title={lang === 'uz' ? 'Chiqish' : lang === 'ru' ? 'Выйти' : 'Logout'}
+          >
+            <LogOut size={16} />
+          </button>
+        )}
       </div>
     </header>
   )
@@ -97,8 +112,28 @@ function Spinner({ color = 'text-white' }) {
 }
 
 // ── Kitchen item row ───────────────────────────────────────────────────────────
-function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
-  const [busy,    setBusy]    = useState(false)  // button locked while animating
+function kitchenItemKey(orderId, item) {
+  return `${item._orderId || orderId}:${item.id || item.menu_item_id}`
+}
+
+function getOrderType(item) {
+  const raw =
+    item.order_type ||
+    item.orderType ||
+    item.service_type ||
+    item.serviceType ||
+    item.fulfillment_type ||
+    item.fulfillmentType
+
+  const value = String(raw || '').toLowerCase()
+  if (value.includes('take') || value.includes('away') || item.is_takeaway || item.isTakeAway) {
+    return 'take_away'
+  }
+  return 'dine_in'
+}
+
+// ── Kitchen item row ───────────────────────────────────────────────────────────
+function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) {
   const [flash,   setFlash]   = useState(false)  // card highlight on status change
   const prevStatus = useRef(item.status)
 
@@ -112,12 +147,10 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
     }
   }, [item.status])
 
-  function handleMark(nextStatus) {
-    if (busy) return
-    setBusy(true)
+  async function handleMark(nextStatus) {
+    if (pending) return
     // Use item._orderId (real order) when items are merged across orders
-    onMark(orderId, item.id, item.menu_item_id, nextStatus, item._orderId || orderId)
-    setTimeout(() => setBusy(false), 700)
+    await onMark(orderId, item, nextStatus, item._orderId || orderId)
   }
 
   const isNew       = item.status === 'new'
@@ -181,14 +214,14 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
         {isNew && (
           <button
             onClick={() => handleMark('preparing')}
-            disabled={busy}
+            disabled={pending}
             className={`w-full py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
-              busy
+              pending
                 ? 'bg-orange-300 text-white cursor-not-allowed'
                 : 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-sm shadow-orange-200'
             }`}
           >
-            {busy ? <Spinner /> : null}
+            {pending ? <Spinner /> : null}
             {statusLabel('preparing', lang)}
           </button>
         )}
@@ -196,14 +229,14 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
         {isPreparing && (
           <button
             onClick={() => handleMark('ready')}
-            disabled={busy}
+            disabled={pending}
             className={`w-full py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
-              busy
+              pending
                 ? 'bg-green-200 text-green-500 cursor-not-allowed border border-green-200'
                 : 'bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0] hover:bg-[#16A34A] hover:text-white'
             }`}
           >
-            {busy ? <Spinner color="text-green-500" /> : null}
+            {pending ? <Spinner color="text-green-500" /> : null}
             {statusLabel('ready', lang)}
           </button>
         )}
@@ -214,19 +247,32 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
             {statusLabel('ready', lang)}
           </div>
         )}
+        {error && (
+          <p className="mt-2 text-[11px] font-semibold text-red-600">
+            {lang === 'uz' ? 'Yangilashda xatolik. Qayta urinib ko‘ring.' : lang === 'ru' ? 'Ошибка обновления. Попробуйте ещё раз.' : 'Update failed. Try again.'}
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
 // ── Order card ─────────────────────────────────────────────────────────────────
-function OrderCard({ order, menuItemMap, lang, onMark }) {
+function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors }) {
   const [bulkBusy, setBulkBusy] = useState(false)
   const elapsed = elapsedSince(order.created_at)
 
   const sortedItems = useMemo(
     () => [...order.items].sort((a, b) => statusSort(a.status) - statusSort(b.status)),
     [order.items]
+  )
+  const dineInItems = useMemo(
+    () => sortedItems.filter(i => getOrderType(i) === 'dine_in'),
+    [sortedItems]
+  )
+  const takeAwayItems = useMemo(
+    () => sortedItems.filter(i => getOrderType(i) === 'take_away'),
+    [sortedItems]
   )
 
   const newCount       = order.items.filter(i => i.status === 'new').length
@@ -241,13 +287,17 @@ function OrderCard({ order, menuItemMap, lang, onMark }) {
     ready:     lang === 'uz' ? 'Hammasi tayyor'           : lang === 'ru' ? 'Все готово'    : 'All Ready',
   }
 
-  function handleBulk(fromStatus, toStatus) {
+  async function handleBulk(fromStatus, toStatus) {
     if (bulkBusy) return
     setBulkBusy(true)
-    order.items
+    const targets = order.items
       .filter(i => i.status === fromStatus)
-      .forEach(i => onMark(order.id, i.id, i.menu_item_id, toStatus, i._orderId || order.id))
-    setTimeout(() => setBulkBusy(false), 700)
+      .filter(i => !pendingIds.has(kitchenItemKey(order.id, i)))
+    try {
+      await Promise.all(targets.map(i => onMark(order.id, i, toStatus, i._orderId || order.id)))
+    } finally {
+      setBulkBusy(false)
+    }
   }
 
   return (
@@ -329,16 +379,41 @@ function OrderCard({ order, menuItemMap, lang, onMark }) {
 
       {/* Item rows */}
       <div className="p-3 space-y-2.5 flex-1">
-        {sortedItems.map(item => (
-          <KitchenItem
-            key={`${item._orderId || order.id}-${item.menu_item_id}`}
-            item={item}
-            orderId={order.id}
-            menuItem={menuItemMap[item.menu_item_id]}
-            lang={lang}
-            onMark={onMark}
-          />
-        ))}
+        {dineInItems.length > 0 && (
+          <>
+            <div className="text-sm font-bold text-gray-700 mt-1 mb-2">Dine In</div>
+            {dineInItems.map(item => (
+              <KitchenItem
+                key={kitchenItemKey(order.id, item)}
+                item={item}
+                orderId={order.id}
+                menuItem={menuItemMap[item.menu_item_id]}
+                lang={lang}
+                onMark={onMark}
+                pending={pendingIds.has(kitchenItemKey(order.id, item))}
+                error={itemErrors[kitchenItemKey(order.id, item)]}
+              />
+            ))}
+          </>
+        )}
+
+        {takeAwayItems.length > 0 && (
+          <>
+            <div className="text-sm font-bold text-orange-600 mt-4 mb-2">Take Away</div>
+            {takeAwayItems.map(item => (
+              <KitchenItem
+                key={kitchenItemKey(order.id, item)}
+                item={item}
+                orderId={order.id}
+                menuItem={menuItemMap[item.menu_item_id]}
+                lang={lang}
+                onMark={onMark}
+                pending={pendingIds.has(kitchenItemKey(order.id, item))}
+                error={itemErrors[kitchenItemKey(order.id, item)]}
+              />
+            ))}
+          </>
+        )}
       </div>
     </div>
   )
@@ -396,7 +471,18 @@ function BottomBar({ orders, lang }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function Kitchen() {
   const { state, dispatch } = useApp()
+  const { profile } = useAuth()
   const lang = state.lang
+  const role = (profile?.role || state.user?.role || '').toLowerCase()
+  const shouldShowSidebar = !['kitchen', 'waiter'].includes(role)
+  const [pendingIds, setPendingIds] = useState(() => new Set())
+  const [itemErrors, setItemErrors] = useState({})
+  const [screenError, setScreenError] = useState('')
+  const pendingIdsRef = useRef(pendingIds)
+
+  useEffect(() => {
+    pendingIdsRef.current = pendingIds
+  }, [pendingIds])
 
   const menuItemMap = useMemo(() => {
     const map = {}
@@ -409,6 +495,7 @@ export default function Kitchen() {
     const raw = state.orders
       .filter(o => ['sent_to_kitchen', 'preparing'].includes(o.status))
       .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    console.log('Kitchen fetched orders', raw)
 
     // Merge orders with the same table_id into one virtual order
     const grouped = {}
@@ -421,7 +508,7 @@ export default function Kitchen() {
           // Hide already-served rounds when a table sends more food later.
           items: (order.items || [])
             .filter(i => i.status !== 'served')
-            .map(i => ({ ...i, _orderId: order.id })),
+            .map(i => ({ ...i, order_type: getOrderType(i), _orderId: order.id })),
         }
       } else {
         // Append items from subsequent orders for the same table
@@ -429,7 +516,7 @@ export default function Kitchen() {
           ...grouped[key].items,
           ...(order.items || [])
             .filter(i => i.status !== 'served')
-            .map(i => ({ ...i, _orderId: order.id })),
+            .map(i => ({ ...i, order_type: getOrderType(i), _orderId: order.id })),
         ]
         // Keep the earliest created_at for sorting
         if (new Date(order.created_at) < new Date(grouped[key].created_at)) {
@@ -441,17 +528,67 @@ export default function Kitchen() {
     return Object.values(grouped).filter(order => order.items.length > 0)
   }, [state.orders])
 
-  function markItem(_cardOrderId, orderItemId, menuItemId, status, realOrderId) {
-    dispatch({ type: 'UPDATE_ORDER_ITEM_STATUS', payload: { orderId: realOrderId, orderItemId, menuItemId, status } })
-  }
+  const markItem = useCallback(async (cardOrderId, item, status, realOrderId) => {
+    const itemId = kitchenItemKey(cardOrderId, item)
+    if (pendingIdsRef.current.has(itemId)) return
+
+    console.log('Prepare clicked', itemId)
+    console.log('Prepare request started', itemId)
+    setPendingIds(prev => {
+      const next = new Set(prev)
+      next.add(itemId)
+      pendingIdsRef.current = next
+      return next
+    })
+    setItemErrors(prev => {
+      const next = { ...prev }
+      delete next[itemId]
+      return next
+    })
+    setScreenError('')
+
+    try {
+      const result = await dispatch({
+        type: 'UPDATE_ORDER_ITEM_STATUS',
+        payload: {
+          orderId: realOrderId,
+          orderItemId: item.id,
+          menuItemId: item.menu_item_id,
+          status,
+        },
+      })
+      if (result?.error) throw result.error
+      console.log('Prepare request success', itemId)
+    } catch (error) {
+      console.error('Prepare request failed', itemId, error)
+      setItemErrors(prev => ({ ...prev, [itemId]: true }))
+      setScreenError(
+        lang === 'uz'
+          ? 'Mahsulot holatini yangilab bo‘lmadi. Qayta urinib ko‘ring.'
+          : lang === 'ru'
+            ? 'Не удалось обновить позицию. Попробуйте ещё раз.'
+            : 'Failed to update item. Please try again.'
+      )
+    } finally {
+      console.log('Prepare request finished', itemId)
+      setPendingIds(prev => {
+        const next = new Set(prev)
+        next.delete(itemId)
+        pendingIdsRef.current = next
+        return next
+      })
+    }
+  }, [dispatch, lang])
 
   return (
     <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
 
       {/* Sidebar */}
+      {shouldShowSidebar && (
       <div className="hidden lg:block flex-shrink-0 h-full">
         <UnifiedSidebar />
       </div>
+      )}
 
       {/* Main */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -460,6 +597,11 @@ export default function Kitchen() {
           lang={lang}
           onLangChange={l => dispatch({ type: 'SET_LANG', payload: l })}
         />
+        {screenError && (
+          <div className="flex-shrink-0 bg-red-50 border-b border-red-100 px-5 py-2 text-sm font-semibold text-red-700">
+            {screenError}
+          </div>
+        )}
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-5">
@@ -489,6 +631,8 @@ export default function Kitchen() {
                   menuItemMap={menuItemMap}
                   lang={lang}
                   onMark={markItem}
+                  pendingIds={pendingIds}
+                  itemErrors={itemErrors}
                 />
               ))}
             </div>

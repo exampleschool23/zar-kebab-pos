@@ -30,6 +30,11 @@ function loadInitialLang() {
   }
 }
 
+function normalizeOrderType(value) {
+  const raw = String(value || '').toLowerCase()
+  return raw.includes('take') || raw.includes('away') ? 'take_away' : 'dine_in'
+}
+
 function makeLocalId(prefix) {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -317,20 +322,40 @@ export function AppProvider({ children }) {
   // dbDispatch: optimistic local update + async Supabase write
   function dbDispatch(action) {
     // Pre-inject a stable orderId so reducer and Supabase writer share it
-    const enriched = action.type === 'SEND_TO_KITCHEN'
+      const enriched = action.type === 'SEND_TO_KITCHEN'
       ? {
           ...action,
           _orderId: stateRef.current.orders.find(o =>
             o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
           )?.id || 'o' + Date.now(),
-          _items: stateRef.current.cart.map(i => ({ ...i, id: makeLocalId('oi'), status: 'new' })),
+          _items: stateRef.current.cart.map(i => ({
+            ...i,
+            id: makeLocalId('oi'),
+            status: 'new',
+            order_type: normalizeOrderType(action.payload?.orderType),
+          })),
         }
       : action
 
+    if (enriched.type === 'UPDATE_ORDER_ITEM_STATUS') {
+      return writeToSupabase(enriched, stateRef.current)
+        .then(() => {
+          dispatch(enriched)
+          return { error: null }
+        })
+        .catch(err => {
+          console.error('[db] write failed:', action.type, err)
+          return { error: err }
+        })
+    }
+
     dispatch(enriched)
-    writeToSupabase(enriched, stateRef.current).catch(err =>
-      console.error('[db] write failed:', action.type, err)
-    )
+    return writeToSupabase(enriched, stateRef.current)
+      .then(() => ({ error: null }))
+      .catch(err => {
+        console.error('[db] write failed:', action.type, err)
+        return { error: err }
+      })
   }
 
   // Load from Supabase on mount + subscribe to realtime

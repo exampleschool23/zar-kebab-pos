@@ -7,7 +7,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 // Delivery tab removed — only Dine In and Take Away
 const ORDER_TYPES = [
   { key: 'dine_in',  uz: 'Zalda',      ru: 'В зале',  en: 'Dine In'  },
-  { key: 'takeaway', uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
+  { key: 'take_away', uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
 ]
 
 function orderTypeLabel(ot, lang) {
@@ -115,7 +115,9 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
 
   function handleSend() {
     if (cart.length === 0) return
-    dispatch({ type: 'SEND_TO_KITCHEN' })
+    console.log('Order type', orderType)
+    console.log('Send to kitchen payload', { orderType, items: cart })
+    dispatch({ type: 'SEND_TO_KITCHEN', payload: { orderType } })
     onClose?.()
   }
 
