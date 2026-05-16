@@ -201,22 +201,22 @@ function shortLabel(ds, mode) {
 
 function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight }) {
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 min-w-0 ${highlight ? 'border-red-200' : 'border-[#E5E7EB]'}`}>
+    <div className={`bg-white rounded-2xl border shadow-sm p-4 flex flex-col gap-2 min-w-0 ${highlight ? 'border-red-200' : 'border-[#E5E7EB]'}`}>
       <div className="flex items-start justify-between gap-2">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${highlight ? 'bg-red-50' : 'bg-gray-50'}`}>
-          <Icon size={18} className={highlight ? 'text-[#DC2626]' : 'text-[#6B7280]'} />
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${highlight ? 'bg-red-50' : 'bg-gray-50'}`}>
+          <Icon size={17} className={highlight ? 'text-[#DC2626]' : 'text-[#6B7280]'} />
         </div>
         {badge && (
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap ${badge.cls}`}>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 ${badge.cls}`}>
             {badge.up !== null && (badge.up ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />)}
             {badge.text}
           </span>
         )}
       </div>
       <div>
-        <p className={`font-black text-2xl leading-none mb-1 truncate ${highlight ? 'text-[#DC2626]' : 'text-[#1F2937]'}`}>{value}</p>
+        <p className={`font-black text-xl leading-tight break-words tabular-nums mb-1 ${highlight ? 'text-[#DC2626]' : 'text-[#1F2937]'}`}>{value}</p>
         <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider">{label}</p>
-        {sub && <p className={`text-xs mt-0.5 ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
+        {sub && <p className={`text-xs mt-0.5 leading-snug ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
       </div>
     </div>
   )
@@ -245,6 +245,20 @@ const PAYMENT_COLORS = {
   terminal: '#2563EB',
   qr:       '#D97706',
   unknown:  '#D1D5DB',
+}
+
+const ROLE_BADGE = {
+  owner:       'bg-orange-100 text-[#ff5a00] border-orange-200',
+  admin:       'bg-blue-100 text-blue-700 border-blue-200',
+  waiter:      'bg-green-100 text-green-700 border-green-200',
+  cashier:     'bg-teal-100 text-teal-700 border-teal-200',
+  kitchen:     'bg-yellow-100 text-yellow-700 border-yellow-200',
+  stakeholder: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+}
+
+const ROLE_LABEL = {
+  owner: 'Owner', admin: 'Admin', waiter: 'Waiter',
+  cashier: 'Cashier', kitchen: 'Kitchen', stakeholder: 'Stakeholder',
 }
 
 function DonutChart({ slices }) {
@@ -524,9 +538,14 @@ export default function AdminDashboard() {
       map[name].items   += (o.items || []).reduce((s, i) => s + (Number(i.quantity) || 1), 0)
     })
     return Object.values(map)
-      .map(s => ({ ...s, avgOrder: s.orders > 0 ? Math.round(s.revenue / s.orders) : 0 }))
+      .map(s => {
+        const profile = (staffProfiles || []).find(p =>
+          p.full_name === s.name || p.email === s.name
+        )
+        return { ...s, avgOrder: s.orders > 0 ? Math.round(s.revenue / s.orders) : 0, role: profile?.role || null }
+      })
       .sort((a, b) => b.revenue - a.revenue)
-  }, [paidOrders])
+  }, [paidOrders, staffProfiles])
 
   // ── Recent orders (latest 8, not grouped) ─────────────────────────────────
   const recentOrders = useMemo(() => {
@@ -645,7 +664,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Bar chart — fixed 160px, bars use h-full so they fill it properly */}
-            <div className="relative h-40 mb-1">
+            <div className="relative h-52 mb-1">
               <div className="flex items-end gap-[3px] h-full">
                 {chartBars.map((bar, i) => {
                   const pct = Math.round((bar.revenue / chartMax) * 100)
@@ -741,7 +760,7 @@ export default function AdminDashboard() {
               {recentOrders.length === 0 ? (
                 <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noOrders}</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[280px] overflow-y-auto">
                   {recentOrders.map(order => {
                     const shortId = String(order.id).slice(-4).toUpperCase()
                     const method  = (order.payment_method || '').toLowerCase()
@@ -774,7 +793,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── Bottom 3-col: Category / Best-selling / Staff ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:items-start">
 
           {/* Sales by Category */}
           <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
@@ -835,26 +854,59 @@ export default function AdminDashboard() {
             {staffPerformance.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noStaff}</p>
             ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-4 gap-1 mb-1">
-                  <p className="text-xs font-bold text-[#9CA3AF] uppercase col-span-1">Staff</p>
-                  <p className="text-xs font-bold text-[#9CA3AF] uppercase text-right">Orders</p>
-                  <p className="text-xs font-bold text-[#9CA3AF] uppercase text-right">Revenue</p>
-                  <p className="text-xs font-bold text-[#9CA3AF] uppercase text-right">Items</p>
-                </div>
-                {staffPerformance.map(s => (
-                  <div key={s.name} className="grid grid-cols-4 gap-1 items-center">
-                    <div className="col-span-1 flex items-center gap-1.5 min-w-0">
-                      <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#6B7280] text-[10px] font-black">{(s.name || '?')[0].toUpperCase()}</span>
+              <div className="divide-y divide-[#F9FAFB]">
+                {staffPerformance.map((s, idx) => {
+                  const maxRev = staffPerformance[0]?.revenue || 1
+                  const pct    = Math.round((s.revenue / maxRev) * 100)
+                  return (
+                    <div key={s.name} className="py-3 first:pt-0 last:pb-0">
+                      {/* Avatar + name + role */}
+                      <div className="flex items-center gap-2.5 mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[#ff5a00] text-sm font-black">{(s.name || '?')[0].toUpperCase()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-bold text-[#1F2937]">{s.name}</p>
+                            {s.role && (
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border leading-none ${ROLE_BADGE[s.role] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                                {ROLE_LABEL[s.role] || s.role}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {idx === 0 && (
+                          <span className="text-base flex-shrink-0">🥇</span>
+                        )}
                       </div>
-                      <p className="text-xs font-semibold text-[#1F2937] truncate">{s.name.split(' ')[0]}</p>
+                      {/* Stats row */}
+                      <div className="grid grid-cols-3 gap-2 mb-2 ml-10">
+                        <div>
+                          <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase mb-0.5">{l.orders}</p>
+                          <p className="text-sm font-bold text-[#1F2937]">{s.orders}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase mb-0.5">{l.avgOrderShort}</p>
+                          <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatCurrency(s.avgOrder)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase mb-0.5">{l.items}</p>
+                          <p className="text-sm font-bold text-[#1F2937]">{s.items}</p>
+                        </div>
+                      </div>
+                      {/* Revenue + progress */}
+                      <div className="ml-10">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase">{l.revenue}</p>
+                          <p className="text-xs font-black text-[#ff5a00] tabular-nums">{formatCurrency(s.revenue)}</p>
+                        </div>
+                        <div className="h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
+                          <div className="h-full bg-[#ff5a00] rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs font-bold text-[#1F2937] text-right">{s.orders}</p>
-                    <p className="text-xs font-bold text-[#1F2937] text-right">{formatCurrency(s.revenue)}</p>
-                    <p className="text-xs font-bold text-[#1F2937] text-right">{s.items}</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
