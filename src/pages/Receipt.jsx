@@ -122,7 +122,7 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
 
   return (
     <div
-      className="receipt-paper bg-white"
+      className="receipt-paper print-area bg-white"
       style={{
         width: '340px',
         maxWidth: '100%',
