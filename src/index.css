@@ -47,15 +47,52 @@ h3 { font-size: 1.0625rem; } /* 17px */
 }
 
 @media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 80mm;
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
-  .print-area, .print-area * {
-    visibility: visible;
+
+  .receipt-print-area,
+  .receipt-print-area * {
+    visibility: visible !important;
   }
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
+
+  .receipt-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    padding: 4mm !important;
+    box-sizing: border-box !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-family: Arial, sans-serif !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+
+  .no-print,
+  button,
+  nav,
+  aside,
+  header,
+  footer,
+  dialog,
+  [role="dialog"] {
+    display: none !important;
   }
 }

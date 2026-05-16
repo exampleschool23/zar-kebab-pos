@@ -86,9 +86,31 @@ const PRINT_CSS = `
 }
 
 @media print {
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { margin: 0; padding: 0; background: #fff; }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html,
+  body {
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
   .no-print { display: none !important; }
+  button,
+  nav,
+  aside,
+  header,
+  footer,
+  dialog,
+  [role="dialog"] {
+    display: none !important;
+  }
   .receipt-bg {
     display: block !important;
     background: #fff !important;
@@ -101,19 +123,47 @@ const PRINT_CSS = `
     box-shadow: none !important;
     display: block !important;
   }
-  .receipt-paper {
+  .receipt-print-area,
+  .receipt-print-area * {
+    visibility: visible !important;
+  }
+  .receipt-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     display: block !important;
     width: 80mm !important;
     max-width: 80mm !important;
+    min-height: auto !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     margin: 0 !important;
-    padding: 6mm 5mm !important;
+    padding: 4mm !important;
     border: none !important;
     overflow: visible !important;
+    box-sizing: border-box !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-family: Arial, sans-serif !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+  .receipt-print-area *,
+  .receipt-print-area svg,
+  .receipt-print-area img {
+    color: #000 !important;
+    border-color: #000 !important;
+    box-shadow: none !important;
   }
 }
 `
+
+function handlePrintReceipt(delay = 300) {
+  // Browser JavaScript cannot select a printer. For silent Windows thermal
+  // printing, set the Xprinter as the Windows default printer and launch Chrome
+  // with --kiosk-printing; then window.print() prints directly to that printer.
+  window.setTimeout(() => window.print(), delay)
+}
 
 // ── ReceiptPaper ──────────────────────────────────────────────────────────────
 
@@ -122,7 +172,7 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
 
   return (
     <div
-      className="receipt-paper print-area bg-white"
+      className="receipt-paper receipt-print-area bg-white"
       style={{
         width: '340px',
         maxWidth: '100%',
@@ -565,7 +615,7 @@ export default function Receipt() {
 function ReceiptShell({ lang, dispatch, onBack, autoPrint, children }) {
   useEffect(() => {
     if (!autoPrint) return
-    const t = setTimeout(() => window.print(), 600)
+    const t = setTimeout(() => handlePrintReceipt(0), 600)
     return () => clearTimeout(t)
   }, [autoPrint])
 
@@ -601,7 +651,7 @@ function ReceiptShell({ lang, dispatch, onBack, autoPrint, children }) {
         </div>
 
         <button
-          onClick={() => window.print()}
+          onClick={() => handlePrintReceipt()}
           className="flex items-center gap-1.5 bg-[#ff5a00] text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-[#cc4800] transition-colors shadow-sm shadow-orange-200"
         >
           <Printer size={15} />
