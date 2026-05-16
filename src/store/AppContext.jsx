@@ -27,7 +27,7 @@ function makeLocalId(prefix) {
 }
 
 const initialState = {
-  lang:           localStorage.getItem('zk_lang') || 'uz',
+  lang:           localStorage.getItem('zk_lang') || 'ru',
   settings:       { ...DEFAULT_SETTINGS, ...loadSettings() },
   user:           null,
   tables:         [],
