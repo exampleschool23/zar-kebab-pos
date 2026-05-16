@@ -299,7 +299,8 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+      <div className="w-full overflow-x-auto rounded-2xl border border-[#E5E7EB] shadow-sm">
+        <div className="bg-white rounded-2xl overflow-hidden min-w-[520px]">
         {/* Header */}
         <div className="hidden md:grid grid-cols-[32px_48px_1fr_120px_80px_110px] gap-3 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
           <span>#</span><span></span><span>Product</span><span>Category</span>
@@ -337,6 +338,7 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
             <span className="text-right font-bold text-sm text-[#ff5a00]">{formatCurrency(item.revenue)}</span>
           </div>
         ))}
+        </div>
       </div>
     </div>
   )
@@ -594,7 +596,8 @@ function WaiterPerformanceTab({ orders, lang }) {
   const maxRev = data[0]?.revenue || 1
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+    <div className="w-full overflow-x-auto rounded-2xl border border-[#E5E7EB] shadow-sm">
+    <div className="bg-white rounded-2xl overflow-hidden min-w-[640px]">
       {/* Header */}
       <div className="hidden md:grid grid-cols-[32px_1fr_80px_140px_140px_80px] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
         <span>#</span><span>Waiter</span>
@@ -650,6 +653,7 @@ function WaiterPerformanceTab({ orders, lang }) {
           </div>
         </div>
       ))}
+    </div>
     </div>
   )
 }
@@ -834,7 +838,8 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
       {pageOrders.length === 0 ? (
         <EmptyState label="No orders found" />
       ) : (
-        <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+        <div className="w-full overflow-x-auto rounded-2xl border border-[#E5E7EB] shadow-sm">
+        <div className="bg-white rounded-2xl overflow-hidden min-w-[1050px]">
           {/* Desktop header */}
           <div className="hidden lg:grid grid-cols-[80px_90px_130px_150px_90px_110px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
             <span>Order ID</span><span>Table</span><span>Waiter</span>
@@ -922,6 +927,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
               <PageBtn disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight size={14} /></PageBtn>
             </div>
           </div>
+        </div>
         </div>
       )}
     </div>
@@ -1089,11 +1095,11 @@ export default function Reports() {
               <KpiCard icon={Package}     iconCls="bg-purple-50 text-purple-600" label={l.itemsSold} value={kpiItemsSold} />
             </div>
 
-            {/* Tab bar */}
-            <div className="flex gap-0 border-b border-[#E5E7EB] mb-5 overflow-x-auto">
+            {/* Tab bar — scrolls horizontally when tabs don't fit */}
+            <div className="flex gap-0 border-b border-[#E5E7EB] mb-5 overflow-x-auto scrollbar-none">
               {TABS.map(({ key, label, Icon }) => (
                 <button key={key} onClick={() => setActiveTab(key)}
-                  className={`flex items-center gap-1.5 px-4 py-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
                     activeTab === key
                       ? 'text-[#ff5a00] border-[#ff5a00]'
                       : 'text-[#6B7280] border-transparent hover:text-[#1F2937]'
