@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Search, ShoppingCart, Plus, Minus, UtensilsCrossed,
   Menu as MenuIcon, LayoutGrid, X, CheckCircle2, Clock,
-  ChefHat, Receipt, Loader2, Tag, ArrowLeft,
+  ChefHat, Receipt, Loader2, ArrowLeft,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -15,35 +15,47 @@ import UnifiedSidebar from '../components/UnifiedSidebar'
 // ── CategoryCard ───────────────────────────────────────────────────────────────
 function CategoryCard({ cat, active, itemCount, onClick, lang }) {
   const isAll = cat.id === 'all'
+  const title = isAll
+    ? (lang === 'uz' ? 'Barchasi' : lang === 'ru' ? 'Все' : 'All')
+    : getCategoryName(cat, lang)
+  const countLabel = lang === 'uz' ? 'ta' : lang === 'ru' ? 'шт' : 'items'
+
   return (
     <button
       onClick={onClick}
-      style={{ width: '120px', minWidth: '120px', height: '96px' }}
-      className={`flex-shrink-0 flex flex-col items-center justify-center rounded-2xl border-2 transition-all gap-1.5 p-2 ${
+      className={`min-w-[124px] w-[124px] flex-shrink-0 overflow-hidden rounded-[20px] border-2 text-left transition-all active:scale-[0.98] ${
         active
-          ? 'border-[#ff5a00] bg-[#fff1e8]'
-          : 'border-[#E5E7EB] bg-white hover:border-orange-200 hover:bg-orange-50/30 shadow-sm'
+          ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-[0_8px_18px_rgba(255,90,31,0.16)]'
+          : 'border-[#E5E7EB] bg-white shadow-sm hover:border-orange-200 hover:shadow-md'
       }`}
     >
-      {isAll ? (
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? 'bg-[#ff5a00]/15' : 'bg-orange-50'}`}>
-          <LayoutGrid size={20} className={active ? 'text-[#ff5a00]' : 'text-orange-400'} />
-        </div>
-      ) : cat.image_url ? (
-        <img src={cat.image_url} alt="" className="w-11 h-11 rounded-xl object-cover flex-shrink-0" />
-      ) : (
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? 'bg-[#ff5a00]/15' : 'bg-gray-100'}`}>
-          <UtensilsCrossed size={16} className={active ? 'text-[#ff5a00]' : 'text-gray-400'} />
-        </div>
-      )}
-      <div className="text-center w-full px-0.5">
-        <p className={`text-[12px] font-bold truncate leading-tight ${active ? 'text-[#ff5a00]' : 'text-[#1F2937]'}`}>
-          {isAll
-            ? (lang === 'uz' ? 'Barchasi' : lang === 'ru' ? 'Все' : 'All')
-            : getCategoryName(cat, lang)}
+      <div className={`aspect-square w-full overflow-hidden ${active ? 'bg-[#FFE8D8]' : 'bg-[#F3F4F6]'}`}>
+        {isAll ? (
+          <div className="h-full w-full flex items-center justify-center">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${active ? 'bg-[#ff5a1f]/15' : 'bg-white shadow-sm'}`}>
+              <LayoutGrid size={24} className={active ? 'text-[#ff4d00]' : 'text-[#ff8a3d]'} />
+            </div>
+          </div>
+        ) : cat.image_url ? (
+          <img
+            src={cat.image_url}
+            alt={title}
+            className="h-full w-full object-cover object-center"
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center bg-orange-50">
+            <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
+          </div>
+        )}
+      </div>
+
+      <div className="min-h-[58px] px-2.5 py-2.5 text-center">
+        <p className={`truncate text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
+          {title}
         </p>
-        <p className={`text-[10px] mt-0.5 ${active ? 'text-[#ff5a00]/70' : 'text-[#9CA3AF]'}`}>
-          {itemCount} {lang === 'uz' ? 'ta' : lang === 'ru' ? 'шт' : 'items'}
+        <p className={`mt-1 text-xs font-semibold ${active ? 'text-[#ff4d00]/70' : 'text-[#9CA3AF]'}`}>
+          {itemCount} {countLabel}
         </p>
       </div>
     </button>
@@ -131,12 +143,11 @@ function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail,
   )
 }
 
-// ── ProductDetailsModal ────────────────────────────────────────────────────────
-function ProductDetailsModal({ item, category, currentQty, currentNotes, lang, onConfirm, onClose }) {
+// ── ProductDetailPage ──────────────────────────────────────────────────────────
+function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart }) {
   const [qty,   setQty]   = useState(Math.max(1, currentQty))
   const [notes, setNotes] = useState(currentNotes || '')
 
-  // Sync when item changes
   useEffect(() => {
     setQty(Math.max(1, currentQty))
     setNotes(currentNotes || '')
@@ -144,127 +155,137 @@ function ProductDetailsModal({ item, category, currentQty, currentNotes, lang, o
 
   if (!item) return null
 
-  const inCart = currentQty > 0
-  const total  = item.price * qty
+  const name = getItemName(item, lang)
+  const desc = getItemDesc(item, lang)
+  const total = item.price * qty
+  const labels = {
+    back: lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Назад в меню' : 'Back to menu',
+    description: lang === 'uz' ? 'Tavsif' : lang === 'ru' ? 'Описание' : 'Description',
+    noDescription: lang === 'uz' ? 'Tavsif qo‘shilmagan.' : lang === 'ru' ? 'Описание не добавлено.' : 'No description added.',
+    quantity: lang === 'uz' ? 'Miqdor' : lang === 'ru' ? 'Количество' : 'Quantity',
+    quantitySub: lang === 'uz' ? 'Porsiyalar sonini tanlang' : lang === 'ru' ? 'Выберите количество порций' : 'Choose how many portions',
+    notes: lang === 'uz' ? 'Maxsus izohlar' : lang === 'ru' ? 'Особые заметки' : 'Special notes',
+    notesSub: lang === 'uz' ? 'Oshxona uchun ixtiyoriy ko‘rsatma' : lang === 'ru' ? 'Дополнительная инструкция для кухни' : 'Optional kitchen instruction',
+    cancel: lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel',
+    add: lang === 'uz' ? "Savatga qo'shish" : lang === 'ru' ? 'Добавить в корзину' : 'Add to Cart',
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 p-0 md:p-4"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      {/* Modal card */}
-      <div className="bg-white w-full md:max-w-[680px] md:rounded-[24px] rounded-t-[24px] shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[92vh] md:max-h-[85vh]">
-
-        {/* Image */}
-        <div className="relative md:w-[280px] md:flex-shrink-0 h-[200px] md:h-auto">
-          {item.image_url ? (
-            <img src={item.image_url} alt={getItemName(item, lang)} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-orange-50 flex items-center justify-center">
-              <UtensilsCrossed size={48} className="text-orange-200" />
-            </div>
+    <div className="flex h-full flex-col bg-[#FAF6EE]">
+      <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-[#E5E7EB] bg-white px-5 py-3 shadow-sm">
+        <button
+          onClick={onBack}
+          className="w-11 h-11 rounded-2xl border border-[#E5E7EB] bg-white text-[#64748B] flex items-center justify-center hover:bg-[#F8FAFC] hover:text-[#0F3B2E] active:scale-95 transition-all shadow-sm"
+          aria-label={labels.back}
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-xl font-black uppercase tracking-tight text-[#111827]">{name}</h1>
+          {category && (
+            <p className="mt-0.5 text-xs font-black uppercase tracking-wider text-[#FF4D00]">
+              {getCategoryName(category, lang)}
+            </p>
           )}
         </div>
+        <p className="whitespace-nowrap text-xl sm:text-2xl font-black text-[#FF4D00] tabular-nums">
+          {formatCurrency(item.price)}
+        </p>
+      </div>
 
-        {/* Info side */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-5 pt-5 pb-2">
-
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div className="flex-1 min-w-0">
-                <h2 className="font-black text-[20px] text-[#1F2937] leading-tight">
-                  {getItemName(item, lang)}
-                </h2>
-                {getItemDesc(item, lang) && (
-                  <p className="text-[13px] text-[#6B7280] mt-1.5 leading-relaxed">
-                    {getItemDesc(item, lang)}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={onClose}
-                className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors flex-shrink-0"
-              >
-                <X size={16} className="text-[#6B7280]" />
-              </button>
-            </div>
-
-            {/* Category + Price */}
-            <div className="flex items-center gap-3 mb-4">
-              {category && (
-                <div className="flex items-center gap-1.5 bg-orange-50 px-2.5 py-1.5 rounded-xl">
-                  <Tag size={11} className="text-[#ff5a00]" />
-                  <span className="text-[11px] font-bold text-[#ff5a00] uppercase tracking-wide">
-                    {getCategoryName(category, lang)}
-                  </span>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 pb-28">
+        <div className="mx-auto w-full max-w-[1040px] space-y-4">
+          <section className="overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white shadow-sm">
+            <div className="relative aspect-[16/9] w-full bg-orange-50 md:max-h-[420px]">
+              {item.image_url ? (
+                <img
+                  src={item.image_url}
+                  alt={name}
+                  className="h-full w-full object-cover object-center"
+                />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center">
+                  <UtensilsCrossed size={64} className="text-orange-200" />
                 </div>
               )}
-              <span className="font-black text-[22px] text-[#ff5a00] ml-auto">
-                {formatCurrency(item.price)}
-              </span>
             </div>
 
-            {/* Quantity */}
-            <div className="mb-4">
-              <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-2.5">
-                {lang === 'uz' ? 'Miqdor' : lang === 'ru' ? 'Количество' : 'Quantity'}
-              </p>
-              <div className="flex items-center gap-4">
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="text-3xl font-black uppercase tracking-tight text-[#111827]">{name}</h2>
+                  <p className="mt-2 text-lg font-black text-[#FF4D00]">{formatCurrency(item.price)}</p>
+                </div>
+                {category && (
+                  <span className="mt-1 rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00]">
+                    {getCategoryName(category, lang)}
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-5 border-t border-[#EEF2F6] pt-4">
+                <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-[#8EA0BB]">{labels.description}</p>
+                <p className="text-[15px] leading-7 text-[#475569]">
+                  {desc || labels.noDescription}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[#E5E7EB] bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-black text-[#111827]">{labels.quantity}</h3>
+                <p className="mt-1 text-sm text-[#8A94A6]">{labels.quantitySub}</p>
+              </div>
+              <div className="flex items-center gap-4 rounded-[20px] border border-[#E5E7EB] bg-[#F8FAFC] p-1.5">
                 <button
                   onClick={() => setQty(q => Math.max(1, q - 1))}
-                  className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition-all"
+                  className="w-14 h-14 rounded-2xl bg-white border border-[#E5E7EB] flex items-center justify-center text-[#64748B] hover:text-[#0F3B2E] active:scale-95 transition-all shadow-sm"
                 >
-                  <Minus size={16} className="text-[#1F2937]" />
+                  <Minus size={20} />
                 </button>
-                <span className="font-black text-[26px] text-[#1F2937] min-w-[36px] text-center leading-none">
-                  {qty}
-                </span>
+                <span className="min-w-[44px] text-center text-3xl font-black leading-none text-[#111827] tabular-nums">{qty}</span>
                 <button
                   onClick={() => setQty(q => q + 1)}
-                  className="w-11 h-11 rounded-xl bg-[#ff5a00] flex items-center justify-center hover:bg-[#cc4800] active:scale-95 transition-all shadow-sm shadow-orange-200"
+                  className="w-14 h-14 rounded-2xl bg-[#0F3B2E] flex items-center justify-center text-white hover:bg-[#0A2A20] active:scale-95 transition-all shadow-sm"
                 >
-                  <Plus size={16} className="text-white" />
+                  <Plus size={22} />
                 </button>
               </div>
             </div>
+          </section>
 
-            {/* Notes */}
-            <div>
-              <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-2">
-                {lang === 'uz' ? 'Izoh (ixtiyoriy)' : lang === 'ru' ? 'Заметки (опционально)' : 'Notes (optional)'}
-              </p>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder={
-                  lang === 'uz' ? 'Izoh qo\'shing...'
-                  : lang === 'ru' ? 'Добавьте заметку...'
-                  : 'Add notes...'
-                }
-                rows={2}
-                className="w-full border border-[#E5E7EB] rounded-xl px-3 py-2.5 text-[13px] text-[#1F2937] placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] resize-none transition-all"
-              />
+          <section className="rounded-[24px] border border-[#E5E7EB] bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <h3 className="text-lg font-black text-[#111827]">{labels.notes}</h3>
+              <p className="mt-1 text-sm text-[#8A94A6]">{labels.notesSub}</p>
             </div>
-          </div>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Например: без лука, хорошо прожарить…"
+              rows={4}
+              className="w-full resize-none rounded-[20px] border border-[#E5E7EB] bg-[#F8FAFC] px-4 py-4 text-[15px] leading-6 text-[#1F2937] placeholder-[#9CA3AF] transition-all focus:border-[#ff5a00] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/15"
+            />
+          </section>
+        </div>
+      </div>
 
-          {/* CTA */}
-          <div className="px-5 py-4 flex-shrink-0 border-t border-[#F3F4F6]">
-            <button
-              onClick={() => onConfirm(item, qty, notes)}
-              className="w-full bg-[#ff5a00] text-white rounded-xl font-black text-[15px] flex items-center justify-center gap-2.5 hover:bg-[#cc4800] active:scale-[0.98] transition-all shadow-md shadow-orange-200"
-              style={{ height: '52px' }}
-            >
-              <ShoppingCart size={18} />
-              <span>
-                {inCart
-                  ? (lang === 'uz' ? 'Yangilash' : lang === 'ru' ? 'Обновить корзину' : 'Update Cart')
-                  : (lang === 'uz' ? "Savatga qo'shish" : lang === 'ru' ? 'Добавить в корзину' : 'Add to Cart')
-                }
-              </span>
-              <span className="font-medium opacity-80 text-[13px]">{formatCurrency(total)}</span>
-            </button>
-          </div>
+      <div className="sticky bottom-0 z-20 border-t border-[#E5E7EB] bg-white/95 px-4 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[1040px] gap-3">
+          <button
+            onClick={onCancel}
+            className="h-14 flex-1 rounded-2xl border border-[#E5E7EB] bg-white text-sm font-black text-[#64748B] hover:bg-[#F8FAFC] active:scale-[0.99] transition-all"
+          >
+            {labels.cancel}
+          </button>
+          <button
+            onClick={() => onAddToCart(item, qty, notes)}
+            className="h-14 flex-[2] rounded-2xl bg-[#0F3B2E] text-sm sm:text-base font-black text-white hover:bg-[#0A2A20] active:scale-[0.99] transition-all shadow-[0_8px_18px_rgba(15,59,46,0.22)]"
+          >
+            {labels.add} · {formatCurrency(total)}
+          </button>
         </div>
       </div>
     </div>
@@ -620,7 +641,7 @@ export default function WaiterOrder() {
       .filter(s => s.items.length > 0)
   }, [activeCategory, q, sortedCategories, filteredItems])
 
-  // Category lookup map (for modal)
+  // Category lookup map (for product detail page)
   const categoryMap = useMemo(() => {
     const map = {}
     state.categories.forEach(c => { map[c.id] = c })
@@ -649,7 +670,7 @@ export default function WaiterOrder() {
     setDetailItem(item)
   }
 
-  function handleModalConfirm(item, qty, notes) {
+  function handleProductDetailAdd(item, qty, notes) {
     const alreadyInCart = (cartQtyMap[item.id] || 0) > 0
     if (!alreadyInCart) {
       dispatch({ type: 'ADD_TO_CART', payload: { menu_item_id: item.id, name: getItemName(item, lang), price: item.price } })
@@ -702,6 +723,19 @@ export default function WaiterOrder() {
 
       {/* ── Center column ───────────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {detailItem ? (
+          <ProductDetailPage
+            item={detailItem}
+            category={categoryMap[detailItem.category_id]}
+            currentQty={cartQtyMap[detailItem.id] || 0}
+            currentNotes={cartNotesMap[detailItem.id] || ''}
+            lang={lang}
+            onBack={() => setDetailItem(null)}
+            onCancel={() => setDetailItem(null)}
+            onAddToCart={handleProductDetailAdd}
+          />
+        ) : (
+          <>
 
         {/* Search bar */}
         <div className="flex-shrink-0 bg-white border-b border-[#E5E7EB] px-4 py-3 flex items-center gap-3 shadow-sm">
@@ -818,9 +852,12 @@ export default function WaiterOrder() {
           currentTableId={tableId}
           onNewOrder={() => navigate('/waiter/tables')}
         />
+          </>
+        )}
       </div>
 
       {/* ── Desktop cart panel ───────────────────────────────────────────── */}
+      {!detailItem && (
       <div
         className="hidden lg:flex flex-col flex-shrink-0 bg-white border-l border-[#E5E7EB] overflow-hidden"
         style={{ width: '380px', boxShadow: '-4px 0 20px rgba(0,0,0,0.04)' }}
@@ -842,9 +879,10 @@ export default function WaiterOrder() {
           />
         </div>
       </div>
+      )}
 
       {/* ── Mobile cart bottom sheet ─────────────────────────────────────── */}
-      {cartOpen && (
+      {!detailItem && cartOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/40" onClick={() => setCartOpen(false)} />
           <div className="relative bg-white rounded-t-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
@@ -868,18 +906,6 @@ export default function WaiterOrder() {
         </div>
       )}
 
-      {/* ── Product details modal ────────────────────────────────────────── */}
-      {detailItem && (
-        <ProductDetailsModal
-          item={detailItem}
-          category={categoryMap[detailItem.category_id]}
-          currentQty={cartQtyMap[detailItem.id] || 0}
-          currentNotes={cartNotesMap[detailItem.id] || ''}
-          lang={lang}
-          onConfirm={handleModalConfirm}
-          onClose={() => setDetailItem(null)}
-        />
-      )}
     </div>
   )
 }

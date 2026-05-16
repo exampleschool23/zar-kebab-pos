@@ -420,7 +420,7 @@ export default function AdminMenu() {
   }, [sortedItems, filterCat, filterAvail, search, lang])
 
   const itemCountByCat = useMemo(() => {
-    const m = {}
+    const m = { all: state.menuItems.length }
     state.menuItems.forEach(i => { m[i.category_id] = (m[i.category_id] || 0) + 1 })
     return m
   }, [state.menuItems])
@@ -569,8 +569,8 @@ export default function AdminMenu() {
                 <OrangeBtn onClick={openNewItem} icon={Plus}>{t(lang, 'addItem')}</OrangeBtn>
               </div>
 
-              {/* Toolbar row 2: category squares */}
-              <div className="flex gap-2 overflow-x-auto pb-2 mb-2" style={{ scrollbarWidth: 'none' }}>
+              {/* Toolbar row 2: category cards */}
+              <div className="flex gap-3 overflow-x-auto pb-2 mb-2" style={{ scrollbarWidth: 'none' }}>
                 {/* "All" square */}
                 {[
                   { id: 'all', label: lang === 'uz' ? 'Hammasi' : lang === 'ru' ? 'Все' : 'All', image_url: null },
@@ -581,50 +581,40 @@ export default function AdminMenu() {
                     <button
                       key={cat.id}
                       onClick={() => setFilterCat(cat.id)}
-                      className={`flex-shrink-0 flex flex-col items-center justify-end rounded-2xl border-2 transition-all active:scale-95 overflow-hidden
+                      className={`min-w-[124px] w-[124px] flex-shrink-0 overflow-hidden rounded-[20px] border-2 text-left transition-all active:scale-[0.98]
                         ${active
-                          ? 'border-[#ff5a00] shadow-md shadow-orange-100'
-                          : 'border-gray-200 hover:border-orange-300 bg-white hover:shadow-sm'
+                          ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-[0_8px_18px_rgba(255,90,31,0.16)]'
+                          : 'border-gray-200 bg-white shadow-sm hover:border-orange-300 hover:shadow-md'
                         }`}
-                      style={{ width: '88px', height: '88px' }}
                     >
-                      {/* Image or coloured background */}
-                      <div className="relative w-full h-full flex flex-col items-center justify-end">
+                      <div className={`aspect-square w-full overflow-hidden ${active ? 'bg-[#FFE8D8]' : 'bg-gray-100'}`}>
                         {cat.id === 'all' ? (
-                          <>
-                            <div className={`absolute inset-0 ${active ? 'bg-[#fff1e8]' : 'bg-gray-50'}`} />
-                            <div className="absolute inset-0 flex items-center justify-center pb-5">
-                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${active ? 'bg-[#ff5a00]/15' : 'bg-orange-100'}`}>
-                                <LayoutGrid size={18} className={active ? 'text-[#ff5a00]' : 'text-orange-400'} />
-                              </div>
+                          <div className="h-full w-full flex items-center justify-center">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${active ? 'bg-[#ff5a1f]/15' : 'bg-white shadow-sm'}`}>
+                              <LayoutGrid size={24} className={active ? 'text-[#ff4d00]' : 'text-[#ff8a3d]'} />
                             </div>
-                          </>
+                          </div>
                         ) : cat.image_url ? (
                           <img
                             src={cat.image_url}
                             alt={cat.label}
-                            className="absolute inset-0 w-full h-full object-cover"
+                            className="h-full w-full object-cover object-center"
+                            loading="lazy"
                           />
                         ) : (
-                          <div className={`absolute inset-0 ${active ? 'bg-[#fff1e8]' : 'bg-gray-50'}`} />
+                          <div className="h-full w-full flex items-center justify-center bg-orange-50">
+                            <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
+                          </div>
                         )}
-                        {/* Label overlay */}
-                        <div className={`relative z-10 w-full px-1.5 py-1.5 text-center
-                          ${cat.image_url && cat.id !== 'all'
-                            ? 'bg-black/45 backdrop-blur-[1px]'
-                            : ''
-                          }`}
-                        >
-                          <span className={`text-[11px] font-bold leading-tight block
-                            ${cat.image_url && cat.id !== 'all'
-                              ? 'text-white'
-                              : active ? 'text-[#ff5a00]' : 'text-gray-700'
-                            }`}
-                            style={{ wordBreak: 'break-word', hyphens: 'auto' }}
-                          >
-                            {cat.label}
-                          </span>
-                        </div>
+                      </div>
+
+                      <div className="min-h-[58px] px-2.5 py-2.5 text-center">
+                        <p className={`truncate text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
+                          {cat.label}
+                        </p>
+                        <p className={`mt-1 text-xs font-semibold ${active ? 'text-[#ff4d00]/70' : 'text-[#9CA3AF]'}`}>
+                          {itemCountByCat[cat.id] || 0} {lang === 'uz' ? 'ta' : lang === 'ru' ? 'шт' : 'items'}
+                        </p>
                       </div>
                     </button>
                   )
