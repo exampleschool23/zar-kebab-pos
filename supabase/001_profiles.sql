@@ -9,9 +9,9 @@ create table if not exists public.profiles (
   email       text,
   full_name   text        default '',
   phone       text        default '',
-  role        text        not null default 'waiter'
+  role        text        not null default 'admin'
                           check (role in ('owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder')),
-  status      text        not null default 'pending'
+  status      text        not null default 'active'
                           check (status in ('pending', 'active', 'disabled')),
   created_at  timestamptz not null default now()
 );
@@ -19,10 +19,10 @@ create table if not exists public.profiles (
 -- 2. Enable Row Level Security
 alter table public.profiles enable row level security;
 
--- 3. Users can read their own profile
-create policy "Users: read own profile"
+-- 3. All authenticated users can read ALL profiles (team visibility for every role)
+create policy "Authenticated: read all profiles"
   on public.profiles for select
-  using (auth.uid() = id);
+  using (auth.uid() is not null);
 
 -- 4. Helper function — used by admin policies to avoid infinite recursion
 create or replace function public.is_admin()
@@ -39,11 +39,6 @@ as $$
       and status = 'active'
   )
 $$;
-
--- 5. Admin/owner can read ALL profiles
-create policy "Admin: read all profiles"
-  on public.profiles for select
-  using (public.is_admin());
 
 -- 6. Users can update their own non-sensitive fields (name, phone only)
 create policy "Users: update own safe fields"
@@ -76,8 +71,8 @@ begin
       new.raw_user_meta_data->>'name',
       ''
     ),
-    'waiter',
-    'pending'
+    'admin',
+    'active'
   )
   on conflict (id) do nothing;
   return new;

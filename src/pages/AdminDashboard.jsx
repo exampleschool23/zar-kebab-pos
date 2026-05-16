@@ -634,11 +634,11 @@ export default function AdminDashboard() {
           />
         </div>
 
-        {/* ── Main grid: Left 2/3 + Right 1/3 — items-start prevents height stretching ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 lg:items-start">
+        {/* ── Row 2: Revenue Statistics + Payment Methods ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
 
           {/* Revenue Statistics — left 2 cols */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+          <div className="xl:col-span-2 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="font-bold text-[#1F2937] text-base">{l.revenueStats}</h3>
               <div className="flex gap-1">
@@ -663,8 +663,8 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Bar chart — fixed 160px, bars use h-full so they fill it properly */}
-            <div className="relative h-52 mb-1">
+            {/* Bar chart — bars use h-full so they fill it properly */}
+            <div className="relative h-36 mb-1">
               <div className="flex items-end gap-[3px] h-full">
                 {chartBars.map((bar, i) => {
                   const pct = Math.round((bar.revenue / chartMax) * 100)
@@ -725,75 +725,35 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Payment Methods + Recent Orders — right col */}
-          <div className="flex flex-col gap-4">
-
-            {/* Payment Methods */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <h3 className="font-black text-[#1F2937] text-base mb-4">{l.paymentMethods}</h3>
-              {paymentMethods.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noData}</p>
-              ) : (
-                <div className="flex items-center gap-4">
-                  <div className="relative flex-shrink-0">
-                    <DonutChart slices={paymentMethods.map(p => ({ value: p.amount, color: p.color }))} />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <p className="font-black text-[#1F2937] text-xs leading-none">{formatCurrency(paymentMethods.reduce((s, p) => s + p.amount, 0)).split(' ')[0]}</p>
+          {/* Payment Methods */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.paymentMethods}</h3>
+            {paymentMethods.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noData}</p>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="relative flex-shrink-0">
+                  <DonutChart slices={paymentMethods.map(p => ({ value: p.amount, color: p.color }))} />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <p className="font-black text-[#1F2937] text-xs leading-none">{formatCurrency(paymentMethods.reduce((s, p) => s + p.amount, 0)).split(' ')[0]}</p>
+                  </div>
+                </div>
+                <div className="flex-1 space-y-1.5 min-w-0">
+                  {paymentMethods.map(p => (
+                    <div key={p.key} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
+                      <span className="text-xs text-[#6B7280] flex-1 truncate">{p.label}</span>
+                      <span className="text-xs font-bold text-[#1F2937] flex-shrink-0">{p.pct}%</span>
                     </div>
-                  </div>
-                  <div className="flex-1 space-y-1.5 min-w-0">
-                    {paymentMethods.map(p => (
-                      <div key={p.key} className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
-                        <span className="text-xs text-[#6B7280] flex-1 truncate">{p.label}</span>
-                        <span className="text-xs font-bold text-[#1F2937] flex-shrink-0">{p.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
+                  ))}
                 </div>
-              )}
-            </div>
-
-            {/* Recent Orders */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-              <h3 className="font-black text-[#1F2937] text-base mb-3">{l.recentOrders}</h3>
-              {recentOrders.length === 0 ? (
-                <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noOrders}</p>
-              ) : (
-                <div className="space-y-2 max-h-[280px] overflow-y-auto">
-                  {recentOrders.map(order => {
-                    const shortId = String(order.id).slice(-4).toUpperCase()
-                    const method  = (order.payment_method || '').toLowerCase()
-                    const methodLabel = { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr }[method] || ''
-                    return (
-                      <div key={order.id} className="flex items-center gap-2.5 py-1.5 border-b border-[#F9FAFB] last:border-0">
-                        <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
-                          <ShoppingBag size={12} className="text-[#ff5a00]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                            <p className="text-xs font-bold text-[#1F2937]">#{shortId}</p>
-                            <p className="text-xs text-[#6B7280]">{order.table_name}</p>
-                            <OrderBadge status={order.status} lang={lang} />
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-[#9CA3AF]">
-                            <Clock size={9} />
-                            {elapsedSince(order.created_at)}
-                            {methodLabel && <span className="ml-1 font-semibold">{methodLabel}</span>}
-                          </div>
-                        </div>
-                        <p className="text-xs font-black text-[#1F2937] flex-shrink-0">{formatCurrency(getOrderTotal(order))}</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── Bottom 3-col: Category / Best-selling / Staff ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:items-start">
+        {/* ── Row 3: Sales by Category + Best-Selling + Recent Orders ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
 
           {/* Sales by Category */}
           <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
@@ -847,6 +807,46 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+
+          {/* Recent Orders */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+            <h3 className="font-black text-[#1F2937] text-base mb-3">{l.recentOrders}</h3>
+            {recentOrders.length === 0 ? (
+              <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noOrders}</p>
+            ) : (
+              <div className="space-y-2 max-h-[420px] overflow-y-auto">
+                {recentOrders.map(order => {
+                  const shortId = String(order.id).slice(-4).toUpperCase()
+                  const method  = (order.payment_method || '').toLowerCase()
+                  const methodLabel = { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr }[method] || ''
+                  return (
+                    <div key={order.id} className="flex items-center gap-2.5 py-1.5 border-b border-[#F9FAFB] last:border-0">
+                      <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                        <ShoppingBag size={12} className="text-[#ff5a00]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                          <p className="text-xs font-bold text-[#1F2937]">#{shortId}</p>
+                          <p className="text-xs text-[#6B7280]">{order.table_name}</p>
+                          <OrderBadge status={order.status} lang={lang} />
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-[#9CA3AF]">
+                          <Clock size={9} />
+                          {elapsedSince(order.created_at)}
+                          {methodLabel && <span className="ml-1 font-semibold">{methodLabel}</span>}
+                        </div>
+                      </div>
+                      <p className="text-xs font-black text-[#1F2937] flex-shrink-0">{formatCurrency(getOrderTotal(order))}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Row 4: Staff Performance ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
 
           {/* Staff Performance */}
           <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
