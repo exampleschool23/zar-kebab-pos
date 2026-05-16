@@ -17,6 +17,15 @@ function loadSettings() {
   } catch { return {} }
 }
 
+function makeLocalId(prefix) {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 const initialState = {
   lang:           localStorage.getItem('zk_lang') || 'uz',
   settings:       { ...DEFAULT_SETTINGS, ...loadSettings() },
@@ -111,35 +120,63 @@ function reducer(state, action) {
       const table = state.tables.find(t => t.id === state.currentTableId)
       if (!table || state.cart.length === 0) return state
       const orderId     = action._orderId || ('o' + Date.now())
-      const subtotal    = state.cart.reduce((s, i) => s + i.price * i.quantity, 0)
+      const cartItems   = action._items || state.cart.map(i => ({ ...i, id: makeLocalId('oi'), status: 'new' }))
+      const addedSubtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0)
       const svcRate     = (state.settings?.serviceRate ?? 20) / 100
+      const activeOrder = state.orders.find(o =>
+        o.id === orderId ||
+        (o.table_id === state.currentTableId && o.payment_status !== 'paid')
+      )
+      const subtotal    = (Number(activeOrder?.subtotal) || 0) + addedSubtotal
       const service_fee = Math.round(subtotal * svcRate)
-      const newOrder = {
-        id: orderId,
-        table_id: state.currentTableId,
-        table_name: table.name,
-        waiter_name: state.user?.name || 'Waiter',
-        status: 'sent_to_kitchen',
-        payment_status: 'unpaid',
-        items: state.cart.map(i => ({ ...i, status: 'new' })),
-        subtotal,
-        service_fee,
-        total: subtotal + service_fee,
-        created_at: new Date().toISOString(),
-      }
+      const service_rate_pct = Math.round(svcRate * 100)
+      const nextOrders = activeOrder
+        ? state.orders.map(o => o.id === activeOrder.id
+            ? {
+                ...o,
+                status: 'sent_to_kitchen',
+                items: [...(o.items || []), ...cartItems],
+                subtotal,
+                service_fee,
+                service_rate_pct,
+                total: subtotal + service_fee,
+              }
+            : o
+          )
+        : [...state.orders, {
+            id: orderId,
+            table_id: state.currentTableId,
+            table_name: table.name,
+            waiter_name: state.user?.name || 'Waiter',
+            status: 'sent_to_kitchen',
+            payment_status: 'unpaid',
+            items: cartItems,
+            subtotal,
+            service_fee,
+            service_rate_pct,
+            total: subtotal + service_fee,
+            created_at: new Date().toISOString(),
+          }]
       const updatedTables = state.tables.map(t =>
         t.id === state.currentTableId ? { ...t, status: 'occupied' } : t
       )
-      return { ...state, orders: [...state.orders, newOrder], cart: [], tables: updatedTables }
+      return { ...state, orders: nextOrders, cart: [], tables: updatedTables }
     }
 
     case 'UPDATE_ORDER_ITEM_STATUS': {
-      const { orderId, menuItemId, status } = action.payload
+      const { orderId, orderItemId, menuItemId, status } = action.payload
       return {
         ...state,
         orders: state.orders.map(o =>
           o.id === orderId
-            ? { ...o, items: o.items.map(i => i.menu_item_id === menuItemId ? { ...i, status } : i) }
+            ? {
+                ...o,
+                items: o.items.map(i =>
+                  (orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
+                    ? { ...i, status }
+                    : i
+                ),
+              }
             : o
         ),
       }
@@ -268,7 +305,13 @@ export function AppProvider({ children }) {
   function dbDispatch(action) {
     // Pre-inject a stable orderId so reducer and Supabase writer share it
     const enriched = action.type === 'SEND_TO_KITCHEN'
-      ? { ...action, _orderId: 'o' + Date.now() }
+      ? {
+          ...action,
+          _orderId: stateRef.current.orders.find(o =>
+            o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
+          )?.id || 'o' + Date.now(),
+          _items: stateRef.current.cart.map(i => ({ ...i, id: makeLocalId('oi'), status: 'new' })),
+        }
       : action
 
     dispatch(enriched)

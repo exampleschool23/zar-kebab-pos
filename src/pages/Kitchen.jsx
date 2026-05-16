@@ -116,7 +116,7 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark }) {
     if (busy) return
     setBusy(true)
     // Use item._orderId (real order) when items are merged across orders
-    onMark(orderId, item.menu_item_id, nextStatus, item._orderId || orderId)
+    onMark(orderId, item.id, item.menu_item_id, nextStatus, item._orderId || orderId)
     setTimeout(() => setBusy(false), 700)
   }
 
@@ -246,7 +246,7 @@ function OrderCard({ order, menuItemMap, lang, onMark }) {
     setBulkBusy(true)
     order.items
       .filter(i => i.status === fromStatus)
-      .forEach(i => onMark(order.id, i.menu_item_id, toStatus, i._orderId || order.id))
+      .forEach(i => onMark(order.id, i.id, i.menu_item_id, toStatus, i._orderId || order.id))
     setTimeout(() => setBulkBusy(false), 700)
   }
 
@@ -417,14 +417,19 @@ export default function Kitchen() {
       if (!grouped[key]) {
         grouped[key] = {
           ...order,
-          // Tag each item with its real orderId so UPDATE_ORDER_ITEM_STATUS works
-          items: (order.items || []).map(i => ({ ...i, _orderId: order.id })),
+          // Tag each item with its real orderId so UPDATE_ORDER_ITEM_STATUS works.
+          // Hide already-served rounds when a table sends more food later.
+          items: (order.items || [])
+            .filter(i => i.status !== 'served')
+            .map(i => ({ ...i, _orderId: order.id })),
         }
       } else {
         // Append items from subsequent orders for the same table
         grouped[key].items = [
           ...grouped[key].items,
-          ...(order.items || []).map(i => ({ ...i, _orderId: order.id })),
+          ...(order.items || [])
+            .filter(i => i.status !== 'served')
+            .map(i => ({ ...i, _orderId: order.id })),
         ]
         // Keep the earliest created_at for sorting
         if (new Date(order.created_at) < new Date(grouped[key].created_at)) {
@@ -433,11 +438,11 @@ export default function Kitchen() {
       }
     })
 
-    return Object.values(grouped)
+    return Object.values(grouped).filter(order => order.items.length > 0)
   }, [state.orders])
 
-  function markItem(_cardOrderId, menuItemId, status, realOrderId) {
-    dispatch({ type: 'UPDATE_ORDER_ITEM_STATUS', payload: { orderId: realOrderId, menuItemId, status } })
+  function markItem(_cardOrderId, orderItemId, menuItemId, status, realOrderId) {
+    dispatch({ type: 'UPDATE_ORDER_ITEM_STATUS', payload: { orderId: realOrderId, orderItemId, menuItemId, status } })
   }
 
   return (

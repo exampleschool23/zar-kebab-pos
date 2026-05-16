@@ -4,6 +4,17 @@ import { useApp } from '../store/AppContext'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import {
+  getOrderDate,
+  getOrderItems,
+  getOrderServiceFee,
+  getOrderServiceRatePct,
+  getOrderTotal,
+  groupOrdersBySession,
+  isPaidOrder,
+  matchesRange,
+  toLocalDateStr,
+} from '../lib/analytics'
 import AppShell from '../components/AppShell'
 import {
   TrendingUp, ShoppingBag, DollarSign, Package,
@@ -13,71 +24,9 @@ import {
   BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle,
 } from 'lucide-react'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DATA HELPERS  — single source of truth used by every tab
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** True if the order is a completed/paid order that should count in revenue */
-function isPaidOrder(o) {
-  if (!o) return false
-  if (o.status === 'cancelled' || o.payment_status === 'cancelled') return false
-  return (
-    o.payment_status === 'paid' ||
-    o.status === 'paid'         ||
-    o.status === 'completed'    ||
-    !!o.paid_at
-  )
-}
-
-/** Best date to represent "when this order happened" */
-function getOrderDate(o) {
-  return o.paid_at || o.created_at || null
-}
-
-/** All line items from an order, supporting both shapes */
-function getOrderItems(o) {
-  return o.items || o.order_items || []
-}
-
 /** Payment method with fallback */
 function getPaymentMethod(o) {
   return o.payment_method || null
-}
-
-/** Total revenue for one order, derived from stored components so multi-round grouping stays accurate */
-function getOrderTotal(o) {
-  const sub  = Number(o.subtotal)  || 0
-  const svc  = Number(o.service_fee) || 0
-  const disc = Number(o.loyalty_discount_amount) || Number(o.discount_amount) || 0
-  if (sub > 0) return sub + svc - disc
-  // Legacy/single orders without subtotal — fall back to stored total
-  if (o.total != null && Number(o.total) > 0) return Number(o.total)
-  const items = getOrderItems(o)
-  const itemsSum = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
-  return Math.round(itemsSum * 1.2)
-}
-
-/** Convert any ISO/date string to local YYYY-MM-DD */
-function toLocalDateStr(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
-  ].join('-')
-}
-
-/** Timezone-safe date range check using local time */
-function matchesRange(o, from, to) {
-  if (!from && !to) return true
-  const d = getOrderDate(o)
-  if (!d) return false
-  const ds = toLocalDateStr(d)
-  if (from && ds < from) return false
-  if (to   && ds > to)   return false
-  return true
 }
 
 function addDays(isoDate, n) {
@@ -87,58 +36,9 @@ function addDays(isoDate, n) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SESSION GROUPING
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Orders from the same table paid in the same minute = one dining session.
- * Key = table_id + paid_at truncated to minute (or created_at if unpaid).
- */
-function groupOrdersBySession(orders) {
-  const map = {}
-  orders.forEach(o => {
-    // When paid_at is set, all orders for a table are stamped at the same instant
-    // → minute-level key merges them precisely.
-    // When paid_at is null (legacy data), fall back to day-level so that multiple
-    // rounds at the same table on the same day still appear as one session.
-    const anchor = o.paid_at
-      ? o.paid_at.slice(0, 16)
-      : (o.created_at || '').slice(0, 10)
-    const key    = `${o.table_id}::${anchor}`
-    if (!map[key]) {
-      map[key] = {
-        ...o,
-        items:                    [...getOrderItems(o)],
-        total:                    Number(o.total)                    || 0,
-        subtotal:                 Number(o.subtotal)                 || 0,
-        service_fee:              Number(o.service_fee)              || 0,
-        loyalty_discount_amount:  Number(o.loyalty_discount_amount)  || 0,
-        _orderCount:  1,
-        _mergedIds:   [o.id],
-      }
-    } else {
-      const s = map[key]
-      s.items                   = [...s.items, ...getOrderItems(o)]
-      s.total                   = (s.total                   || 0) + (Number(o.total)                   || 0)
-      s.subtotal                = (s.subtotal                || 0) + (Number(o.subtotal)                || 0)
-      s.service_fee             = (s.service_fee             || 0) + (Number(o.service_fee)             || 0)
-      s.loyalty_discount_amount = (s.loyalty_discount_amount || 0) + (Number(o.loyalty_discount_amount) || 0)
-      s._mergedIds    = [...(s._mergedIds || []), o.id]
-      s._orderCount += 1
-      if (!s.payment_method && o.payment_method) s.payment_method = o.payment_method
-      // Keep earliest created_at, latest paid_at
-      if (o.created_at && new Date(o.created_at) < new Date(s.created_at)) s.created_at = o.created_at
-      if (o.paid_at    && (!s.paid_at || new Date(o.paid_at) > new Date(s.paid_at))) s.paid_at = o.paid_at
-    }
-  })
-  return Object.values(map)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SERVICE_RATE = 0.2
 const PAGE_SIZE    = 8
 
 const TABS = [
@@ -691,7 +591,7 @@ function WaiterPerformanceTab({ orders, lang }) {
 // TAB 6 — ORDER HISTORY
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
+function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRatePct }) {
   const [fetchedItems, setFetchedItems] = useState(null)
 
   useEffect(() => {
@@ -716,11 +616,8 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang }) {
     ? Math.round(subtotal * discPct / 100)
     : (Number(order.loyalty_discount_amount) || Number(order.discount_amount) || 0)
   const afterDisc    = Math.max(0, subtotal - discAmt)
-  // Use accumulated service_fee from grouping (now correctly proportional per round)
-  const serviceAmt   = Number(order.service_fee) > 0
-    ? Number(order.service_fee)
-    : Math.round(afterDisc * 0.2)
-  const servicePct   = afterDisc > 0 ? Math.round((serviceAmt / afterDisc) * 100) : 20
+  const servicePct   = getOrderServiceRatePct(order, serviceRatePct)
+  const serviceAmt   = getOrderServiceFee({ ...order, subtotal, loyalty_discount_amount: discAmt }, serviceRatePct)
   const total        = afterDisc + serviceAmt
   const received   = order.amount_received || 0
   const change     = order.change_amount   || (received > 0 ? Math.max(0, received - total) : 0)
@@ -1003,6 +900,7 @@ export default function Reports() {
   const { state }    = useApp()
   const navigate     = useNavigate()
   const lang         = state.lang
+  const serviceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
 
   const [activeTab,     setActiveTab]     = useState('order_history')
   const [dateFrom, setDateFrom] = useState(todayStr())
@@ -1214,6 +1112,7 @@ export default function Reports() {
                 onClose={() => setSelectedOrder(null)}
                 navigate={navigate}
                 lang={lang}
+                serviceRatePct={serviceRatePct}
               />
             </div>
           </>

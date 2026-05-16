@@ -40,7 +40,23 @@ as $$
   )
 $$;
 
+create or replace function public.is_owner()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid()
+      and role = 'owner'
+      and status = 'active'
+  )
+$$;
+
 -- 6. Users can update their own non-sensitive fields (name, phone only)
+drop policy if exists "Users: update own safe fields" on public.profiles;
 create policy "Users: update own safe fields"
   on public.profiles for update
   using (auth.uid() = id)
@@ -49,10 +65,30 @@ create policy "Users: update own safe fields"
     status = (select status from public.profiles where id = auth.uid())
   );
 
--- 7. Admin/owner can update any profile (role, status, etc.)
-create policy "Admin: update any profile"
+-- 7. Owner can update any profile. Admin can update only non-owner/non-stakeholder users
+-- and cannot assign owner/stakeholder. Frontend checks are convenience; RLS is authority.
+drop policy if exists "Admin: update any profile" on public.profiles;
+drop policy if exists "Owner: update any profile" on public.profiles;
+drop policy if exists "Admin: update staff profiles" on public.profiles;
+
+create policy "Owner: update any profile"
   on public.profiles for update
-  using (public.is_admin());
+  using (public.is_owner())
+  with check (public.is_owner());
+
+create policy "Admin: update staff profiles"
+  on public.profiles for update
+  using (
+    public.is_admin()
+    and not public.is_owner()
+    and id <> auth.uid()
+    and role not in ('owner', 'stakeholder')
+  )
+  with check (
+    public.is_admin()
+    and not public.is_owner()
+    and role not in ('owner', 'stakeholder')
+  );
 
 -- 7. Trigger: auto-create profile when user signs up
 create or replace function public.handle_new_user()

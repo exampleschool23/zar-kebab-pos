@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../lib/formatCurrency'
+import { getOrderDate, getOrderTotal, groupOrdersBySession, isPaidOrder, toLocalDateStr } from '../lib/analytics'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -336,8 +337,6 @@ export default function CashierTables() {
   const [filterStatus,setFilterStatus]= useState('all')
   const [sortKey,     setSortKey]     = useState('newest')
 
-  const today = new Date().toDateString()
-
   // ── Menu item lookup map ────────────────────────────────────────────────────
   const menuItemMap = useMemo(() =>
     Object.fromEntries(state.menuItems.map(m => [m.id, m])),
@@ -354,11 +353,11 @@ export default function CashierTables() {
         grouped[key] = {
           ...order,
           items: [...(order.items || [])],
-          total: order.total || 0,
+          total: getOrderTotal(order),
         }
       } else {
         grouped[key].items  = [...grouped[key].items, ...(order.items || [])]
-        grouped[key].total  = (grouped[key].total || 0) + (order.total || 0)
+        grouped[key].total  = (grouped[key].total || 0) + getOrderTotal(order)
         // Keep earliest created_at
         if (new Date(order.created_at) < new Date(grouped[key].created_at)) {
           grouped[key].created_at = order.created_at
@@ -371,8 +370,8 @@ export default function CashierTables() {
   }, [state.orders])
 
   const paidTodayOrders = useMemo(() =>
-    state.orders.filter(o =>
-      o.payment_status === 'paid' && new Date(o.created_at).toDateString() === today
+    groupOrdersBySession(state.orders).filter(o =>
+      isPaidOrder(o) && toLocalDateStr(getOrderDate(o)) === toLocalDateStr(new Date().toISOString())
     ),
     [state.orders]
   )
@@ -380,10 +379,9 @@ export default function CashierTables() {
   // ── KPI values ─────────────────────────────────────────────────────────────
   const needsBillCount = activeBills.filter(o => o.status === 'needs_bill').length
   const paidTodayCount = useMemo(() => {
-    // Count unique tables paid today, not raw order rows
-    return new Set(paidTodayOrders.map(o => o.table_id)).size
+    return paidTodayOrders.length
   }, [paidTodayOrders])
-  const todayRevenue   = paidTodayOrders.reduce((s, o) => s + (o.total || 0), 0)
+  const todayRevenue   = paidTodayOrders.reduce((s, o) => s + getOrderTotal(o), 0)
 
   // Payment method breakdown — tracks { amount, count } per method
   const payMethodTotals = useMemo(() => {
@@ -393,7 +391,7 @@ export default function CashierTables() {
       const raw = (o.payment_method || '').toLowerCase().trim()
       const key = KNOWN.includes(raw) ? raw : 'unknown'
       if (!map[key]) map[key] = { amount: 0, count: 0 }
-      map[key].amount += o.total || 0
+      map[key].amount += getOrderTotal(o)
       map[key].count++
     })
     return map

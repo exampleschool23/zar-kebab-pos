@@ -108,7 +108,8 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
   }, [state.menuItems])
 
   const subtotal  = cart.reduce((s, i) => s + i.price * i.quantity, 0)
-  const service   = Math.round(subtotal * 0.2)
+  const serviceRate = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20)) / 100
+  const service   = Math.round(subtotal * serviceRate)
   const total     = subtotal + service
   const itemCount = cart.reduce((s, i) => s + i.quantity, 0)
 

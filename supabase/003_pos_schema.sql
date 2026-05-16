@@ -50,10 +50,13 @@ create table if not exists public.orders (
   payment_status          text        not null default 'unpaid',
   subtotal                integer     not null default 0,
   service_fee             integer     not null default 0,
+  service_rate_pct        integer     not null default 20,
   total                   integer     not null default 0,
+  payment_method          text,
   loyalty_discount_pct    integer     default 0,
   loyalty_discount_amount integer     default 0,
   discounted_subtotal     integer     default 0,
+  paid_at                 timestamptz,
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now()
 );

@@ -7,6 +7,14 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getAllProfiles } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
+import {
+  getOrderDate,
+  getOrderItems,
+  getOrderTotal,
+  groupOrdersBySession,
+  isPaidOrder,
+  toLocalDateStr,
+} from '../lib/analytics'
 import AppShell from '../components/AppShell'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
@@ -165,18 +173,8 @@ const L = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isPaid(o) {
-  return o.payment_status === 'paid' || o.status === 'paid'
-}
-
-function getOrderTotal(o) {
-  if (o.total && Number(o.total) > 0) return Number(o.total)
-  return (o.items || []).reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
-}
-
 function localDateStr(d) {
-  const dt = d instanceof Date ? d : new Date(d)
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+  return toLocalDateStr(d instanceof Date ? d.toISOString() : d)
 }
 
 function todayStr()     { return localDateStr(new Date()) }
@@ -307,7 +305,10 @@ export default function AdminDashboard() {
   }, [])
 
   // ── Core derived sets ─────────────────────────────────────────────────────
-  const paidOrders = useMemo(() => state.orders.filter(isPaid), [state.orders])
+  const paidOrders = useMemo(
+    () => groupOrdersBySession(state.orders).filter(isPaidOrder),
+    [state.orders]
+  )
 
   const menuItemMap = useMemo(
     () => Object.fromEntries(state.menuItems.map(m => [m.id, m])),
@@ -329,19 +330,16 @@ export default function AdminDashboard() {
     const today     = todayStr()
     const yesterday = yesterdayStr()
 
-    const todayPaid = paidOrders.filter(o => localDateStr(o.created_at) === today)
-    const yestPaid  = paidOrders.filter(o => localDateStr(o.created_at) === yesterday)
-    const todayAll  = state.orders.filter(o => localDateStr(o.created_at) === today)
-    const yestAll   = state.orders.filter(o => localDateStr(o.created_at) === yesterday)
-
+    const todayPaid = paidOrders.filter(o => localDateStr(getOrderDate(o)) === today)
+    const yestPaid  = paidOrders.filter(o => localDateStr(getOrderDate(o)) === yesterday)
     const todayRevenue     = todayPaid.reduce((s, o) => s + getOrderTotal(o), 0)
     const yesterdayRevenue = yestPaid.reduce((s, o) => s + getOrderTotal(o), 0)
     const revenueChange    = yesterdayRevenue > 0
       ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
       : null
 
-    const todayOrderCount     = todayAll.length
-    const yesterdayOrderCount = yestAll.length
+    const todayOrderCount     = todayPaid.length
+    const yesterdayOrderCount = yestPaid.length
     const orderChange         = yesterdayOrderCount > 0
       ? Math.round(((todayOrderCount - yesterdayOrderCount) / yesterdayOrderCount) * 100)
       : null
@@ -353,7 +351,7 @@ export default function AdminDashboard() {
       : null
 
     const itemsSoldToday = todayPaid
-      .flatMap(o => o.items || [])
+      .flatMap(o => getOrderItems(o))
       .reduce((s, i) => s + (Number(i.quantity) || 1), 0)
 
     return {
@@ -376,13 +374,13 @@ export default function AdminDashboard() {
     if (period === 'today') {
       const today = todayStr()
       const yesterday = yesterdayStr()
-      const todayPaid = paidOrders.filter(o => localDateStr(o.created_at) === today)
-      const yestPaid  = paidOrders.filter(o => localDateStr(o.created_at) === yesterday)
+      const todayPaid = paidOrders.filter(o => localDateStr(getOrderDate(o)) === today)
+      const yestPaid  = paidOrders.filter(o => localDateStr(getOrderDate(o)) === yesterday)
       const currentHour = now.getHours()
       const bars = Array.from({ length: currentHour + 1 }, (_, h) => ({
         label:   `${h}:00`,
         revenue: todayPaid
-          .filter(o => new Date(o.created_at).getHours() === h)
+          .filter(o => new Date(getOrderDate(o)).getHours() === h)
           .reduce((s, o) => s + getOrderTotal(o), 0),
         isToday: h === currentHour,
       }))
@@ -403,11 +401,11 @@ export default function AdminDashboard() {
       const todayDs = todayStr()
       const bars = days.map(ds => ({
         label:   new Date(ds + 'T12:00:00').toLocaleDateString('en', { weekday: 'short', day: 'numeric' }),
-        revenue: paidOrders.filter(o => localDateStr(o.created_at) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
+        revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
         isToday: ds === todayDs,
       }))
       const prevTotal = prev.reduce((s, ds) =>
-        s + paidOrders.filter(o => localDateStr(o.created_at) === ds).reduce((s2, o) => s2 + getOrderTotal(o), 0), 0)
+        s + paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s2, o) => s2 + getOrderTotal(o), 0), 0)
       return {
         chartBars: bars,
         currentPeriodTotal:  bars.reduce((s, b) => s + b.revenue, 0),
@@ -424,7 +422,7 @@ export default function AdminDashboard() {
         const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
         return {
           label:   String(i + 1),
-          revenue: paidOrders.filter(o => localDateStr(o.created_at) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
+          revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
           isToday: ds === todayDs,
         }
       })
@@ -434,7 +432,7 @@ export default function AdminDashboard() {
       const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate()
       const prevTotal = Array.from({ length: daysInPrevMonth }, (_, i) => {
         const ds = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
-        return paidOrders.filter(o => localDateStr(o.created_at) === ds).reduce((s, o) => s + getOrderTotal(o), 0)
+        return paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0)
       }).reduce((s, v) => s + v, 0)
       return {
         chartBars: bars,
@@ -451,7 +449,7 @@ export default function AdminDashboard() {
       const prefix = `${year}-${String(m + 1).padStart(2, '0')}-`
       return {
         label:   monthNames[m],
-        revenue: paidOrders.filter(o => localDateStr(o.created_at).startsWith(prefix)).reduce((s, o) => s + getOrderTotal(o), 0),
+        revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)).startsWith(prefix)).reduce((s, o) => s + getOrderTotal(o), 0),
         isToday: localDateStr(new Date()).startsWith(prefix),
       }
     })
@@ -493,7 +491,7 @@ export default function AdminDashboard() {
   const salesByCategory = useMemo(() => {
     const map = {}
     paidOrders.forEach(o => {
-      ;(o.items || []).forEach(item => {
+      getOrderItems(o).forEach(item => {
         const mi    = menuItemMap[item.menu_item_id]
         const cat   = mi ? categoryMap[mi.category_id] : null
         const name  = cat
@@ -514,7 +512,7 @@ export default function AdminDashboard() {
   const bestSelling = useMemo(() => {
     const map = {}
     paidOrders.forEach(o => {
-      ;(o.items || []).forEach(item => {
+      getOrderItems(o).forEach(item => {
         const key = item.menu_item_id || item.name
         if (!map[key]) map[key] = { menuItemId: item.menu_item_id, name: item.name, qty: 0, revenue: 0 }
         map[key].qty     += Number(item.quantity) || 1
@@ -535,7 +533,7 @@ export default function AdminDashboard() {
       if (!map[name]) map[name] = { name, orders: 0, revenue: 0, items: 0 }
       map[name].orders++
       map[name].revenue += getOrderTotal(o)
-      map[name].items   += (o.items || []).reduce((s, i) => s + (Number(i.quantity) || 1), 0)
+      map[name].items   += getOrderItems(o).reduce((s, i) => s + (Number(i.quantity) || 1), 0)
     })
     return Object.values(map)
       .map(s => {

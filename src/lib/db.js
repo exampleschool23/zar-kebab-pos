@@ -6,6 +6,15 @@ function startOfYear() {
   return new Date(new Date().getFullYear(), 0, 1).toISOString()
 }
 
+function serviceRateFromSettings(settings) {
+  const pct = Number(settings?.serviceRate)
+  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) / 100 : 0.2
+}
+
+function serviceRatePctFromSettings(settings) {
+  return Math.round(serviceRateFromSettings(settings) * 100)
+}
+
 export async function loadPOSData() {
   const [tablesRes, categoriesRes, menuItemsRes, unpaidRes, paidRes] = await Promise.all([
     supabase.from('restaurant_tables').select('*').order('id'),
@@ -81,22 +90,44 @@ export async function writeToSupabase(action, state) {
       const table    = state.tables.find(t => t.id === tableId)
       if (!table || state.cart.length === 0) return
 
-      const subtotal    = state.cart.reduce((s, i) => s + i.price * i.quantity, 0)
-      const service_fee = Math.round(subtotal * 0.2)
+      const items = action._items || state.cart.map(i => ({ ...i, status: 'new' }))
+      const addedSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
+      const { data: existingOrder } = await supabase
+        .from('orders')
+        .select('id, subtotal')
+        .eq('id', orderId)
+        .eq('payment_status', 'unpaid')
+        .maybeSingle()
 
-      await supabase.from('orders').insert({
-        id:             orderId,
-        table_id:       tableId,
-        table_name:     table.name,
-        waiter_name:    state.user?.name || 'Waiter',
-        status:         'sent_to_kitchen',
-        payment_status: 'unpaid',
-        subtotal,
-        service_fee,
-        total:          subtotal + service_fee,
-      })
+      const subtotal    = (Number(existingOrder?.subtotal) || 0) + addedSubtotal
+      const serviceRatePct = serviceRatePctFromSettings(state.settings)
+      const service_fee = Math.round(subtotal * serviceRatePct / 100)
 
-      const items = state.cart.map(i => ({
+      if (existingOrder) {
+        await supabase.from('orders').update({
+          status: 'sent_to_kitchen',
+          subtotal,
+          service_fee,
+          service_rate_pct: serviceRatePct,
+          total: subtotal + service_fee,
+        }).eq('id', orderId)
+      } else {
+        await supabase.from('orders').insert({
+          id:             orderId,
+          table_id:       tableId,
+          table_name:     table.name,
+          waiter_name:    state.user?.name || 'Waiter',
+          status:         'sent_to_kitchen',
+          payment_status: 'unpaid',
+          subtotal,
+          service_fee,
+          service_rate_pct: serviceRatePct,
+          total:          subtotal + service_fee,
+        })
+      }
+
+      const rows = items.map(i => ({
+        id:           i.id,
         order_id:     orderId,
         menu_item_id: i.menu_item_id,
         name:         i.name,
@@ -105,7 +136,7 @@ export async function writeToSupabase(action, state) {
         notes:        i.notes || '',
         status:       'new',
       }))
-      await supabase.from('order_items').insert(items)
+      await supabase.from('order_items').insert(rows)
 
       await supabase
         .from('restaurant_tables')
@@ -115,12 +146,10 @@ export async function writeToSupabase(action, state) {
     }
 
     case 'UPDATE_ORDER_ITEM_STATUS': {
-      const { orderId, menuItemId, status } = action.payload
-      await supabase
-        .from('order_items')
-        .update({ status })
-        .eq('order_id', orderId)
-        .eq('menu_item_id', menuItemId)
+      const { orderId, orderItemId, menuItemId, status } = action.payload
+      let query = supabase.from('order_items').update({ status }).eq('order_id', orderId)
+      query = orderItemId ? query.eq('id', orderItemId) : query.eq('menu_item_id', menuItemId)
+      await query
       break
     }
 
@@ -173,10 +202,10 @@ export async function writeToSupabase(action, state) {
       if (unpaidOrders?.length) {
         const combinedSubtotal   = unpaidOrders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0)
         const combinedAfterDisc  = combinedSubtotal * (1 - discPct / 100)
-        // Derive service rate from what CashierBill computed; fall back to 20 %
+        // Derive service rate from what CashierBill computed; fall back to settings.
         const serviceRate = combinedAfterDisc > 0 && loyalty?.service_fee
           ? loyalty.service_fee / combinedAfterDisc
-          : 0.2
+          : serviceRateFromSettings(state.settings)
 
         for (const o of unpaidOrders) {
           const sub     = Number(o.subtotal) || 0
@@ -189,6 +218,7 @@ export async function writeToSupabase(action, state) {
             paid_at:        paidAt,
             total:          afterDisc + svcFee,
             service_fee:    svcFee,
+            service_rate_pct: Math.round(serviceRate * 100),
             ...(payment_method ? { payment_method }                              : {}),
             ...(discPct        ? { loyalty_discount_pct:    discPct }            : {}),
             ...(discAmt        ? { loyalty_discount_amount: discAmt }            : {}),
@@ -235,6 +265,19 @@ export async function writeToSupabase(action, state) {
       break
     }
 
+    case 'REORDER_MENU_ITEM': {
+      const { idA, idB } = action.payload
+      const itemA = state.menuItems.find(i => i.id === idA)
+      const itemB = state.menuItems.find(i => i.id === idB)
+      if (!itemA || !itemB) return
+
+      await Promise.all([
+        supabase.from('menu_items').update({ sort_order: itemB.sort_order ?? 0 }).eq('id', idA),
+        supabase.from('menu_items').update({ sort_order: itemA.sort_order ?? 0 }).eq('id', idB),
+      ])
+      break
+    }
+
     case 'ADD_CATEGORY': {
       await supabase.from('menu_categories').insert(action.payload)
       break
@@ -248,6 +291,19 @@ export async function writeToSupabase(action, state) {
 
     case 'DELETE_CATEGORY': {
       await supabase.from('menu_categories').delete().eq('id', action.payload)
+      break
+    }
+
+    case 'REORDER_CATEGORY': {
+      const { idA, idB } = action.payload
+      const catA = state.categories.find(c => c.id === idA)
+      const catB = state.categories.find(c => c.id === idB)
+      if (!catA || !catB) return
+
+      await Promise.all([
+        supabase.from('menu_categories').update({ sort_order: catB.sort_order ?? 0 }).eq('id', idA),
+        supabase.from('menu_categories').update({ sort_order: catA.sort_order ?? 0 }).eq('id', idB),
+      ])
       break
     }
 
