@@ -711,14 +711,14 @@ export default function WaiterOrder() {
     <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
 
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
-      {shouldShowSidebar && (
+      {shouldShowSidebar && !detailItem && (
       <div className="hidden lg:block flex-shrink-0 h-full">
         <UnifiedSidebar />
       </div>
       )}
 
       {/* ── Mobile sidebar overlay ───────────────────────────────────────── */}
-      {shouldShowSidebar && sidebarOpen && (
+      {shouldShowSidebar && !detailItem && sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
           <div className="relative z-10 h-full">
