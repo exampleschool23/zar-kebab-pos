@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { getItemName } from '../lib/i18n'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { getOrderPaymentSummary } from '../lib/analytics'
+import { getGroupedOrderItems, getOrderItemProductId, getOrderPaymentSummary } from '../lib/analytics'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -71,71 +71,14 @@ function fmtUZS(n) {
   return `${fmtNum(n)} UZS`
 }
 
-function stableStringify(value) {
-  if (value == null) return ''
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
-  if (typeof value === 'object') {
-    return `{${Object.keys(value).sort().map(key => `${key}:${stableStringify(value[key])}`).join(',')}}`
-  }
-  return String(value)
-}
-
-function getReceiptItemProductId(item) {
-  return item.menu_item_id ?? item.menuItemId ?? item.product_id ?? item.productId ?? null
-}
-
-function getReceiptItemOptionsKey(item) {
-  const optionFields = [
-    'variant_id',
-    'variantId',
-    'size_id',
-    'sizeId',
-    'modifiers',
-    'selected_modifiers',
-    'selectedModifiers',
-    'options',
-    'selected_options',
-    'selectedOptions',
-    'extras',
-    'selected_extras',
-    'selectedExtras',
-  ]
-
-  const selected = {}
-  optionFields.forEach(field => {
-    if (item[field] != null) selected[field] = item[field]
-  })
-  return stableStringify(selected)
-}
-
 function getReceiptItems(rawItems, menuItemMap, lang) {
-  const grouped = new Map()
-
-  rawItems.forEach((item, index) => {
-    const productId = getReceiptItemProductId(item)
-    // Never group by localized/display name. If there is no product id, keep the
-    // original row separate so similar translations cannot collapse together.
-    const key = productId != null
-      ? `${productId}::${getReceiptItemOptionsKey(item)}`
-      : `row::${item.id || index}`
-    const existing = grouped.get(key)
-
-    if (existing) {
-      grouped.set(key, {
-        ...existing,
-        quantity: (Number(existing.quantity) || 1) + (Number(item.quantity) || 1),
-      })
-      return
-    }
-
+  // Never group by localized/display name. Shared grouping uses product id plus
+  // selected modifiers/options, and leaves rows without product ids separate.
+  return getGroupedOrderItems(rawItems, item => {
+    const productId = getOrderItemProductId(item)
     const menuItem = productId != null ? menuItemMap[productId] : null
-    grouped.set(key, {
-      ...item,
-      name: (menuItem && getItemName(menuItem, lang)) || item.name,
-    })
+    return (menuItem && getItemName(menuItem, lang)) || item.name
   })
-
-  return Array.from(grouped.values())
 }
 
 function combineReceiptOrders(orders) {

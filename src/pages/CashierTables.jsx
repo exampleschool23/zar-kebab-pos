@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../lib/formatCurrency'
-import { getOrderDate, getOrderTotal, groupOrdersBySession, isPaidOrder, toLocalDateStr } from '../lib/analytics'
+import { getGroupedOrderItems, getOrderDate, getOrderTotal, groupOrdersBySession, isPaidOrder, toLocalDateStr } from '../lib/analytics'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -191,18 +191,8 @@ function TableStatusBadge({ status, lang }) {
 function BillCard({ order, table, menuItemMap, lang, onOpen }) {
   const l = L[lang] || L.en
 
-  // Group same menu items together and sum quantities
   const items = useMemo(() => {
-    const map = {}
-    ;(order.items || []).forEach(item => {
-      const key = item.menu_item_id || item.name
-      if (!map[key]) {
-        map[key] = { ...item }
-      } else {
-        map[key] = { ...map[key], quantity: (map[key].quantity || 1) + (item.quantity || 1) }
-      }
-    })
-    return Object.values(map)
+    return getGroupedOrderItems(order.items || [])
   }, [order.items])
 
   const preview   = items.slice(0, 4)
@@ -248,7 +238,7 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
       {/* Total */}
       <div className="px-5 pt-4 pb-3">
         <p className={`font-black text-[26px] leading-none mb-4 ${readyForCashier ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'}`}>
-          {formatCurrency(order.total)}
+          {formatCurrency(getOrderTotal(order))}
         </p>
 
         {/* Item preview */}

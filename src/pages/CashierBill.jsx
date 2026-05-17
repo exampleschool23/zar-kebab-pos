@@ -9,6 +9,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { t } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import { getGroupedOrderItems, getOrderPaymentSummary } from '../lib/analytics'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import StatusBadge from '../components/StatusBadge'
 
@@ -53,7 +54,7 @@ export default function CashierBill() {
   const { state, dispatch } = useApp()
   const lang = state.lang
 
-  const serviceRate = (state.settings?.serviceRate ?? 20) / 100
+  const configuredServiceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
 
   const [payMethod,  setPayMethod]  = useState('cash')
   const [received,   setReceived]   = useState('')
@@ -65,24 +66,18 @@ export default function CashierBill() {
     const orders = state.orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
     if (orders.length === 0) return null
     const allItems = orders.flatMap(o => o.items || [])
-    // Group same menu items
-    const itemMap = {}
-    allItems.forEach(item => {
-      const key = item.menu_item_id || item.name
-      if (!itemMap[key]) itemMap[key] = { ...item }
-      else itemMap[key] = { ...itemMap[key], quantity: (itemMap[key].quantity || 1) + (item.quantity || 1) }
-    })
-    const mergedItems = Object.values(itemMap)
-    const subtotal    = mergedItems.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0)
-    const service_fee = Math.round(subtotal * serviceRate)
+    const mergedItems = getGroupedOrderItems(allItems)
+    const serviceRatePct = orders.find(o => o.service_rate_pct != null)?.service_rate_pct ?? configuredServiceRatePct
+    const summary = getOrderPaymentSummary({ service_rate_pct: serviceRatePct }, allItems, configuredServiceRatePct)
     return {
       ...orders[0],
       items:       mergedItems,
-      subtotal,
-      service_fee,
-      total:       subtotal + service_fee,
+      subtotal:    summary.subtotal,
+      service_fee: summary.serviceFee,
+      service_rate_pct: summary.serviceRatePct,
+      total:       summary.total,
     }
-  }, [state.orders, tableId])
+  }, [state.orders, tableId, configuredServiceRatePct])
 
   const table = state.tables.find(t => t.id === tableId)
 
@@ -93,11 +88,15 @@ export default function CashierBill() {
   }, [state.menuItems])
 
   // ── Totals ─────────────────────────────────────────────────────────────────
-  const subtotal      = order ? order.items.reduce((s, i) => s + i.price * i.quantity, 0) : 0
-  const loyaltyAmt    = Math.round(subtotal * loyaltyPct / 100)
-  const afterDiscount = subtotal - loyaltyAmt
-  const serviceFee    = Math.round(afterDiscount * serviceRate)
-  const total         = afterDiscount + serviceFee
+  const payment       = order
+    ? getOrderPaymentSummary({ ...order, loyalty_discount_pct: loyaltyPct }, order.items, configuredServiceRatePct)
+    : getOrderPaymentSummary({ service_rate_pct: configuredServiceRatePct }, [], configuredServiceRatePct)
+  const subtotal      = payment.subtotal
+  const loyaltyAmt    = payment.discountAmount
+  const afterDiscount = payment.afterDiscount
+  const serviceFee    = payment.serviceFee
+  const serviceRatePct = payment.serviceRatePct
+  const total         = payment.total
 
   // Cash
   const receivedNum  = parseFloat(received) || 0
@@ -140,7 +139,7 @@ export default function CashierBill() {
     total:        lang === 'uz' ? 'Jami' : lang === 'ru' ? 'Итого' : 'Total',
     paySummary:   lang === 'uz' ? "To'lov xulosasi" : lang === 'ru' ? 'Итоговый счёт' : 'Payment Summary',
     subtotal:     lang === 'uz' ? 'Buyurtma summasi' : lang === 'ru' ? 'Сумма заказа' : 'Subtotal',
-    service:      lang === 'uz' ? `Xizmat (${serviceRate * 100}%)` : lang === 'ru' ? `Обслуживание (${serviceRate * 100}%)` : `Service (${serviceRate * 100}%)`,
+    service:      lang === 'uz' ? `Xizmat (${serviceRatePct}%)` : lang === 'ru' ? `Обслуживание (${serviceRatePct}%)` : `Service (${serviceRatePct}%)`,
     loyalty:      lang === 'uz' ? 'Chegirma' : lang === 'ru' ? 'Скидка' : 'Discount',
     totalAmt:     lang === 'uz' ? "To'lovga jami" : lang === 'ru' ? 'Итого к оплате' : 'Total Amount',
     payMethod:    lang === 'uz' ? "To'lov usuli" : lang === 'ru' ? 'Способ оплаты' : 'Payment Method',

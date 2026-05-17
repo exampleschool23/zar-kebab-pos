@@ -36,6 +36,17 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
     0
   )
   const subtotal = itemsSubtotal || (Number(order?.subtotal) || 0)
+  if (subtotal <= 0 && Number(order?.total) > 0) {
+    return {
+      subtotal: 0,
+      discountPercent: 0,
+      discountAmount: 0,
+      afterDiscount: 0,
+      serviceRatePct: getOrderServiceRatePct(order, fallbackServicePct),
+      serviceFee: Number(order?.service_fee) || 0,
+      total: Number(order.total),
+    }
+  }
   const discPct = Number(order?.loyalty_discount_pct ?? order?.discount_percent ?? 0) || 0
   const discountAmount = discPct > 0
     ? Math.round(subtotal * discPct / 100)
@@ -53,6 +64,70 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
     serviceFee,
     total: afterDiscount + serviceFee,
   }
+}
+
+function stableStringify(value) {
+  if (value == null) return ''
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  if (typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${key}:${stableStringify(value[key])}`).join(',')}}`
+  }
+  return String(value)
+}
+
+export function getOrderItemProductId(item) {
+  return item?.menu_item_id ?? item?.menuItemId ?? item?.product_id ?? item?.productId ?? null
+}
+
+export function getOrderItemOptionsKey(item) {
+  const optionFields = [
+    'variant_id',
+    'variantId',
+    'size_id',
+    'sizeId',
+    'modifiers',
+    'selected_modifiers',
+    'selectedModifiers',
+    'options',
+    'selected_options',
+    'selectedOptions',
+    'extras',
+    'selected_extras',
+    'selectedExtras',
+  ]
+
+  const selected = {}
+  optionFields.forEach(field => {
+    if (item?.[field] != null) selected[field] = item[field]
+  })
+  return stableStringify(selected)
+}
+
+export function getGroupedOrderItems(items, resolveName) {
+  const grouped = new Map()
+
+  items.forEach((item, index) => {
+    const productId = getOrderItemProductId(item)
+    const key = productId != null
+      ? `${productId}::${getOrderItemOptionsKey(item)}`
+      : `row::${item.id || index}`
+    const existing = grouped.get(key)
+
+    if (existing) {
+      grouped.set(key, {
+        ...existing,
+        quantity: (Number(existing.quantity) || 1) + (Number(item.quantity) || 1),
+      })
+      return
+    }
+
+    grouped.set(key, {
+      ...item,
+      name: resolveName ? resolveName(item) : item.name,
+    })
+  })
+
+  return Array.from(grouped.values())
 }
 
 export function toLocalDateStr(iso) {

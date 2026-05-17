@@ -3,6 +3,7 @@ import { X, ShoppingCart, Minus, Plus, Trash2, UtensilsCrossed } from 'lucide-re
 import { useApp } from '../store/AppContext'
 import { t, getItemDesc } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import { getOrderPaymentSummary } from '../lib/analytics'
 
 // Delivery tab removed — only Dine In and Take Away
 const ORDER_TYPES = [
@@ -107,11 +108,11 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
     return map
   }, [state.menuItems])
 
-  const subtotal  = cart.reduce((s, i) => s + i.price * i.quantity, 0)
   const serviceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
-  const serviceRate = serviceRatePct / 100
-  const service   = Math.round(subtotal * serviceRate)
-  const total     = subtotal + service
+  const payment = getOrderPaymentSummary({ service_rate_pct: serviceRatePct }, cart, serviceRatePct)
+  const subtotal  = payment.subtotal
+  const service   = payment.serviceFee
+  const total     = payment.total
   const itemCount = cart.reduce((s, i) => s + i.quantity, 0)
 
   function handleSend() {
