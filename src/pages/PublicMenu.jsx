@@ -152,30 +152,42 @@ export default function PublicMenu() {
   function ProductCard({ item }) {
     return (
       <article
-        onClick={() => openDetail(item)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={e => e.key === 'Enter' && openDetail(item)}
-        className="cursor-pointer overflow-hidden rounded-[24px] border border-[#E5E7EB] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+        className="overflow-hidden rounded-[24px] border border-[#E5E7EB] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
       >
-        <div className="aspect-[4/3] bg-orange-50">
-          {item.image_url ? (
-            <img src={item.image_url} alt={getItemName(item, lang)} className="h-full w-full object-cover object-center" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <UtensilsCrossed size={34} className="text-orange-200" />
-            </div>
-          )}
-        </div>
-        <div className="p-4">
-          <h2 className="line-clamp-1 text-base font-black text-[#1F2937]">{getItemName(item, lang)}</h2>
-          {getItemDesc(item, lang) && (
-            <p className="mt-1 line-clamp-2 min-h-[40px] text-sm leading-5 text-[#8A94A6]">{getItemDesc(item, lang)}</p>
-          )}
-          <div className="mt-4 flex items-center gap-3">
-            <p className="flex-1 text-sm font-black text-[#ff4d00]">{formatCurrency(item.price)}</p>
+        <button
+          type="button"
+          onClick={() => openDetail(item)}
+          className="block w-full cursor-pointer text-left"
+          aria-label={getItemName(item, lang)}
+        >
+          <div className="aspect-[4/3] bg-orange-50">
+            {item.image_url ? (
+              <img src={item.image_url} alt={getItemName(item, lang)} className="h-full w-full object-cover object-center" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <UtensilsCrossed size={34} className="text-orange-200" />
+              </div>
+            )}
+          </div>
+          <div className="px-4 pt-4">
+            <h2 className="line-clamp-1 text-base font-black text-[#1F2937]">{getItemName(item, lang)}</h2>
+            {getItemDesc(item, lang) && (
+              <p className="mt-1 line-clamp-2 min-h-[40px] text-sm leading-5 text-[#8A94A6]">{getItemDesc(item, lang)}</p>
+            )}
+          </div>
+        </button>
+        <div className="px-4 pb-4 pt-4">
+          <div className="flex items-center gap-3">
             <button
-              onClick={e => { e.stopPropagation(); openDetail(item) }}
+              type="button"
+              onClick={() => openDetail(item)}
+              className="flex-1 text-left text-sm font-black text-[#ff4d00]"
+            >
+              {formatCurrency(item.price)}
+            </button>
+            <button
+              type="button"
+              onClick={handleOrderIntent}
               className="flex items-center gap-1.5 rounded-xl bg-[#0F3B2E] px-3 py-2 text-xs font-black text-white hover:bg-[#0A2A20]"
             >
               <ShoppingCart size={14} />
@@ -188,7 +200,7 @@ export default function PublicMenu() {
   }
 
   function handleOrderIntent() {
-    setLoginRequired(true)
+    navigate('/login')
   }
 
   function ProductDetailPage({ item }) {
