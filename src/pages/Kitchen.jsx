@@ -16,6 +16,11 @@ const STATUS_BADGE = {
   served:    'bg-gray-100 text-gray-500 border border-gray-200',
 }
 
+const ORDER_TYPE_LABEL = {
+  dine_in:   { uz: 'Zalda',      ru: 'В зале',  en: 'Dine In' },
+  take_away: { uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
+}
+
 function statusSort(s) {
   return s === 'new' ? 0 : s === 'preparing' ? 1 : 2
 }
@@ -381,7 +386,9 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
       <div className="p-3 space-y-2.5 flex-1">
         {dineInItems.length > 0 && (
           <>
-            <div className="text-sm font-bold text-gray-700 mt-1 mb-2">Dine In</div>
+            <div className="text-sm font-bold text-gray-700 mt-1 mb-2">
+              {ORDER_TYPE_LABEL.dine_in[lang] || ORDER_TYPE_LABEL.dine_in.en}
+            </div>
             {dineInItems.map(item => (
               <KitchenItem
                 key={kitchenItemKey(order.id, item)}
@@ -399,7 +406,9 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
 
         {takeAwayItems.length > 0 && (
           <>
-            <div className="text-sm font-bold text-orange-600 mt-4 mb-2">Take Away</div>
+            <div className="text-sm font-bold text-orange-600 mt-4 mb-2">
+              {ORDER_TYPE_LABEL.take_away[lang] || ORDER_TYPE_LABEL.take_away.en}
+            </div>
             {takeAwayItems.map(item => (
               <KitchenItem
                 key={kitchenItemKey(order.id, item)}

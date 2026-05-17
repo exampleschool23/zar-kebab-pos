@@ -13,12 +13,11 @@ import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 
 // ── CategoryCard ───────────────────────────────────────────────────────────────
-function CategoryCard({ cat, active, itemCount, onClick, lang }) {
+function CategoryCard({ cat, active, onClick, lang }) {
   const isAll = cat.id === 'all'
   const title = isAll
     ? (lang === 'uz' ? 'Barchasi' : lang === 'ru' ? 'Все' : 'All')
     : getCategoryName(cat, lang)
-  const countLabel = lang === 'uz' ? 'ta' : lang === 'ru' ? 'шт' : 'items'
 
   return (
     <button
@@ -50,12 +49,9 @@ function CategoryCard({ cat, active, itemCount, onClick, lang }) {
         )}
       </div>
 
-      <div className="min-h-[58px] px-2.5 py-2.5 text-center">
-        <p className={`truncate text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
+      <div className="min-h-[58px] px-2.5 py-2.5 text-center flex items-center justify-center">
+        <p className={`line-clamp-2 text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
           {title}
-        </p>
-        <p className={`mt-1 text-xs font-semibold ${active ? 'text-[#ff4d00]/70' : 'text-[#9CA3AF]'}`}>
-          {itemCount} {countLabel}
         </p>
       </div>
     </button>
@@ -826,7 +822,6 @@ export default function WaiterOrder() {
                 key={cat.id}
                 cat={cat}
                 active={activeCategory === cat.id}
-                itemCount={categoryItemCounts[cat.id] || 0}
                 onClick={() => setCategory(cat.id)}
                 lang={lang}
               />

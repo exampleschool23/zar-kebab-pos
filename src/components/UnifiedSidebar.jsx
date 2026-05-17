@@ -75,6 +75,7 @@ const ROLE_LABELS = {
   cashier:     { uz: 'Kassir',      ru: 'Кассир',        en: 'Cashier'      },
   kitchen:     { uz: 'Oshxona',     ru: 'Кухня',         en: 'Kitchen'      },
   stakeholder: { uz: 'Stakeholder', ru: 'Стейкхолдер',   en: 'Stakeholder'  },
+  guest:       { uz: 'Mehmon',      ru: 'Гость',         en: 'Guest'        },
 }
 
 // Derive active nav key from current pathname
@@ -100,7 +101,7 @@ export default function UnifiedSidebar({ onClose }) {
   const { profile, signOut } = useAuth()
 
   const lang    = state.lang
-  const role    = profile?.role || state.user?.role || 'waiter'
+  const role    = (profile?.role || state.user?.role || 'guest').toLowerCase()
   const current = activeKey(pathname)
 
   const displayName = profile?.full_name || state.user?.name || profile?.email || ''

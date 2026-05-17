@@ -9,8 +9,8 @@ create table if not exists public.profiles (
   email       text,
   full_name   text        default '',
   phone       text        default '',
-  role        text        not null default 'admin'
-                          check (role in ('owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder')),
+  role        text        not null default 'guest'
+                          check (role in ('owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder', 'guest')),
   status      text        not null default 'active'
                           check (status in ('pending', 'active', 'disabled')),
   created_at  timestamptz not null default now()
@@ -107,7 +107,7 @@ begin
       new.raw_user_meta_data->>'name',
       ''
     ),
-    'admin',
+    'guest',
     'active'
   )
   on conflict (id) do nothing;

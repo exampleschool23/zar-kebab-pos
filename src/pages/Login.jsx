@@ -1,14 +1,41 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  ArrowRight, Eye, EyeOff, Leaf, Loader2, Lock,
+  Mail, ShieldCheck, User, UserRound, Utensils,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../store/AppContext'
 import { t } from '../lib/i18n'
 import LanguageSwitcher from '../components/LanguageSwitcher'
-import { Utensils, Eye, EyeOff, Loader2, ShieldCheck, LayoutDashboard, Users } from 'lucide-react'
+
+const HERO_IMAGE =
+  'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=1400&q=85'
+
+function LoginLanguageSwitcher({ className = '' }) {
+  const { state, dispatch } = useApp()
+  return (
+    <div className={`flex rounded-full border border-[#D4AF37]/55 bg-[#07130F]/65 p-1 shadow-lg backdrop-blur ${className}`}>
+      {['en', 'ru', 'uz'].map(l => (
+        <button
+          key={l}
+          onClick={() => dispatch({ type: 'SET_LANG', payload: l })}
+          className={`min-w-9 rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wide transition-all ${
+            state.lang === l
+              ? 'bg-[#D4AF37] text-[#181818]'
+              : 'text-[#F5EBD4]/78 hover:bg-[#D4AF37]/10 hover:text-[#D4AF37]'
+          }`}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function GoogleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="20" height="20" viewBox="0 0 18 18" aria-hidden="true" focusable="false">
       <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
       <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/>
       <path d="M3.964 10.707C3.784 10.167 3.682 9.59 3.682 9c0-.59.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.548 0 9c0 1.452.348 2.825.957 4.039l3.007-2.332z" fill="#FBBC05"/>
@@ -17,11 +44,375 @@ function GoogleIcon() {
   )
 }
 
-const FEATURES = [
-  { icon: LayoutDashboard, key: 'authFeatureOrders'   },
-  { icon: Users,           key: 'authFeatureRoles'    },
-  { icon: ShieldCheck,     key: 'authFeatureSecurity' },
-]
+function BrandMark({ compact = false, lang = 'en', showTagline = false }) {
+  const uid = useId().replace(/:/g, '')
+  const goldId = `logoGold-${uid}`
+  const glowId = `logoGlow-${uid}`
+
+  return (
+    <div className={`flex flex-col items-center text-center ${compact ? 'w-[132px]' : 'w-[310px]'}`}>
+      <svg
+        viewBox="0 0 360 230"
+        className="h-auto w-full drop-shadow-[0_14px_26px_rgba(212,175,55,0.2)]"
+        role="img"
+        aria-label="Zar Kebab"
+      >
+        <defs>
+          <linearGradient id={goldId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#F7D778" />
+            <stop offset="42%" stopColor="#D4AF37" />
+            <stop offset="72%" stopColor="#A8711F" />
+            <stop offset="100%" stopColor="#F0C866" />
+          </linearGradient>
+          <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2.2" floodColor="#000000" floodOpacity="0.42" />
+          </filter>
+        </defs>
+
+        <g fill="none" stroke={`url(#${goldId})`} strokeLinecap="round" strokeLinejoin="round" filter={`url(#${glowId})`}>
+          <path d="M76 82 C76 48 116 45 128 32 C144 18 159 6 180 0 C201 6 216 18 232 32 C244 45 284 48 284 82" strokeWidth="6" />
+          <path d="M98 82 C102 58 132 57 144 43 C156 31 166 22 180 17 C194 22 204 31 216 43 C228 57 258 58 262 82" strokeWidth="3" opacity="0.9" />
+          <path d="M180 74 C160 57 177 38 180 25 C191 43 209 55 180 74Z" fill={`url(#${goldId})`} strokeWidth="2" />
+          <path d="M164 74 C151 61 160 47 164 38 C173 51 184 62 164 74Z" fill={`url(#${goldId})`} strokeWidth="1.5" opacity="0.84" />
+          <path d="M196 74 C209 61 200 47 196 38 C187 51 176 62 196 74Z" fill={`url(#${goldId})`} strokeWidth="1.5" opacity="0.84" />
+          <path d="M34 98 H326" strokeWidth="6" />
+          <path d="M18 98 L34 87 L50 98 L34 109 Z" fill={`url(#${goldId})`} strokeWidth="4" />
+          <path d="M326 98 L346 88 L342 98 L346 108 Z" fill={`url(#${goldId})`} strokeWidth="4" />
+        </g>
+
+        <g filter={`url(#${glowId})`}>
+          {[0, 1, 2, 3, 4, 5].map((idx) => (
+            <rect
+              key={idx}
+              x={105 + idx * 25}
+              y={82 + (idx % 2) * 2}
+              width="29"
+              height="31"
+              rx="11"
+              transform={`rotate(${idx % 2 === 0 ? -8 : 8} ${119 + idx * 25} 98)`}
+              fill={idx % 2 === 0 ? '#C1772E' : '#F0C866'}
+              stroke="#6B3D15"
+              strokeWidth="3"
+            />
+          ))}
+        </g>
+
+        <text
+          x="180"
+          y="164"
+          textAnchor="middle"
+          fill={`url(#${goldId})`}
+          fontFamily="Georgia, Times New Roman, serif"
+          fontSize="76"
+          fontWeight="700"
+          letterSpacing="10"
+          filter={`url(#${glowId})`}
+        >
+          ZAR
+        </text>
+        <text
+          x="180"
+          y="203"
+          textAnchor="middle"
+          fill={`url(#${goldId})`}
+          fontFamily="Georgia, Times New Roman, serif"
+          fontSize="31"
+          fontWeight="700"
+          letterSpacing="14"
+          filter={`url(#${glowId})`}
+        >
+          KEBAB
+        </text>
+        <g fill={`url(#${goldId})`} opacity="0.95">
+          <rect x="55" y="188" width="10" height="10" transform="rotate(45 60 193)" />
+          <rect x="295" y="188" width="10" height="10" transform="rotate(45 300 193)" />
+          <path d="M128 219 C150 229 210 229 232 219" stroke={`url(#${goldId})`} strokeWidth="3" fill="none" />
+        </g>
+      </svg>
+      {showTagline && (
+        <p className={`${compact ? 'mt-1 text-[9px]' : 'mt-4 text-sm'} font-black uppercase tracking-[0.28em] text-[#D4AF37]`}>
+          {t(lang, 'premiumLoginTagline')}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function LoginCard({
+  lang,
+  mode,
+  setMode,
+  isForgot,
+  isSignup,
+  name,
+  setName,
+  email,
+  setEmail,
+  password,
+  setPassword,
+  confirmPassword,
+  setConfirmPassword,
+  showPass,
+  setShowPass,
+  showConfirmPass,
+  setShowConfirmPass,
+  remember,
+  setRemember,
+  loading,
+  googleLoading,
+  error,
+  info,
+  resetCooldown,
+  clearMessages,
+  handleSubmit,
+  handleGoogle,
+  navigate,
+  showLogo = true,
+  className = '',
+}) {
+  return (
+    <div className={`rounded-[34px] border border-[#D4AF37]/70 bg-[#07130F]/86 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-7 lg:p-7 ${className}`}>
+      <div className={`${showLogo ? 'mb-4 hidden justify-center lg:flex' : 'hidden'}`}>
+        <BrandMark compact lang={lang} />
+      </div>
+
+      <div className="mb-5 text-center">
+        <div className="mx-auto mb-3 h-px w-32 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
+        <h2
+          className="text-4xl font-bold leading-tight text-[#F5EBD4] sm:text-[40px]"
+          style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
+        >
+          {isForgot
+            ? t(lang, 'forgotTitle')
+            : isSignup
+              ? t(lang, 'authCreateAccountPremium')
+              : t(lang, 'premiumLoginWelcome')}
+        </h2>
+        <p className="mx-auto mt-2 max-w-[380px] text-[15px] leading-6 text-[#F5EBD4]/82">
+          {isForgot
+            ? t(lang, 'forgotSubtitle')
+            : isSignup
+              ? t(lang, 'signupSubtitle')
+              : t(lang, 'premiumLoginSubtitle')}
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-5 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-100">
+          {error}
+        </div>
+      )}
+      {info && (
+        <div className="mb-5 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100">
+          {info}
+        </div>
+      )}
+
+      {!isForgot && (
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={googleLoading || loading}
+          className="mb-4 flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/55 bg-white/95 text-sm font-black text-[#181818] shadow-sm transition-all hover:bg-[#F5EBD4] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {googleLoading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
+          {t(lang, 'continueWithGoogle')}
+        </button>
+      )}
+
+      {!isForgot && (
+        <div className="mb-4 flex items-center gap-5">
+          <div className="h-px flex-1 bg-[#D4AF37]/15" />
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
+          <div className="h-px flex-1 bg-[#D4AF37]/15" />
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-3.5">
+        {isSignup && (
+          <div>
+            <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
+              {t(lang, 'authName')}
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={name}
+                onChange={e => { setName(e.target.value); clearMessages() }}
+                placeholder={t(lang, 'authNamePlaceholder')}
+                required
+                className="h-12 w-full rounded-2xl border border-[#D4AF37]/60 bg-[#07130F]/80 px-5 pr-12 text-base text-[#F5EBD4] outline-none transition-all placeholder:text-[#F5EBD4]/38 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
+              />
+              <User size={21} className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55" />
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
+            {t(lang, 'premiumLoginIdentifierLabel')}
+          </label>
+          <div className="relative">
+            <input
+              type="email"
+              inputMode="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); clearMessages() }}
+              placeholder={t(lang, 'premiumLoginIdentifierPlaceholder')}
+              required
+              className="h-12 w-full rounded-2xl border border-[#D4AF37]/60 bg-[#07130F]/80 px-5 pr-12 text-base text-[#F5EBD4] outline-none transition-all placeholder:text-[#F5EBD4]/38 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
+            />
+            <Mail size={22} className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55" />
+          </div>
+        </div>
+
+        {!isForgot && (
+          <div>
+            <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
+              {t(lang, 'password')}
+            </label>
+            <div className="relative">
+              <input
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                onChange={e => { setPassword(e.target.value); clearMessages() }}
+                placeholder={t(lang, 'premiumLoginPasswordPlaceholder')}
+                required
+                minLength={6}
+                className="h-12 w-full rounded-2xl border border-[#D4AF37]/60 bg-[#07130F]/80 px-5 pr-24 text-base text-[#F5EBD4] outline-none transition-all placeholder:text-[#F5EBD4]/38 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
+              />
+              <Lock size={21} className="absolute right-14 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55" />
+              <button
+                type="button"
+                onClick={() => setShowPass(s => !s)}
+                className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55 transition-colors hover:text-[#D4AF37]"
+                aria-label={showPass ? 'Hide password' : 'Show password'}
+              >
+                {showPass ? <EyeOff size={21} /> : <Eye size={21} />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isSignup && (
+          <div>
+            <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
+              {t(lang, 'authConfirmPassword')}
+            </label>
+            <div className="relative">
+              <input
+                type={showConfirmPass ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={e => { setConfirmPassword(e.target.value); clearMessages() }}
+                placeholder={t(lang, 'authConfirmPasswordPlaceholder')}
+                required
+                minLength={6}
+                className="h-12 w-full rounded-2xl border border-[#D4AF37]/60 bg-[#07130F]/80 px-5 pr-24 text-base text-[#F5EBD4] outline-none transition-all placeholder:text-[#F5EBD4]/38 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
+              />
+              <Lock size={21} className="absolute right-14 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55" />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPass(s => !s)}
+                className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55 transition-colors hover:text-[#D4AF37]"
+                aria-label={showConfirmPass ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPass ? <EyeOff size={21} /> : <Eye size={21} />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isForgot && !isSignup && (
+          <div className="flex items-center justify-between gap-4">
+            <label className="flex cursor-pointer items-center gap-3 text-sm text-[#F5EBD4]/82">
+              <span className={`flex h-5 w-5 items-center justify-center rounded-md border transition-all ${remember ? 'border-[#D4AF37] bg-[#D4AF37] text-[#181818]' : 'border-[#D4AF37]/50'}`}>
+                {remember && <span className="text-xs font-black">✓</span>}
+              </span>
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={e => setRemember(e.target.checked)}
+                className="sr-only"
+              />
+              {t(lang, 'premiumLoginRemember')}
+            </label>
+            <button
+              type="button"
+              onClick={() => { setMode('forgot'); clearMessages() }}
+              className="text-sm font-semibold text-[#D4AF37] underline-offset-4 transition-colors hover:text-[#F5EBD4] hover:underline"
+            >
+              {t(lang, 'forgotPassword')}
+            </button>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading || resetCooldown > 0}
+          className="group flex h-12 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#D4AF37] via-[#F0C866] to-[#B8872D] text-base font-black uppercase tracking-[0.18em] text-[#181818] shadow-[0_18px_40px_rgba(212,175,55,0.23)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading && <Loader2 size={18} className="animate-spin" />}
+          {isForgot
+            ? (resetCooldown > 0 ? t(lang, 'tryAgainIn').replace('{seconds}', resetCooldown) : t(lang, 'sendResetLink'))
+            : isSignup
+              ? t(lang, 'authCreateAccountPremium')
+              : t(lang, 'signIn')}
+          {!loading && !isForgot && <ArrowRight size={22} className="transition-transform group-hover:translate-x-1" />}
+        </button>
+      </form>
+
+      <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
+        {!isForgot && !isSignup && (
+          <>
+            {t(lang, 'authNoAccountPremium')}{' '}
+            <button
+              type="button"
+              onClick={() => { setMode('signup'); clearMessages() }}
+              className="font-black text-[#D4AF37] underline-offset-4 hover:underline"
+            >
+              {t(lang, 'authSignUp')}
+            </button>
+          </>
+        )}
+        {isSignup && (
+          <>
+            {t(lang, 'authHaveAccountPremium')}{' '}
+            <button
+              type="button"
+              onClick={() => { setMode('signin'); clearMessages() }}
+              className="font-black text-[#D4AF37] underline-offset-4 hover:underline"
+            >
+              {t(lang, 'signIn')}
+            </button>
+          </>
+        )}
+        {isForgot && (
+          <button
+            type="button"
+            onClick={() => { setMode('signin'); clearMessages() }}
+            className="font-black text-[#D4AF37] underline-offset-4 hover:underline"
+          >
+            {t(lang, 'backToSignIn')}
+          </button>
+        )}
+      </div>
+
+      <div className="my-4 flex items-center gap-5">
+        <div className="h-px flex-1 bg-[#D4AF37]/15" />
+        <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
+        <div className="h-px flex-1 bg-[#D4AF37]/15" />
+      </div>
+
+      <button
+        onClick={() => navigate('/menu')}
+        className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/65 text-base font-black uppercase tracking-[0.16em] text-[#D4AF37] transition-all hover:border-[#D4AF37] hover:bg-[#D4AF37]/10"
+      >
+        <UserRound size={22} />
+        {t(lang, 'premiumLoginGuest')}
+      </button>
+    </div>
+  )
+}
 
 export default function Login() {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuth()
@@ -29,15 +420,18 @@ export default function Login() {
   const navigate = useNavigate()
   const lang = state.lang || 'ru'
 
-  const [mode, setMode]           = useState('signin') // 'signin' | 'signup' | 'forgot'
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [fullName, setFullName]   = useState('')
-  const [showPass, setShowPass]   = useState(false)
-  const [loading, setLoading]     = useState(false)
+  const [mode, setMode]         = useState('signin')
+  const [name, setName]         = useState('')
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [showConfirmPass, setShowConfirmPass] = useState(false)
+  const [remember, setRemember] = useState(true)
+  const [loading, setLoading]   = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
-  const [error, setError]         = useState('')
-  const [info, setInfo]           = useState('')
+  const [error, setError]       = useState('')
+  const [info, setInfo]         = useState('')
   const [resetCooldownUntil, setResetCooldownUntil] = useState(() => {
     return Number(localStorage.getItem('zk_reset_cooldown_until') || 0)
   })
@@ -72,6 +466,9 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault()
     clearMessages()
+
+    const loginId = email.trim()
+
     setLoading(true)
 
     if (mode === 'forgot') {
@@ -81,7 +478,7 @@ export default function Login() {
         return setError(t(lang, 'waitBeforeReset').replace('{seconds}', cooldown))
       }
 
-      const { error } = await resetPassword(email)
+      const { error } = await resetPassword(loginId)
       setLoading(false)
       if (error) {
         if (error.message?.toLowerCase().includes('email rate limit')) {
@@ -95,242 +492,417 @@ export default function Login() {
     }
 
     if (mode === 'signup') {
-      if (!fullName.trim()) { setLoading(false); return setError(t(lang, 'fullNameRequired')) }
-      const { error } = await signUpWithEmail(email, password, fullName)
+      if (!name.trim()) {
+        setLoading(false)
+        return setError(t(lang, 'fullNameRequired'))
+      }
+      if (password !== confirmPassword) {
+        setLoading(false)
+        return setError(t(lang, 'authPasswordMismatch'))
+      }
+
+      const { error } = await signUpWithEmail(loginId, password, name.trim())
       setLoading(false)
       if (error) return setError(error.message)
       setInfo(t(lang, 'accountCreated'))
-      setMode('signin')
+      navigate('/', { replace: true })
       return
     }
 
-    // signin
-    const { error } = await signInWithEmail(email, password)
+    const { error } = await signInWithEmail(loginId, password)
     setLoading(false)
     if (error) return setError(t(lang, 'invalidCredentials'))
-    // AuthContext handles profile load → App.jsx redirects
+    navigate('/', { replace: true })
   }
 
   async function handleGoogle() {
     clearMessages()
     setGoogleLoading(true)
     const { error } = await signInWithGoogle()
-    if (error) { setGoogleLoading(false); setError(error.message) }
-    // Browser redirects to Google; no further action needed here
-  }
-
-  const titles = {
-    signin: { heading: t(lang, 'loginTitle'), sub: t(lang, 'loginSubtitle') },
-    signup: { heading: t(lang, 'signupTitle'), sub: t(lang, 'signupSubtitle') },
-    forgot: { heading: t(lang, 'forgotTitle'), sub: t(lang, 'forgotSubtitle') },
+    if (error) {
+      setGoogleLoading(false)
+      setError(error.message)
+    }
   }
 
   const resetCooldown = mode === 'forgot' ? resetCooldownSeconds() : 0
+  const isForgot = mode === 'forgot'
+  const isSignup = mode === 'signup'
+  const cardProps = {
+    lang,
+    mode,
+    setMode,
+    isForgot,
+    isSignup,
+    name,
+    setName,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    confirmPassword,
+    setConfirmPassword,
+    showPass,
+    setShowPass,
+    showConfirmPass,
+    setShowConfirmPass,
+    remember,
+    setRemember,
+    loading,
+    googleLoading,
+    error,
+    info,
+    resetCooldown,
+    clearMessages,
+    handleSubmit,
+    handleGoogle,
+    navigate,
+  }
 
   return (
-    <div className="relative min-h-screen flex w-full max-w-full overflow-x-hidden bg-[#faf9f7]">
-      <div className="fixed bottom-4 left-4 z-20 no-print">
+    <div className="min-h-screen overflow-x-hidden bg-[#07130F] text-[#F5EBD4]">
+      <div className="fixed bottom-4 left-4 z-40 hidden lg:block no-print">
         <LanguageSwitcher />
       </div>
 
-      {/* ── Left panel (desktop only) ── */}
-      <div className="hidden lg:flex flex-col justify-between w-[420px] flex-shrink-0 bg-[#141414] px-12 py-14 text-white">
-        {/* Brand */}
-        <div>
-          <div className="flex items-center gap-3 mb-14">
-            <div className="w-10 h-10 bg-[#ff5a00] rounded-xl flex items-center justify-center">
-              <Utensils size={20} className="text-white" />
-            </div>
-            <span className="text-xl font-black tracking-tight">Zar Kebab</span>
+      <div className="lg:hidden">
+        <section
+          className="relative flex min-h-[430px] flex-col items-center justify-center overflow-hidden px-5 pb-16 pt-14 text-center"
+          style={{
+            backgroundImage: `linear-gradient(180deg, rgba(7,19,15,0.28), rgba(7,19,15,0.72) 48%, #07130F 100%), url(${HERO_IMAGE})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <LoginLanguageSwitcher className="absolute right-4 top-4 z-20" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(212,175,55,0.22),transparent_36%)]" />
+          <div className="relative z-10 flex flex-col items-center">
+            <BrandMark compact={false} lang={lang} showTagline />
+            <div className="mx-auto my-5 h-px w-32 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
+            <h1
+              className="max-w-[340px] text-3xl font-bold leading-tight text-[#F5EBD4]"
+              style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
+            >
+              {t(lang, 'premiumLoginHeroTitle')}
+            </h1>
+            <p className="mt-3 max-w-[330px] text-sm leading-6 text-[#F5EBD4]/84">
+              {t(lang, 'premiumLoginHeroSubtitle')}
+            </p>
           </div>
+        </section>
 
-          <h1 className="text-3xl font-black leading-snug mb-3">
-            {t(lang, 'authHeroTitle')}
-          </h1>
-          <p className="text-[#888] text-sm leading-relaxed mb-12">
-            {t(lang, 'authHeroSubtitle')}
-          </p>
-
-          <div className="space-y-5">
-            {FEATURES.map(({ icon: Icon, key }) => (
-              <div key={key} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#ff5a00]/10 flex items-center justify-center flex-shrink-0">
-                  <Icon size={15} className="text-[#ff5a00]" />
-                </div>
-                <span className="text-sm text-[#ccc]">{t(lang, key)}</span>
-              </div>
-            ))}
+        <main className="relative -mt-10 min-h-[calc(100vh-390px)] bg-[#07130F] px-4 pb-7">
+          <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_50%_0%,rgba(212,175,55,0.13),transparent_58%)]" />
+          <div className="relative mx-auto max-w-[520px]">
+            <LoginCard {...cardProps} showLogo={false} className="rounded-[30px] bg-[#0B211A]/92 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.55)]" />
+            <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs leading-5 text-[#F5EBD4]/72">
+              <ShieldCheck size={16} className="text-[#D4AF37]" />
+              {t(lang, 'premiumLoginSecurity')}
+            </p>
           </div>
-        </div>
-
-        <p className="text-[#444] text-xs">© {new Date().getFullYear()} Zar Kebab.</p>
+        </main>
       </div>
 
-      {/* ── Right panel ── */}
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-[420px]">
-
-          {/* Mobile brand */}
-          <div className="flex lg:hidden items-center gap-3 justify-center mb-8">
-            <div className="w-10 h-10 bg-[#ff5a00] rounded-xl flex items-center justify-center">
-              <Utensils size={20} className="text-white" />
+      <div className="hidden min-h-screen lg:grid lg:grid-cols-[46%_54%]">
+        <section
+          className="relative hidden min-h-screen overflow-hidden lg:flex"
+          style={{
+            backgroundImage: `linear-gradient(180deg, rgba(7,19,15,0.1), rgba(7,19,15,0.88)), url(${HERO_IMAGE})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(212,175,55,0.18),transparent_32%),linear-gradient(90deg,rgba(7,19,15,0.28),rgba(7,19,15,0.78))]" />
+          <div className="relative z-10 flex w-full flex-col items-center justify-between px-14 py-16 text-center">
+            <div className="pt-4">
+              <BrandMark lang={lang} showTagline />
+              <div className="mx-auto my-8 h-px w-36 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
             </div>
-            <span className="text-xl font-black text-[#141414] tracking-tight">Zar Kebab</span>
+
+            <div className="max-w-[430px]">
+              <h1
+                className="text-4xl font-bold leading-tight text-[#F5EBD4]"
+                style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
+              >
+                {t(lang, 'premiumLoginHeroTitle')}
+              </h1>
+              <p className="mt-5 text-lg leading-8 text-[#F5EBD4]/85">
+                {t(lang, 'premiumLoginHeroSubtitle')}
+              </p>
+            </div>
+
+            <div className="grid w-full max-w-[520px] grid-cols-3 overflow-hidden rounded-[28px] border border-[#D4AF37]/55 bg-[#07130F]/75 shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur">
+              {[
+                [Utensils, 'premiumLoginFeatureFire'],
+                [Leaf, 'premiumLoginFeatureFlavor'],
+                [Utensils, 'premiumLoginFeatureRecipe'],
+              ].map(([Icon, key]) => (
+                <div key={key} className="border-r border-[#D4AF37]/20 px-5 py-6 last:border-r-0">
+                  <Icon size={26} className="mx-auto mb-4 text-[#D4AF37]" />
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-[#D4AF37]">
+                    {t(lang, key)}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
+        </section>
 
-          {/* Card */}
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl shadow-gray-100 p-8">
+        <main className="relative flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(212,175,55,0.13),transparent_30%),linear-gradient(135deg,#06100D_0%,#0F2B22_48%,#050807_100%)] px-4 py-6 sm:px-8">
+          <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(30deg,#D4AF37_12%,transparent_12.5%,transparent_87%,#D4AF37_87.5%,#D4AF37),linear-gradient(150deg,#D4AF37_12%,transparent_12.5%,transparent_87%,#D4AF37_87.5%,#D4AF37)] [background-position:0_0,0_0] [background-size:42px_74px]" />
 
-            <div className="mb-7">
-              <h2 className="text-xl font-black text-[#141414]">{titles[mode].heading}</h2>
-              <p className="text-sm text-gray-400 mt-1">{titles[mode].sub}</p>
+          <div className="relative z-10 w-full max-w-[600px]">
+            <div className="mb-4 flex justify-center lg:hidden">
+              <BrandMark compact lang={lang} />
             </div>
 
-            {/* Error / Info */}
-            {error && (
-              <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
-                {error}
+            <div className="rounded-[34px] border border-[#D4AF37]/70 bg-[#07130F]/86 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-7 lg:p-7">
+              <div className="mb-4 hidden justify-center lg:flex">
+                <BrandMark compact lang={lang} />
               </div>
-            )}
-            {info && (
-              <div className="mb-4 px-4 py-3 bg-green-50 border border-green-100 rounded-xl text-sm text-green-700">
-                {info}
-              </div>
-            )}
 
-            {/* Google button (not on forgot) */}
-            {mode !== 'forgot' && (
-              <>
-                <button
-                  onClick={handleGoogle}
-                  disabled={googleLoading}
-                  className="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 rounded-xl py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-60 shadow-sm"
+              <div className="mb-5 text-center">
+                <div className="mx-auto mb-3 h-px w-32 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
+                <h2
+                  className="text-4xl font-bold leading-tight text-[#F5EBD4] sm:text-[40px]"
+                  style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
                 >
-                  {googleLoading
-                    ? <Loader2 size={16} className="animate-spin" />
-                    : <GoogleIcon />
-                  }
+                  {isForgot
+                    ? t(lang, 'forgotTitle')
+                    : isSignup
+                      ? t(lang, 'createAccount')
+                      : t(lang, 'premiumLoginWelcome')}
+                </h2>
+                <p className="mx-auto mt-2 max-w-[380px] text-[15px] leading-6 text-[#F5EBD4]/82">
+                  {isForgot
+                    ? t(lang, 'forgotSubtitle')
+                    : isSignup
+                      ? t(lang, 'signupSubtitle')
+                      : t(lang, 'premiumLoginSubtitle')}
+                </p>
+              </div>
+
+              {error && (
+                <div className="mb-5 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-100">
+                  {error}
+                </div>
+              )}
+              {info && (
+                <div className="mb-5 rounded-2xl border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100">
+                  {info}
+                </div>
+              )}
+
+              {!isForgot && (
+                <button
+                  type="button"
+                  onClick={handleGoogle}
+                  disabled={googleLoading || loading}
+                  className="mb-4 flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/55 bg-white/95 text-sm font-black text-[#181818] shadow-sm transition-all hover:bg-[#F5EBD4] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {googleLoading ? <Loader2 size={18} className="animate-spin" /> : <GoogleIcon />}
                   {t(lang, 'continueWithGoogle')}
                 </button>
+              )}
 
-                <div className="flex items-center gap-3 my-5">
-                  <div className="flex-1 h-px bg-gray-100" />
-                  <span className="text-xs text-gray-400 uppercase tracking-wider">{t(lang, 'or')}</span>
-                  <div className="flex-1 h-px bg-gray-100" />
-                </div>
-              </>
-            )}
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {mode === 'signup' && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t(lang, 'fullName')}</label>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={e => { setFullName(e.target.value); clearMessages() }}
-                    placeholder={t(lang, 'fullNamePlaceholder')}
-                    required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
-                  />
+              {!isForgot && (
+                <div className="mb-4 flex items-center gap-5">
+                  <div className="h-px flex-1 bg-[#D4AF37]/15" />
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
+                  <div className="h-px flex-1 bg-[#D4AF37]/15" />
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t(lang, 'emailAddress')}</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); clearMessages() }}
-                  placeholder={t(lang, 'emailPlaceholder')}
-                  required
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
-                />
-              </div>
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                {isSignup && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
+                      {t(lang, 'authName')}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={e => { setName(e.target.value); clearMessages() }}
+                        placeholder={t(lang, 'authNamePlaceholder')}
+                        required
+                        className="h-12 w-full rounded-2xl border border-[#D4AF37]/60 bg-[#07130F]/80 px-5 pr-12 text-base text-[#F5EBD4] outline-none transition-all placeholder:text-[#F5EBD4]/38 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
+                      />
+                      <User size={21} className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55" />
+                    </div>
+                  </div>
+                )}
 
-              {mode !== 'forgot' && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t(lang, 'password')}</label>
+                  <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
+                    {t(lang, 'premiumLoginIdentifierLabel')}
+                  </label>
                   <div className="relative">
                     <input
-                      type={showPass ? 'text' : 'password'}
-                      value={password}
-                      onChange={e => { setPassword(e.target.value); clearMessages() }}
-                      placeholder="••••••••"
+                      type="email"
+                      inputMode="email"
+                      value={email}
+                      onChange={e => { setEmail(e.target.value); clearMessages() }}
+                      placeholder={t(lang, 'premiumLoginIdentifierPlaceholder')}
                       required
-                      minLength={6}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
+                      className="h-12 w-full rounded-2xl border border-[#D4AF37]/60 bg-[#07130F]/80 px-5 pr-12 text-base text-[#F5EBD4] outline-none transition-all placeholder:text-[#F5EBD4]/38 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass(s => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                    <Mail size={22} className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55" />
                   </div>
                 </div>
-              )}
 
-              {mode === 'signin' && (
-                <div className="text-right">
+                {!isForgot && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
+                      {t(lang, 'password')}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPass ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); clearMessages() }}
+                        placeholder={t(lang, 'premiumLoginPasswordPlaceholder')}
+                        required
+                        minLength={6}
+                        className="h-12 w-full rounded-2xl border border-[#D4AF37]/60 bg-[#07130F]/80 px-5 pr-24 text-base text-[#F5EBD4] outline-none transition-all placeholder:text-[#F5EBD4]/38 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
+                      />
+                      <Lock size={21} className="absolute right-14 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55" />
+                      <button
+                        type="button"
+                        onClick={() => setShowPass(s => !s)}
+                        className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55 transition-colors hover:text-[#D4AF37]"
+                        aria-label={showPass ? 'Hide password' : 'Show password'}
+                      >
+                        {showPass ? <EyeOff size={21} /> : <Eye size={21} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {isSignup && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
+                      {t(lang, 'authConfirmPassword')}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPass ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={e => { setConfirmPassword(e.target.value); clearMessages() }}
+                        placeholder={t(lang, 'authConfirmPasswordPlaceholder')}
+                        required
+                        minLength={6}
+                        className="h-12 w-full rounded-2xl border border-[#D4AF37]/60 bg-[#07130F]/80 px-5 pr-24 text-base text-[#F5EBD4] outline-none transition-all placeholder:text-[#F5EBD4]/38 focus:border-[#D4AF37] focus:ring-2 focus:ring-[#D4AF37]/20"
+                      />
+                      <Lock size={21} className="absolute right-14 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55" />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPass(s => !s)}
+                        className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55 transition-colors hover:text-[#D4AF37]"
+                        aria-label={showConfirmPass ? 'Hide password' : 'Show password'}
+                      >
+                        {showConfirmPass ? <EyeOff size={21} /> : <Eye size={21} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!isForgot && !isSignup && (
+                  <div className="flex items-center justify-between gap-4">
+                    <label className="flex cursor-pointer items-center gap-3 text-sm text-[#F5EBD4]/82">
+                      <span className={`flex h-5 w-5 items-center justify-center rounded-md border transition-all ${remember ? 'border-[#D4AF37] bg-[#D4AF37] text-[#181818]' : 'border-[#D4AF37]/50'}`}>
+                        {remember && <span className="text-xs font-black">✓</span>}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={remember}
+                        onChange={e => setRemember(e.target.checked)}
+                        className="sr-only"
+                      />
+                      {t(lang, 'premiumLoginRemember')}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => { setMode('forgot'); clearMessages() }}
+                      className="text-sm font-semibold text-[#D4AF37] underline-offset-4 transition-colors hover:text-[#F5EBD4] hover:underline"
+                    >
+                      {t(lang, 'forgotPassword')}
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || resetCooldown > 0}
+                  className="group flex h-12 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#D4AF37] via-[#F0C866] to-[#B8872D] text-base font-black uppercase tracking-[0.18em] text-[#181818] shadow-[0_18px_40px_rgba(212,175,55,0.23)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading && <Loader2 size={18} className="animate-spin" />}
+                  {isForgot
+                    ? (resetCooldown > 0 ? t(lang, 'tryAgainIn').replace('{seconds}', resetCooldown) : t(lang, 'sendResetLink'))
+                    : isSignup
+                      ? t(lang, 'authCreateAccountPremium')
+                      : t(lang, 'signIn')}
+                  {!loading && !isForgot && <ArrowRight size={22} className="transition-transform group-hover:translate-x-1" />}
+                </button>
+              </form>
+
+              <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
+                {!isForgot && !isSignup && (
+                  <>
+                    {t(lang, 'authNoAccountPremium')}{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setMode('signup'); clearMessages() }}
+                      className="font-black text-[#D4AF37] underline-offset-4 hover:underline"
+                    >
+                      {t(lang, 'authSignUp')}
+                    </button>
+                  </>
+                )}
+                {isSignup && (
+                  <>
+                    {t(lang, 'authHaveAccountPremium')}{' '}
+                    <button
+                      type="button"
+                      onClick={() => { setMode('signin'); clearMessages() }}
+                      className="font-black text-[#D4AF37] underline-offset-4 hover:underline"
+                    >
+                      {t(lang, 'signIn')}
+                    </button>
+                  </>
+                )}
+                {isForgot && (
                   <button
                     type="button"
-                    onClick={() => { setMode('forgot'); clearMessages() }}
-                    className="text-xs text-[#ff5a00] hover:underline font-medium"
+                    onClick={() => { setMode('signin'); clearMessages() }}
+                    className="font-black text-[#D4AF37] underline-offset-4 hover:underline"
                   >
-                    {t(lang, 'forgotPassword')}
+                    {t(lang, 'backToSignIn')}
                   </button>
-                </div>
-              )}
+                )}
+              </div>
+
+              <div className="my-4 flex items-center gap-5">
+                <div className="h-px flex-1 bg-[#D4AF37]/15" />
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
+                <div className="h-px flex-1 bg-[#D4AF37]/15" />
+              </div>
 
               <button
-                type="submit"
-                disabled={loading || resetCooldown > 0}
-                className="w-full bg-[#ff5a00] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#cc4800] transition-colors disabled:opacity-60 shadow-lg shadow-orange-100 flex items-center justify-center gap-2 mt-1"
+                onClick={() => navigate('/menu')}
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/65 text-base font-black uppercase tracking-[0.16em] text-[#D4AF37] transition-all hover:border-[#D4AF37] hover:bg-[#D4AF37]/10"
               >
-                {loading && <Loader2 size={15} className="animate-spin" />}
-                {mode === 'signin' && t(lang, 'signIn')}
-                {mode === 'signup' && t(lang, 'createAccount')}
-                {mode === 'forgot' && (
-                  resetCooldown > 0
-                    ? t(lang, 'tryAgainIn').replace('{seconds}', resetCooldown)
-                    : t(lang, 'sendResetLink')
-                )}
+                <UserRound size={22} />
+                {t(lang, 'premiumLoginGuest')}
               </button>
-            </form>
-
-            {/* Mode switcher */}
-            <div className="mt-6 text-center text-sm text-gray-400">
-              {mode === 'signin' && (
-                <>
-                  {t(lang, 'noAccount')}{' '}
-                  <button onClick={() => { setMode('signup'); clearMessages() }} className="text-[#ff5a00] font-semibold hover:underline">
-                    {t(lang, 'createAccount')}
-                  </button>
-                </>
-              )}
-              {mode === 'signup' && (
-                <>
-                  {t(lang, 'haveAccount')}{' '}
-                  <button onClick={() => { setMode('signin'); clearMessages() }} className="text-[#ff5a00] font-semibold hover:underline">
-                    {t(lang, 'signIn')}
-                  </button>
-                </>
-              )}
-              {mode === 'forgot' && (
-                <button onClick={() => { setMode('signin'); clearMessages() }} className="text-[#ff5a00] font-semibold hover:underline">
-                  ← {t(lang, 'backToSignIn')}
-                </button>
-              )}
             </div>
-          </div>
 
-          <p className="text-center text-xs text-gray-300 mt-6">
-            {t(lang, 'secureAccess')}
-          </p>
-        </div>
+            <p className="mt-4 flex items-center justify-center gap-2 text-center text-sm text-[#F5EBD4]/72">
+              <ShieldCheck size={17} className="text-[#D4AF37]" />
+              {t(lang, 'premiumLoginSecurity')}
+            </p>
+          </div>
+        </main>
       </div>
     </div>
   )

@@ -9,6 +9,7 @@ import { defaultPath as roleDefaultPath, PAGE_ACCESS } from './lib/permissions'
 import Login          from './pages/Login'
 import AuthCallback   from './pages/AuthCallback'
 import ResetPassword  from './pages/ResetPassword'
+import PublicMenu     from './pages/PublicMenu'
 import PendingApproval from './pages/PendingApproval'
 import WaiterTables   from './pages/WaiterTables'
 import WaiterOrder    from './pages/WaiterOrder'
@@ -35,10 +36,10 @@ function ProfileSync() {
     if (profile) {
       dispatch({
         type: 'LOGIN',
-        payload: { role: profile.role, name: profile.full_name || profile.email },
+        payload: { role: profile.role || 'guest', name: profile.full_name || profile.email },
       })
     } else {
-      dispatch({ type: 'LOGOUT' })
+      dispatch({ type: 'LOGIN', payload: { role: 'guest', name: 'Guest' } })
     }
   }, [profile, dispatch])
   return null
@@ -81,14 +82,15 @@ function ProtectedRoute({ children, roles }) {
   const { session, profile, loading } = useAuth()
 
   if (loading) return <Spinner />
-  if (!session) return <Navigate to="/login" replace />
-  if (!profile) return <Spinner />
+  if (!session) return <Navigate to="/menu" replace />
 
-  if (profile.status === 'disabled') return null // handled by RoleRedirect
-  if (profile.status === 'pending')  return <Navigate to="/pending-approval" replace />
+  const role = (profile?.role || 'guest').toLowerCase()
 
-  if (roles && !roles.includes(profile.role)) {
-    return <Navigate to={defaultPath(profile.role)} replace />
+  if (profile?.status === 'disabled') return null // handled by RoleRedirect
+  if (profile?.status === 'pending')  return <Navigate to="/pending-approval" replace />
+
+  if (roles && !roles.includes(role)) {
+    return <Navigate to={defaultPath(role)} replace />
   }
 
   return children
@@ -102,11 +104,11 @@ function RoleRedirect() {
 
   useEffect(() => {
     if (loading) return
-    if (!session) { navigate('/login', { replace: true }); return }
-    if (!profile) return
-    if (profile.status === 'disabled') return
-    if (profile.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
-    navigate(defaultPath(profile.role), { replace: true })
+    if (!session) { navigate('/menu', { replace: true }); return }
+    const role = (profile?.role || 'guest').toLowerCase()
+    if (profile?.status === 'disabled') return
+    if (profile?.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
+    navigate(defaultPath(role), { replace: true })
   }, [session, profile, loading, navigate])
 
   // If session exists but profile never loads, show a retry option
@@ -117,7 +119,7 @@ function RoleRedirect() {
   }, [session, profile, loading])
 
   if (loading) return <Spinner />
-  if (!session) return <Navigate to="/login" replace />
+  if (!session) return <Navigate to="/menu" replace />
   if (profile?.status === 'disabled') return <DisabledAccount signOut={signOut} />
 
   if (profileTimeout) {
@@ -146,6 +148,7 @@ function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/"              element={<RoleRedirect />} />
+        <Route path="/menu"          element={<PublicMenu />} />
         <Route path="/login"         element={<Login />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />

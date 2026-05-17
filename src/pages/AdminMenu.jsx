@@ -608,12 +608,9 @@ export default function AdminMenu() {
                         )}
                       </div>
 
-                      <div className="min-h-[58px] px-2.5 py-2.5 text-center">
-                        <p className={`truncate text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
+                      <div className="min-h-[58px] px-2.5 py-2.5 text-center flex items-center justify-center">
+                        <p className={`line-clamp-2 text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
                           {cat.label}
-                        </p>
-                        <p className={`mt-1 text-xs font-semibold ${active ? 'text-[#ff4d00]/70' : 'text-[#9CA3AF]'}`}>
-                          {itemCountByCat[cat.id] || 0} {lang === 'uz' ? 'ta' : lang === 'ru' ? 'шт' : 'items'}
                         </p>
                       </div>
                     </button>

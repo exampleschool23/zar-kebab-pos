@@ -8,13 +8,28 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  async function loadProfile(userId) {
+  async function loadProfile(user) {
     try {
-      const data = await getProfile(userId)
-      setProfile(data)
-      return data
+      const data = await getProfile(user.id)
+      const next = data || {
+        id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+        role: 'guest',
+        status: 'active',
+      }
+      setProfile(next)
+      return next
     } catch {
-      setProfile(null)
+      const fallback = {
+        id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+        role: 'guest',
+        status: 'active',
+      }
+      setProfile(fallback)
+      return fallback
     }
   }
 
@@ -31,7 +46,7 @@ export function AuthProvider({ children }) {
       setSession(session)
       setLoading(false)
       if (session?.user) {
-        loadProfile(session.user.id)
+        loadProfile(session.user)
       } else {
         setProfile(null)
       }
@@ -42,7 +57,7 @@ export function AuthProvider({ children }) {
       clearTimeout(hardTimeout)
       setSession(session)
       setLoading(false)
-      if (session?.user) loadProfile(session.user.id)
+      if (session?.user) loadProfile(session.user)
     })
 
     return () => {
@@ -83,7 +98,7 @@ export function AuthProvider({ children }) {
   }
 
   async function refreshProfile() {
-    if (session?.user) return loadProfile(session.user.id)
+    if (session?.user) return loadProfile(session.user)
   }
 
   return (

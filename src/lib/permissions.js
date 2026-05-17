@@ -2,6 +2,7 @@
 // All sidebar visibility and route protection should reference these — never hardcode role arrays elsewhere.
 
 export const PAGE_ACCESS = {
+  publicMenu: ['guest', 'owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder'],
   dashboard: ['owner', 'admin', 'cashier', 'stakeholder'],
   tables:    ['owner', 'admin', 'waiter',  'cashier'],
   menu:      ['owner', 'admin'],
@@ -13,7 +14,7 @@ export const PAGE_ACCESS = {
 }
 
 export function canViewPage(role, page) {
-  return (PAGE_ACCESS[page] || []).includes(role)
+  return (PAGE_ACCESS[page] || []).includes((role || 'guest').toLowerCase())
 }
 
 export function canEditMenu(role)          { return ['owner', 'admin'].includes(role) }
@@ -36,16 +37,17 @@ export function canEditTeamMember(viewerRole, targetRole) {
 
 /** Roles the viewer is allowed to assign. Owner can assign any role; admin cannot assign owner. */
 export function assignableRoles(viewerRole) {
-  const all = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder']
+  const all = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder', 'guest']
   if (viewerRole === 'owner') return all
   if (viewerRole === 'admin') return all.filter(r => r !== 'owner' && r !== 'stakeholder')
   return []
 }
 
 export function defaultPath(role) {
+  role = (role || 'guest').toLowerCase()
   if (['owner', 'admin', 'stakeholder'].includes(role)) return '/admin'
   if (role === 'cashier')  return '/cashier/tables'
   if (role === 'waiter')   return '/waiter/tables'
   if (role === 'kitchen')  return '/kitchen'
-  return '/pending-approval'
+  return '/menu'
 }

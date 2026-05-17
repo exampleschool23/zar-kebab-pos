@@ -7,7 +7,7 @@ import StatusBadge from '../components/StatusBadge'
 import { canEditTeamMember, assignableRoles } from '../lib/permissions'
 import { Search, RefreshCw, UserCircle2, Loader2, Eye } from 'lucide-react'
 
-const ROLES    = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder']
+const ROLES    = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder', 'guest']
 const STATUSES = ['pending', 'active', 'disabled']
 
 const ROLE_LABELS = {
@@ -17,6 +17,7 @@ const ROLE_LABELS = {
   cashier:     { uz: 'Kassir',     ru: 'Кассир',        en: 'Cashier'     },
   kitchen:     { uz: 'Oshxona',    ru: 'Кухня',         en: 'Kitchen'     },
   stakeholder: { uz: 'Stakeholder', ru: 'Стейкхолдер',  en: 'Stakeholder' },
+  guest:       { uz: 'Mehmon',     ru: 'Гость',         en: 'Guest'       },
 }
 
 const ROLE_BADGE = {
@@ -26,6 +27,7 @@ const ROLE_BADGE = {
   cashier:     'bg-teal-100 text-teal-700 border-teal-200',
   kitchen:     'bg-yellow-100 text-yellow-700 border-yellow-200',
   stakeholder: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  guest:       'bg-gray-100 text-gray-600 border-gray-200',
 }
 
 const STATUS_LABELS = {
