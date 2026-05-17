@@ -94,6 +94,17 @@ export function getOrderItemOptionsKey(item) {
     'extras',
     'selected_extras',
     'selectedExtras',
+    'notes',
+    'order_type',
+    'orderType',
+    'service_type',
+    'serviceType',
+    'dining_type',
+    'diningType',
+    'fulfillment_type',
+    'fulfillmentType',
+    'is_takeaway',
+    'isTakeAway',
   ]
 
   const selected = {}

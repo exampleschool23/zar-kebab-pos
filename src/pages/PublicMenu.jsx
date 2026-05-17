@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Lock, LogIn, Minus, Plus, Search, ShoppingCart, UtensilsCrossed } from 'lucide-react'
+import { LogIn, Search, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { getCategoryName, getItemDesc, getItemName, t } from '../lib/i18n'
-import { formatCurrency } from '../lib/formatCurrency'
+import { getCategoryName } from '../lib/i18n'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import {
+  ProductCard as MenuProductCard,
+  ProductDetailPage as MenuProductDetailPage,
+} from './WaiterOrder'
 
 async function loadPublicMenuData() {
   const rpcRes = await supabase.rpc('get_public_menu_data')
@@ -40,7 +43,7 @@ async function loadPublicMenuData() {
 export default function PublicMenu() {
   const navigate = useNavigate()
   const { state } = useApp()
-  const { session, profile } = useAuth()
+  const { session } = useAuth()
   const lang = state.lang || 'ru'
 
   const [categories, setCategories] = useState([])
@@ -49,10 +52,7 @@ export default function PublicMenu() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [loginRequired, setLoginRequired] = useState(false)
   const [detailItem, setDetailItem] = useState(null)
-  const [detailQty, setDetailQty] = useState(1)
-  const [detailNotes, setDetailNotes] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -137,237 +137,32 @@ export default function PublicMenu() {
   }, [categories])
 
   function openDetail(item) {
-    setLoginRequired(false)
     setDetailItem(item)
-    setDetailQty(1)
-    setDetailNotes('')
   }
 
   function closeDetail() {
     setDetailItem(null)
-    setDetailQty(1)
-    setDetailNotes('')
-  }
-
-  function ProductCard({ item }) {
-    return (
-      <article
-        className="overflow-hidden rounded-[24px] border border-[#E5E7EB] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-      >
-        <button
-          type="button"
-          onClick={() => openDetail(item)}
-          className="block w-full cursor-pointer text-left"
-          aria-label={getItemName(item, lang)}
-        >
-          <div className="aspect-[4/3] bg-orange-50">
-            {item.image_url ? (
-              <img src={item.image_url} alt={getItemName(item, lang)} className="h-full w-full object-cover object-center" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <UtensilsCrossed size={34} className="text-orange-200" />
-              </div>
-            )}
-          </div>
-          <div className="px-4 pt-4">
-            <h2 className="line-clamp-1 text-base font-black text-[#1F2937]">{getItemName(item, lang)}</h2>
-            {getItemDesc(item, lang) && (
-              <p className="mt-1 line-clamp-2 min-h-[40px] text-sm leading-5 text-[#8A94A6]">{getItemDesc(item, lang)}</p>
-            )}
-          </div>
-        </button>
-        <div className="px-4 pb-4 pt-4">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => openDetail(item)}
-              className="flex-1 text-left text-sm font-black text-[#ff4d00]"
-            >
-              {formatCurrency(item.price)}
-            </button>
-            <button
-              type="button"
-              onClick={handleOrderIntent}
-              className="flex items-center gap-1.5 rounded-xl bg-[#0F3B2E] px-3 py-2 text-xs font-black text-white hover:bg-[#0A2A20]"
-            >
-              <ShoppingCart size={14} />
-              {lang === 'uz' ? "Qo'shish" : lang === 'ru' ? 'Добавить' : 'Add'}
-            </button>
-          </div>
-        </div>
-      </article>
-    )
   }
 
   function handleOrderIntent() {
     navigate('/login')
   }
 
-  function ProductDetailPage({ item }) {
-    if (!item) return null
-
-    const category = categoryMap[item.category_id]
-    const name = getItemName(item, lang)
-    const desc = getItemDesc(item, lang)
-    const total = item.price * detailQty
-    const labels = {
-      back: lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Назад в меню' : 'Back to menu',
-      description: lang === 'uz' ? 'Tavsif' : lang === 'ru' ? 'Описание' : 'Description',
-      noDescription: lang === 'uz' ? 'Tavsif qo‘shilmagan.' : lang === 'ru' ? 'Описание не добавлено.' : 'No description added.',
-      quantity: lang === 'uz' ? 'Miqdor' : lang === 'ru' ? 'Количество' : 'Quantity',
-      quantitySub: lang === 'uz' ? 'Porsiyalar sonini tanlang' : lang === 'ru' ? 'Выберите количество порций' : 'Choose how many portions',
-      notes: lang === 'uz' ? 'Maxsus izohlar' : lang === 'ru' ? 'Особые заметки' : 'Special notes',
-      notesSub: lang === 'uz' ? 'Oshxona uchun ixtiyoriy ko‘rsatma' : lang === 'ru' ? 'Дополнительная инструкция для кухни' : 'Optional kitchen instruction',
-      cancel: lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel',
-      add: lang === 'uz' ? "Savatga qo'shish" : lang === 'ru' ? 'Добавить в корзину' : 'Add to Cart',
-    }
-
+  if (detailItem) {
     return (
-      <div className="min-h-screen bg-[#FAF6EE] text-[#1F2937]">
-        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-[#E5E7EB] bg-white px-5 py-3 shadow-sm">
-          <button
-            onClick={closeDetail}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white text-[#64748B] shadow-sm transition-all hover:bg-[#F8FAFC] hover:text-[#0F3B2E]"
-            aria-label={labels.back}
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-black uppercase tracking-tight text-[#111827]">{name}</h1>
-            {category && (
-              <p className="mt-0.5 text-xs font-black uppercase tracking-wider text-[#FF4D00]">
-                {getCategoryName(category, lang)}
-              </p>
-            )}
-          </div>
-          <p className="whitespace-nowrap text-xl font-black tabular-nums text-[#FF4D00] sm:text-2xl">
-            {formatCurrency(item.price)}
-          </p>
-        </div>
-
-        <main className="mx-auto w-full max-w-[1040px] px-4 py-5 pb-28">
-          <div className="space-y-4">
-            <section className="overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white shadow-sm">
-              <div className="aspect-[16/9] w-full bg-orange-50 md:max-h-[420px]">
-                {item.image_url ? (
-                  <img src={item.image_url} alt={name} className="h-full w-full object-cover object-center" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <UtensilsCrossed size={64} className="text-orange-200" />
-                  </div>
-                )}
-              </div>
-
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <h2 className="text-3xl font-black uppercase tracking-tight text-[#111827]">{name}</h2>
-                    <p className="mt-2 text-lg font-black text-[#FF4D00]">{formatCurrency(item.price)}</p>
-                  </div>
-                  {category && (
-                    <span className="mt-1 rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00]">
-                      {getCategoryName(category, lang)}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-5 border-t border-[#EEF2F6] pt-4">
-                  <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-[#8EA0BB]">{labels.description}</p>
-                  <p className="text-[15px] leading-7 text-[#475569]">{desc || labels.noDescription}</p>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-[24px] border border-[#E5E7EB] bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-black text-[#111827]">{labels.quantity}</h3>
-                  <p className="mt-1 text-sm text-[#8A94A6]">{labels.quantitySub}</p>
-                </div>
-                <div className="flex items-center gap-4 rounded-[20px] border border-[#E5E7EB] bg-[#F8FAFC] p-1.5">
-                  <button
-                    onClick={() => setDetailQty(qty => Math.max(1, qty - 1))}
-                    className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[#E5E7EB] bg-white text-[#64748B] shadow-sm transition-all hover:text-[#0F3B2E]"
-                  >
-                    <Minus size={20} />
-                  </button>
-                  <span className="min-w-[44px] text-center text-3xl font-black leading-none tabular-nums text-[#111827]">{detailQty}</span>
-                  <button
-                    onClick={() => setDetailQty(qty => qty + 1)}
-                    className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0F3B2E] text-white shadow-sm transition-all hover:bg-[#0A2A20]"
-                  >
-                    <Plus size={22} />
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <section className="rounded-[24px] border border-[#E5E7EB] bg-white p-5 shadow-sm">
-              <div className="mb-4">
-                <h3 className="text-lg font-black text-[#111827]">{labels.notes}</h3>
-                <p className="mt-1 text-sm text-[#8A94A6]">{labels.notesSub}</p>
-              </div>
-              <textarea
-                value={detailNotes}
-                onChange={e => setDetailNotes(e.target.value)}
-                placeholder="Например: без лука, хорошо прожарить…"
-                rows={4}
-                className="w-full resize-none rounded-[20px] border border-[#E5E7EB] bg-[#F8FAFC] px-4 py-4 text-[15px] leading-6 text-[#1F2937] placeholder-[#9CA3AF] transition-all focus:border-[#ff5a00] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/15"
-              />
-            </section>
-          </div>
-        </main>
-
-        {loginRequired && (
-          <div className="fixed inset-x-4 bottom-24 z-30 mx-auto flex max-w-[1040px] items-start gap-3 rounded-[24px] border border-orange-200 bg-[#FFF7ED] p-4 text-[#9A3412] shadow-lg">
-            <Lock size={20} className="mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-black">{promptTitle}</p>
-              <p className="mt-1 text-sm">{promptText}</p>
-            </div>
-            {!session && (
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => setLoginRequired(false)} className="rounded-xl bg-white px-4 py-2 text-sm font-black text-[#9A3412] shadow-sm">
-                  {t(lang, 'premiumLoginContinueBrowsing')}
-                </button>
-                <button onClick={() => navigate('/login')} className="rounded-xl bg-[#0F3B2E] px-4 py-2 text-sm font-black text-white">
-                  {t(lang, 'signIn')}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-[#E5E7EB] bg-white/95 px-4 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
-          <div className="mx-auto flex w-full max-w-[1040px] gap-3">
-            <button
-              onClick={closeDetail}
-              className="h-14 flex-1 rounded-2xl border border-[#E5E7EB] bg-white text-sm font-black text-[#64748B] transition-all hover:bg-[#F8FAFC]"
-            >
-              {labels.cancel}
-            </button>
-            <button
-              onClick={handleOrderIntent}
-              className="h-14 flex-[2] rounded-2xl bg-[#0F3B2E] text-sm font-black text-white shadow-[0_8px_18px_rgba(15,59,46,0.22)] transition-all hover:bg-[#0A2A20] sm:text-base"
-            >
-              {labels.add} · {formatCurrency(total)}
-            </button>
-          </div>
-        </div>
+      <div className="h-screen bg-[#FAF6EE]">
+        <MenuProductDetailPage
+          item={detailItem}
+          category={categoryMap[detailItem.category_id]}
+          currentQty={0}
+          currentNotes=""
+          lang={lang}
+          onBack={closeDetail}
+          onCancel={closeDetail}
+          onAddToCart={handleOrderIntent}
+        />
       </div>
     )
-  }
-
-  const role = (profile?.role || 'guest').toLowerCase()
-  const promptTitle = session && role === 'guest'
-    ? (lang === 'uz' ? 'Guest akkaunt' : lang === 'ru' ? 'Гостевой аккаунт' : 'Guest account')
-    : (lang === 'uz' ? 'Kirish kerak' : lang === 'ru' ? 'Требуется вход' : 'Sign in required')
-  const promptText = session && role === 'guest'
-    ? (lang === 'uz' ? 'Buyurtma berish uchun xodim roli kerak.' : lang === 'ru' ? 'Для оформления заказа нужна роль сотрудника.' : 'Ordering requires a staff account.')
-    : t(lang, 'premiumLoginRequired')
-
-  if (detailItem) {
-    return <ProductDetailPage item={detailItem} />
   }
 
   return (
@@ -445,26 +240,6 @@ export default function PublicMenu() {
           </div>
         </div>
 
-        {loginRequired && (
-          <div className="mb-5 flex items-start gap-3 rounded-[24px] border border-orange-200 bg-[#FFF7ED] p-4 text-[#9A3412]">
-            <Lock size={20} className="mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-black">{promptTitle}</p>
-              <p className="mt-1 text-sm">{promptText}</p>
-            </div>
-            {!session && (
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => setLoginRequired(false)} className="rounded-xl bg-white px-4 py-2 text-sm font-black text-[#9A3412] shadow-sm">
-                  {t(lang, 'premiumLoginContinueBrowsing')}
-                </button>
-                <button onClick={() => navigate('/login')} className="rounded-xl bg-[#0F3B2E] px-4 py-2 text-sm font-black text-white">
-                  {t(lang, 'signIn')}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
         {loading ? (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, idx) => (
@@ -514,14 +289,36 @@ export default function PublicMenu() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                    {section.items.map(item => <ProductCard key={item.id} item={item} />)}
+                    {section.items.map(item => (
+                      <MenuProductCard
+                        key={item.id}
+                        item={item}
+                        qty={0}
+                        lang={lang}
+                        onAdd={handleOrderIntent}
+                        onIncrement={handleOrderIntent}
+                        onDecrement={handleOrderIntent}
+                        onOpenDetail={openDetail}
+                      />
+                    ))}
                   </div>
                 </section>
               ))}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-              {filteredItems.map(item => <ProductCard key={item.id} item={item} />)}
+              {filteredItems.map(item => (
+                <MenuProductCard
+                  key={item.id}
+                  item={item}
+                  qty={0}
+                  lang={lang}
+                  onAdd={handleOrderIntent}
+                  onIncrement={handleOrderIntent}
+                  onDecrement={handleOrderIntent}
+                  onOpenDetail={openDetail}
+                />
+              ))}
             </div>
           )
         )}

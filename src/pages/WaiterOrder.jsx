@@ -13,7 +13,7 @@ import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 
 // ── CategoryCard ───────────────────────────────────────────────────────────────
-function CategoryCard({ cat, active, onClick, lang }) {
+export function CategoryCard({ cat, active, onClick, lang }) {
   const isAll = cat.id === 'all'
   const title = isAll
     ? (lang === 'uz' ? 'Barchasi' : lang === 'ru' ? 'Все' : 'All')
@@ -59,7 +59,7 @@ function CategoryCard({ cat, active, onClick, lang }) {
 }
 
 // ── ProductCard ────────────────────────────────────────────────────────────────
-function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang }) {
+export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang }) {
   const inCart = qty > 0
 
   return (
@@ -140,7 +140,7 @@ function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail,
 }
 
 // ── ProductDetailPage ──────────────────────────────────────────────────────────
-function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart }) {
+export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart }) {
   const [qty,   setQty]   = useState(Math.max(1, currentQty))
   const [notes, setNotes] = useState(currentNotes || '')
 

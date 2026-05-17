@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   UtensilsCrossed, Clock, CheckCircle2, AlertCircle, ArrowLeft,
-  Bell, ChefHat, Loader2, LogOut,
+  Bell, BellRing, ChefHat, Loader2, LogOut, Volume2, VolumeX,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,6 +20,9 @@ const ORDER_TYPE_LABEL = {
   dine_in:   { uz: 'Zalda',      ru: 'В зале',  en: 'Dine In' },
   take_away: { uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
 }
+
+const KITCHEN_SOUND_PREF_KEY = 'zk_kitchen_sound_enabled'
+const KITCHEN_SOUND_SRC = '/sounds/kitchen-new-order.wav'
 
 function statusSort(s) {
   return s === 'new' ? 0 : s === 'preparing' ? 1 : 2
@@ -44,12 +47,25 @@ function statusLabel(status, lang) {
 
 // ── Sidebar ────────────────────────────────────────────────────────────────────
 // ── Header ─────────────────────────────────────────────────────────────────────
-function KitchenHeader({ lang, onLangChange }) {
+function KitchenHeader({
+  lang,
+  onLangChange,
+  soundEnabled,
+  soundBlocked,
+  onToggleSound,
+  onEnableSound,
+}) {
   const { profile, signOut } = useAuth()
   const { dispatch } = useApp()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
   const title = lang === 'uz' ? 'Oshxona Displey' : lang === 'ru' ? 'Дисплей кухни' : 'Kitchen Display'
+  const soundLabel = soundEnabled
+    ? (lang === 'uz' ? 'Ovoz: ON' : lang === 'ru' ? 'Звук: ON' : 'Sound: ON')
+    : (lang === 'uz' ? 'Ovoz: OFF' : lang === 'ru' ? 'Звук: OFF' : 'Sound: OFF')
+  const enableSoundLabel = lang === 'uz'
+    ? 'Oshxona ovozini yoqish'
+    : lang === 'ru' ? 'Включить звук кухни' : 'Enable kitchen sound'
 
   function handleSignOut() {
     dispatch({ type: 'LOGOUT' })
@@ -78,6 +94,27 @@ function KitchenHeader({ lang, onLangChange }) {
       </div>
 
       <div className="flex items-center gap-2">
+        {soundBlocked && soundEnabled && (
+          <button
+            onClick={onEnableSound}
+            className="flex max-w-[150px] items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-black text-amber-700 hover:bg-amber-100 transition-colors"
+          >
+            <BellRing size={14} />
+            <span className="truncate">{enableSoundLabel}</span>
+          </button>
+        )}
+        <button
+          onClick={onToggleSound}
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-black transition-colors ${
+            soundEnabled
+              ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+              : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100'
+          }`}
+          title={soundBlocked && soundEnabled ? enableSoundLabel : soundLabel}
+        >
+          {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+          <span className="hidden sm:inline">{soundLabel}</span>
+        </button>
         {/* Lang switcher */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
           {['uz', 'ru', 'en'].map(l => (
@@ -487,7 +524,18 @@ export default function Kitchen() {
   const [pendingIds, setPendingIds] = useState(() => new Set())
   const [itemErrors, setItemErrors] = useState({})
   const [screenError, setScreenError] = useState('')
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    try {
+      return localStorage.getItem(KITCHEN_SOUND_PREF_KEY) !== 'off'
+    } catch {
+      return true
+    }
+  })
+  const [soundBlocked, setSoundBlocked] = useState(false)
   const pendingIdsRef = useRef(pendingIds)
+  const knownKitchenItemKeysRef = useRef(new Set())
+  const soundBaselineReadyRef = useRef(false)
+  const audioRef = useRef(null)
 
   useEffect(() => {
     pendingIdsRef.current = pendingIds
@@ -498,6 +546,78 @@ export default function Kitchen() {
     state.menuItems.forEach(i => { map[i.id] = i })
     return map
   }, [state.menuItems])
+
+  const activeKitchenAlertKeys = useMemo(() => (
+    state.orders
+      .filter(o => ['sent_to_kitchen', 'preparing'].includes(o.status))
+      .flatMap(o => (o.items || [])
+        .filter(i => i.status === 'new')
+        .map(i => kitchenItemKey(o.id, i))
+      )
+  ), [state.orders])
+
+  const getKitchenAudio = useCallback(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(KITCHEN_SOUND_SRC)
+      audioRef.current.preload = 'auto'
+    }
+    return audioRef.current
+  }, [])
+
+  const playKitchenSound = useCallback(async (force = false) => {
+    if (!force && !soundEnabled) return
+
+    try {
+      const audio = getKitchenAudio()
+      audio.currentTime = 0
+      await audio.play()
+      setSoundBlocked(false)
+    } catch (error) {
+      console.warn('[kitchen] sound blocked until user enables audio', error)
+      setSoundBlocked(true)
+    }
+  }, [getKitchenAudio, soundEnabled])
+
+  const enableKitchenSound = useCallback(async () => {
+    try {
+      localStorage.setItem(KITCHEN_SOUND_PREF_KEY, 'on')
+    } catch {}
+    setSoundEnabled(true)
+    await playKitchenSound(true)
+  }, [playKitchenSound])
+
+  const toggleKitchenSound = useCallback(() => {
+    const next = !soundEnabled
+    setSoundEnabled(next)
+    try {
+      localStorage.setItem(KITCHEN_SOUND_PREF_KEY, next ? 'on' : 'off')
+    } catch {}
+    if (next) {
+      setTimeout(() => { enableKitchenSound() }, 0)
+    } else {
+      setSoundBlocked(false)
+    }
+  }, [enableKitchenSound, soundEnabled])
+
+  useEffect(() => {
+    if (!state.loaded) return
+
+    // Baseline existing kitchen items silently, then alert only for newly inserted "new" items.
+    // This catches both brand-new orders and later rounds added to the same unpaid order.
+    const currentKeys = new Set(activeKitchenAlertKeys)
+    if (!soundBaselineReadyRef.current) {
+      knownKitchenItemKeysRef.current = currentKeys
+      soundBaselineReadyRef.current = true
+      return
+    }
+
+    const newKitchenItemKeys = activeKitchenAlertKeys.filter(key => !knownKitchenItemKeysRef.current.has(key))
+    knownKitchenItemKeysRef.current = currentKeys
+
+    if (newKitchenItemKeys.length > 0) {
+      playKitchenSound()
+    }
+  }, [activeKitchenAlertKeys, playKitchenSound, state.loaded])
 
   // Group all active orders by table — one card per table
   const activeOrders = useMemo(() => {
@@ -605,6 +725,10 @@ export default function Kitchen() {
         <KitchenHeader
           lang={lang}
           onLangChange={l => dispatch({ type: 'SET_LANG', payload: l })}
+          soundEnabled={soundEnabled}
+          soundBlocked={soundBlocked}
+          onToggleSound={toggleKitchenSound}
+          onEnableSound={enableKitchenSound}
         />
         {screenError && (
           <div className="flex-shrink-0 bg-red-50 border-b border-red-100 px-5 py-2 text-sm font-semibold text-red-700">
