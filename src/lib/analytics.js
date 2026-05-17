@@ -18,32 +18,41 @@ export function getOrderItems(o) {
 }
 
 export function getOrderServiceRatePct(o, fallbackPct = 20) {
-  const pct = Number(o?.service_rate_pct)
+  const pct = Number(o?.service_rate_pct ?? o?.service_percent ?? o?.servicePercent)
   return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : fallbackPct
 }
 
 export function getOrderServiceFee(o, fallbackPct = 20) {
-  const sub = Number(o?.subtotal) || 0
-  const disc = Number(o?.loyalty_discount_amount) || Number(o?.discount_amount) || 0
-  const afterDisc = Math.max(0, sub - disc)
-  if (afterDisc <= 0) return Number(o?.service_fee) || 0
-
-  const servicePct = getOrderServiceRatePct(o, fallbackPct)
-  return Math.round(afterDisc * servicePct / 100)
+  return getOrderPaymentSummary(o, getOrderItems(o), fallbackPct).serviceFee
 }
 
 export function getOrderTotal(o, fallbackServicePct = 20) {
-  const sub = Number(o?.subtotal) || 0
-  const disc = Number(o?.loyalty_discount_amount) || Number(o?.discount_amount) || 0
-  if (sub > 0) return Math.max(0, sub - disc) + getOrderServiceFee(o, fallbackServicePct)
+  return getOrderPaymentSummary(o, getOrderItems(o), fallbackServicePct).total
+}
 
-  if (o?.total != null && Number(o.total) > 0) return Number(o.total)
-
-  const itemsSum = getOrderItems(o).reduce(
+export function getOrderPaymentSummary(order, items = getOrderItems(order), fallbackServicePct = 20) {
+  const itemsSubtotal = items.reduce(
     (s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
     0
   )
-  return Math.round(itemsSum * 1.2)
+  const subtotal = itemsSubtotal || (Number(order?.subtotal) || 0)
+  const discPct = Number(order?.loyalty_discount_pct ?? order?.discount_percent ?? 0) || 0
+  const discountAmount = discPct > 0
+    ? Math.round(subtotal * discPct / 100)
+    : (Number(order?.loyalty_discount_amount) || Number(order?.discount_amount) || 0)
+  const afterDiscount = Math.max(0, subtotal - discountAmount)
+  const serviceRatePct = getOrderServiceRatePct(order, fallbackServicePct)
+  const serviceFee = Math.round(afterDiscount * serviceRatePct / 100)
+
+  return {
+    subtotal,
+    discountPercent: discPct,
+    discountAmount,
+    afterDiscount,
+    serviceRatePct,
+    serviceFee,
+    total: afterDiscount + serviceFee,
+  }
 }
 
 export function toLocalDateStr(iso) {
@@ -82,7 +91,7 @@ export function groupOrdersBySession(orders) {
         total: Number(o.total) || 0,
         subtotal: Number(o.subtotal) || 0,
         service_fee: Number(o.service_fee) || 0,
-        service_rate_pct: Number(o.service_rate_pct) || null,
+        service_rate_pct: Number(o.service_rate_pct ?? o.service_percent ?? o.servicePercent) || null,
         loyalty_discount_amount: Number(o.loyalty_discount_amount) || 0,
         _orderCount: 1,
         _mergedIds: [o.id],
@@ -95,8 +104,9 @@ export function groupOrdersBySession(orders) {
     session.total = (session.total || 0) + (Number(o.total) || 0)
     session.subtotal = (session.subtotal || 0) + (Number(o.subtotal) || 0)
     session.service_fee = (session.service_fee || 0) + (Number(o.service_fee) || 0)
-    if (session.service_rate_pct == null && o.service_rate_pct != null) {
-      session.service_rate_pct = Number(o.service_rate_pct)
+    const servicePct = Number(o.service_rate_pct ?? o.service_percent ?? o.servicePercent)
+    if (session.service_rate_pct == null && Number.isFinite(servicePct)) {
+      session.service_rate_pct = servicePct
     }
     session.loyalty_discount_amount =
       (session.loyalty_discount_amount || 0) + (Number(o.loyalty_discount_amount) || 0)

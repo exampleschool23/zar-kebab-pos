@@ -7,8 +7,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import {
   getOrderDate,
   getOrderItems,
-  getOrderServiceFee,
-  getOrderServiceRatePct,
+  getOrderPaymentSummary,
   getOrderTotal,
   groupOrdersBySession,
   isPaidOrder,
@@ -608,17 +607,13 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
   if (!order) return null
 
   const items    = fetchedItems || getOrderItems(order)
-  const itemsSum = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0)
-  const subtotal = itemsSum || (Number(order.subtotal) || 0)
-  // Re-derive discAmt from the stored percentage so it's always consistent with subtotal
-  const discPct  = order.loyalty_discount_pct || order.discount_percent || 0
-  const discAmt  = discPct > 0
-    ? Math.round(subtotal * discPct / 100)
-    : (Number(order.loyalty_discount_amount) || Number(order.discount_amount) || 0)
-  const afterDisc    = Math.max(0, subtotal - discAmt)
-  const servicePct   = getOrderServiceRatePct(order, serviceRatePct)
-  const serviceAmt   = getOrderServiceFee({ ...order, subtotal, loyalty_discount_amount: discAmt }, serviceRatePct)
-  const total        = afterDisc + serviceAmt
+  const payment = getOrderPaymentSummary(order, items, serviceRatePct)
+  const subtotal = payment.subtotal
+  const discPct = payment.discountPercent
+  const discAmt = payment.discountAmount
+  const servicePct = payment.serviceRatePct
+  const serviceAmt = payment.serviceFee
+  const total = payment.total
   const received   = order.amount_received || 0
   const change     = order.change_amount   || (received > 0 ? Math.max(0, received - total) : 0)
   const orderNum   = order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '—'
@@ -808,7 +803,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
               const orderNum    = order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '—'
               const sessionCnt  = order._orderCount || 1
               const discPct     = order.loyalty_discount_pct || order.discount_percent || 0
-              const servicePct  = order.service_percent != null ? order.service_percent : 20
+              const servicePct  = getOrderPaymentSummary(order, getOrderItems(order), 20).serviceRatePct
               const status      = order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')
               const isSelected  = selectedOrder?.id === order.id
               return (

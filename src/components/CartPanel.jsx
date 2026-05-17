@@ -108,7 +108,8 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
   }, [state.menuItems])
 
   const subtotal  = cart.reduce((s, i) => s + i.price * i.quantity, 0)
-  const serviceRate = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20)) / 100
+  const serviceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
+  const serviceRate = serviceRatePct / 100
   const service   = Math.round(subtotal * serviceRate)
   const total     = subtotal + service
   const itemCount = cart.reduce((s, i) => s + i.quantity, 0)
@@ -208,7 +209,7 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
             </div>
             <div className="flex justify-between items-center text-[13px]">
               <span className="text-[#9CA3AF] font-medium">
-                {lang === 'uz' ? 'Xizmat (20%)' : lang === 'ru' ? 'Сервис (20%)' : 'Service (20%)'}
+                {lang === 'uz' ? `Xizmat (${serviceRatePct}%)` : lang === 'ru' ? `Сервис (${serviceRatePct}%)` : `Service (${serviceRatePct}%)`}
               </span>
               <span className="text-[#1F2937] font-semibold">{formatCurrency(service)}</span>
             </div>

@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { getItemName } from '../lib/i18n'
 import { ArrowLeft, Printer } from 'lucide-react'
+import { getOrderPaymentSummary } from '../lib/analytics'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -68,6 +69,93 @@ function fmtNum(n) {
 }
 function fmtUZS(n) {
   return `${fmtNum(n)} UZS`
+}
+
+function stableStringify(value) {
+  if (value == null) return ''
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  if (typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${key}:${stableStringify(value[key])}`).join(',')}}`
+  }
+  return String(value)
+}
+
+function getReceiptItemProductId(item) {
+  return item.menu_item_id ?? item.menuItemId ?? item.product_id ?? item.productId ?? null
+}
+
+function getReceiptItemOptionsKey(item) {
+  const optionFields = [
+    'variant_id',
+    'variantId',
+    'size_id',
+    'sizeId',
+    'modifiers',
+    'selected_modifiers',
+    'selectedModifiers',
+    'options',
+    'selected_options',
+    'selectedOptions',
+    'extras',
+    'selected_extras',
+    'selectedExtras',
+  ]
+
+  const selected = {}
+  optionFields.forEach(field => {
+    if (item[field] != null) selected[field] = item[field]
+  })
+  return stableStringify(selected)
+}
+
+function getReceiptItems(rawItems, menuItemMap, lang) {
+  const grouped = new Map()
+
+  rawItems.forEach((item, index) => {
+    const productId = getReceiptItemProductId(item)
+    // Never group by localized/display name. If there is no product id, keep the
+    // original row separate so similar translations cannot collapse together.
+    const key = productId != null
+      ? `${productId}::${getReceiptItemOptionsKey(item)}`
+      : `row::${item.id || index}`
+    const existing = grouped.get(key)
+
+    if (existing) {
+      grouped.set(key, {
+        ...existing,
+        quantity: (Number(existing.quantity) || 1) + (Number(item.quantity) || 1),
+      })
+      return
+    }
+
+    const menuItem = productId != null ? menuItemMap[productId] : null
+    grouped.set(key, {
+      ...item,
+      name: (menuItem && getItemName(menuItem, lang)) || item.name,
+    })
+  })
+
+  return Array.from(grouped.values())
+}
+
+function combineReceiptOrders(orders) {
+  return {
+    ...orders[0],
+    subtotal: orders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0),
+    service_fee: orders.reduce((s, o) => s + (Number(o.service_fee) || 0), 0),
+    total: orders.reduce((s, o) => s + (Number(o.total) || 0), 0),
+    loyalty_discount_amount: orders.reduce(
+      (s, o) => s + (Number(o.loyalty_discount_amount) || Number(o.discount_amount) || 0),
+      0
+    ),
+    loyalty_discount_pct: orders.find(o => o.loyalty_discount_pct != null)?.loyalty_discount_pct ??
+      orders.find(o => o.discount_percent != null)?.discount_percent ??
+      orders[0]?.loyalty_discount_pct ??
+      0,
+    service_rate_pct: orders.find(o => o.service_rate_pct != null)?.service_rate_pct ??
+      orders.find(o => o.service_percent != null)?.service_percent ??
+      orders[0]?.service_rate_pct,
+  }
 }
 
 // ── Shared font styles ────────────────────────────────────────────────────────
@@ -467,7 +555,6 @@ export function TableReceipt() {
   const lang     = state.lang
   const labels   = L[lang] || L.en
   const settings = state.settings
-  const svcRate  = (settings.serviceRate ?? 20) / 100
 
   const menuItemMap = useMemo(() => {
     const m = {}
@@ -483,33 +570,26 @@ export function TableReceipt() {
 
     const table    = state.tables.find(t => t.id === tableId)
     const allItems = orders.flatMap(o => o.items || [])
-
-    const map = {}
-    allItems.forEach(item => {
-      const key = item.menu_item_id || item.name
-      if (!map[key]) map[key] = { ...item }
-      else map[key] = { ...map[key], quantity: (map[key].quantity || 1) + (item.quantity || 1) }
-    })
-    const items = Object.values(map).map(item => ({
-      ...item,
-      name: (menuItemMap[item.menu_item_id] && getItemName(menuItemMap[item.menu_item_id], lang)) || item.name,
-    }))
-    const subtotal   = items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0)
-    const serviceFee = Math.round(subtotal * svcRate)
+    const items = getReceiptItems(allItems, menuItemMap, lang)
+    const summary = getOrderPaymentSummary(
+      combineReceiptOrders(orders),
+      allItems,
+      settings.serviceRate ?? 20
+    )
 
     return {
       tableName:  table?.name || orders[0]?.table_name || tableId,
       waiterName: orders[0]?.waiter_name || '—',
       createdAt:  orders[0]?.created_at,
       items,
-      subtotal,
-      serviceFee,
-      serviceRate: settings.serviceRate ?? 20,
-      loyaltyPct:  0,
-      loyaltyAmt:  0,
-      total: subtotal + serviceFee,
+      subtotal: summary.subtotal,
+      serviceFee: summary.serviceFee,
+      serviceRate: summary.serviceRatePct,
+      loyaltyPct:  summary.discountPercent,
+      loyaltyAmt:  summary.discountAmount,
+      total: summary.total,
     }
-  }, [state.orders, state.tables, tableId, svcRate, settings.serviceRate, menuItemMap, lang])
+  }, [state.orders, state.tables, tableId, settings.serviceRate, menuItemMap, lang])
 
   if (!data) return <NotFound onBack={() => navigate(-1)} />
 
@@ -541,7 +621,6 @@ export default function Receipt() {
   const lang     = state.lang
   const labels   = L[lang] || L.en
   const settings = state.settings
-  const svcRate  = (settings.serviceRate ?? 20) / 100
 
   const menuItemMap = useMemo(() => {
     const m = {}
@@ -569,23 +648,12 @@ export default function Receipt() {
         })()
 
     const allItems = allOrders.flatMap(o => o.items || [])
-    const map = {}
-    allItems.forEach(item => {
-      const key = item.menu_item_id || item.name
-      if (!map[key]) map[key] = { ...item }
-      else map[key] = { ...map[key], quantity: (map[key].quantity || 1) + (item.quantity || 1) }
-    })
-    const items = Object.values(map).map(item => ({
-      ...item,
-      name: (menuItemMap[item.menu_item_id] && getItemName(menuItemMap[item.menu_item_id], lang)) || item.name,
-    }))
-
-    const loyaltyPct = order.loyalty_discount_pct || 0
-    // Sum the per-round discount amounts written by MARK_ORDER_PAID
-    const loyaltyAmt = allOrders.reduce((s, o) => s + (Number(o.loyalty_discount_amount) || 0), 0)
-    const subtotal   = allOrders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0) || items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0)
-    const serviceFee = allOrders.reduce((s, o) => s + (Number(o.service_fee) || 0), 0)
-    const afterDisc  = subtotal - loyaltyAmt
+    const items = getReceiptItems(allItems, menuItemMap, lang)
+    const summary = getOrderPaymentSummary(
+      combineReceiptOrders(allOrders),
+      allItems,
+      settings.serviceRate ?? 20
+    )
     const table      = state.tables.find(t => t.id === order.table_id)
 
     return {
@@ -593,14 +661,14 @@ export default function Receipt() {
       waiterName: order.waiter_name || '—',
       createdAt:  order.created_at,
       items,
-      subtotal,
-      serviceFee,
-      serviceRate: settings.serviceRate ?? 20,
-      loyaltyPct,
-      loyaltyAmt,
-      total: afterDisc + serviceFee,
+      subtotal: summary.subtotal,
+      serviceFee: summary.serviceFee,
+      serviceRate: summary.serviceRatePct,
+      loyaltyPct: summary.discountPercent,
+      loyaltyAmt: summary.discountAmount,
+      total: summary.total,
     }
-  }, [state.orders, state.tables, orderId, svcRate, settings.serviceRate, menuItemMap, lang])
+  }, [state.orders, state.tables, orderId, settings.serviceRate, menuItemMap, lang])
 
   if (!data) return <NotFound onBack={() => navigate(-1)} />
 
