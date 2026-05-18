@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, DragOverlay,
@@ -20,6 +20,32 @@ import {
 import { supabase } from '../lib/supabase'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
+
+function SafeMenuImage({ src, alt = '', className = '', fallbackClassName = '', iconSize = 28 }) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
+
+  if (!src || failed) {
+    return (
+      <div className={`bg-orange-50 flex items-center justify-center ${fallbackClassName}`}>
+        <UtensilsCrossed size={iconSize} className="text-orange-200" />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  )
+}
 
 function Modal({ title, onClose, children }) {
   return (
@@ -162,39 +188,38 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-all flex flex-col group"
+      className="flex flex-col overflow-hidden rounded-[18px] border-2 border-[#E5E7EB] bg-white shadow-sm transition-all hover:border-gray-200 hover:shadow-md group"
     >
       {/* Drag handle strip at top of image */}
       <div className="relative">
-        {item.image_url ? (
-          <img src={item.image_url} alt={getItemName(item, lang)} className="w-full h-[130px] object-cover" />
-        ) : (
-          <div className="w-full h-[130px] bg-orange-50 flex items-center justify-center">
-            <UtensilsCrossed size={28} className="text-orange-200" />
-          </div>
-        )}
+        <SafeMenuImage
+          src={item.image_url}
+          alt={getItemName(item, lang)}
+          className="aspect-[4/3] w-full object-cover object-center"
+          fallbackClassName="aspect-[4/3] w-full"
+        />
         {/* Drag handle overlay */}
         <button
           {...listeners}
           {...attributes}
-          className="absolute top-2 left-2 p-1 rounded-lg bg-white/80 backdrop-blur-sm text-gray-400 hover:text-gray-700 hover:bg-white transition-colors cursor-grab active:cursor-grabbing touch-none shadow-sm"
+          className="absolute top-2 left-2 p-1.5 rounded-xl bg-white/85 backdrop-blur-sm text-gray-400 hover:text-gray-700 hover:bg-white transition-colors cursor-grab active:cursor-grabbing touch-none shadow-sm"
           tabIndex={-1}
         >
-          <GripVertical size={14} />
+          <GripVertical size={15} />
         </button>
       </div>
 
       {/* Body */}
       <div className="p-3 flex flex-col flex-1">
-        <p className="font-black text-gray-900 text-[13px] leading-snug line-clamp-2 mb-0.5">
+        <p className="font-bold text-[15px] text-[#1F2937] line-clamp-2 leading-snug mb-1">
           {getItemName(item, lang)}
         </p>
         {cat && (
-          <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-1">
+          <p className="text-[11px] text-[#9CA3AF] uppercase tracking-wide font-semibold mb-1">
             {getCategoryName(cat, lang)}
           </p>
         )}
-        <p className="text-[#ff5a00] font-black text-sm mb-2">{formatCurrency(item.price)}</p>
+        <p className="text-[#ff5a00] font-black text-[16px] mb-2">{formatCurrency(item.price)}</p>
         <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit mb-3 ${
           item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
         }`}>
@@ -207,14 +232,14 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
         <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-gray-50">
           <button
             onClick={() => onEdit(item)}
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-[11px] font-semibold"
+            className="flex-1 flex h-10 items-center justify-center gap-1 rounded-xl border border-[#ff5a00]/20 bg-[#fff1e8] text-[#ff5a00] hover:bg-[#ff5a00] hover:text-white transition-colors text-[12px] font-bold"
           >
             <Edit2 size={11} />
             {lang === 'uz' ? 'Tahrirl' : lang === 'ru' ? 'Ред.' : 'Edit'}
           </button>
           <button
             onClick={() => onDelete(item.id)}
-            className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+            className="h-10 w-10 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center"
           >
             <Trash2 size={12} />
           </button>
@@ -496,7 +521,7 @@ export default function AdminMenu() {
 
         {/* Page header */}
         <div className="bg-white border-b border-gray-100 px-6 pt-5 pb-0">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full">
             <h1 className="text-2xl font-black text-gray-900">{t(lang, 'menu')}</h1>
             <p className="text-sm text-gray-400 mt-0.5 mb-4">
               {lang === 'uz' ? 'Menyu elementlari va kategoriyalarini boshqaring' :
@@ -519,14 +544,14 @@ export default function AdminMenu() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="w-full px-6 py-6">
 
           {/* ══ Menu Items tab ═══════════════════════════════════════════════ */}
           {tab === 'items' && (
             <>
               {/* Toolbar row 1: search + availability + grid toggle + add */}
               <div className="flex flex-wrap items-center gap-3 mb-3">
-                <div className="relative flex-1 min-w-[200px]">
+                <div className="relative flex-1 min-w-[240px]">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
@@ -534,13 +559,13 @@ export default function AdminMenu() {
                     onChange={e => setSearch(e.target.value)}
                     placeholder={lang === 'uz' ? 'Menyu elementlarini qidirish...' :
                                  lang === 'ru' ? 'Поиск позиций меню...' : 'Search menu items...'}
-                    className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all shadow-sm"
+                    className="w-full pl-9 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all shadow-sm"
                   />
                 </div>
                 <select
                   value={filterAvail}
                   onChange={e => setFilterAvail(e.target.value)}
-                  className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] shadow-sm cursor-pointer"
+                  className="bg-white border border-gray-200 rounded-xl px-3 py-3 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] shadow-sm cursor-pointer"
                 >
                   <option value="all">
                     {lang === 'uz' ? 'Mavjudlik' : lang === 'ru' ? 'Доступность' : 'Availability'}
@@ -555,13 +580,13 @@ export default function AdminMenu() {
                 <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                   <button
                     onClick={() => setGridView(true)}
-                    className={`p-2.5 transition-colors ${gridView ? 'bg-[#ff5a00] text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`p-3 transition-colors ${gridView ? 'bg-[#ff5a00] text-white' : 'text-gray-400 hover:text-gray-600'}`}
                   >
                     <LayoutGrid size={15} />
                   </button>
                   <button
                     onClick={() => setGridView(false)}
-                    className={`p-2.5 transition-colors ${!gridView ? 'bg-[#ff5a00] text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`p-3 transition-colors ${!gridView ? 'bg-[#ff5a00] text-white' : 'text-gray-400 hover:text-gray-600'}`}
                   >
                     <List size={15} />
                   </button>
@@ -595,11 +620,12 @@ export default function AdminMenu() {
                             </div>
                           </div>
                         ) : cat.image_url ? (
-                          <img
+                          <SafeMenuImage
                             src={cat.image_url}
                             alt={cat.label}
                             className="h-full w-full object-cover object-center"
-                            loading="lazy"
+                            fallbackClassName="h-full w-full"
+                            iconSize={28}
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center bg-orange-50">
@@ -673,13 +699,12 @@ export default function AdminMenu() {
 
                 const DragGhost = () => activeItem ? (
                   <div className="bg-white rounded-2xl border-2 border-[#ff5a00]/40 shadow-2xl opacity-95 w-44 rotate-2">
-                    {activeItem.image_url ? (
-                      <img src={activeItem.image_url} alt="" className="w-full h-[100px] object-cover rounded-t-2xl" />
-                    ) : (
-                      <div className="w-full h-[100px] bg-orange-50 rounded-t-2xl flex items-center justify-center">
-                        <UtensilsCrossed size={24} className="text-orange-200" />
-                      </div>
-                    )}
+                    <SafeMenuImage
+                      src={activeItem.image_url}
+                      className="aspect-[4/3] w-full rounded-t-2xl object-cover object-center"
+                      fallbackClassName="aspect-[4/3] w-full rounded-t-2xl"
+                      iconSize={24}
+                    />
                     <div className="p-2.5">
                       <p className="font-black text-gray-900 text-[12px] truncate">{getItemName(activeItem, lang)}</p>
                       <p className="text-[#ff5a00] font-black text-xs">{formatCurrency(activeItem.price)}</p>
@@ -705,21 +730,20 @@ export default function AdminMenu() {
                           {sections.map(({ cat, items: catItems }) => (
                             <div key={cat.id}>
                               {/* Section header */}
-                              <div className="flex items-center gap-3 mb-3">
+                              <div className="flex items-center gap-2.5 mb-3">
                                 {cat.image_url && (
                                   <img src={cat.image_url} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
                                 )}
-                                <h3 className="text-base font-black text-gray-800">
+                                <h3 className="text-xl font-black uppercase tracking-tight text-[#1F2937]">
                                   {getCategoryName(cat, lang)}
                                 </h3>
-                                <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-0.5 text-xs font-bold text-[#6B7280]">
                                   {catItems.length}
                                 </span>
-                                <div className="flex-1 h-px bg-gray-100" />
                               </div>
 
                               {gridView ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                                   {catItems.map(item => (
                                     <SortableItemCard
                                       key={item.id}
@@ -752,16 +776,15 @@ export default function AdminMenu() {
                           {uncategorised.length > 0 && (
                             <div>
                               <div className="flex items-center gap-3 mb-3">
-                                <h3 className="text-base font-black text-gray-500">
+                                <h3 className="text-xl font-black uppercase tracking-tight text-[#1F2937]">
                                   {lang === 'uz' ? 'Kategoriyasiz' : lang === 'ru' ? 'Без категории' : 'Uncategorised'}
                                 </h3>
-                                <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-0.5 text-xs font-bold text-[#6B7280]">
                                   {uncategorised.length}
                                 </span>
-                                <div className="flex-1 h-px bg-gray-100" />
                               </div>
                               {gridView ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                                   {uncategorised.map(item => (
                                     <SortableItemCard key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
                                   ))}
@@ -779,7 +802,7 @@ export default function AdminMenu() {
                       ) : (
                         // ── Flat grid (specific category or active filter) ────
                         gridView ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                             {filteredItems.map(item => (
                               <SortableItemCard key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
                             ))}

@@ -12,6 +12,32 @@ import {
   ProductDetailPage as MenuProductDetailPage,
 } from './WaiterOrder'
 
+function PublicCategoryImage({ src, alt, active }) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
+
+  if (!src || failed) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-orange-50">
+        <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="h-full w-full object-cover object-center"
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 async function loadPublicMenuData() {
   const rpcRes = await supabase.rpc('get_public_menu_data')
 
@@ -224,11 +250,9 @@ export default function PublicMenu() {
                         <UtensilsCrossed size={30} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
                       </div>
                     ) : cat.image_url ? (
-                      <img src={cat.image_url} alt={title} className="h-full w-full object-cover object-center" />
+                      <PublicCategoryImage src={cat.image_url} alt={title} active={active} />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-orange-50">
-                        <UtensilsCrossed size={28} className="text-orange-300" />
-                      </div>
+                      <PublicCategoryImage src={null} alt={title} active={active} />
                     )}
                   </div>
                   <div className="min-h-[58px] px-2.5 py-2.5 flex items-center justify-center">

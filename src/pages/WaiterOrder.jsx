@@ -12,6 +12,36 @@ import { formatCurrency } from '../lib/formatCurrency'
 import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 
+function MenuImageFallback({ className = '', iconSize = 32, active = false }) {
+  return (
+    <div className={`flex h-full w-full items-center justify-center bg-orange-50 ${className}`}>
+      <UtensilsCrossed size={iconSize} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
+    </div>
+  )
+}
+
+function SafeMenuImage({ src, alt, className = '', fallbackIconSize = 32, active = false }) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
+
+  if (!src || failed) {
+    return <MenuImageFallback iconSize={fallbackIconSize} active={active} />
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 // ── CategoryCard ───────────────────────────────────────────────────────────────
 export function CategoryCard({ cat, active, onClick, lang }) {
   const isAll = cat.id === 'all'
@@ -36,16 +66,15 @@ export function CategoryCard({ cat, active, onClick, lang }) {
             </div>
           </div>
         ) : cat.image_url ? (
-          <img
+          <SafeMenuImage
             src={cat.image_url}
             alt={title}
             className="h-full w-full object-cover object-center"
-            loading="lazy"
+            fallbackIconSize={28}
+            active={active}
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center bg-orange-50">
-            <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
-          </div>
+          <MenuImageFallback iconSize={28} active={active} />
         )}
       </div>
 
@@ -75,19 +104,13 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
       }`}
     >
       {/* Image */}
-      <div className="relative w-full bg-gray-50 flex-shrink-0" style={{ height: '140px' }}>
-        {item.image_url ? (
-          <img
-            src={item.image_url}
-            alt={getItemName(item, lang)}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full bg-orange-50 flex items-center justify-center">
-            <UtensilsCrossed size={32} className="text-orange-200" />
-          </div>
-        )}
+      <div className="relative aspect-[4/3] w-full flex-shrink-0 overflow-hidden bg-orange-50">
+        <SafeMenuImage
+          src={item.image_url}
+          alt={getItemName(item, lang)}
+          className="h-full w-full object-cover object-center"
+          fallbackIconSize={34}
+        />
         {inCart && (
           <div className="absolute top-2 right-2 bg-[#ff5a00] text-white text-[11px] font-black rounded-full w-6 h-6 flex items-center justify-center shadow">
             {qty}
@@ -189,87 +212,79 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 pb-28">
-        <div className="mx-auto w-full max-w-[1040px] space-y-4">
-          <section className="overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white shadow-sm">
-            <div className="relative aspect-[16/9] w-full bg-orange-50 md:max-h-[420px]">
-              {item.image_url ? (
-                <img
-                  src={item.image_url}
-                  alt={name}
-                  className="h-full w-full object-cover object-center"
-                />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center">
-                  <UtensilsCrossed size={64} className="text-orange-200" />
-                </div>
-              )}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 pb-28">
+        <div className="mx-auto w-full max-w-[1120px]">
+          <section className="grid gap-5 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm md:grid-cols-[minmax(320px,0.9fr)_minmax(360px,1.1fr)] md:p-5 lg:gap-6">
+            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[22px] bg-orange-50 md:max-h-[360px]">
+              <SafeMenuImage
+                src={item.image_url}
+                alt={name}
+                className="h-full w-full object-cover object-center"
+                fallbackIconSize={64}
+              />
             </div>
-
-            <div className="p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h2 className="text-3xl font-black uppercase tracking-tight text-[#111827]">{name}</h2>
-                  <p className="mt-2 text-lg font-black text-[#FF4D00]">{formatCurrency(item.price)}</p>
-                </div>
+            <div className="min-w-0 space-y-5">
+              <div>
                 {category && (
-                  <span className="mt-1 rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00]">
+                  <span className="mb-3 inline-flex rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00]">
                     {getCategoryName(category, lang)}
                   </span>
                 )}
+                <h2 className="text-2xl font-black uppercase tracking-tight text-[#111827] sm:text-3xl">{name}</h2>
+                <p className="mt-2 text-lg font-black text-[#FF4D00]">{formatCurrency(item.price)}</p>
               </div>
 
-              <div className="mt-5 border-t border-[#EEF2F6] pt-4">
-                <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-[#8EA0BB]">{labels.description}</p>
-                <p className="text-[15px] leading-7 text-[#475569]">
+              <div className="border-t border-[#EEF2F6] pt-4">
+                <p className="mb-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#8EA0BB]">{labels.description}</p>
+                <p className="text-[14px] leading-6 text-[#475569]">
                   {desc || labels.noDescription}
                 </p>
               </div>
-            </div>
-          </section>
 
-          <section className="rounded-[24px] border border-[#E5E7EB] bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-black text-[#111827]">{labels.quantity}</h3>
-                <p className="mt-1 text-sm text-[#8A94A6]">{labels.quantitySub}</p>
+              <div className="rounded-[22px] border border-[#E5E7EB] bg-[#FBFCFE] p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-[#111827]">{labels.quantity}</h3>
+                    <p className="mt-1 text-sm text-[#8A94A6]">{labels.quantitySub}</p>
+                  </div>
+                  <div className="flex w-full items-center justify-between gap-4 rounded-[18px] border border-[#E5E7EB] bg-white p-1.5 sm:w-auto">
+                    <button
+                      onClick={() => setQty(q => Math.max(1, q - 1))}
+                      className="w-12 h-12 rounded-2xl bg-white border border-[#E5E7EB] flex items-center justify-center text-[#64748B] hover:text-[#0F3B2E] active:scale-95 transition-all shadow-sm"
+                    >
+                      <Minus size={18} />
+                    </button>
+                    <span className="min-w-[44px] text-center text-2xl font-black leading-none text-[#111827] tabular-nums">{qty}</span>
+                    <button
+                      onClick={() => setQty(q => q + 1)}
+                      className="w-12 h-12 rounded-2xl bg-[#0F3B2E] flex items-center justify-center text-white hover:bg-[#0A2A20] active:scale-95 transition-all shadow-sm"
+                    >
+                      <Plus size={20} />
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-4 rounded-[20px] border border-[#E5E7EB] bg-[#F8FAFC] p-1.5">
-                <button
-                  onClick={() => setQty(q => Math.max(1, q - 1))}
-                  className="w-14 h-14 rounded-2xl bg-white border border-[#E5E7EB] flex items-center justify-center text-[#64748B] hover:text-[#0F3B2E] active:scale-95 transition-all shadow-sm"
-                >
-                  <Minus size={20} />
-                </button>
-                <span className="min-w-[44px] text-center text-3xl font-black leading-none text-[#111827] tabular-nums">{qty}</span>
-                <button
-                  onClick={() => setQty(q => q + 1)}
-                  className="w-14 h-14 rounded-2xl bg-[#0F3B2E] flex items-center justify-center text-white hover:bg-[#0A2A20] active:scale-95 transition-all shadow-sm"
-                >
-                  <Plus size={22} />
-                </button>
-              </div>
-            </div>
-          </section>
 
-          <section className="rounded-[24px] border border-[#E5E7EB] bg-white p-5 shadow-sm">
-            <div className="mb-4">
-              <h3 className="text-lg font-black text-[#111827]">{labels.notes}</h3>
-              <p className="mt-1 text-sm text-[#8A94A6]">{labels.notesSub}</p>
+              <div className="rounded-[22px] border border-[#E5E7EB] bg-[#FBFCFE] p-4">
+                <div className="mb-3">
+                  <h3 className="text-base font-black text-[#111827]">{labels.notes}</h3>
+                  <p className="mt-1 text-sm text-[#8A94A6]">{labels.notesSub}</p>
+                </div>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="Например: без лука, хорошо прожарить…"
+                  rows={3}
+                  className="w-full resize-none rounded-[18px] border border-[#E5E7EB] bg-white px-4 py-3 text-[14px] leading-6 text-[#1F2937] placeholder-[#9CA3AF] transition-all focus:border-[#ff5a00] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/15"
+                />
+              </div>
             </div>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Например: без лука, хорошо прожарить…"
-              rows={4}
-              className="w-full resize-none rounded-[20px] border border-[#E5E7EB] bg-[#F8FAFC] px-4 py-4 text-[15px] leading-6 text-[#1F2937] placeholder-[#9CA3AF] transition-all focus:border-[#ff5a00] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/15"
-            />
           </section>
         </div>
       </div>
 
       <div className="sticky bottom-0 z-20 border-t border-[#E5E7EB] bg-white/95 px-4 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1040px] gap-3">
+        <div className="mx-auto flex w-full max-w-[1120px] gap-3">
           <button
             onClick={onCancel}
             className="h-14 flex-1 rounded-2xl border border-[#E5E7EB] bg-white text-sm font-black text-[#64748B] hover:bg-[#F8FAFC] active:scale-[0.99] transition-all"
