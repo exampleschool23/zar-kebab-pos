@@ -48,21 +48,23 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
     }
   }
   const discPct = Number(order?.loyalty_discount_pct ?? order?.discount_percent ?? 0) || 0
-  const discountAmount = discPct > 0
-    ? Math.round(subtotal * discPct / 100)
-    : (Number(order?.loyalty_discount_amount) || Number(order?.discount_amount) || 0)
-  const afterDiscount = Math.max(0, subtotal - discountAmount)
   const serviceRatePct = getOrderServiceRatePct(order, fallbackServicePct)
-  const serviceFee = Math.round(afterDiscount * serviceRatePct / 100)
+  const serviceFee = Math.round(subtotal * serviceRatePct / 100)
+  const grossAmount = subtotal + serviceFee
+  const discountAmount = discPct > 0
+    ? Math.round(grossAmount * discPct / 100)
+    : (Number(order?.loyalty_discount_amount) || Number(order?.discount_amount) || 0)
+  const afterDiscount = Math.max(0, grossAmount - discountAmount)
 
   return {
     subtotal,
     discountPercent: discPct,
     discountAmount,
+    grossAmount,
     afterDiscount,
     serviceRatePct,
     serviceFee,
-    total: afterDiscount + serviceFee,
+    total: afterDiscount,
   }
 }
 
@@ -178,6 +180,7 @@ export function groupOrdersBySession(orders) {
         subtotal: Number(o.subtotal) || 0,
         service_fee: Number(o.service_fee) || 0,
         service_rate_pct: Number(o.service_rate_pct ?? o.service_percent ?? o.servicePercent) || null,
+        loyalty_discount_pct: Number(o.loyalty_discount_pct ?? o.discount_percent) || 0,
         loyalty_discount_amount: Number(o.loyalty_discount_amount) || 0,
         _orderCount: 1,
         _mergedIds: [o.id],
@@ -196,6 +199,10 @@ export function groupOrdersBySession(orders) {
     }
     session.loyalty_discount_amount =
       (session.loyalty_discount_amount || 0) + (Number(o.loyalty_discount_amount) || 0)
+    const discountPct = Number(o.loyalty_discount_pct ?? o.discount_percent)
+    if (!session.loyalty_discount_pct && Number.isFinite(discountPct)) {
+      session.loyalty_discount_pct = discountPct
+    }
     session._mergedIds = [...(session._mergedIds || []), o.id]
     session._orderCount += 1
 

@@ -249,22 +249,20 @@ export async function writeToSupabase(action, state) {
 
       if (unpaidOrders?.length) {
         const combinedSubtotal   = unpaidOrders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0)
-        const combinedAfterDisc  = combinedSubtotal * (1 - discPct / 100)
-        // Derive service rate from what CashierBill computed; fall back to settings.
-        const serviceRate = combinedAfterDisc > 0 && loyalty?.service_fee
-          ? loyalty.service_fee / combinedAfterDisc
+        const serviceRate = Number.isFinite(Number(loyalty?.service_rate_pct))
+          ? Number(loyalty.service_rate_pct) / 100
           : serviceRateFromSettings(state.settings)
 
         for (const o of unpaidOrders) {
           const sub     = Number(o.subtotal) || 0
-          const discAmt = Math.round(sub * discPct / 100)
-          const afterDisc = sub - discAmt
-          const svcFee  = Math.round(afterDisc * serviceRate)
+          const svcFee  = Math.round(sub * serviceRate)
+          const grossAmount = sub + svcFee
+          const discAmt = Math.round(grossAmount * discPct / 100)
           await supabase.from('orders').update({
             status:         'paid',
             payment_status: 'paid',
             paid_at:        paidAt,
-            total:          afterDisc + svcFee,
+            total:          Math.max(0, grossAmount - discAmt),
             service_fee:    svcFee,
             service_rate_pct: Math.round(serviceRate * 100),
             ...(payment_method ? { payment_method }                              : {}),

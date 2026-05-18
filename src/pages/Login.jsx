@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight, Eye, EyeOff, Leaf, Loader2, Lock,
@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../store/AppContext'
 import { t } from '../lib/i18n'
+import { getBrandLogo } from '../lib/brandLogo'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 
 const HERO_IMAGE =
@@ -45,92 +46,17 @@ function GoogleIcon() {
 }
 
 function BrandMark({ compact = false, lang = 'en', showTagline = false }) {
-  const uid = useId().replace(/:/g, '')
-  const goldId = `logoGold-${uid}`
-  const glowId = `logoGlow-${uid}`
-
   return (
-    <div className={`flex flex-col items-center text-center ${compact ? 'w-[132px]' : 'w-[310px]'}`}>
-      <svg
-        viewBox="0 0 360 230"
-        className="h-auto w-full drop-shadow-[0_14px_26px_rgba(212,175,55,0.2)]"
-        role="img"
-        aria-label="Zar Kebab"
-      >
-        <defs>
-          <linearGradient id={goldId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#F7D778" />
-            <stop offset="42%" stopColor="#D4AF37" />
-            <stop offset="72%" stopColor="#A8711F" />
-            <stop offset="100%" stopColor="#F0C866" />
-          </linearGradient>
-          <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2.2" floodColor="#000000" floodOpacity="0.42" />
-          </filter>
-        </defs>
-
-        <g fill="none" stroke={`url(#${goldId})`} strokeLinecap="round" strokeLinejoin="round" filter={`url(#${glowId})`}>
-          <path d="M76 82 C76 48 116 45 128 32 C144 18 159 6 180 0 C201 6 216 18 232 32 C244 45 284 48 284 82" strokeWidth="6" />
-          <path d="M98 82 C102 58 132 57 144 43 C156 31 166 22 180 17 C194 22 204 31 216 43 C228 57 258 58 262 82" strokeWidth="3" opacity="0.9" />
-          <path d="M180 74 C160 57 177 38 180 25 C191 43 209 55 180 74Z" fill={`url(#${goldId})`} strokeWidth="2" />
-          <path d="M164 74 C151 61 160 47 164 38 C173 51 184 62 164 74Z" fill={`url(#${goldId})`} strokeWidth="1.5" opacity="0.84" />
-          <path d="M196 74 C209 61 200 47 196 38 C187 51 176 62 196 74Z" fill={`url(#${goldId})`} strokeWidth="1.5" opacity="0.84" />
-          <path d="M34 98 H326" strokeWidth="6" />
-          <path d="M18 98 L34 87 L50 98 L34 109 Z" fill={`url(#${goldId})`} strokeWidth="4" />
-          <path d="M326 98 L346 88 L342 98 L346 108 Z" fill={`url(#${goldId})`} strokeWidth="4" />
-        </g>
-
-        <g filter={`url(#${glowId})`}>
-          {[0, 1, 2, 3, 4, 5].map((idx) => (
-            <rect
-              key={idx}
-              x={105 + idx * 25}
-              y={82 + (idx % 2) * 2}
-              width="29"
-              height="31"
-              rx="11"
-              transform={`rotate(${idx % 2 === 0 ? -8 : 8} ${119 + idx * 25} 98)`}
-              fill={idx % 2 === 0 ? '#C1772E' : '#F0C866'}
-              stroke="#6B3D15"
-              strokeWidth="3"
-            />
-          ))}
-        </g>
-
-        <text
-          x="180"
-          y="164"
-          textAnchor="middle"
-          fill={`url(#${goldId})`}
-          fontFamily="Georgia, Times New Roman, serif"
-          fontSize="76"
-          fontWeight="700"
-          letterSpacing="10"
-          filter={`url(#${glowId})`}
-        >
-          ZAR
-        </text>
-        <text
-          x="180"
-          y="203"
-          textAnchor="middle"
-          fill={`url(#${goldId})`}
-          fontFamily="Georgia, Times New Roman, serif"
-          fontSize="31"
-          fontWeight="700"
-          letterSpacing="14"
-          filter={`url(#${glowId})`}
-        >
-          KEBAB
-        </text>
-        <g fill={`url(#${goldId})`} opacity="0.95">
-          <rect x="55" y="188" width="10" height="10" transform="rotate(45 60 193)" />
-          <rect x="295" y="188" width="10" height="10" transform="rotate(45 300 193)" />
-          <path d="M128 219 C150 229 210 229 232 219" stroke={`url(#${goldId})`} strokeWidth="3" fill="none" />
-        </g>
-      </svg>
+    <div className={`flex flex-col items-center text-center ${compact ? 'w-[112px]' : 'w-[220px] sm:w-[250px]'}`}>
+      <img
+        src={getBrandLogo(lang)}
+        alt="Zar Kebab"
+        className="h-auto w-full object-contain drop-shadow-[0_14px_26px_rgba(212,175,55,0.24)]"
+        loading="eager"
+        decoding="async"
+      />
       {showTagline && (
-        <p className={`${compact ? 'mt-1 text-[9px]' : 'mt-4 text-sm'} font-black uppercase tracking-[0.28em] text-[#D4AF37]`}>
+        <p className={`${compact ? 'mt-0 text-[9px]' : 'mt-1 text-xs'} font-black uppercase tracking-[0.28em] text-[#D4AF37]`}>
           {t(lang, 'premiumLoginTagline')}
         </p>
       )}

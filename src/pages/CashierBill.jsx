@@ -120,6 +120,7 @@ export default function CashierBill() {
           loyalty_discount_amount: loyaltyAmt,
           discounted_subtotal:     afterDiscount,
           service_fee:             serviceFee,
+          service_rate_pct:         serviceRatePct,
           total,
         },
       },
@@ -381,16 +382,16 @@ export default function CashierBill() {
                     <span>{lbl.subtotal}</span>
                     <span>{formatCurrency(subtotal)}</span>
                   </div>
+                  <div className="flex justify-between text-sm text-[#6B7280]">
+                    <span>{lbl.service}</span>
+                    <span>{formatCurrency(serviceFee)}</span>
+                  </div>
                   {loyaltyPct > 0 && (
                     <div className="flex justify-between text-sm text-[#16A34A] font-medium">
                       <span>{lbl.loyalty} ({loyaltyPct}%)</span>
                       <span>− {formatCurrency(loyaltyAmt)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-sm text-[#6B7280]">
-                    <span>{lbl.service}</span>
-                    <span>{formatCurrency(serviceFee)}</span>
-                  </div>
                   <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200">
                     <span className="font-black text-[#1F2937]">{lbl.totalAmt}</span>
                     <span className="font-black text-2xl text-[#ff5a00]">{formatCurrency(total)}</span>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { LogIn, Search, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
+import { getBrandLogo } from '../lib/brandLogo'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -169,11 +170,12 @@ export default function PublicMenu() {
     <div className="min-h-screen bg-[#FAF6EE] text-[#1F2937]">
       <header className="sticky top-0 z-20 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-4 py-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ff5a00] text-white shadow-sm shadow-orange-200">
-            <UtensilsCrossed size={20} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-black uppercase tracking-tight">Zar Kebab</h1>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <img
+              src={getBrandLogo(lang)}
+              alt="Zar Kebab"
+              className="h-12 w-auto max-w-[150px] object-contain"
+            />
             <p className="text-xs font-bold uppercase tracking-wider text-[#ff5a00]">
               {lang === 'uz' ? 'Menyu' : lang === 'ru' ? 'Меню' : 'Menu'}
             </p>

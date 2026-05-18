@@ -2,6 +2,7 @@ import React, { useMemo, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { getItemName } from '../lib/i18n'
+import { getBrandLogo } from '../lib/brandLogo'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { getGroupedOrderItems, getOrderItemProductId, getOrderPaymentSummary } from '../lib/analytics'
 
@@ -198,7 +199,7 @@ function handlePrintReceipt(delay = 300) {
 
 // ── ReceiptPaper ──────────────────────────────────────────────────────────────
 
-function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyPct, loyaltyAmt, total, labels, restaurantName, receiptFooter }) {
+function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyPct, loyaltyAmt, total, labels, lang, restaurantName, receiptFooter }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=https://instagram.com/zarkebab&size=220x220&margin=6&color=111111&bgcolor=ffffff`
 
   return (
@@ -218,16 +219,17 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
 
       {/* ── Brand header ─────────────────────────────────────────────────── */}
       <div style={{ textAlign: 'center', marginBottom: '4px' }}>
-        <div style={{
-          fontFamily: POPPINS,
-          fontSize: '32px',
-          fontWeight: 800,
-          letterSpacing: '-0.5px',
-          lineHeight: 1.1,
-          color: '#111',
-        }}>
-          {restaurantName}
-        </div>
+        <img
+          src={getBrandLogo(lang)}
+          alt={restaurantName}
+          style={{
+            display: 'block',
+            width: '128px',
+            maxWidth: '70%',
+            height: 'auto',
+            margin: '0 auto 6px',
+          }}
+        />
         <div style={{
           fontFamily: INTER,
           fontSize: '12px',
@@ -236,7 +238,7 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
           marginTop: '5px',
           letterSpacing: '0.1px',
         }}>
-          {restaurantName} — {labels.slogan}
+          {labels.slogan}
         </div>
       </div>
 
@@ -314,10 +316,10 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4px' }}>
         <tbody>
           <TotalRow label={labels.orderAmount}              value={fmtUZS(subtotal)}   />
+          <TotalRow label={labels.servicePct(serviceRate)}  value={fmtUZS(serviceFee)} />
           {loyaltyPct > 0 && (
             <TotalRow label={labels.loyaltyPct(loyaltyPct)} value={`− ${fmtUZS(loyaltyAmt)}`} color="#16a34a" />
           )}
-          <TotalRow label={labels.servicePct(serviceRate)}  value={fmtUZS(serviceFee)} />
         </tbody>
       </table>
 
@@ -547,6 +549,7 @@ export function TableReceipt() {
         {...data}
         dateStr={formatDate(data.createdAt)}
         labels={labels}
+        lang={lang}
         restaurantName={settings.restaurantName}
         receiptFooter={settings.receiptFooter}
       />
@@ -626,6 +629,7 @@ export default function Receipt() {
         {...data}
         dateStr={formatDate(data.createdAt)}
         labels={labels}
+        lang={lang}
         restaurantName={settings.restaurantName}
         receiptFooter={settings.receiptFooter}
       />

@@ -50,6 +50,56 @@ test('receipt total equals order details total', () => {
   assert.equal(receiptSummary.total, orderDetailsSummary.total)
 })
 
+test('loyalty discount is applied after subtotal plus unchanged service for cashier receipt reports and dashboard', () => {
+  const rows = [item({ id: 'loyalty-row', menu_item_id: 'mixed', quantity: 1, price: 214000 })]
+  const order = paidOrder({
+    id: 'loyalty-5',
+    table_id: 'table-10',
+    items: rows,
+    service_rate_pct: 20,
+    loyalty_discount_pct: 5,
+  })
+
+  const cashier = pagePaymentSummary(order, 20)
+  const receipt = pagePaymentSummary({ ...order, items: getGroupedOrderItems(rows) }, 20)
+  const reportsRevenue = paidRevenue([order])
+  const dashboardRevenue = paidRevenue(groupOrdersBySession([order]))
+
+  assert.equal(cashier.subtotal, 214000)
+  assert.equal(cashier.serviceFee, 42800)
+  assert.equal(cashier.grossAmount, 256800)
+  assert.equal(cashier.discountAmount, 12840)
+  assert.equal(cashier.total, 243960)
+  assert.deepEqual(receipt, cashier)
+  assert.equal(reportsRevenue, 243960)
+  assert.equal(dashboardRevenue, reportsRevenue)
+})
+
+test('service and loyalty discount combinations use the shared payment rule', () => {
+  const rows = [item({ id: 'combo-row', menu_item_id: 'combo', quantity: 1, price: 100000 })]
+
+  const both = getOrderPaymentSummary({ service_rate_pct: 20, loyalty_discount_pct: 10 }, rows, 20)
+  assert.equal(both.serviceFee, 20000)
+  assert.equal(both.grossAmount, 120000)
+  assert.equal(both.discountAmount, 12000)
+  assert.equal(both.total, 108000)
+
+  const discountOnly = getOrderPaymentSummary({ service_rate_pct: 0, loyalty_discount_pct: 10 }, rows, 20)
+  assert.equal(discountOnly.serviceFee, 0)
+  assert.equal(discountOnly.discountAmount, 10000)
+  assert.equal(discountOnly.total, 90000)
+
+  const serviceOnly = getOrderPaymentSummary({ service_rate_pct: 20 }, rows, 20)
+  assert.equal(serviceOnly.serviceFee, 20000)
+  assert.equal(serviceOnly.discountAmount, 0)
+  assert.equal(serviceOnly.total, 120000)
+
+  const neither = getOrderPaymentSummary({ service_rate_pct: 0 }, rows, 20)
+  assert.equal(neither.serviceFee, 0)
+  assert.equal(neither.discountAmount, 0)
+  assert.equal(neither.total, 100000)
+})
+
 test('items with different menu_item_id but similar localized names are not merged', () => {
   const items = [
     { id: '1', menu_item_id: 'lula-en', name: 'Lula kebab', quantity: 1, price: 24000 },
@@ -100,7 +150,13 @@ function item(overrides) {
 function paidOrder(overrides) {
   const items = overrides.items || []
   const serviceRatePct = overrides.service_rate_pct ?? 17
-  const summary = getOrderPaymentSummary({ service_rate_pct: serviceRatePct }, items, serviceRatePct)
+  const summary = getOrderPaymentSummary({
+    service_rate_pct: serviceRatePct,
+    loyalty_discount_pct: overrides.loyalty_discount_pct,
+    discount_percent: overrides.discount_percent,
+    loyalty_discount_amount: overrides.loyalty_discount_amount,
+    discount_amount: overrides.discount_amount,
+  }, items, serviceRatePct)
   return {
     id: overrides.id,
     table_id: overrides.table_id,
@@ -113,6 +169,8 @@ function paidOrder(overrides) {
     subtotal: overrides.subtotal ?? summary.subtotal,
     service_fee: overrides.service_fee ?? summary.serviceFee,
     service_rate_pct: serviceRatePct,
+    loyalty_discount_pct: overrides.loyalty_discount_pct,
+    loyalty_discount_amount: overrides.loyalty_discount_amount ?? summary.discountAmount,
     total: overrides.total ?? summary.total,
     ...overrides,
   }
@@ -140,6 +198,14 @@ function activeOrder(overrides) {
 
 function paidRevenue(orders) {
   return orders.filter(isPaidOrder).reduce((sum, order) => sum + getOrderTotal(order), 0)
+}
+
+function pagePaymentSummary(order, fallbackServicePct = 20) {
+  return getOrderPaymentSummary(order, getOrderItemsForTest(order), fallbackServicePct)
+}
+
+function getOrderItemsForTest(order) {
+  return order.items || order.order_items || []
 }
 
 test('same table multiple order rounds include all additions and merge repeated plain items', () => {
