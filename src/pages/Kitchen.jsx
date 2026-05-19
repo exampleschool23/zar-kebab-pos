@@ -12,7 +12,7 @@ import UnifiedSidebar from '../components/UnifiedSidebar'
 const STATUS_BADGE = {
   new:       'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE]',
   preparing: 'bg-[#FFF1E8] text-[#FF5A00] border border-[#FDBA74]',
-  ready:     'bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0]',
+  ready:     'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE]',
   served:    'bg-gray-100 text-gray-500 border border-gray-200',
 }
 
@@ -274,17 +274,17 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
             disabled={pending}
             className={`w-full py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
               pending
-                ? 'bg-green-200 text-green-500 cursor-not-allowed border border-green-200'
-                : 'bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0] hover:bg-[#16A34A] hover:text-white'
+                ? 'bg-blue-100 text-blue-400 cursor-not-allowed border border-blue-200'
+                : 'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE] hover:bg-[#2563EB] hover:text-white'
             }`}
           >
-            {pending ? <Spinner color="text-green-500" /> : null}
+            {pending ? <Spinner color="text-blue-500" /> : null}
             {statusLabel('ready', lang)}
           </button>
         )}
 
         {isReady && (
-          <div className={`flex items-center gap-1.5 text-[#16A34A] text-sm font-black mt-0.5 transition-all duration-300 ${flash ? 'scale-105' : ''}`}>
+          <div className={`flex items-center gap-1.5 text-[#2563EB] text-sm font-black mt-0.5 transition-all duration-300 ${flash ? 'scale-105' : ''}`}>
             <CheckCircle2 size={15} />
             {statusLabel('ready', lang)}
           </div>
@@ -344,11 +344,11 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
 
   return (
     <div className={`bg-white rounded-2xl border overflow-hidden flex flex-col shadow-sm ${
-      allReady ? 'border-[#BBF7D0]' : 'border-[#E5E7EB]'
+      allReady ? 'border-[#BFDBFE]' : 'border-[#E5E7EB]'
     }`}>
       {/* Card header */}
       <div className={`px-4 py-3 border-b ${
-        allReady ? 'bg-[#F0FDF4] border-[#BBF7D0]' : 'bg-gray-50 border-[#F3F4F6]'
+        allReady ? 'bg-[#EFF6FF] border-[#BFDBFE]' : 'bg-gray-50 border-[#F3F4F6]'
       }`}>
         <div className="mb-2">
           <h3 className="font-black text-[#1F2937] text-xl leading-tight">{order.table_name}</h3>
@@ -376,7 +376,7 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
             </span>
           )}
           {readyCount > 0 && (
-            <span className="px-2.5 py-1 bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0] text-xs font-bold rounded-full">
+            <span className="px-2.5 py-1 bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE] text-xs font-bold rounded-full">
               {readyCount} {statusLabel('ready', lang)}
             </span>
           )}
@@ -406,12 +406,12 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
               disabled={bulkBusy}
               className={`flex-1 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.97] ${
                 bulkBusy
-                  ? 'bg-green-100 text-green-400 cursor-not-allowed'
-                  : 'bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0] hover:bg-[#16A34A] hover:text-white'
+                  ? 'bg-blue-100 text-blue-400 cursor-not-allowed'
+                  : 'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE] hover:bg-[#2563EB] hover:text-white'
               }`}
             >
               {bulkBusy
-                ? <Loader2 size={13} className="animate-spin text-green-400" />
+                ? <Loader2 size={13} className="animate-spin text-blue-400" />
                 : <CheckCircle2 size={13} />}
               {markAllLabel.ready}
             </button>
@@ -477,7 +477,7 @@ function BottomBar({ orders, lang }) {
   const legend = [
     { cls: 'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE]', label: statusLabel('new', lang) },
     { cls: 'bg-[#FFF1E8] text-[#FF5A00] border border-[#FDBA74]', label: statusLabel('preparing', lang) },
-    { cls: 'bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0]', label: statusLabel('ready', lang) },
+    { cls: 'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE]', label: statusLabel('ready', lang) },
   ]
 
   const oldestAlert = lang === 'uz'

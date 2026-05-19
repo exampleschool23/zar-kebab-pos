@@ -22,13 +22,13 @@ calculated as (
 update public.orders o
 set
   subtotal = c.subtotal,
-  discounted_subtotal = greatest(c.subtotal - c.discount_amount, 0),
-  total = greatest(c.subtotal - c.discount_amount, 0) + c.service_fee,
+  discounted_subtotal = greatest(c.subtotal + c.service_fee - c.discount_amount, 0),
+  total = greatest(c.subtotal + c.service_fee - c.discount_amount, 0),
   updated_at = now()
 from calculated c
 where o.id = c.id
   and (
     o.subtotal is distinct from c.subtotal
-    or o.discounted_subtotal is distinct from greatest(c.subtotal - c.discount_amount, 0)
-    or o.total is distinct from greatest(c.subtotal - c.discount_amount, 0) + c.service_fee
+    or o.discounted_subtotal is distinct from greatest(c.subtotal + c.service_fee - c.discount_amount, 0)
+    or o.total is distinct from greatest(c.subtotal + c.service_fee - c.discount_amount, 0)
   );

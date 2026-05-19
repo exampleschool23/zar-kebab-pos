@@ -12,8 +12,10 @@ import { formatCurrency } from '../lib/formatCurrency'
 import {
   getOrderDate,
   getOrderItems,
+  getOrderPaymentBreakdown,
   getOrderTotal,
   groupOrdersBySession,
+  isActiveNeedsBillOrder,
   isPaidOrder,
   toLocalDateStr,
 } from '../lib/analytics'
@@ -200,6 +202,31 @@ function localDateStr(d) {
 function todayStr()     { return localDateStr(new Date()) }
 function yesterdayStr() { const d = new Date(); d.setDate(d.getDate() - 1); return localDateStr(d) }
 
+function isOrderInPeriod(order, period) {
+  const ds = localDateStr(getOrderDate(order))
+  if (!ds) return false
+  const now = new Date()
+
+  if (period === 'today') return ds === todayStr()
+
+  if (period === '7days') {
+    const start = new Date()
+    start.setDate(start.getDate() - 6)
+    return ds >= localDateStr(start) && ds <= todayStr()
+  }
+
+  if (period === 'month') {
+    const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-`
+    return ds.startsWith(prefix)
+  }
+
+  if (period === 'year') {
+    return ds.startsWith(`${now.getFullYear()}-`)
+  }
+
+  return true
+}
+
 function elapsedSince(iso) {
   if (!iso) return ''
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
@@ -247,7 +274,7 @@ function OrderBadge({ status, lang }) {
     new:             { cls: 'bg-blue-50 text-blue-600 border-blue-100',      label: l.new       },
     preparing:       { cls: 'bg-orange-50 text-[#ff5a00] border-orange-100', label: l.preparing },
     needs_bill:      { cls: 'bg-red-50 text-[#DC2626] border-red-100',       label: l.needsBill },
-    ready:           { cls: 'bg-green-50 text-[#16A34A] border-green-100',   label: l.ready     },
+    ready:           { cls: 'bg-blue-50 text-blue-700 border-blue-200',      label: l.ready     },
     paid:            { cls: 'bg-gray-100 text-[#6B7280] border-gray-200',    label: l.paid      },
     cancelled:       { cls: 'bg-gray-100 text-[#6B7280] border-gray-200',    label: l.cancelled },
   }
@@ -424,6 +451,11 @@ export default function AdminDashboard() {
     [state.orders]
   )
 
+  const periodPaidOrders = useMemo(
+    () => paidOrders.filter(order => isOrderInPeriod(order, period)),
+    [paidOrders, period]
+  )
+
   const menuItemMap = useMemo(
     () => Object.fromEntries(state.menuItems.map(m => [m.id, m])),
     [state.menuItems]
@@ -581,13 +613,17 @@ export default function AdminDashboard() {
 
   // ── Payment methods breakdown ─────────────────────────────────────────────
   const paymentMethods = useMemo(() => {
-    const KNOWN = { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr }
+    const KNOWN = { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr, loyalty_card: 'Loyalty' }
     const map = {}
-    paidOrders.forEach(o => {
-      const raw    = (o.payment_method || '').toLowerCase().trim()
-      const key    = ['cash','card','terminal','qr'].includes(raw) ? raw : 'unknown'
-      const amount = getOrderTotal(o)
-      map[key] = (map[key] || 0) + amount
+    periodPaidOrders.forEach(o => {
+      const breakdown = getOrderPaymentBreakdown(o)
+      const rows = breakdown.length > 0 ? breakdown : [{ method: o.payment_method, amount: getOrderTotal(o) }]
+      rows.forEach(row => {
+        const raw    = (row.method || '').toLowerCase().trim()
+        const key    = ['cash','card','terminal','qr','loyalty_card'].includes(raw) ? raw : 'unknown'
+        const amount = Number(row.amount) || 0
+        map[key] = (map[key] || 0) + amount
+      })
     })
     const total = Object.values(map).reduce((s, v) => s + v, 0)
     return Object.entries(map)
@@ -599,7 +635,7 @@ export default function AdminDashboard() {
         color:  PAYMENT_COLORS[key] || PAYMENT_COLORS.unknown,
       }))
       .sort((a, b) => b.amount - a.amount)
-  }, [paidOrders, l])
+  }, [periodPaidOrders, l])
 
   // ── Sales by category ─────────────────────────────────────────────────────
   const salesByCategory = useMemo(() => {
@@ -662,16 +698,19 @@ export default function AdminDashboard() {
   // ── Recent orders: action-needed bills first, paid history second ─────────
   const recentOrderGroups = useMemo(() => {
     const grouped = groupOrdersBySession(state.orders)
-      .filter(o => o.status === 'needs_bill' || isPaidOrder(o))
+      .filter(o => {
+        if (isPaidOrder(o)) return true
+        return isActiveNeedsBillOrder(o, state.tables)
+      })
       .sort((a, b) => new Date(getOrderDate(b) || b.created_at) - new Date(getOrderDate(a) || a.created_at))
 
-    const needsBill = grouped.filter(o => o.status === 'needs_bill')
-    const paid = grouped.filter(o => o.status !== 'needs_bill' && isPaidOrder(o))
+    const needsBill = grouped.filter(o => isActiveNeedsBillOrder(o, state.tables))
+    const paid = grouped.filter(isPaidOrder)
     const visibleNeedsBill = needsBill.slice(0, 8)
     const visiblePaid = paid.slice(0, Math.max(0, 8 - visibleNeedsBill.length))
 
     return { needsBill: visibleNeedsBill, paid: visiblePaid, needsBillTotal: needsBill.length }
-  }, [state.orders])
+  }, [state.orders, state.tables])
 
   const recentOrdersCount = recentOrderGroups.needsBill.length + recentOrderGroups.paid.length
 

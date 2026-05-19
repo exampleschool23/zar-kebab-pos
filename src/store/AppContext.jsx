@@ -1,5 +1,11 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react'
 import { loadPOSData, writeToSupabase, subscribeToRealtime } from '../lib/db'
+import {
+  allocateSplitPaymentsToOrders,
+  getOrderPaymentFields,
+  getPaymentMethodSummary,
+  normalizeSplitPayments,
+} from '../lib/analytics'
 
 const AppContext = createContext(null)
 
@@ -35,6 +41,11 @@ function normalizeOrderType(value) {
   return raw.includes('take') || raw.includes('away') ? 'take_away' : 'dine_in'
 }
 
+function serviceRatePctFromSettings(settings) {
+  const pct = Number(settings?.serviceRate)
+  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 20
+}
+
 function makeLocalId(prefix) {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -42,6 +53,23 @@ function makeLocalId(prefix) {
     const v = c === 'x' ? r : (r & 0x3 | 0x8)
     return v.toString(16)
   })
+}
+
+function recalcOrderTotals(order, settings) {
+  const serviceRatePct = Number.isFinite(Number(order?.service_rate_pct))
+    ? Number(order.service_rate_pct)
+    : serviceRatePctFromSettings(settings)
+  const paymentFields = getOrderPaymentFields(
+    { ...order, service_rate_pct: serviceRatePct },
+    order?.items || [],
+    serviceRatePct
+  )
+  return { ...order, ...paymentFields }
+}
+
+function getQuickSortOrder(item) {
+  const value = Number(item?.quick_item_sort_order ?? item?.quickItemSortOrder ?? item?.sort_order ?? 9999)
+  return Number.isFinite(value) ? value : 9999
 }
 
 const initialState = {
@@ -140,24 +168,26 @@ function reducer(state, action) {
       const orderId     = action._orderId || ('o' + Date.now())
       const cartItems   = action._items || state.cart.map(i => ({ ...i, id: makeLocalId('oi'), status: 'new' }))
       const addedSubtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0)
-      const svcRate     = (state.settings?.serviceRate ?? 20) / 100
       const activeOrder = state.orders.find(o =>
         o.id === orderId ||
         (o.table_id === state.currentTableId && o.payment_status !== 'paid')
       )
       const subtotal    = (Number(activeOrder?.subtotal) || 0) + addedSubtotal
-      const service_fee = Math.round(subtotal * svcRate)
-      const service_rate_pct = Math.round(svcRate * 100)
+      const serviceRatePct = Number.isFinite(Number(activeOrder?.service_rate_pct))
+        ? Number(activeOrder.service_rate_pct)
+        : serviceRatePctFromSettings(state.settings)
+      const paymentFields = getOrderPaymentFields(
+        { subtotal, service_rate_pct: serviceRatePct },
+        [],
+        serviceRatePct
+      )
       const nextOrders = activeOrder
         ? state.orders.map(o => o.id === activeOrder.id
             ? {
                 ...o,
                 status: 'sent_to_kitchen',
                 items: [...(o.items || []), ...cartItems],
-                subtotal,
-                service_fee,
-                service_rate_pct,
-                total: subtotal + service_fee,
+                ...paymentFields,
               }
             : o
           )
@@ -169,10 +199,7 @@ function reducer(state, action) {
             status: 'sent_to_kitchen',
             payment_status: 'unpaid',
             items: cartItems,
-            subtotal,
-            service_fee,
-            service_rate_pct,
-            total: subtotal + service_fee,
+            ...paymentFields,
             created_at: new Date().toISOString(),
           }]
       const updatedTables = state.tables.map(t =>
@@ -219,18 +246,118 @@ function reducer(state, action) {
         orders: state.orders.map(o => o.table_id === action.payload ? { ...o, status: 'needs_bill' } : o),
       }
 
+    case 'ADD_QUICK_ITEM_TO_ORDER': {
+      const { tableId, item } = action.payload
+      const activeOrder = state.orders.find(o => o.table_id === tableId && o.payment_status !== 'paid')
+      if (!activeOrder || !item) return state
+
+      const existing = (activeOrder.items || []).find(i =>
+        i.menu_item_id === item.id &&
+        !i.notes &&
+        (i.status === 'served' || i.status === 'new' || i.status === 'ready' || i.status === 'preparing')
+      )
+      const nextItems = existing
+        ? activeOrder.items.map(i => i.id === existing.id ? { ...i, quantity: (Number(i.quantity) || 1) + 1 } : i)
+        : [
+            ...(activeOrder.items || []),
+            {
+              id: action._itemId || makeLocalId('oi'),
+              menu_item_id: item.id,
+              name: item.name,
+              price: Number(item.price) || 0,
+              quantity: 1,
+              notes: '',
+              status: item.sendToKitchen || item.send_to_kitchen ? 'new' : 'served',
+              order_type: item.order_type || 'dine_in',
+            },
+          ]
+
+      return {
+        ...state,
+        orders: state.orders.map(o => o.id === activeOrder.id
+          ? recalcOrderTotals({ ...o, items: nextItems }, state.settings)
+          : o
+        ),
+      }
+    }
+
+    case 'UPDATE_BILL_ITEM_QTY': {
+      const { tableId, orderItemId, menuItemId, qty } = action.payload
+      const nextQty = Math.max(0, Number(qty) || 0)
+
+      return {
+        ...state,
+        orders: state.orders.map(o => {
+          if (o.table_id !== tableId || o.payment_status === 'paid') return o
+          const hasItem = (o.items || []).some(i => orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
+          if (!hasItem) return o
+          const nextItems = nextQty <= 0
+            ? (o.items || []).filter(i => orderItemId ? i.id !== orderItemId : i.menu_item_id !== menuItemId)
+            : (o.items || []).map(i => (orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
+                ? { ...i, quantity: nextQty }
+                : i
+              )
+          return recalcOrderTotals({ ...o, items: nextItems }, state.settings)
+        }),
+      }
+    }
+
     case 'MARK_ORDER_PAID': {
       const tableId        = typeof action.payload === 'string' ? action.payload : action.payload.tableId
       const loyalty        = typeof action.payload === 'object' ? action.payload.loyalty : null
       const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
+      const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
+      const paidAt = new Date().toISOString()
+      const activeOrderSummaries = state.orders
+        .filter(o => o.table_id === tableId && o.payment_status !== 'paid')
+        .map(o => {
+          const serviceRatePct = Number.isFinite(Number(loyalty?.service_rate_pct))
+            ? Number(loyalty.service_rate_pct)
+            : Number.isFinite(Number(o.service_rate_pct))
+              ? Number(o.service_rate_pct)
+              : serviceRatePctFromSettings(state.settings)
+          const fields = getOrderPaymentFields(
+            { ...o, ...(loyalty || {}), service_rate_pct: serviceRatePct },
+            o.items || [],
+            serviceRatePct
+          )
+          return { id: o.id, fields, total: fields.total }
+        })
+      const totalDue = activeOrderSummaries.reduce((sum, row) => sum + row.total, 0)
+      const payments = normalizeSplitPayments(
+        requestedPayments || [{ method: payment_method || 'cash', amount: totalDue }],
+        totalDue
+      )
+      const finalPaymentMethod = getPaymentMethodSummary(payments, payment_method)
+      const paymentAllocations = new Map(activeOrderSummaries.map(row => [row.id, []]))
+      allocateSplitPaymentsToOrders(activeOrderSummaries, payments).forEach(row => {
+        paymentAllocations.get(row.order_id)?.push({ method: row.method, amount: row.amount })
+      })
       return {
         ...state,
         tables: state.tables.map(t => t.id === tableId ? { ...t, status: 'available' } : t),
-        orders: state.orders.map(o =>
-          o.table_id === tableId && o.payment_status !== 'paid'
-            ? { ...o, status: 'paid', payment_status: 'paid', payment_method, ...(loyalty || {}) }
-            : o
-        ),
+        orders: state.orders.map(o => {
+          if (o.table_id !== tableId || o.payment_status === 'paid') return o
+          const serviceRatePct = Number.isFinite(Number(loyalty?.service_rate_pct))
+            ? Number(loyalty.service_rate_pct)
+            : Number.isFinite(Number(o.service_rate_pct))
+              ? Number(o.service_rate_pct)
+              : serviceRatePctFromSettings(state.settings)
+          const paymentFields = activeOrderSummaries.find(row => row.id === o.id)?.fields || getOrderPaymentFields(
+            { ...o, ...(loyalty || {}), service_rate_pct: serviceRatePct },
+            o.items || [],
+            serviceRatePct
+          )
+          return {
+            ...o,
+            status: 'paid',
+            payment_status: 'paid',
+            paid_at: paidAt,
+            payment_method: finalPaymentMethod,
+            payments: paymentAllocations.get(o.id) || [],
+            ...paymentFields,
+          }
+        }),
       }
     }
 
@@ -270,6 +397,23 @@ function reducer(state, action) {
         menuItems: state.menuItems.map(i => {
           if (i.id === idA) return { ...i, sort_order: orderB }
           if (i.id === idB) return { ...i, sort_order: orderA }
+          return i
+        }),
+      }
+    }
+
+    case 'REORDER_QUICK_ITEM': {
+      const { idA, idB } = action.payload
+      const itemA = state.menuItems.find(i => i.id === idA)
+      const itemB = state.menuItems.find(i => i.id === idB)
+      if (!itemA || !itemB) return state
+      const orderA = getQuickSortOrder(itemA)
+      const orderB = getQuickSortOrder(itemB)
+      return {
+        ...state,
+        menuItems: state.menuItems.map(i => {
+          if (i.id === idA) return { ...i, quick_item_sort_order: orderB }
+          if (i.id === idB) return { ...i, quick_item_sort_order: orderA }
           return i
         }),
       }
@@ -335,6 +479,11 @@ export function AppProvider({ children }) {
             order_type: normalizeOrderType(action.payload?.orderType),
           })),
         }
+      : action.type === 'ADD_QUICK_ITEM_TO_ORDER'
+        ? {
+            ...action,
+            _itemId: makeLocalId('oi'),
+          }
       : action
 
     if (enriched.type === 'UPDATE_ORDER_ITEM_STATUS') {
@@ -363,11 +512,12 @@ export function AppProvider({ children }) {
     let unsubscribe = () => {}
 
     loadPOSData()
-      .then(({ tables, categories, menuItems, orders }) => {
+      .then(({ tables, categories, menuItems, orders, settings }) => {
         dispatch({ type: 'SET_TABLES',     payload: tables })
         dispatch({ type: 'SET_CATEGORIES', payload: categories })
         dispatch({ type: 'SET_MENU_ITEMS', payload: menuItems })
         dispatch({ type: 'SET_ORDERS',     payload: orders })
+        if (settings) dispatch({ type: 'SET_SETTINGS', payload: settings })
         dispatch({ type: 'SET_LOADED' })
         unsubscribe = subscribeToRealtime(dispatch)
       })

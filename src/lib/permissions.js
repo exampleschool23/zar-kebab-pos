@@ -10,6 +10,7 @@ export const PAGE_ACCESS = {
   cashier:   ['owner', 'admin', 'cashier'],
   team:      ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder'],
   reports:   ['owner', 'admin', 'cashier', 'stakeholder'],
+  audit:     ['owner', 'admin'],
   settings:  ['owner', 'admin'],
 }
 
@@ -22,6 +23,9 @@ export function canManageSettings(role)    { return ['owner', 'admin'].includes(
 export function canUseKitchenActions(role) { return ['owner', 'admin', 'kitchen'].includes(role) }
 export function canUseCashierActions(role) { return ['owner', 'admin', 'cashier'].includes(role) }
 export function isReadOnlyUser(role)       { return role === 'stakeholder' }
+export function isPublicOnlyRole(role) {
+  return ['guest', 'customer'].includes((role || 'guest').toLowerCase())
+}
 
 /**
  * Returns whether `viewerRole` can change the role/status of a user who currently has `targetRole`.

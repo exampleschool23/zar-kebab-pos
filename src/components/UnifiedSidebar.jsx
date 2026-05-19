@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   UtensilsCrossed, LayoutDashboard, Table2, BookOpen,
-  ChefHat, Receipt, Users, BarChart2, Settings, LogOut,
+  ChefHat, Receipt, Users, BarChart2, ShieldCheck, Settings, LogOut,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -60,6 +60,13 @@ const NAV = [
     roles: PAGE_ACCESS.reports,
   },
   {
+    key: 'audit',
+    icon: ShieldCheck,
+    labels: { uz: 'Audit', ru: 'Аудит', en: 'Audit' },
+    path: '/admin/audit',
+    roles: PAGE_ACCESS.audit,
+  },
+  {
     key: 'settings',
     icon: Settings,
     labels: { uz: 'Sozlamalar', ru: 'Настройки', en: 'Settings' },
@@ -87,6 +94,7 @@ function activeKey(pathname) {
   if (pathname.startsWith('/admin/menu'))     return 'menu'
   if (pathname.startsWith('/admin/users'))    return 'team'
   if (pathname.startsWith('/admin/reports'))   return 'reports'
+  if (pathname.startsWith('/admin/audit'))      return 'audit'
   if (pathname.startsWith('/admin/tables'))    return 'tables'
   if (pathname.startsWith('/admin/settings'))  return 'settings'
   if (pathname === '/admin' || pathname === '/admin/') return 'dashboard'

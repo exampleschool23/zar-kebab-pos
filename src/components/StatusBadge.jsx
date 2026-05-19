@@ -5,6 +5,7 @@ const STATUS_MAP = {
   available:  { label: 'Available',  classes: 'bg-green-50 text-green-700 border-green-200'  },
   occupied:   { label: 'Occupied',   classes: 'bg-orange-50 text-orange-700 border-orange-200' },
   needs_bill: { label: 'Needs Bill', classes: 'bg-red-50 text-red-600 border-red-200'         },
+  waiting_kitchen: { label: 'Waiting', classes: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
   // User statuses
   active:     { label: 'Active',     classes: 'bg-green-50 text-green-700 border-green-200'  },
   pending:    { label: 'Pending',    classes: 'bg-amber-50 text-amber-700 border-amber-200'  },
@@ -12,7 +13,7 @@ const STATUS_MAP = {
   // Order statuses
   new:        { label: 'New',        classes: 'bg-blue-50 text-blue-700 border-blue-200'     },
   preparing:  { label: 'Preparing',  classes: 'bg-orange-50 text-orange-700 border-orange-200' },
-  ready:      { label: 'Ready',      classes: 'bg-green-50 text-green-700 border-green-200'  },
+  ready:      { label: 'Ready',      classes: 'bg-blue-50 text-blue-700 border-blue-200'     },
   paid:       { label: 'Paid',       classes: 'bg-gray-50 text-gray-500 border-gray-200'     },
 }
 

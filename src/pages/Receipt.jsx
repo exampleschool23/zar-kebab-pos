@@ -4,7 +4,12 @@ import { useApp } from '../store/AppContext'
 import { getItemName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
 import { ArrowLeft, Printer } from 'lucide-react'
-import { getGroupedOrderItems, getOrderItemProductId, getOrderPaymentSummary } from '../lib/analytics'
+import {
+  getGroupedOrderItems,
+  getOrderItemProductId,
+  getOrderPaymentBreakdown,
+  getOrderPaymentSummary,
+} from '../lib/analytics'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -21,6 +26,7 @@ const L = {
     orderAmount: 'Buyurtma summasi',
     servicePct:  n => `Xizmat haqi ${n}%`,
     loyaltyPct:  n => `Chegirma (${n}%)`,
+    payment:     "To'lov",
     total:       "To'lovga jami",
     thanks1:     'Tashrifingiz uchun rahmat!',
     thanks2:     'Sizni yana kutib qolamiz!',
@@ -38,6 +44,7 @@ const L = {
     orderAmount: 'Сумма заказа',
     servicePct:  n => `Обслуживание ${n}%`,
     loyaltyPct:  n => `Скидка (${n}%)`,
+    payment:     'Оплата',
     total:       'Итого к оплате',
     thanks1:     'Спасибо, что выбрали ZarKebab!',
     thanks2:     'Будем рады видеть вас снова!',
@@ -55,6 +62,7 @@ const L = {
     orderAmount: 'Order amount',
     servicePct:  n => `Service ${n}%`,
     loyaltyPct:  n => `Discount (${n}%)`,
+    payment:     'Payment',
     total:       'Total to pay',
     thanks1:     'Thank you for choosing ZarKebab!',
     thanks2:     'We hope to see you again!',
@@ -99,7 +107,21 @@ function combineReceiptOrders(orders) {
     service_rate_pct: orders.find(o => o.service_rate_pct != null)?.service_rate_pct ??
       orders.find(o => o.service_percent != null)?.service_percent ??
       orders[0]?.service_rate_pct,
+    payments: orders.flatMap(o => getOrderPaymentBreakdown(o)),
   }
+}
+
+function payMethodLabel(method, lang) {
+  const labels = {
+    cash: { uz: 'Naqd', ru: 'Наличные', en: 'Cash' },
+    card: { uz: 'Karta', ru: 'Карта', en: 'Card' },
+    terminal: { uz: 'Terminal', ru: 'Терминал', en: 'Terminal' },
+    qr: { uz: 'QR Code', ru: 'QR-код', en: 'QR Code' },
+    loyalty_card: { uz: 'Loyalty', ru: 'Лояльность', en: 'Loyalty' },
+    mixed: { uz: 'Aralash', ru: 'Смешанная', en: 'Mixed' },
+    unknown: { uz: "Noma'lum", ru: 'Неизвестно', en: 'Unknown' },
+  }
+  return (labels[method] || labels.unknown)[lang] || (labels[method] || labels.unknown).en
 }
 
 // ── Shared font styles ────────────────────────────────────────────────────────
@@ -199,7 +221,7 @@ function handlePrintReceipt(delay = 300) {
 
 // ── ReceiptPaper ──────────────────────────────────────────────────────────────
 
-function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyPct, loyaltyAmt, total, labels, lang, restaurantName, receiptFooter }) {
+function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyPct, loyaltyAmt, total, payments, labels, lang, restaurantName, receiptFooter }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=https://instagram.com/zarkebab&size=220x220&margin=6&color=111111&bgcolor=ffffff`
 
   return (
@@ -320,6 +342,13 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
           {loyaltyPct > 0 && (
             <TotalRow label={labels.loyaltyPct(loyaltyPct)} value={`− ${fmtUZS(loyaltyAmt)}`} color="#16a34a" />
           )}
+          {payments?.length > 0 && payments.map((row, index) => (
+            <TotalRow
+              key={`${row.method}-${row.amount}-${index}`}
+              label={`${labels.payment} · ${payMethodLabel(row.method, lang)}`}
+              value={fmtUZS(row.amount)}
+            />
+          ))}
         </tbody>
       </table>
 
@@ -533,6 +562,7 @@ export function TableReceipt() {
       loyaltyPct:  summary.discountPercent,
       loyaltyAmt:  summary.discountAmount,
       total: summary.total,
+      payments: getOrderPaymentBreakdown(combineReceiptOrders(orders)),
     }
   }, [state.orders, state.tables, tableId, settings.serviceRate, menuItemMap, lang])
 
@@ -613,6 +643,7 @@ export default function Receipt() {
       loyaltyPct: summary.discountPercent,
       loyaltyAmt: summary.discountAmount,
       total: summary.total,
+      payments: getOrderPaymentBreakdown(combineReceiptOrders(allOrders)),
     }
   }, [state.orders, state.tables, orderId, settings.serviceRate, menuItemMap, lang])
 

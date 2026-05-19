@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppProvider, useApp } from './store/AppContext'
-import { defaultPath as roleDefaultPath, PAGE_ACCESS } from './lib/permissions'
+import { defaultPath as roleDefaultPath, isPublicOnlyRole, PAGE_ACCESS } from './lib/permissions'
 
 import Login          from './pages/Login'
 import AuthCallback   from './pages/AuthCallback'
@@ -22,6 +22,7 @@ import AdminMenu      from './pages/AdminMenu'
 import AdminTables    from './pages/AdminTables'
 import AdminUsers     from './pages/AdminUsers'
 import Reports        from './pages/Reports'
+import AdminAudit     from './pages/AdminAudit'
 import AdminSettings  from './pages/AdminSettings'
 
 function defaultPath(role) {
@@ -96,6 +97,33 @@ function ProtectedRoute({ children, roles }) {
   return children
 }
 
+function PublicMenuRoute({ children }) {
+  const { session, profile, loading } = useAuth()
+
+  if (loading) return <Spinner />
+  if (!session) return children
+  if (!profile) return <Spinner />
+
+  const role = (profile?.role || 'guest').toLowerCase()
+  if (profile?.status === 'disabled' || profile?.status === 'pending') {
+    return <RoleRedirect />
+  }
+  if (!isPublicOnlyRole(role)) {
+    return <Navigate to={defaultPath(role)} replace />
+  }
+
+  return children
+}
+
+function SignedOutRoute({ children }) {
+  const { session, profile, loading } = useAuth()
+
+  if (loading) return <Spinner />
+  if (!session) return children
+  if (!profile) return <Spinner />
+  return <Navigate to={defaultPath(profile?.role || 'guest')} replace />
+}
+
 // Decides where to send user after login
 function RoleRedirect() {
   const { session, profile, loading, signOut } = useAuth()
@@ -148,8 +176,8 @@ function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/"              element={<RoleRedirect />} />
-        <Route path="/menu"          element={<PublicMenu />} />
-        <Route path="/login"         element={<Login />} />
+        <Route path="/menu"          element={<PublicMenuRoute><PublicMenu /></PublicMenuRoute>} />
+        <Route path="/login"         element={<SignedOutRoute><Login /></SignedOutRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
@@ -196,6 +224,9 @@ function AppRoutes() {
         } />
         <Route path="/admin/reports" element={
           <ProtectedRoute roles={PAGE_ACCESS.reports}><Reports /></ProtectedRoute>
+        } />
+        <Route path="/admin/audit" element={
+          <ProtectedRoute roles={PAGE_ACCESS.audit}><AdminAudit /></ProtectedRoute>
         } />
         <Route path="/admin/settings" element={
           <ProtectedRoute roles={PAGE_ACCESS.settings}><AdminSettings /></ProtectedRoute>

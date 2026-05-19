@@ -7,7 +7,15 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../lib/formatCurrency'
-import { getGroupedOrderItems, getOrderDate, getOrderTotal, groupOrdersBySession, isPaidOrder, toLocalDateStr } from '../lib/analytics'
+import {
+  getGroupedOrderItems,
+  getOrderDate,
+  getOrderPaymentBreakdown,
+  getOrderTotal,
+  groupOrdersBySession,
+  isPaidOrder,
+  toLocalDateStr,
+} from '../lib/analytics'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -375,14 +383,18 @@ export default function CashierTables() {
 
   // Payment method breakdown — tracks { amount, count } per method
   const payMethodTotals = useMemo(() => {
-    const KNOWN = ['cash', 'card', 'terminal', 'qr']
+    const KNOWN = ['cash', 'card', 'terminal', 'qr', 'loyalty_card']
     const map = {}
     paidTodayOrders.forEach(o => {
-      const raw = (o.payment_method || '').toLowerCase().trim()
-      const key = KNOWN.includes(raw) ? raw : 'unknown'
-      if (!map[key]) map[key] = { amount: 0, count: 0 }
-      map[key].amount += getOrderTotal(o)
-      map[key].count++
+      const breakdown = getOrderPaymentBreakdown(o)
+      const rows = breakdown.length > 0 ? breakdown : [{ method: o.payment_method, amount: getOrderTotal(o) }]
+      rows.forEach(row => {
+        const raw = (row.method || '').toLowerCase().trim()
+        const key = KNOWN.includes(raw) ? raw : 'unknown'
+        if (!map[key]) map[key] = { amount: 0, count: 0 }
+        map[key].amount += Number(row.amount) || 0
+        map[key].count++
+      })
     })
     return map
   }, [paidTodayOrders])

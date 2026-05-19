@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Store, Percent, Globe, Printer, Bell, Shield,
   Check, ChevronRight,
@@ -56,12 +56,28 @@ export default function AdminSettings() {
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
   const [notifications,  setNotifications]  = useState(true)
   const [saved,          setSaved]          = useState(false)
+  const [saving,         setSaving]         = useState(false)
+  const [error,          setError]          = useState('')
 
-  function handleSave() {
-    dispatch({
+  useEffect(() => {
+    setRestaurantName(settings.restaurantName)
+    setServiceRate(settings.serviceRate)
+    setReceiptFooter(settings.receiptFooter)
+    setAutoPrint(settings.autoPrint)
+  }, [settings.restaurantName, settings.serviceRate, settings.receiptFooter, settings.autoPrint])
+
+  async function handleSave() {
+    setSaving(true)
+    setError('')
+    const result = await dispatch({
       type: 'SET_SETTINGS',
       payload: { restaurantName, serviceRate, receiptFooter, autoPrint },
     })
+    setSaving(false)
+    if (result?.error) {
+      setError(result.error.message || 'Failed to save settings')
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -86,7 +102,9 @@ export default function AdminSettings() {
       notifications:   'Bildirishnomalar',
       notifSub:        'Yangi buyurtmalar uchun ovozli signal',
       save:            'Saqlash',
+      saving:          'Saqlanmoqda...',
       saved:           'Saqlandi!',
+      saveError:       'Sozlamalarni saqlab bo‘lmadi',
     },
     ru: {
       title:           'Настройки',
@@ -107,7 +125,9 @@ export default function AdminSettings() {
       notifications:   'Уведомления',
       notifSub:        'Звук при новых заказах',
       save:            'Сохранить',
+      saving:          'Сохранение...',
       saved:           'Сохранено!',
+      saveError:       'Не удалось сохранить настройки',
     },
     en: {
       title:           'Settings',
@@ -128,7 +148,9 @@ export default function AdminSettings() {
       notifications:   'Notifications',
       notifSub:        'Sound alert for new orders',
       save:            'Save Changes',
+      saving:          'Saving...',
       saved:           'Saved!',
+      saveError:       'Could not save settings',
     },
   }
   const l = L[lang] || L.en
@@ -214,16 +236,22 @@ export default function AdminSettings() {
         {/* Save button */}
         <button
           onClick={handleSave}
+          disabled={saving}
           className={`w-full rounded-2xl font-black text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
             saved
               ? 'bg-green-500 text-white'
-              : 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-lg shadow-orange-100'
+              : 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-lg shadow-orange-100 disabled:cursor-not-allowed disabled:opacity-70'
           }`}
           style={{ height: '52px' }}
         >
           {saved ? <Check size={18} /> : <Shield size={18} />}
-          {saved ? l.saved : l.save}
+          {saved ? l.saved : saving ? l.saving : l.save}
         </button>
+        {error && (
+          <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {l.saveError}: {error}
+          </p>
+        )}
       </div>
     </AppShell>
   )

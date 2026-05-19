@@ -19,10 +19,9 @@ update public.orders o
 set
   service_rate_pct = 20,
   subtotal = c.subtotal,
-  discounted_subtotal = greatest(c.subtotal - c.discount_amount, 0),
-  service_fee = round(greatest(c.subtotal - c.discount_amount, 0) * 0.20)::integer,
-  total = greatest(c.subtotal - c.discount_amount, 0)
-        + round(greatest(c.subtotal - c.discount_amount, 0) * 0.20)::integer,
+  service_fee = round(c.subtotal * 0.20)::integer,
+  discounted_subtotal = greatest(c.subtotal + round(c.subtotal * 0.20)::integer - c.discount_amount, 0),
+  total = greatest(c.subtotal + round(c.subtotal * 0.20)::integer - c.discount_amount, 0),
   updated_at = now()
 from calculated c
 where o.id = c.id;

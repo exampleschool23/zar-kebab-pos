@@ -9,6 +9,13 @@ export function isPaidOrder(o) {
   )
 }
 
+export function isActiveNeedsBillOrder(order, tables = []) {
+  if (!order || isPaidOrder(order)) return false
+  if (order.status !== 'needs_bill') return false
+  const table = tables.find(t => t.id === order.table_id)
+  return table?.status === 'needs_bill'
+}
+
 export function getOrderDate(o) {
   return o?.paid_at || o?.created_at || null
 }
@@ -66,6 +73,156 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
     serviceFee,
     total: afterDiscount,
   }
+}
+
+export function getOrderPaymentFields(order, items = getOrderItems(order), fallbackServicePct = 20) {
+  const summary = getOrderPaymentSummary(order, items, fallbackServicePct)
+  const fields = {
+    subtotal: summary.subtotal,
+    service_fee: summary.serviceFee,
+    service_rate_pct: summary.serviceRatePct,
+    total: summary.total,
+  }
+
+  if (summary.discountPercent > 0) {
+    fields.loyalty_discount_pct = summary.discountPercent
+  }
+
+  if (summary.discountAmount > 0) {
+    fields.loyalty_discount_amount = summary.discountAmount
+  }
+
+  return fields
+}
+
+export function normalizePaymentMethod(method) {
+  const raw = String(method || '').toLowerCase().trim()
+  if (raw === 'qr_code' || raw === 'qr-code' || raw === 'qrcode') return 'qr'
+  if (raw === 'loyalty' || raw === 'loyalty-card' || raw === 'loyalty_card') return 'loyalty_card'
+  if (['cash', 'card', 'terminal', 'qr', 'loyalty_card', 'other', 'mixed'].includes(raw)) return raw
+  return raw || 'unknown'
+}
+
+export function getOrderPayments(order) {
+  const rows = order?.payments || order?.order_payments || []
+  if (Array.isArray(rows) && rows.length > 0) {
+    return rows
+      .map(row => ({
+        ...row,
+        method: normalizePaymentMethod(row.method || row.payment_method),
+        amount: Math.round(Number(row.amount) || 0),
+      }))
+      .filter(row => row.amount > 0)
+  }
+
+  if (!isPaidOrder(order)) return []
+
+  const total = getOrderTotal(order)
+  if (total <= 0) return []
+
+  return [{
+    method: normalizePaymentMethod(order?.payment_method),
+    amount: total,
+  }]
+}
+
+export function normalizeSplitPayments(payments, total) {
+  const due = Math.max(0, Math.round(Number(total) || 0))
+  const rows = (payments || [])
+    .map(row => ({
+      method: normalizePaymentMethod(row.method || row.payment_method),
+      amount: Math.round(Number(row.amount) || 0),
+    }))
+    .filter(row => row.amount > 0 && row.method !== 'mixed')
+
+  if (due <= 0) return []
+  if (rows.length === 0) return [{ method: 'cash', amount: due }]
+
+  const sum = rows.reduce((s, row) => s + row.amount, 0)
+  if (sum <= due) return rows
+
+  const adjusted = rows.map(row => ({ ...row }))
+  let overpay = sum - due
+  const cashIndex = adjusted.map(row => row.method).lastIndexOf('cash')
+  const preferredIndex = cashIndex >= 0 ? cashIndex : adjusted.length - 1
+
+  for (let offset = 0; offset < adjusted.length && overpay > 0; offset += 1) {
+    const index = (preferredIndex - offset + adjusted.length) % adjusted.length
+    const reduction = Math.min(adjusted[index].amount, overpay)
+    adjusted[index].amount -= reduction
+    overpay -= reduction
+  }
+
+  return adjusted.filter(row => row.amount > 0)
+}
+
+export function getSplitPaymentValidation(payments, total) {
+  const due = Math.max(0, Math.round(Number(total) || 0))
+  const paidAmount = (payments || []).reduce(
+    (sum, row) => sum + Math.max(0, Math.round(Number(row.amount) || 0)),
+    0
+  )
+  const overpaidAmount = Math.max(0, paidAmount - due)
+  const remainingAmount = Math.max(0, due - paidAmount)
+  const isFullyPaid = due > 0 && paidAmount === due
+
+  return {
+    totalAmount: due,
+    paidAmount,
+    remainingAmount,
+    overpaidAmount,
+    isOverpaid: overpaidAmount > 0,
+    isFullyPaid,
+    canConfirmPayment: isFullyPaid && overpaidAmount === 0,
+  }
+}
+
+export function getPaymentMethodSummary(payments, fallbackMethod = null) {
+  const rows = (payments || []).filter(row => Number(row.amount) > 0)
+  if (rows.length === 0) return normalizePaymentMethod(fallbackMethod)
+  const methods = [...new Set(rows.map(row => normalizePaymentMethod(row.method || row.payment_method)))]
+  return methods.length === 1 ? methods[0] : 'mixed'
+}
+
+export function allocateSplitPaymentsToOrders(orderTotals, payments) {
+  const totals = (orderTotals || [])
+    .map(row => ({
+      order_id: row.order_id || row.orderId || row.id,
+      total: Math.max(0, Math.round(Number(row.total) || 0)),
+    }))
+    .filter(row => row.order_id && row.total > 0)
+  const totalDue = totals.reduce((sum, row) => sum + row.total, 0)
+  const normalizedPayments = normalizeSplitPayments(payments, totalDue)
+  const remainingByOrder = new Map(totals.map(row => [row.order_id, row.total]))
+  const allocations = []
+
+  normalizedPayments.forEach(payment => {
+    let remainingPayment = payment.amount
+    for (const orderRow of totals) {
+      if (remainingPayment <= 0) break
+      const remainingOrder = remainingByOrder.get(orderRow.order_id) || 0
+      if (remainingOrder <= 0) continue
+      const amount = Math.min(remainingPayment, remainingOrder)
+      allocations.push({
+        order_id: orderRow.order_id,
+        method: payment.method,
+        amount,
+      })
+      remainingByOrder.set(orderRow.order_id, remainingOrder - amount)
+      remainingPayment -= amount
+    }
+  })
+
+  return allocations
+}
+
+export function getOrderPaymentBreakdown(order) {
+  const map = {}
+  getOrderPayments(order).forEach(row => {
+    const method = normalizePaymentMethod(row.method)
+    map[method] = (map[method] || 0) + (Number(row.amount) || 0)
+  })
+  return Object.entries(map).map(([method, amount]) => ({ method, amount }))
 }
 
 function stableStringify(value) {
@@ -182,6 +339,7 @@ export function groupOrdersBySession(orders) {
         service_rate_pct: Number(o.service_rate_pct ?? o.service_percent ?? o.servicePercent) || null,
         loyalty_discount_pct: Number(o.loyalty_discount_pct ?? o.discount_percent) || 0,
         loyalty_discount_amount: Number(o.loyalty_discount_amount) || 0,
+        payments: [...getOrderPayments(o)],
         _orderCount: 1,
         _mergedIds: [o.id],
       }
@@ -199,6 +357,7 @@ export function groupOrdersBySession(orders) {
     }
     session.loyalty_discount_amount =
       (session.loyalty_discount_amount || 0) + (Number(o.loyalty_discount_amount) || 0)
+    session.payments = [...(session.payments || []), ...getOrderPayments(o)]
     const discountPct = Number(o.loyalty_discount_pct ?? o.discount_percent)
     if (!session.loyalty_discount_pct && Number.isFinite(discountPct)) {
       session.loyalty_discount_pct = discountPct

@@ -7,6 +7,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import {
   getOrderDate,
   getOrderItems,
+  getOrderPaymentBreakdown,
   getOrderPaymentSummary,
   getOrderTotal,
   groupOrdersBySession,
@@ -25,7 +26,9 @@ import {
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
-  return o.payment_method || null
+  const breakdown = getOrderPaymentBreakdown(o)
+  if (breakdown.length > 1) return 'mixed'
+  return breakdown[0]?.method || o.payment_method || null
 }
 
 function addDays(isoDate, n) {
@@ -60,6 +63,8 @@ const PAY_CFG = {
   card:     { label: { uz: 'Karta',     ru: 'Карта',      en: 'Card'     }, cls: 'bg-blue-50 text-blue-700',     Icon: CreditCard, bar: '#2563EB' },
   terminal: { label: { uz: 'Terminal',  ru: 'Терминал',   en: 'Terminal' }, cls: 'bg-purple-50 text-purple-700', Icon: Monitor,    bar: '#7C3AED' },
   qr:       { label: { uz: 'QR Kod',    ru: 'QR Код',     en: 'QR Code'  }, cls: 'bg-pink-50 text-pink-700',     Icon: QrCode,     bar: '#DB2777' },
+  loyalty_card: { label: { uz: 'Loyalty', ru: 'Лояльность', en: 'Loyalty' }, cls: 'bg-amber-50 text-amber-700', Icon: Tag, bar: '#D97706' },
+  mixed:    { label: { uz: 'Aralash',    ru: 'Смешанная',  en: 'Mixed'    }, cls: 'bg-teal-50 text-teal-700',     Icon: CreditCard, bar: '#0F766E' },
   unknown:  { label: { uz: "Noma'lum",  ru: 'Неизвестно', en: 'Unknown'  }, cls: 'bg-gray-50 text-gray-600',     Icon: HelpCircle, bar: '#9CA3AF' },
 }
 
@@ -421,14 +426,17 @@ function PaymentMethodsTab({ orders, lang }) {
     const map = {}
     let total = 0
     orders.forEach(o => {
-      const raw = getPaymentMethod(o)
-      const key = (raw || '').toLowerCase()
-      const m   = PAY_CFG[key] ? key : 'unknown'
-      const rev = getOrderTotal(o)
-      if (!map[m]) map[m] = { method: m, revenue: 0, count: 0 }
-      map[m].revenue += rev
-      map[m].count   += 1
-      total          += rev
+      const breakdown = getOrderPaymentBreakdown(o)
+      const rows = breakdown.length > 0 ? breakdown : [{ method: getPaymentMethod(o), amount: getOrderTotal(o) }]
+      rows.forEach(row => {
+        const key = (row.method || '').toLowerCase()
+        const m   = PAY_CFG[key] ? key : 'unknown'
+        const rev = Number(row.amount) || 0
+        if (!map[m]) map[m] = { method: m, revenue: 0, count: 0 }
+        map[m].revenue += rev
+        map[m].count   += 1
+        total          += rev
+      })
     })
     const rows = Object.values(map)
       .map(d => ({ ...d, pct: total > 0 ? Math.round(d.revenue / total * 100) : 0 }))

@@ -12,6 +12,8 @@ import { useApp } from '../store/AppContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import AppShell from '../components/AppShell'
+import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
+import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
@@ -392,6 +394,9 @@ const blankItem = {
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
   price: '', image_url: '', available: true, sort_order: '',
+  show_in_cashier_quick_items: false,
+  send_to_kitchen: false,
+  quick_item_sort_order: '',
 }
 
 const blankCat = { id: '', name_uz: '', name_ru: '', name_en: '', image_url: '', sort_order: '' }
@@ -434,15 +439,21 @@ export default function AdminMenu() {
     [state.menuItems]
   )
 
+  const quickItems = useMemo(() =>
+    sortedItems
+      .filter(isCashierQuickItem)
+      .sort((a, b) => getQuickItemSortOrder(a) - getQuickItemSortOrder(b)),
+    [sortedItems]
+  )
+
   const filteredItems = useMemo(() => {
     return sortedItems.filter(item => {
-      const matchCat    = filterCat === 'all' || item.category_id === filterCat
       const matchAvail  = filterAvail === 'all' || (filterAvail === 'available' ? item.available : !item.available)
       const q           = search.trim().toLowerCase()
       const matchSearch = !q || getItemName(item, lang).toLowerCase().includes(q)
-      return matchCat && matchAvail && matchSearch
+      return matchAvail && matchSearch
     })
-  }, [sortedItems, filterCat, filterAvail, search, lang])
+  }, [sortedItems, filterAvail, search, lang])
 
   const itemCountByCat = useMemo(() => {
     const m = { all: state.menuItems.length }
@@ -457,12 +468,44 @@ export default function AdminMenu() {
     setForm({ ...blankItem, id: 'i' + Date.now(), sort_order: maxOrder + 1 })
     setItemModal('new')
   }
-  function openEditItem(i) { setForm({ ...i, sort_order: i.sort_order ?? 0 }); setItemModal('edit') }
+  function openNewQuickItem() {
+    const maxOrder = state.menuItems.length > 0
+      ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
+    const maxQuickOrder = quickItems.length > 0
+      ? Math.max(...quickItems.map(i => getQuickItemSortOrder(i))) : 0
+    setForm({
+      ...blankItem,
+      id: 'i' + Date.now(),
+      sort_order: maxOrder + 1,
+      show_in_cashier_quick_items: true,
+      send_to_kitchen: false,
+      quick_item_sort_order: maxQuickOrder + 1,
+    })
+    setItemModal('new')
+  }
+  function openEditItem(i) {
+    setForm({
+      ...blankItem,
+      ...i,
+      sort_order: i.sort_order ?? 0,
+      show_in_cashier_quick_items: isCashierQuickItem(i),
+      send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
+      quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
+    })
+    setItemModal('edit')
+  }
   function saveItem() {
     if (!form.name_uz || !form.price || !form.category_id) return
     dispatch({
       type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
-      payload: { ...form, price: Number(form.price), sort_order: Number(form.sort_order) || 0 },
+      payload: {
+        ...form,
+        price: Number(form.price),
+        sort_order: Number(form.sort_order) || 0,
+        quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
+        show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
+        send_to_kitchen: !!form.send_to_kitchen,
+      },
     })
     setItemModal(null)
   }
@@ -510,6 +553,13 @@ export default function AdminMenu() {
     dispatch({ type: 'REORDER_CATEGORY', payload: { idA: active.id, idB: over.id } })
   }
 
+  function handleQuickItemDragEnd(event) {
+    const { active, over } = event
+    setActiveId(null)
+    if (!over || active.id === over.id) return
+    dispatch({ type: 'REORDER_QUICK_ITEM', payload: { idA: active.id, idB: over.id } })
+  }
+
   // Overlay item for drag ghost
   const activeItem = activeId ? filteredItems.find(i => i.id === activeId) : null
   const activeCat  = activeId ? realSortedCats.find(c => c.id === activeId) : null
@@ -517,7 +567,7 @@ export default function AdminMenu() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AppShell title={t(lang, 'menu')}>
-      <div className="min-h-screen bg-[#faf9f7]">
+      <div className="min-h-screen bg-[#FAF6EE]">
 
         {/* Page header */}
         <div className="bg-white border-b border-gray-100 px-6 pt-5 pb-0">
@@ -529,7 +579,11 @@ export default function AdminMenu() {
                'Manage your menu items and categories'}
             </p>
             <div className="flex gap-0">
-              {[['items', t(lang, 'menuItems')], ['categories', t(lang, 'categories')]].map(([key, label]) => (
+              {[
+                ['items', t(lang, 'menuItems')],
+                ['categories', t(lang, 'categories')],
+                ['quick_items', lang === 'uz' ? 'Tezkor mahsulotlar' : lang === 'ru' ? 'Быстрые товары' : 'Quick Items'],
+              ].map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setTab(key)}
@@ -544,11 +598,12 @@ export default function AdminMenu() {
           </div>
         </div>
 
-        <div className="w-full px-6 py-6">
+        <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
 
           {/* ══ Menu Items tab ═══════════════════════════════════════════════ */}
           {tab === 'items' && (
             <>
+              <div className="mb-5 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
               {/* Toolbar row 1: search + availability + grid toggle + add */}
               <div className="flex flex-wrap items-center gap-3 mb-3">
                 <div className="relative flex-1 min-w-[240px]">
@@ -595,53 +650,20 @@ export default function AdminMenu() {
               </div>
 
               {/* Toolbar row 2: category cards */}
-              <div className="flex gap-3 overflow-x-auto pb-2 mb-2" style={{ scrollbarWidth: 'none' }}>
-                {/* "All" square */}
-                {[
+              <MenuCategoryScroller
+                categories={[
                   { id: 'all', label: lang === 'uz' ? 'Hammasi' : lang === 'ru' ? 'Все' : 'All', image_url: null },
-                  ...realSortedCats.map(c => ({ id: c.id, label: getCategoryName(c, lang), image_url: c.image_url })),
-                ].map(cat => {
-                  const active = filterCat === cat.id
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => setFilterCat(cat.id)}
-                      className={`min-w-[124px] w-[124px] flex-shrink-0 overflow-hidden rounded-[20px] border-2 text-left transition-all active:scale-[0.98]
-                        ${active
-                          ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-[0_8px_18px_rgba(255,90,31,0.16)]'
-                          : 'border-gray-200 bg-white shadow-sm hover:border-orange-300 hover:shadow-md'
-                        }`}
-                    >
-                      <div className={`aspect-square w-full overflow-hidden ${active ? 'bg-[#FFE8D8]' : 'bg-gray-100'}`}>
-                        {cat.id === 'all' ? (
-                          <div className="h-full w-full flex items-center justify-center">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${active ? 'bg-[#ff5a1f]/15' : 'bg-white shadow-sm'}`}>
-                              <LayoutGrid size={24} className={active ? 'text-[#ff4d00]' : 'text-[#ff8a3d]'} />
-                            </div>
-                          </div>
-                        ) : cat.image_url ? (
-                          <SafeMenuImage
-                            src={cat.image_url}
-                            alt={cat.label}
-                            className="h-full w-full object-cover object-center"
-                            fallbackClassName="h-full w-full"
-                            iconSize={28}
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center bg-orange-50">
-                            <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="min-h-[58px] px-2.5 py-2.5 text-center flex items-center justify-center">
-                        <p className={`line-clamp-2 text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
-                          {cat.label}
-                        </p>
-                      </div>
-                    </button>
-                  )
-                })}
+                  ...realSortedCats.map(c => ({ ...c, label: getCategoryName(c, lang) })),
+                ]}
+                activeCategoryId={filterCat}
+                onCategoryClick={setFilterCat}
+                onActiveCategoryChange={setFilterCat}
+                lang={lang}
+                itemCounts={itemCountByCat}
+                sectionPrefix="admin-menu-category"
+                topOffset={0}
+                className="mb-2"
+              />
               </div>
 
               {/* Hint */}
@@ -680,7 +702,7 @@ export default function AdminMenu() {
                 </div>
               ) : (() => {
                 // Show grouped sections when "All" is selected with no active filters
-                const showGrouped = filterCat === 'all' && !search && filterAvail === 'all'
+                const showGrouped = true
 
                 // Build category sections for grouped view
                 const sections = showGrouped
@@ -728,7 +750,11 @@ export default function AdminMenu() {
                         // ── Grouped by category ──────────────────────────────
                         <div className="space-y-8">
                           {sections.map(({ cat, items: catItems }) => (
-                            <div key={cat.id}>
+                            <div
+                              key={cat.id}
+                              id={menuCategorySectionId('admin-menu-category', cat.id)}
+                              className="scroll-mt-24"
+                            >
                               {/* Section header */}
                               <div className="flex items-center gap-2.5 mb-3">
                                 {cat.image_url && (
@@ -925,6 +951,96 @@ export default function AdminMenu() {
               )}
             </>
           )}
+
+          {/* ══ Quick Items tab ═════════════════════════════════════════════ */}
+          {tab === 'quick_items' && (
+            <>
+              <div className="mb-5 flex flex-col gap-3 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-black text-[#1F2937]">
+                    {lang === 'uz' ? 'Kassadagi tezkor mahsulotlar' : lang === 'ru' ? 'Быстрые товары у кассы' : 'Cashier Quick Items'}
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-400">
+                    {lang === 'uz'
+                      ? 'Bu mahsulotlar faqat kassir to‘lov ekranida ko‘rinadi.'
+                      : lang === 'ru'
+                        ? 'Эти товары видны только на экране оплаты кассира.'
+                        : 'These items appear only on the cashier payment screen.'}
+                  </p>
+                </div>
+                <OrangeBtn onClick={openNewQuickItem} icon={Plus}>
+                  {lang === 'uz' ? 'Tezkor mahsulot qo‘shish' : lang === 'ru' ? 'Добавить быстрый товар' : 'Add Quick Item'}
+                </OrangeBtn>
+              </div>
+
+              {quickItems.length === 0 ? (
+                <div className="bg-white border border-gray-100 rounded-2xl py-20 text-center shadow-sm">
+                  <Tag size={40} className="mx-auto mb-3 text-gray-200" />
+                  <p className="text-gray-500 font-semibold mb-1">
+                    {lang === 'uz' ? 'Tezkor mahsulotlar yo‘q' : lang === 'ru' ? 'Быстрых товаров пока нет' : 'No quick items yet'}
+                  </p>
+                  <p className="text-sm text-gray-400 mb-5">
+                    {lang === 'uz'
+                      ? 'Kassada tez qo‘shiladigan mahsulot yarating.'
+                      : lang === 'ru'
+                        ? 'Создайте товар, который кассир сможет быстро добавить.'
+                        : 'Create items cashiers can add quickly at checkout.'}
+                  </p>
+                  <OrangeBtn onClick={openNewQuickItem} icon={Plus}>
+                    {lang === 'uz' ? 'Tezkor mahsulot qo‘shish' : lang === 'ru' ? 'Добавить быстрый товар' : 'Add Quick Item'}
+                  </OrangeBtn>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+                    <GripVertical size={12} />
+                    {lang === 'uz' ? 'Tartiblash uchun sudrang' : lang === 'ru' ? 'Перетащите для сортировки' : 'Drag to reorder'}
+                  </p>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={e => setActiveId(e.active.id)}
+                    onDragEnd={handleQuickItemDragEnd}
+                    onDragCancel={() => setActiveId(null)}
+                  >
+                    <SortableContext
+                      items={quickItems.map(i => i.id)}
+                      strategy={rectSortingStrategy}
+                    >
+                      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                        {quickItems.map(item => (
+                          <SortableItemCard
+                            key={item.id}
+                            item={item}
+                            lang={lang}
+                            onEdit={openEditItem}
+                            onDelete={deleteItem}
+                            categories={realSortedCats}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                    <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
+                      {activeItem && (
+                        <div className="bg-white rounded-2xl border-2 border-[#ff5a00]/40 shadow-2xl opacity-95 w-44 rotate-2">
+                          <SafeMenuImage
+                            src={activeItem.image_url}
+                            className="aspect-[4/3] w-full rounded-t-2xl object-cover object-center"
+                            fallbackClassName="aspect-[4/3] w-full rounded-t-2xl"
+                            iconSize={24}
+                          />
+                          <div className="p-2.5">
+                            <p className="font-black text-gray-900 text-[12px] truncate">{getItemName(activeItem, lang)}</p>
+                            <p className="text-[#ff5a00] font-black text-xs">{formatCurrency(activeItem.price)}</p>
+                          </div>
+                        </div>
+                      )}
+                    </DragOverlay>
+                  </DndContext>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -954,6 +1070,13 @@ export default function AdminMenu() {
             <Field label={`${t(lang, 'price')} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="25000" />
             <ImageUploadField label={t(lang, 'imageUrl')} value={form.image_url} onChange={setF('image_url')} />
             <Field label="Sort order" type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
+            <Field
+              label={lang === 'uz' ? 'Tezkor mahsulot tartibi' : lang === 'ru' ? 'Порядок быстрого товара' : 'Quick item order'}
+              type="number"
+              value={form.quick_item_sort_order}
+              onChange={setF('quick_item_sort_order')}
+              placeholder="1"
+            />
             <div className="flex items-center gap-2 pt-1">
               <input
                 id="avail"
@@ -963,6 +1086,30 @@ export default function AdminMenu() {
                 className="accent-[#ff5a00] w-4 h-4"
               />
               <label htmlFor="avail" className="text-sm text-gray-700 font-medium">{t(lang, 'available_item')}</label>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="cashierQuick"
+                type="checkbox"
+                checked={!!form.show_in_cashier_quick_items}
+                onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked }))}
+                className="accent-[#ff5a00] w-4 h-4"
+              />
+              <label htmlFor="cashierQuick" className="text-sm text-gray-700 font-medium">
+                {lang === 'uz' ? 'Kassir tezkor mahsulotlarida ko‘rsatish' : lang === 'ru' ? 'Показывать в быстрых товарах кассира' : 'Show in cashier quick items'}
+              </label>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="sendToKitchen"
+                type="checkbox"
+                checked={!!form.send_to_kitchen}
+                onChange={e => setForm(f => ({ ...f, send_to_kitchen: e.target.checked }))}
+                className="accent-[#ff5a00] w-4 h-4"
+              />
+              <label htmlFor="sendToKitchen" className="text-sm text-gray-700 font-medium">
+                {lang === 'uz' ? 'Qo‘shilganda oshxonaga yuborish' : lang === 'ru' ? 'Отправлять на кухню при добавлении' : 'Send to kitchen when added'}
+              </label>
             </div>
             <div className="flex gap-2 pt-2">
               <button onClick={() => setItemModal(null)} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">

@@ -1,4 +1,11 @@
 import { supabase } from './supabase'
+import {
+  allocateSplitPaymentsToOrders,
+  getOrderPaymentFields,
+  getOrderPaymentSummary,
+  getPaymentMethodSummary,
+  normalizeSplitPayments,
+} from './analytics'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -6,13 +13,9 @@ function startOfYear() {
   return new Date(new Date().getFullYear(), 0, 1).toISOString()
 }
 
-function serviceRateFromSettings(settings) {
-  const pct = Number(settings?.serviceRate)
-  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) / 100 : 0.2
-}
-
 function serviceRatePctFromSettings(settings) {
-  return Math.round(serviceRateFromSettings(settings) * 100)
+  const pct = Number(settings?.serviceRate)
+  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 20
 }
 
 function normalizeOrderType(value) {
@@ -20,24 +23,58 @@ function normalizeOrderType(value) {
   return raw.includes('take') || raw.includes('away') ? 'take_away' : 'dine_in'
 }
 
+function normalizeBusinessSettings(row) {
+  if (!row) return null
+  return {
+    restaurantName: row.restaurant_name || 'Zar Kebab',
+    serviceRate: Number.isFinite(Number(row.service_rate_pct)) ? Number(row.service_rate_pct) : 20,
+    receiptFooter: row.receipt_footer || 'Thank you for visiting!',
+    autoPrint: !!row.auto_print,
+  }
+}
+
+async function loadBusinessSettings() {
+  const { data, error } = await supabase
+    .from('business_settings')
+    .select('*')
+    .eq('id', 'default')
+    .maybeSingle()
+
+  if (error) {
+    console.warn('[db] business settings unavailable, using local fallback:', error.message)
+    return null
+  }
+
+  return normalizeBusinessSettings(data)
+}
+
+async function fetchOrdersByPaymentStatus(paymentStatus, includeRecentPaidFilter = false) {
+  const buildQuery = (select) => {
+    let query = supabase.from('orders').select(select)
+    query = paymentStatus === 'paid'
+      ? query.eq('payment_status', 'paid')
+      : query.neq('payment_status', 'paid')
+    if (includeRecentPaidFilter) query = query.gte('created_at', startOfYear())
+    return query.order('created_at', { ascending: false })
+  }
+
+  const withPayments = await buildQuery('*, items:order_items(*), payments:order_payments(*)')
+  if (!withPayments.error) return withPayments
+
+  console.warn('[db] order_payments relation unavailable, loading orders without split payments:', withPayments.error.message)
+  return buildQuery('*, items:order_items(*)')
+}
+
 export async function loadPOSData() {
-  const [tablesRes, categoriesRes, menuItemsRes, unpaidRes, paidRes] = await Promise.all([
+  const [tablesRes, categoriesRes, menuItemsRes, unpaidRes, paidRes, settings] = await Promise.all([
     supabase.from('restaurant_tables').select('*').order('id'),
     supabase.from('menu_categories').select('*').order('sort_order'),
     supabase.from('menu_items').select('*').order('sort_order'),
     // All unpaid/active orders (no date limit)
-    supabase
-      .from('orders')
-      .select('*, items:order_items(*)')
-      .neq('payment_status', 'paid')
-      .order('created_at', { ascending: false }),
+    fetchOrdersByPaymentStatus('unpaid'),
     // Paid orders from the last 7 days (for revenue & best-sellers)
-    supabase
-      .from('orders')
-      .select('*, items:order_items(*)')
-      .eq('payment_status', 'paid')
-      .gte('created_at', startOfYear())
-      .order('created_at', { ascending: false }),
+    fetchOrdersByPaymentStatus('paid', true),
+    loadBusinessSettings(),
   ])
 
   return {
@@ -45,6 +82,7 @@ export async function loadPOSData() {
     categories: categoriesRes.data || [],
     menuItems:  menuItemsRes.data  || [],
     orders:     [...(unpaidRes.data || []), ...(paidRes.data || [])],
+    settings,
   }
 }
 
@@ -63,17 +101,8 @@ export function subscribeToRealtime(dispatch) {
 
     ordersReloadInFlight = true
     const [unpaid, paid] = await Promise.all([
-      supabase
-        .from('orders')
-        .select('*, items:order_items(*)')
-        .neq('payment_status', 'paid')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('orders')
-        .select('*, items:order_items(*)')
-        .eq('payment_status', 'paid')
-        .gte('created_at', startOfYear())
-        .order('created_at', { ascending: false }),
+      fetchOrdersByPaymentStatus('unpaid'),
+      fetchOrdersByPaymentStatus('paid', true),
     ])
     const combined = [...(unpaid.data || []), ...(paid.data || [])]
     dispatch({ type: 'SET_ORDERS', payload: combined })
@@ -105,6 +134,7 @@ export function subscribeToRealtime(dispatch) {
     .channel('pos-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'order_payments' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, reloadTables)
     .subscribe()
 
@@ -131,22 +161,25 @@ export async function writeToSupabase(action, state) {
       const addedSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
       const { data: existingOrder } = await supabase
         .from('orders')
-        .select('id, subtotal')
+        .select('id, subtotal, service_rate_pct')
         .eq('id', orderId)
         .eq('payment_status', 'unpaid')
         .maybeSingle()
 
       const subtotal    = (Number(existingOrder?.subtotal) || 0) + addedSubtotal
-      const serviceRatePct = serviceRatePctFromSettings(state.settings)
-      const service_fee = Math.round(subtotal * serviceRatePct / 100)
+      const serviceRatePct = Number.isFinite(Number(existingOrder?.service_rate_pct))
+        ? Number(existingOrder.service_rate_pct)
+        : serviceRatePctFromSettings(state.settings)
+      const paymentFields = getOrderPaymentFields(
+        { subtotal, service_rate_pct: serviceRatePct },
+        [],
+        serviceRatePct
+      )
 
       if (existingOrder) {
         const { data: updatedOrder, error: orderUpdateError } = await supabase.from('orders').update({
           status: 'sent_to_kitchen',
-          subtotal,
-          service_fee,
-          service_rate_pct: serviceRatePct,
-          total: subtotal + service_fee,
+          ...paymentFields,
         }).eq('id', orderId).select('*').maybeSingle()
         if (orderUpdateError) throw orderUpdateError
         console.log('Created order', updatedOrder || { id: orderId, status: 'sent_to_kitchen' })
@@ -158,10 +191,7 @@ export async function writeToSupabase(action, state) {
           waiter_name:    state.user?.name || 'Waiter',
           status:         'sent_to_kitchen',
           payment_status: 'unpaid',
-          subtotal,
-          service_fee,
-          service_rate_pct: serviceRatePct,
-          total:          subtotal + service_fee,
+          ...paymentFields,
         }).select('*').maybeSingle()
         if (orderInsertError) throw orderInsertError
         console.log('Created order', createdOrder)
@@ -231,10 +261,121 @@ export async function writeToSupabase(action, state) {
       break
     }
 
+    case 'ADD_QUICK_ITEM_TO_ORDER': {
+      const { tableId, item } = action.payload
+      if (!tableId || !item) return
+
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, service_rate_pct, items:order_items(*)')
+        .eq('table_id', tableId)
+        .eq('payment_status', 'unpaid')
+        .order('created_at', { ascending: true })
+      if (ordersError) throw ordersError
+
+      const order = orders?.[0]
+      if (!order) return
+
+      const existing = (order.items || []).find(row =>
+        row.menu_item_id === item.id &&
+        !row.notes &&
+        ['served', 'new', 'ready', 'preparing'].includes(row.status)
+      )
+
+      let nextItems
+      if (existing) {
+        const nextQty = (Number(existing.quantity) || 1) + 1
+        const { error } = await supabase
+          .from('order_items')
+          .update({ quantity: nextQty })
+          .eq('id', existing.id)
+        if (error) throw error
+        nextItems = (order.items || []).map(row => row.id === existing.id ? { ...row, quantity: nextQty } : row)
+      } else {
+        const row = {
+          id: action._itemId,
+          order_id: order.id,
+          menu_item_id: item.id,
+          name: item.name,
+          price: Number(item.price) || 0,
+          quantity: 1,
+          notes: '',
+          status: item.sendToKitchen || item.send_to_kitchen ? 'new' : 'served',
+          order_type: item.order_type || 'dine_in',
+        }
+        const { error } = await supabase.from('order_items').insert(row)
+        if (error) throw error
+        nextItems = [...(order.items || []), row]
+      }
+
+      const serviceRatePct = Number.isFinite(Number(order.service_rate_pct))
+        ? Number(order.service_rate_pct)
+        : serviceRatePctFromSettings(state.settings)
+      const paymentFields = getOrderPaymentFields(
+        { service_rate_pct: serviceRatePct },
+        nextItems,
+        serviceRatePct
+      )
+      const { error: orderUpdateError } = await supabase
+        .from('orders')
+        .update(paymentFields)
+        .eq('id', order.id)
+      if (orderUpdateError) throw orderUpdateError
+      break
+    }
+
+    case 'UPDATE_BILL_ITEM_QTY': {
+      const { tableId, orderItemId, menuItemId, qty } = action.payload
+      const nextQty = Math.max(0, Number(qty) || 0)
+      if (!tableId || (!orderItemId && !menuItemId)) return
+
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, service_rate_pct, items:order_items(*)')
+        .eq('table_id', tableId)
+        .eq('payment_status', 'unpaid')
+      if (ordersError) throw ordersError
+
+      const order = (orders || []).find(o =>
+        (o.items || []).some(row => orderItemId ? row.id === orderItemId : row.menu_item_id === menuItemId)
+      )
+      if (!order) return
+
+      const target = (order.items || []).find(row => orderItemId ? row.id === orderItemId : row.menu_item_id === menuItemId)
+      if (!target) return
+
+      if (nextQty <= 0) {
+        const { error } = await supabase.from('order_items').delete().eq('id', target.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('order_items').update({ quantity: nextQty }).eq('id', target.id)
+        if (error) throw error
+      }
+
+      const nextItems = nextQty <= 0
+        ? (order.items || []).filter(row => row.id !== target.id)
+        : (order.items || []).map(row => row.id === target.id ? { ...row, quantity: nextQty } : row)
+      const serviceRatePct = Number.isFinite(Number(order.service_rate_pct))
+        ? Number(order.service_rate_pct)
+        : serviceRatePctFromSettings(state.settings)
+      const paymentFields = getOrderPaymentFields(
+        { service_rate_pct: serviceRatePct },
+        nextItems,
+        serviceRatePct
+      )
+      const { error: orderUpdateError } = await supabase
+        .from('orders')
+        .update(paymentFields)
+        .eq('id', order.id)
+      if (orderUpdateError) throw orderUpdateError
+      break
+    }
+
     case 'MARK_ORDER_PAID': {
       const tableId        = typeof action.payload === 'string' ? action.payload : action.payload.tableId
       const loyalty        = typeof action.payload === 'object' ? action.payload.loyalty : null
       const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
+      const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
 
       const paidAt  = new Date().toISOString()
       const discPct = loyalty?.loyalty_discount_pct || 0
@@ -248,26 +389,54 @@ export async function writeToSupabase(action, state) {
         .eq('payment_status', 'unpaid')
 
       if (unpaidOrders?.length) {
-        const combinedSubtotal   = unpaidOrders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0)
-        const serviceRate = Number.isFinite(Number(loyalty?.service_rate_pct))
-          ? Number(loyalty.service_rate_pct) / 100
-          : serviceRateFromSettings(state.settings)
+        const serviceRatePct = Number.isFinite(Number(loyalty?.service_rate_pct))
+          ? Math.max(0, Math.min(100, Number(loyalty.service_rate_pct)))
+          : serviceRatePctFromSettings(state.settings)
+        const orderSummaries = unpaidOrders.map(o => {
+          const paymentFields = getOrderPaymentFields(
+            { subtotal: Number(o.subtotal) || 0, service_rate_pct: serviceRatePct, loyalty_discount_pct: discPct },
+            [],
+            serviceRatePct
+          )
+          return {
+            id: o.id,
+            paymentFields,
+            total: getOrderPaymentSummary(paymentFields, [], serviceRatePct).total,
+          }
+        })
+        const totalDue = orderSummaries.reduce((sum, row) => sum + row.total, 0)
+        const normalizedPayments = normalizeSplitPayments(
+          requestedPayments || [{ method: payment_method || 'cash', amount: totalDue }],
+          totalDue
+        )
+        const finalPaymentMethod = getPaymentMethodSummary(normalizedPayments, payment_method)
+        const paymentRows = allocateSplitPaymentsToOrders(orderSummaries, normalizedPayments)
 
-        for (const o of unpaidOrders) {
-          const sub     = Number(o.subtotal) || 0
-          const svcFee  = Math.round(sub * serviceRate)
-          const grossAmount = sub + svcFee
-          const discAmt = Math.round(grossAmount * discPct / 100)
+        if (paymentRows.length > 0) {
+          const { error: deletePaymentsError } = await supabase
+            .from('order_payments')
+            .delete()
+            .in('order_id', orderSummaries.map(row => row.id))
+          const paymentsTableMissing = deletePaymentsError && /order_payments|schema cache|relation/i.test(deletePaymentsError.message || '')
+          if (deletePaymentsError && !paymentsTableMissing) throw deletePaymentsError
+
+          if (!paymentsTableMissing) {
+            const { error: insertPaymentsError } = await supabase
+              .from('order_payments')
+              .insert(paymentRows)
+            if (insertPaymentsError) throw insertPaymentsError
+          } else {
+            console.warn('[db] order_payments table is missing; paid order will keep only summary payment_method')
+          }
+        }
+
+        for (const o of orderSummaries) {
           await supabase.from('orders').update({
             status:         'paid',
             payment_status: 'paid',
             paid_at:        paidAt,
-            total:          Math.max(0, grossAmount - discAmt),
-            service_fee:    svcFee,
-            service_rate_pct: Math.round(serviceRate * 100),
-            ...(payment_method ? { payment_method }                              : {}),
-            ...(discPct        ? { loyalty_discount_pct:    discPct }            : {}),
-            ...(discAmt        ? { loyalty_discount_amount: discAmt }            : {}),
+            ...o.paymentFields,
+            payment_method: finalPaymentMethod,
           }).eq('id', o.id)
         }
       }
@@ -276,6 +445,23 @@ export async function writeToSupabase(action, state) {
         .from('restaurant_tables')
         .update({ status: 'available' })
         .eq('id', tableId)
+      break
+    }
+
+    case 'SET_SETTINGS': {
+      const settings = action.payload || {}
+      const serviceRatePct = serviceRatePctFromSettings({ serviceRate: settings.serviceRate })
+      const { error } = await supabase
+        .from('business_settings')
+        .upsert({
+          id: 'default',
+          restaurant_name: settings.restaurantName || 'Zar Kebab',
+          service_rate_pct: serviceRatePct,
+          receipt_footer: settings.receiptFooter || '',
+          auto_print: !!settings.autoPrint,
+          updated_at: new Date().toISOString(),
+        })
+      if (error) throw error
       break
     }
 
@@ -320,6 +506,21 @@ export async function writeToSupabase(action, state) {
       await Promise.all([
         supabase.from('menu_items').update({ sort_order: itemB.sort_order ?? 0 }).eq('id', idA),
         supabase.from('menu_items').update({ sort_order: itemA.sort_order ?? 0 }).eq('id', idB),
+      ])
+      break
+    }
+
+    case 'REORDER_QUICK_ITEM': {
+      const { idA, idB } = action.payload
+      const itemA = state.menuItems.find(i => i.id === idA)
+      const itemB = state.menuItems.find(i => i.id === idB)
+      if (!itemA || !itemB) return
+
+      const orderA = Number(itemA.quick_item_sort_order ?? itemA.sort_order ?? 0)
+      const orderB = Number(itemB.quick_item_sort_order ?? itemB.sort_order ?? 0)
+      await Promise.all([
+        supabase.from('menu_items').update({ quick_item_sort_order: orderB }).eq('id', idA),
+        supabase.from('menu_items').update({ quick_item_sort_order: orderA }).eq('id', idB),
       ])
       break
     }

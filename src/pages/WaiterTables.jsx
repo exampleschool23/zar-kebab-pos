@@ -102,21 +102,21 @@ const STATUS_CFG = {
     border: 'border-emerald-200',
     hoverBorder: 'hover:border-emerald-400',
     bg: 'bg-emerald-50',
-    badge: 'bg-emerald-100 text-emerald-700',
+    badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
     dot: 'bg-emerald-400',
     icon: Coffee,
-    chipBg: 'bg-emerald-100 text-emerald-700',
+    chipBg: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
     chipActiveBg: 'bg-emerald-500 text-white',
   },
   waiting_kitchen: {
-    border: 'border-amber-200',
-    hoverBorder: 'hover:border-amber-400',
-    bg: 'bg-amber-50',
-    badge: 'bg-amber-100 text-amber-700',
-    dot: 'bg-amber-400',
+    border: 'border-yellow-200',
+    hoverBorder: 'hover:border-yellow-400',
+    bg: 'bg-yellow-50',
+    badge: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
+    dot: 'bg-yellow-400',
     icon: Clock,
-    chipBg: 'bg-amber-100 text-amber-700',
-    chipActiveBg: 'bg-amber-500 text-white',
+    chipBg: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
+    chipActiveBg: 'bg-yellow-500 text-white',
   },
   preparing: {
     border: 'border-orange-200',
@@ -129,14 +129,14 @@ const STATUS_CFG = {
     chipActiveBg: 'bg-orange-500 text-white',
   },
   ready: {
-    border: 'border-green-300',
-    hoverBorder: 'hover:border-green-500',
-    bg: 'bg-green-50',
-    badge: 'bg-green-100 text-green-700',
-    dot: 'bg-green-500',
+    border: 'border-blue-200',
+    hoverBorder: 'hover:border-blue-400',
+    bg: 'bg-blue-50',
+    badge: 'bg-blue-100 text-blue-700 border border-blue-200',
+    dot: 'bg-blue-500',
     icon: CheckCircle2,
-    chipBg: 'bg-green-100 text-green-700',
-    chipActiveBg: 'bg-green-600 text-white',
+    chipBg: 'bg-blue-100 text-blue-700 border border-blue-200',
+    chipActiveBg: 'bg-blue-500 text-white',
   },
   occupied: {
     border: 'border-blue-200',
@@ -152,10 +152,10 @@ const STATUS_CFG = {
     border: 'border-red-300',
     hoverBorder: 'hover:border-red-500',
     bg: 'bg-red-50',
-    badge: 'bg-red-100 text-red-700',
+    badge: 'bg-red-100 text-red-700 border border-red-200',
     dot: 'bg-red-500',
     icon: Receipt,
-    chipBg: 'bg-red-100 text-red-700',
+    chipBg: 'bg-red-100 text-red-700 border border-red-200',
     chipActiveBg: 'bg-red-500 text-white',
   },
 }
@@ -275,7 +275,7 @@ function TableCard({ table, status, counts, lang, onClick }) {
       {(status === 'waiting_kitchen') && (
         <div className="flex flex-wrap gap-1 mt-1">
           {counts.newCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-amber-100 text-amber-700" />
+            <KitchenChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-yellow-100 text-yellow-700 border border-yellow-200" />
           )}
           <p className="w-full text-[#ff5a00] font-bold text-sm mt-1">{formatCurrency(counts.total)}</p>
         </div>
@@ -284,13 +284,13 @@ function TableCard({ table, status, counts, lang, onClick }) {
       {(status === 'preparing') && (
         <div className="flex flex-wrap gap-1 mt-1">
           {counts.newCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-amber-100 text-amber-700" />
+            <KitchenChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-yellow-100 text-yellow-700 border border-yellow-200" />
           )}
           {counts.preparingCount > 0 && (
             <KitchenChip label={tr(lang, 'itemsPreparing', counts.preparingCount)} color="bg-orange-100 text-orange-700" />
           )}
           {counts.readyCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-green-100 text-green-700" />
+            <KitchenChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-blue-100 text-blue-700 border border-blue-200" />
           )}
           <p className="w-full text-[#ff5a00] font-bold text-sm mt-1">{formatCurrency(counts.total)}</p>
         </div>
@@ -299,7 +299,7 @@ function TableCard({ table, status, counts, lang, onClick }) {
       {status === 'ready' && (
         <div className="mt-1">
           {counts.readyCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-green-100 text-green-700" />
+            <KitchenChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-blue-100 text-blue-700 border border-blue-200" />
           )}
           <p className="text-[#ff5a00] font-bold text-sm mt-1">{formatCurrency(counts.total)}</p>
         </div>

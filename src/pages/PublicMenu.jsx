@@ -7,36 +7,11 @@ import { getBrandLogo } from '../lib/brandLogo'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import {
   ProductCard as MenuProductCard,
   ProductDetailPage as MenuProductDetailPage,
 } from './WaiterOrder'
-
-function PublicCategoryImage({ src, alt, active }) {
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    setFailed(false)
-  }, [src])
-
-  if (!src || failed) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-orange-50">
-        <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
-      </div>
-    )
-  }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      className="h-full w-full object-cover object-center"
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
-  )
-}
 
 async function loadPublicMenuData() {
   const rpcRes = await supabase.rpc('get_public_menu_data')
@@ -129,15 +104,13 @@ export default function PublicMenu() {
 
   const filteredItems = useMemo(() => {
     return items.filter(item => {
-      const matchesCategory = activeCategory === 'all' || item.category_id === activeCategory
       const names = [item.name_uz, item.name_ru, item.name_en, item.description_uz, item.description_ru, item.description_en]
       const matchesSearch = !q || names.some(value => value?.toLowerCase().includes(q))
-      return matchesCategory && matchesSearch
+      return matchesSearch
     })
-  }, [items, activeCategory, q])
+  }, [items, q])
 
   const groupedSections = useMemo(() => {
-    if (activeCategory !== 'all' || q) return null
     const sections = categories
       .map(cat => ({
         cat,
@@ -155,7 +128,7 @@ export default function PublicMenu() {
     }
 
     return sections
-  }, [activeCategory, q, categories, filteredItems])
+  }, [categories, filteredItems])
 
   const categoryMap = useMemo(() => {
     const map = {}
@@ -231,39 +204,17 @@ export default function PublicMenu() {
             />
           </div>
 
-          <div className="mt-4 flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {categoryCards.map(cat => {
-              const isAll = cat.id === 'all'
-              const active = activeCategory === cat.id
-              const title = isAll ? (lang === 'uz' ? 'Barchasi' : lang === 'ru' ? 'Все' : 'All') : getCategoryName(cat, lang)
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`w-[124px] min-w-[124px] overflow-hidden rounded-[20px] border-2 bg-white text-center transition-all ${
-                    active ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-[0_8px_18px_rgba(255,90,31,0.16)]' : 'border-[#E5E7EB] shadow-sm'
-                  }`}
-                >
-                  <div className={`aspect-square w-full overflow-hidden ${active ? 'bg-[#FFE8D8]' : 'bg-[#F3F4F6]'}`}>
-                    {isAll ? (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <UtensilsCrossed size={30} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
-                      </div>
-                    ) : cat.image_url ? (
-                      <PublicCategoryImage src={cat.image_url} alt={title} active={active} />
-                    ) : (
-                      <PublicCategoryImage src={null} alt={title} active={active} />
-                    )}
-                  </div>
-                  <div className="min-h-[58px] px-2.5 py-2.5 flex items-center justify-center">
-                    <p className={`line-clamp-2 text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
-                      {title}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+          <MenuCategoryScroller
+            categories={categoryCards}
+            activeCategoryId={activeCategory}
+            onCategoryClick={setActiveCategory}
+            onActiveCategoryChange={setActiveCategory}
+            lang={lang}
+            itemCounts={itemCounts}
+            sectionPrefix="public-menu-category"
+            topOffset={73}
+            className="mt-4"
+          />
         </div>
 
         {loading ? (
@@ -305,7 +256,11 @@ export default function PublicMenu() {
           groupedSections ? (
             <div className="space-y-8">
               {groupedSections.map(section => (
-                <section key={section.cat.id}>
+                <section
+                  key={section.cat.id}
+                  id={menuCategorySectionId('public-menu-category', section.cat.id)}
+                  className="scroll-mt-32"
+                >
                   <div className="mb-3 flex items-center gap-2.5">
                     <h2 className="text-xl font-black uppercase tracking-tight text-[#1F2937]">
                       {getCategoryName(section.cat, lang)}

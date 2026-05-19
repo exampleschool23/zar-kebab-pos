@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Search, ShoppingCart, Plus, Minus, UtensilsCrossed,
@@ -11,6 +11,7 @@ import { t, getItemName, getItemDesc, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
+import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 
 function MenuImageFallback({ className = '', iconSize = 32, active = false }) {
   return (
@@ -582,6 +583,7 @@ export default function WaiterOrder() {
   const [sidebarOpen,   setSidebarOpen]  = useState(false)
   const [orderType,     setOrderType]    = useState('dine_in')
   const [detailItem,    setDetailItem]   = useState(null)
+  const productScrollRef = useRef(null)
 
   const table = state.tables.find(t => t.id === tableId)
 
@@ -640,20 +642,18 @@ export default function WaiterOrder() {
     return state.menuItems
       .filter(item => {
         if (!item.available) return false
-        const matchCat    = activeCategory === 'all' || item.category_id === activeCategory
         const matchSearch = !q || [item.name_uz, item.name_ru, item.name_en].some(n => n?.toLowerCase().includes(q))
-        return matchCat && matchSearch
+        return matchSearch
       })
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
-  }, [state.menuItems, activeCategory, q])
+  }, [state.menuItems, q])
 
   // Grouped sections when "All" is selected without a search query
   const sections = useMemo(() => {
-    if (activeCategory !== 'all' || q) return null
     return sortedCategories
       .map(cat => ({ cat, items: filteredItems.filter(i => i.category_id === cat.id) }))
       .filter(s => s.items.length > 0)
-  }, [activeCategory, q, sortedCategories, filteredItems])
+  }, [sortedCategories, filteredItems])
 
   // Category lookup map (for product detail page)
   const categoryMap = useMemo(() => {
@@ -758,8 +758,10 @@ export default function WaiterOrder() {
         ) : (
           <>
 
-        {/* Search bar */}
-        <div className="flex-shrink-0 bg-white border-b border-[#E5E7EB] px-4 py-3 flex items-center gap-3 shadow-sm">
+        {/* Public-menu style search */}
+        <div className="flex-shrink-0 px-4 pt-4 pb-0">
+          <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-3">
           {/* Mobile hamburger */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -827,25 +829,25 @@ export default function WaiterOrder() {
               </button>
             </div>
           )}
-        </div>
 
-        {/* Category row */}
-        <div className="flex-shrink-0 bg-white border-b border-[#E5E7EB] px-4 py-3">
-          <div className="flex gap-2.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
-            {allCategoryCards.map(cat => (
-              <CategoryCard
-                key={cat.id}
-                cat={cat}
-                active={activeCategory === cat.id}
-                onClick={() => setCategory(cat.id)}
-                lang={lang}
-              />
-            ))}
+            </div>
           </div>
         </div>
 
         {/* Product area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+        <div ref={productScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-0">
+          <MenuCategoryScroller
+            categories={allCategoryCards}
+            activeCategoryId={activeCategory}
+            onCategoryClick={setCategory}
+            onActiveCategoryChange={setCategory}
+            lang={lang}
+            itemCounts={categoryItemCounts}
+            sectionPrefix="waiter-menu-category"
+            scrollContainerRef={productScrollRef}
+            className="pt-4 mb-4"
+            collapsedClassName="-mx-4 px-4"
+          />
           {filteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-[#9CA3AF]">
               <Search size={36} className="mb-3 opacity-20" />
@@ -862,12 +864,17 @@ export default function WaiterOrder() {
             // Grouped by category when "All" selected, no search
             <div className="space-y-8">
               {sections.map(({ cat, items }) => (
-                <ProductSection
+                <div
                   key={cat.id}
-                  cat={cat}
-                  items={items}
-                  {...cardProps}
-                />
+                  id={menuCategorySectionId('waiter-menu-category', cat.id)}
+                  className="scroll-mt-20"
+                >
+                  <ProductSection
+                    cat={cat}
+                    items={items}
+                    {...cardProps}
+                  />
+                </div>
               ))}
             </div>
           ) : (

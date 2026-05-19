@@ -2,12 +2,21 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  allocateSplitPaymentsToOrders,
   getGroupedOrderItems,
+  getOrderPaymentBreakdown,
+  getOrderPaymentFields,
   getOrderTotal,
   getOrderPaymentSummary,
+  getPaymentMethodSummary,
+  getSplitPaymentValidation,
   groupOrdersBySession,
+  isActiveNeedsBillOrder,
   isPaidOrder,
+  normalizeSplitPayments,
 } from '../src/lib/analytics.js'
+import { defaultPath, isPublicOnlyRole } from '../src/lib/permissions.js'
+import { getQuickItemSortOrder, isCashierQuickItem } from '../src/lib/menuItems.js'
 
 const screenshotItems = [
   { id: 'a', menu_item_id: 'lula-en', name: 'Lula kebab', quantity: 1, price: 24000 },
@@ -18,6 +27,18 @@ const screenshotItems = [
   { id: 'f', menu_item_id: 'lula-ru', name: 'Люля-кебаб', quantity: 3, price: 24000 },
   { id: 'g', menu_item_id: 'lentil', name: 'Чечевица', quantity: 4, price: 25000 },
 ]
+
+test('signed-in internal roles resolve to workspace routes while guest stays public menu', () => {
+  assert.equal(isPublicOnlyRole('guest'), true)
+  assert.equal(isPublicOnlyRole('customer'), true)
+  assert.equal(isPublicOnlyRole('owner'), false)
+  assert.equal(defaultPath('owner'), '/admin')
+  assert.equal(defaultPath('admin'), '/admin')
+  assert.equal(defaultPath('cashier'), '/cashier/tables')
+  assert.equal(defaultPath('waiter'), '/waiter/tables')
+  assert.equal(defaultPath('kitchen'), '/kitchen')
+  assert.equal(defaultPath('guest'), '/menu')
+})
 
 test('order subtotal is calculated from item rows, not stale stored subtotal', () => {
   const summary = getOrderPaymentSummary(
@@ -98,6 +119,292 @@ test('service and loyalty discount combinations use the shared payment rule', ()
   assert.equal(neither.serviceFee, 0)
   assert.equal(neither.discountAmount, 0)
   assert.equal(neither.total, 100000)
+})
+
+test('split payment can settle one order with cash card loyalty and qr methods', () => {
+  const rows = [item({ id: 'split-row', menu_item_id: 'table-bill', quantity: 1, price: 214000 })]
+  const order = paidOrder({
+    id: 'split-payment-order',
+    table_id: 'table-8',
+    items: rows,
+    service_rate_pct: 20,
+    loyalty_discount_pct: 5,
+  })
+  const summary = getOrderPaymentSummary(order, rows, 20)
+  const payments = normalizeSplitPayments([
+    { method: 'cash', amount: 50000 },
+    { method: 'card', amount: 100000 },
+    { method: 'loyalty_card', amount: 40000 },
+    { method: 'qr', amount: 53960 },
+  ], summary.total)
+  const paid = payments.reduce((sum, row) => sum + row.amount, 0)
+  const paymentOrder = { ...order, payments, payment_method: getPaymentMethodSummary(payments) }
+
+  assert.equal(summary.subtotal, 214000)
+  assert.equal(summary.serviceFee, 42800)
+  assert.equal(summary.discountAmount, 12840)
+  assert.equal(summary.total, 243960)
+  assert.equal(paid, summary.total)
+  assert.equal(paymentOrder.payment_method, 'mixed')
+  assert.deepEqual(getOrderPaymentBreakdown(paymentOrder), payments)
+  assert.equal(paidRevenue([paymentOrder]), summary.total)
+})
+
+test('cashier validation rejects overpayment instead of treating it as fully paid', () => {
+  const validation = getSplitPaymentValidation([
+    { method: 'cash', amount: 81650 },
+  ], 65320)
+
+  assert.equal(validation.paidAmount, 81650)
+  assert.equal(validation.remainingAmount, 0)
+  assert.equal(validation.overpaidAmount, 16330)
+  assert.equal(validation.isOverpaid, true)
+  assert.equal(validation.isFullyPaid, false)
+  assert.equal(validation.canConfirmPayment, false)
+})
+
+test('cashier payment row quick amount is capped by remaining total', () => {
+  const total = 976120
+  const existingRows = [
+    { id: 'cash', amount: 300000 },
+    { id: 'card', amount: 100000 },
+  ]
+  const otherPaid = existingRows.reduce((sum, row) => (
+    row.id === 'cash' ? sum : sum + row.amount
+  ), 0)
+  const maxForCashRow = Math.max(0, total - otherPaid)
+  const requestedCashAmount = 3312314
+  const clampedCashAmount = Math.min(Math.max(0, requestedCashAmount), maxForCashRow)
+
+  assert.equal(maxForCashRow, 876120)
+  assert.equal(clampedCashAmount, 876120)
+  assert.equal(clampedCashAmount + otherPaid, total)
+})
+
+test('split payment confirm is enabled only when paid amount exactly matches total', () => {
+  const underpaid = getSplitPaymentValidation([
+    { method: 'cash', amount: 40000 },
+    { method: 'card', amount: 20000 },
+  ], 65320)
+  const exact = getSplitPaymentValidation([
+    { method: 'cash', amount: 40000 },
+    { method: 'card', amount: 25320 },
+  ], 65320)
+  const overpaid = getSplitPaymentValidation([
+    { method: 'cash', amount: 40000 },
+    { method: 'card', amount: 30000 },
+  ], 65320)
+
+  assert.equal(underpaid.canConfirmPayment, false)
+  assert.equal(underpaid.remainingAmount, 5320)
+  assert.equal(exact.isFullyPaid, true)
+  assert.equal(exact.canConfirmPayment, true)
+  assert.equal(overpaid.canConfirmPayment, false)
+  assert.equal(overpaid.overpaidAmount, 4680)
+})
+
+test('single payment keeps its original method for legacy reports and badges', () => {
+  const payments = normalizeSplitPayments([{ method: 'qr_code', amount: 58500 }], 58500)
+
+  assert.equal(getPaymentMethodSummary(payments), 'qr')
+  assert.deepEqual(payments, [{ method: 'qr', amount: 58500 }])
+})
+
+test('unpaid bills do not invent a payment breakdown before checkout', () => {
+  const order = activeOrder({
+    id: 'unpaid-bill',
+    table_id: 'table-8',
+    payment_method: null,
+    items: [item({ id: 'u1', menu_item_id: 'kebab', quantity: 1, price: 25000 })],
+  })
+
+  assert.deepEqual(getOrderPaymentBreakdown(order), [])
+})
+
+test('split payment allocation covers multiple unpaid rounds without double-counting', () => {
+  const orderRounds = [
+    { id: 'round-1', total: 80000 },
+    { id: 'round-2', total: 50000 },
+    { id: 'round-3', total: 30000 },
+  ]
+  const payments = normalizeSplitPayments([
+    { method: 'cash', amount: 70000 },
+    { method: 'card', amount: 60000 },
+    { method: 'loyalty_card', amount: 30000 },
+  ], 160000)
+
+  const allocations = allocateSplitPaymentsToOrders(orderRounds, payments)
+
+  assert.deepEqual(allocations, [
+    { order_id: 'round-1', method: 'cash', amount: 70000 },
+    { order_id: 'round-1', method: 'card', amount: 10000 },
+    { order_id: 'round-2', method: 'card', amount: 50000 },
+    { order_id: 'round-3', method: 'loyalty_card', amount: 30000 },
+  ])
+  assert.equal(allocations.reduce((sum, row) => sum + row.amount, 0), 160000)
+})
+
+test('grouped paid session keeps split payment breakdown equal to final revenue', () => {
+  const orderA = paidOrder({
+    id: 'split-session-a',
+    table_id: 'table-10',
+    paid_at: '2026-05-16T18:22:00.000Z',
+    items: [item({ id: 'a1', menu_item_id: 'kebab', quantity: 2, price: 25000 })],
+    payments: [
+      { method: 'cash', amount: 50000 },
+      { method: 'card', amount: 8500 },
+    ],
+    payment_method: 'mixed',
+  })
+  const orderB = paidOrder({
+    id: 'split-session-b',
+    table_id: 'table-10',
+    paid_at: '2026-05-16T18:22:30.000Z',
+    items: [item({ id: 'b1', menu_item_id: 'cola', quantity: 2, price: 12000 })],
+    payments: [
+      { method: 'card', amount: 19580 },
+      { method: 'loyalty_card', amount: 8500 },
+    ],
+    payment_method: 'mixed',
+  })
+
+  const [session] = groupOrdersBySession([orderA, orderB])
+  const breakdown = getOrderPaymentBreakdown(session)
+  const paidByMethod = breakdown.reduce((sum, row) => sum + row.amount, 0)
+
+  assert.equal(groupOrdersBySession([orderA, orderB]).length, 1)
+  assert.equal(paidByMethod, getOrderTotal(session))
+  assert.equal(paidByMethod, paidRevenue([session]))
+  assert.deepEqual(breakdown, [
+    { method: 'cash', amount: 50000 },
+    { method: 'card', amount: 28080 },
+    { method: 'loyalty_card', amount: 8500 },
+  ])
+})
+
+test('dashboard needs bill ignores paid or stale orders whose table is no longer waiting for bill', () => {
+  const tables = [
+    { id: 'table-6', status: 'available' },
+    { id: 'table-8', status: 'needs_bill' },
+  ]
+  const stale = activeOrder({
+    id: 'stale-needs-bill',
+    table_id: 'table-6',
+    status: 'needs_bill',
+    items: [item({ id: 'stale-item', menu_item_id: 'kebab', quantity: 1, price: 25000 })],
+  })
+  const paidButOldStatus = paidOrder({
+    id: 'paid-old-status',
+    table_id: 'table-8',
+    status: 'needs_bill',
+    items: [item({ id: 'paid-item', menu_item_id: 'cola', quantity: 1, price: 12000 })],
+  })
+  const realNeedsBill = activeOrder({
+    id: 'real-needs-bill',
+    table_id: 'table-8',
+    status: 'needs_bill',
+    items: [item({ id: 'real-item', menu_item_id: 'lagman', quantity: 1, price: 32000 })],
+  })
+
+  assert.equal(isActiveNeedsBillOrder(stale, tables), false)
+  assert.equal(isActiveNeedsBillOrder(paidButOldStatus, tables), false)
+  assert.equal(isActiveNeedsBillOrder(realNeedsBill, tables), true)
+})
+
+test('database write fields are generated from the shared payment summary', () => {
+  const rows = [
+    item({ id: 'write-a', menu_item_id: 'kebab', quantity: 2, price: 25000 }),
+    item({ id: 'write-b', menu_item_id: 'cola', quantity: 3, price: 12000 }),
+  ]
+
+  const summary = getOrderPaymentSummary(
+    { service_rate_pct: 17, loyalty_discount_pct: 5 },
+    rows,
+    20
+  )
+  const fields = getOrderPaymentFields(
+    { service_rate_pct: 17, loyalty_discount_pct: 5 },
+    rows,
+    20
+  )
+
+  assert.deepEqual(fields, {
+    subtotal: summary.subtotal,
+    service_fee: summary.serviceFee,
+    service_rate_pct: summary.serviceRatePct,
+    total: summary.total,
+    loyalty_discount_pct: summary.discountPercent,
+    loyalty_discount_amount: summary.discountAmount,
+  })
+})
+
+test('repeated table additions use write fields that match receipt and reports totals', () => {
+  const firstRound = [
+    item({ id: 'wf-1', menu_item_id: 'lula', quantity: 1, price: 24000 }),
+    item({ id: 'wf-2', menu_item_id: 'cola', quantity: 3, price: 12000 }),
+  ]
+  const secondRound = [
+    item({ id: 'wf-3', menu_item_id: 'lagman', quantity: 4, price: 32000 }),
+    item({ id: 'wf-4', menu_item_id: 'lula', quantity: 2, price: 24000 }),
+  ]
+  const allItems = [...firstRound, ...secondRound]
+  const orderForWrite = { service_rate_pct: 17, loyalty_discount_pct: 5 }
+  const written = getOrderPaymentFields(orderForWrite, allItems, 20)
+  const storedOrder = paidOrder({
+    id: 'write-rounds',
+    table_id: 'table-10',
+    items: allItems,
+    ...written,
+    service_rate_pct: written.service_rate_pct,
+    loyalty_discount_pct: written.loyalty_discount_pct,
+    loyalty_discount_amount: written.loyalty_discount_amount,
+  })
+
+  const receiptSummary = getOrderPaymentSummary(storedOrder, getGroupedOrderItems(allItems), 20)
+  const reportsRevenue = paidRevenue([storedOrder])
+
+  assert.equal(written.subtotal, 236000)
+  assert.equal(written.service_fee, 40120)
+  assert.equal(written.total, 262314)
+  assert.equal(receiptSummary.total, written.total)
+  assert.equal(reportsRevenue, written.total)
+})
+
+test('cashier counter items are real order items and immediately change totals and remaining payment', () => {
+  const beforeItems = [
+    item({ id: 'meal-1', menu_item_id: 'kebab', quantity: 1, price: 81650 }),
+  ]
+  const paidBeforeCounterItem = 81650
+  const before = getOrderPaymentSummary({ service_rate_pct: 0 }, beforeItems, 0)
+  assert.equal(before.total, 81650)
+
+  const afterItems = [
+    ...beforeItems,
+    item({ id: 'counter-cola', menu_item_id: 'coca-cola', name: 'Coca-Cola', quantity: 1, price: 12000, status: 'served' }),
+  ]
+  const after = getOrderPaymentSummary({ service_rate_pct: 0 }, afterItems, 0)
+  const validation = getSplitPaymentValidation([{ method: 'cash', amount: paidBeforeCounterItem }], after.total)
+  const groupedForReceipt = getGroupedOrderItems(afterItems)
+
+  assert.equal(after.total, 93650)
+  assert.equal(validation.canConfirmPayment, false)
+  assert.equal(validation.remainingAmount, 12000)
+  assert.equal(groupedForReceipt.some(row => row.menu_item_id === 'coca-cola' && row.quantity === 1), true)
+})
+
+test('cashier quick items are explicit menu items with independent cashier ordering', () => {
+  const menuItems = [
+    { id: 'kebab', name_en: 'Kebab', show_in_cashier_quick_items: false, sort_order: 1 },
+    { id: 'cola', name_en: 'Coca-Cola', show_in_cashier_quick_items: true, quick_item_sort_order: 2, sort_order: 10 },
+    { id: 'orbit', name_en: 'Orbit', show_in_cashier_quick_items: true, quick_item_sort_order: 1, sort_order: 20 },
+  ]
+  const quickItems = menuItems
+    .filter(isCashierQuickItem)
+    .sort((a, b) => getQuickItemSortOrder(a) - getQuickItemSortOrder(b))
+
+  assert.deepEqual(quickItems.map(item => item.id), ['orbit', 'cola'])
+  assert.equal(isCashierQuickItem({ id: 'legacy', isCounterItem: true }), true)
+  assert.equal(isCashierQuickItem({ id: 'plain-cola-by-name-only', name_en: 'Coca-Cola' }), false)
 })
 
 test('items with different menu_item_id but similar localized names are not merged', () => {

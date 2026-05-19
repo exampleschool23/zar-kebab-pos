@@ -3,15 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Printer, CheckCircle2, Banknote, CreditCard,
   Receipt, Users, Clock, Tag, UtensilsCrossed, Menu as MenuIcon,
-  Monitor, QrCode, MoreHorizontal,
+  Monitor, QrCode, MoreHorizontal, Plus, Minus, Trash2,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
-import { t } from '../lib/i18n'
+import { getItemName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { getGroupedOrderItems, getOrderPaymentSummary } from '../lib/analytics'
+import {
+  getGroupedOrderItems,
+  getPaymentMethodSummary,
+  getOrderPaymentSummary,
+  getSplitPaymentValidation,
+  normalizeSplitPayments,
+} from '../lib/analytics'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import StatusBadge from '../components/StatusBadge'
+import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const LOYALTY_PRESETS = [0, 5, 10, 15, 20]
@@ -27,6 +34,7 @@ const PAY_METHODS = [
   { key: 'card',     icon: CreditCard, labelUz: 'Karta',   labelRu: 'Карта',     labelEn: 'Card'     },
   { key: 'terminal', icon: Monitor,   labelUz: 'Terminal', labelRu: 'Терминал',  labelEn: 'Terminal' },
   { key: 'qr',       icon: QrCode,    labelUz: 'QR Code',  labelRu: 'QR-код',    labelEn: 'QR Code'  },
+  { key: 'loyalty_card', icon: Tag, labelUz: 'Loyalty', labelRu: 'Лояльность', labelEn: 'Loyalty' },
 ]
 
 function payLabel(m, lang) {
@@ -57,7 +65,8 @@ export default function CashierBill() {
   const configuredServiceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
 
   const [payMethod,  setPayMethod]  = useState('cash')
-  const [received,   setReceived]   = useState('')
+  const [splitPayments, setSplitPayments] = useState([{ id: 'payment-1', method: 'cash', amount: '' }])
+  const [activePaymentId, setActivePaymentId] = useState('payment-1')
   const [loyaltyPct, setLoyaltyPct] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -87,6 +96,14 @@ export default function CashierBill() {
     return m
   }, [state.menuItems])
 
+  const quickItems = useMemo(() =>
+    state.menuItems
+      .filter(item => item.available !== false && isCashierQuickItem(item))
+      .sort((a, b) => getQuickItemSortOrder(a) - getQuickItemSortOrder(b))
+      .slice(0, 8),
+    [state.menuItems]
+  )
+
   // ── Totals ─────────────────────────────────────────────────────────────────
   const payment       = order
     ? getOrderPaymentSummary({ ...order, loyalty_discount_pct: loyaltyPct }, order.items, configuredServiceRatePct)
@@ -98,23 +115,85 @@ export default function CashierBill() {
   const serviceRatePct = payment.serviceRatePct
   const total         = payment.total
 
-  // Cash
-  const receivedNum  = parseFloat(received) || 0
-  const change       = receivedNum - total
-  const shortfall    = total - receivedNum
-  const needsCash    = payMethod === 'cash'
-  const canProcess   = !needsCash || receivedNum >= total
+  const enteredPayments = splitPayments.map(row => ({
+    method: row.method,
+    amount: Number(row.amount) || 0,
+  }))
+  const paymentValidation = getSplitPaymentValidation(enteredPayments, total)
+  const paidAmount = paymentValidation.paidAmount
+  const appliedPayments = normalizeSplitPayments(enteredPayments, total)
+  const finalPaymentMethod = getPaymentMethodSummary(appliedPayments, payMethod)
+  const shortfall = paymentValidation.remainingAmount
+  const overpaidAmount = paymentValidation.overpaidAmount
+  const canProcess = paymentValidation.canConfirmPayment
+  const isOverpaid = paymentValidation.isOverpaid
+  const isFullyPaid = paymentValidation.isFullyPaid
 
   function applyPreset(p) {
-    setReceived(p.exact ? String(total) : String(p.value))
+    const remainingForActive = getMaxForPaymentRow(activePaymentId)
+    updateActivePaymentAmount(p.exact ? remainingForActive : Math.min(p.value, remainingForActive))
+  }
+
+  function getMaxForPaymentRow(id) {
+    const otherPaid = splitPayments.reduce((sum, row) => (
+      row.id === id ? sum : sum + (Number(row.amount) || 0)
+    ), 0)
+    return Math.max(0, total - otherPaid)
+  }
+
+  function updatePayment(id, patch) {
+    setSplitPayments(prev => prev.map(row => {
+      if (row.id !== id) return row
+      if (!Object.prototype.hasOwnProperty.call(patch, 'amount')) return { ...row, ...patch }
+      const amount = Math.max(0, Math.round(Number(patch.amount) || 0))
+      return { ...row, ...patch, amount: patch.amount === '' ? '' : String(amount) }
+    }))
+  }
+
+  function updateActivePaymentAmount(amount) {
+    setSplitPayments(prev => prev.map(row =>
+      row.id === activePaymentId ? { ...row, amount: String(Math.max(0, Math.round(Number(amount) || 0))) } : row
+    ))
+  }
+
+  function fillRemaining(id = activePaymentId) {
+    updatePayment(id, { amount: String(getMaxForPaymentRow(id)) })
+  }
+
+  function addPaymentRow() {
+    const id = `payment-${Date.now()}`
+    setSplitPayments(prev => [...prev, { id, method: 'cash', amount: '' }])
+    setActivePaymentId(id)
+  }
+
+  function removePaymentRow(id) {
+    setSplitPayments(prev => {
+      const next = prev.filter(row => row.id !== id)
+      if (next.length === 0) return [{ id: 'payment-1', method: 'cash', amount: '' }]
+      return next
+    })
+    if (activePaymentId === id) {
+      const nextRow = splitPayments.find(row => row.id !== id)
+      if (nextRow) {
+        setActivePaymentId(nextRow.id)
+        setPayMethod(nextRow.method)
+      }
+    }
+  }
+
+  function selectPaymentMethod(method) {
+    setPayMethod(method)
+    updatePayment(activePaymentId, { method })
   }
 
   function handlePaid() {
+    if (!canProcess) return
     dispatch({
       type: 'MARK_ORDER_PAID',
       payload: {
         tableId,
-        payment_method: payMethod,
+        payment_method: finalPaymentMethod,
+        payments: appliedPayments,
         loyalty: {
           loyalty_discount_pct:    loyaltyPct,
           loyalty_discount_amount: loyaltyAmt,
@@ -126,6 +205,33 @@ export default function CashierBill() {
       },
     })
     navigate('/cashier/tables')
+  }
+
+  function addQuickItem(item) {
+    dispatch({
+      type: 'ADD_QUICK_ITEM_TO_ORDER',
+      payload: {
+        tableId,
+        item: {
+          id: item.id,
+          name: getItemName(item, lang),
+          price: item.price,
+          sendToKitchen: !!(item.sendToKitchen || item.send_to_kitchen),
+        },
+      },
+    })
+  }
+
+  function updateBillItemQty(item, qty) {
+    dispatch({
+      type: 'UPDATE_BILL_ITEM_QTY',
+      payload: {
+        tableId,
+        orderItemId: item.id,
+        menuItemId: item.menu_item_id,
+        qty,
+      },
+    })
   }
 
   // ── Localized strings ───────────────────────────────────────────────────────
@@ -144,8 +250,12 @@ export default function CashierBill() {
     loyalty:      lang === 'uz' ? 'Chegirma' : lang === 'ru' ? 'Скидка' : 'Discount',
     totalAmt:     lang === 'uz' ? "To'lovga jami" : lang === 'ru' ? 'Итого к оплате' : 'Total Amount',
     payMethod:    lang === 'uz' ? "To'lov usuli" : lang === 'ru' ? 'Способ оплаты' : 'Payment Method',
+    splitPay:     lang === 'uz' ? "Bo'lib to'lash" : lang === 'ru' ? 'Смешанная оплата' : 'Split payment',
+    addPayment:   lang === 'uz' ? "To'lov qo'shish" : lang === 'ru' ? 'Добавить оплату' : 'Add payment',
+    fillRest:     lang === 'uz' ? 'Qoldiqni to‘ldirish' : lang === 'ru' ? 'Заполнить остаток' : 'Fill remaining',
+    paid:         lang === 'uz' ? "To'langan" : lang === 'ru' ? 'Оплачено' : 'Paid',
     receivedAmt:  lang === 'uz' ? 'Qabul qilingan summa' : lang === 'ru' ? 'Полученная сумма' : 'Enter received amount',
-    changeAmt:    lang === 'uz' ? 'Qaytim' : lang === 'ru' ? 'Сдача' : 'Change',
+    fullyPaid:    lang === 'uz' ? "To'liq to'landi" : lang === 'ru' ? 'Оплачено полностью' : 'Fully paid',
     remaining:    lang === 'uz' ? 'Yetishmaydi' : lang === 'ru' ? 'Не хватает' : 'Remaining',
     quickAmt:     lang === 'uz' ? 'Tez summa' : lang === 'ru' ? 'Быстрая сумма' : 'Quick Amount',
     exact:        lang === 'uz' ? 'Aniq' : lang === 'ru' ? 'Точно' : 'Exact',
@@ -156,6 +266,9 @@ export default function CashierBill() {
     saving:       lang === 'uz' ? 'Tejash' : lang === 'ru' ? 'Экономия' : 'Saving',
     noOrder:      lang === 'uz' ? 'Bu stol uchun faol buyurtma yo\'q' : lang === 'ru' ? 'Нет активного заказа для этого стола' : 'No active order for this table',
     noteLabel:    lang === 'uz' ? 'Izoh' : lang === 'ru' ? 'Примечание' : 'Note',
+    overpaid:     lang === 'uz' ? 'Ortiqcha to‘lov' : lang === 'ru' ? 'Переплата' : 'Overpayment',
+    exceedsTotal: lang === 'uz' ? 'Kiritilgan summa jami to‘lovdan oshib ketdi' : lang === 'ru' ? 'Введённая сумма превышает итоговую сумму' : 'Entered amount exceeds total amount',
+    counterItems: lang === 'uz' ? 'Kassa mahsulotlari' : lang === 'ru' ? 'Товары у кассы' : 'Counter Items',
   }
 
   // ── Empty state ─────────────────────────────────────────────────────────────
@@ -313,6 +426,7 @@ export default function CashierBill() {
                   {order.items.map((item, i) => {
                     const mi   = menuItemMap[item.menu_item_id]
                     const desc = getDesc(mi, lang)
+                    const isCounter = isCashierQuickItem(mi)
                     return (
                       <div
                         key={i}
@@ -352,14 +466,60 @@ export default function CashierBill() {
                               <span className="text-xs text-[#6B7280]">{formatCurrency(item.price)}</span>
                               <span className="text-sm font-black text-[#1F2937]">{formatCurrency(item.price * item.quantity)}</span>
                             </div>
+                            {isCounter && (
+                              <div className="mt-2 flex w-fit items-center gap-1 rounded-xl border border-[#FFE0CC] bg-[#fff7f2] p-1 sm:hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => updateBillItemQty(item, (Number(item.quantity) || 1) - 1)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-[#6B7280]"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <span className="min-w-[24px] text-center text-xs font-black text-[#ff5a00]">{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateBillItemQty(item, (Number(item.quantity) || 1) + 1)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff5a00] text-white"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateBillItemQty(item, 0)}
+                                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-red-500"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
 
                         {/* Qty */}
                         <div className="hidden sm:flex col-span-2 justify-center">
-                          <span className="inline-flex items-center justify-center bg-[#fff1e8] text-[#ff5a00] font-black text-xs rounded-lg w-9 h-7">
-                            ×{item.quantity}
-                          </span>
+                          {isCounter ? (
+                            <div className="flex items-center gap-1 rounded-xl border border-[#FFE0CC] bg-[#fff7f2] p-1">
+                              <button
+                                type="button"
+                                onClick={() => updateBillItemQty(item, (Number(item.quantity) || 1) - 1)}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-[#6B7280] hover:bg-red-50 hover:text-red-600"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span className="min-w-[24px] text-center text-xs font-black text-[#ff5a00]">×{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => updateBillItemQty(item, (Number(item.quantity) || 1) + 1)}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ff5a00] text-white hover:bg-[#cc4800]"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center justify-center bg-[#fff1e8] text-[#ff5a00] font-black text-xs rounded-lg w-9 h-7">
+                              ×{item.quantity}
+                            </span>
+                          )}
                         </div>
 
                         {/* Unit price */}
@@ -369,7 +529,18 @@ export default function CashierBill() {
 
                         {/* Line total */}
                         <div className="hidden sm:block col-span-2 text-right font-black text-sm text-[#1F2937]">
-                          {formatCurrency(item.price * item.quantity)}
+                          <div className="flex items-center justify-end gap-2">
+                            <span>{formatCurrency(item.price * item.quantity)}</span>
+                            {isCounter && (
+                              <button
+                                type="button"
+                                onClick={() => updateBillItemQty(item, 0)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#D1D5DB] hover:bg-red-50 hover:text-red-500"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )
@@ -467,9 +638,18 @@ export default function CashierBill() {
                 </div>
               </div>
 
-              {/* Payment Method */}
+              {/* Split Payment */}
               <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-                <h3 className="font-black text-[#1F2937] text-sm mb-3">{lbl.payMethod}</h3>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="font-black text-[#1F2937] text-sm">{lbl.splitPay}</h3>
+                  <button
+                    type="button"
+                    onClick={addPaymentRow}
+                    className="text-[11px] font-black text-[#0f3b2e] hover:text-[#ff5a00]"
+                  >
+                    + {lbl.addPayment}
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   {PAY_METHODS.map(m => {
@@ -478,7 +658,7 @@ export default function CashierBill() {
                     return (
                       <button
                         key={m.key}
-                        onClick={() => setPayMethod(m.key)}
+                        onClick={() => selectPaymentMethod(m.key)}
                         className={`flex flex-col items-center gap-2 py-3.5 rounded-xl border-2 font-semibold text-[12px] transition-all ${
                           active
                             ? 'border-[#ff5a00] bg-[#fff1e8] text-[#ff5a00]'
@@ -492,86 +672,182 @@ export default function CashierBill() {
                   })}
                 </div>
 
-                {/* Cash section */}
-                {payMethod === 'cash' && (
-                  <div className="space-y-3">
-                    {/* Quick amounts */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-[#9CA3AF] mb-2 uppercase tracking-wide">
-                        {lbl.quickAmt}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {CASH_PRESETS.map((p, i) => (
+                <div className="space-y-2.5">
+                  {splitPayments.map((row, index) => {
+                    const method = PAY_METHODS.find(m => m.key === row.method) || PAY_METHODS[0]
+                    const Icon = method.icon
+                    const active = activePaymentId === row.id
+                    const rowAmount = Number(row.amount) || 0
+                    const maxForRow = getMaxForPaymentRow(row.id)
+                    const rowOverLimit = rowAmount > maxForRow
+                    return (
+                      <div
+                        key={row.id}
+                        className={`rounded-xl border p-3 transition-all ${
+                          rowOverLimit
+                            ? 'border-red-300 bg-red-50'
+                            : active ? 'border-[#ff5a00] bg-[#fff7f2]' : 'border-[#E5E7EB] bg-white'
+                        }`}
+                        onClick={() => {
+                          setActivePaymentId(row.id)
+                          setPayMethod(row.method)
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-[104px]">
+                            <Icon size={15} className={active ? 'text-[#ff5a00]' : 'text-[#6B7280]'} />
+                            <span className="text-xs font-black text-[#1F2937]">{payLabel(method, lang)}</span>
+                          </div>
+                          <div className="relative flex-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max={maxForRow}
+                              value={row.amount}
+                              onChange={e => updatePayment(row.id, { amount: e.target.value })}
+                              onFocus={() => {
+                                setActivePaymentId(row.id)
+                                setPayMethod(row.method)
+                              }}
+                              placeholder="0"
+                              className={`w-full border rounded-lg px-3 py-2.5 text-sm font-black text-[#1F2937] pr-11 focus:outline-none transition-colors ${
+                                rowOverLimit
+                                  ? 'border-red-300 bg-white text-red-700 focus:border-red-500'
+                                  : 'border-[#E5E7EB] focus:border-[#ff5a00]'
+                              }`}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-[10px] font-bold">UZS</span>
+                          </div>
+                          {splitPayments.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={e => {
+                                e.stopPropagation()
+                                removePaymentRow(row.id)
+                              }}
+                              className="w-8 h-8 rounded-lg border border-[#E5E7EB] text-[#9CA3AF] hover:text-red-600 hover:border-red-200"
+                              aria-label="Remove payment"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                        {active && (
                           <button
-                            key={i}
-                            onClick={() => applyPreset(p)}
-                            className="px-3 py-1.5 rounded-xl border border-[#E5E7EB] text-xs font-semibold text-[#6B7280] hover:border-[#ff5a00] hover:text-[#ff5a00] bg-white transition-all"
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              fillRemaining(row.id)
+                            }}
+                            className="mt-2 text-[11px] font-bold text-[#0f3b2e] hover:text-[#ff5a00]"
                           >
-                            {p.exact ? lbl.exact : p.label}
+                            {lbl.fillRest}
                           </button>
-                        ))}
+                        )}
+                        {rowOverLimit && (
+                          <p className="mt-2 text-[11px] font-bold text-red-600">
+                            {lbl.exceedsTotal}
+                          </p>
+                        )}
                       </div>
+                    )
+                  })}
+                </div>
+
+                {quickItems.length > 0 && (
+                  <div className="mt-4 rounded-2xl border border-[#E5E7EB] bg-[#FBFCFE] p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <h4 className="text-[12px] font-black uppercase tracking-wide text-[#1F2937]">{lbl.counterItems}</h4>
                     </div>
-
-                    {/* Received amount input */}
-                    <div>
-                      <label className="text-[10px] font-semibold text-[#9CA3AF] block mb-1.5 uppercase tracking-wide">
-                        {lbl.receivedAmt}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          value={received}
-                          onChange={e => setReceived(e.target.value)}
-                          placeholder={`0`}
-                          className="w-full border-2 border-[#E5E7EB] rounded-xl px-4 py-3 text-xl font-black text-[#1F2937] pr-16 focus:outline-none focus:border-[#ff5a00] transition-all"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-sm font-bold">UZS</span>
-                      </div>
+                    <div className="grid grid-cols-2 gap-2 max-[420px]:flex max-[420px]:overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                      {quickItems.map(item => {
+                        const current = order.items.find(row => row.menu_item_id === item.id)
+                        const qty = Number(current?.quantity) || 0
+                        return (
+                          <div
+                            key={item.id}
+                            className="min-w-[142px] rounded-xl border border-[#E5E7EB] bg-white p-2"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => addQuickItem(item)}
+                              className="w-full text-left"
+                            >
+                              <p className="line-clamp-1 text-[12px] font-black text-[#1F2937]">{getItemName(item, lang)}</p>
+                              <div className="mt-1 flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-bold text-[#ff5a00]">{formatCurrency(item.price)}</span>
+                                {qty > 0 ? (
+                                  <span className="rounded-lg bg-[#fff1e8] px-2 py-0.5 text-[10px] font-black text-[#ff5a00]">×{qty}</span>
+                                ) : (
+                                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#0f3b2e] text-white">
+                                    <Plus size={12} />
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                            {qty > 0 && current && (
+                              <div className="mt-2 flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => updateBillItemQty(current, qty - 1)}
+                                  className="flex h-7 flex-1 items-center justify-center rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateBillItemQty(current, qty + 1)}
+                                  className="flex h-7 flex-1 items-center justify-center rounded-lg bg-[#0f3b2e] text-white hover:bg-[#0A2A20]"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
-
-                    {/* Change / shortfall */}
-                    {receivedNum > 0 && (
-                      <div className={`rounded-xl px-4 py-3 flex justify-between items-center ${
-                        change >= 0
-                          ? 'bg-green-50 border border-green-200'
-                          : 'bg-red-50 border border-red-200'
-                      }`}>
-                        <span className={`text-sm font-semibold ${change >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                          {change >= 0 ? lbl.changeAmt : lbl.remaining}
-                        </span>
-                        <span className={`font-black text-lg ${change >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-                          {formatCurrency(Math.abs(change >= 0 ? change : shortfall))}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* When no input yet, show placeholder change row */}
-                    {receivedNum === 0 && (
-                      <div className="rounded-xl px-4 py-3 flex justify-between items-center bg-gray-50 border border-gray-100">
-                        <span className="text-sm font-semibold text-[#9CA3AF]">{lbl.changeAmt}</span>
-                        <span className="font-black text-lg text-[#9CA3AF]">0 UZS</span>
-                      </div>
-                    )}
                   </div>
                 )}
 
-                {/* Card / Terminal / QR helper */}
-                {payMethod !== 'cash' && (
-                  <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 flex items-center gap-2">
-                    {React.createElement(PAY_METHODS.find(m => m.key === payMethod)?.icon || Receipt, {
-                      size: 15,
-                      className: 'text-[#6B7280] flex-shrink-0',
-                    })}
-                    <p className="text-sm text-[#6B7280] font-medium">
-                      {payMethod === 'card'
-                        ? (lang === 'uz' ? 'Karta orqali to\'lov' : lang === 'ru' ? 'Оплата картой' : 'Card terminal payment')
-                        : payMethod === 'terminal'
-                        ? (lang === 'uz' ? 'Terminal orqali to\'lov' : lang === 'ru' ? 'Оплата через терминал' : 'Terminal payment selected')
-                        : (lang === 'uz' ? 'QR kod orqali to\'lov' : lang === 'ru' ? 'Оплата по QR-коду' : 'QR payment selected')}
+                <div className="mt-4">
+                  <p className="text-[10px] font-semibold text-[#9CA3AF] mb-2 uppercase tracking-wide">
+                    {lbl.quickAmt}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CASH_PRESETS.map((p, i) => (
+                      <button
+                        key={i}
+                        onClick={() => applyPreset(p)}
+                        className="px-3 py-1.5 rounded-xl border border-[#E5E7EB] text-xs font-semibold text-[#6B7280] hover:border-[#ff5a00] hover:text-[#ff5a00] bg-white transition-all"
+                      >
+                        {p.exact ? lbl.exact : p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <div className="rounded-xl px-4 py-3 flex justify-between items-center bg-gray-50 border border-gray-100">
+                    <span className="text-sm font-semibold text-[#6B7280]">{lbl.paid}</span>
+                    <span className="font-black text-lg text-[#1F2937]">{formatCurrency(paidAmount)}</span>
+                  </div>
+                  <div className={`rounded-xl px-4 py-3 flex justify-between items-center ${
+                    isFullyPaid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                  }`}>
+                    <span className={`text-sm font-semibold ${isFullyPaid ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                      {isOverpaid ? lbl.overpaid : isFullyPaid ? lbl.fullyPaid : lbl.remaining}
+                    </span>
+                    <span className={`font-black text-lg ${isFullyPaid ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                      {formatCurrency(isOverpaid ? overpaidAmount : isFullyPaid ? 0 : shortfall)}
+                    </span>
+                  </div>
+                  {isOverpaid && (
+                    <p className="text-[11px] font-bold text-red-600">
+                      {lbl.exceedsTotal}
                     </p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {/* Action buttons */}
