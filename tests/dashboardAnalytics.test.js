@@ -1,0 +1,176 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+
+import {
+  formatReadableDateTime,
+  getDashboardBestSelling,
+  getDashboardPaymentMethods,
+  getDashboardPeriodOrders,
+  getDashboardSalesByCategory,
+} from '../src/lib/dashboardAnalytics.js'
+
+const menuItemMap = {
+  kebab: { id: 'kebab', category_id: 'kebab', image_url: 'kebab.jpg' },
+  cola: { id: 'cola', category_id: 'drinks', image_url: 'cola.jpg' },
+  lagman: { id: 'lagman', category_id: 'first', image_url: 'lagman.jpg' },
+  salad: { id: 'salad', category_id: 'salads', image_url: 'salad.jpg' },
+}
+
+const categoryMap = {
+  kebab: { id: 'kebab', name_en: 'Kebab' },
+  drinks: { id: 'drinks', name_en: 'Drinks' },
+  first: { id: 'first', name_en: 'First Meal' },
+  salads: { id: 'salads', name_en: 'Salads' },
+}
+
+function order({ id, paidAt, method = 'cash', items, total }) {
+  return {
+    id,
+    payment_status: 'paid',
+    paid_at: paidAt,
+    payment_method: method,
+    total,
+    service_rate_pct: 0,
+    items,
+  }
+}
+
+function item(menu_item_id, name, quantity, price) {
+  return { menu_item_id, name, quantity, price }
+}
+
+const now = new Date('2026-05-19T23:29:00')
+
+const orders = [
+  order({
+    id: 'today',
+    paidAt: '2026-05-19T10:00:00',
+    method: 'cash',
+    items: [item('kebab', 'Kebab', 2, 25000), item('cola', 'Cola', 1, 12000)],
+    total: 62000,
+  }),
+  order({
+    id: 'week',
+    paidAt: '2026-05-15T10:00:00',
+    method: 'card',
+    items: [item('lagman', 'Lagman', 3, 32000)],
+    total: 96000,
+  }),
+  order({
+    id: 'month',
+    paidAt: '2026-05-02T10:00:00',
+    method: 'qr',
+    items: [item('salad', 'Salad', 4, 15000)],
+    total: 60000,
+  }),
+  order({
+    id: 'year',
+    paidAt: '2026-01-12T10:00:00',
+    method: 'terminal',
+    items: [item('cola', 'Cola', 5, 12000)],
+    total: 60000,
+  }),
+  order({
+    id: 'previous-year',
+    paidAt: '2025-12-31T10:00:00',
+    method: 'cash',
+    items: [item('kebab', 'Old Kebab', 9, 25000)],
+    total: 225000,
+  }),
+]
+
+function analyticsFor(period) {
+  const periodOrders = getDashboardPeriodOrders(orders, period, now)
+  return {
+    ids: periodOrders.map(row => row.id),
+    revenue: periodOrders.reduce((sum, row) => sum + row.total, 0),
+    payments: getDashboardPaymentMethods(periodOrders),
+    categories: getDashboardSalesByCategory(periodOrders, menuItemMap, categoryMap, 'en'),
+    best: getDashboardBestSelling(periodOrders, menuItemMap),
+  }
+}
+
+test('dashboard selected period filters revenue payments categories and best sellers together for today', () => {
+  const data = analyticsFor('today')
+
+  assert.deepEqual(data.ids, ['today'])
+  assert.equal(data.revenue, 62000)
+  assert.deepEqual(data.payments.map(row => row.key), ['cash'])
+  assert.deepEqual(data.categories.map(row => row.name), ['Kebab', 'Drinks'])
+  assert.deepEqual(data.best.map(row => row.menuItemId), ['kebab', 'cola'])
+})
+
+test('dashboard period change from today to 7 days removes stale today-only category and dish data', () => {
+  const today = analyticsFor('today')
+  const week = analyticsFor('7days')
+
+  assert.deepEqual(today.categories.map(row => row.name), ['Kebab', 'Drinks'])
+  assert.deepEqual(week.ids, ['today', 'week'])
+  assert.deepEqual(week.categories.map(row => row.name), ['First Meal', 'Kebab', 'Drinks'])
+  assert.deepEqual(week.best.map(row => row.menuItemId), ['lagman', 'kebab', 'cola'])
+})
+
+test('dashboard period change from 7 days to month updates all widgets to month data', () => {
+  const month = analyticsFor('month')
+
+  assert.deepEqual(month.ids, ['today', 'week', 'month'])
+  assert.equal(month.revenue, 218000)
+  assert.deepEqual(month.payments.map(row => row.key), ['card', 'cash', 'qr'])
+  assert.deepEqual(month.categories.map(row => row.name), ['First Meal', 'Salads', 'Kebab', 'Drinks'])
+  assert.deepEqual(month.best.map(row => row.menuItemId), ['salad', 'lagman', 'kebab', 'cola'])
+})
+
+test('dashboard period change from month to year updates all widgets to year data', () => {
+  const year = analyticsFor('year')
+
+  assert.deepEqual(year.ids, ['today', 'week', 'month', 'year'])
+  assert.equal(year.revenue, 278000)
+  assert.deepEqual(year.payments.map(row => row.key), ['card', 'cash', 'qr', 'terminal'])
+  assert.deepEqual(year.categories.map(row => row.name), ['First Meal', 'Drinks', 'Salads', 'Kebab'])
+  assert.deepEqual(year.best.map(row => row.menuItemId), ['cola', 'salad', 'lagman', 'kebab'])
+})
+
+test('dashboard empty selected period returns zero and empty widget states', () => {
+  const empty = getDashboardPeriodOrders(orders, 'today', new Date('2026-05-18T12:00:00'))
+  const payments = getDashboardPaymentMethods(empty)
+  const categories = getDashboardSalesByCategory(empty, menuItemMap, categoryMap, 'en')
+  const best = getDashboardBestSelling(empty, menuItemMap)
+
+  assert.equal(empty.reduce((sum, row) => sum + row.total, 0), 0)
+  assert.deepEqual(payments, [])
+  assert.deepEqual(categories, [])
+  assert.deepEqual(best, [])
+})
+
+test('latest selected period wins when a slow analytics response resolves out of order', async () => {
+  let selectedPeriod = 'today'
+  let rendered = null
+
+  function request(period, delay) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve({ period, data: analyticsFor(period) })
+      }, delay)
+    }).then(result => {
+      if (result.period === selectedPeriod) {
+        rendered = result
+      }
+    })
+  }
+
+  const slowToday = request('today', 20)
+  selectedPeriod = '7days'
+  const fastWeek = request('7days', 1)
+
+  await Promise.all([slowToday, fastWeek])
+
+  assert.equal(rendered.period, '7days')
+  assert.deepEqual(rendered.data.ids, ['today', 'week'])
+})
+
+test('dashboard readable date format uses a clear date time separator', () => {
+  assert.equal(
+    formatReadableDateTime('2026-05-19T23:29:00'),
+    'May 19, 2026 · 11:29 PM'
+  )
+})

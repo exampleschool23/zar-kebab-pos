@@ -67,6 +67,8 @@ const L = {
     infoBar:         "Buyurtma tafsilotlarini ko'rish, to'lovni qayta ishlash va chek chiqarish uchun stol hisobini tanlang.",
     viewAllTables:   "Barcha stollarni ko'rish",
     noPayData:       "To'lov ma'lumotlari yo'q",
+    takeAway:         'Olib ketish',
+    noTable:          'Stolsiz',
     waitingKitchen:  'Oshxona tayyorlayapti',
     waitingKitchenSub: 'Ofitsiant hisob so\'rashini kuting',
     payments:        n => `${n} ta to'lov`,
@@ -104,6 +106,8 @@ const L = {
     infoBar:         'Выберите счёт стола, чтобы просмотреть детали заказа, обработать оплату и распечатать чек.',
     viewAllTables:   'Все столы',
     noPayData:       'Нет данных об оплате',
+    takeAway:         'С собой',
+    noTable:          'Без стола',
     waitingKitchen:  'Готовится на кухне',
     waitingKitchenSub: 'Ожидайте запроса счёта от официанта',
     payments:        n => `${n} платёж${n === 1 ? '' : n < 5 ? 'а' : 'ей'}`,
@@ -141,6 +145,8 @@ const L = {
     infoBar:         'Select a table bill to view order details, process payment and print receipt.',
     viewAllTables:   'View All Tables',
     noPayData:       'No payments today yet',
+    takeAway:         'Take Away',
+    noTable:          'No table',
     waitingKitchen:  'Waiting for kitchen',
     waitingKitchenSub: 'Waiter must request the bill first',
     payments:        n => `${n} payment${n === 1 ? '' : 's'}`,
@@ -198,6 +204,7 @@ function TableStatusBadge({ status, lang }) {
 
 function BillCard({ order, table, menuItemMap, lang, onOpen }) {
   const l = L[lang] || L.en
+  const isTakeAway = order.order_type === 'take_away' || (!order.table_id && String(order.table_name || '').toLowerCase().includes('take'))
 
   const items = useMemo(() => {
     return getGroupedOrderItems(order.items || [])
@@ -205,7 +212,7 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
 
   const preview   = items.slice(0, 4)
   const moreCount = items.length - preview.length
-  const readyForCashier = order.status === 'needs_bill'
+  const readyForCashier = isTakeAway || order.status === 'needs_bill'
 
   return (
     <div className={`rounded-2xl border flex flex-col transition-all ${
@@ -224,7 +231,10 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
               <Users size={16} className="text-[#6B7280]" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-black text-[#1F2937] text-[16px] leading-tight">{order.table_name}</h3>
+              <h3 className="font-black text-[#1F2937] text-[16px] leading-tight">
+                {isTakeAway ? `${l.takeAway} · ${order.order_number || order.id}` : order.table_name}
+              </h3>
+              {isTakeAway && <p className="text-[11px] font-bold text-[#ff5a00]">{l.noTable}</p>}
               {order.waiter_name && (
                 <p className="text-[11px] text-[#9CA3AF]">{l.waiter}: {order.waiter_name}</p>
               )}
@@ -287,7 +297,7 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
       <div className="px-5 pb-5 mt-auto pt-3">
         {readyForCashier ? (
           <button
-            onClick={() => onOpen(order.table_id)}
+            onClick={() => onOpen(order)}
             className="w-full flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-3 text-[14px] font-bold hover:bg-[#cc4800] active:scale-[0.98] transition-all shadow-sm shadow-orange-200"
           >
             <Receipt size={16} />
@@ -341,12 +351,14 @@ export default function CashierTables() {
     [state.menuItems]
   )
 
-  // ── Derive active bills — one merged entry per table ──────────────────────
+  // ── Derive active bills — dine-in is merged per table; take-away stays one bill per order.
   const activeBills = useMemo(() => {
     const raw = state.orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled')
     const grouped = {}
     raw.forEach(order => {
-      const key = order.table_id
+      const key = order.order_type === 'take_away' || !order.table_id
+        ? `order:${order.id}`
+        : `table:${order.table_id}`
       if (!grouped[key]) {
         grouped[key] = {
           ...order,
@@ -424,7 +436,7 @@ export default function CashierTables() {
     // Search
     if (q) {
       result = result.filter(o => {
-        const matchTable  = o.table_name?.toLowerCase().includes(q)
+        const matchTable  = o.table_name?.toLowerCase().includes(q) || o.order_number?.toLowerCase().includes(q)
         const matchWaiter = o.waiter_name?.toLowerCase().includes(q)
         const matchItems  = (o.items || []).some(i => i.name?.toLowerCase().includes(q))
         return matchTable || matchWaiter || matchItems
@@ -439,7 +451,7 @@ export default function CashierTables() {
     // Status filter
     if (filterStatus !== 'all') {
       result = result.filter(o => {
-        if (filterStatus === 'needs_bill') return o.status === 'needs_bill'
+        if (filterStatus === 'needs_bill') return o.status === 'needs_bill' || o.order_type === 'take_away' || !o.table_id
         return o.status !== 'needs_bill' // occupied = everything else active
       })
     }
@@ -627,7 +639,10 @@ export default function CashierTables() {
                   table={tableMap[order.table_id]}
                   menuItemMap={menuItemMap}
                   lang={lang}
-                  onOpen={tableId => navigate(`/cashier/bill/${tableId}`)}
+                  onOpen={bill => navigate(bill.order_type === 'take_away' || !bill.table_id
+                    ? `/cashier/bill/order/${bill.id}`
+                    : `/cashier/bill/${bill.table_id}`
+                  )}
                 />
               ))}
             </div>

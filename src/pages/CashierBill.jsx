@@ -57,7 +57,7 @@ function getDesc(menuItem, lang) {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export default function CashierBill() {
-  const { tableId }  = useParams()
+  const { tableId, orderId }  = useParams()
   const navigate     = useNavigate()
   const { state, dispatch } = useApp()
   const lang = state.lang
@@ -70,25 +70,36 @@ export default function CashierBill() {
   const [loyaltyPct, setLoyaltyPct] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Merge all active orders for this table into one
+  // Merge all active orders for a table, or load one take-away order by id.
   const order = useMemo(() => {
-    const orders = state.orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
+    const orders = state.orders.filter(o =>
+      (orderId ? o.id === orderId : o.table_id === tableId) && o.payment_status !== 'paid'
+    )
     if (orders.length === 0) return null
     const allItems = orders.flatMap(o => o.items || [])
     const mergedItems = getGroupedOrderItems(allItems)
-    const serviceRatePct = orders.find(o => o.service_rate_pct != null)?.service_rate_pct ?? configuredServiceRatePct
-    const summary = getOrderPaymentSummary({ service_rate_pct: serviceRatePct }, allItems, configuredServiceRatePct)
+    const firstOrder = orders[0]
+    const orderType = firstOrder?.order_type || (!firstOrder?.table_id && String(firstOrder?.table_name || '').toLowerCase().includes('take') ? 'take_away' : 'dine_in')
+    const serviceRatePct = orderType === 'take_away'
+      ? 0
+      : orders.find(o => o.service_rate_pct != null)?.service_rate_pct ?? configuredServiceRatePct
+    const summary = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, allItems, configuredServiceRatePct)
     return {
       ...orders[0],
+      order_type: orderType,
       items:       mergedItems,
       subtotal:    summary.subtotal,
       service_fee: summary.serviceFee,
       service_rate_pct: summary.serviceRatePct,
       total:       summary.total,
     }
-  }, [state.orders, tableId, configuredServiceRatePct])
+  }, [state.orders, tableId, orderId, configuredServiceRatePct])
 
   const table = state.tables.find(t => t.id === tableId)
+  const isTakeAway = order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
+  const orderLabel = isTakeAway
+    ? `${lang === 'uz' ? 'Olib ketish' : lang === 'ru' ? 'С собой' : 'Take Away'} · ${order?.order_number || order?.id || ''}`
+    : table?.name
 
   const menuItemMap = useMemo(() => {
     const m = {}
@@ -192,6 +203,7 @@ export default function CashierBill() {
       type: 'MARK_ORDER_PAID',
       payload: {
         tableId,
+        orderId,
         payment_method: finalPaymentMethod,
         payments: appliedPayments,
         loyalty: {
@@ -212,6 +224,7 @@ export default function CashierBill() {
       type: 'ADD_QUICK_ITEM_TO_ORDER',
       payload: {
         tableId,
+        orderId,
         item: {
           id: item.id,
           name: getItemName(item, lang),
@@ -227,6 +240,7 @@ export default function CashierBill() {
       type: 'UPDATE_BILL_ITEM_QTY',
       payload: {
         tableId,
+        orderId,
         orderItemId: item.id,
         menuItemId: item.menu_item_id,
         qty,
@@ -269,6 +283,7 @@ export default function CashierBill() {
     overpaid:     lang === 'uz' ? 'Ortiqcha to‘lov' : lang === 'ru' ? 'Переплата' : 'Overpayment',
     exceedsTotal: lang === 'uz' ? 'Kiritilgan summa jami to‘lovdan oshib ketdi' : lang === 'ru' ? 'Введённая сумма превышает итоговую сумму' : 'Entered amount exceeds total amount',
     counterItems: lang === 'uz' ? 'Kassa mahsulotlari' : lang === 'ru' ? 'Товары у кассы' : 'Counter Items',
+    noTable:      lang === 'uz' ? 'Stol tanlanmagan' : lang === 'ru' ? 'Стол не выбран' : 'No table selected',
   }
 
   // ── Empty state ─────────────────────────────────────────────────────────────
@@ -379,9 +394,10 @@ export default function CashierBill() {
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h1 className="font-black text-[#1F2937] text-2xl leading-tight">{table?.name}</h1>
+                        <h1 className="font-black text-[#1F2937] text-2xl leading-tight">{orderLabel}</h1>
                         <StatusBadge status={order.payment_status === 'paid' ? 'paid' : order.status} />
                       </div>
+                      {isTakeAway && <p className="text-[11px] font-bold text-[#ff5a00] mt-0.5">{lbl.noTable}</p>}
                       <div className="flex items-center gap-3 mt-1 text-[11px] text-[#6B7280]">
                         {order.waiter_name && (
                           <span className="flex items-center gap-1">
@@ -400,7 +416,7 @@ export default function CashierBill() {
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
-                        onClick={() => navigate(`/receipt/table/${tableId}`)}
+                        onClick={() => navigate(orderId ? `/receipt/${orderId}` : `/receipt/table/${tableId}`)}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#E5E7EB] text-[#1F2937] text-[12px] font-semibold hover:bg-gray-100 transition-colors"
                       >
                         <Printer size={14} />
@@ -866,7 +882,7 @@ export default function CashierBill() {
                 </button>
 
                 <button
-                  onClick={() => navigate(`/receipt/table/${tableId}`)}
+                  onClick={() => navigate(orderId ? `/receipt/${orderId}` : `/receipt/table/${tableId}`)}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#E5E7EB] text-[#1F2937] font-bold text-sm hover:bg-gray-50 transition-colors"
                 >
                   <Printer size={16} />

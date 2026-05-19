@@ -73,7 +73,7 @@ function CategoryChip({ category, active, title, count, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-11 max-w-[190px] flex-shrink-0 items-center gap-2 rounded-2xl border px-3 text-sm font-black transition-all ${
+      className={`flex h-14 w-auto min-w-[104px] max-w-none flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border px-3 py-2 text-sm font-black transition-all ${
         active
           ? 'border-[#ff5a1f] bg-[#fff4ed] text-[#ff4d00] shadow-sm'
           : 'border-[#E5E7EB] bg-white text-[#1F2937] hover:border-orange-200 hover:bg-orange-50/40'
@@ -88,9 +88,9 @@ function CategoryChip({ category, active, title, count, onClick }) {
           <UtensilsCrossed size={15} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
         )}
       </span>
-      <span className="truncate">{title}</span>
+      <span className="max-w-none flex-shrink-0 whitespace-nowrap text-[12px] leading-tight">{title}</span>
       {Number.isFinite(count) && (
-        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-black ${active ? 'bg-white/80 text-[#ff4d00]' : 'bg-gray-100 text-[#8A94A6]'}`}>
+        <span className={`flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-black ${active ? 'bg-white/80 text-[#ff4d00]' : 'bg-gray-100 text-[#8A94A6]'}`}>
           {count}
         </span>
       )}
@@ -110,6 +110,8 @@ export default function MenuCategoryScroller({
   topOffset = 0,
   className = '',
   collapsedClassName = '',
+  collapsedPosition = 'sticky',
+  scrollOffset = 84,
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const sentinelRef = useRef(null)
@@ -152,11 +154,11 @@ export default function MenuCategoryScroller({
     if (!section) return
 
     if (root === window) {
-      const target = section.getBoundingClientRect().top + window.scrollY - topOffset - 12
+      const target = section.getBoundingClientRect().top + window.scrollY - topOffset - scrollOffset
       window.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
     } else {
       const rootRect = scroller.getBoundingClientRect()
-      const target = section.getBoundingClientRect().top - rootRect.top + scroller.scrollTop - 64
+      const target = section.getBoundingClientRect().top - rootRect.top + scroller.scrollTop - scrollOffset
       scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
     }
   }
@@ -226,12 +228,12 @@ export default function MenuCategoryScroller({
       </div>
 
       <div
-        className={`sticky z-30 -mx-1 -mt-[61px] border-b border-[#E5E7EB] bg-[#FAF6EE]/95 px-1 py-2 backdrop-blur transition-all duration-200 ${
+        className={`${collapsedPosition === 'fixed' ? 'fixed left-0 right-0' : 'sticky -mx-1 -mt-[61px]'} z-30 border-b border-[#E5E7EB] bg-[#FAF6EE]/95 px-1 py-2 backdrop-blur transition-all duration-200 ${
           collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
         } ${collapsedClassName}`}
         style={{ top: topOffset }}
       >
-        <div className="flex gap-2 overflow-x-auto px-1" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex gap-2 overflow-x-auto overflow-y-hidden px-1" style={{ scrollbarWidth: 'none' }}>
           {cards.map(category => {
             const title = titleFor(category)
             return (

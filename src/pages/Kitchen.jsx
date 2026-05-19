@@ -7,6 +7,7 @@ import {
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import UnifiedSidebar from '../components/UnifiedSidebar'
+import { loadOrders } from '../lib/db'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_BADGE = {
@@ -323,6 +324,10 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
   const allReady       = newCount === 0 && preparingCount === 0
 
   const waiterLabel = lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант' : 'Waiter'
+  const isTakeAway = order.order_type === 'take_away' || (!order.table_id && String(order.table_name || '').toLowerCase().includes('take'))
+  const orderTitle = isTakeAway
+    ? `${ORDER_TYPE_LABEL.take_away[lang] || ORDER_TYPE_LABEL.take_away.en} · ${order.order_number || order.id}`
+    : order.table_name
 
   const markAllLabel = {
     preparing: lang === 'uz' ? 'Hammasini tayyorlanmoqda' : lang === 'ru' ? 'Все готовятся' : 'All Preparing',
@@ -351,7 +356,7 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
         allReady ? 'bg-[#EFF6FF] border-[#BFDBFE]' : 'bg-gray-50 border-[#F3F4F6]'
       }`}>
         <div className="mb-2">
-          <h3 className="font-black text-[#1F2937] text-xl leading-tight">{order.table_name}</h3>
+          <h3 className="font-black text-[#1F2937] text-xl leading-tight">{orderTitle}</h3>
           <p className="text-xs text-[#6B7280] font-medium mt-0.5">
             {waiterLabel}: {order.waiter_name}
           </p>
@@ -536,10 +541,15 @@ export default function Kitchen() {
   const knownKitchenItemKeysRef = useRef(new Set())
   const soundBaselineReadyRef = useRef(false)
   const audioRef = useRef(null)
+  const dispatchRef = useRef(dispatch)
 
   useEffect(() => {
     pendingIdsRef.current = pendingIds
   }, [pendingIds])
+
+  useEffect(() => {
+    dispatchRef.current = dispatch
+  }, [dispatch])
 
   const menuItemMap = useMemo(() => {
     const map = {}
@@ -619,6 +629,42 @@ export default function Kitchen() {
     }
   }, [activeKitchenAlertKeys, playKitchenSound, state.loaded])
 
+  useEffect(() => {
+    if (!state.loaded) return
+
+    let cancelled = false
+    let inFlight = false
+
+    const refreshKitchenOrders = async () => {
+      if (inFlight || document.visibilityState === 'hidden') return
+      inFlight = true
+      try {
+        const orders = await loadOrders()
+        if (!cancelled) {
+          dispatchRef.current({ type: 'SET_ORDERS', payload: orders })
+        }
+      } catch (error) {
+        console.warn('[kitchen] polling refresh failed:', error)
+      } finally {
+        inFlight = false
+      }
+    }
+
+    // Supabase realtime is still the primary path. This small Kitchen-only
+    // fallback keeps the display live if realtime is delayed or blocked.
+    const intervalId = window.setInterval(refreshKitchenOrders, 3000)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshKitchenOrders()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [state.loaded])
+
   // Group all active orders by table — one card per table
   const activeOrders = useMemo(() => {
     const raw = state.orders
@@ -626,10 +672,12 @@ export default function Kitchen() {
       .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
     console.log('Kitchen fetched orders', raw)
 
-    // Merge orders with the same table_id into one virtual order
+    // Merge dine-in orders with the same table_id; keep take-away orders separate.
     const grouped = {}
     raw.forEach(order => {
-      const key = order.table_id
+      const key = order.order_type === 'take_away' || !order.table_id
+        ? `order:${order.id}`
+        : `table:${order.table_id}`
       if (!grouped[key]) {
         grouped[key] = {
           ...order,
@@ -637,7 +685,7 @@ export default function Kitchen() {
           // Hide already-served rounds when a table sends more food later.
           items: (order.items || [])
             .filter(i => i.status !== 'served')
-            .map(i => ({ ...i, order_type: getOrderType(i), _orderId: order.id })),
+            .map(i => ({ ...i, order_type: getOrderType({ ...i, order_type: i.order_type || order.order_type }), _orderId: order.id })),
         }
       } else {
         // Append items from subsequent orders for the same table
@@ -645,7 +693,7 @@ export default function Kitchen() {
           ...grouped[key].items,
           ...(order.items || [])
             .filter(i => i.status !== 'served')
-            .map(i => ({ ...i, order_type: getOrderType(i), _orderId: order.id })),
+            .map(i => ({ ...i, order_type: getOrderType({ ...i, order_type: i.order_type || order.order_type }), _orderId: order.id })),
         ]
         // Keep the earliest created_at for sorting
         if (new Date(order.created_at) < new Date(grouped[key].created_at)) {

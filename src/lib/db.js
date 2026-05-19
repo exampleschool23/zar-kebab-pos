@@ -23,6 +23,19 @@ function normalizeOrderType(value) {
   return raw.includes('take') || raw.includes('away') ? 'take_away' : 'dine_in'
 }
 
+function isMissingOptionalOrderTypeColumn(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (
+    message.includes('schema cache') &&
+    (message.includes('order_type') || message.includes('order_number'))
+  )
+}
+
+function makeTakeAwayOrderNumber(orderId) {
+  const suffix = String(orderId || Date.now()).replace(/\D/g, '').slice(-4).padStart(4, '0')
+  return `TA-${suffix}`
+}
+
 function normalizeBusinessSettings(row) {
   if (!row) return null
   return {
@@ -65,6 +78,18 @@ async function fetchOrdersByPaymentStatus(paymentStatus, includeRecentPaidFilter
   return buildQuery('*, items:order_items(*)')
 }
 
+export async function loadOrders() {
+  const [unpaidRes, paidRes] = await Promise.all([
+    fetchOrdersByPaymentStatus('unpaid'),
+    fetchOrdersByPaymentStatus('paid', true),
+  ])
+
+  if (unpaidRes.error) throw unpaidRes.error
+  if (paidRes.error) throw paidRes.error
+
+  return [...(unpaidRes.data || []), ...(paidRes.data || [])]
+}
+
 export async function loadPOSData() {
   const [tablesRes, categoriesRes, menuItemsRes, unpaidRes, paidRes, settings] = await Promise.all([
     supabase.from('restaurant_tables').select('*').order('id'),
@@ -100,12 +125,7 @@ export function subscribeToRealtime(dispatch) {
     }
 
     ordersReloadInFlight = true
-    const [unpaid, paid] = await Promise.all([
-      fetchOrdersByPaymentStatus('unpaid'),
-      fetchOrdersByPaymentStatus('paid', true),
-    ])
-    const combined = [...(unpaid.data || []), ...(paid.data || [])]
-    dispatch({ type: 'SET_ORDERS', payload: combined })
+    dispatch({ type: 'SET_ORDERS', payload: await loadOrders() })
     ordersReloadInFlight = false
 
     if (ordersReloadQueued) {
@@ -136,7 +156,11 @@ export function subscribeToRealtime(dispatch) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_payments' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, reloadTables)
-    .subscribe()
+    .subscribe(status => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('[db] realtime channel status:', status)
+      }
+    })
 
   return () => {
     if (ordersReloadTimer) clearTimeout(ordersReloadTimer)
@@ -152,10 +176,11 @@ export async function writeToSupabase(action, state) {
     case 'SEND_TO_KITCHEN': {
       const orderId  = action._orderId
       const tableId  = state.currentTableId
-      const table    = state.tables.find(t => t.id === tableId)
-      if (!table || state.cart.length === 0) return
-
       const orderType = normalizeOrderType(action.payload?.orderType)
+      const isTakeAway = orderType === 'take_away'
+      const table    = isTakeAway ? null : state.tables.find(t => t.id === tableId)
+      if ((!isTakeAway && !table) || state.cart.length === 0) return
+
       const items = action._items || state.cart.map(i => ({ ...i, status: 'new', order_type: orderType }))
       console.log('Send to kitchen payload', { orderId, tableId, orderType, items })
       const addedSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
@@ -167,11 +192,11 @@ export async function writeToSupabase(action, state) {
         .maybeSingle()
 
       const subtotal    = (Number(existingOrder?.subtotal) || 0) + addedSubtotal
-      const serviceRatePct = Number.isFinite(Number(existingOrder?.service_rate_pct))
+      const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(existingOrder?.service_rate_pct))
         ? Number(existingOrder.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
       const paymentFields = getOrderPaymentFields(
-        { subtotal, service_rate_pct: serviceRatePct },
+        { subtotal, order_type: orderType, service_rate_pct: serviceRatePct },
         [],
         serviceRatePct
       )
@@ -184,15 +209,26 @@ export async function writeToSupabase(action, state) {
         if (orderUpdateError) throw orderUpdateError
         console.log('Created order', updatedOrder || { id: orderId, status: 'sent_to_kitchen' })
       } else {
-        const { data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert({
+        const orderInsert = {
           id:             orderId,
-          table_id:       tableId,
-          table_name:     table.name,
+          table_id:       isTakeAway ? null : tableId,
+          table_name:     isTakeAway ? 'Take Away' : table.name,
           waiter_name:    state.user?.name || 'Waiter',
           status:         'sent_to_kitchen',
           payment_status: 'unpaid',
           ...paymentFields,
-        }).select('*').maybeSingle()
+        }
+        if (isTakeAway) {
+          orderInsert.order_number = action._orderNumber || makeTakeAwayOrderNumber(orderId)
+          orderInsert.order_type = orderType
+        }
+        let { data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(orderInsert).select('*').maybeSingle()
+        if (orderInsertError && isTakeAway && isMissingOptionalOrderTypeColumn(orderInsertError)) {
+          // Backward-compatible fallback while the take-away migration is being applied.
+          // table_id=null + service_fee=0 still lets the order reach kitchen/cashier.
+          const { order_type, order_number, ...fallbackOrderInsert } = orderInsert
+          ;({ data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle())
+        }
         if (orderInsertError) throw orderInsertError
         console.log('Created order', createdOrder)
       }
@@ -208,17 +244,26 @@ export async function writeToSupabase(action, state) {
         status:       'new',
         order_type:   normalizeOrderType(i.order_type || orderType),
       }))
-      const { data: insertedItems, error: itemInsertError } = await supabase
+      let { data: insertedItems, error: itemInsertError } = await supabase
         .from('order_items')
         .insert(rows)
         .select('*')
+      if (itemInsertError && isMissingOptionalOrderTypeColumn(itemInsertError)) {
+        const fallbackRows = rows.map(({ order_type, ...row }) => row)
+        ;({ data: insertedItems, error: itemInsertError } = await supabase
+          .from('order_items')
+          .insert(fallbackRows)
+          .select('*'))
+      }
       if (itemInsertError) throw itemInsertError
       console.log('Created kitchen items', insertedItems || rows)
 
-      await supabase
-        .from('restaurant_tables')
-        .update({ status: 'occupied' })
-        .eq('id', tableId)
+      if (!isTakeAway) {
+        await supabase
+          .from('restaurant_tables')
+          .update({ status: 'occupied' })
+          .eq('id', tableId)
+      }
       break
     }
 
@@ -262,14 +307,15 @@ export async function writeToSupabase(action, state) {
     }
 
     case 'ADD_QUICK_ITEM_TO_ORDER': {
-      const { tableId, item } = action.payload
-      if (!tableId || !item) return
+      const { tableId, orderId, item } = action.payload
+      if ((!tableId && !orderId) || !item) return
 
-      const { data: orders, error: ordersError } = await supabase
+      let query = supabase
         .from('orders')
-        .select('id, service_rate_pct, items:order_items(*)')
-        .eq('table_id', tableId)
+        .select('*, items:order_items(*)')
         .eq('payment_status', 'unpaid')
+      query = orderId ? query.eq('id', orderId) : query.eq('table_id', tableId)
+      const { data: orders, error: ordersError } = await query
         .order('created_at', { ascending: true })
       if (ordersError) throw ordersError
 
@@ -301,18 +347,22 @@ export async function writeToSupabase(action, state) {
           quantity: 1,
           notes: '',
           status: item.sendToKitchen || item.send_to_kitchen ? 'new' : 'served',
-          order_type: item.order_type || 'dine_in',
+          order_type: item.order_type || order.order_type || 'dine_in',
         }
-        const { error } = await supabase.from('order_items').insert(row)
+        let { error } = await supabase.from('order_items').insert(row)
+        if (error && isMissingOptionalOrderTypeColumn(error)) {
+          const { order_type, ...fallbackRow } = row
+          ;({ error } = await supabase.from('order_items').insert(fallbackRow))
+        }
         if (error) throw error
         nextItems = [...(order.items || []), row]
       }
 
-      const serviceRatePct = Number.isFinite(Number(order.service_rate_pct))
+      const serviceRatePct = normalizeOrderType(order.order_type) === 'take_away' ? 0 : Number.isFinite(Number(order.service_rate_pct))
         ? Number(order.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
       const paymentFields = getOrderPaymentFields(
-        { service_rate_pct: serviceRatePct },
+        { order_type: order.order_type, service_rate_pct: serviceRatePct },
         nextItems,
         serviceRatePct
       )
@@ -325,15 +375,16 @@ export async function writeToSupabase(action, state) {
     }
 
     case 'UPDATE_BILL_ITEM_QTY': {
-      const { tableId, orderItemId, menuItemId, qty } = action.payload
+      const { tableId, orderId, orderItemId, menuItemId, qty } = action.payload
       const nextQty = Math.max(0, Number(qty) || 0)
-      if (!tableId || (!orderItemId && !menuItemId)) return
+      if ((!tableId && !orderId) || (!orderItemId && !menuItemId)) return
 
-      const { data: orders, error: ordersError } = await supabase
+      let query = supabase
         .from('orders')
-        .select('id, service_rate_pct, items:order_items(*)')
-        .eq('table_id', tableId)
+        .select('*, items:order_items(*)')
         .eq('payment_status', 'unpaid')
+      query = orderId ? query.eq('id', orderId) : query.eq('table_id', tableId)
+      const { data: orders, error: ordersError } = await query
       if (ordersError) throw ordersError
 
       const order = (orders || []).find(o =>
@@ -355,11 +406,11 @@ export async function writeToSupabase(action, state) {
       const nextItems = nextQty <= 0
         ? (order.items || []).filter(row => row.id !== target.id)
         : (order.items || []).map(row => row.id === target.id ? { ...row, quantity: nextQty } : row)
-      const serviceRatePct = Number.isFinite(Number(order.service_rate_pct))
+      const serviceRatePct = normalizeOrderType(order.order_type) === 'take_away' ? 0 : Number.isFinite(Number(order.service_rate_pct))
         ? Number(order.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
       const paymentFields = getOrderPaymentFields(
-        { service_rate_pct: serviceRatePct },
+        { order_type: order.order_type, service_rate_pct: serviceRatePct },
         nextItems,
         serviceRatePct
       )
@@ -373,6 +424,7 @@ export async function writeToSupabase(action, state) {
 
     case 'MARK_ORDER_PAID': {
       const tableId        = typeof action.payload === 'string' ? action.payload : action.payload.tableId
+      const orderId        = typeof action.payload === 'object' ? action.payload.orderId : null
       const loyalty        = typeof action.payload === 'object' ? action.payload.loyalty : null
       const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
       const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
@@ -382,19 +434,22 @@ export async function writeToSupabase(action, state) {
 
       // Fetch each unpaid order so we can write correct proportional values per round.
       // Writing the combined total to every row then summing in Reports caused double-counting.
-      const { data: unpaidOrders } = await supabase
+      let unpaidQuery = supabase
         .from('orders')
-        .select('id, subtotal')
-        .eq('table_id', tableId)
+        .select('*')
         .eq('payment_status', 'unpaid')
+      unpaidQuery = orderId ? unpaidQuery.eq('id', orderId) : unpaidQuery.eq('table_id', tableId)
+      const { data: unpaidOrders } = await unpaidQuery
 
       if (unpaidOrders?.length) {
-        const serviceRatePct = Number.isFinite(Number(loyalty?.service_rate_pct))
-          ? Math.max(0, Math.min(100, Number(loyalty.service_rate_pct)))
-          : serviceRatePctFromSettings(state.settings)
         const orderSummaries = unpaidOrders.map(o => {
+          const serviceRatePct = normalizeOrderType(o.order_type) === 'take_away' ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
+            ? Math.max(0, Math.min(100, Number(loyalty.service_rate_pct)))
+            : Number.isFinite(Number(o.service_rate_pct))
+              ? Math.max(0, Math.min(100, Number(o.service_rate_pct)))
+              : serviceRatePctFromSettings(state.settings)
           const paymentFields = getOrderPaymentFields(
-            { subtotal: Number(o.subtotal) || 0, service_rate_pct: serviceRatePct, loyalty_discount_pct: discPct },
+            { order_type: o.order_type, subtotal: Number(o.subtotal) || 0, service_rate_pct: serviceRatePct, loyalty_discount_pct: discPct },
             [],
             serviceRatePct
           )
@@ -441,10 +496,12 @@ export async function writeToSupabase(action, state) {
         }
       }
 
-      await supabase
-        .from('restaurant_tables')
-        .update({ status: 'available' })
-        .eq('id', tableId)
+      if (!orderId) {
+        await supabase
+          .from('restaurant_tables')
+          .update({ status: 'available' })
+          .eq('id', tableId)
+      }
       break
     }
 

@@ -12,13 +12,20 @@ import { formatCurrency } from '../lib/formatCurrency'
 import {
   getOrderDate,
   getOrderItems,
-  getOrderPaymentBreakdown,
   getOrderTotal,
   groupOrdersBySession,
   isActiveNeedsBillOrder,
   isPaidOrder,
   toLocalDateStr,
 } from '../lib/analytics'
+import {
+  formatReadableDateTime,
+  getDashboardBestSelling,
+  getDashboardPaymentMethods,
+  getDashboardPeriodOrders,
+  getDashboardSalesByCategory,
+  isOrderInDashboardPeriod,
+} from '../lib/dashboardAnalytics'
 import AppShell from '../components/AppShell'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
@@ -203,28 +210,7 @@ function todayStr()     { return localDateStr(new Date()) }
 function yesterdayStr() { const d = new Date(); d.setDate(d.getDate() - 1); return localDateStr(d) }
 
 function isOrderInPeriod(order, period) {
-  const ds = localDateStr(getOrderDate(order))
-  if (!ds) return false
-  const now = new Date()
-
-  if (period === 'today') return ds === todayStr()
-
-  if (period === '7days') {
-    const start = new Date()
-    start.setDate(start.getDate() - 6)
-    return ds >= localDateStr(start) && ds <= todayStr()
-  }
-
-  if (period === 'month') {
-    const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-`
-    return ds.startsWith(prefix)
-  }
-
-  if (period === 'year') {
-    return ds.startsWith(`${now.getFullYear()}-`)
-  }
-
-  return true
+  return isOrderInDashboardPeriod(order, period)
 }
 
 function elapsedSince(iso) {
@@ -246,7 +232,7 @@ function shortLabel(ds, mode) {
 
 function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight }) {
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm p-4 flex flex-col gap-2 min-w-0 ${highlight ? 'border-red-200' : 'border-[#E5E7EB]'}`}>
+    <div className={`bg-white rounded-2xl border shadow-sm p-4 flex flex-col gap-2 min-w-0 h-full ${highlight ? 'border-red-200' : 'border-[#E5E7EB]'}`}>
       <div className="flex items-start justify-between gap-2">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${highlight ? 'bg-red-50' : 'bg-gray-50'}`}>
           <Icon size={17} className={highlight ? 'text-[#DC2626]' : 'text-[#6B7280]'} />
@@ -260,7 +246,7 @@ function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight }) 
       </div>
       <div>
         <p className={`font-black text-xl leading-tight break-words tabular-nums mb-1 ${highlight ? 'text-[#DC2626]' : 'text-[#1F2937]'}`}>{value}</p>
-        <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider">{label}</p>
+        <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider leading-snug">{label}</p>
         {sub && <p className={`text-xs mt-0.5 leading-snug ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
       </div>
     </div>
@@ -300,11 +286,11 @@ function RecentStatusPill({ status, lang }) {
 
 function RecentSectionHeader({ title, count, urgent }) {
   return (
-    <div className="flex items-center justify-between px-1 pt-1 mb-2">
-      <p className="text-[11px] font-black tracking-[0.24em] text-[#8EA0BB]">
+    <div className="flex items-center justify-between gap-2 px-1 pt-1 mb-2 min-w-0">
+      <p className="text-[11px] font-black tracking-[0.18em] text-[#8EA0BB] truncate min-w-0">
         {title}
       </p>
-      <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#8EA0BB]">
+      <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#8EA0BB] flex-shrink-0">
         {count}
       </span>
     </div>
@@ -322,33 +308,34 @@ function RecentOrderRow({ order, lang, methodLabel, onPrintBill, onView }) {
         ? 'bg-[#FFF8F8] border-[#FFD6D3]'
         : 'bg-white border-[#EDF1F5] hover:bg-[#FAFBFC]'
     }`}>
-      <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-          isNeedsBill ? 'bg-white text-[#EF3D32]' : 'bg-[#FFF7ED] text-[#FF5A00]'
-        }`}>
-          <Receipt size={14} />
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-center max-[1320px]:grid-cols-1">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            isNeedsBill ? 'bg-white text-[#EF3D32]' : 'bg-[#FFF7ED] text-[#FF5A00]'
+          }`}>
+            <Receipt size={14} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+              <p className="text-base font-black text-[#1F2937] leading-none flex-shrink-0">#{shortId}</p>
+              <p className="text-sm text-[#718096] truncate min-w-0 max-w-[140px]">{order.table_name || l.table}</p>
+              <RecentStatusPill status={isNeedsBill ? 'needs_bill' : 'paid'} lang={lang} />
+            </div>
+
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#8EA0BB] min-w-0">
+              <Clock size={13} className="flex-shrink-0" />
+              <span className="whitespace-nowrap flex-shrink-0">{elapsedSince(getOrderDate(order) || order.created_at)}</span>
+              {methodLabel && (
+                <>
+                  <CreditCard size={13} className="ml-0.5 flex-shrink-0" />
+                  <span className="truncate font-semibold text-[#63738A] min-w-0">{methodLabel}</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-base font-black text-[#1F2937] leading-none">#{shortId}</p>
-            <p className="text-sm text-[#718096] truncate max-w-[90px]">{order.table_name || l.table}</p>
-            <RecentStatusPill status={isNeedsBill ? 'needs_bill' : 'paid'} lang={lang} />
-          </div>
-
-          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#8EA0BB] min-w-0">
-            <Clock size={13} className="flex-shrink-0" />
-            <span className="whitespace-nowrap">{elapsedSince(getOrderDate(order) || order.created_at)}</span>
-            {methodLabel && (
-              <>
-                <CreditCard size={13} className="ml-0.5 flex-shrink-0" />
-                <span className="truncate font-semibold text-[#63738A]">{methodLabel}</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+        <div className="flex flex-col items-end gap-2 flex-shrink-0 max-[1320px]:flex-row max-[1320px]:justify-between max-[1320px]:items-center">
           <p className="text-[15px] font-black text-[#111827] tabular-nums whitespace-nowrap">
             {formatCurrency(getOrderTotal(order))}
           </p>
@@ -452,7 +439,7 @@ export default function AdminDashboard() {
   )
 
   const periodPaidOrders = useMemo(
-    () => paidOrders.filter(order => isOrderInPeriod(order, period)),
+    () => getDashboardPeriodOrders(paidOrders, period),
     [paidOrders, period]
   )
 
@@ -613,67 +600,29 @@ export default function AdminDashboard() {
 
   // ── Payment methods breakdown ─────────────────────────────────────────────
   const paymentMethods = useMemo(() => {
-    const KNOWN = { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr, loyalty_card: 'Loyalty' }
-    const map = {}
-    periodPaidOrders.forEach(o => {
-      const breakdown = getOrderPaymentBreakdown(o)
-      const rows = breakdown.length > 0 ? breakdown : [{ method: o.payment_method, amount: getOrderTotal(o) }]
-      rows.forEach(row => {
-        const raw    = (row.method || '').toLowerCase().trim()
-        const key    = ['cash','card','terminal','qr','loyalty_card'].includes(raw) ? raw : 'unknown'
-        const amount = Number(row.amount) || 0
-        map[key] = (map[key] || 0) + amount
-      })
-    })
-    const total = Object.values(map).reduce((s, v) => s + v, 0)
-    return Object.entries(map)
-      .map(([key, amount]) => ({
-        key,
-        label:  KNOWN[key] || l.unknown,
-        amount,
-        pct:    total > 0 ? Math.round((amount / total) * 100) : 0,
-        color:  PAYMENT_COLORS[key] || PAYMENT_COLORS.unknown,
-      }))
-      .sort((a, b) => b.amount - a.amount)
+    return getDashboardPaymentMethods(periodPaidOrders, {
+      cash: l.cash,
+      card: l.card,
+      terminal: l.terminal,
+      qr: l.qr,
+      loyalty: 'Loyalty',
+      unknown: l.unknown,
+      colors: PAYMENT_COLORS,
+    }).map(row => ({
+      ...row,
+      color: row.color || PAYMENT_COLORS[row.key] || PAYMENT_COLORS.unknown,
+    }))
   }, [periodPaidOrders, l])
 
   // ── Sales by category ─────────────────────────────────────────────────────
   const salesByCategory = useMemo(() => {
-    const map = {}
-    paidOrders.forEach(o => {
-      getOrderItems(o).forEach(item => {
-        const mi    = menuItemMap[item.menu_item_id]
-        const cat   = mi ? categoryMap[mi.category_id] : null
-        const name  = cat
-          ? (cat[`name_${lang}`] || cat.name_en || cat.name_uz || 'Other')
-          : 'Other'
-        const rev = (Number(item.price) || 0) * (Number(item.quantity) || 1)
-        if (!map[name]) map[name] = { name, revenue: 0, qty: 0 }
-        map[name].revenue += rev
-        map[name].qty     += Number(item.quantity) || 1
-      })
-    })
-    const rows  = Object.values(map).sort((a, b) => b.revenue - a.revenue)
-    const total = rows.reduce((s, r) => s + r.revenue, 0)
-    return rows.map(r => ({ ...r, pct: total > 0 ? Math.round((r.revenue / total) * 100) : 0 }))
-  }, [paidOrders, menuItemMap, categoryMap, lang])
+    return getDashboardSalesByCategory(periodPaidOrders, menuItemMap, categoryMap, lang)
+  }, [periodPaidOrders, menuItemMap, categoryMap, lang])
 
   // ── Best-selling dishes ───────────────────────────────────────────────────
   const bestSelling = useMemo(() => {
-    const map = {}
-    paidOrders.forEach(o => {
-      getOrderItems(o).forEach(item => {
-        const key = item.menu_item_id || item.name
-        if (!map[key]) map[key] = { menuItemId: item.menu_item_id, name: item.name, qty: 0, revenue: 0 }
-        map[key].qty     += Number(item.quantity) || 1
-        map[key].revenue += (Number(item.price) || 0) * (Number(item.quantity) || 1)
-      })
-    })
-    return Object.values(map)
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 5)
-      .map(row => ({ ...row, image_url: menuItemMap[row.menuItemId]?.image_url || '' }))
-  }, [paidOrders, menuItemMap])
+    return getDashboardBestSelling(periodPaidOrders, menuItemMap)
+  }, [periodPaidOrders, menuItemMap])
 
   // ── Staff performance ─────────────────────────────────────────────────────
   const staffPerformance = useMemo(() => {
@@ -739,7 +688,7 @@ export default function AdminDashboard() {
 
   const chartMax = Math.max(...chartBars.map(b => b.revenue), 1)
   const now      = new Date()
-  const lastUpdated = `${now.getDate().toString().padStart(2,'0')}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
+  const lastUpdated = formatReadableDateTime(now)
 
   if (!state.loaded) {
     return (
@@ -754,22 +703,22 @@ export default function AdminDashboard() {
 
   return (
     <AppShell title={l.greeting(displayName)}>
-      <div className="p-5 xl:p-6 max-w-[1500px] mx-auto">
+      <div className="w-full max-w-[1440px] mx-auto px-4 py-4 sm:px-5 lg:px-6 lg:py-5 overflow-x-hidden min-w-0">
 
         {/* Header */}
-        <div className="mb-6 flex items-start justify-between flex-wrap gap-2">
-          <div>
+        <div className="mb-5 flex items-start justify-between flex-wrap gap-3 min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 className="font-black text-[#1F2937] text-2xl leading-tight">{l.greeting(displayName)}</h2>
             <p className="text-sm text-[#6B7280] mt-1">{l.subtitle}</p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-[#6B7280] bg-white border border-gray-200 px-3 py-2 rounded-xl">
+          <div className="flex items-center gap-2 text-xs text-[#6B7280] bg-white border border-gray-200 px-3 py-2 rounded-xl flex-shrink-0">
             <Clock size={13} />
             {lastUpdated}
           </div>
         </div>
 
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
             label={l.todayRevenue}
@@ -808,13 +757,13 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── Row 2: Revenue Statistics + Payment Methods ── */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-12 gap-4 mb-4 min-w-0">
 
           {/* Revenue Statistics — left 2 cols */}
-          <div className="xl:col-span-2 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+          <div className="col-span-12 xl:col-span-8 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="font-bold text-[#1F2937] text-base">{l.revenueStats}</h3>
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 {[
                   { key: 'today',  label: l.today    },
                   { key: '7days',  label: l.days7    },
@@ -875,16 +824,16 @@ export default function AdminDashboard() {
             </div>
 
             {/* Period comparison */}
-            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[#F3F4F6]">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-[#F3F4F6]">
+              <div className="min-w-0">
                 <p className="text-xs text-[#9CA3AF] mb-1">{l.prevPeriod}</p>
-                <p className="font-bold text-[#1F2937] text-sm">{formatCurrency(previousPeriodTotal)}</p>
+                <p className="font-bold text-[#1F2937] text-sm truncate">{formatCurrency(previousPeriodTotal)}</p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-[#9CA3AF] mb-1">{l.thisPeriod}</p>
-                <p className="font-bold text-[#1F2937] text-sm">{formatCurrency(currentPeriodTotal)}</p>
+                <p className="font-bold text-[#1F2937] text-sm truncate">{formatCurrency(currentPeriodTotal)}</p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-[#9CA3AF] mb-1">{l.growth}</p>
                 {periodGrowth !== null ? (
                   <p className={`font-bold text-sm flex items-center gap-0.5 ${periodGrowth >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
@@ -899,12 +848,12 @@ export default function AdminDashboard() {
           </div>
 
           {/* Payment Methods */}
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+          <div className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
             <h3 className="font-black text-[#1F2937] text-base mb-4">{l.paymentMethods}</h3>
             {paymentMethods.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noData}</p>
             ) : (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 min-w-0">
                 <div className="relative flex-shrink-0">
                   <DonutChart slices={paymentMethods.map(p => ({ value: p.amount, color: p.color }))} />
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -926,10 +875,10 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── Row 3: Sales by Category + Best-Selling + Recent Orders ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-12 gap-4 mb-4 min-w-0">
 
           {/* Sales by Category */}
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+          <div className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
             <h3 className="font-black text-[#1F2937] text-base mb-4">{l.salesByCategory}</h3>
             {salesByCategory.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
@@ -954,7 +903,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Best-selling */}
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+          <div className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
             <h3 className="font-black text-[#1F2937] text-base mb-4">{l.bestSelling}</h3>
             {bestSelling.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
@@ -974,7 +923,7 @@ export default function AdminDashboard() {
                       <p className="text-sm font-semibold text-[#1F2937] truncate">{item.name}</p>
                       <p className="text-xs text-[#9CA3AF]">{item.qty} {l.pcs}</p>
                     </div>
-                    <p className="text-xs font-black text-[#1F2937] flex-shrink-0">{formatCurrency(item.revenue)}</p>
+                    <p className="text-xs font-black text-[#1F2937] flex-shrink-0 whitespace-nowrap">{formatCurrency(item.revenue)}</p>
                   </div>
                 ))}
               </div>
@@ -982,15 +931,15 @@ export default function AdminDashboard() {
           </div>
 
           {/* Recent Orders */}
-          <div className="bg-white rounded-[24px] border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.05)] p-5">
+          <div className="col-span-12 xl:col-span-4 bg-white rounded-[24px] border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.05)] p-5 min-w-0">
             <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h3 className="font-black text-[#1F2937] text-xl leading-tight">{l.recentOrders}</h3>
                 <p className="text-sm text-[#8EA0BB] mt-2 leading-snug">{l.recentOrdersSub}</p>
               </div>
-              <div className="w-20 h-16 rounded-2xl bg-[#0F3B2E] text-white flex flex-col items-center justify-center shadow-[0_6px_14px_rgba(15,59,46,0.18)] flex-shrink-0">
+              <div className="min-w-[76px] max-w-[92px] px-2 h-16 rounded-2xl bg-[#0F3B2E] text-white flex flex-col items-center justify-center shadow-[0_6px_14px_rgba(15,59,46,0.18)] flex-shrink-0">
                 <span className="text-xl font-black leading-none">{recentOrderGroups.needsBillTotal}</span>
-                <span className="text-[10px] font-bold tracking-wider uppercase text-[#C9DCD5] mt-1">{l.needsBill}</span>
+                <span className="text-[9px] font-bold tracking-wide uppercase text-[#C9DCD5] mt-1 text-center leading-tight">{l.needsBill}</span>
               </div>
             </div>
 

@@ -166,8 +166,8 @@ export default function PublicMenu() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF6EE] text-[#1F2937]">
-      <header className="sticky top-0 z-20 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
+    <div className="min-h-screen bg-[#FAF6EE] pt-[73px] text-[#1F2937]">
+      <header className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-4 py-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <img
@@ -193,7 +193,7 @@ export default function PublicMenu() {
       </header>
 
       <main className="mx-auto max-w-[1180px] px-4 py-5">
-        <div className="mb-5 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+        <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
           <div className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
             <input
@@ -203,19 +203,22 @@ export default function PublicMenu() {
               className="w-full rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] py-3 pl-11 pr-4 text-sm outline-none transition-all focus:border-[#ff5a00] focus:bg-white focus:ring-2 focus:ring-[#ff5a00]/15"
             />
           </div>
-
-          <MenuCategoryScroller
-            categories={categoryCards}
-            activeCategoryId={activeCategory}
-            onCategoryClick={setActiveCategory}
-            onActiveCategoryChange={setActiveCategory}
-            lang={lang}
-            itemCounts={itemCounts}
-            sectionPrefix="public-menu-category"
-            topOffset={73}
-            className="mt-4"
-          />
         </div>
+
+        <MenuCategoryScroller
+          categories={categoryCards}
+          activeCategoryId={activeCategory}
+          onCategoryClick={setActiveCategory}
+          onActiveCategoryChange={setActiveCategory}
+          lang={lang}
+          itemCounts={itemCounts}
+          sectionPrefix="public-menu-category"
+          topOffset={73}
+          scrollOffset={96}
+          className="mb-5 mt-3 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm"
+          collapsedPosition="fixed"
+          collapsedClassName="z-30 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1180px] sm:-translate-x-1/2"
+        />
 
         {loading ? (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">

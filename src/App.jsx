@@ -189,6 +189,9 @@ function AppRoutes() {
         <Route path="/waiter/order/:tableId" element={
           <ProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></ProtectedRoute>
         } />
+        <Route path="/waiter/take-away" element={
+          <ProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></ProtectedRoute>
+        } />
 
         {/* Kitchen — kitchen role + admin/owner only */}
         <Route path="/kitchen" element={
@@ -200,6 +203,9 @@ function AppRoutes() {
           <ProtectedRoute roles={PAGE_ACCESS.cashier}><CashierTables /></ProtectedRoute>
         } />
         <Route path="/cashier/bill/:tableId" element={
+          <ProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></ProtectedRoute>
+        } />
+        <Route path="/cashier/bill/order/:orderId" element={
           <ProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></ProtectedRoute>
         } />
         <Route path="/receipt/:orderId" element={

@@ -6,7 +6,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import AppShell from '../components/AppShell'
 import {
   UtensilsCrossed, Clock, ChefHat, CheckCircle2,
-  Receipt, Coffee, RefreshCw, Layers,
+  Receipt, Coffee, RefreshCw, Layers, Plus,
 } from 'lucide-react'
 
 // ── Localization ──────────────────────────────────────────────────────────────
@@ -36,6 +36,7 @@ const L = {
     guideReady: 'All items ready — confirm delivery',
     guideOccupied: 'Order delivered and eating',
     guideNeedsBill: 'Guest requested the bill',
+    takeAwayOrder: 'Take Away Order',
   },
   ru: {
     tables: 'Столы',
@@ -61,6 +62,7 @@ const L = {
     guideReady: 'Всё готово — подтвердите доставку',
     guideOccupied: 'Заказ доставлен, гость ест',
     guideNeedsBill: 'Гость попросил счёт',
+    takeAwayOrder: 'Заказ с собой',
   },
   uz: {
     tables: 'Stollar',
@@ -86,6 +88,7 @@ const L = {
     guideReady: 'Hammasi tayyor — yetkazib berishni tasdiqlang',
     guideOccupied: 'Buyurtma yetkazildi, mehmon ovqatlanmoqda',
     guideNeedsBill: 'Mehmon hisob so\'radi',
+    takeAwayOrder: 'Olib ketish buyurtmasi',
   },
 }
 
@@ -407,6 +410,12 @@ export default function WaiterTables() {
     navigate(`/waiter/order/${table.id}`)
   }
 
+  function handleTakeAway() {
+    dispatch({ type: 'SET_TABLE', payload: null })
+    dispatch({ type: 'CLEAR_CART' })
+    navigate('/waiter/take-away')
+  }
+
   const allCfg = {
     chipBg: 'bg-gray-100 text-gray-600',
     chipActiveBg: 'bg-gray-800 text-white',
@@ -423,13 +432,22 @@ export default function WaiterTables() {
               <h2 className="text-2xl font-black text-gray-900">{tr(lang, 'tables')}</h2>
               <p className="text-sm text-gray-400 mt-0.5">{tr(lang, 'welcome')}, {waiterName}</p>
             </div>
-            <button
-              onClick={() => {}}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
-            >
-              <RefreshCw size={14} />
-              {tr(lang, 'refresh')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {}}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <RefreshCw size={14} />
+                {tr(lang, 'refresh')}
+              </button>
+              <button
+                onClick={handleTakeAway}
+                className="flex items-center gap-2 px-4 py-2 bg-[#ff5a00] text-white rounded-xl text-sm font-black hover:bg-[#cc4800] transition-colors shadow-sm shadow-orange-200"
+              >
+                <Plus size={15} />
+                {tr(lang, 'takeAwayOrder')}
+              </button>
+            </div>
           </div>
 
           {/* Filter chips */}

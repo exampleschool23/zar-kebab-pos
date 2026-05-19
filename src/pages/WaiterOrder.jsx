@@ -581,14 +581,19 @@ export default function WaiterOrder() {
   const [activeCategory,setCategory]     = useState('all')
   const [cartOpen,      setCartOpen]     = useState(false)
   const [sidebarOpen,   setSidebarOpen]  = useState(false)
-  const [orderType,     setOrderType]    = useState('dine_in')
+  const isTakeAwayFlow = !tableId
+  const [orderType,     setOrderType]    = useState(isTakeAwayFlow ? 'take_away' : 'dine_in')
   const [detailItem,    setDetailItem]   = useState(null)
   const productScrollRef = useRef(null)
 
-  const table = state.tables.find(t => t.id === tableId)
+  const table = isTakeAwayFlow ? null : state.tables.find(t => t.id === tableId)
+  const orderTitle = isTakeAwayFlow
+    ? (lang === 'uz' ? 'Olib ketish buyurtmasi' : lang === 'ru' ? 'Заказ с собой' : 'Take Away Order')
+    : table?.name
 
   // Merge all active orders for this table
   const activeOrder = useMemo(() => {
+    if (isTakeAwayFlow) return null
     const orders = state.orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
     if (orders.length === 0) return null
     const merged = { ...orders[0] }
@@ -598,7 +603,7 @@ export default function WaiterOrder() {
       if (orders.some(o => o.status === p)) { merged.status = p; break }
     }
     return merged
-  }, [state.orders, tableId])
+  }, [state.orders, tableId, isTakeAwayFlow])
 
   // Cart lookups
   const cartQtyMap = useMemo(() => {
@@ -699,7 +704,15 @@ export default function WaiterOrder() {
     signOut?.()
   }
 
-  if (!table) {
+  React.useEffect(() => {
+    dispatch({ type: 'SET_TABLE', payload: isTakeAwayFlow ? null : tableId })
+    if (isTakeAwayFlow) setOrderType('take_away')
+    return () => dispatch({ type: 'CLEAR_CART' })
+    // dispatch is intentionally omitted because AppContext recreates dbDispatch after state updates.
+    // Including it here would clear the cart after every add/increment render.
+  }, [isTakeAwayFlow, tableId])
+
+  if (!isTakeAwayFlow && !table) {
     return (
       <div className="min-h-screen bg-[#FAF7F0] flex items-center justify-center">
         <div className="text-center">
@@ -897,10 +910,12 @@ export default function WaiterOrder() {
         </div>
 
         {/* Bottom table chips */}
-        <BottomTableChips
-          currentTableId={tableId}
-          onNewOrder={() => navigate('/waiter/tables')}
-        />
+        {!isTakeAwayFlow && (
+          <BottomTableChips
+            currentTableId={tableId}
+            onNewOrder={() => navigate('/waiter/tables')}
+          />
+        )}
           </>
         )}
       </div>
@@ -922,9 +937,10 @@ export default function WaiterOrder() {
         </div>
         <div className="flex-1 min-h-0 overflow-hidden">
           <CartPanel
-            tableName={table.name}
+            tableName={orderTitle}
             orderType={orderType}
             onOrderTypeChange={setOrderType}
+            allowOrderTypeChange={!isTakeAwayFlow}
           />
         </div>
       </div>
@@ -946,9 +962,10 @@ export default function WaiterOrder() {
               />
             </div>
             <CartPanel
-              tableName={table.name}
+              tableName={orderTitle}
               orderType={orderType}
               onOrderTypeChange={setOrderType}
+              allowOrderTypeChange={!isTakeAwayFlow}
               onClose={() => setCartOpen(false)}
             />
           </div>

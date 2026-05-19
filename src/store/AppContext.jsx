@@ -56,15 +56,21 @@ function makeLocalId(prefix) {
 }
 
 function recalcOrderTotals(order, settings) {
-  const serviceRatePct = Number.isFinite(Number(order?.service_rate_pct))
+  const isTakeAway = normalizeOrderType(order?.order_type || order?.orderType) === 'take_away'
+  const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(order?.service_rate_pct))
     ? Number(order.service_rate_pct)
     : serviceRatePctFromSettings(settings)
   const paymentFields = getOrderPaymentFields(
-    { ...order, service_rate_pct: serviceRatePct },
+    { ...order, order_type: isTakeAway ? 'take_away' : normalizeOrderType(order?.order_type || order?.orderType), service_rate_pct: serviceRatePct },
     order?.items || [],
     serviceRatePct
   )
   return { ...order, ...paymentFields }
+}
+
+function makeTakeAwayOrderNumber(orderId) {
+  const suffix = String(orderId || Date.now()).replace(/\D/g, '').slice(-4).padStart(4, '0')
+  return `TA-${suffix}`
 }
 
 function getQuickSortOrder(item) {
@@ -163,21 +169,23 @@ function reducer(state, action) {
 
     // ── Orders ────────────────────────────────────────────────────────────────
     case 'SEND_TO_KITCHEN': {
-      const table = state.tables.find(t => t.id === state.currentTableId)
-      if (!table || state.cart.length === 0) return state
+      const orderType = normalizeOrderType(action.payload?.orderType)
+      const isTakeAway = orderType === 'take_away'
+      const table = isTakeAway ? null : state.tables.find(t => t.id === state.currentTableId)
+      if ((!isTakeAway && !table) || state.cart.length === 0) return state
       const orderId     = action._orderId || ('o' + Date.now())
-      const cartItems   = action._items || state.cart.map(i => ({ ...i, id: makeLocalId('oi'), status: 'new' }))
+      const cartItems   = action._items || state.cart.map(i => ({ ...i, id: makeLocalId('oi'), status: 'new', order_type: orderType }))
       const addedSubtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0)
       const activeOrder = state.orders.find(o =>
         o.id === orderId ||
-        (o.table_id === state.currentTableId && o.payment_status !== 'paid')
+        (!isTakeAway && o.table_id === state.currentTableId && o.payment_status !== 'paid')
       )
       const subtotal    = (Number(activeOrder?.subtotal) || 0) + addedSubtotal
-      const serviceRatePct = Number.isFinite(Number(activeOrder?.service_rate_pct))
+      const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(activeOrder?.service_rate_pct))
         ? Number(activeOrder.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
       const paymentFields = getOrderPaymentFields(
-        { subtotal, service_rate_pct: serviceRatePct },
+        { subtotal, order_type: orderType, service_rate_pct: serviceRatePct },
         [],
         serviceRatePct
       )
@@ -193,8 +201,10 @@ function reducer(state, action) {
           )
         : [...state.orders, {
             id: orderId,
-            table_id: state.currentTableId,
-            table_name: table.name,
+            order_number: isTakeAway ? (action._orderNumber || makeTakeAwayOrderNumber(orderId)) : undefined,
+            order_type: orderType,
+            table_id: isTakeAway ? null : state.currentTableId,
+            table_name: isTakeAway ? 'Take Away' : table.name,
             waiter_name: state.user?.name || 'Waiter',
             status: 'sent_to_kitchen',
             payment_status: 'unpaid',
@@ -202,7 +212,7 @@ function reducer(state, action) {
             ...paymentFields,
             created_at: new Date().toISOString(),
           }]
-      const updatedTables = state.tables.map(t =>
+      const updatedTables = isTakeAway ? state.tables : state.tables.map(t =>
         t.id === state.currentTableId ? { ...t, status: 'occupied' } : t
       )
       return { ...state, orders: nextOrders, cart: [], tables: updatedTables }
@@ -247,8 +257,10 @@ function reducer(state, action) {
       }
 
     case 'ADD_QUICK_ITEM_TO_ORDER': {
-      const { tableId, item } = action.payload
-      const activeOrder = state.orders.find(o => o.table_id === tableId && o.payment_status !== 'paid')
+      const { tableId, orderId, item } = action.payload
+      const activeOrder = state.orders.find(o =>
+        orderId ? o.id === orderId : o.table_id === tableId && o.payment_status !== 'paid'
+      )
       if (!activeOrder || !item) return state
 
       const existing = (activeOrder.items || []).find(i =>
@@ -268,7 +280,7 @@ function reducer(state, action) {
               quantity: 1,
               notes: '',
               status: item.sendToKitchen || item.send_to_kitchen ? 'new' : 'served',
-              order_type: item.order_type || 'dine_in',
+              order_type: item.order_type || activeOrder.order_type || 'dine_in',
             },
           ]
 
@@ -282,13 +294,13 @@ function reducer(state, action) {
     }
 
     case 'UPDATE_BILL_ITEM_QTY': {
-      const { tableId, orderItemId, menuItemId, qty } = action.payload
+      const { tableId, orderId, orderItemId, menuItemId, qty } = action.payload
       const nextQty = Math.max(0, Number(qty) || 0)
 
       return {
         ...state,
         orders: state.orders.map(o => {
-          if (o.table_id !== tableId || o.payment_status === 'paid') return o
+          if ((orderId ? o.id !== orderId : o.table_id !== tableId) || o.payment_status === 'paid') return o
           const hasItem = (o.items || []).some(i => orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
           if (!hasItem) return o
           const nextItems = nextQty <= 0
@@ -304,14 +316,16 @@ function reducer(state, action) {
 
     case 'MARK_ORDER_PAID': {
       const tableId        = typeof action.payload === 'string' ? action.payload : action.payload.tableId
+      const orderId        = typeof action.payload === 'object' ? action.payload.orderId : null
       const loyalty        = typeof action.payload === 'object' ? action.payload.loyalty : null
       const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
       const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
       const paidAt = new Date().toISOString()
       const activeOrderSummaries = state.orders
-        .filter(o => o.table_id === tableId && o.payment_status !== 'paid')
+        .filter(o => (orderId ? o.id === orderId : o.table_id === tableId) && o.payment_status !== 'paid')
         .map(o => {
-          const serviceRatePct = Number.isFinite(Number(loyalty?.service_rate_pct))
+          const isTakeAway = normalizeOrderType(o.order_type) === 'take_away'
+          const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
             ? Number(loyalty.service_rate_pct)
             : Number.isFinite(Number(o.service_rate_pct))
               ? Number(o.service_rate_pct)
@@ -335,10 +349,11 @@ function reducer(state, action) {
       })
       return {
         ...state,
-        tables: state.tables.map(t => t.id === tableId ? { ...t, status: 'available' } : t),
+        tables: orderId ? state.tables : state.tables.map(t => t.id === tableId ? { ...t, status: 'available' } : t),
         orders: state.orders.map(o => {
-          if (o.table_id !== tableId || o.payment_status === 'paid') return o
-          const serviceRatePct = Number.isFinite(Number(loyalty?.service_rate_pct))
+          if ((orderId ? o.id !== orderId : o.table_id !== tableId) || o.payment_status === 'paid') return o
+          const isTakeAway = normalizeOrderType(o.order_type) === 'take_away'
+          const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
             ? Number(loyalty.service_rate_pct)
             : Number.isFinite(Number(o.service_rate_pct))
               ? Number(o.service_rate_pct)
@@ -469,9 +484,14 @@ export function AppProvider({ children }) {
       const enriched = action.type === 'SEND_TO_KITCHEN'
       ? {
           ...action,
-          _orderId: stateRef.current.orders.find(o =>
-            o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
-          )?.id || 'o' + Date.now(),
+          _orderId: normalizeOrderType(action.payload?.orderType) === 'take_away'
+            ? `ta-${Date.now()}`
+            : stateRef.current.orders.find(o =>
+              o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
+            )?.id || 'o' + Date.now(),
+          _orderNumber: normalizeOrderType(action.payload?.orderType) === 'take_away'
+            ? makeTakeAwayOrderNumber(Date.now())
+            : undefined,
           _items: stateRef.current.cart.map(i => ({
             ...i,
             id: makeLocalId('oi'),
@@ -486,7 +506,7 @@ export function AppProvider({ children }) {
           }
       : action
 
-    if (enriched.type === 'UPDATE_ORDER_ITEM_STATUS') {
+    if (enriched.type === 'UPDATE_ORDER_ITEM_STATUS' || enriched.type === 'SEND_TO_KITCHEN') {
       return writeToSupabase(enriched, stateRef.current)
         .then(() => {
           dispatch(enriched)

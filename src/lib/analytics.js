@@ -25,6 +25,8 @@ export function getOrderItems(o) {
 }
 
 export function getOrderServiceRatePct(o, fallbackPct = 20) {
+  const typeText = String(o?.order_type || o?.orderType || o?.table_name || '').toLowerCase()
+  if (typeText.includes('take') || (!o?.table_id && typeText.includes('away'))) return 0
   const pct = Number(o?.service_rate_pct ?? o?.service_percent ?? o?.servicePercent)
   return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : fallbackPct
 }
@@ -327,7 +329,9 @@ export function groupOrdersBySession(orders) {
     const anchor = o.paid_at
       ? o.paid_at.slice(0, 16)
       : (o.created_at || '').slice(0, 10)
-    const key = `${o.table_id}::${anchor}`
+    const typeText = String(o.order_type || o.table_name || '').toLowerCase()
+    const isTakeAway = typeText.includes('take') || (!o.table_id && typeText.includes('away'))
+    const key = isTakeAway || !o.table_id ? `order::${o.id}` : `${o.table_id}::${anchor}`
 
     if (!map[key]) {
       map[key] = {

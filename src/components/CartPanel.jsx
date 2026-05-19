@@ -97,7 +97,7 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
 }
 
 // ── Cart panel ─────────────────────────────────────────────────────────────────
-export default function CartPanel({ tableName, orderType, onOrderTypeChange, onClose }) {
+export default function CartPanel({ tableName, orderType, onOrderTypeChange, onClose, allowOrderTypeChange = true }) {
   const { state, dispatch } = useApp()
   const lang    = state.lang
   const cart    = state.cart
@@ -108,18 +108,27 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
     return map
   }, [state.menuItems])
 
-  const serviceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
-  const payment = getOrderPaymentSummary({ service_rate_pct: serviceRatePct }, cart, serviceRatePct)
+  const configuredServiceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
+  const serviceRatePct = orderType === 'take_away' ? 0 : configuredServiceRatePct
+  const payment = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, cart, configuredServiceRatePct)
   const subtotal  = payment.subtotal
   const service   = payment.serviceFee
   const total     = payment.total
   const itemCount = cart.reduce((s, i) => s + i.quantity, 0)
 
-  function handleSend() {
+  async function handleSend() {
     if (cart.length === 0) return
     console.log('Order type', orderType)
     console.log('Send to kitchen payload', { orderType, items: cart })
-    dispatch({ type: 'SEND_TO_KITCHEN', payload: { orderType } })
+    const result = await dispatch({ type: 'SEND_TO_KITCHEN', payload: { orderType } })
+    if (result?.error) {
+      window.alert(lang === 'uz'
+        ? 'Buyurtmani oshxonaga yuborib bo‘lmadi. Konsol va Supabase jadval migratsiyalarini tekshiring.'
+        : lang === 'ru'
+          ? 'Не удалось отправить заказ на кухню. Проверьте консоль и миграции таблиц Supabase.'
+          : 'Could not send the order to kitchen. Check the console and Supabase table migrations.')
+      return
+    }
     onClose?.()
   }
 
@@ -154,21 +163,23 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
         </div>
 
         {/* Order type tabs */}
-        <div className="flex gap-1 bg-[#F3F4F6] p-1 rounded-xl mt-3">
-          {ORDER_TYPES.map(ot => (
-            <button
-              key={ot.key}
-              onClick={() => onOrderTypeChange?.(ot.key)}
-              className={`flex-1 py-1.5 text-[12px] font-bold rounded-lg transition-all ${
-                orderType === ot.key
-                  ? 'bg-white text-[#1F2937] shadow-sm'
-                  : 'text-[#9CA3AF] hover:text-[#6B7280]'
-              }`}
-            >
-              {orderTypeLabel(ot, lang)}
-            </button>
-          ))}
-        </div>
+        {allowOrderTypeChange && (
+          <div className="flex gap-1 bg-[#F3F4F6] p-1 rounded-xl mt-3">
+            {ORDER_TYPES.map(ot => (
+              <button
+                key={ot.key}
+                onClick={() => onOrderTypeChange?.(ot.key)}
+                className={`flex-1 py-1.5 text-[12px] font-bold rounded-lg transition-all ${
+                  orderType === ot.key
+                    ? 'bg-white text-[#1F2937] shadow-sm'
+                    : 'text-[#9CA3AF] hover:text-[#6B7280]'
+                }`}
+              >
+                {orderTypeLabel(ot, lang)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Cart items ─────────────────────────────────────────────────────── */}

@@ -458,6 +458,7 @@ function paidOrder(overrides) {
   const items = overrides.items || []
   const serviceRatePct = overrides.service_rate_pct ?? 17
   const summary = getOrderPaymentSummary({
+    order_type: overrides.order_type,
     service_rate_pct: serviceRatePct,
     loyalty_discount_pct: overrides.loyalty_discount_pct,
     discount_percent: overrides.discount_percent,
@@ -475,7 +476,7 @@ function paidOrder(overrides) {
     items,
     subtotal: overrides.subtotal ?? summary.subtotal,
     service_fee: overrides.service_fee ?? summary.serviceFee,
-    service_rate_pct: serviceRatePct,
+    service_rate_pct: summary.serviceRatePct,
     loyalty_discount_pct: overrides.loyalty_discount_pct,
     loyalty_discount_amount: overrides.loyalty_discount_amount ?? summary.discountAmount,
     total: overrides.total ?? summary.total,
@@ -486,7 +487,7 @@ function paidOrder(overrides) {
 function activeOrder(overrides) {
   const items = overrides.items || []
   const serviceRatePct = overrides.service_rate_pct ?? 17
-  const summary = getOrderPaymentSummary({ service_rate_pct: serviceRatePct }, items, serviceRatePct)
+  const summary = getOrderPaymentSummary({ order_type: overrides.order_type, service_rate_pct: serviceRatePct }, items, serviceRatePct)
   return {
     id: overrides.id,
     table_id: overrides.table_id,
@@ -497,7 +498,7 @@ function activeOrder(overrides) {
     items,
     subtotal: overrides.subtotal ?? summary.subtotal,
     service_fee: overrides.service_fee ?? summary.serviceFee,
-    service_rate_pct: serviceRatePct,
+    service_rate_pct: summary.serviceRatePct,
     total: overrides.total ?? summary.total,
     ...overrides,
   }
@@ -624,13 +625,70 @@ test('partial additions before payment include all final items without duplicati
 test('takeaway-only paid order without a table calculates and reports revenue correctly', () => {
   const order = paidOrder({
     id: 'takeaway-only',
+    order_number: 'TA-1001',
+    order_type: 'take_away',
     table_id: null,
     table_name: 'Take Away',
     items: [item({ id: 't1', menu_item_id: 'shashlik', quantity: 2, price: 25000, order_type: 'take_away' })],
   })
 
   assert.equal(getOrderPaymentSummary(order, order.items, 17).subtotal, 50000)
-  assert.equal(paidRevenue([order]), 58500)
+  assert.equal(getOrderPaymentSummary(order, order.items, 17).serviceFee, 0)
+  assert.equal(paidRevenue([order]), 50000)
+  assert.equal(order.table_id, null)
+})
+
+test('take-away order service fee is always zero even when restaurant service is configured', () => {
+  const rows = [item({ id: 'ta-row', menu_item_id: 'lula', quantity: 3, price: 24000 })]
+  const summary = getOrderPaymentSummary(
+    { order_type: 'take_away', service_rate_pct: 20 },
+    rows,
+    20
+  )
+
+  assert.equal(summary.subtotal, 72000)
+  assert.equal(summary.serviceRatePct, 0)
+  assert.equal(summary.serviceFee, 0)
+  assert.equal(summary.total, 72000)
+})
+
+test('dine-in order still requires table context and calculates configured service', () => {
+  const order = paidOrder({
+    id: 'dine-requires-table',
+    order_type: 'dine_in',
+    table_id: 'table-8',
+    service_rate_pct: 15,
+    items: [item({ id: 'dine-row', menu_item_id: 'lagman', quantity: 2, price: 32000 })],
+  })
+  const summary = getOrderPaymentSummary(order, order.items, 20)
+
+  assert.equal(Boolean(order.table_id), true)
+  assert.equal(summary.serviceRatePct, 15)
+  assert.equal(summary.serviceFee, 9600)
+  assert.equal(summary.total, 73600)
+})
+
+test('take-away orders with null table_id stay separate in cashier reports sessions', () => {
+  const orderA = paidOrder({
+    id: 'ta-a',
+    order_number: 'TA-1001',
+    order_type: 'take_away',
+    table_id: null,
+    paid_at: '2026-05-16T12:00:00.000Z',
+    items: [item({ id: 'ta-a-item', menu_item_id: 'cola', quantity: 2, price: 12000 })],
+  })
+  const orderB = paidOrder({
+    id: 'ta-b',
+    order_number: 'TA-1002',
+    order_type: 'take_away',
+    table_id: null,
+    paid_at: '2026-05-16T12:05:00.000Z',
+    items: [item({ id: 'ta-b-item', menu_item_id: 'bread', quantity: 1, price: 8000 })],
+  })
+  const sessions = groupOrdersBySession([orderA, orderB])
+
+  assert.equal(sessions.length, 2)
+  assert.equal(paidRevenue(sessions), 32000)
 })
 
 test('dine-in-only order shows table context and calculates correct total', () => {
