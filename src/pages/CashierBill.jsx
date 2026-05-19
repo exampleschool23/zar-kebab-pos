@@ -98,7 +98,7 @@ export default function CashierBill() {
 
   const quickItems = useMemo(() =>
     state.menuItems
-      .filter(item => item.available !== false && isCashierQuickItem(item))
+      .filter(isCashierQuickItem)
       .sort((a, b) => getQuickItemSortOrder(a) - getQuickItemSortOrder(b))
       .slice(0, 8),
     [state.menuItems]
