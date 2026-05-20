@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 
@@ -12,19 +12,21 @@ import ResetPassword  from './pages/ResetPassword'
 import PublicMenu     from './pages/PublicMenu'
 import TelegramMiniApp from './pages/TelegramMiniApp'
 import PendingApproval from './pages/PendingApproval'
-import WaiterTables   from './pages/WaiterTables'
-import WaiterOrder    from './pages/WaiterOrder'
-import Kitchen        from './pages/Kitchen'
-import CashierTables  from './pages/CashierTables'
-import CashierBill    from './pages/CashierBill'
-import Receipt, { TableReceipt } from './pages/Receipt'
-import AdminDashboard from './pages/AdminDashboard'
-import AdminMenu      from './pages/AdminMenu'
-import AdminTables    from './pages/AdminTables'
-import AdminUsers     from './pages/AdminUsers'
-import Reports        from './pages/Reports'
-import AdminAudit     from './pages/AdminAudit'
-import AdminSettings  from './pages/AdminSettings'
+
+const WaiterTables = lazy(() => import('./pages/WaiterTables'))
+const WaiterOrder = lazy(() => import('./pages/WaiterOrder'))
+const Kitchen = lazy(() => import('./pages/Kitchen'))
+const CashierTables = lazy(() => import('./pages/CashierTables'))
+const CashierBill = lazy(() => import('./pages/CashierBill'))
+const Receipt = lazy(() => import('./pages/Receipt'))
+const TableReceipt = lazy(() => import('./pages/Receipt').then(module => ({ default: module.TableReceipt })))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const AdminMenu = lazy(() => import('./pages/AdminMenu'))
+const AdminTables = lazy(() => import('./pages/AdminTables'))
+const AdminUsers = lazy(() => import('./pages/AdminUsers'))
+const Reports = lazy(() => import('./pages/Reports'))
+const AdminAudit = lazy(() => import('./pages/AdminAudit'))
+const AdminSettings = lazy(() => import('./pages/AdminSettings'))
 
 function defaultPath(role) {
   return roleDefaultPath(role)
@@ -125,6 +127,16 @@ function SignedOutRoute({ children }) {
   return <Navigate to={defaultPath(profile?.role || 'guest')} replace />
 }
 
+function LazyProtectedRoute({ roles, children }) {
+  return (
+    <ProtectedRoute roles={roles}>
+      <Suspense fallback={<Spinner />}>
+        {children}
+      </Suspense>
+    </ProtectedRoute>
+  )
+}
+
 // Decides where to send user after login
 function RoleRedirect() {
   const { session, profile, loading, signOut } = useAuth()
@@ -186,58 +198,58 @@ function AppRoutes() {
 
         {/* Waiter — tables & order flow only; no kitchen or cashier */}
         <Route path="/waiter/tables" element={
-          <ProtectedRoute roles={PAGE_ACCESS.tables}><WaiterTables /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterTables /></LazyProtectedRoute>
         } />
         <Route path="/waiter/order/:tableId" element={
-          <ProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></LazyProtectedRoute>
         } />
         <Route path="/waiter/take-away" element={
-          <ProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></LazyProtectedRoute>
         } />
 
         {/* Kitchen — kitchen role + admin/owner only */}
         <Route path="/kitchen" element={
-          <ProtectedRoute roles={PAGE_ACCESS.kitchen}><Kitchen /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.kitchen}><Kitchen /></LazyProtectedRoute>
         } />
 
         {/* Cashier — cashier + admin/owner; waiters and kitchen are redirected */}
         <Route path="/cashier/tables" element={
-          <ProtectedRoute roles={PAGE_ACCESS.cashier}><CashierTables /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><CashierTables /></LazyProtectedRoute>
         } />
         <Route path="/cashier/bill/:tableId" element={
-          <ProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></LazyProtectedRoute>
         } />
         <Route path="/cashier/bill/order/:orderId" element={
-          <ProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></LazyProtectedRoute>
         } />
         <Route path="/receipt/:orderId" element={
-          <ProtectedRoute roles={PAGE_ACCESS.cashier}><Receipt /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><Receipt /></LazyProtectedRoute>
         } />
         <Route path="/receipt/table/:tableId" element={
-          <ProtectedRoute roles={PAGE_ACCESS.cashier}><TableReceipt /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><TableReceipt /></LazyProtectedRoute>
         } />
 
         {/* Dashboard — admin, owner, cashier, stakeholder */}
         <Route path="/admin" element={
-          <ProtectedRoute roles={PAGE_ACCESS.dashboard}><AdminDashboard /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.dashboard}><AdminDashboard /></LazyProtectedRoute>
         } />
         <Route path="/admin/menu" element={
-          <ProtectedRoute roles={PAGE_ACCESS.menu}><AdminMenu /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.menu}><AdminMenu /></LazyProtectedRoute>
         } />
         <Route path="/admin/tables" element={
-          <ProtectedRoute roles={PAGE_ACCESS.menu}><AdminTables /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.menu}><AdminTables /></LazyProtectedRoute>
         } />
         <Route path="/admin/users" element={
-          <ProtectedRoute roles={PAGE_ACCESS.team}><AdminUsers /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.team}><AdminUsers /></LazyProtectedRoute>
         } />
         <Route path="/admin/reports" element={
-          <ProtectedRoute roles={PAGE_ACCESS.reports}><Reports /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.reports}><Reports /></LazyProtectedRoute>
         } />
         <Route path="/admin/audit" element={
-          <ProtectedRoute roles={PAGE_ACCESS.audit}><AdminAudit /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.audit}><AdminAudit /></LazyProtectedRoute>
         } />
         <Route path="/admin/settings" element={
-          <ProtectedRoute roles={PAGE_ACCESS.settings}><AdminSettings /></ProtectedRoute>
+          <LazyProtectedRoute roles={PAGE_ACCESS.settings}><AdminSettings /></LazyProtectedRoute>
         } />
 
         {/* Catch-all: redirect based on role */}

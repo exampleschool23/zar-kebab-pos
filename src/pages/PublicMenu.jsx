@@ -11,7 +11,7 @@ import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuC
 import {
   ProductCard as MenuProductCard,
   ProductDetailPage as MenuProductDetailPage,
-} from './WaiterOrder'
+} from '../components/MenuProductCards'
 
 async function loadPublicMenuData() {
   const rpcRes = await supabase.rpc('get_public_menu_data')
