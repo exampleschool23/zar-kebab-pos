@@ -214,7 +214,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
   }
 
   const channel = dbClient
-    .channel('pos-realtime')
+    .channel(`pos-realtime-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_payments' }, scheduleReloadOrders)

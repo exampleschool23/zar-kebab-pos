@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react'
 import { loadPOSData, writeToSupabase, subscribeToRealtime } from '../lib/db'
 import {
   allocateSplitPaymentsToOrders,
@@ -500,7 +500,7 @@ export function AppProvider({ children }) {
   useEffect(() => { stateRef.current = state }, [state])
 
   // dbDispatch: optimistic local update + async Supabase write
-  function dbDispatch(action) {
+  const dbDispatch = useCallback(function dbDispatch(action) {
     // Pre-inject a stable orderId so reducer and Supabase writer share it
       const enriched = action.type === 'SEND_TO_KITCHEN'
       ? {
@@ -572,7 +572,7 @@ export function AppProvider({ children }) {
         })
         return { error: err }
       })
-  }
+  }, [])
 
   // Load from Supabase on mount + subscribe to realtime
   useEffect(() => {

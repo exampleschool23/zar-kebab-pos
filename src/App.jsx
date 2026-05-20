@@ -43,7 +43,7 @@ function ProfileSync() {
     } else {
       dispatch({ type: 'LOGIN', payload: { role: 'guest', name: 'Guest' } })
     }
-  }, [profile, dispatch])
+  }, [profile?.id, profile?.role, profile?.full_name, profile?.email, dispatch])
   return null
 }
 
