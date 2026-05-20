@@ -141,6 +141,7 @@ function ImageUploadField({ label, value, onChange }) {
       {value && (
         <img src={value} alt="preview" className="mt-2 h-20 w-20 object-cover rounded-xl border border-gray-200" />
       )}
+      {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   )
 }
@@ -249,7 +250,6 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
           </button>
         </div>
       </div>
-      {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   )
 }
