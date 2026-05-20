@@ -8,6 +8,8 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import { loadOrders } from '../lib/db'
+import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { useAppDataStatus } from '../store/appHooks'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_BADGE = {
@@ -522,6 +524,7 @@ function BottomBar({ orders, lang }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function Kitchen() {
   const { state, dispatch } = useApp()
+  const { loaded, loadError } = useAppDataStatus()
   const { profile } = useAuth()
   const lang = state.lang
   const role = (profile?.role || state.user?.role || '').toLowerCase()
@@ -780,7 +783,19 @@ export default function Kitchen() {
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-5">
-          {activeOrders.length === 0 ? (
+          {!loaded ? (
+            <OperationalLoading
+              title={lang === 'uz' ? 'Oshxona yuklanmoqda' : lang === 'ru' ? 'Загрузка кухни' : 'Loading kitchen'}
+              description={lang === 'uz' ? 'Buyurtmalar va menyu maʼlumotlari olinmoqda.' : lang === 'ru' ? 'Получаем заказы и меню.' : 'Fetching orders and menu data.'}
+            />
+          ) : loadError ? (
+            <OperationalError
+              title={lang === 'uz' ? 'Oshxonani yuklab bo‘lmadi' : lang === 'ru' ? 'Не удалось загрузить кухню' : 'Could not load kitchen'}
+              description={loadError}
+              actionLabel={lang === 'uz' ? 'Qayta yuklash' : lang === 'ru' ? 'Перезагрузить' : 'Reload'}
+              onAction={() => window.location.reload()}
+            />
+          ) : activeOrders.length === 0 ? (
             <div className="max-w-sm mx-auto mt-20">
               <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-10 flex flex-col items-center text-center">
                 <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mb-4">

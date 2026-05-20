@@ -20,6 +20,8 @@ import {
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import StatusBadge from '../components/StatusBadge'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
+import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { useAppDataStatus } from '../store/appHooks'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const LOYALTY_PRESETS = [0, 5, 10, 15, 20]
@@ -61,6 +63,7 @@ export default function CashierBill() {
   const { tableId, orderId }  = useParams()
   const navigate     = useNavigate()
   const { state, dispatch } = useApp()
+  const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
 
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
@@ -295,6 +298,29 @@ export default function CashierBill() {
     exceedsTotal: lang === 'uz' ? 'Kiritilgan summa jami to‘lovdan oshib ketdi' : lang === 'ru' ? 'Введённая сумма превышает итоговую сумму' : 'Entered amount exceeds total amount',
     counterItems: lang === 'uz' ? 'Kassa mahsulotlari' : lang === 'ru' ? 'Товары у кассы' : 'Counter Items',
     noTable:      lang === 'uz' ? 'Stol tanlanmagan' : lang === 'ru' ? 'Стол не выбран' : 'No table selected',
+  }
+
+  if (!loaded || loadError) {
+    return (
+      <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
+        <div className="hidden lg:block flex-shrink-0 h-full"><UnifiedSidebar /></div>
+        <div className="flex-1 overflow-y-auto">
+          {!loaded ? (
+            <OperationalLoading
+              title={lang === 'uz' ? 'Hisob yuklanmoqda' : lang === 'ru' ? 'Загрузка счёта' : 'Loading bill'}
+              description={lang === 'uz' ? 'Buyurtma va to‘lov maʼlumotlari olinmoqda.' : lang === 'ru' ? 'Получаем заказ и данные оплаты.' : 'Fetching order and payment details.'}
+            />
+          ) : (
+            <OperationalError
+              title={lang === 'uz' ? 'Hisobni yuklab bo‘lmadi' : lang === 'ru' ? 'Не удалось загрузить счёт' : 'Could not load bill'}
+              description={loadError}
+              actionLabel={lang === 'uz' ? 'Qayta yuklash' : lang === 'ru' ? 'Перезагрузить' : 'Reload'}
+              onAction={() => window.location.reload()}
+            />
+          )}
+        </div>
+      </div>
+    )
   }
 
   // ── Empty state ─────────────────────────────────────────────────────────────

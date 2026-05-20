@@ -20,6 +20,8 @@ import {
   ImagePlus, Loader2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { useAppDataStatus } from '../store/appHooks'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -408,6 +410,7 @@ const blankCat = { id: '', name_uz: '', name_ru: '', name_en: '', image_url: '',
 
 export default function AdminMenu() {
   const { state, dispatch } = useApp()
+  const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
 
   const [tab,        setTab]        = useState('items')
@@ -568,6 +571,28 @@ export default function AdminMenu() {
   const activeCat  = activeId ? realSortedCats.find(c => c.id === activeId) : null
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  if (!loaded || loadError) {
+    return (
+      <AppShell title={t(lang, 'menu')}>
+        <div className="min-h-screen bg-[#FAF6EE]">
+          {!loaded ? (
+            <OperationalLoading
+              title={lang === 'uz' ? 'Menyu yuklanmoqda' : lang === 'ru' ? 'Загрузка меню' : 'Loading menu'}
+              description={lang === 'uz' ? 'Kategoriyalar va mahsulotlar olinmoqda.' : lang === 'ru' ? 'Получаем категории и позиции.' : 'Fetching categories and items.'}
+            />
+          ) : (
+            <OperationalError
+              title={lang === 'uz' ? 'Menyuni yuklab bo‘lmadi' : lang === 'ru' ? 'Не удалось загрузить меню' : 'Could not load menu'}
+              description={loadError}
+              actionLabel={lang === 'uz' ? 'Qayta yuklash' : lang === 'ru' ? 'Перезагрузить' : 'Reload'}
+              onAction={() => window.location.reload()}
+            />
+          )}
+        </div>
+      </AppShell>
+    )
+  }
+
   return (
     <AppShell title={t(lang, 'menu')}>
       <div className="min-h-screen bg-[#FAF6EE]">

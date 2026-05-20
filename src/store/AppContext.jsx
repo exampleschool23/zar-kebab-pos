@@ -90,6 +90,7 @@ const initialState = {
   cart:           [],
   currentTableId: null,
   connectionNotice: null,
+  loadError: null,
   loaded:         false,
 }
 
@@ -128,7 +129,10 @@ function reducer(state, action) {
       return { ...state, menuItems: action.payload }
 
     case 'SET_LOADED':
-      return { ...state, loaded: true }
+      return { ...state, loaded: true, loadError: null }
+
+    case 'SET_LOAD_ERROR':
+      return { ...state, loaded: true, loadError: action.payload || 'Failed to load POS data' }
 
     case 'SET_CONNECTION_NOTICE':
       return { ...state, connectionNotice: action.payload || null }
@@ -588,7 +592,10 @@ export function AppProvider({ children }) {
         dispatch({ type: 'SET_LOADED' })
         unsubscribe = subscribeToRealtime(dispatch)
       })
-      .catch(err => console.error('[db] initial load failed:', err))
+      .catch(err => {
+        console.error('[db] initial load failed:', err)
+        dispatch({ type: 'SET_LOAD_ERROR', payload: err?.message || 'Failed to load POS data' })
+      })
 
     return () => unsubscribe()
   }, [])

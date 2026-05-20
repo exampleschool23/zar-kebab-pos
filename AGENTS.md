@@ -23,6 +23,7 @@ Use these from the repo root:
 npm run dev
 npm test
 npm run build
+npm run db:health
 npm run bot:telegram
 ```
 
@@ -33,6 +34,8 @@ Equivalent direct commands used in this environment:
 /Users/hoggish/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node ./node_modules/vite/bin/vite.js build
 /Users/hoggish/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node ./node_modules/vite/bin/vite.js --host 127.0.0.1
 ```
+
+`npm run db:health` runs `scripts/check-db-health.js`. It reads `.env.local`/`.env`, connects to Supabase, and checks required tables, columns, and RPCs. Use it first when a page loads forever or logs missing migration warnings.
 
 ## Routes And Roles
 
@@ -67,6 +70,8 @@ Role access rules are centralized in `src/lib/permissions.js`.
 - loaded flag
 
 `AppProvider` hydrates from Supabase with `loadPOSData()`, subscribes with `subscribeToRealtime()`, and exposes `dispatch: dbDispatch`. `dbDispatch` is intentionally wrapped in `useCallback`; do not make it unstable or `ProfileSync` can re-dispatch forever and make the website load forever.
+
+Selector hooks live in `src/store/appHooks.js`. Prefer adding focused hooks there, such as `useOrders`, `useCart`, `useSettings`, or `useAppDataStatus`, instead of spreading more direct state-shape knowledge into pages.
 
 ## Recent Regression Context
 
@@ -208,4 +213,3 @@ The Vite build currently emits a large chunk warning. That warning is known and 
 - Do not clear the whole cart after async submits.
 - Do not assume applying migration `018` means the database has `011` or `012`.
 - Do not trust old browser console logs after hot reloads without checking timestamps.
-

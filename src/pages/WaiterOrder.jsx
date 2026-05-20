@@ -14,6 +14,8 @@ import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import { ProductCard, ProductDetailPage } from '../components/MenuProductCards'
+import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { useAppDataStatus } from '../store/appHooks'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
 function OrderActionPanel({ order, tableId, lang, dispatch, cartCount }) {
@@ -284,6 +286,7 @@ export default function WaiterOrder() {
   const { tableId }         = useParams()
   const navigate            = useNavigate()
   const { state, dispatch } = useApp()
+  const { loaded, loadError } = useAppDataStatus()
   const { profile, signOut } = useAuth()
   const lang                = state.lang
   const role                = (profile?.role || state.user?.role || '').toLowerCase()
@@ -433,6 +436,33 @@ export default function WaiterOrder() {
     // dispatch is intentionally omitted because AppContext recreates dbDispatch after state updates.
     // Including it here would clear the cart after every add/increment render.
   }, [isTakeAwayFlow, tableId])
+
+  if (!loaded || loadError) {
+    return (
+      <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
+        {shouldShowSidebar && (
+          <div className="hidden lg:block flex-shrink-0 h-full">
+            <UnifiedSidebar />
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto">
+          {!loaded ? (
+            <OperationalLoading
+              title={lang === 'uz' ? 'Buyurtma ekrani yuklanmoqda' : lang === 'ru' ? 'Загрузка экрана заказа' : 'Loading order screen'}
+              description={lang === 'uz' ? 'Stollar, menyu va buyurtmalar olinmoqda.' : lang === 'ru' ? 'Получаем столы, меню и заказы.' : 'Fetching tables, menu, and orders.'}
+            />
+          ) : (
+            <OperationalError
+              title={lang === 'uz' ? 'Buyurtmani yuklab bo‘lmadi' : lang === 'ru' ? 'Не удалось загрузить заказ' : 'Could not load order'}
+              description={loadError}
+              actionLabel={lang === 'uz' ? 'Qayta yuklash' : lang === 'ru' ? 'Перезагрузить' : 'Reload'}
+              onAction={() => window.location.reload()}
+            />
+          )}
+        </div>
+      </div>
+    )
+  }
 
   if (!isTakeAwayFlow && !table) {
     return (

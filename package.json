@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "bot:telegram": "node bots/telegram-bot.js",
+    "db:health": "node scripts/check-db-health.js",
     "test": "node --test",
     "build": "vite build",
     "preview": "vite preview"

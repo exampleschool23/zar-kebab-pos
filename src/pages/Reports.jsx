@@ -17,6 +17,8 @@ import {
   toLocalDateStr,
 } from '../lib/analytics'
 import AppShell from '../components/AppShell'
+import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { useAppDataStatus } from '../store/appHooks'
 import {
   TrendingUp, ShoppingBag, DollarSign, Package,
   Download, X, Printer, Eye, ChevronLeft, ChevronRight,
@@ -902,6 +904,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
 
 export default function Reports() {
   const { state }    = useApp()
+  const { loaded, loadError } = useAppDataStatus()
   const navigate     = useNavigate()
   const lang         = state.lang
   const serviceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
@@ -965,6 +968,28 @@ export default function Reports() {
     en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Total Revenue',  numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold',allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To' },
   }
   const l = L[lang] || L.en
+
+  if (!loaded || loadError) {
+    return (
+      <AppShell title={l.title}>
+        <div className="min-h-screen bg-[#FAF7F0]">
+          {!loaded ? (
+            <OperationalLoading
+              title={lang === 'uz' ? 'Hisobotlar yuklanmoqda' : lang === 'ru' ? 'Загрузка отчётов' : 'Loading reports'}
+              description={lang === 'uz' ? 'Buyurtmalar va to‘lovlar olinmoqda.' : lang === 'ru' ? 'Получаем заказы и платежи.' : 'Fetching orders and payments.'}
+            />
+          ) : (
+            <OperationalError
+              title={lang === 'uz' ? 'Hisobotlarni yuklab bo‘lmadi' : lang === 'ru' ? 'Не удалось загрузить отчёты' : 'Could not load reports'}
+              description={loadError}
+              actionLabel={lang === 'uz' ? 'Qayta yuklash' : lang === 'ru' ? 'Перезагрузить' : 'Reload'}
+              onAction={() => window.location.reload()}
+            />
+          )}
+        </div>
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell title={l.title}>
