@@ -70,13 +70,25 @@ export default function CashierBill() {
   const [loyaltyPct, setLoyaltyPct] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  const menuItemMap = useMemo(() => {
+    const m = {}
+    state.menuItems.forEach(mi => { m[mi.id] = mi })
+    return m
+  }, [state.menuItems])
+
   // Merge all active orders for a table, or load one take-away order by id.
   const order = useMemo(() => {
     const orders = state.orders.filter(o =>
       (orderId ? o.id === orderId : o.table_id === tableId) && o.payment_status !== 'paid'
     )
     if (orders.length === 0) return null
-    const allItems = orders.flatMap(o => o.items || [])
+    const allItems = orders.flatMap(o => (o.items || []).map(item => {
+      const menuItem = menuItemMap[item.menu_item_id]
+      const isCounter = isCashierQuickItem(menuItem) || item.is_counter_item || item.isCounterItem
+      return isCounter
+        ? { ...item, item_type: item.item_type || item.itemType || 'counter', is_counter_item: true }
+        : item
+    }))
     const mergedItems = getGroupedOrderItems(allItems)
     const firstOrder = orders[0]
     const orderType = firstOrder?.order_type || (!firstOrder?.table_id && String(firstOrder?.table_name || '').toLowerCase().includes('take') ? 'take_away' : 'dine_in')
@@ -93,19 +105,13 @@ export default function CashierBill() {
       service_rate_pct: summary.serviceRatePct,
       total:       summary.total,
     }
-  }, [state.orders, tableId, orderId, configuredServiceRatePct])
+  }, [state.orders, tableId, orderId, configuredServiceRatePct, menuItemMap])
 
   const table = state.tables.find(t => t.id === tableId)
   const isTakeAway = order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
   const orderLabel = isTakeAway
     ? `${lang === 'uz' ? 'Olib ketish' : lang === 'ru' ? 'С собой' : 'Take Away'} · ${order?.order_number || order?.id || ''}`
     : table?.name
-
-  const menuItemMap = useMemo(() => {
-    const m = {}
-    state.menuItems.forEach(mi => { m[mi.id] = mi })
-    return m
-  }, [state.menuItems])
 
   const quickItems = useMemo(() =>
     state.menuItems
@@ -230,18 +236,22 @@ export default function CashierBill() {
           name: getItemName(item, lang),
           price: item.price,
           sendToKitchen: !!(item.sendToKitchen || item.send_to_kitchen),
+          item_type: 'counter',
+          is_counter_item: true,
         },
       },
     })
   }
 
   function updateBillItemQty(item, qty) {
+    const sourceItemIds = item.source_item_ids || item.sourceItemIds || []
     dispatch({
       type: 'UPDATE_BILL_ITEM_QTY',
       payload: {
         tableId,
         orderId,
         orderItemId: item.id,
+        sourceItemIds,
         menuItemId: item.menu_item_id,
         qty,
       },
@@ -777,7 +787,10 @@ export default function CashierBill() {
                     </div>
                     <div className="grid grid-cols-2 gap-2 max-[420px]:flex max-[420px]:overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
                       {quickItems.map(item => {
-                        const current = order.items.find(row => row.menu_item_id === item.id)
+                        const current = order.items.find(row =>
+                          row.menu_item_id === item.id &&
+                          (row.is_counter_item || row.isCounterItem || row.item_type === 'counter' || row.itemType === 'counter')
+                        )
                         const qty = Number(current?.quantity) || 0
                         return (
                           <div

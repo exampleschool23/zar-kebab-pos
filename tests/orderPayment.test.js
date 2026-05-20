@@ -71,7 +71,7 @@ test('receipt total equals order details total', () => {
   assert.equal(receiptSummary.total, orderDetailsSummary.total)
 })
 
-test('loyalty discount is applied after subtotal plus unchanged service for cashier receipt reports and dashboard', () => {
+test('loyalty discount is applied after subtotal plus service for cashier receipt reports and dashboard', () => {
   const rows = [item({ id: 'loyalty-row', menu_item_id: 'mixed', quantity: 1, price: 214000 })]
   const order = paidOrder({
     id: 'loyalty-5',
@@ -119,6 +119,111 @@ test('service and loyalty discount combinations use the shared payment rule', ()
   assert.equal(neither.serviceFee, 0)
   assert.equal(neither.discountAmount, 0)
   assert.equal(neither.total, 100000)
+})
+
+test('cashier example discounts menu subtotal plus service fee', () => {
+  const rows = [
+    item({ id: 'chicken', menu_item_id: 'chicken', quantity: 1, price: 22000 }),
+    item({ id: 'beef', menu_item_id: 'beef', quantity: 1, price: 25000 }),
+    item({ id: 'lula', menu_item_id: 'lula', quantity: 1, price: 24000 }),
+  ]
+  const summary = getOrderPaymentSummary(
+    { order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    rows,
+    15
+  )
+
+  assert.equal(summary.menuItemsSubtotal, 71000)
+  assert.equal(summary.counterItemsSubtotal, 0)
+  assert.equal(summary.subtotal, 71000)
+  assert.equal(summary.serviceFeeBase, 71000)
+  assert.equal(summary.serviceFee, 10650)
+  assert.equal(summary.discountBase, 81650)
+  assert.equal(summary.discountAmount, 8165)
+  assert.equal(summary.total, 73485)
+})
+
+test('dine-in counter items are included in total but excluded from service and loyalty discount', () => {
+  const rows = [
+    item({ id: 'chicken', menu_item_id: 'chicken', quantity: 1, price: 22000 }),
+    item({ id: 'beef', menu_item_id: 'beef', quantity: 1, price: 25000 }),
+    item({ id: 'lula', menu_item_id: 'lula', quantity: 1, price: 24000 }),
+    item({ id: 'water', menu_item_id: 'water', quantity: 3, price: 5000, item_type: 'counter', is_counter_item: true }),
+  ]
+  const summary = getOrderPaymentSummary(
+    { order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    rows,
+    15
+  )
+
+  assert.equal(summary.menuItemsSubtotal, 71000)
+  assert.equal(summary.counterItemsSubtotal, 15000)
+  assert.equal(summary.subtotal, 86000)
+  assert.equal(summary.serviceFee, 10650)
+  assert.equal(summary.discountBase, 81650)
+  assert.equal(summary.discountAmount, 8165)
+  assert.equal(summary.total, 88485)
+})
+
+test('take-away discounts menu items only and has no service fee', () => {
+  const rows = [
+    item({ id: 'meal', menu_item_id: 'meal', quantity: 1, price: 71000 }),
+    item({ id: 'counter', menu_item_id: 'counter', quantity: 1, price: 15000, item_type: 'counter', is_counter_item: true }),
+  ]
+  const summary = getOrderPaymentSummary(
+    { order_type: 'take_away', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    rows,
+    15
+  )
+
+  assert.equal(summary.serviceRatePct, 0)
+  assert.equal(summary.serviceFee, 0)
+  assert.equal(summary.discountBase, 71000)
+  assert.equal(summary.discountAmount, 7100)
+  assert.equal(summary.total, 78900)
+})
+
+test('counter-only order has no service fee and no loyalty discount', () => {
+  const rows = [
+    item({ id: 'counter-only', menu_item_id: 'water', quantity: 4, price: 5000, item_type: 'counter', is_counter_item: true }),
+  ]
+  const summary = getOrderPaymentSummary(
+    { order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    rows,
+    15
+  )
+
+  assert.equal(summary.menuItemsSubtotal, 0)
+  assert.equal(summary.counterItemsSubtotal, 20000)
+  assert.equal(summary.subtotal, 20000)
+  assert.equal(summary.serviceFee, 0)
+  assert.equal(summary.discountAmount, 0)
+  assert.equal(summary.total, 20000)
+})
+
+test('rounding uses integer UZS after service is added to the discount base', () => {
+  const rows = [item({ id: 'rounding', menu_item_id: 'rounding', quantity: 1, price: 33333 })]
+  const summary = getOrderPaymentSummary(
+    { order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    rows,
+    15
+  )
+
+  assert.equal(summary.serviceFee, 5000)
+  assert.equal(summary.discountBase, 38333)
+  assert.equal(summary.discountAmount, 3833)
+  assert.equal(summary.total, 34500)
+})
+
+test('payment validation follows the helper total after loyalty discount changes', () => {
+  const rows = [item({ id: 'validation-row', menu_item_id: 'combo', quantity: 1, price: 71000 })]
+  const withoutDiscount = getOrderPaymentSummary({ order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 0 }, rows, 15)
+  const withDiscount = getOrderPaymentSummary({ order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 }, rows, 15)
+
+  assert.equal(withoutDiscount.total, 81650)
+  assert.equal(withDiscount.total, 73485)
+  assert.equal(getSplitPaymentValidation([{ method: 'cash', amount: 81650 }], withDiscount.total).canConfirmPayment, false)
+  assert.equal(getSplitPaymentValidation([{ method: 'cash', amount: 73485 }], withDiscount.total).canConfirmPayment, true)
 })
 
 test('split payment can settle one order with cash card loyalty and qr methods', () => {
@@ -380,7 +485,7 @@ test('cashier counter items are real order items and immediately change totals a
 
   const afterItems = [
     ...beforeItems,
-    item({ id: 'counter-cola', menu_item_id: 'coca-cola', name: 'Coca-Cola', quantity: 1, price: 12000, status: 'served' }),
+    item({ id: 'counter-cola', menu_item_id: 'coca-cola', name: 'Coca-Cola', quantity: 1, price: 12000, status: 'served', item_type: 'counter', is_counter_item: true }),
   ]
   const after = getOrderPaymentSummary({ service_rate_pct: 0 }, afterItems, 0)
   const validation = getSplitPaymentValidation([{ method: 'cash', amount: paidBeforeCounterItem }], after.total)
@@ -440,6 +545,29 @@ test('items with same menu_item_id and same modifiers/options are merged correct
 
   assert.equal(grouped.length, 1)
   assert.equal(grouped[0].quantity, 4)
+})
+
+test('grouped cashier rows preserve source ids so minus can update duplicate counter rows', () => {
+  const items = [
+    item({ id: 'counter-a', menu_item_id: 'water', quantity: 1, price: 5000, item_type: 'counter', is_counter_item: true }),
+    item({ id: 'counter-b', menu_item_id: 'water', quantity: 2, price: 5000, item_type: 'counter', is_counter_item: true }),
+  ]
+  const grouped = getGroupedOrderItems(items)
+  const nextQty = grouped[0].quantity - 1
+  const sourceIds = new Set(grouped[0].source_item_ids)
+  const collapsedAfterMinus = items.flatMap(row => {
+    if (!sourceIds.has(row.id)) return [row]
+    if (row.id !== grouped[0].id) return []
+    return [{ ...row, quantity: nextQty }]
+  })
+  const summary = getOrderPaymentSummary({ service_rate_pct: 15, loyalty_discount_pct: 10 }, collapsedAfterMinus, 15)
+
+  assert.deepEqual(grouped[0].source_item_ids, ['counter-a', 'counter-b'])
+  assert.equal(grouped[0].quantity, 3)
+  assert.equal(collapsedAfterMinus.length, 1)
+  assert.equal(collapsedAfterMinus[0].quantity, 2)
+  assert.equal(summary.counterItemsSubtotal, 10000)
+  assert.equal(summary.total, 10000)
 })
 
 function item(overrides) {

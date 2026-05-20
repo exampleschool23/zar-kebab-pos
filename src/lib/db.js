@@ -2,10 +2,10 @@ import { supabase } from './supabase'
 import {
   allocateSplitPaymentsToOrders,
   getOrderPaymentFields,
-  getOrderPaymentSummary,
   getPaymentMethodSummary,
   normalizeSplitPayments,
 } from './analytics'
+import { notifyTelegramOrderStatus } from './telegramNotifications'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,12 @@ function isMissingOptionalOrderTypeColumn(error) {
   const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
   return (
     message.includes('schema cache') &&
-    (message.includes('order_type') || message.includes('order_number'))
+    (
+      message.includes('order_type') ||
+      message.includes('order_number') ||
+      message.includes('item_type') ||
+      message.includes('is_counter_item')
+    )
   )
 }
 
@@ -273,6 +278,7 @@ export async function writeToSupabase(action, state) {
       query = orderItemId ? query.eq('id', orderItemId) : query.eq('menu_item_id', menuItemId)
       const { error } = await query
       if (error) throw error
+      await notifyTelegramOrderStatus(orderId, status)
       break
     }
 
@@ -288,6 +294,7 @@ export async function writeToSupabase(action, state) {
         const ids = tableOrders.map(o => o.id)
         await supabase.from('orders').update({ status: 'delivered' }).in('id', ids)
         await supabase.from('order_items').update({ status: 'served' }).in('order_id', ids)
+        await Promise.all(ids.map(id => notifyTelegramOrderStatus(id, 'completed')))
       }
       break
     }
@@ -331,12 +338,31 @@ export async function writeToSupabase(action, state) {
       let nextItems
       if (existing) {
         const nextQty = (Number(existing.quantity) || 1) + 1
-        const { error } = await supabase
+        const updateRow = {
+          quantity: nextQty,
+          item_type: existing.item_type || existing.itemType || 'counter',
+          is_counter_item: true,
+        }
+        let { error } = await supabase
           .from('order_items')
-          .update({ quantity: nextQty })
+          .update(updateRow)
           .eq('id', existing.id)
+        if (error && isMissingOptionalOrderTypeColumn(error)) {
+          ;({ error } = await supabase
+            .from('order_items')
+            .update({ quantity: nextQty })
+            .eq('id', existing.id))
+        }
         if (error) throw error
-        nextItems = (order.items || []).map(row => row.id === existing.id ? { ...row, quantity: nextQty } : row)
+        nextItems = (order.items || []).map(row => row.id === existing.id
+          ? {
+              ...row,
+              quantity: nextQty,
+              item_type: row.item_type || row.itemType || 'counter',
+              is_counter_item: true,
+            }
+          : row
+        )
       } else {
         const row = {
           id: action._itemId,
@@ -348,10 +374,12 @@ export async function writeToSupabase(action, state) {
           notes: '',
           status: item.sendToKitchen || item.send_to_kitchen ? 'new' : 'served',
           order_type: item.order_type || order.order_type || 'dine_in',
+          item_type: item.item_type || item.itemType || 'counter',
+          is_counter_item: item.is_counter_item ?? item.isCounterItem ?? true,
         }
         let { error } = await supabase.from('order_items').insert(row)
         if (error && isMissingOptionalOrderTypeColumn(error)) {
-          const { order_type, ...fallbackRow } = row
+          const { order_type, item_type, is_counter_item, ...fallbackRow } = row
           ;({ error } = await supabase.from('order_items').insert(fallbackRow))
         }
         if (error) throw error
@@ -376,6 +404,7 @@ export async function writeToSupabase(action, state) {
 
     case 'UPDATE_BILL_ITEM_QTY': {
       const { tableId, orderId, orderItemId, menuItemId, qty } = action.payload
+      const sourceItemIds = new Set(action.payload.sourceItemIds || [])
       const nextQty = Math.max(0, Number(qty) || 0)
       if ((!tableId && !orderId) || (!orderItemId && !menuItemId)) return
 
@@ -388,24 +417,39 @@ export async function writeToSupabase(action, state) {
       if (ordersError) throw ordersError
 
       const order = (orders || []).find(o =>
-        (o.items || []).some(row => orderItemId ? row.id === orderItemId : row.menu_item_id === menuItemId)
+        (o.items || []).some(row => orderItemId ? row.id === orderItemId || sourceItemIds.has(row.id) : row.menu_item_id === menuItemId)
       )
       if (!order) return
 
-      const target = (order.items || []).find(row => orderItemId ? row.id === orderItemId : row.menu_item_id === menuItemId)
+      const matchesItem = row => orderItemId
+        ? row.id === orderItemId || sourceItemIds.has(row.id)
+        : row.menu_item_id === menuItemId
+      const target = (order.items || []).find(matchesItem)
       if (!target) return
+      const duplicateIds = (order.items || [])
+        .filter(row => matchesItem(row) && row.id !== target.id)
+        .map(row => row.id)
 
       if (nextQty <= 0) {
-        const { error } = await supabase.from('order_items').delete().eq('id', target.id)
+        const idsToDelete = [target.id, ...duplicateIds]
+        const { error } = await supabase.from('order_items').delete().in('id', idsToDelete)
         if (error) throw error
       } else {
         const { error } = await supabase.from('order_items').update({ quantity: nextQty }).eq('id', target.id)
         if (error) throw error
+        if (duplicateIds.length > 0) {
+          const { error: deleteDuplicatesError } = await supabase.from('order_items').delete().in('id', duplicateIds)
+          if (deleteDuplicatesError) throw deleteDuplicatesError
+        }
       }
 
       const nextItems = nextQty <= 0
-        ? (order.items || []).filter(row => row.id !== target.id)
-        : (order.items || []).map(row => row.id === target.id ? { ...row, quantity: nextQty } : row)
+        ? (order.items || []).filter(row => !matchesItem(row))
+        : (order.items || []).flatMap(row => {
+            if (!matchesItem(row)) return [row]
+            if (row.id !== target.id) return []
+            return [{ ...row, quantity: nextQty }]
+          })
       const serviceRatePct = normalizeOrderType(order.order_type) === 'take_away' ? 0 : Number.isFinite(Number(order.service_rate_pct))
         ? Number(order.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
@@ -436,7 +480,7 @@ export async function writeToSupabase(action, state) {
       // Writing the combined total to every row then summing in Reports caused double-counting.
       let unpaidQuery = supabase
         .from('orders')
-        .select('*')
+        .select('*, items:order_items(*)')
         .eq('payment_status', 'unpaid')
       unpaidQuery = orderId ? unpaidQuery.eq('id', orderId) : unpaidQuery.eq('table_id', tableId)
       const { data: unpaidOrders } = await unpaidQuery
@@ -449,14 +493,14 @@ export async function writeToSupabase(action, state) {
               ? Math.max(0, Math.min(100, Number(o.service_rate_pct)))
               : serviceRatePctFromSettings(state.settings)
           const paymentFields = getOrderPaymentFields(
-            { order_type: o.order_type, subtotal: Number(o.subtotal) || 0, service_rate_pct: serviceRatePct, loyalty_discount_pct: discPct },
-            [],
+            { order_type: o.order_type, service_rate_pct: serviceRatePct, loyalty_discount_pct: discPct },
+            o.items || [],
             serviceRatePct
           )
           return {
             id: o.id,
             paymentFields,
-            total: getOrderPaymentSummary(paymentFields, [], serviceRatePct).total,
+            total: paymentFields.total,
           }
         })
         const totalDue = orderSummaries.reduce((sum, row) => sum + row.total, 0)
@@ -493,6 +537,7 @@ export async function writeToSupabase(action, state) {
             ...o.paymentFields,
             payment_method: finalPaymentMethod,
           }).eq('id', o.id)
+          await notifyTelegramOrderStatus(o.id, 'completed')
         }
       }
 

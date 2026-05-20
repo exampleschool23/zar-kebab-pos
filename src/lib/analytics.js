@@ -24,6 +24,19 @@ export function getOrderItems(o) {
   return o?.items || o?.order_items || []
 }
 
+export function isCounterOrderItem(item) {
+  const typeText = String(item?.item_type || item?.itemType || '').toLowerCase()
+  return !!(
+    item?.is_counter_item ||
+    item?.isCounterItem ||
+    item?.show_in_cashier_quick_items ||
+    item?.showInCashierQuickItems ||
+    typeText === 'counter' ||
+    typeText === 'quick' ||
+    typeText === 'cashier_quick'
+  )
+}
+
 export function getOrderServiceRatePct(o, fallbackPct = 20) {
   const typeText = String(o?.order_type || o?.orderType || o?.table_name || '').toLowerCase()
   if (typeText.includes('take') || (!o?.table_id && typeText.includes('away'))) return 0
@@ -40,33 +53,66 @@ export function getOrderTotal(o, fallbackServicePct = 20) {
 }
 
 export function getOrderPaymentSummary(order, items = getOrderItems(order), fallbackServicePct = 20) {
-  const itemsSubtotal = items.reduce(
-    (s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
+  const hasItems = items.length > 0
+  const menuItemsSubtotal = items.reduce(
+    (s, i) => isCounterOrderItem(i) ? s : s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
     0
   )
-  const subtotal = itemsSubtotal || (Number(order?.subtotal) || 0)
+  const counterItemsSubtotal = items.reduce(
+    (s, i) => isCounterOrderItem(i) ? s + (Number(i.price) || 0) * (Number(i.quantity) || 1) : s,
+    0
+  )
+  const itemsSubtotal = menuItemsSubtotal + counterItemsSubtotal
+  const counterSubtotal = hasItems
+    ? counterItemsSubtotal
+    : Number(order?.counter_items_subtotal ?? order?.counterItemsSubtotal ?? 0) || 0
+  const subtotal = hasItems ? itemsSubtotal : (Number(order?.subtotal) || 0)
+  const storedMenuSubtotal = Number(order?.menu_items_subtotal ?? order?.menuItemsSubtotal)
+  const menuSubtotal = hasItems
+    ? menuItemsSubtotal
+    : Number.isFinite(storedMenuSubtotal)
+      ? storedMenuSubtotal
+      : Math.max(0, subtotal - counterSubtotal)
+
   if (subtotal <= 0 && Number(order?.total) > 0) {
+    const serviceRatePct = getOrderServiceRatePct(order, fallbackServicePct)
+    const serviceFee = Number(order?.service_fee) || 0
+    const discountAmount = Number(order?.loyalty_discount_amount) || Number(order?.discount_amount) || 0
     return {
       subtotal: 0,
+      menuItemsSubtotal: 0,
+      normalItemsSubtotal: 0,
+      counterItemsSubtotal: 0,
+      serviceFeeBase: 0,
+      discountBase: serviceFee,
       discountPercent: 0,
-      discountAmount: 0,
-      afterDiscount: 0,
-      serviceRatePct: getOrderServiceRatePct(order, fallbackServicePct),
-      serviceFee: Number(order?.service_fee) || 0,
+      discountAmount,
+      grossAmount: serviceFee,
+      afterDiscount: Number(order.total),
+      serviceRatePct,
+      serviceFee,
       total: Number(order.total),
     }
   }
+
   const discPct = Number(order?.loyalty_discount_pct ?? order?.discount_percent ?? 0) || 0
   const serviceRatePct = getOrderServiceRatePct(order, fallbackServicePct)
-  const serviceFee = Math.round(subtotal * serviceRatePct / 100)
-  const grossAmount = subtotal + serviceFee
+  const serviceFeeBase = serviceRatePct > 0 ? menuSubtotal : 0
+  const serviceFee = Math.round(serviceFeeBase * serviceRatePct / 100)
+  const discountBase = menuSubtotal + serviceFee
   const discountAmount = discPct > 0
-    ? Math.round(grossAmount * discPct / 100)
+    ? Math.round(discountBase * discPct / 100)
     : (Number(order?.loyalty_discount_amount) || Number(order?.discount_amount) || 0)
+  const grossAmount = subtotal + serviceFee
   const afterDiscount = Math.max(0, grossAmount - discountAmount)
 
   return {
     subtotal,
+    menuItemsSubtotal: menuSubtotal,
+    normalItemsSubtotal: menuSubtotal,
+    counterItemsSubtotal: counterSubtotal,
+    serviceFeeBase,
+    discountBase,
     discountPercent: discPct,
     discountAmount,
     grossAmount,
@@ -266,6 +312,10 @@ export function getOrderItemOptionsKey(item) {
     'fulfillmentType',
     'is_takeaway',
     'isTakeAway',
+    'item_type',
+    'itemType',
+    'is_counter_item',
+    'isCounterItem',
   ]
 
   const selected = {}
@@ -289,6 +339,10 @@ export function getGroupedOrderItems(items, resolveName) {
       grouped.set(key, {
         ...existing,
         quantity: (Number(existing.quantity) || 1) + (Number(item.quantity) || 1),
+        source_item_ids: [
+          ...(existing.source_item_ids || (existing.id ? [existing.id] : [])),
+          ...(item.source_item_ids || (item.id ? [item.id] : [])),
+        ],
       })
       return
     }
@@ -296,6 +350,7 @@ export function getGroupedOrderItems(items, resolveName) {
     grouped.set(key, {
       ...item,
       name: resolveName ? resolveName(item) : item.name,
+      source_item_ids: item.source_item_ids || (item.id ? [item.id] : []),
     })
   })
 

@@ -10,6 +10,7 @@ import {
   getOrderPaymentBreakdown,
   getOrderPaymentSummary,
 } from '../lib/analytics'
+import { isCashierQuickItem } from '../lib/menuItems'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -80,10 +81,21 @@ function fmtUZS(n) {
   return `${fmtNum(n)} UZS`
 }
 
+function normalizeReceiptItems(rawItems, menuItemMap) {
+  return rawItems.map(item => {
+    const productId = getOrderItemProductId(item)
+    const menuItem = productId != null ? menuItemMap[productId] : null
+    return isCashierQuickItem(menuItem)
+      ? { ...item, item_type: item.item_type || item.itemType || 'counter', is_counter_item: true }
+      : item
+  })
+}
+
 function getReceiptItems(rawItems, menuItemMap, lang) {
   // Never group by localized/display name. Shared grouping uses product id plus
   // selected modifiers/options, and leaves rows without product ids separate.
-  return getGroupedOrderItems(rawItems, item => {
+  const normalizedItems = normalizeReceiptItems(rawItems, menuItemMap)
+  return getGroupedOrderItems(normalizedItems, item => {
     const productId = getOrderItemProductId(item)
     const menuItem = productId != null ? menuItemMap[productId] : null
     return (menuItem && getItemName(menuItem, lang)) || item.name
@@ -543,7 +555,7 @@ export function TableReceipt() {
     if (orders.length === 0) return null
 
     const table    = state.tables.find(t => t.id === tableId)
-    const allItems = orders.flatMap(o => o.items || [])
+    const allItems = normalizeReceiptItems(orders.flatMap(o => o.items || []), menuItemMap)
     const items = getReceiptItems(allItems, menuItemMap, lang)
     const summary = getOrderPaymentSummary(
       combineReceiptOrders(orders),
@@ -623,7 +635,7 @@ export default function Receipt() {
           return siblings.length > 0 ? siblings : [order]
         })()
 
-    const allItems = allOrders.flatMap(o => o.items || [])
+    const allItems = normalizeReceiptItems(allOrders.flatMap(o => o.items || []), menuItemMap)
     const items = getReceiptItems(allItems, menuItemMap, lang)
     const summary = getOrderPaymentSummary(
       combineReceiptOrders(allOrders),

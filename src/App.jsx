@@ -10,6 +10,7 @@ import Login          from './pages/Login'
 import AuthCallback   from './pages/AuthCallback'
 import ResetPassword  from './pages/ResetPassword'
 import PublicMenu     from './pages/PublicMenu'
+import TelegramMiniApp from './pages/TelegramMiniApp'
 import PendingApproval from './pages/PendingApproval'
 import WaiterTables   from './pages/WaiterTables'
 import WaiterOrder    from './pages/WaiterOrder'
@@ -177,6 +178,7 @@ function AppRoutes() {
         {/* Public */}
         <Route path="/"              element={<RoleRedirect />} />
         <Route path="/menu"          element={<PublicMenuRoute><PublicMenu /></PublicMenuRoute>} />
+        <Route path="/telegram"      element={<TelegramMiniApp />} />
         <Route path="/login"         element={<SignedOutRoute><Login /></SignedOutRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />

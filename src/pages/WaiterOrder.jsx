@@ -9,6 +9,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { t, getItemName, getItemDesc, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import { getOrderPaymentSummary } from '../lib/analytics'
 import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
@@ -550,7 +551,7 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
           {items.length}
         </span>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
         {items.map(item => (
           <ProductCard
             key={item.id}
@@ -619,6 +620,11 @@ export default function WaiterOrder() {
   }, [state.cart])
 
   const cartCount = state.cart.reduce((s, i) => s + i.quantity, 0)
+  const configuredServiceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
+  const cartSummary = useMemo(() => {
+    const serviceRatePct = orderType === 'take_away' ? 0 : configuredServiceRatePct
+    return getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, state.cart, configuredServiceRatePct)
+  }, [configuredServiceRatePct, orderType, state.cart])
 
   // Categories
   const sortedCategories = useMemo(() =>
@@ -808,14 +814,27 @@ export default function WaiterOrder() {
             )}
           </div>
 
-          {/* Mobile cart FAB */}
           <button
             onClick={() => setCartOpen(true)}
-            className="lg:hidden relative flex-shrink-0 bg-[#ff5a00] text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-md"
+            className={`relative flex-shrink-0 rounded-xl border font-black transition-all active:scale-[0.98] ${
+              cartCount > 0
+                ? 'bg-[#ff5a00] border-[#ff5a00] text-white shadow-md shadow-orange-100 hover:bg-[#e64d00]'
+                : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-orange-200 hover:bg-orange-50'
+            }`}
+            title={cartCount > 0
+              ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
+              : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
           >
-            <ShoppingCart size={17} />
+            <span className="flex h-10 items-center gap-2 px-3 sm:px-4">
+              <ShoppingCart size={17} />
+              <span className="hidden sm:inline whitespace-nowrap text-[13px]">
+                {cartCount > 0
+                  ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
+                  : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
+              </span>
+            </span>
             {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-[#1F2937] text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              <span className="sm:hidden absolute -top-1.5 -right-1.5 bg-[#1F2937] text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
                 {cartCount}
               </span>
             )}
@@ -892,7 +911,7 @@ export default function WaiterOrder() {
             </div>
           ) : (
             // Flat grid for specific category or search results
-            <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
               {filteredItems.map(item => (
                 <ProductCard
                   key={item.id}
@@ -920,38 +939,11 @@ export default function WaiterOrder() {
         )}
       </div>
 
-      {/* ── Desktop cart panel ───────────────────────────────────────────── */}
-      {!detailItem && (
-      <div
-        className="hidden lg:flex flex-col flex-shrink-0 bg-white border-l border-[#E5E7EB] overflow-hidden"
-        style={{ width: '380px', boxShadow: '-4px 0 20px rgba(0,0,0,0.04)' }}
-      >
-        <div className="flex-shrink-0 pt-3">
-          <OrderActionPanel
-            order={activeOrder}
-            tableId={tableId}
-            lang={lang}
-            dispatch={dispatch}
-            cartCount={cartCount}
-          />
-        </div>
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <CartPanel
-            tableName={orderTitle}
-            orderType={orderType}
-            onOrderTypeChange={setOrderType}
-            allowOrderTypeChange={!isTakeAwayFlow}
-          />
-        </div>
-      </div>
-      )}
-
-      {/* ── Mobile cart bottom sheet ─────────────────────────────────────── */}
+      {/* ── Cart drawer ─────────────────────────────────────────────────── */}
       {!detailItem && cartOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setCartOpen(false)} />
-          <div className="relative bg-white rounded-t-3xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 flex-shrink-0" />
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-slate-900/30" onClick={() => setCartOpen(false)} />
+          <div className="relative flex h-full w-full max-w-full flex-col overflow-hidden bg-white shadow-[-12px_0_32px_rgba(15,23,42,0.16)] sm:max-w-[420px] lg:max-w-[460px]">
             <div className="flex-shrink-0">
               <OrderActionPanel
                 order={activeOrder}
@@ -961,13 +953,15 @@ export default function WaiterOrder() {
                 cartCount={cartCount}
               />
             </div>
-            <CartPanel
-              tableName={orderTitle}
-              orderType={orderType}
-              onOrderTypeChange={setOrderType}
-              allowOrderTypeChange={!isTakeAwayFlow}
-              onClose={() => setCartOpen(false)}
-            />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <CartPanel
+                tableName={orderTitle}
+                orderType={orderType}
+                onOrderTypeChange={setOrderType}
+                allowOrderTypeChange={!isTakeAwayFlow}
+                onClose={() => setCartOpen(false)}
+              />
+            </div>
           </div>
         </div>
       )}

@@ -269,7 +269,15 @@ function reducer(state, action) {
         (i.status === 'served' || i.status === 'new' || i.status === 'ready' || i.status === 'preparing')
       )
       const nextItems = existing
-        ? activeOrder.items.map(i => i.id === existing.id ? { ...i, quantity: (Number(i.quantity) || 1) + 1 } : i)
+        ? activeOrder.items.map(i => i.id === existing.id
+            ? {
+                ...i,
+                quantity: (Number(i.quantity) || 1) + 1,
+                item_type: i.item_type || i.itemType || 'counter',
+                is_counter_item: true,
+              }
+            : i
+          )
         : [
             ...(activeOrder.items || []),
             {
@@ -281,6 +289,8 @@ function reducer(state, action) {
               notes: '',
               status: item.sendToKitchen || item.send_to_kitchen ? 'new' : 'served',
               order_type: item.order_type || activeOrder.order_type || 'dine_in',
+              item_type: item.item_type || item.itemType || 'counter',
+              is_counter_item: item.is_counter_item ?? item.isCounterItem ?? true,
             },
           ]
 
@@ -295,20 +305,26 @@ function reducer(state, action) {
 
     case 'UPDATE_BILL_ITEM_QTY': {
       const { tableId, orderId, orderItemId, menuItemId, qty } = action.payload
+      const sourceItemIds = new Set(action.payload.sourceItemIds || [])
       const nextQty = Math.max(0, Number(qty) || 0)
 
       return {
         ...state,
         orders: state.orders.map(o => {
           if ((orderId ? o.id !== orderId : o.table_id !== tableId) || o.payment_status === 'paid') return o
-          const hasItem = (o.items || []).some(i => orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
+          const matchesItem = i => orderItemId
+            ? i.id === orderItemId || sourceItemIds.has(i.id)
+            : i.menu_item_id === menuItemId
+          const target = (o.items || []).find(matchesItem)
+          const hasItem = !!target
           if (!hasItem) return o
           const nextItems = nextQty <= 0
-            ? (o.items || []).filter(i => orderItemId ? i.id !== orderItemId : i.menu_item_id !== menuItemId)
-            : (o.items || []).map(i => (orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
-                ? { ...i, quantity: nextQty }
-                : i
-              )
+            ? (o.items || []).filter(i => !matchesItem(i))
+            : (o.items || []).flatMap(i => {
+                if (!matchesItem(i)) return [i]
+                if (i.id !== target.id) return []
+                return [{ ...i, quantity: nextQty }]
+              })
           return recalcOrderTotals({ ...o, items: nextItems }, state.settings)
         }),
       }
