@@ -798,17 +798,18 @@ export default function Kitchen() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+            <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
               {activeOrders.map(order => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  menuItemMap={menuItemMap}
-                  lang={lang}
-                  onMark={markItem}
-                  pendingIds={pendingIds}
-                  itemErrors={itemErrors}
-                />
+                <div key={order.id} className="mb-4 break-inside-avoid">
+                  <OrderCard
+                    order={order}
+                    menuItemMap={menuItemMap}
+                    lang={lang}
+                    onMark={markItem}
+                    pendingIds={pendingIds}
+                    itemErrors={itemErrors}
+                  />
+                </div>
               ))}
             </div>
           )}
