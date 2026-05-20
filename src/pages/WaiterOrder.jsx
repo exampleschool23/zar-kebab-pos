@@ -9,7 +9,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { t, getItemName, getItemDesc, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { getOrderPaymentSummary } from '../lib/analytics'
+import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
 import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
@@ -582,6 +582,7 @@ export default function WaiterOrder() {
   const [activeCategory,setCategory]     = useState('all')
   const [cartOpen,      setCartOpen]     = useState(false)
   const [sidebarOpen,   setSidebarOpen]  = useState(false)
+  const [isSendingOrder,setSendingOrder] = useState(false)
   const isTakeAwayFlow = !tableId
   const [orderType,     setOrderType]    = useState(isTakeAwayFlow ? 'take_away' : 'dine_in')
   const [detailItem,    setDetailItem]   = useState(null)
@@ -620,7 +621,7 @@ export default function WaiterOrder() {
   }, [state.cart])
 
   const cartCount = state.cart.reduce((s, i) => s + i.quantity, 0)
-  const configuredServiceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
+  const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const cartSummary = useMemo(() => {
     const serviceRatePct = orderType === 'take_away' ? 0 : configuredServiceRatePct
     return getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, state.cart, configuredServiceRatePct)
@@ -676,14 +677,17 @@ export default function WaiterOrder() {
   // ── Cart handlers ──────────────────────────────────────────────────────────
 
   function handleAdd(item) {
+    if (isSendingOrder) return
     dispatch({ type: 'ADD_TO_CART', payload: { menu_item_id: item.id, name: getItemName(item, lang), price: item.price } })
   }
 
   function handleIncrement(item) {
+    if (isSendingOrder) return
     dispatch({ type: 'ADD_TO_CART', payload: { menu_item_id: item.id, name: getItemName(item, lang), price: item.price } })
   }
 
   function handleDecrement(item) {
+    if (isSendingOrder) return
     const qty = (cartQtyMap[item.id] || 0) - 1
     if (qty <= 0) dispatch({ type: 'REMOVE_FROM_CART', payload: item.id })
     else dispatch({ type: 'UPDATE_CART_QTY', payload: { menu_item_id: item.id, qty } })
@@ -692,10 +696,12 @@ export default function WaiterOrder() {
   // ── Modal handlers ─────────────────────────────────────────────────────────
 
   function openDetail(item) {
+    if (isSendingOrder) return
     setDetailItem(item)
   }
 
   function handleProductDetailAdd(item, qty, notes) {
+    if (isSendingOrder) return
     const alreadyInCart = (cartQtyMap[item.id] || 0) > 0
     if (!alreadyInCart) {
       dispatch({ type: 'ADD_TO_CART', payload: { menu_item_id: item.id, name: getItemName(item, lang), price: item.price } })
@@ -791,7 +797,8 @@ export default function WaiterOrder() {
 
           {/* Back to Tables */}
           <button
-            onClick={() => navigate('/waiter/tables')}
+            onClick={() => { if (!isSendingOrder) navigate('/waiter/tables') }}
+            disabled={isSendingOrder}
             className="flex items-center justify-center w-9 h-9 rounded-xl border border-[#E5E7EB] text-[#6B7280] hover:text-[#ff5a00] hover:border-orange-300 hover:bg-orange-50 transition-colors flex-shrink-0"
             title={lang === 'uz' ? 'Stollar' : lang === 'ru' ? 'Столы' : 'Tables'}
           >
@@ -932,7 +939,7 @@ export default function WaiterOrder() {
         {!isTakeAwayFlow && (
           <BottomTableChips
             currentTableId={tableId}
-            onNewOrder={() => navigate('/waiter/tables')}
+            onNewOrder={() => { if (!isSendingOrder) navigate('/waiter/tables') }}
           />
         )}
           </>
@@ -942,7 +949,7 @@ export default function WaiterOrder() {
       {/* ── Cart drawer ─────────────────────────────────────────────────── */}
       {!detailItem && cartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/30" onClick={() => setCartOpen(false)} />
+          <div className="absolute inset-0 bg-slate-900/30" onClick={() => { if (!isSendingOrder) setCartOpen(false) }} />
           <div className="relative flex h-full w-full max-w-full flex-col overflow-hidden bg-white shadow-[-12px_0_32px_rgba(15,23,42,0.16)] sm:max-w-[420px] lg:max-w-[460px]">
             <div className="flex-shrink-0">
               <OrderActionPanel
@@ -959,7 +966,9 @@ export default function WaiterOrder() {
                 orderType={orderType}
                 onOrderTypeChange={setOrderType}
                 allowOrderTypeChange={!isTakeAwayFlow}
-                onClose={() => setCartOpen(false)}
+                isSending={isSendingOrder}
+                onSendingChange={setSendingOrder}
+                onClose={() => { if (!isSendingOrder) setCartOpen(false) }}
               />
             </div>
           </div>

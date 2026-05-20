@@ -65,11 +65,6 @@ export default function PublicMenu() {
       try {
         const data = await loadPublicMenuData()
         if (cancelled) return
-        console.log('[guest-menu] loaded public menu', {
-          source: data.source,
-          categories: data.categories.length,
-          items: data.items.length,
-        })
         if (data.source === 'direct' && data.categories.length === 0 && data.items.length === 0 && data.rpcError) {
           throw new Error('Public menu SQL has not been applied yet. Run supabase/009_guest_public_menu.sql.')
         }

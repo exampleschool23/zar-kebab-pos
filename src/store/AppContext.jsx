@@ -4,7 +4,9 @@ import {
   allocateSplitPaymentsToOrders,
   getOrderPaymentFields,
   getPaymentMethodSummary,
+  normalizeServiceRatePct,
   normalizeSplitPayments,
+  removeSentCartItems,
 } from '../lib/analytics'
 
 const AppContext = createContext(null)
@@ -42,8 +44,7 @@ function normalizeOrderType(value) {
 }
 
 function serviceRatePctFromSettings(settings) {
-  const pct = Number(settings?.serviceRate)
-  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 20
+  return normalizeServiceRatePct(settings?.serviceRate)
 }
 
 function makeLocalId(prefix) {
@@ -88,6 +89,7 @@ const initialState = {
   orders:         [],
   cart:           [],
   currentTableId: null,
+  connectionNotice: null,
   loaded:         false,
 }
 
@@ -127,6 +129,9 @@ function reducer(state, action) {
 
     case 'SET_LOADED':
       return { ...state, loaded: true }
+
+    case 'SET_CONNECTION_NOTICE':
+      return { ...state, connectionNotice: action.payload || null }
 
     // ── Cart ──────────────────────────────────────────────────────────────────
     case 'ADD_TO_CART': {
@@ -215,7 +220,7 @@ function reducer(state, action) {
       const updatedTables = isTakeAway ? state.tables : state.tables.map(t =>
         t.id === state.currentTableId ? { ...t, status: 'occupied' } : t
       )
-      return { ...state, orders: nextOrders, cart: [], tables: updatedTables }
+      return { ...state, orders: nextOrders, cart: removeSentCartItems(state.cart, cartItems), tables: updatedTables }
     }
 
     case 'UPDATE_ORDER_ITEM_STATUS': {
@@ -526,19 +531,45 @@ export function AppProvider({ children }) {
       return writeToSupabase(enriched, stateRef.current)
         .then(() => {
           dispatch(enriched)
+          dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
           return { error: null }
         })
         .catch(err => {
           console.error('[db] write failed:', action.type, err)
+          dispatch({
+            type: 'SET_CONNECTION_NOTICE',
+            payload: {
+              tone: 'error',
+              message: stateRef.current.lang === 'ru'
+                ? 'Не удалось сохранить изменения. Проверьте подключение.'
+                : stateRef.current.lang === 'uz'
+                  ? 'O‘zgarishlarni saqlab bo‘lmadi. Internet ulanishini tekshiring.'
+                  : 'Could not save changes. Check the connection.',
+            },
+          })
           return { error: err }
         })
     }
 
     dispatch(enriched)
     return writeToSupabase(enriched, stateRef.current)
-      .then(() => ({ error: null }))
+      .then(() => {
+        dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
+        return { error: null }
+      })
       .catch(err => {
         console.error('[db] write failed:', action.type, err)
+        dispatch({
+          type: 'SET_CONNECTION_NOTICE',
+          payload: {
+            tone: 'error',
+            message: stateRef.current.lang === 'ru'
+              ? 'Не удалось сохранить изменения. Проверьте подключение.'
+              : stateRef.current.lang === 'uz'
+                ? 'O‘zgarishlarni saqlab bo‘lmadi. Internet ulanishini tekshiring.'
+                : 'Could not save changes. Check the connection.',
+          },
+        })
         return { error: err }
       })
   }
@@ -564,6 +595,15 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{ state, dispatch: dbDispatch }}>
+      {state.connectionNotice && (
+        <div className={`fixed top-3 left-1/2 z-[9999] -translate-x-1/2 rounded-xl px-4 py-2 text-sm font-semibold shadow-lg ${
+          state.connectionNotice.tone === 'error'
+            ? 'bg-red-600 text-white'
+            : 'bg-[#1F2937] text-white'
+        }`}>
+          {state.connectionNotice.message}
+        </div>
+      )}
       {children}
     </AppContext.Provider>
   )

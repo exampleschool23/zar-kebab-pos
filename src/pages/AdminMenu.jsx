@@ -84,12 +84,14 @@ function Field({ label, type = 'text', value, onChange, placeholder }) {
 function ImageUploadField({ label, value, onChange }) {
   const fileRef = useRef(null)
   const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
     const input = e.target
     setUploading(true)
+    setError('')
     try {
       const ext  = file.name.split('.').pop()
       const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
@@ -101,13 +103,13 @@ function ImageUploadField({ label, value, onChange }) {
 
       const { error: uploadError } = await supabase.storage.from('menu-images').upload(path, file, { upsert: true })
       if (uploadError) {
-        alert('Upload failed: ' + uploadError.message)
+        setError('Upload failed: ' + uploadError.message)
         return
       }
       const { data } = supabase.storage.from('menu-images').getPublicUrl(path)
       onChange({ target: { value: data.publicUrl } })
     } catch (err) {
-      alert('Upload error: ' + err.message)
+      setError('Upload error: ' + err.message)
     } finally {
       setUploading(false)
       input.value = ''
@@ -247,6 +249,7 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
           </button>
         </div>
       </div>
+      {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   )
 }

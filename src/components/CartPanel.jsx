@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react'
-import { X, ShoppingCart, Minus, Plus, Trash2, UtensilsCrossed } from 'lucide-react'
+import React, { useMemo, useState } from 'react'
+import { X, ShoppingCart, Minus, Plus, Trash2, UtensilsCrossed, Loader2 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { t, getItemDesc } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { getOrderPaymentSummary } from '../lib/analytics'
+import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
 
 // Delivery tab removed — only Dine In and Take Away
 const ORDER_TYPES = [
@@ -97,10 +97,19 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
 }
 
 // ── Cart panel ─────────────────────────────────────────────────────────────────
-export default function CartPanel({ tableName, orderType, onOrderTypeChange, onClose, allowOrderTypeChange = true }) {
+export default function CartPanel({
+  tableName,
+  orderType,
+  onOrderTypeChange,
+  onClose,
+  allowOrderTypeChange = true,
+  isSending = false,
+  onSendingChange,
+}) {
   const { state, dispatch } = useApp()
   const lang    = state.lang
   const cart    = state.cart
+  const [message, setMessage] = useState(null)
 
   const menuItemMap = useMemo(() => {
     const map = {}
@@ -108,7 +117,7 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
     return map
   }, [state.menuItems])
 
-  const configuredServiceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
+  const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const serviceRatePct = orderType === 'take_away' ? 0 : configuredServiceRatePct
   const payment = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, cart, configuredServiceRatePct)
   const subtotal  = payment.subtotal
@@ -117,19 +126,34 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
   const itemCount = cart.reduce((s, i) => s + i.quantity, 0)
 
   async function handleSend() {
-    if (cart.length === 0) return
-    console.log('Order type', orderType)
-    console.log('Send to kitchen payload', { orderType, items: cart })
-    const result = await dispatch({ type: 'SEND_TO_KITCHEN', payload: { orderType } })
-    if (result?.error) {
-      window.alert(lang === 'uz'
-        ? 'Buyurtmani oshxonaga yuborib bo‘lmadi. Konsol va Supabase jadval migratsiyalarini tekshiring.'
-        : lang === 'ru'
-          ? 'Не удалось отправить заказ на кухню. Проверьте консоль и миграции таблиц Supabase.'
-          : 'Could not send the order to kitchen. Check the console and Supabase table migrations.')
-      return
+    if (cart.length === 0 || isSending) return
+    setMessage(null)
+    onSendingChange?.(true)
+    try {
+      const result = await dispatch({ type: 'SEND_TO_KITCHEN', payload: { orderType } })
+      if (result?.error) {
+        setMessage({
+          tone: 'error',
+          text: lang === 'uz'
+            ? 'Buyurtmani oshxonaga yuborib bo‘lmadi.'
+            : lang === 'ru'
+              ? 'Не удалось отправить заказ на кухню.'
+              : 'Could not send the order to kitchen.',
+        })
+        return
+      }
+      setMessage({
+        tone: 'success',
+        text: lang === 'uz'
+          ? 'Buyurtma oshxonaga yuborildi.'
+          : lang === 'ru'
+            ? 'Заказ отправлен на кухню.'
+            : 'Order sent to kitchen.',
+      })
+      onClose?.()
+    } finally {
+      onSendingChange?.(false)
     }
-    onClose?.()
   }
 
   return (
@@ -140,7 +164,11 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
         <div className="flex items-start justify-between mb-1">
           <div className="flex items-center gap-2 min-w-0">
             {onClose && (
-              <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0">
+              <button
+                onClick={onClose}
+                disabled={isSending}
+                className="p-1.5 rounded-xl hover:bg-gray-100 disabled:cursor-wait disabled:opacity-50 transition-colors flex-shrink-0"
+              >
                 <X size={16} className="text-[#9CA3AF]" />
               </button>
             )}
@@ -169,6 +197,7 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
               <button
                 key={ot.key}
                 onClick={() => onOrderTypeChange?.(ot.key)}
+                disabled={isSending}
                 className={`flex-1 py-1.5 text-[12px] font-bold rounded-lg transition-all ${
                   orderType === ot.key
                     ? 'bg-white text-[#1F2937] shadow-sm'
@@ -202,7 +231,7 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
               key={item.menu_item_id}
               item={item}
               lang={lang}
-              dispatch={dispatch}
+              dispatch={isSending ? () => {} : dispatch}
               menuItem={menuItemMap[item.menu_item_id]}
             />
           ))
@@ -211,6 +240,16 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
 
       {/* ── Summary + Send button ──────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-t border-[#F3F4F6] px-4 pt-4 pb-5">
+        {message && (
+          <div className={`mb-3 rounded-xl px-3 py-2 text-[12px] font-bold ${
+            message.tone === 'error'
+              ? 'bg-red-50 text-red-700 border border-red-100'
+              : 'bg-green-50 text-green-700 border border-green-100'
+          }`}>
+            {message.text}
+          </div>
+        )}
+
         {cart.length > 0 && (
           <div className="space-y-2 mb-4">
             <div className="flex justify-between items-center text-[13px]">
@@ -236,16 +275,20 @@ export default function CartPanel({ tableName, orderType, onOrderTypeChange, onC
 
         <button
           onClick={handleSend}
-          disabled={cart.length === 0}
+          disabled={cart.length === 0 || isSending}
           className={`w-full rounded-xl font-black text-[14px] active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
-            cart.length > 0
+            cart.length > 0 && !isSending
               ? 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-lg shadow-orange-200'
-              : 'bg-[#F3F4F6] text-[#D1D5DB] cursor-not-allowed'
+              : cart.length > 0
+                ? 'bg-[#ff5a00] text-white opacity-80 cursor-wait shadow-lg shadow-orange-200'
+                : 'bg-[#F3F4F6] text-[#D1D5DB] cursor-not-allowed'
           }`}
           style={{ height: '52px' }}
         >
-          <UtensilsCrossed size={17} />
-          {lang === 'uz' ? 'Oshxonaga yuborish' : lang === 'ru' ? 'Отправить на кухню' : 'Send to Kitchen'}
+          {isSending ? <Loader2 size={17} className="animate-spin" /> : <UtensilsCrossed size={17} />}
+          {isSending
+            ? (lang === 'uz' ? 'Yuborilmoqda...' : lang === 'ru' ? 'Отправка...' : 'Sending...')
+            : (lang === 'uz' ? 'Oshxonaga yuborish' : lang === 'ru' ? 'Отправить на кухню' : 'Send to Kitchen')}
         </button>
       </div>
     </div>

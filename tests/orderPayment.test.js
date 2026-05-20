@@ -13,7 +13,9 @@ import {
   groupOrdersBySession,
   isActiveNeedsBillOrder,
   isPaidOrder,
+  normalizeServiceRatePct,
   normalizeSplitPayments,
+  removeSentCartItems,
 } from '../src/lib/analytics.js'
 import { defaultPath, isPublicOnlyRole } from '../src/lib/permissions.js'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../src/lib/menuItems.js'
@@ -59,6 +61,32 @@ test('service fee uses saved/configured service_rate_pct', () => {
 
   assert.equal(summary.serviceRatePct, 17)
   assert.equal(summary.serviceFee, 67830)
+})
+
+test('service rate normalization preserves zero and clamps invalid settings', () => {
+  assert.equal(normalizeServiceRatePct(0), 0)
+  assert.equal(normalizeServiceRatePct('0'), 0)
+  assert.equal(normalizeServiceRatePct(15), 15)
+  assert.equal(normalizeServiceRatePct(150), 100)
+  assert.equal(normalizeServiceRatePct(-10), 0)
+  assert.equal(normalizeServiceRatePct(null, 15), 15)
+  assert.equal(normalizeServiceRatePct(undefined, 15), 15)
+  assert.equal(normalizeServiceRatePct('bad', 15), 15)
+})
+
+test('sent cart snapshot removal preserves items added while send is pending', () => {
+  const cart = [
+    item({ id: 'lula-current', menu_item_id: 'lula', quantity: 3, price: 24000 }),
+    item({ id: 'cola-current', menu_item_id: 'cola', quantity: 1, price: 12000 }),
+  ]
+  const sentSnapshot = [
+    item({ id: 'lula-sent', menu_item_id: 'lula', quantity: 2, price: 24000 }),
+  ]
+
+  assert.deepEqual(removeSentCartItems(cart, sentSnapshot), [
+    item({ id: 'lula-current', menu_item_id: 'lula', quantity: 1, price: 24000 }),
+    item({ id: 'cola-current', menu_item_id: 'cola', quantity: 1, price: 12000 }),
+  ])
 })
 
 test('receipt total equals order details total', () => {

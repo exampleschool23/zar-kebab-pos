@@ -13,6 +13,7 @@ import {
   groupOrdersBySession,
   isPaidOrder,
   matchesRange,
+  normalizeServiceRatePct,
   toLocalDateStr,
 } from '../lib/analytics'
 import AppShell from '../components/AppShell'
@@ -741,7 +742,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
   )
 }
 
-function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selectedOrder, onSelect }) {
+function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selectedOrder, onSelect, serviceRatePct }) {
   const [page,      setPage]      = useState(1)
   const [search,    setSearch]    = useState('')
   const [filterPay, setFilterPay] = useState('all')
@@ -811,7 +812,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
               const orderNum    = order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '—'
               const sessionCnt  = order._orderCount || 1
               const discPct     = order.loyalty_discount_pct || order.discount_percent || 0
-              const servicePct  = getOrderPaymentSummary(order, getOrderItems(order), 20).serviceRatePct
+              const servicePct  = getOrderPaymentSummary(order, getOrderItems(order), serviceRatePct).serviceRatePct
               const status      = order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')
               const isSelected  = selectedOrder?.id === order.id
               return (
@@ -903,7 +904,7 @@ export default function Reports() {
   const { state }    = useApp()
   const navigate     = useNavigate()
   const lang         = state.lang
-  const serviceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
+  const serviceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
 
   const [activeTab,     setActiveTab]     = useState('order_history')
   const [dateFrom, setDateFrom] = useState(todayStr())
@@ -1098,6 +1099,7 @@ export default function Reports() {
                 navigate={navigate}
                 selectedOrder={selectedOrder}
                 onSelect={setSelectedOrder}
+                serviceRatePct={serviceRatePct}
               />
             )}
 

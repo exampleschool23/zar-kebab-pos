@@ -670,8 +670,6 @@ export default function Kitchen() {
     const raw = state.orders
       .filter(o => ['sent_to_kitchen', 'preparing'].includes(o.status))
       .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-    console.log('Kitchen fetched orders', raw)
-
     // Merge dine-in orders with the same table_id; keep take-away orders separate.
     const grouped = {}
     raw.forEach(order => {
@@ -709,8 +707,6 @@ export default function Kitchen() {
     const itemId = kitchenItemKey(cardOrderId, item)
     if (pendingIdsRef.current.has(itemId)) return
 
-    console.log('Prepare clicked', itemId)
-    console.log('Prepare request started', itemId)
     setPendingIds(prev => {
       const next = new Set(prev)
       next.add(itemId)
@@ -735,7 +731,6 @@ export default function Kitchen() {
         },
       })
       if (result?.error) throw result.error
-      console.log('Prepare request success', itemId)
     } catch (error) {
       console.error('Prepare request failed', itemId, error)
       setItemErrors(prev => ({ ...prev, [itemId]: true }))
@@ -747,7 +742,6 @@ export default function Kitchen() {
             : 'Failed to update item. Please try again.'
       )
     } finally {
-      console.log('Prepare request finished', itemId)
       setPendingIds(prev => {
         const next = new Set(prev)
         next.delete(itemId)

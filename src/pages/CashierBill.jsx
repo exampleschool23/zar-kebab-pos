@@ -14,6 +14,7 @@ import {
   getPaymentMethodSummary,
   getOrderPaymentSummary,
   getSplitPaymentValidation,
+  normalizeServiceRatePct,
   normalizeSplitPayments,
 } from '../lib/analytics'
 import UnifiedSidebar from '../components/UnifiedSidebar'
@@ -62,7 +63,7 @@ export default function CashierBill() {
   const { state, dispatch } = useApp()
   const lang = state.lang
 
-  const configuredServiceRatePct = Math.max(0, Math.min(100, Number(state.settings?.serviceRate) || 20))
+  const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
 
   const [payMethod,  setPayMethod]  = useState('cash')
   const [splitPayments, setSplitPayments] = useState([{ id: 'payment-1', method: 'cash', amount: '' }])

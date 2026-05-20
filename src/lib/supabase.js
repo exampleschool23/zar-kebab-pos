@@ -1,7 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const env = import.meta.env || {}
+const supabaseUrl = env.VITE_SUPABASE_URL
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY
+const isBrowser = typeof window !== 'undefined'
+const missingConfig = !supabaseUrl || !supabaseAnonKey
+
+if (missingConfig && isBrowser) {
+  console.error('[supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Check deployment environment variables.')
+}
+
+export const isSupabaseConfigured = !missingConfig
 
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',

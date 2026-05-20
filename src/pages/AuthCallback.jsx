@@ -9,7 +9,6 @@ export default function AuthCallback() {
   const [debugLog, setDebugLog] = useState([])
 
   function log(msg) {
-    console.log('[AuthCallback]', msg)
     setDebugLog(prev => [...prev, msg])
   }
 

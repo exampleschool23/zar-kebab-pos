@@ -37,11 +37,49 @@ export function isCounterOrderItem(item) {
   )
 }
 
+export function normalizeServiceRatePct(value, fallbackPct = 20) {
+  if (value == null || value === '') {
+    const fallback = Number(fallbackPct)
+    return Number.isFinite(fallback) ? Math.max(0, Math.min(100, fallback)) : 20
+  }
+
+  const pct = Number(value)
+  if (Number.isFinite(pct)) return Math.max(0, Math.min(100, pct))
+
+  const fallback = Number(fallbackPct)
+  return Number.isFinite(fallback) ? Math.max(0, Math.min(100, fallback)) : 20
+}
+
+export function removeSentCartItems(cart = [], sentItems = []) {
+  const remainingByKey = new Map()
+
+  for (const item of sentItems) {
+    const key = item?.menu_item_id
+    if (!key) continue
+    remainingByKey.set(key, (remainingByKey.get(key) || 0) + (Number(item.quantity) || 0))
+  }
+
+  return cart.flatMap(item => {
+    const key = item?.menu_item_id
+    const sentQty = remainingByKey.get(key) || 0
+    if (sentQty <= 0) return [item]
+
+    const qty = Number(item.quantity) || 0
+    if (sentQty >= qty) {
+      remainingByKey.set(key, sentQty - qty)
+      return []
+    }
+
+    remainingByKey.set(key, 0)
+    return [{ ...item, quantity: qty - sentQty }]
+  })
+}
+
 export function getOrderServiceRatePct(o, fallbackPct = 20) {
   const typeText = String(o?.order_type || o?.orderType || o?.table_name || '').toLowerCase()
   if (typeText.includes('take') || (!o?.table_id && typeText.includes('away'))) return 0
   const pct = Number(o?.service_rate_pct ?? o?.service_percent ?? o?.servicePercent)
-  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : fallbackPct
+  return Number.isFinite(pct) ? normalizeServiceRatePct(pct, fallbackPct) : normalizeServiceRatePct(fallbackPct)
 }
 
 export function getOrderServiceFee(o, fallbackPct = 20) {

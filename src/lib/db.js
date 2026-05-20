@@ -1,11 +1,12 @@
-import { supabase } from './supabase'
+import { supabase } from './supabase.js'
 import {
   allocateSplitPaymentsToOrders,
   getOrderPaymentFields,
   getPaymentMethodSummary,
+  normalizeServiceRatePct,
   normalizeSplitPayments,
-} from './analytics'
-import { notifyTelegramOrderStatus } from './telegramNotifications'
+} from './analytics.js'
+import { notifyTelegramOrderStatus } from './telegramNotifications.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -14,8 +15,7 @@ function startOfYear() {
 }
 
 function serviceRatePctFromSettings(settings) {
-  const pct = Number(settings?.serviceRate)
-  return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 20
+  return normalizeServiceRatePct(settings?.serviceRate)
 }
 
 function normalizeOrderType(value) {
@@ -36,6 +36,15 @@ function isMissingOptionalOrderTypeColumn(error) {
   )
 }
 
+function isMissingKitchenSubmitRpc(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (
+    message.includes('submit_order_to_kitchen') ||
+    message.includes('schema cache') ||
+    message.includes('function') && message.includes('not found')
+  )
+}
+
 function makeTakeAwayOrderNumber(orderId) {
   const suffix = String(orderId || Date.now()).replace(/\D/g, '').slice(-4).padStart(4, '0')
   return `TA-${suffix}`
@@ -45,14 +54,46 @@ function normalizeBusinessSettings(row) {
   if (!row) return null
   return {
     restaurantName: row.restaurant_name || 'Zar Kebab',
-    serviceRate: Number.isFinite(Number(row.service_rate_pct)) ? Number(row.service_rate_pct) : 20,
+    serviceRate: normalizeServiceRatePct(row.service_rate_pct),
     receiptFooter: row.receipt_footer || 'Thank you for visiting!',
     autoPrint: !!row.auto_print,
   }
 }
 
-async function loadBusinessSettings() {
-  const { data, error } = await supabase
+async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, isTakeAway, items, paymentFields, state, action }) {
+  const payload = {
+    order: {
+      id: orderId,
+      table_id: isTakeAway ? null : tableId,
+      table_name: isTakeAway ? 'Take Away' : table.name,
+      waiter_name: state.user?.name || 'Waiter',
+      status: 'sent_to_kitchen',
+      payment_status: 'unpaid',
+      order_type: orderType,
+      order_number: isTakeAway ? (action._orderNumber || makeTakeAwayOrderNumber(orderId)) : null,
+      ...paymentFields,
+    },
+    items: items.map(i => ({
+      id: i.id,
+      menu_item_id: i.menu_item_id,
+      name: i.name,
+      price: Number(i.price) || 0,
+      quantity: Number(i.quantity) || 1,
+      notes: i.notes || '',
+      status: 'new',
+      order_type: normalizeOrderType(i.order_type || orderType),
+      item_type: i.item_type || i.itemType || 'menu',
+      is_counter_item: !!(i.is_counter_item ?? i.isCounterItem),
+    })),
+    table_status: isTakeAway ? null : 'occupied',
+  }
+
+  const { error } = await supabase.rpc('submit_order_to_kitchen', { payload })
+  return { error }
+}
+
+async function loadBusinessSettings(dbClient = supabase) {
+  const { data, error } = await dbClient
     .from('business_settings')
     .select('*')
     .eq('id', 'default')
@@ -118,10 +159,15 @@ export async function loadPOSData() {
 
 // ── Realtime subscription ─────────────────────────────────────────────────────
 
-export function subscribeToRealtime(dispatch) {
+export function subscribeToRealtime(dispatch, options = {}) {
+  const dbClient = options.dbClient || supabase
+  const settingsLoader = options.settingsLoader || (() => loadBusinessSettings(dbClient))
+  const debounceMs = options.debounceMs ?? 250
+
   let ordersReloadTimer = null
   let ordersReloadInFlight = false
   let ordersReloadQueued = false
+  let settingsReloadTimer = null
 
   async function reloadOrders() {
     if (ordersReloadInFlight) {
@@ -147,29 +193,52 @@ export function subscribeToRealtime(dispatch) {
         ordersReloadInFlight = false
         console.error('[db] realtime orders reload failed:', err)
       })
-    }, 250)
+    }, debounceMs)
   }
 
   async function reloadTables() {
-    const { data } = await supabase.from('restaurant_tables').select('*').order('id')
+    const { data } = await dbClient.from('restaurant_tables').select('*').order('id')
     if (data) dispatch({ type: 'SET_TABLES', payload: data })
   }
 
-  const channel = supabase
+  function scheduleReloadSettings() {
+    if (settingsReloadTimer) clearTimeout(settingsReloadTimer)
+    settingsReloadTimer = setTimeout(() => {
+      settingsReloadTimer = null
+      settingsLoader()
+        .then(settings => {
+          if (settings) dispatch({ type: 'SET_SETTINGS', payload: settings })
+        })
+        .catch(err => console.error('[db] realtime settings reload failed:', err))
+    }, debounceMs)
+  }
+
+  const channel = dbClient
     .channel('pos-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_payments' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, reloadTables)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'business_settings' }, scheduleReloadSettings)
     .subscribe(status => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      if (status === 'SUBSCRIBED') {
+        dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         console.warn('[db] realtime channel status:', status)
+        dispatch({
+          type: 'SET_CONNECTION_NOTICE',
+          payload: {
+            tone: 'error',
+            message: 'Realtime connection is unstable. Data may be delayed.',
+          },
+        })
       }
     })
 
   return () => {
     if (ordersReloadTimer) clearTimeout(ordersReloadTimer)
-    supabase.removeChannel(channel)
+    if (settingsReloadTimer) clearTimeout(settingsReloadTimer)
+    dbClient.removeChannel(channel)
   }
 }
 
@@ -187,7 +256,6 @@ export async function writeToSupabase(action, state) {
       if ((!isTakeAway && !table) || state.cart.length === 0) return
 
       const items = action._items || state.cart.map(i => ({ ...i, status: 'new', order_type: orderType }))
-      console.log('Send to kitchen payload', { orderId, tableId, orderType, items })
       const addedSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
       const { data: existingOrder } = await supabase
         .from('orders')
@@ -206,13 +274,26 @@ export async function writeToSupabase(action, state) {
         serviceRatePct
       )
 
+      const rpcResult = await submitOrderToKitchenRpc({
+        orderId,
+        table,
+        tableId,
+        orderType,
+        isTakeAway,
+        items,
+        paymentFields,
+        state,
+        action,
+      })
+      if (!rpcResult.error) break
+      if (!isMissingKitchenSubmitRpc(rpcResult.error)) throw rpcResult.error
+
       if (existingOrder) {
         const { data: updatedOrder, error: orderUpdateError } = await supabase.from('orders').update({
           status: 'sent_to_kitchen',
           ...paymentFields,
         }).eq('id', orderId).select('*').maybeSingle()
         if (orderUpdateError) throw orderUpdateError
-        console.log('Created order', updatedOrder || { id: orderId, status: 'sent_to_kitchen' })
       } else {
         const orderInsert = {
           id:             orderId,
@@ -235,7 +316,6 @@ export async function writeToSupabase(action, state) {
           ;({ data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle())
         }
         if (orderInsertError) throw orderInsertError
-        console.log('Created order', createdOrder)
       }
 
       const rows = items.map(i => ({
@@ -261,7 +341,6 @@ export async function writeToSupabase(action, state) {
           .select('*'))
       }
       if (itemInsertError) throw itemInsertError
-      console.log('Created kitchen items', insertedItems || rows)
 
       if (!isTakeAway) {
         await supabase
