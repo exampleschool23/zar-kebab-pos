@@ -7,8 +7,8 @@ const TABLE_CHECKS = [
   { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
   { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name'] },
-  { name: 'menu_items', columns: ['id', 'name', 'price', 'sort_order'] },
-  { name: 'menu_categories', columns: ['id', 'name', 'sort_order'] },
+  { name: 'menu_items', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'price', 'sort_order'] },
+  { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'sort_order'] },
   { name: 'profiles', columns: ['id', 'role', 'full_name'] },
   { name: 'order_payment_audit', columns: ['id', 'order_id', 'action', 'changed_at'] },
 ]
