@@ -184,6 +184,13 @@ test('WaiterTables hides disabled tables and links admins to management', () => 
   assert.match(source, /navigate\('\/admin\/tables'\)/)
 })
 
+test('WaiterTables lets occupied tables request the bill from the card action', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(source, /status === 'occupied'\) return \{ label: tr\(lang, 'requestBill'\)/)
+  assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'occupied'\) \{[\s\S]*MARK_TABLE_NEEDS_BILL/)
+})
+
 test('AdminTables protects table history and manages zones', () => {
   const source = readSource('src/pages/AdminTables.jsx')
 

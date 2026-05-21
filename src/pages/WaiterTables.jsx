@@ -315,7 +315,7 @@ function actionForStatus(lang, status) {
   if (status === 'waiting_kitchen') return { label: tr(lang, 'viewOrder'), Icon: Clock, cls: 'bg-yellow-500 text-white hover:bg-yellow-600' }
   if (status === 'needs_bill') return { label: tr(lang, 'takePayment'), Icon: CreditCard, cls: 'bg-red-600 text-white hover:bg-red-700' }
   if (status === 'reserved') return { label: tr(lang, 'seatReserved'), Icon: CalendarClock, cls: 'bg-purple-600 text-white hover:bg-purple-700' }
-  if (status === 'occupied') return { label: tr(lang, 'viewTable'), Icon: UtensilsCrossed, cls: 'bg-indigo-600 text-white hover:bg-indigo-700' }
+  if (status === 'occupied') return { label: tr(lang, 'requestBill'), Icon: Receipt, cls: 'bg-indigo-600 text-white hover:bg-indigo-700' }
   return null
 }
 
@@ -568,6 +568,10 @@ export default function WaiterTables() {
     }
     if (status === 'needs_bill') {
       navigate(`/cashier/bill/${table.id}`)
+      return
+    }
+    if (status === 'occupied') {
+      dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: table.id })
       return
     }
     if (status === 'reserved') {
