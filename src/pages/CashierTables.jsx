@@ -33,6 +33,21 @@ function timeLabel(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+function isTakeAwayBill(order) {
+  return order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
+}
+
+function countLabel(count, lang) {
+  if (lang === 'uz') return `${count} hisob`
+  if (lang === 'ru') return `${count} ${count === 1 ? 'счёт' : count < 5 ? 'счёта' : 'счетов'}`
+  return `${count} bill${count === 1 ? '' : 's'}`
+}
+
+function paidTimeLabel(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 // ── Localisation ──────────────────────────────────────────────────────────────
 const L = {
   uz: {
@@ -52,6 +67,8 @@ const L = {
     allWaiters:      'Barcha ofitsiantlar',
     allStatus:       'Barcha holat',
     occupied:        'Band',
+    activeNotReady:  'Faol, hisobga tayyor emas',
+    takeAwayBills:   'Olib ketish hisoblari',
     needsBillBadge:  'Hisob kerak',
     newestFirst:     'Yangi avval',
     oldestFirst:     'Eski avval',
@@ -68,6 +85,8 @@ const L = {
     viewAllTables:   "Barcha stollarni ko'rish",
     noPayData:       "To'lov ma'lumotlari yo'q",
     takeAway:         'Olib ketish',
+    showPaid:         "To'langanlarni ko'rsatish",
+    hidePaid:         "To'langanlarni yashirish",
     noTable:          'Stolsiz',
     waitingKitchen:  'Oshxona tayyorlayapti',
     waitingKitchenSub: 'Ofitsiant hisob so\'rashini kuting',
@@ -91,6 +110,8 @@ const L = {
     allWaiters:      'Все официанты',
     allStatus:       'Все статусы',
     occupied:        'Занят',
+    activeNotReady:  'Активные, счёт не готов',
+    takeAwayBills:   'Счета с собой',
     needsBillBadge:  'Нужен счёт',
     newestFirst:     'Сначала новые',
     oldestFirst:     'Сначала старые',
@@ -107,6 +128,8 @@ const L = {
     viewAllTables:   'Все столы',
     noPayData:       'Нет данных об оплате',
     takeAway:         'С собой',
+    showPaid:         'Показать оплаченные',
+    hidePaid:         'Скрыть оплаченные',
     noTable:          'Без стола',
     waitingKitchen:  'Готовится на кухне',
     waitingKitchenSub: 'Ожидайте запроса счёта от официанта',
@@ -130,6 +153,8 @@ const L = {
     allWaiters:      'All Waiters',
     allStatus:       'All Status',
     occupied:        'Occupied',
+    activeNotReady:  'Active, not bill-ready',
+    takeAwayBills:   'Take-away bills',
     needsBillBadge:  'Needs Bill',
     newestFirst:     'Newest First',
     oldestFirst:     'Oldest First',
@@ -146,6 +171,8 @@ const L = {
     viewAllTables:   'View All Tables',
     noPayData:       'No payments today yet',
     takeAway:         'Take Away',
+    showPaid:         'Show paid today',
+    hidePaid:         'Hide paid today',
     noTable:          'No table',
     waitingKitchen:  'Waiting for kitchen',
     waitingKitchenSub: 'Waiter must request the bill first',
@@ -188,6 +215,13 @@ function KpiCard({ label, value, sub, accent, icon: Icon, iconBg, iconColor }) {
 
 function TableStatusBadge({ status, lang }) {
   const l = L[lang] || L.en
+  if (status === 'take_away') {
+    return (
+      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-[#2563EB] border border-blue-100">
+        {l.takeAway}
+      </span>
+    )
+  }
   if (status === 'needs_bill') {
     return (
       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-[#DC2626] border border-red-100">
@@ -204,7 +238,7 @@ function TableStatusBadge({ status, lang }) {
 
 function BillCard({ order, table, menuItemMap, lang, onOpen }) {
   const l = L[lang] || L.en
-  const isTakeAway = order.order_type === 'take_away' || (!order.table_id && String(order.table_name || '').toLowerCase().includes('take'))
+  const isTakeAway = isTakeAwayBill(order)
 
   const items = useMemo(() => {
     return getGroupedOrderItems(order.items || [])
@@ -240,7 +274,7 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
               )}
             </div>
           </div>
-          <TableStatusBadge status={table?.status || order.status} lang={lang} />
+          <TableStatusBadge status={isTakeAway ? 'take_away' : table?.status || order.status} lang={lang} />
         </div>
 
         <div className="flex items-center gap-4 mt-3 text-[11px] text-[#9CA3AF]">
@@ -332,6 +366,95 @@ function FilterSelect({ value, onChange, options, placeholder }) {
   )
 }
 
+function BillsSection({ title, count, icon: Icon, tone, children }) {
+  const toneClasses = {
+    red:    'bg-red-50 text-[#DC2626] border-red-100',
+    amber:  'bg-orange-50 text-[#ff5a00] border-orange-100',
+    blue:   'bg-blue-50 text-[#2563EB] border-blue-100',
+  }[tone] || 'bg-gray-50 text-[#6B7280] border-gray-100'
+
+  return (
+    <section className="mb-8 border-t border-[#E5E7EB] pt-5 first:border-t-0 first:pt-0">
+      <div className="sticky top-0 z-10 -mx-1 mb-3 flex items-center justify-between gap-3 bg-[#FAF7F0]/95 px-1 py-2 backdrop-blur">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`w-8 h-8 rounded-xl border flex items-center justify-center flex-shrink-0 ${toneClasses}`}>
+            <Icon size={16} />
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-black text-[#1F2937] text-[15px] leading-tight">{title}</h2>
+            <p className="text-[11px] font-semibold text-[#9CA3AF]">{count}</p>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+function PaidTodaySummary({ orders, lang, expanded, onToggle }) {
+  const l = L[lang] || L.en
+  const total = orders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+  const latest = [...orders]
+    .sort((a, b) => new Date(getOrderDate(b)) - new Date(getOrderDate(a)))
+    .slice(0, 8)
+
+  return (
+    <section className="mt-8 border-t border-[#E5E7EB] pt-5">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full bg-white border border-[#E5E7EB] rounded-2xl px-5 py-4 shadow-sm hover:shadow-md transition-all text-left"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center flex-shrink-0">
+              <CreditCard size={17} className="text-[#16A34A]" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-black text-[#1F2937] text-[15px] leading-tight">{l.paidToday}</h2>
+              <p className="text-[11px] font-semibold text-[#9CA3AF]">
+                {countLabel(orders.length, lang)} · {formatCurrency(total)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-[12px] font-bold text-[#16A34A]">
+            <span className="hidden sm:inline">{expanded ? l.hidePaid : l.showPaid}</span>
+            <ChevronDown size={16} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </div>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="mt-3 bg-white border border-[#E5E7EB] rounded-2xl shadow-sm overflow-hidden">
+          {latest.length === 0 ? (
+            <p className="px-5 py-4 text-[13px] text-[#6B7280]">{l.noPayData}</p>
+          ) : (
+            latest.map(order => {
+              const isTakeAway = isTakeAwayBill(order)
+              return (
+                <div key={order.id} className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[#F3F4F6] last:border-b-0">
+                  <div className="min-w-0">
+                    <p className="font-bold text-[#1F2937] text-[13px] truncate">
+                      {isTakeAway ? `${l.takeAway} · ${order.order_number || order.id}` : order.table_name}
+                    </p>
+                    <p className="text-[11px] text-[#9CA3AF]">
+                      {paidTimeLabel(order.paid_at || getOrderDate(order))}
+                      {order.waiter_name ? ` · ${order.waiter_name}` : ''}
+                    </p>
+                  </div>
+                  <p className="font-black text-[#16A34A] text-[13px] flex-shrink-0">{formatCurrency(getOrderTotal(order))}</p>
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CashierTables() {
   const { state, dispatch } = useApp()
@@ -344,6 +467,7 @@ export default function CashierTables() {
   const [filterWaiter,setFilterWaiter]= useState('all')
   const [filterStatus,setFilterStatus]= useState('all')
   const [sortKey,     setSortKey]     = useState('newest')
+  const [showPaidToday, setShowPaidToday] = useState(false)
 
   // ── Menu item lookup map ────────────────────────────────────────────────────
   const menuItemMap = useMemo(() =>
@@ -422,8 +546,9 @@ export default function CashierTables() {
 
   const statusOptions = [
     { value: 'all',        label: l.allStatus      },
-    { value: 'occupied',   label: l.occupied       },
     { value: 'needs_bill', label: l.needsBillBadge },
+    { value: 'occupied',   label: l.occupied       },
+    { value: 'take_away',  label: l.takeAway       },
   ]
 
   const sortOptions = SORT_OPTIONS(l).map(o => ({ value: o.key, label: o.label }))
@@ -451,8 +576,10 @@ export default function CashierTables() {
     // Status filter
     if (filterStatus !== 'all') {
       result = result.filter(o => {
-        if (filterStatus === 'needs_bill') return o.status === 'needs_bill' || o.order_type === 'take_away' || !o.table_id
-        return o.status !== 'needs_bill' // occupied = everything else active
+        const isTakeAway = isTakeAwayBill(o)
+        if (filterStatus === 'needs_bill') return !isTakeAway && o.status === 'needs_bill'
+        if (filterStatus === 'take_away') return isTakeAway
+        return !isTakeAway && o.status !== 'needs_bill'
       })
     }
 
@@ -471,6 +598,20 @@ export default function CashierTables() {
     Object.fromEntries(state.tables.map(t => [t.id, t])),
     [state.tables]
   )
+
+  const billSections = useMemo(() => {
+    const needsBill = filteredBills.filter(o => !isTakeAwayBill(o) && o.status === 'needs_bill')
+    const active = filteredBills.filter(o => !isTakeAwayBill(o) && o.status !== 'needs_bill')
+    const takeAway = filteredBills.filter(isTakeAwayBill)
+
+    return [
+      { key: 'needs_bill', title: l.needsBill, tone: 'red', icon: CreditCard, bills: needsBill },
+      { key: 'active', title: l.activeNotReady, tone: 'amber', icon: Clock, bills: active },
+      { key: 'take_away', title: l.takeAwayBills, tone: 'blue', icon: Receipt, bills: takeAway },
+    ].filter(section => section.bills.length > 0)
+  }, [filteredBills, l])
+
+  const visibleBillCount = billSections.reduce((sum, section) => sum + section.bills.length, 0)
 
   return (
     <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
@@ -570,7 +711,7 @@ export default function CashierTables() {
             <div className="flex items-center gap-2">
               <h2 className="font-black text-[#1F2937] text-[16px]">{l.activeBillsSec}</h2>
               <span className="bg-[#ff5a00] text-white text-[10px] font-black px-2 py-0.5 rounded-full">
-                {filteredBills.length}
+                {visibleBillCount}
               </span>
             </div>
           </div>
@@ -620,7 +761,7 @@ export default function CashierTables() {
           </div>
 
           {/* ── Bill cards ── */}
-          {filteredBills.length === 0 ? (
+          {visibleBillCount === 0 ? (
             <div className="max-w-sm mx-auto mt-12">
               <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-10 flex flex-col items-center text-center">
                 <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mb-4">
@@ -631,22 +772,37 @@ export default function CashierTables() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredBills.map(order => (
-                <BillCard
-                  key={order.id}
-                  order={order}
-                  table={tableMap[order.table_id]}
-                  menuItemMap={menuItemMap}
-                  lang={lang}
-                  onOpen={bill => navigate(bill.order_type === 'take_away' || !bill.table_id
-                    ? `/cashier/bill/order/${bill.id}`
-                    : `/cashier/bill/${bill.table_id}`
-                  )}
-                />
-              ))}
-            </div>
+            billSections.map(section => (
+              <BillsSection
+                key={section.key}
+                title={section.title}
+                count={countLabel(section.bills.length, lang)}
+                icon={section.icon}
+                tone={section.tone}
+              >
+                {section.bills.map(order => (
+                  <BillCard
+                    key={order.id}
+                    order={order}
+                    table={tableMap[order.table_id]}
+                    menuItemMap={menuItemMap}
+                    lang={lang}
+                    onOpen={bill => navigate(isTakeAwayBill(bill)
+                      ? `/cashier/bill/order/${bill.id}`
+                      : `/cashier/bill/${bill.table_id}`
+                    )}
+                  />
+                ))}
+              </BillsSection>
+            ))
           )}
+
+          <PaidTodaySummary
+            orders={paidTodayOrders}
+            lang={lang}
+            expanded={showPaidToday}
+            onToggle={() => setShowPaidToday(value => !value)}
+          />
 
           {/* ── Bottom info bar ── */}
           <div className="mt-6 bg-white border border-[#E5E7EB] rounded-2xl px-5 py-4 flex items-center justify-between gap-4 shadow-sm">

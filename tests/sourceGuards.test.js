@@ -166,3 +166,12 @@ test('WaiterTables uses responsive section grids instead of one flat table grid'
   assert.match(source, /grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4/)
   assert.match(source, /sections\.map\(\(\{ status, items \}\)/)
 })
+
+test('CashierTables groups bills by cashier urgency', () => {
+  const source = readSource('src/pages/CashierTables.jsx')
+
+  assert.match(source, /key: 'needs_bill'[\s\S]*key: 'active'[\s\S]*key: 'take_away'/)
+  assert.match(source, /function PaidTodaySummary/)
+  assert.match(source, /showPaidToday/)
+  assert.doesNotMatch(source, /filteredBills\.map\(order =>/)
+})
