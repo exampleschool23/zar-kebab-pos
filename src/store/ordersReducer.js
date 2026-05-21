@@ -1,6 +1,8 @@
 import {
   allocateSplitPaymentsToOrders,
+  calculateLoyaltyCashback,
   getOrderPaymentFields,
+  getOrderPaymentSummary,
   getPaymentMethodSummary,
   normalizeSplitPayments,
   removeSentCartItems,
@@ -197,6 +199,7 @@ export function ordersReducer(state, action) {
       const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
       const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
       const paidAt = new Date().toISOString()
+      let remainingLoyalty = Math.max(0, Math.round(Number(loyalty?.loyalty_used_amount ?? loyalty?.loyalty_redeem_amount ?? 0) || 0))
       const activeOrderSummaries = state.orders
         .filter(o => (orderId ? o.id === orderId : o.table_id === tableId) && o.payment_status !== 'paid')
         .map(o => {
@@ -206,12 +209,26 @@ export function ordersReducer(state, action) {
             : Number.isFinite(Number(o.service_rate_pct))
               ? Number(o.service_rate_pct)
               : serviceRatePctFromSettings(state.settings)
+          const gross = getOrderPaymentSummary({ ...o, service_rate_pct: serviceRatePct }, o.items || [], serviceRatePct)
+          const loyaltyUsedAmount = Math.min(remainingLoyalty, gross.total)
+          remainingLoyalty -= loyaltyUsedAmount
+          const cashbackEarned = calculateLoyaltyCashback(
+            { ...o, loyalty_used_amount: loyaltyUsedAmount, status: 'paid', payment_status: 'paid' },
+            o.items || [],
+            state.settings?.cashbackPercent ?? 5
+          )
           const fields = getOrderPaymentFields(
-            { ...o, ...(loyalty || {}), service_rate_pct: serviceRatePct },
+            {
+              ...o,
+              service_rate_pct: serviceRatePct,
+              loyalty_used_amount: loyaltyUsedAmount,
+              loyalty_redeem_amount: loyaltyUsedAmount,
+              cashback_earned: cashbackEarned,
+            },
             o.items || [],
             serviceRatePct
           )
-          return { id: o.id, fields, total: fields.total }
+          return { id: o.id, fields, total: fields.total, loyaltyUsedAmount, cashbackEarned }
         })
       const totalDue = activeOrderSummaries.reduce((sum, row) => sum + row.total, 0)
       const payments = normalizeSplitPayments(
@@ -245,7 +262,8 @@ export function ordersReducer(state, action) {
             : Number.isFinite(Number(o.service_rate_pct))
               ? Number(o.service_rate_pct)
               : serviceRatePctFromSettings(state.settings)
-          const paymentFields = activeOrderSummaries.find(row => row.id === o.id)?.fields || getOrderPaymentFields(
+          const activeSummary = activeOrderSummaries.find(row => row.id === o.id)
+          const paymentFields = activeSummary?.fields || getOrderPaymentFields(
             { ...o, ...(loyalty || {}), service_rate_pct: serviceRatePct },
             o.items || [],
             serviceRatePct
@@ -257,6 +275,9 @@ export function ordersReducer(state, action) {
             paid_at: paidAt,
             payment_method: finalPaymentMethod,
             payments: paymentAllocations.get(o.id) || [],
+            loyalty_card_number: loyalty?.loyalty_card_number || null,
+            cashback_percent: state.settings?.cashbackPercent ?? 5,
+            cashback_earned: activeSummary?.cashbackEarned || 0,
             ...paymentFields,
           }
         }),

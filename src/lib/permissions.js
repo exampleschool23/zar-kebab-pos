@@ -8,6 +8,7 @@ export const PAGE_ACCESS = {
   menu:      ['owner', 'admin'],
   kitchen:   ['owner', 'admin', 'kitchen'],
   cashier:   ['owner', 'admin', 'cashier'],
+  loyalty:   ['owner', 'admin', 'cashier'],
   team:      ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder'],
   reports:   ['owner', 'admin', 'cashier', 'stakeholder'],
   audit:     ['owner', 'admin'],

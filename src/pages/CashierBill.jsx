@@ -14,9 +14,14 @@ import {
   getPaymentMethodSummary,
   getOrderPaymentSummary,
   getSplitPaymentValidation,
+  validateLoyaltyRedeemAmount,
+  getMaxLoyaltyRedeemAmount,
+  calculateLoyaltyCashback,
   normalizeServiceRatePct,
   normalizeSplitPayments,
 } from '../lib/analytics'
+import { supabase } from '../lib/supabase'
+import { getCashbackTypePercent } from '../lib/loyalty'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import StatusBadge from '../components/StatusBadge'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
@@ -24,7 +29,6 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const LOYALTY_PRESETS = [0, 5, 10, 15, 20]
 const CASH_PRESETS    = [
   { label: 'Exact',   exact: true  },
   { label: '150,000', value: 150000 },
@@ -37,7 +41,6 @@ const PAY_METHODS = [
   { key: 'card',     icon: CreditCard, labelUz: 'Karta',   labelRu: 'Карта',     labelEn: 'Card'     },
   { key: 'terminal', icon: Monitor,   labelUz: 'Terminal', labelRu: 'Терминал',  labelEn: 'Terminal' },
   { key: 'qr',       icon: QrCode,    labelUz: 'QR Code',  labelRu: 'QR-код',    labelEn: 'QR Code'  },
-  { key: 'loyalty_card', icon: Tag, labelUz: 'Loyalty', labelRu: 'Лояльность', labelEn: 'Loyalty' },
 ]
 
 function payLabel(m, lang) {
@@ -71,7 +74,11 @@ export default function CashierBill() {
   const [payMethod,  setPayMethod]  = useState('cash')
   const [splitPayments, setSplitPayments] = useState([{ id: 'payment-1', method: 'cash', amount: '' }])
   const [activePaymentId, setActivePaymentId] = useState('payment-1')
-  const [loyaltyPct, setLoyaltyPct] = useState(0)
+  const [loyaltyCardNumber, setLoyaltyCardNumber] = useState('')
+  const [loyaltyCard, setLoyaltyCard] = useState(null)
+  const [loyaltyRedeemAmount, setLoyaltyRedeemAmount] = useState('')
+  const [loyaltyLookupMessage, setLoyaltyLookupMessage] = useState('')
+  const [isCheckingLoyalty, setCheckingLoyalty] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const menuItemMap = useMemo(() => {
@@ -126,15 +133,36 @@ export default function CashierBill() {
   )
 
   // ── Totals ─────────────────────────────────────────────────────────────────
+  const requestedLoyaltyUsed = Math.max(0, Math.round(Number(loyaltyRedeemAmount) || 0))
+  const basePayment = order
+    ? getOrderPaymentSummary(order, order.items, configuredServiceRatePct)
+    : getOrderPaymentSummary({ service_rate_pct: configuredServiceRatePct }, [], configuredServiceRatePct)
+  const loyaltyValidation = validateLoyaltyRedeemAmount(
+    requestedLoyaltyUsed,
+    loyaltyCard?.balance || 0,
+    basePayment.grossAmount
+  )
+  const effectiveLoyaltyUsed = loyaltyValidation.ok ? loyaltyValidation.amount : requestedLoyaltyUsed
   const payment       = order
-    ? getOrderPaymentSummary({ ...order, loyalty_discount_pct: loyaltyPct }, order.items, configuredServiceRatePct)
+    ? getOrderPaymentSummary({ ...order, loyalty_used_amount: effectiveLoyaltyUsed }, order.items, configuredServiceRatePct)
     : getOrderPaymentSummary({ service_rate_pct: configuredServiceRatePct }, [], configuredServiceRatePct)
   const subtotal      = payment.subtotal
-  const loyaltyAmt    = payment.discountAmount
-  const afterDiscount = payment.afterDiscount
+  const counterItemsSubtotal = payment.counterItemsSubtotal
+  const loyaltyAmt    = payment.loyaltyUsedAmount
+  const loyaltyCashbackPercent = loyaltyCard
+    ? getCashbackTypePercent(loyaltyCard.cashback_type || 'bronze')
+    : state.settings?.cashbackPercent ?? 5
+  const cashbackToBeEarned = order
+    ? calculateLoyaltyCashback(
+        { ...order, loyalty_used_amount: loyaltyAmt, status: 'paid', payment_status: 'paid' },
+        order.items,
+        loyaltyCashbackPercent
+      )
+    : 0
   const serviceFee    = payment.serviceFee
   const serviceRatePct = payment.serviceRatePct
   const total         = payment.total
+  const maxLoyaltyRedeemAmount = getMaxLoyaltyRedeemAmount(loyaltyCard?.balance || 0, basePayment.grossAmount)
 
   const enteredPayments = splitPayments.map(row => ({
     method: row.method,
@@ -146,7 +174,8 @@ export default function CashierBill() {
   const finalPaymentMethod = getPaymentMethodSummary(appliedPayments, payMethod)
   const shortfall = paymentValidation.remainingAmount
   const overpaidAmount = paymentValidation.overpaidAmount
-  const canProcess = paymentValidation.canConfirmPayment
+  const loyaltyReady = loyaltyAmt <= 0 || (loyaltyCard && loyaltyValidation.ok)
+  const canProcess = paymentValidation.canConfirmPayment && loyaltyReady
   const isOverpaid = paymentValidation.isOverpaid
   const isFullyPaid = paymentValidation.isFullyPaid
 
@@ -207,6 +236,52 @@ export default function CashierBill() {
     updatePayment(activePaymentId, { method })
   }
 
+  async function checkLoyaltyCard() {
+    const cardNumber = String(loyaltyCardNumber || '').trim()
+    setLoyaltyCard(null)
+    setLoyaltyLookupMessage('')
+    if (!/^\d{8}$/.test(cardNumber)) {
+      setLoyaltyLookupMessage(lbl.loyaltyInvalid)
+      return
+    }
+
+    setCheckingLoyalty(true)
+    try {
+      const { data, error } = await supabase
+        .from('loyalty_cards')
+        .select('*')
+        .eq('card_number', cardNumber)
+        .maybeSingle()
+      if (error) throw error
+      if (!data || data.is_active === false) {
+        setLoyaltyLookupMessage(lbl.loyaltyNotFound)
+        return
+      }
+      const balance = Math.max(0, Math.round(Number(data.balance ?? data.balance_amount ?? 0) || 0))
+      setLoyaltyCard({ ...data, balance })
+      setLoyaltyLookupMessage(lbl.loyaltyFound)
+    } catch (error) {
+      setLoyaltyLookupMessage(error?.message || lbl.loyaltyLookupFailed)
+    } finally {
+      setCheckingLoyalty(false)
+    }
+  }
+
+  function updateLoyaltyRedeem(value) {
+    const amount = Math.max(0, Math.round(Number(value) || 0))
+    setLoyaltyRedeemAmount(value === '' ? '' : String(amount))
+  }
+
+  function fillMaxLoyaltyRedeem() {
+    if (maxLoyaltyRedeemAmount <= 0) {
+      setLoyaltyRedeemAmount('')
+      setLoyaltyLookupMessage(lbl.noLoyaltyBalance)
+      return
+    }
+    setLoyaltyRedeemAmount(String(maxLoyaltyRedeemAmount))
+    setLoyaltyLookupMessage('')
+  }
+
   function handlePaid() {
     if (!canProcess) return
     dispatch({
@@ -217,9 +292,13 @@ export default function CashierBill() {
         payment_method: finalPaymentMethod,
         payments: appliedPayments,
         loyalty: {
-          loyalty_discount_pct:    loyaltyPct,
-          loyalty_discount_amount: loyaltyAmt,
-          discounted_subtotal:     afterDiscount,
+          loyalty_card_number: loyaltyCard?.card_number || loyaltyCardNumber || null,
+          loyalty_used_amount: loyaltyAmt,
+          loyalty_redeem_amount: loyaltyAmt,
+          cashback_earned: cashbackToBeEarned,
+          cashback_percent: loyaltyCashbackPercent,
+          cashback_type: loyaltyCard?.cashback_type || null,
+          discounted_subtotal: total,
           service_fee:             serviceFee,
           service_rate_pct:         serviceRatePct,
           total,
@@ -275,7 +354,7 @@ export default function CashierBill() {
     paySummary:   lang === 'uz' ? "To'lov xulosasi" : lang === 'ru' ? 'Итоговый счёт' : 'Payment Summary',
     subtotal:     lang === 'uz' ? 'Buyurtma summasi' : lang === 'ru' ? 'Сумма заказа' : 'Subtotal',
     service:      lang === 'uz' ? `Xizmat (${serviceRatePct}%)` : lang === 'ru' ? `Обслуживание (${serviceRatePct}%)` : `Service (${serviceRatePct}%)`,
-    loyalty:      lang === 'uz' ? 'Chegirma' : lang === 'ru' ? 'Скидка' : 'Discount',
+    loyalty:      lang === 'uz' ? 'Sodiqlik ishlatildi' : lang === 'ru' ? 'Использовано с карты' : 'Loyalty used',
     totalAmt:     lang === 'uz' ? "To'lovga jami" : lang === 'ru' ? 'Итого к оплате' : 'Total Amount',
     payMethod:    lang === 'uz' ? "To'lov usuli" : lang === 'ru' ? 'Способ оплаты' : 'Payment Method',
     splitPay:     lang === 'uz' ? "Bo'lib to'lash" : lang === 'ru' ? 'Смешанная оплата' : 'Split payment',
@@ -290,13 +369,27 @@ export default function CashierBill() {
     confirmPay:   lang === 'uz' ? "To'lovni tasdiqlash" : lang === 'ru' ? 'Подтвердить оплату' : 'Confirm Payment',
     printBill:    lang === 'uz' ? 'Hisob chiqarish' : lang === 'ru' ? 'Распечатать счёт' : 'Print Bill',
     printReceipt: lang === 'uz' ? 'Chek chiqarish' : lang === 'ru' ? 'Распечатать чек' : 'Print Receipt',
-    loyaltyLabel: lang === 'uz' ? 'Sodiqlik chegirmasi' : lang === 'ru' ? 'Скидка лояльности' : 'Loyalty Discount',
-    saving:       lang === 'uz' ? 'Tejash' : lang === 'ru' ? 'Экономия' : 'Saving',
+    loyaltyLabel: lang === 'uz' ? 'Sodiqlik kartasi' : lang === 'ru' ? 'Карта лояльности' : 'Loyalty Card',
+    cashbackBalance: lang === 'uz' ? 'Cashback balansi' : lang === 'ru' ? 'Баланс кешбэка' : 'Cashback balance',
+    useLoyalty:   lang === 'uz' ? 'Ishlatiladigan sodiqlik summasi' : lang === 'ru' ? 'Сумма лояльности к списанию' : 'Loyalty amount to use',
+    cardNumber:   lang === 'uz' ? 'Karta raqami' : lang === 'ru' ? 'Номер карты' : 'Card number',
+    checkCard:    lang === 'uz' ? 'Tekshirish' : lang === 'ru' ? 'Проверить' : 'Check card',
+    cashbackToBeEarned: lang === 'uz' ? 'To‘lovdan keyin cashback' : lang === 'ru' ? 'Кешбэк после оплаты' : 'Cashback to be earned',
+    cashbackRewardHint: lang === 'uz' ? 'To‘lovdan keyin mukofot' : lang === 'ru' ? 'Награда после оплаты' : 'Reward after payment',
+    loyaltyInvalid: lang === 'uz' ? '8 xonali karta raqamini kiriting' : lang === 'ru' ? 'Введите 8-значный номер карты' : 'Enter an 8-digit card number',
+    loyaltyNotFound: lang === 'uz' ? 'Faol karta topilmadi' : lang === 'ru' ? 'Активная карта не найдена' : 'Active card not found',
+    loyaltyFound: lang === 'uz' ? 'Karta topildi' : lang === 'ru' ? 'Карта найдена' : 'Card found',
+    loyaltyLookupFailed: lang === 'uz' ? 'Kartani tekshirib bo‘lmadi' : lang === 'ru' ? 'Не удалось проверить карту' : 'Could not check card',
+    loyaltyBalanceExceeded: lang === 'uz' ? 'Summa cashback balansidan oshib ketdi' : lang === 'ru' ? 'Сумма превышает баланс кешбэка' : 'Amount exceeds cashback balance',
+    loyaltyBillExceeded: lang === 'uz' ? 'Summa to‘lov qoldig‘idan oshib ketdi' : lang === 'ru' ? 'Сумма превышает остаток счёта' : 'Amount exceeds remaining bill',
+    tapBalanceMax: lang === 'uz' ? 'Maksimal summani ishlatish uchun balansni bosing' : lang === 'ru' ? 'Нажмите на баланс, чтобы использовать максимум' : 'Tap balance to use max available',
+    noLoyaltyBalance: lang === 'uz' ? 'Ishlatish uchun sodiqlik balansi yo‘q' : lang === 'ru' ? 'Нет баланса лояльности для использования' : 'No loyalty balance available to use',
     noOrder:      lang === 'uz' ? 'Bu stol uchun faol buyurtma yo\'q' : lang === 'ru' ? 'Нет активного заказа для этого стола' : 'No active order for this table',
     noteLabel:    lang === 'uz' ? 'Izoh' : lang === 'ru' ? 'Примечание' : 'Note',
     overpaid:     lang === 'uz' ? 'Ortiqcha to‘lov' : lang === 'ru' ? 'Переплата' : 'Overpayment',
     exceedsTotal: lang === 'uz' ? 'Kiritilgan summa jami to‘lovdan oshib ketdi' : lang === 'ru' ? 'Введённая сумма превышает итоговую сумму' : 'Entered amount exceeds total amount',
     counterItems: lang === 'uz' ? 'Kassa mahsulotlari' : lang === 'ru' ? 'Товары у кассы' : 'Counter Items',
+    counterItemsSub: lang === 'uz' ? 'Bu hisobga tezkor kassa mahsulotlarini qo‘shing' : lang === 'ru' ? 'Добавьте быстрые товары кассы к этому счёту' : 'Add quick cashier items to this bill',
     noTable:      lang === 'uz' ? 'Stol tanlanmagan' : lang === 'ru' ? 'Стол не выбран' : 'No table selected',
   }
 
@@ -610,9 +703,15 @@ export default function CashierBill() {
                     <span>{lbl.service}</span>
                     <span>{formatCurrency(serviceFee)}</span>
                   </div>
-                  {loyaltyPct > 0 && (
+                  {counterItemsSubtotal > 0 && (
+                    <div className="flex justify-between text-sm text-[#6B7280]">
+                      <span>{lbl.counterItems}</span>
+                      <span>{formatCurrency(counterItemsSubtotal)}</span>
+                    </div>
+                  )}
+                  {loyaltyAmt > 0 && (
                     <div className="flex justify-between text-sm text-[#16A34A] font-medium">
-                      <span>{lbl.loyalty} ({loyaltyPct}%)</span>
+                      <span>{lbl.loyalty}</span>
                       <span>− {formatCurrency(loyaltyAmt)}</span>
                     </div>
                   )}
@@ -620,8 +719,80 @@ export default function CashierBill() {
                     <span className="font-black text-[#1F2937]">{lbl.totalAmt}</span>
                     <span className="font-black text-2xl text-[#ff5a00]">{formatCurrency(total)}</span>
                   </div>
+                  {cashbackToBeEarned > 0 && (
+                    <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-2.5">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-bold text-[#92400E]">{lbl.cashbackRewardHint}</span>
+                        <span className="font-black text-[#D97706]">+ {formatCurrency(cashbackToBeEarned)}</span>
+                      </div>
+                      <p className="mt-0.5 text-[11px] font-semibold text-[#B45309]">{lbl.cashbackToBeEarned}</p>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Counter Items */}
+              {quickItems.length > 0 && (
+                <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-black text-[#1F2937]">{lbl.counterItems}</h3>
+                      <p className="mt-0.5 text-xs font-semibold text-[#6B7280]">{lbl.counterItemsSub}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {quickItems.map(item => {
+                      const current = order.items.find(row =>
+                        row.menu_item_id === item.id &&
+                        (row.is_counter_item || row.isCounterItem || row.item_type === 'counter' || row.itemType === 'counter')
+                      )
+                      const qty = Number(current?.quantity) || 0
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-xl border border-[#E5E7EB] bg-[#FBFCFE] p-3"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => addQuickItem(item)}
+                            className="w-full text-left"
+                          >
+                            <p className="line-clamp-1 text-[13px] font-black text-[#1F2937]">{getItemName(item, lang)}</p>
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-[#ff5a00]">{formatCurrency(item.price)}</span>
+                              {qty > 0 ? (
+                                <span className="rounded-lg bg-[#fff1e8] px-2 py-0.5 text-[11px] font-black text-[#ff5a00]">×{qty}</span>
+                              ) : (
+                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0f3b2e] text-white">
+                                  <Plus size={13} />
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                          {qty > 0 && current && (
+                            <div className="mt-2 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => updateBillItemQty(current, qty - 1)}
+                                className="flex h-8 flex-1 items-center justify-center rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-red-50 hover:text-red-600"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateBillItemQty(current, qty + 1)}
+                                className="flex h-8 flex-1 items-center justify-center rounded-lg bg-[#0f3b2e] text-white hover:bg-[#0A2A20]"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Loyalty card */}
               <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
@@ -629,35 +800,85 @@ export default function CashierBill() {
                   <Tag size={15} className="text-[#ff5a00]" />
                   <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">{lbl.loyaltyLabel}</p>
                 </div>
-                <div className="flex gap-1.5 flex-wrap mb-3">
-                  {LOYALTY_PRESETS.map(pct => (
-                    <button
-                      key={pct}
-                      onClick={() => setLoyaltyPct(pct)}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
-                        loyaltyPct === pct
-                          ? 'border-[#ff5a00] bg-[#fff1e8] text-[#ff5a00]'
-                          : 'border-[#E5E7EB] text-[#6B7280] hover:border-orange-300 bg-white'
-                      }`}
-                    >
-                      {pct}%
-                    </button>
-                  ))}
-                </div>
-                <div className="relative">
+                <div className="flex gap-2">
                   <input
-                    type="number" min="0" max="100"
-                    value={loyaltyPct === 0 ? '' : loyaltyPct}
-                    onChange={e => setLoyaltyPct(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                    placeholder="Custom %"
-                    className="w-full border-2 border-[#E5E7EB] rounded-xl px-4 py-2.5 text-sm font-semibold text-[#1F2937] pr-8 focus:outline-none focus:border-[#ff5a00] transition-all"
+                    type="text"
+                    inputMode="numeric"
+                    value={loyaltyCardNumber}
+                    onChange={e => {
+                      setLoyaltyCardNumber(e.target.value.replace(/\D/g, '').slice(0, 8))
+                      setLoyaltyCard(null)
+                      setLoyaltyRedeemAmount('')
+                      setLoyaltyLookupMessage('')
+                    }}
+                    placeholder={lbl.cardNumber}
+                    className="min-w-0 flex-1 border-2 border-[#E5E7EB] rounded-xl px-4 py-2.5 text-sm font-semibold text-[#1F2937] focus:outline-none focus:border-[#ff5a00] transition-all"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-sm font-bold">%</span>
+                  <button
+                    type="button"
+                    onClick={checkLoyaltyCard}
+                    disabled={isCheckingLoyalty}
+                    className="rounded-xl bg-[#0f3b2e] px-4 py-2.5 text-sm font-black text-white disabled:bg-gray-200 disabled:text-gray-500"
+                  >
+                    {isCheckingLoyalty ? '...' : lbl.checkCard}
+                  </button>
                 </div>
-                {loyaltyPct > 0 && (
-                  <div className="mt-3 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 flex justify-between items-center">
-                    <span className="text-sm text-[#16A34A] font-medium">{lbl.saving}</span>
-                    <span className="font-black text-[#16A34A]">− {formatCurrency(loyaltyAmt)}</span>
+                {loyaltyLookupMessage && (
+                  <p className="mt-2 text-[11px] font-bold text-[#6B7280]">{loyaltyLookupMessage}</p>
+                )}
+                {loyaltyCard && (
+                  <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-bold text-[#16A34A]">{lbl.cashbackBalance}</span>
+                      <button
+                        type="button"
+                        onClick={fillMaxLoyaltyRedeem}
+                        aria-disabled={maxLoyaltyRedeemAmount <= 0}
+                        className={`text-right font-black underline-offset-2 hover:underline ${
+                          maxLoyaltyRedeemAmount > 0
+                            ? 'text-[#16A34A] md:cursor-pointer'
+                            : 'text-[#9CA3AF] md:cursor-not-allowed'
+                        }`}
+                      >
+                        {formatCurrency(loyaltyCard.balance)}
+                      </button>
+                    </div>
+                    <p className={`mt-1 text-[11px] font-bold ${maxLoyaltyRedeemAmount > 0 ? 'text-[#15803D]' : 'text-[#9CA3AF]'}`}>
+                      {lbl.tapBalanceMax}
+                    </p>
+                  </div>
+                )}
+                <div className="mt-3">
+                  <input
+                    type="number"
+                    min="0"
+                    max={maxLoyaltyRedeemAmount}
+                    value={loyaltyRedeemAmount}
+                    onChange={e => updateLoyaltyRedeem(e.target.value)}
+                    placeholder={lbl.useLoyalty}
+                    className={`w-full border-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-[#1F2937] focus:outline-none transition-all ${
+                      loyaltyValidation.ok ? 'border-[#E5E7EB] focus:border-[#ff5a00]' : 'border-red-300 focus:border-red-500'
+                    }`}
+                  />
+                </div>
+                {!loyaltyValidation.ok && (
+                  <p className="mt-2 text-[11px] font-bold text-red-600">
+                    {loyaltyValidation.reason === 'balance' ? lbl.loyaltyBalanceExceeded : lbl.loyaltyBillExceeded}
+                  </p>
+                )}
+                {loyaltyAmt > 0 && loyaltyValidation.ok && (
+                  <div className="mt-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-2.5 flex justify-between items-center">
+                    <span className="text-sm text-[#C2410C] font-medium">{lbl.loyalty}</span>
+                    <span className="font-black text-[#C2410C]">− {formatCurrency(loyaltyAmt)}</span>
+                  </div>
+                )}
+                {cashbackToBeEarned > 0 && (
+                  <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-[#D97706]">{lbl.cashbackToBeEarned}</span>
+                      <span className="font-black text-[#D97706]">+ {formatCurrency(cashbackToBeEarned)}</span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] font-semibold text-[#B45309]">{lbl.cashbackRewardHint}</p>
                   </div>
                 )}
               </div>
@@ -678,16 +899,31 @@ export default function CashierBill() {
                     <span className="text-[#6B7280]">{lbl.service}</span>
                     <span className="text-[#1F2937] font-semibold">{formatCurrency(serviceFee)}</span>
                   </div>
+                  {counterItemsSubtotal > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-[#6B7280]">{lbl.counterItems}</span>
+                      <span className="text-[#1F2937] font-semibold">{formatCurrency(counterItemsSubtotal)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-[#6B7280]">{lbl.loyalty}</span>
                     <span className="text-[#1F2937] font-semibold">
-                      {loyaltyPct > 0 ? `− ${formatCurrency(loyaltyAmt)}` : `− 0 UZS`}
+                      {loyaltyAmt > 0 ? `− ${formatCurrency(loyaltyAmt)}` : `− 0 UZS`}
                     </span>
                   </div>
                   <div className="pt-3 border-t border-dashed border-[#E5E7EB] flex justify-between items-baseline">
                     <span className="font-black text-[#1F2937] text-sm">{lbl.totalAmt}</span>
                     <span className="font-black text-2xl text-[#ff5a00]">{formatCurrency(total)}</span>
                   </div>
+                  {cashbackToBeEarned > 0 && (
+                    <div className="rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-2.5">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[#B45309]">{lbl.cashbackRewardHint}</p>
+                      <div className="mt-1 flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-[#92400E]">{lbl.cashbackToBeEarned}</span>
+                        <span className="font-black text-[#D97706]">+ {formatCurrency(cashbackToBeEarned)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -806,65 +1042,6 @@ export default function CashierBill() {
                     )
                   })}
                 </div>
-
-                {quickItems.length > 0 && (
-                  <div className="mt-4 rounded-2xl border border-[#E5E7EB] bg-[#FBFCFE] p-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <h4 className="text-[12px] font-black uppercase tracking-wide text-[#1F2937]">{lbl.counterItems}</h4>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 max-[420px]:flex max-[420px]:overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                      {quickItems.map(item => {
-                        const current = order.items.find(row =>
-                          row.menu_item_id === item.id &&
-                          (row.is_counter_item || row.isCounterItem || row.item_type === 'counter' || row.itemType === 'counter')
-                        )
-                        const qty = Number(current?.quantity) || 0
-                        return (
-                          <div
-                            key={item.id}
-                            className="min-w-[142px] rounded-xl border border-[#E5E7EB] bg-white p-2"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => addQuickItem(item)}
-                              className="w-full text-left"
-                            >
-                              <p className="line-clamp-1 text-[12px] font-black text-[#1F2937]">{getItemName(item, lang)}</p>
-                              <div className="mt-1 flex items-center justify-between gap-2">
-                                <span className="text-[11px] font-bold text-[#ff5a00]">{formatCurrency(item.price)}</span>
-                                {qty > 0 ? (
-                                  <span className="rounded-lg bg-[#fff1e8] px-2 py-0.5 text-[10px] font-black text-[#ff5a00]">×{qty}</span>
-                                ) : (
-                                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#0f3b2e] text-white">
-                                    <Plus size={12} />
-                                  </span>
-                                )}
-                              </div>
-                            </button>
-                            {qty > 0 && current && (
-                              <div className="mt-2 flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => updateBillItemQty(current, qty - 1)}
-                                  className="flex h-7 flex-1 items-center justify-center rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:bg-red-50 hover:text-red-600"
-                                >
-                                  <Minus size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateBillItemQty(current, qty + 1)}
-                                  className="flex h-7 flex-1 items-center justify-center rounded-lg bg-[#0f3b2e] text-white hover:bg-[#0A2A20]"
-                                >
-                                  <Plus size={12} />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
 
                 <div className="mt-4">
                   <p className="text-[10px] font-semibold text-[#9CA3AF] mb-2 uppercase tracking-wide">

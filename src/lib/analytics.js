@@ -90,6 +90,56 @@ export function getOrderTotal(o, fallbackServicePct = 20) {
   return getOrderPaymentSummary(o, getOrderItems(o), fallbackServicePct).total
 }
 
+export function getLoyaltyUsedAmount(order) {
+  return Math.max(0, Math.round(
+    Number(
+      order?.loyalty_used_amount ??
+      order?.loyaltyUsedAmount ??
+      order?.loyalty_redeem_amount ??
+      order?.loyaltyRedeemAmount ??
+      order?.loyalty_discount_amount ??
+      order?.discount_amount ??
+      0
+    ) || 0
+  ))
+}
+
+export function normalizeCashbackPercent(value, fallbackPct = 5) {
+  const pct = Number(value)
+  if (Number.isFinite(pct)) return Math.max(0, Math.min(100, pct))
+  const fallback = Number(fallbackPct)
+  return Number.isFinite(fallback) ? Math.max(0, Math.min(100, fallback)) : 5
+}
+
+export function calculateLoyaltyCashback(order, items = getOrderItems(order), cashbackPercent = 5) {
+  if (order?.status === 'cancelled' || order?.payment_status === 'cancelled') return 0
+  const summary = getOrderPaymentSummary(order, items)
+  const loyaltyUsed = getLoyaltyUsedAmount(order)
+  const cashbackBase = Math.max(0, summary.menuItemsSubtotal - loyaltyUsed)
+  return Math.floor(cashbackBase * normalizeCashbackPercent(cashbackPercent) / 100)
+}
+
+export function validateLoyaltyRedeemAmount(amount, availableBalance, remainingBillTotal) {
+  const redeemAmount = Math.round(Number(amount) || 0)
+  const balance = Math.max(0, Math.round(Number(availableBalance) || 0))
+  const billTotal = Math.max(0, Math.round(Number(remainingBillTotal) || 0))
+
+  if (redeemAmount <= 0) return { ok: true, amount: 0 }
+  if (redeemAmount > balance) {
+    return { ok: false, amount: redeemAmount, reason: 'balance' }
+  }
+  if (redeemAmount > billTotal) {
+    return { ok: false, amount: redeemAmount, reason: 'bill' }
+  }
+  return { ok: true, amount: redeemAmount }
+}
+
+export function getMaxLoyaltyRedeemAmount(availableBalance, remainingOrderAmount) {
+  const balance = Math.max(0, Math.round(Number(availableBalance) || 0))
+  const remaining = Math.max(0, Math.round(Number(remainingOrderAmount) || 0))
+  return Math.min(balance, remaining)
+}
+
 export function getOrderPaymentSummary(order, items = getOrderItems(order), fallbackServicePct = 20) {
   const hasItems = items.length > 0
   const menuItemsSubtotal = items.reduce(
@@ -115,7 +165,7 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
   if (subtotal <= 0 && Number(order?.total) > 0) {
     const serviceRatePct = getOrderServiceRatePct(order, fallbackServicePct)
     const serviceFee = Number(order?.service_fee) || 0
-    const discountAmount = Number(order?.loyalty_discount_amount) || Number(order?.discount_amount) || 0
+    const loyaltyUsedAmount = getLoyaltyUsedAmount(order)
     return {
       subtotal: 0,
       menuItemsSubtotal: 0,
@@ -124,7 +174,9 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
       serviceFeeBase: 0,
       discountBase: serviceFee,
       discountPercent: 0,
-      discountAmount,
+      discountAmount: loyaltyUsedAmount,
+      loyaltyUsedAmount,
+      cashbackEarned: Math.max(0, Math.round(Number(order?.cashback_earned ?? order?.cashbackEarned ?? 0) || 0)),
       grossAmount: serviceFee,
       afterDiscount: Number(order.total),
       serviceRatePct,
@@ -138,9 +190,17 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
   const serviceFeeBase = serviceRatePct > 0 ? menuSubtotal : 0
   const serviceFee = Math.round(serviceFeeBase * serviceRatePct / 100)
   const discountBase = menuSubtotal + serviceFee
-  const discountAmount = discPct > 0
+  const hasWalletAmount = order?.loyalty_used_amount != null ||
+    order?.loyaltyUsedAmount != null ||
+    order?.loyalty_redeem_amount != null ||
+    order?.loyaltyRedeemAmount != null
+  const legacyDiscountAmount = !hasWalletAmount && isPaidOrder(order) && discPct > 0
     ? Math.round(discountBase * discPct / 100)
-    : (Number(order?.loyalty_discount_amount) || Number(order?.discount_amount) || 0)
+    : 0
+  const loyaltyUsedAmount = hasWalletAmount
+    ? getLoyaltyUsedAmount(order)
+    : legacyDiscountAmount || getLoyaltyUsedAmount({ ...order, loyalty_discount_amount: order?.loyalty_discount_amount, discount_amount: order?.discount_amount })
+  const discountAmount = Math.min(loyaltyUsedAmount, subtotal + serviceFee)
   const grossAmount = subtotal + serviceFee
   const afterDiscount = Math.max(0, grossAmount - discountAmount)
 
@@ -151,8 +211,10 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
     counterItemsSubtotal: counterSubtotal,
     serviceFeeBase,
     discountBase,
-    discountPercent: discPct,
+    discountPercent: legacyDiscountAmount > 0 ? discPct : 0,
     discountAmount,
+    loyaltyUsedAmount: discountAmount,
+    cashbackEarned: Math.max(0, Math.round(Number(order?.cashback_earned ?? order?.cashbackEarned ?? 0) || 0)),
     grossAmount,
     afterDiscount,
     serviceRatePct,
@@ -176,6 +238,8 @@ export function getOrderPaymentFields(order, items = getOrderItems(order), fallb
 
   if (summary.discountAmount > 0) {
     fields.loyalty_discount_amount = summary.discountAmount
+    fields.loyalty_used_amount = summary.discountAmount
+    fields.loyalty_redeem_amount = summary.discountAmount
   }
 
   return fields

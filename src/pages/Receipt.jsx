@@ -26,7 +26,8 @@ const L = {
     amountCol:   'Summa',
     orderAmount: 'Buyurtma summasi',
     servicePct:  n => `Xizmat haqi ${n}%`,
-    loyaltyPct:  n => `Chegirma (${n}%)`,
+    loyaltyUsed: 'Sodiqlik ishlatildi',
+    cashbackEarned: 'Cashback hisoblandi',
     payment:     "To'lov",
     total:       "To'lovga jami",
     thanks1:     'Tashrifingiz uchun rahmat!',
@@ -44,7 +45,8 @@ const L = {
     amountCol:   'Сумма',
     orderAmount: 'Сумма заказа',
     servicePct:  n => `Обслуживание ${n}%`,
-    loyaltyPct:  n => `Скидка (${n}%)`,
+    loyaltyUsed: 'Использовано с карты',
+    cashbackEarned: 'Начислен кешбэк',
     payment:     'Оплата',
     total:       'Итого к оплате',
     thanks1:     'Спасибо, что выбрали ZarKebab!',
@@ -62,7 +64,8 @@ const L = {
     amountCol:   'Amount',
     orderAmount: 'Order amount',
     servicePct:  n => `Service ${n}%`,
-    loyaltyPct:  n => `Discount (${n}%)`,
+    loyaltyUsed: 'Loyalty used',
+    cashbackEarned: 'Cashback earned',
     payment:     'Payment',
     total:       'Total to pay',
     thanks1:     'Thank you for choosing ZarKebab!',
@@ -109,9 +112,14 @@ function combineReceiptOrders(orders) {
     service_fee: orders.reduce((s, o) => s + (Number(o.service_fee) || 0), 0),
     total: orders.reduce((s, o) => s + (Number(o.total) || 0), 0),
     loyalty_discount_amount: orders.reduce(
-      (s, o) => s + (Number(o.loyalty_discount_amount) || Number(o.discount_amount) || 0),
+      (s, o) => s + (Number(o.loyalty_used_amount) || Number(o.loyalty_redeem_amount) || Number(o.loyalty_discount_amount) || Number(o.discount_amount) || 0),
       0
     ),
+    loyalty_used_amount: orders.reduce(
+      (s, o) => s + (Number(o.loyalty_used_amount) || Number(o.loyalty_redeem_amount) || Number(o.loyalty_discount_amount) || Number(o.discount_amount) || 0),
+      0
+    ),
+    cashback_earned: orders.reduce((s, o) => s + (Number(o.cashback_earned) || 0), 0),
     loyalty_discount_pct: orders.find(o => o.loyalty_discount_pct != null)?.loyalty_discount_pct ??
       orders.find(o => o.discount_percent != null)?.discount_percent ??
       orders[0]?.loyalty_discount_pct ??
@@ -129,7 +137,7 @@ function payMethodLabel(method, lang) {
     card: { uz: 'Karta', ru: 'Карта', en: 'Card' },
     terminal: { uz: 'Terminal', ru: 'Терминал', en: 'Terminal' },
     qr: { uz: 'QR Code', ru: 'QR-код', en: 'QR Code' },
-    loyalty_card: { uz: 'Loyalty', ru: 'Лояльность', en: 'Loyalty' },
+    loyalty_card: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' },
     mixed: { uz: 'Aralash', ru: 'Смешанная', en: 'Mixed' },
     unknown: { uz: "Noma'lum", ru: 'Неизвестно', en: 'Unknown' },
   }
@@ -233,7 +241,7 @@ function handlePrintReceipt(delay = 300) {
 
 // ── ReceiptPaper ──────────────────────────────────────────────────────────────
 
-function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyPct, loyaltyAmt, total, payments, labels, lang, restaurantName, receiptFooter }) {
+function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, payments, labels, lang, restaurantName, receiptFooter }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=https://instagram.com/zarkebab&size=220x220&margin=6&color=111111&bgcolor=ffffff`
 
   return (
@@ -351,8 +359,11 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
         <tbody>
           <TotalRow label={labels.orderAmount}              value={fmtUZS(subtotal)}   />
           <TotalRow label={labels.servicePct(serviceRate)}  value={fmtUZS(serviceFee)} />
-          {loyaltyPct > 0 && (
-            <TotalRow label={labels.loyaltyPct(loyaltyPct)} value={`− ${fmtUZS(loyaltyAmt)}`} color="#16a34a" />
+          {loyaltyAmt > 0 && (
+            <TotalRow label={labels.loyaltyUsed} value={`− ${fmtUZS(loyaltyAmt)}`} color="#16a34a" />
+          )}
+          {cashbackEarned > 0 && (
+            <TotalRow label={labels.cashbackEarned} value={`+ ${fmtUZS(cashbackEarned)}`} color="#d97706" />
           )}
           {payments?.length > 0 && payments.map((row, index) => (
             <TotalRow
@@ -571,8 +582,8 @@ export function TableReceipt() {
       subtotal: summary.subtotal,
       serviceFee: summary.serviceFee,
       serviceRate: summary.serviceRatePct,
-      loyaltyPct:  summary.discountPercent,
       loyaltyAmt:  summary.discountAmount,
+      cashbackEarned: summary.cashbackEarned,
       total: summary.total,
       payments: getOrderPaymentBreakdown(combineReceiptOrders(orders)),
     }
@@ -652,8 +663,8 @@ export default function Receipt() {
       subtotal: summary.subtotal,
       serviceFee: summary.serviceFee,
       serviceRate: summary.serviceRatePct,
-      loyaltyPct: summary.discountPercent,
       loyaltyAmt: summary.discountAmount,
+      cashbackEarned: summary.cashbackEarned,
       total: summary.total,
       payments: getOrderPaymentBreakdown(combineReceiptOrders(allOrders)),
     }

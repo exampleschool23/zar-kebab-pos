@@ -101,7 +101,8 @@ export default async function handler(req, res) {
       {
         order_type: orderType,
         service_rate_pct: serviceRatePct,
-        loyalty_discount_amount: loyaltyRedeemAmount,
+        loyalty_redeem_amount: loyaltyRedeemAmount,
+        loyalty_used_amount: loyaltyRedeemAmount,
       },
       rows,
       serviceRatePct

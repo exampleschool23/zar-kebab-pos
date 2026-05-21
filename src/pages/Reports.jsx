@@ -66,7 +66,7 @@ const PAY_CFG = {
   card:     { label: { uz: 'Karta',     ru: 'Карта',      en: 'Card'     }, cls: 'bg-blue-50 text-blue-700',     Icon: CreditCard, bar: '#2563EB' },
   terminal: { label: { uz: 'Terminal',  ru: 'Терминал',   en: 'Terminal' }, cls: 'bg-purple-50 text-purple-700', Icon: Monitor,    bar: '#7C3AED' },
   qr:       { label: { uz: 'QR Kod',    ru: 'QR Код',     en: 'QR Code'  }, cls: 'bg-pink-50 text-pink-700',     Icon: QrCode,     bar: '#DB2777' },
-  loyalty_card: { label: { uz: 'Loyalty', ru: 'Лояльность', en: 'Loyalty' }, cls: 'bg-amber-50 text-amber-700', Icon: Tag, bar: '#D97706' },
+  loyalty_card: { label: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' }, cls: 'bg-amber-50 text-amber-700', Icon: Tag, bar: '#D97706' },
   mixed:    { label: { uz: 'Aralash',    ru: 'Смешанная',  en: 'Mixed'    }, cls: 'bg-teal-50 text-teal-700',     Icon: CreditCard, bar: '#0F766E' },
   unknown:  { label: { uz: "Noma'lum",  ru: 'Неизвестно', en: 'Unknown'  }, cls: 'bg-gray-50 text-gray-600',     Icon: HelpCircle, bar: '#9CA3AF' },
 }
@@ -620,8 +620,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
   const items    = fetchedItems || getOrderItems(order)
   const payment = getOrderPaymentSummary(order, items, serviceRatePct)
   const subtotal = payment.subtotal
-  const discPct = payment.discountPercent
-  const discAmt = payment.discountAmount
+  const loyaltyUsed = payment.loyaltyUsedAmount || payment.discountAmount
   const servicePct = payment.serviceRatePct
   const serviceAmt = payment.serviceFee
   const total = payment.total
@@ -710,8 +709,8 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
           <p className="text-xs font-bold text-[#9CA3AF] uppercase tracking-widest mb-3">{lang === 'uz' ? "To'lov xulosasi" : lang === 'ru' ? 'Итог оплаты' : 'Payment Summary'}</p>
           <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
             <SummaryRow label={lang === 'uz' ? 'Jami' : lang === 'ru' ? 'Подитог' : 'Subtotal'}                                      value={formatCurrency(subtotal)}   />
-            {discAmt > 0 && (
-              <SummaryRow label={`${lang === 'uz' ? 'Chegirma' : lang === 'ru' ? 'Скидка' : 'Discount'} (${discPct}%)`}              value={`− ${formatCurrency(discAmt)}`} valueClass="text-green-600" />
+            {loyaltyUsed > 0 && (
+              <SummaryRow label={lang === 'uz' ? 'Sodiqlik ishlatildi' : lang === 'ru' ? 'Использовано с карты' : 'Loyalty used'} value={`− ${formatCurrency(loyaltyUsed)}`} valueClass="text-green-600" />
             )}
             <SummaryRow label={`${lang === 'uz' ? 'Xizmat' : lang === 'ru' ? 'Сервис' : 'Service'} (${servicePct}%)`}               value={formatCurrency(serviceAmt)} />
             <div className="border-t border-dashed border-gray-200 pt-2.5">
@@ -803,7 +802,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
             <span>{lang === 'uz' ? 'Sana va vaqt' : lang === 'ru' ? 'Дата и время' : 'Date & Time'}</span>
             <span>{lang === 'uz' ? 'Holat' : lang === 'ru' ? 'Статус' : 'Status'}</span>
             <span>{lang === 'uz' ? "To'lov" : lang === 'ru' ? 'Оплата' : 'Payment'}</span>
-            <span className="text-center">{lang === 'uz' ? 'Chegirma' : lang === 'ru' ? 'Скидка' : 'Disc%'}</span>
+            <span className="text-center">{lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty'}</span>
             <span className="text-center">{lang === 'uz' ? 'Xizmat' : lang === 'ru' ? 'Серв.' : 'Serv%'}</span>
             <span className="text-right">{lang === 'uz' ? 'Jami' : lang === 'ru' ? 'Итого' : 'Total'}</span>
             <span className="text-center">{lang === 'uz' ? 'Amal' : lang === 'ru' ? 'Действие' : 'Action'}</span>
@@ -813,7 +812,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
             {pageOrders.map(order => {
               const orderNum    = order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '—'
               const sessionCnt  = order._orderCount || 1
-              const discPct     = order.loyalty_discount_pct || order.discount_percent || 0
+              const loyaltyUsed = Number(order.loyalty_used_amount ?? order.loyalty_redeem_amount ?? order.loyalty_discount_amount ?? 0) || 0
               const servicePct  = getOrderPaymentSummary(order, getOrderItems(order), serviceRatePct).serviceRatePct
               const status      = order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')
               const isSelected  = selectedOrder?.id === order.id
@@ -836,7 +835,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                     <span className="text-[12px] text-[#6B7280]">{fmtDate(getOrderDate(order))}</span>
                     <span><StatusBadge status={status} lang={lang} /></span>
                     <span><PayBadge method={order.payment_method} lang={lang} /></span>
-                    <span className="text-center text-sm text-[#6B7280]">{discPct}%</span>
+                    <span className="text-center text-sm text-[#6B7280]">{loyaltyUsed > 0 ? formatCurrency(loyaltyUsed) : '—'}</span>
                     <span className="text-center text-sm text-[#6B7280]">{servicePct}%</span>
                     <span className="text-right font-black text-sm text-[#ff5a00]">{formatCurrency(getOrderTotal(order))}</span>
                     <div className="flex justify-center">

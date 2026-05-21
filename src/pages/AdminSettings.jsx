@@ -62,6 +62,7 @@ export default function AdminSettings() {
 
   const [restaurantName, setRestaurantName] = useState(settings.restaurantName)
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
+  const [cashbackPercent, setCashbackPercent] = useState(settings.cashbackPercent ?? 5)
   const [receiptFooter,  setReceiptFooter]  = useState(settings.receiptFooter)
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
   const [notifications,  setNotifications]  = useState(true)
@@ -75,16 +76,17 @@ export default function AdminSettings() {
   useEffect(() => {
     setRestaurantName(settings.restaurantName)
     setServiceRate(settings.serviceRate)
+    setCashbackPercent(settings.cashbackPercent ?? 5)
     setReceiptFooter(settings.receiptFooter)
     setAutoPrint(settings.autoPrint)
-  }, [settings.restaurantName, settings.serviceRate, settings.receiptFooter, settings.autoPrint])
+  }, [settings.restaurantName, settings.serviceRate, settings.cashbackPercent, settings.receiptFooter, settings.autoPrint])
 
   async function handleSave() {
     setSaving(true)
     setError('')
     const result = await dispatch({
       type: 'SET_SETTINGS',
-      payload: { restaurantName, serviceRate, receiptFooter, autoPrint },
+      payload: { restaurantName, serviceRate, cashbackPercent, receiptFooter, autoPrint },
     })
     setSaving(false)
     if (result?.error) {
@@ -117,6 +119,8 @@ export default function AdminSettings() {
       billing:         'Hisob-kitob',
       serviceCharge:   'Xizmat to\'lovi',
       serviceChargeSub: 'Barcha buyurtmalarga qo\'shiladi',
+      cashbackPercent: 'Cashback foizi',
+      cashbackPercentSub: 'Menyu mahsulotlari bo‘yicha to‘langan buyurtmadan hisoblanadi',
       receiptFooterL:  'Chek pastki qismi',
       receiptFooterSub: 'Chek pastida ko\'rsatiladigan matn',
       system:          'Tizim',
@@ -152,6 +156,8 @@ export default function AdminSettings() {
       billing:         'Выставление счётов',
       serviceCharge:   'Сервисный сбор',
       serviceChargeSub: 'Добавляется ко всем заказам',
+      cashbackPercent: 'Процент кешбэка',
+      cashbackPercentSub: 'Начисляется с оплаченных позиций меню',
       receiptFooterL:  'Нижняя часть чека',
       receiptFooterSub: 'Текст внизу каждого чека',
       system:          'Система',
@@ -187,6 +193,8 @@ export default function AdminSettings() {
       billing:         'Billing',
       serviceCharge:   'Service Charge',
       serviceChargeSub: 'Added to all orders',
+      cashbackPercent: 'Cashback Percent',
+      cashbackPercentSub: 'Earned from paid menu items',
       receiptFooterL:  'Receipt Footer',
       receiptFooterSub: 'Text shown at the bottom of each receipt',
       system:          'System',
@@ -258,6 +266,16 @@ export default function AdminSettings() {
                 ))}
               </div>
             </div>
+          </SettingRow>
+          <SettingRow icon={Percent} label={l.cashbackPercent} sub={l.cashbackPercentSub}>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={cashbackPercent}
+              onChange={e => setCashbackPercent(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+              className="w-[92px] border border-[#E5E7EB] rounded-xl px-3 py-2 text-[13px] text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all text-right"
+            />
           </SettingRow>
           <SettingRow icon={Printer} label={l.receiptFooterL} sub={l.receiptFooterSub}>
             <input

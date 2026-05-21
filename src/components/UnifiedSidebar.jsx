@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   UtensilsCrossed, LayoutDashboard, Table2, BookOpen,
   ChefHat, Receipt, Users, BarChart2, ShieldCheck, Settings, LogOut,
+  BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -44,6 +45,13 @@ const NAV = [
     labels: { uz: 'Kassir', ru: 'Кассир', en: 'Cashier' },
     path: '/cashier/tables',
     roles: PAGE_ACCESS.cashier,
+  },
+  {
+    key: 'loyalty',
+    icon: BadgeDollarSign,
+    labels: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' },
+    path: '/admin/loyalty',
+    roles: PAGE_ACCESS.loyalty,
   },
   {
     key: 'team',
@@ -91,6 +99,7 @@ function activeKey(pathname) {
   if (pathname.startsWith('/waiter/tables'))  return 'tables'
   if (pathname.startsWith('/kitchen'))        return 'kitchen'
   if (pathname.startsWith('/cashier'))        return 'cashier'
+  if (pathname.startsWith('/admin/loyalty'))  return 'loyalty'
   if (pathname.startsWith('/admin/menu'))     return 'menu'
   if (pathname.startsWith('/admin/tables'))   return 'settings'
   if (pathname.startsWith('/admin/users'))    return 'team'

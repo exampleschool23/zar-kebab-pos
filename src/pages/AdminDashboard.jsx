@@ -606,7 +606,7 @@ export default function AdminDashboard() {
       card: l.card,
       terminal: l.terminal,
       qr: l.qr,
-      loyalty: 'Loyalty',
+      loyalty: lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty',
       unknown: l.unknown,
       colors: PAYMENT_COLORS,
     }).map(row => ({

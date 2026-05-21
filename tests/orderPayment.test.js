@@ -3,12 +3,14 @@ import assert from 'node:assert/strict'
 
 import {
   allocateSplitPaymentsToOrders,
+  calculateLoyaltyCashback,
   getGroupedOrderItems,
   getOrderPaymentBreakdown,
   getOrderPaymentFields,
   getOrderTotal,
   getOrderPaymentSummary,
   getPaymentMethodSummary,
+  getMaxLoyaltyRedeemAmount,
   getSplitPaymentValidation,
   groupOrdersBySession,
   isActiveNeedsBillOrder,
@@ -16,6 +18,7 @@ import {
   normalizeServiceRatePct,
   normalizeSplitPayments,
   removeSentCartItems,
+  validateLoyaltyRedeemAmount,
 } from '../src/lib/analytics.js'
 import { defaultPath, isPublicOnlyRole } from '../src/lib/permissions.js'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../src/lib/menuItems.js'
@@ -124,19 +127,19 @@ test('loyalty discount is applied after subtotal plus service for cashier receip
   assert.equal(dashboardRevenue, reportsRevenue)
 })
 
-test('service and loyalty discount combinations use the shared payment rule', () => {
+test('old loyalty percent fields no longer reduce new order totals', () => {
   const rows = [item({ id: 'combo-row', menu_item_id: 'combo', quantity: 1, price: 100000 })]
 
   const both = getOrderPaymentSummary({ service_rate_pct: 20, loyalty_discount_pct: 10 }, rows, 20)
   assert.equal(both.serviceFee, 20000)
   assert.equal(both.grossAmount, 120000)
-  assert.equal(both.discountAmount, 12000)
-  assert.equal(both.total, 108000)
+  assert.equal(both.discountAmount, 0)
+  assert.equal(both.total, 120000)
 
   const discountOnly = getOrderPaymentSummary({ service_rate_pct: 0, loyalty_discount_pct: 10 }, rows, 20)
   assert.equal(discountOnly.serviceFee, 0)
-  assert.equal(discountOnly.discountAmount, 10000)
-  assert.equal(discountOnly.total, 90000)
+  assert.equal(discountOnly.discountAmount, 0)
+  assert.equal(discountOnly.total, 100000)
 
   const serviceOnly = getOrderPaymentSummary({ service_rate_pct: 20 }, rows, 20)
   assert.equal(serviceOnly.serviceFee, 20000)
@@ -149,14 +152,14 @@ test('service and loyalty discount combinations use the shared payment rule', ()
   assert.equal(neither.total, 100000)
 })
 
-test('cashier example discounts menu subtotal plus service fee', () => {
+test('cashier-entered loyalty redeem amount reduces remaining payable total', () => {
   const rows = [
     item({ id: 'chicken', menu_item_id: 'chicken', quantity: 1, price: 22000 }),
     item({ id: 'beef', menu_item_id: 'beef', quantity: 1, price: 25000 }),
     item({ id: 'lula', menu_item_id: 'lula', quantity: 1, price: 24000 }),
   ]
   const summary = getOrderPaymentSummary(
-    { order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    { order_type: 'dine_in', service_rate_pct: 15, loyalty_used_amount: 8000 },
     rows,
     15
   )
@@ -167,11 +170,12 @@ test('cashier example discounts menu subtotal plus service fee', () => {
   assert.equal(summary.serviceFeeBase, 71000)
   assert.equal(summary.serviceFee, 10650)
   assert.equal(summary.discountBase, 81650)
-  assert.equal(summary.discountAmount, 8165)
-  assert.equal(summary.total, 73485)
+  assert.equal(summary.discountAmount, 8000)
+  assert.equal(summary.loyaltyUsedAmount, 8000)
+  assert.equal(summary.total, 73650)
 })
 
-test('dine-in counter items are included in total but excluded from service and loyalty discount', () => {
+test('dine-in counter items are included in total but cashback excludes counter items', () => {
   const rows = [
     item({ id: 'chicken', menu_item_id: 'chicken', quantity: 1, price: 22000 }),
     item({ id: 'beef', menu_item_id: 'beef', quantity: 1, price: 25000 }),
@@ -179,7 +183,7 @@ test('dine-in counter items are included in total but excluded from service and 
     item({ id: 'water', menu_item_id: 'water', quantity: 3, price: 5000, item_type: 'counter', is_counter_item: true }),
   ]
   const summary = getOrderPaymentSummary(
-    { order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    { order_type: 'dine_in', service_rate_pct: 15, loyalty_used_amount: 8000 },
     rows,
     15
   )
@@ -189,17 +193,18 @@ test('dine-in counter items are included in total but excluded from service and 
   assert.equal(summary.subtotal, 86000)
   assert.equal(summary.serviceFee, 10650)
   assert.equal(summary.discountBase, 81650)
-  assert.equal(summary.discountAmount, 8165)
-  assert.equal(summary.total, 88485)
+  assert.equal(summary.discountAmount, 8000)
+  assert.equal(summary.total, 88650)
+  assert.equal(calculateLoyaltyCashback({ ...summary, status: 'paid', payment_status: 'paid' }, rows, 10), 6300)
 })
 
-test('take-away discounts menu items only and has no service fee', () => {
+test('take-away loyalty wallet redemption has no service fee', () => {
   const rows = [
     item({ id: 'meal', menu_item_id: 'meal', quantity: 1, price: 71000 }),
     item({ id: 'counter', menu_item_id: 'counter', quantity: 1, price: 15000, item_type: 'counter', is_counter_item: true }),
   ]
   const summary = getOrderPaymentSummary(
-    { order_type: 'take_away', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    { order_type: 'take_away', service_rate_pct: 15, loyalty_used_amount: 7000 },
     rows,
     15
   )
@@ -207,8 +212,8 @@ test('take-away discounts menu items only and has no service fee', () => {
   assert.equal(summary.serviceRatePct, 0)
   assert.equal(summary.serviceFee, 0)
   assert.equal(summary.discountBase, 71000)
-  assert.equal(summary.discountAmount, 7100)
-  assert.equal(summary.total, 78900)
+  assert.equal(summary.discountAmount, 7000)
+  assert.equal(summary.total, 79000)
 })
 
 test('counter-only order has no service fee and no loyalty discount', () => {
@@ -229,29 +234,43 @@ test('counter-only order has no service fee and no loyalty discount', () => {
   assert.equal(summary.total, 20000)
 })
 
-test('rounding uses integer UZS after service is added to the discount base', () => {
+test('cashback uses integer UZS from menu items minus loyalty used', () => {
   const rows = [item({ id: 'rounding', menu_item_id: 'rounding', quantity: 1, price: 33333 })]
   const summary = getOrderPaymentSummary(
-    { order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 },
+    { order_type: 'dine_in', service_rate_pct: 15, loyalty_used_amount: 3333 },
     rows,
     15
   )
 
   assert.equal(summary.serviceFee, 5000)
   assert.equal(summary.discountBase, 38333)
-  assert.equal(summary.discountAmount, 3833)
-  assert.equal(summary.total, 34500)
+  assert.equal(summary.discountAmount, 3333)
+  assert.equal(summary.total, 35000)
+  assert.equal(calculateLoyaltyCashback({ loyalty_used_amount: 3333, status: 'paid', payment_status: 'paid' }, rows, 10), 3000)
 })
 
-test('payment validation follows the helper total after loyalty discount changes', () => {
+test('payment validation follows the helper total after loyalty wallet redemption', () => {
   const rows = [item({ id: 'validation-row', menu_item_id: 'combo', quantity: 1, price: 71000 })]
   const withoutDiscount = getOrderPaymentSummary({ order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 0 }, rows, 15)
-  const withDiscount = getOrderPaymentSummary({ order_type: 'dine_in', service_rate_pct: 15, loyalty_discount_pct: 10 }, rows, 15)
+  const withDiscount = getOrderPaymentSummary({ order_type: 'dine_in', service_rate_pct: 15, loyalty_used_amount: 8000 }, rows, 15)
 
   assert.equal(withoutDiscount.total, 81650)
-  assert.equal(withDiscount.total, 73485)
+  assert.equal(withDiscount.total, 73650)
   assert.equal(getSplitPaymentValidation([{ method: 'cash', amount: 81650 }], withDiscount.total).canConfirmPayment, false)
-  assert.equal(getSplitPaymentValidation([{ method: 'cash', amount: 73485 }], withDiscount.total).canConfirmPayment, true)
+  assert.equal(getSplitPaymentValidation([{ method: 'cash', amount: 73650 }], withDiscount.total).canConfirmPayment, true)
+  assert.deepEqual(validateLoyaltyRedeemAmount(8000, 10000, 81650), { ok: true, amount: 8000 })
+  assert.equal(validateLoyaltyRedeemAmount(12000, 10000, 81650).reason, 'balance')
+  assert.equal(validateLoyaltyRedeemAmount(90000, 100000, 81650).reason, 'bill')
+})
+
+test('maximum loyalty redeem amount is capped by balance and remaining order total', () => {
+  assert.equal(getMaxLoyaltyRedeemAmount(50000, 180000), 50000)
+  assert.equal(getMaxLoyaltyRedeemAmount(120000, 80000), 80000)
+  assert.equal(getMaxLoyaltyRedeemAmount(80000, 80000), 80000)
+  assert.equal(getMaxLoyaltyRedeemAmount(0, 180000), 0)
+  assert.equal(getMaxLoyaltyRedeemAmount(50000, 0), 0)
+  assert.equal(getMaxLoyaltyRedeemAmount(-50000, 180000), 0)
+  assert.equal(getMaxLoyaltyRedeemAmount(9007199254740991, 9007199254740000), 9007199254740000)
 })
 
 test('split payment can settle one order with cash card loyalty and qr methods', () => {
@@ -466,8 +485,6 @@ test('database write fields are generated from the shared payment summary', () =
     service_fee: summary.serviceFee,
     service_rate_pct: summary.serviceRatePct,
     total: summary.total,
-    loyalty_discount_pct: summary.discountPercent,
-    loyalty_discount_amount: summary.discountAmount,
   })
 })
 
@@ -481,7 +498,7 @@ test('repeated table additions use write fields that match receipt and reports t
     item({ id: 'wf-4', menu_item_id: 'lula', quantity: 2, price: 24000 }),
   ]
   const allItems = [...firstRound, ...secondRound]
-  const orderForWrite = { service_rate_pct: 17, loyalty_discount_pct: 5 }
+  const orderForWrite = { service_rate_pct: 17, loyalty_used_amount: 12000 }
   const written = getOrderPaymentFields(orderForWrite, allItems, 20)
   const storedOrder = paidOrder({
     id: 'write-rounds',
@@ -489,7 +506,7 @@ test('repeated table additions use write fields that match receipt and reports t
     items: allItems,
     ...written,
     service_rate_pct: written.service_rate_pct,
-    loyalty_discount_pct: written.loyalty_discount_pct,
+    loyalty_used_amount: written.loyalty_used_amount,
     loyalty_discount_amount: written.loyalty_discount_amount,
   })
 
@@ -498,7 +515,7 @@ test('repeated table additions use write fields that match receipt and reports t
 
   assert.equal(written.subtotal, 236000)
   assert.equal(written.service_fee, 40120)
-  assert.equal(written.total, 262314)
+  assert.equal(written.total, 264120)
   assert.equal(receiptSummary.total, written.total)
   assert.equal(reportsRevenue, written.total)
 })
@@ -619,6 +636,9 @@ function paidOrder(overrides) {
     loyalty_discount_pct: overrides.loyalty_discount_pct,
     discount_percent: overrides.discount_percent,
     loyalty_discount_amount: overrides.loyalty_discount_amount,
+    loyalty_used_amount: overrides.loyalty_used_amount,
+    loyalty_redeem_amount: overrides.loyalty_redeem_amount,
+    cashback_earned: overrides.cashback_earned,
     discount_amount: overrides.discount_amount,
   }, items, serviceRatePct)
   return {
@@ -635,6 +655,9 @@ function paidOrder(overrides) {
     service_rate_pct: summary.serviceRatePct,
     loyalty_discount_pct: overrides.loyalty_discount_pct,
     loyalty_discount_amount: overrides.loyalty_discount_amount ?? summary.discountAmount,
+    loyalty_used_amount: overrides.loyalty_used_amount,
+    loyalty_redeem_amount: overrides.loyalty_redeem_amount,
+    cashback_earned: overrides.cashback_earned,
     total: overrides.total ?? summary.total,
     ...overrides,
   }

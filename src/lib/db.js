@@ -1,11 +1,14 @@
 import { supabase } from './supabase.js'
 import {
   allocateSplitPaymentsToOrders,
+  calculateLoyaltyCashback,
   getOrderPaymentFields,
   getPaymentMethodSummary,
   normalizeServiceRatePct,
   normalizeSplitPayments,
+  validateLoyaltyRedeemAmount,
 } from './analytics.js'
+import { getCashbackTypePercent } from './loyalty.js'
 import { notifyTelegramOrderStatus } from './telegramNotifications.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
@@ -83,9 +86,131 @@ function normalizeBusinessSettings(row) {
   return {
     restaurantName: row.restaurant_name || 'Zar Kebab',
     serviceRate: normalizeServiceRatePct(row.service_rate_pct),
+    cashbackPercent: Number.isFinite(Number(row.cashback_percent))
+      ? Math.max(0, Math.min(100, Number(row.cashback_percent)))
+      : 5,
     receiptFooter: row.receipt_footer || 'Thank you for visiting!',
     autoPrint: !!row.auto_print,
   }
+}
+
+function isMissingLoyaltyColumn(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('schema cache') && (
+    message.includes('loyalty_used_amount') ||
+    message.includes('loyalty_card_number') ||
+    message.includes('cashback_earned') ||
+    message.includes('cashback_percent')
+  )
+}
+
+async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt }) {
+  const cardNumber = String(loyalty?.loyalty_card_number || loyalty?.cardNumber || '').trim()
+  const requestedRedeemAmount = Math.max(0, Math.round(Number(loyalty?.loyalty_used_amount ?? loyalty?.loyalty_redeem_amount ?? 0) || 0))
+  const cardTypePercent = loyalty?.cashback_type
+    ? getCashbackTypePercent(loyalty.cashback_type)
+    : null
+  const cashbackPercent = Number.isFinite(Number(cardTypePercent))
+    ? cardTypePercent
+    : Number.isFinite(Number(loyalty?.cashback_percent))
+    ? Math.max(0, Math.min(100, Number(loyalty.cashback_percent)))
+    : Math.max(0, Math.min(100, Number(state.settings?.cashbackPercent ?? 5)))
+
+  if (!cardNumber && requestedRedeemAmount <= 0) {
+    return orderSummaries.map(row => ({ ...row, loyaltyUsedAmount: 0, cashbackEarned: 0 }))
+  }
+
+  const { data: card, error: cardError } = await supabase
+    .from('loyalty_cards')
+    .select('*')
+    .eq('card_number', cardNumber)
+    .maybeSingle()
+  if (cardError) throw cardError
+  if (!card || card.is_active === false) throw new Error('Loyalty card is not active')
+
+  const balance = Math.max(0, Math.round(Number(card.balance ?? card.balance_amount ?? 0) || 0))
+  const totalBeforeLoyalty = orderSummaries.reduce((sum, row) => sum + row.grossTotal, 0)
+  const validation = validateLoyaltyRedeemAmount(requestedRedeemAmount, balance, totalBeforeLoyalty)
+  if (!validation.ok) {
+    throw new Error(validation.reason === 'balance'
+      ? 'Loyalty redeem amount exceeds available balance'
+      : 'Loyalty redeem amount exceeds remaining bill')
+  }
+
+  let remainingRedeem = validation.amount
+  const settled = orderSummaries.map(row => {
+    const loyaltyUsedAmount = Math.min(remainingRedeem, row.grossTotal)
+    remainingRedeem -= loyaltyUsedAmount
+    const cashbackEarned = calculateLoyaltyCashback(
+      { ...row.sourceOrder, loyalty_used_amount: loyaltyUsedAmount, status: 'paid', payment_status: 'paid' },
+      row.sourceOrder.items || [],
+      cashbackPercent
+    )
+    return { ...row, loyaltyUsedAmount, cashbackEarned }
+  })
+
+  const totalRedeemed = settled.reduce((sum, row) => sum + row.loyaltyUsedAmount, 0)
+  const totalCashback = settled.reduce((sum, row) => sum + row.cashbackEarned, 0)
+  const afterRedeem = balance - totalRedeemed
+  const finalBalance = afterRedeem + totalCashback
+
+  if (totalRedeemed > 0 || totalCashback > 0) {
+    const { error: updateError } = await supabase
+      .from('loyalty_cards')
+      .update({
+        balance: finalBalance,
+        total_earned: Math.max(0, Math.round(Number(card.total_earned ?? 0) || 0)) + totalCashback,
+        total_redeemed: Math.max(0, Math.round(Number(card.total_redeemed ?? 0) || 0)) + totalRedeemed,
+        updated_at: paidAt,
+      })
+      .eq('id', card.id)
+    if (updateError) throw updateError
+
+    const transactions = []
+    let runningBalance = balance
+    for (const row of settled) {
+      if (row.loyaltyUsedAmount > 0) {
+        transactions.push({
+          loyalty_card_id: card.id,
+          order_id: row.id,
+          type: 'redeemed',
+          amount: row.loyaltyUsedAmount,
+          balance_before: runningBalance,
+          balance_after: runningBalance - row.loyaltyUsedAmount,
+          reason: 'Order payment',
+        })
+        runningBalance -= row.loyaltyUsedAmount
+      }
+    }
+    for (const row of settled) {
+      if (row.cashbackEarned > 0) {
+        transactions.push({
+          loyalty_card_id: card.id,
+          order_id: row.id,
+          type: 'cashback_earned',
+          amount: row.cashbackEarned,
+          balance_before: runningBalance,
+          balance_after: runningBalance + row.cashbackEarned,
+          reason: `Cashback ${cashbackPercent}%`,
+          cashback_percent_used: cashbackPercent,
+          card_type_at_transaction: card.cashback_type || null,
+        })
+        runningBalance += row.cashbackEarned
+      }
+    }
+    if (transactions.length > 0) {
+      const { error: transactionError } = await supabase
+        .from('loyalty_transactions')
+        .insert(transactions)
+      if (transactionError) throw transactionError
+    }
+  }
+
+  return settled.map(row => ({
+    ...row,
+    loyaltyCardNumber: cardNumber,
+    cashbackPercent,
+  }))
 }
 
 async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, isTakeAway, items, paymentFields, state, action }) {
@@ -638,7 +763,6 @@ export async function writeToSupabase(action, state) {
       const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
 
       const paidAt  = new Date().toISOString()
-      const discPct = loyalty?.loyalty_discount_pct || 0
 
       // Fetch each unpaid order so we can write correct proportional values per round.
       // Writing the combined total to every row then summing in Reports caused double-counting.
@@ -656,30 +780,53 @@ export async function writeToSupabase(action, state) {
             : Number.isFinite(Number(o.service_rate_pct))
               ? Math.max(0, Math.min(100, Number(o.service_rate_pct)))
               : serviceRatePctFromSettings(state.settings)
-          const paymentFields = getOrderPaymentFields(
-            { order_type: o.order_type, service_rate_pct: serviceRatePct, loyalty_discount_pct: discPct },
+          const grossPaymentFields = getOrderPaymentFields(
+            { order_type: o.order_type, service_rate_pct: serviceRatePct },
             o.items || [],
             serviceRatePct
           )
           return {
             id: o.id,
+            sourceOrder: { ...o, service_rate_pct: serviceRatePct },
+            serviceRatePct,
+            grossTotal: grossPaymentFields.total,
+          }
+        })
+        const settledSummaries = await applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt })
+        const finalSummaries = settledSummaries.map(row => {
+          const paymentFields = getOrderPaymentFields(
+            {
+              order_type: row.sourceOrder.order_type,
+              service_rate_pct: row.serviceRatePct,
+              loyalty_used_amount: row.loyaltyUsedAmount,
+              loyalty_redeem_amount: row.loyaltyUsedAmount,
+              cashback_earned: row.cashbackEarned,
+            },
+            row.sourceOrder.items || [],
+            row.serviceRatePct
+          )
+          return {
+            id: row.id,
             paymentFields,
+            loyaltyCardNumber: row.loyaltyCardNumber || null,
+            cashbackEarned: row.cashbackEarned || 0,
+            cashbackPercent: row.cashbackPercent || 0,
             total: paymentFields.total,
           }
         })
-        const totalDue = orderSummaries.reduce((sum, row) => sum + row.total, 0)
+        const totalDue = finalSummaries.reduce((sum, row) => sum + row.total, 0)
         const normalizedPayments = normalizeSplitPayments(
           requestedPayments || [{ method: payment_method || 'cash', amount: totalDue }],
           totalDue
         )
         const finalPaymentMethod = getPaymentMethodSummary(normalizedPayments, payment_method)
-        const paymentRows = allocateSplitPaymentsToOrders(orderSummaries, normalizedPayments)
+        const paymentRows = allocateSplitPaymentsToOrders(finalSummaries, normalizedPayments)
 
         if (paymentRows.length > 0) {
           const { error: deletePaymentsError } = await supabase
             .from('order_payments')
             .delete()
-            .in('order_id', orderSummaries.map(row => row.id))
+            .in('order_id', finalSummaries.map(row => row.id))
           const paymentsTableMissing = deletePaymentsError && /order_payments|schema cache|relation/i.test(deletePaymentsError.message || '')
           if (deletePaymentsError && !paymentsTableMissing) throw deletePaymentsError
 
@@ -693,14 +840,30 @@ export async function writeToSupabase(action, state) {
           }
         }
 
-        for (const o of orderSummaries) {
-          await supabase.from('orders').update({
+        for (const o of finalSummaries) {
+          const updateFields = {
             status:         'paid',
             payment_status: 'paid',
             paid_at:        paidAt,
             ...o.paymentFields,
+            loyalty_card_number: o.loyaltyCardNumber,
+            cashback_earned: o.cashbackEarned,
+            cashback_percent: o.cashbackPercent,
             payment_method: finalPaymentMethod,
-          }).eq('id', o.id)
+          }
+          let { error: updateError } = await supabase.from('orders').update(updateFields).eq('id', o.id)
+          if (updateError && isMissingLoyaltyColumn(updateError)) {
+            const {
+              loyalty_used_amount,
+              loyalty_redeem_amount,
+              loyalty_card_number,
+              cashback_earned,
+              cashback_percent,
+              ...fallbackFields
+            } = updateFields
+            ;({ error: updateError } = await supabase.from('orders').update(fallbackFields).eq('id', o.id))
+          }
+          if (updateError) throw updateError
           await notifyTelegramOrderStatus(o.id, 'completed')
         }
       }
@@ -731,6 +894,9 @@ export async function writeToSupabase(action, state) {
           id: 'default',
           restaurant_name: settings.restaurantName || 'Zar Kebab',
           service_rate_pct: serviceRatePct,
+          cashback_percent: Number.isFinite(Number(settings.cashbackPercent))
+            ? Math.max(0, Math.min(100, Number(settings.cashbackPercent)))
+            : 5,
           receipt_footer: settings.receiptFooter || '',
           auto_print: !!settings.autoPrint,
           updated_at: new Date().toISOString(),
