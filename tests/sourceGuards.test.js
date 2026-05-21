@@ -261,6 +261,7 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   const app = readSource('src/App.jsx')
   const admin = readSource('src/pages/AdminLoyalty.jsx')
   const loyalty = readSource('src/lib/loyalty.js')
+  const db = readSource('src/lib/db.js')
 
   assert.match(migration, /create table if not exists public\.loyalty_cards/)
   assert.match(migration, /create table if not exists public\.loyalty_transactions/)
@@ -280,6 +281,9 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   assert.match(admin, /canCreateLoyaltyCard/)
   assert.match(admin, /canAdjustLoyaltyBalance/)
   assert.match(admin, /canDeactivateLoyaltyCard/)
+  assert.match(admin, /isMissingLoyaltySchemaColumn/)
+  assert.match(admin, /setSupportsCashbackType\(false\)/)
+  assert.match(db, /legacyTransactions/)
   assert.match(loyalty, /bronze: \{ label: 'Bronze', percent: 3 \}/)
   assert.match(loyalty, /black: \{ label: 'Black', percent: 15 \}/)
 })

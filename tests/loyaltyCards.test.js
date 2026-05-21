@@ -19,6 +19,7 @@ import {
   getLoyaltyCashbackPreview,
   getLoyaltyTransactionHistory,
   getPublicLoyaltyCardView,
+  isMissingLoyaltySchemaColumn,
   normalizeCardNumber,
   normalizeCashbackType,
   redeemLoyaltyBalance,
@@ -116,6 +117,16 @@ test('loyalty card registration is owner-only and preserves exact 8-digit card n
     existingCardNumbers: ['00123456'],
   }), 'duplicate_card_number')
   assert.equal(normalizeCardNumber('00000001'), '00000001')
+})
+
+test('loyalty schema cache helper detects missing migration columns without masking other errors', () => {
+  assert.equal(isMissingLoyaltySchemaColumn({
+    message: "Could not find the 'cashback_type' column of 'loyalty_cards' in the schema cache",
+  }, 'cashback_type'), true)
+  assert.equal(isMissingLoyaltySchemaColumn({
+    message: "Could not find the 'cashback_percent_used' column of 'loyalty_transactions' in the schema cache",
+  }, 'cashback_percent_used'), true)
+  assert.equal(isMissingLoyaltySchemaColumn({ message: 'duplicate key value violates unique constraint' }, 'cashback_type'), false)
 })
 
 test('loyalty card display keeps card number, phone number, balance, type and fallbacks distinct', () => {

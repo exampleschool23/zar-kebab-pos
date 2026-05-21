@@ -14,6 +14,7 @@ import {
   createLoyaltyCardRecord,
   editLoyaltyCardRecord,
   getCashbackTypePercent,
+  isMissingLoyaltySchemaColumn,
 } from '../lib/loyalty'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -38,6 +39,7 @@ export default function AdminLoyalty() {
   const [form, setForm] = useState({ customer_name: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
   const [adjustment, setAdjustment] = useState({ amount: '', reason: '' })
   const [message, setMessage] = useState('')
+  const [supportsCashbackType, setSupportsCashbackType] = useState(true)
 
   const L = {
     uz: {
@@ -70,6 +72,7 @@ export default function AdminLoyalty() {
       adjustmentRequired: 'Tuzatish summasi va sababini kiriting.',
       balanceNegative: 'Sodiqlik balansi manfiy bo‘la olmaydi.',
       ownerOnly: 'Bu amal faqat owner uchun ruxsat etilgan.',
+      cashbackTypeUnavailable: 'Cashback turi ustuni hali bazada qo‘llanmagan. 022 migratsiyasini ishga tushiring.',
       transactionTypes: {
         cashback_earned: 'Cashback hisoblandi',
         redeemed: 'Sodiqlik balansi ishlatildi',
@@ -108,6 +111,7 @@ export default function AdminLoyalty() {
       adjustmentRequired: 'Введите сумму корректировки и причину.',
       balanceNegative: 'Баланс лояльности не может быть отрицательным.',
       ownerOnly: 'Это действие доступно только владельцу.',
+      cashbackTypeUnavailable: 'Колонка типа кешбэка ещё не применена в базе. Запустите миграцию 022.',
       transactionTypes: {
         cashback_earned: 'Кешбэк начислен',
         redeemed: 'Использовано с баланса',
@@ -146,6 +150,7 @@ export default function AdminLoyalty() {
       adjustmentRequired: 'Enter an adjustment amount and reason.',
       balanceNegative: 'Loyalty balance cannot go negative.',
       ownerOnly: 'Only the owner can perform this action.',
+      cashbackTypeUnavailable: 'Cashback type is not available in the database yet. Run migration 022.',
       transactionTypes: {
         cashback_earned: 'Cashback earned',
         redeemed: 'Loyalty balance used',
@@ -187,6 +192,9 @@ export default function AdminLoyalty() {
       setMessage(error.message)
       return
     }
+    if ((data || []).some(card => !Object.prototype.hasOwnProperty.call(card, 'cashback_type'))) {
+      setSupportsCashbackType(false)
+    }
     setCards(data || [])
   }
 
@@ -222,11 +230,21 @@ export default function AdminLoyalty() {
       existingCardNumbers: cards.map(card => card.card_number),
       now,
     })
-    const { data, error } = await supabase
+    const { cashback_type: ignoredCashbackType, ...legacyCardRecord } = cardRecord
+    let insertRecord = supportsCashbackType ? cardRecord : legacyCardRecord
+    let { data, error } = await supabase
       .from('loyalty_cards')
-      .insert(cardRecord)
+      .insert(insertRecord)
       .select('*')
       .single()
+    if (error && isMissingLoyaltySchemaColumn(error, 'cashback_type')) {
+      setSupportsCashbackType(false)
+      ;({ data, error } = await supabase
+        .from('loyalty_cards')
+        .insert(legacyCardRecord)
+        .select('*')
+        .single())
+    }
     if (error) {
       setMessage(error.message)
       return
@@ -260,6 +278,10 @@ export default function AdminLoyalty() {
       setMessage(l.ownerOnly)
       return
     }
+    if (!supportsCashbackType) {
+      setMessage(l.cashbackTypeUnavailable)
+      return
+    }
     const next = editLoyaltyCardRecord({ role, card, patch: { cashback_type: cashbackType } })
     const { data, error } = await supabase
       .from('loyalty_cards')
@@ -271,6 +293,11 @@ export default function AdminLoyalty() {
       .select('*')
       .single()
     if (error) {
+      if (isMissingLoyaltySchemaColumn(error, 'cashback_type')) {
+        setSupportsCashbackType(false)
+        setMessage(l.cashbackTypeUnavailable)
+        return
+      }
       setMessage(error.message)
       return
     }
@@ -344,7 +371,7 @@ export default function AdminLoyalty() {
             <div className="space-y-2">
               <input value={form.customer_name} onChange={e => setForm({ ...form, customer_name: e.target.value })} placeholder={l.customerName} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
               <input value={form.phone_number} onChange={e => setForm({ ...form, phone_number: e.target.value })} placeholder={l.phoneNumber} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
-              <select value={form.cashback_type} onChange={e => setForm({ ...form, cashback_type: e.target.value })} disabled={!canCreate} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50 disabled:text-[#9CA3AF]">
+              <select value={form.cashback_type} onChange={e => setForm({ ...form, cashback_type: e.target.value })} disabled={!canCreate || !supportsCashbackType} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50 disabled:text-[#9CA3AF]">
                 {Object.entries(CASHBACK_TYPES).map(([key, config]) => (
                   <option key={key} value={key}>{config.label} · {config.percent}%</option>
                 ))}
@@ -396,7 +423,7 @@ export default function AdminLoyalty() {
                   <div className="rounded-xl bg-gray-50 p-4">
                     <p className="text-xs font-bold text-[#6B7280]">{l.cashbackType}</p>
                     {canEdit ? (
-                      <select value={selected.cashback_type || DEFAULT_CASHBACK_TYPE} onChange={e => updateCashbackType(selected, e.target.value)} className="mt-1 w-full rounded-lg border border-[#E5E7EB] bg-white px-2 py-1 text-sm font-black text-[#1F2937]">
+                      <select value={selected.cashback_type || DEFAULT_CASHBACK_TYPE} disabled={!supportsCashbackType} onChange={e => updateCashbackType(selected, e.target.value)} className="mt-1 w-full rounded-lg border border-[#E5E7EB] bg-white px-2 py-1 text-sm font-black text-[#1F2937] disabled:bg-gray-50 disabled:text-[#9CA3AF]">
                         {Object.entries(CASHBACK_TYPES).map(([key, config]) => (
                           <option key={key} value={key}>{config.label} · {config.percent}%</option>
                         ))}

@@ -26,6 +26,11 @@ export class LoyaltyError extends Error {
   }
 }
 
+export function isMissingLoyaltySchemaColumn(error, columnName) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('schema cache') && message.includes(String(columnName || '').toLowerCase())
+}
+
 function fail(code, message, details) {
   throw new LoyaltyError(code, message, details)
 }

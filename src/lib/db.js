@@ -104,6 +104,11 @@ function isMissingLoyaltyColumn(error) {
   )
 }
 
+function isMissingSchemaColumn(error, columnName) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('schema cache') && message.includes(String(columnName || '').toLowerCase())
+}
+
 async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt }) {
   const cardNumber = String(loyalty?.loyalty_card_number || loyalty?.cardNumber || '').trim()
   const requestedRedeemAmount = Math.max(0, Math.round(Number(loyalty?.loyalty_used_amount ?? loyalty?.loyalty_redeem_amount ?? 0) || 0))
@@ -199,9 +204,23 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
       }
     }
     if (transactions.length > 0) {
-      const { error: transactionError } = await supabase
+      let { error: transactionError } = await supabase
         .from('loyalty_transactions')
         .insert(transactions)
+      if (
+        transactionError &&
+        (isMissingSchemaColumn(transactionError, 'cashback_percent_used') ||
+          isMissingSchemaColumn(transactionError, 'card_type_at_transaction'))
+      ) {
+        const legacyTransactions = transactions.map(({
+          cashback_percent_used,
+          card_type_at_transaction,
+          ...row
+        }) => row)
+        ;({ error: transactionError } = await supabase
+          .from('loyalty_transactions')
+          .insert(legacyTransactions))
+      }
       if (transactionError) throw transactionError
     }
   }
