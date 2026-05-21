@@ -7,6 +7,7 @@ import AppShell from '../components/AppShell'
 import {
   UtensilsCrossed, Clock, ChefHat, CheckCircle2,
   Receipt, Coffee, RefreshCw, Layers, Plus,
+  Search, CreditCard,
 } from 'lucide-react'
 
 // ── Localization ──────────────────────────────────────────────────────────────
@@ -29,6 +30,13 @@ const L = {
     itemsReady: n => `${n} ready`,
     viewOrder: 'View Order',
     requestBill: 'Request Bill',
+    tableSingular: 'table',
+    tablePlural: 'tables',
+    searchPlaceholder: 'Search table...',
+    confirmServed: 'Confirm served',
+    viewKitchen: 'View kitchen',
+    viewTable: 'View table',
+    takePayment: 'Take payment',
     statusGuide: 'Table Status Guide',
     guideAvailable: 'Table is free — tap to take a new order',
     guideWaiting: 'Order sent, kitchen not yet started',
@@ -55,6 +63,13 @@ const L = {
     itemsReady: n => `${n} готово`,
     viewOrder: 'Посмотреть',
     requestBill: 'Запросить счёт',
+    tableSingular: 'стол',
+    tablePlural: 'столов',
+    searchPlaceholder: 'Поиск стола...',
+    confirmServed: 'Подтвердить подачу',
+    viewKitchen: 'Кухня',
+    viewTable: 'Открыть стол',
+    takePayment: 'Оплата',
     statusGuide: 'Статусы столов',
     guideAvailable: 'Стол свободен — нажмите для нового заказа',
     guideWaiting: 'Заказ отправлен, кухня ещё не начала',
@@ -81,6 +96,13 @@ const L = {
     itemsReady: n => `${n} tayyor`,
     viewOrder: 'Ko\'rish',
     requestBill: 'Hisob so\'rash',
+    tableSingular: 'stol',
+    tablePlural: 'stol',
+    searchPlaceholder: 'Stol qidirish...',
+    confirmServed: 'Yetkazildi',
+    viewKitchen: 'Oshxona',
+    viewTable: 'Stolni ko‘rish',
+    takePayment: 'To‘lov olish',
     statusGuide: 'Stol holatlari',
     guideAvailable: 'Stol bo\'sh — yangi buyurtma boshlash uchun bosing',
     guideWaiting: 'Buyurtma yuborildi, oshxona hali boshlamadi',
@@ -142,14 +164,14 @@ const STATUS_CFG = {
     chipActiveBg: 'bg-blue-500 text-white',
   },
   occupied: {
-    border: 'border-blue-200',
-    hoverBorder: 'hover:border-blue-400',
-    bg: 'bg-blue-50',
-    badge: 'bg-blue-100 text-blue-700',
-    dot: 'bg-blue-400',
+    border: 'border-indigo-200',
+    hoverBorder: 'hover:border-indigo-400',
+    bg: 'bg-indigo-50',
+    badge: 'bg-indigo-100 text-indigo-700',
+    dot: 'bg-indigo-500',
     icon: UtensilsCrossed,
-    chipBg: 'bg-blue-100 text-blue-700',
-    chipActiveBg: 'bg-blue-500 text-white',
+    chipBg: 'bg-indigo-100 text-indigo-700',
+    chipActiveBg: 'bg-indigo-500 text-white',
   },
   needs_bill: {
     border: 'border-red-300',
@@ -199,7 +221,8 @@ function getKitchenCounts(tableId, orders) {
     newCount: items.filter(i => (i.status || 'new') === 'new').length,
     preparingCount: items.filter(i => i.status === 'preparing').length,
     readyCount: items.filter(i => i.status === 'ready').length,
-    total: items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0),
+    itemCount: items.reduce((s, i) => s + (Number(i.quantity) || 1), 0),
+    total: active.reduce((s, o) => s + (Number(o.total) || 0), 0) || items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0),
     createdAt: active.reduce((earliest, o) =>
       new Date(o.created_at) < new Date(earliest) ? o.created_at : earliest,
       active[0]?.created_at
@@ -241,32 +264,57 @@ function KitchenChip({ label, color }) {
   )
 }
 
-function TableCard({ table, status, counts, lang, onClick }) {
+function tableCountLabel(lang, count) {
+  return `${count} ${count === 1 ? tr(lang, 'tableSingular') : tr(lang, 'tablePlural')}`
+}
+
+function statusLabel(lang, status) {
+  return status === 'available'       ? tr(lang, 'available')        :
+         status === 'waiting_kitchen' ? tr(lang, 'waitingKitchen')   :
+         status === 'preparing'       ? tr(lang, 'preparing')         :
+         status === 'ready'           ? tr(lang, 'readyFromKitchen')  :
+         status === 'occupied'        ? tr(lang, 'occupied')          :
+                                        tr(lang, 'needsBill')
+}
+
+function actionForStatus(lang, status) {
+  if (status === 'ready') return { label: tr(lang, 'confirmServed'), Icon: CheckCircle2, cls: 'bg-blue-600 text-white hover:bg-blue-700' }
+  if (status === 'preparing') return { label: tr(lang, 'viewKitchen'), Icon: ChefHat, cls: 'bg-orange-500 text-white hover:bg-orange-600' }
+  if (status === 'waiting_kitchen') return { label: tr(lang, 'viewOrder'), Icon: Clock, cls: 'bg-yellow-500 text-white hover:bg-yellow-600' }
+  if (status === 'needs_bill') return { label: tr(lang, 'takePayment'), Icon: CreditCard, cls: 'bg-red-600 text-white hover:bg-red-700' }
+  if (status === 'occupied') return { label: tr(lang, 'viewTable'), Icon: UtensilsCrossed, cls: 'bg-indigo-600 text-white hover:bg-indigo-700' }
+  return null
+}
+
+function TableCard({ table, status, counts, lang, onClick, onAction }) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.available
   const StatusIcon = cfg.icon
   const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt) : null
+  const action = actionForStatus(lang, status)
+  const ActionIcon = action?.Icon
 
   return (
-    <button
+    <div
       onClick={onClick}
-      className={`group relative flex flex-col bg-white border-2 ${cfg.border} ${cfg.hoverBorder} rounded-2xl p-4 text-left transition-all active:scale-95 hover:shadow-lg w-full`}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onClick()}
+      className={`group relative flex min-h-[172px] w-full cursor-pointer flex-col rounded-2xl border border-[#E5E7EB] border-l-4 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${cfg.border} ${cfg.hoverBorder}`}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div>
-          <p className="font-black text-gray-900 text-base leading-none">{table.name}</p>
+          <p className="font-black text-gray-900 text-lg leading-none">{table.name}</p>
           {elapsed && status !== 'available' && (
-            <p className="text-[10px] text-gray-400 mt-0.5">{elapsed} ago</p>
+            <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-gray-400">
+              <Clock size={11} />
+              {elapsed} ago
+            </p>
           )}
         </div>
         <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${cfg.badge}`}>
           <StatusIcon size={10} />
-          {status === 'available'      ? tr(lang, 'available')       :
-           status === 'waiting_kitchen'? tr(lang, 'waitingKitchen')  :
-           status === 'preparing'      ? tr(lang, 'preparing')        :
-           status === 'ready'          ? tr(lang, 'readyFromKitchen') :
-           status === 'occupied'       ? tr(lang, 'occupied')         :
-                                         tr(lang, 'needsBill')}
+          {statusLabel(lang, status)}
         </span>
       </div>
 
@@ -280,7 +328,10 @@ function TableCard({ table, status, counts, lang, onClick }) {
           {counts.newCount > 0 && (
             <KitchenChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-yellow-100 text-yellow-700 border border-yellow-200" />
           )}
-          <p className="w-full text-[#ff5a00] font-bold text-sm mt-1">{formatCurrency(counts.total)}</p>
+          <div className="mt-2 flex w-full items-center justify-between gap-2">
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-600">×{counts.itemCount}</span>
+            <p className="text-[#ff5a00] font-black text-sm">{formatCurrency(counts.total)}</p>
+          </div>
         </div>
       )}
 
@@ -295,7 +346,10 @@ function TableCard({ table, status, counts, lang, onClick }) {
           {counts.readyCount > 0 && (
             <KitchenChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-blue-100 text-blue-700 border border-blue-200" />
           )}
-          <p className="w-full text-[#ff5a00] font-bold text-sm mt-1">{formatCurrency(counts.total)}</p>
+          <div className="mt-2 flex w-full items-center justify-between gap-2">
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-600">×{counts.itemCount}</span>
+            <p className="text-[#ff5a00] font-black text-sm">{formatCurrency(counts.total)}</p>
+          </div>
         </div>
       )}
 
@@ -304,23 +358,41 @@ function TableCard({ table, status, counts, lang, onClick }) {
           {counts.readyCount > 0 && (
             <KitchenChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-blue-100 text-blue-700 border border-blue-200" />
           )}
-          <p className="text-[#ff5a00] font-bold text-sm mt-1">{formatCurrency(counts.total)}</p>
+          <div className="mt-2 flex w-full items-center justify-between gap-2">
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-600">×{counts.itemCount}</span>
+            <p className="text-[#ff5a00] font-black text-sm">{formatCurrency(counts.total)}</p>
+          </div>
         </div>
       )}
 
       {status === 'occupied' && (
-        <p className="text-[#ff5a00] font-bold text-sm mt-auto">{formatCurrency(counts.total)}</p>
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-600">×{counts.itemCount}</span>
+          <p className="text-[#ff5a00] font-black text-sm">{formatCurrency(counts.total)}</p>
+        </div>
       )}
 
       {status === 'needs_bill' && (
-        <p className="text-[#ff5a00] font-bold text-sm mt-auto">{formatCurrency(counts.total)}</p>
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-600">×{counts.itemCount}</span>
+          <p className="text-[#ff5a00] font-black text-sm">{formatCurrency(counts.total)}</p>
+        </div>
       )}
 
-      {/* Active indicator dot */}
-      {status !== 'available' && (
-        <span className={`absolute top-3 right-3 w-2 h-2 rounded-full ${cfg.dot} opacity-0 group-hover:opacity-100 transition-opacity`} />
+      {action && (
+        <button
+          type="button"
+          onClick={e => {
+            e.stopPropagation()
+            onAction?.(status, table)
+          }}
+          className={`mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-sm font-black transition-all active:scale-[0.98] ${action.cls}`}
+        >
+          <ActionIcon size={15} />
+          {action.label}
+        </button>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -335,12 +407,12 @@ const STATUS_GUIDE_ITEMS = [
 
 function StatusGuide({ lang }) {
   return (
-    <div className="mt-8 bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
+    <div className="mt-8 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
         <Layers size={15} className="text-gray-400" />
         <p className="text-sm font-bold text-gray-700">{tr(lang, 'statusGuide')}</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {STATUS_GUIDE_ITEMS.map(({ status, guideKey }) => {
           const cfg = STATUS_CFG[status]
           const Icon = cfg.icon
@@ -352,13 +424,13 @@ function StatusGuide({ lang }) {
             status === 'occupied'        ? tr(lang, 'occupied')          :
                                            tr(lang, 'needsBill')
           return (
-            <div key={status} className="flex items-start gap-2.5">
-              <span className={`flex items-center justify-center w-7 h-7 rounded-lg ${cfg.badge} flex-shrink-0 mt-0.5`}>
-                <Icon size={13} />
+            <div key={status} className="flex items-center gap-2.5">
+              <span className={`flex items-center justify-center w-6 h-6 rounded-lg ${cfg.badge} flex-shrink-0`}>
+                <Icon size={12} />
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-bold text-gray-800">{label}</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">{tr(lang, guideKey)}</p>
+                <p className="truncate text-[11px] text-gray-400">{tr(lang, guideKey)}</p>
               </div>
             </div>
           )
@@ -370,7 +442,8 @@ function StatusGuide({ lang }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const FILTER_ORDER = ['all', 'available', 'waiting_kitchen', 'preparing', 'ready', 'occupied', 'needs_bill']
+const FILTER_ORDER = ['all', 'available', 'waiting_kitchen', 'preparing', 'ready', 'needs_bill', 'occupied']
+const SECTION_ORDER = ['ready', 'preparing', 'waiting_kitchen', 'needs_bill', 'occupied', 'available']
 
 export default function WaiterTables() {
   const { state, dispatch } = useApp()
@@ -378,6 +451,7 @@ export default function WaiterTables() {
   const navigate = useNavigate()
   const lang = state.lang || 'en'
   const [activeFilter, setActiveFilter] = useState('all')
+  const [search, setSearch] = useState('')
 
   const waiterName = profile?.full_name || state.user?.name || 'Waiter'
 
@@ -397,17 +471,45 @@ export default function WaiterTables() {
     return c
   }, [tableInfos])
 
-  const filtered = useMemo(() =>
-    activeFilter === 'all'
-      ? tableInfos
-      : tableInfos.filter(({ status }) => status === activeFilter),
-    [tableInfos, activeFilter]
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return tableInfos.filter(({ table, status }) => {
+      const matchStatus = activeFilter === 'all' || status === activeFilter
+      const matchSearch = !q || table.name.toLowerCase().includes(q)
+      return matchStatus && matchSearch
+    })
+  }, [tableInfos, activeFilter, search])
+
+  const sections = useMemo(() =>
+    SECTION_ORDER
+      .map(status => ({
+        status,
+        items: filtered.filter(info => info.status === status),
+      }))
+      .filter(section => section.items.length > 0),
+    [filtered]
   )
 
   function handleTable(table, status) {
     dispatch({ type: 'SET_TABLE', payload: table.id })
     dispatch({ type: 'CLEAR_CART' })
     navigate(`/waiter/order/${table.id}`)
+  }
+
+  function handleCardAction(status, table) {
+    if (status === 'ready') {
+      dispatch({ type: 'CONFIRM_ORDER_DELIVERED', payload: table.id })
+      return
+    }
+    if (status === 'preparing') {
+      navigate('/kitchen')
+      return
+    }
+    if (status === 'needs_bill') {
+      navigate(`/cashier/bill/${table.id}`)
+      return
+    }
+    handleTable(table, status)
   }
 
   function handleTakeAway() {
@@ -424,17 +526,26 @@ export default function WaiterTables() {
   return (
     <AppShell title={tr(lang, 'tables')}>
       <div className="min-h-screen bg-[#faf9f7] pb-10">
-        <div className="p-5 max-w-5xl mx-auto">
+        <div className="p-4 md:p-5 max-w-[1440px] mx-auto">
 
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-5 flex flex-col gap-4 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-2xl font-black text-gray-900">{tr(lang, 'tables')}</h2>
               <p className="text-sm text-gray-400 mt-0.5">{tr(lang, 'welcome')}, {waiterName}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative min-w-0 sm:w-[280px]">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder={tr(lang, 'searchPlaceholder')}
+                  className="h-10 w-full rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] pl-9 pr-3 text-sm text-[#1F2937] outline-none transition-all focus:border-[#ff5a00] focus:bg-white focus:ring-2 focus:ring-[#ff5a00]/15"
+                />
+              </div>
               <button
-                onClick={() => {}}
+                onClick={() => window.location.reload()}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
               >
                 <RefreshCw size={14} />
@@ -451,7 +562,7 @@ export default function WaiterTables() {
           </div>
 
           {/* Filter chips */}
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="mb-6 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {/* All chip */}
             <button
               onClick={() => setActiveFilter('all')}
@@ -466,19 +577,11 @@ export default function WaiterTables() {
 
             {FILTER_ORDER.filter(s => s !== 'all').map(status => {
               const cnt = countsPerStatus[status] || 0
-              if (cnt === 0) return null
               const cfg = STATUS_CFG[status]
-              const label =
-                status === 'available'       ? tr(lang, 'available')        :
-                status === 'waiting_kitchen' ? tr(lang, 'waitingKitchen')   :
-                status === 'preparing'       ? tr(lang, 'preparing')         :
-                status === 'ready'           ? tr(lang, 'readyFromKitchen')  :
-                status === 'occupied'        ? tr(lang, 'occupied')          :
-                                               tr(lang, 'needsBill')
               return (
                 <FilterChip
                   key={status}
-                  label={label}
+                  label={statusLabel(lang, status)}
                   count={cnt}
                   active={activeFilter === status}
                   cfg={cfg}
@@ -488,18 +591,47 @@ export default function WaiterTables() {
             })}
           </div>
 
-          {/* Table grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {filtered.map(({ table, status, counts }) => (
-              <TableCard
-                key={table.id}
-                table={table}
-                status={status}
-                counts={counts}
-                lang={lang}
-                onClick={() => handleTable(table, status)}
-              />
-            ))}
+          {/* Status sections */}
+          <div className="space-y-9">
+            {sections.map(({ status, items }) => {
+              const cfg = STATUS_CFG[status]
+              const Icon = cfg.icon
+              return (
+                <section key={status} className="border-t border-[#E5E7EB] pt-5 first:border-t-0 first:pt-0">
+                  <div className="sticky top-0 z-10 -mx-1 mb-3 flex items-center gap-3 rounded-2xl bg-[#faf9f7]/95 px-1 py-2 backdrop-blur">
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${cfg.badge}`}>
+                      <Icon size={18} />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="text-lg font-black uppercase tracking-tight text-[#1F2937]">{statusLabel(lang, status)}</h3>
+                      <p className="text-xs font-semibold text-[#8A94A6]">{tableCountLabel(lang, items.length)}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    {items.map(({ table, status: itemStatus, counts }) => (
+                      <TableCard
+                        key={table.id}
+                        table={table}
+                        status={itemStatus}
+                        counts={counts}
+                        lang={lang}
+                        onClick={() => handleTable(table, itemStatus)}
+                        onAction={handleCardAction}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
+
+            {sections.length === 0 && (
+              <div className="rounded-2xl border border-[#E5E7EB] bg-white p-10 text-center shadow-sm">
+                <Search size={34} className="mx-auto mb-3 text-gray-200" />
+                <p className="text-sm font-bold text-gray-500">
+                  {lang === 'uz' ? 'Stol topilmadi' : lang === 'ru' ? 'Стол не найден' : 'No tables found'}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Status guide */}

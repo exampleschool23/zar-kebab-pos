@@ -133,3 +133,23 @@ test('kitchen submit RPC migration protects paid orders from late item inserts',
   assert.match(source, /payment_status <> 'paid'/)
   assert.match(source, /raise exception 'order % is already paid or unavailable'/)
 })
+
+test('WaiterTables keeps urgent status sections before available tables', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(source, /const SECTION_ORDER = \['ready', 'preparing', 'waiting_kitchen', 'needs_bill', 'occupied', 'available'\]/)
+  assert.match(source, /SECTION_ORDER\s*\n\s*\.map\(status =>/)
+})
+
+test('WaiterTables keeps filter chips in requested status order', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(source, /const FILTER_ORDER = \['all', 'available', 'waiting_kitchen', 'preparing', 'ready', 'needs_bill', 'occupied'\]/)
+})
+
+test('WaiterTables uses responsive section grids instead of one flat table grid', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(source, /grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4/)
+  assert.match(source, /sections\.map\(\(\{ status, items \}\)/)
+})
