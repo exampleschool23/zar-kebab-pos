@@ -24,6 +24,7 @@ import {
   getDashboardPaymentMethods,
   getDashboardPeriodOrders,
   getDashboardSalesByCategory,
+  getDashboardStaffPerformance,
   isOrderInDashboardPeriod,
 } from '../lib/dashboardAnalytics'
 import AppShell from '../components/AppShell'
@@ -626,23 +627,8 @@ export default function AdminDashboard() {
 
   // ── Staff performance ─────────────────────────────────────────────────────
   const staffPerformance = useMemo(() => {
-    const map = {}
-    paidOrders.forEach(o => {
-      const name = o.waiter_name || 'Unknown'
-      if (!map[name]) map[name] = { name, orders: 0, revenue: 0, items: 0 }
-      map[name].orders++
-      map[name].revenue += getOrderTotal(o)
-      map[name].items   += getOrderItems(o).reduce((s, i) => s + (Number(i.quantity) || 1), 0)
-    })
-    return Object.values(map)
-      .map(s => {
-        const profile = (staffProfiles || []).find(p =>
-          p.full_name === s.name || p.email === s.name
-        )
-        return { ...s, avgOrder: s.orders > 0 ? Math.round(s.revenue / s.orders) : 0, role: profile?.role || null }
-      })
-      .sort((a, b) => b.revenue - a.revenue)
-  }, [paidOrders, staffProfiles])
+    return getDashboardStaffPerformance(periodPaidOrders, staffProfiles || [])
+  }, [periodPaidOrders, staffProfiles])
 
   // ── Recent orders: action-needed bills first, paid history second ─────────
   const recentOrderGroups = useMemo(() => {

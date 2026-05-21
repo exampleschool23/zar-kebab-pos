@@ -128,6 +128,30 @@ export function getDashboardPaymentMethods(orders, labels = {}) {
     .sort((a, b) => b.amount - a.amount)
 }
 
+export function getDashboardStaffPerformance(orders, staffProfiles = []) {
+  const map = {}
+  ;(orders || []).forEach(order => {
+    const name = order.waiter_name || order.waiter_email || 'Unknown'
+    if (!map[name]) map[name] = { name, orders: 0, revenue: 0, items: 0 }
+    map[name].orders += 1
+    map[name].revenue += getOrderTotal(order)
+    map[name].items += getOrderItems(order).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
+  })
+
+  return Object.values(map)
+    .map(row => {
+      const profile = (staffProfiles || []).find(profile =>
+        profile.full_name === row.name || profile.email === row.name
+      )
+      return {
+        ...row,
+        avgOrder: row.orders > 0 ? Math.round(row.revenue / row.orders) : 0,
+        role: profile?.role || null,
+      }
+    })
+    .sort((a, b) => b.revenue - a.revenue)
+}
+
 export function formatReadableDateTime(date, locale = 'en-US') {
   const value = typeof date === 'string' ? new Date(date) : date
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) return ''

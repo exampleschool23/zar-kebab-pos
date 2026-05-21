@@ -7,6 +7,7 @@ import {
   getDashboardPaymentMethods,
   getDashboardPeriodOrders,
   getDashboardSalesByCategory,
+  getDashboardStaffPerformance,
 } from '../src/lib/dashboardAnalytics.js'
 
 const menuItemMap = {
@@ -23,12 +24,13 @@ const categoryMap = {
   salads: { id: 'salads', name_en: 'Salads' },
 }
 
-function order({ id, paidAt, method = 'cash', items, total }) {
+function order({ id, paidAt, method = 'cash', items, total, waiter = 'Jasurbek' }) {
   return {
     id,
     payment_status: 'paid',
     paid_at: paidAt,
     payment_method: method,
+    waiter_name: waiter,
     total,
     service_rate_pct: 0,
     items,
@@ -53,6 +55,7 @@ const orders = [
     id: 'week',
     paidAt: '2026-05-15T10:00:00',
     method: 'card',
+    waiter: 'Dildora',
     items: [item('lagman', 'Lagman', 3, 32000)],
     total: 96000,
   }),
@@ -60,6 +63,7 @@ const orders = [
     id: 'month',
     paidAt: '2026-05-02T10:00:00',
     method: 'qr',
+    waiter: 'Dildora',
     items: [item('salad', 'Salad', 4, 15000)],
     total: 60000,
   }),
@@ -67,6 +71,7 @@ const orders = [
     id: 'year',
     paidAt: '2026-01-12T10:00:00',
     method: 'terminal',
+    waiter: 'Aziz',
     items: [item('cola', 'Cola', 5, 12000)],
     total: 60000,
   }),
@@ -74,6 +79,7 @@ const orders = [
     id: 'previous-year',
     paidAt: '2025-12-31T10:00:00',
     method: 'cash',
+    waiter: 'Aziz',
     items: [item('kebab', 'Old Kebab', 9, 25000)],
     total: 225000,
   }),
@@ -87,6 +93,11 @@ function analyticsFor(period) {
     payments: getDashboardPaymentMethods(periodOrders),
     categories: getDashboardSalesByCategory(periodOrders, menuItemMap, categoryMap, 'en'),
     best: getDashboardBestSelling(periodOrders, menuItemMap),
+    staff: getDashboardStaffPerformance(periodOrders, [
+      { full_name: 'Jasurbek', role: 'waiter' },
+      { full_name: 'Dildora', role: 'waiter' },
+      { full_name: 'Aziz', role: 'admin' },
+    ]),
   }
 }
 
@@ -98,6 +109,7 @@ test('dashboard selected period filters revenue payments categories and best sel
   assert.deepEqual(data.payments.map(row => row.key), ['cash'])
   assert.deepEqual(data.categories.map(row => row.name), ['Kebab', 'Drinks'])
   assert.deepEqual(data.best.map(row => row.menuItemId), ['kebab', 'cola'])
+  assert.deepEqual(data.staff.map(row => row.name), ['Jasurbek'])
 })
 
 test('dashboard period change from today to 7 days removes stale today-only category and dish data', () => {
@@ -108,6 +120,7 @@ test('dashboard period change from today to 7 days removes stale today-only cate
   assert.deepEqual(week.ids, ['today', 'week'])
   assert.deepEqual(week.categories.map(row => row.name), ['First Meal', 'Kebab', 'Drinks'])
   assert.deepEqual(week.best.map(row => row.menuItemId), ['lagman', 'kebab', 'cola'])
+  assert.deepEqual(week.staff.map(row => row.name), ['Dildora', 'Jasurbek'])
 })
 
 test('dashboard period change from 7 days to month updates all widgets to month data', () => {
@@ -118,6 +131,8 @@ test('dashboard period change from 7 days to month updates all widgets to month 
   assert.deepEqual(month.payments.map(row => row.key), ['card', 'cash', 'qr'])
   assert.deepEqual(month.categories.map(row => row.name), ['First Meal', 'Salads', 'Kebab', 'Drinks'])
   assert.deepEqual(month.best.map(row => row.menuItemId), ['salad', 'lagman', 'kebab', 'cola'])
+  assert.deepEqual(month.staff.map(row => row.name), ['Dildora', 'Jasurbek'])
+  assert.deepEqual(month.staff.map(row => row.revenue), [156000, 62000])
 })
 
 test('dashboard period change from month to year updates all widgets to year data', () => {
@@ -128,6 +143,7 @@ test('dashboard period change from month to year updates all widgets to year dat
   assert.deepEqual(year.payments.map(row => row.key), ['card', 'cash', 'qr', 'terminal'])
   assert.deepEqual(year.categories.map(row => row.name), ['First Meal', 'Drinks', 'Salads', 'Kebab'])
   assert.deepEqual(year.best.map(row => row.menuItemId), ['cola', 'salad', 'lagman', 'kebab'])
+  assert.deepEqual(year.staff.map(row => row.name), ['Dildora', 'Jasurbek', 'Aziz'])
 })
 
 test('dashboard empty selected period returns zero and empty widget states', () => {
@@ -135,11 +151,13 @@ test('dashboard empty selected period returns zero and empty widget states', () 
   const payments = getDashboardPaymentMethods(empty)
   const categories = getDashboardSalesByCategory(empty, menuItemMap, categoryMap, 'en')
   const best = getDashboardBestSelling(empty, menuItemMap)
+  const staff = getDashboardStaffPerformance(empty)
 
   assert.equal(empty.reduce((sum, row) => sum + row.total, 0), 0)
   assert.deepEqual(payments, [])
   assert.deepEqual(categories, [])
   assert.deepEqual(best, [])
+  assert.deepEqual(staff, [])
 })
 
 test('latest selected period wins when a slow analytics response resolves out of order', async () => {
