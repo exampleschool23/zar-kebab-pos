@@ -81,6 +81,22 @@ export function normalizeCardNumber(cardNumber) {
   return value
 }
 
+export function formatUzPhoneNumberInput(value) {
+  let digits = String(value || '').replace(/\D/g, '')
+  if (digits.startsWith('998')) digits = digits.slice(3)
+  digits = digits.slice(0, 9)
+  const parts = []
+  if (digits.length > 0) parts.push(digits.slice(0, 2))
+  if (digits.length > 2) parts.push(digits.slice(2, 5))
+  if (digits.length > 5) parts.push(digits.slice(5, 7))
+  if (digits.length > 7) parts.push(digits.slice(7, 9))
+  return parts.length ? `+998 ${parts.join(' ')}` : '+998 '
+}
+
+export function isValidUzPhoneNumber(value) {
+  return /^\+998 \d{2} \d{3} \d{2} \d{2}$/.test(String(value || '').trim())
+}
+
 export function normalizeCashbackType(type = DEFAULT_CASHBACK_TYPE) {
   const value = String(type || DEFAULT_CASHBACK_TYPE).toLowerCase().trim()
   if (!CASHBACK_TYPES[value]) fail('invalid_cashback_type', 'Invalid cashback type')
@@ -119,6 +135,10 @@ export function createLoyaltyCardRecord({
 } = {}) {
   requireLoyaltyPermission(role, 'create')
   const normalizedCardNumber = normalizeCardNumber(cardNumber)
+  const normalizedCustomerName = String(customerName || '').trim()
+  const normalizedPhoneNumber = formatUzPhoneNumberInput(phoneNumber).trim()
+  if (!normalizedCustomerName) fail('customer_name_required', 'Customer name is required')
+  if (!isValidUzPhoneNumber(normalizedPhoneNumber)) fail('invalid_phone_number', 'Phone number must match +998 91 132 32 32')
   if (existingCardNumbers.map(String).includes(normalizedCardNumber)) {
     fail('duplicate_card_number', 'Duplicate loyalty card number', { status: 409 })
   }
@@ -126,8 +146,8 @@ export function createLoyaltyCardRecord({
   return {
     card_number: normalizedCardNumber,
     public_token: publicToken || makePublicToken(normalizedCardNumber),
-    customer_name: String(customerName || '').trim(),
-    phone_number: String(phoneNumber || '').trim(),
+    customer_name: normalizedCustomerName,
+    phone_number: normalizedPhoneNumber,
     cashback_type: normalizedType,
     balance: 0,
     total_earned: 0,

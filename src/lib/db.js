@@ -8,7 +8,7 @@ import {
   normalizeSplitPayments,
   validateLoyaltyRedeemAmount,
 } from './analytics.js'
-import { getCashbackTypePercent } from './loyalty.js'
+import { DEFAULT_CASHBACK_TYPE, getCashbackTypePercent } from './loyalty.js'
 import { notifyTelegramOrderStatus } from './telegramNotifications.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
@@ -86,9 +86,6 @@ function normalizeBusinessSettings(row) {
   return {
     restaurantName: row.restaurant_name || 'Zar Kebab',
     serviceRate: normalizeServiceRatePct(row.service_rate_pct),
-    cashbackPercent: Number.isFinite(Number(row.cashback_percent))
-      ? Math.max(0, Math.min(100, Number(row.cashback_percent)))
-      : 5,
     receiptFooter: row.receipt_footer || 'Thank you for visiting!',
     autoPrint: !!row.auto_print,
   }
@@ -112,14 +109,6 @@ function isMissingSchemaColumn(error, columnName) {
 async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt }) {
   const cardNumber = String(loyalty?.loyalty_card_number || loyalty?.cardNumber || '').trim()
   const requestedRedeemAmount = Math.max(0, Math.round(Number(loyalty?.loyalty_used_amount ?? loyalty?.loyalty_redeem_amount ?? 0) || 0))
-  const cardTypePercent = loyalty?.cashback_type
-    ? getCashbackTypePercent(loyalty.cashback_type)
-    : null
-  const cashbackPercent = Number.isFinite(Number(cardTypePercent))
-    ? cardTypePercent
-    : Number.isFinite(Number(loyalty?.cashback_percent))
-    ? Math.max(0, Math.min(100, Number(loyalty.cashback_percent)))
-    : Math.max(0, Math.min(100, Number(state.settings?.cashbackPercent ?? 5)))
 
   if (!cardNumber && requestedRedeemAmount <= 0) {
     return orderSummaries.map(row => ({ ...row, loyaltyUsedAmount: 0, cashbackEarned: 0 }))
@@ -133,6 +122,8 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
   if (cardError) throw cardError
   if (!card || card.is_active === false) throw new Error('Loyalty card is not active')
 
+  const cardType = loyalty?.cashback_type || card.cashback_type || DEFAULT_CASHBACK_TYPE
+  const cashbackPercent = getCashbackTypePercent(cardType)
   const balance = Math.max(0, Math.round(Number(card.balance ?? card.balance_amount ?? 0) || 0))
   const totalBeforeLoyalty = orderSummaries.reduce((sum, row) => sum + row.grossTotal, 0)
   const validation = validateLoyaltyRedeemAmount(requestedRedeemAmount, balance, totalBeforeLoyalty)
@@ -198,7 +189,7 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
           balance_after: runningBalance + row.cashbackEarned,
           reason: `Cashback ${cashbackPercent}%`,
           cashback_percent_used: cashbackPercent,
-          card_type_at_transaction: card.cashback_type || null,
+          card_type_at_transaction: cardType,
         })
         runningBalance += row.cashbackEarned
       }
@@ -907,15 +898,12 @@ export async function writeToSupabase(action, state) {
     case 'SET_SETTINGS': {
       const settings = action.payload || {}
       const serviceRatePct = serviceRatePctFromSettings({ serviceRate: settings.serviceRate })
-      const { error } = await supabase
+      let { error } = await supabase
         .from('business_settings')
         .upsert({
           id: 'default',
           restaurant_name: settings.restaurantName || 'Zar Kebab',
           service_rate_pct: serviceRatePct,
-          cashback_percent: Number.isFinite(Number(settings.cashbackPercent))
-            ? Math.max(0, Math.min(100, Number(settings.cashbackPercent)))
-            : 5,
           receipt_footer: settings.receiptFooter || '',
           auto_print: !!settings.autoPrint,
           updated_at: new Date().toISOString(),

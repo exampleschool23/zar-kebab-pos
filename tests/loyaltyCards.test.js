@@ -14,12 +14,14 @@ import {
   createLoyaltyCardRecord,
   deactivateLoyaltyCardRecord,
   editLoyaltyCardRecord,
+  formatUzPhoneNumberInput,
   getCashbackTypePercent,
   getLoyaltyCardDisplay,
   getLoyaltyCashbackPreview,
   getLoyaltyTransactionHistory,
   getPublicLoyaltyCardView,
   isMissingLoyaltySchemaColumn,
+  isValidUzPhoneNumber,
   normalizeCardNumber,
   normalizeCashbackType,
   redeemLoyaltyBalance,
@@ -98,7 +100,7 @@ test('loyalty card registration is owner-only and preserves exact 8-digit card n
   assert.equal(created.card_number, '00123456')
   assert.equal(typeof created.card_number, 'string')
   assert.equal(created.customer_name, 'Ali Valiyev')
-  assert.equal(created.phone_number, '+998901112233')
+  assert.equal(created.phone_number, '+998 90 111 22 33')
   assert.equal(created.cashback_type, DEFAULT_CASHBACK_TYPE)
   assert.equal(created.public_token, 'token-00123456')
   assert.equal(created.balance, 0)
@@ -115,8 +117,29 @@ test('loyalty card registration is owner-only and preserves exact 8-digit card n
     role: 'owner',
     cardNumber: '00123456',
     existingCardNumbers: ['00123456'],
+    customerName: 'Ali',
+    phoneNumber: '+998 91 132 32 32',
   }), 'duplicate_card_number')
+  assertLoyaltyError(() => createLoyaltyCardRecord({
+    role: 'owner',
+    cardNumber: '11112222',
+    customerName: '',
+    phoneNumber: '+998 91 132 32 32',
+  }), 'customer_name_required')
+  assertLoyaltyError(() => createLoyaltyCardRecord({
+    role: 'owner',
+    cardNumber: '11112222',
+    customerName: 'Ali',
+    phoneNumber: '+998 91 132',
+  }), 'invalid_phone_number')
   assert.equal(normalizeCardNumber('00000001'), '00000001')
+})
+
+test('loyalty card phone input masks and validates Uzbek numbers', () => {
+  assert.equal(formatUzPhoneNumberInput('911323232'), '+998 91 132 32 32')
+  assert.equal(formatUzPhoneNumberInput('+998911323232'), '+998 91 132 32 32')
+  assert.equal(isValidUzPhoneNumber('+998 91 132 32 32'), true)
+  assert.equal(isValidUzPhoneNumber('+998 911 32 32'), false)
 })
 
 test('loyalty schema cache helper detects missing migration columns without masking other errors', () => {

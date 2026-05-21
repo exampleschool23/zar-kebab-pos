@@ -1,10 +1,6 @@
 -- Loyalty cashback wallet.
 -- Replaces active percentage card discounts with stored wallet balance.
 
-alter table public.business_settings
-  add column if not exists cashback_percent numeric not null default 5
-    check (cashback_percent >= 0 and cashback_percent <= 100);
-
 create table if not exists public.loyalty_cards (
   id             uuid primary key default gen_random_uuid(),
   card_number    text not null unique,

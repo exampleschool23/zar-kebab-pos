@@ -6,7 +6,7 @@ const TABLE_CHECKS = [
   { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned'] },
   { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
-  { name: 'business_settings', columns: ['id', 'service_rate_pct', 'cashback_percent', 'restaurant_name'] },
+  { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name'] },
   { name: 'loyalty_cards', columns: ['id', 'card_number', 'cashback_type', 'balance', 'total_earned', 'total_redeemed', 'is_active'] },
   { name: 'loyalty_transactions', columns: ['id', 'loyalty_card_id', 'type', 'amount', 'balance_before', 'balance_after', 'cashback_percent_used', 'card_type_at_transaction'] },
   { name: 'menu_items', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'price', 'sort_order'] },
@@ -17,6 +17,10 @@ const TABLE_CHECKS = [
 
 function missingColumnMessage(error) {
   const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`
+  const schemaCacheMatch = message.match(/["']([a-z0-9_]+)["']\s+column/i)
+  if (schemaCacheMatch?.[1]) return schemaCacheMatch[1]
+  const qualifiedMatch = message.match(/column\s+(?:[a-z0-9_]+\.)?([a-z0-9_]+)/i)
+  if (qualifiedMatch?.[1]) return qualifiedMatch[1]
   const match = message.match(/column ["']?([a-z0-9_]+)["']?/i)
   return match?.[1] || null
 }

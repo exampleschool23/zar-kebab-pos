@@ -215,7 +215,7 @@ export function ordersReducer(state, action) {
           const cashbackEarned = calculateLoyaltyCashback(
             { ...o, loyalty_used_amount: loyaltyUsedAmount, status: 'paid', payment_status: 'paid' },
             o.items || [],
-            state.settings?.cashbackPercent ?? 5
+            Number(loyalty?.cashback_percent) || 0
           )
           const fields = getOrderPaymentFields(
             {
@@ -276,7 +276,7 @@ export function ordersReducer(state, action) {
             payment_method: finalPaymentMethod,
             payments: paymentAllocations.get(o.id) || [],
             loyalty_card_number: loyalty?.loyalty_card_number || null,
-            cashback_percent: state.settings?.cashbackPercent ?? 5,
+            cashback_percent: Number(loyalty?.cashback_percent) || 0,
             cashback_earned: activeSummary?.cashbackEarned || 0,
             ...paymentFields,
           }

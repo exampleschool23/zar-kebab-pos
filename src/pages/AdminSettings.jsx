@@ -54,6 +54,10 @@ function healthMessage(check, labels) {
   return check.detail || labels.healthUnknownError
 }
 
+function healthCheckName(check, labels) {
+  return labels.healthNames?.[check.name] || check.name
+}
+
 export default function AdminSettings() {
   const { state, dispatch } = useApp()
   const navigate = useNavigate()
@@ -62,7 +66,6 @@ export default function AdminSettings() {
 
   const [restaurantName, setRestaurantName] = useState(settings.restaurantName)
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
-  const [cashbackPercent, setCashbackPercent] = useState(settings.cashbackPercent ?? 5)
   const [receiptFooter,  setReceiptFooter]  = useState(settings.receiptFooter)
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
   const [notifications,  setNotifications]  = useState(true)
@@ -76,17 +79,16 @@ export default function AdminSettings() {
   useEffect(() => {
     setRestaurantName(settings.restaurantName)
     setServiceRate(settings.serviceRate)
-    setCashbackPercent(settings.cashbackPercent ?? 5)
     setReceiptFooter(settings.receiptFooter)
     setAutoPrint(settings.autoPrint)
-  }, [settings.restaurantName, settings.serviceRate, settings.cashbackPercent, settings.receiptFooter, settings.autoPrint])
+  }, [settings.restaurantName, settings.serviceRate, settings.receiptFooter, settings.autoPrint])
 
   async function handleSave() {
     setSaving(true)
     setError('')
     const result = await dispatch({
       type: 'SET_SETTINGS',
-      payload: { restaurantName, serviceRate, cashbackPercent, receiptFooter, autoPrint },
+      payload: { restaurantName, serviceRate, receiptFooter, autoPrint },
     })
     setSaving(false)
     if (result?.error) {
@@ -119,8 +121,6 @@ export default function AdminSettings() {
       billing:         'Hisob-kitob',
       serviceCharge:   'Xizmat to\'lovi',
       serviceChargeSub: 'Barcha buyurtmalarga qo\'shiladi',
-      cashbackPercent: 'Cashback foizi',
-      cashbackPercentSub: 'Menyu mahsulotlari bo‘yicha to‘langan buyurtmadan hisoblanadi',
       receiptFooterL:  'Chek pastki qismi',
       receiptFooterSub: 'Chek pastida ko\'rsatiladigan matn',
       system:          'Tizim',
@@ -141,6 +141,21 @@ export default function AdminSettings() {
       healthAvailable:  'Mavjud',
       healthMissingColumn: column => `Ustun yo‘q: ${column}`,
       healthUnknownError: 'Noma’lum xatolik',
+      healthNames: {
+        restaurant_tables: 'Restoran stollari',
+        table_zones: 'Stol zonalari',
+        orders: 'Buyurtmalar',
+        order_items: 'Buyurtma mahsulotlari',
+        order_payments: 'Buyurtma to‘lovlari',
+        business_settings: 'Biznes sozlamalari',
+        loyalty_cards: 'Sodiqlik kartalari',
+        loyalty_transactions: 'Sodiqlik tranzaksiyalari',
+        menu_items: 'Menyu mahsulotlari',
+        menu_categories: 'Menyu kategoriyalari',
+        profiles: 'Profil foydalanuvchilari',
+        order_payment_audit: 'To‘lov auditi',
+        submit_order_to_kitchen: 'Oshxonaga yuborish RPC',
+      },
       open:             'Ochish',
       save:            'Saqlash',
       saving:          'Saqlanmoqda...',
@@ -156,8 +171,6 @@ export default function AdminSettings() {
       billing:         'Выставление счётов',
       serviceCharge:   'Сервисный сбор',
       serviceChargeSub: 'Добавляется ко всем заказам',
-      cashbackPercent: 'Процент кешбэка',
-      cashbackPercentSub: 'Начисляется с оплаченных позиций меню',
       receiptFooterL:  'Нижняя часть чека',
       receiptFooterSub: 'Текст внизу каждого чека',
       system:          'Система',
@@ -178,6 +191,21 @@ export default function AdminSettings() {
       healthAvailable:  'Доступно',
       healthMissingColumn: column => `Нет колонки: ${column}`,
       healthUnknownError: 'Неизвестная ошибка',
+      healthNames: {
+        restaurant_tables: 'Столы ресторана',
+        table_zones: 'Зоны столов',
+        orders: 'Заказы',
+        order_items: 'Позиции заказа',
+        order_payments: 'Платежи заказа',
+        business_settings: 'Настройки бизнеса',
+        loyalty_cards: 'Карты лояльности',
+        loyalty_transactions: 'Транзакции лояльности',
+        menu_items: 'Позиции меню',
+        menu_categories: 'Категории меню',
+        profiles: 'Профили пользователей',
+        order_payment_audit: 'Аудит платежей',
+        submit_order_to_kitchen: 'RPC отправки на кухню',
+      },
       open:             'Открыть',
       save:            'Сохранить',
       saving:          'Сохранение...',
@@ -193,8 +221,6 @@ export default function AdminSettings() {
       billing:         'Billing',
       serviceCharge:   'Service Charge',
       serviceChargeSub: 'Added to all orders',
-      cashbackPercent: 'Cashback Percent',
-      cashbackPercentSub: 'Earned from paid menu items',
       receiptFooterL:  'Receipt Footer',
       receiptFooterSub: 'Text shown at the bottom of each receipt',
       system:          'System',
@@ -215,6 +241,21 @@ export default function AdminSettings() {
       healthAvailable:  'Available',
       healthMissingColumn: column => `Missing column: ${column}`,
       healthUnknownError: 'Unknown error',
+      healthNames: {
+        restaurant_tables: 'Restaurant tables',
+        table_zones: 'Table zones',
+        orders: 'Orders',
+        order_items: 'Order items',
+        order_payments: 'Order payments',
+        business_settings: 'Business settings',
+        loyalty_cards: 'Loyalty cards',
+        loyalty_transactions: 'Loyalty transactions',
+        menu_items: 'Menu items',
+        menu_categories: 'Menu categories',
+        profiles: 'User profiles',
+        order_payment_audit: 'Payment audit',
+        submit_order_to_kitchen: 'Kitchen submit RPC',
+      },
       open:             'Open',
       save:            'Save Changes',
       saving:          'Saving...',
@@ -266,16 +307,6 @@ export default function AdminSettings() {
                 ))}
               </div>
             </div>
-          </SettingRow>
-          <SettingRow icon={Percent} label={l.cashbackPercent} sub={l.cashbackPercentSub}>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={cashbackPercent}
-              onChange={e => setCashbackPercent(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-              className="w-[92px] border border-[#E5E7EB] rounded-xl px-3 py-2 text-[13px] text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all text-right"
-            />
           </SettingRow>
           <SettingRow icon={Printer} label={l.receiptFooterL} sub={l.receiptFooterSub}>
             <input
@@ -360,7 +391,7 @@ export default function AdminSettings() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   {health.checks.map(check => (
                     <div key={`${check.type}-${check.name}`} className="rounded-xl bg-white px-3 py-2 text-xs">
-                      <p className="font-black text-[#1F2937]">{check.name}</p>
+                      <p className="font-black text-[#1F2937]">{healthCheckName(check, l)}</p>
                       <p className={check.ok ? 'font-bold text-emerald-600' : 'font-bold text-red-600'}>{healthMessage(check, l)}</p>
                     </div>
                   ))}

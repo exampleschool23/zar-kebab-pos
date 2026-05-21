@@ -2,15 +2,22 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runDbHealthChecks } from '../src/lib/dbHealth.js'
 
-function makeClient({ missingTable = null, missingRpc = false } = {}) {
+function makeClient({ missingTable = null, missingColumnTable = null, missingColumn = null, missingRpc = false } = {}) {
   return {
     from(name) {
       return {
-        select() {
+        select(columns) {
           return {
             limit() {
               if (name === missingTable) {
                 return Promise.resolve({ error: { message: `relation "${name}" does not exist` } })
+              }
+              if (name === missingColumnTable && columns?.includes(missingColumn)) {
+                return Promise.resolve({
+                  error: {
+                    message: `column ${name}.${missingColumn} does not exist`,
+                  },
+                })
               }
               return Promise.resolve({ data: [], error: null })
             },
@@ -34,6 +41,18 @@ test('database health passes when tables exist and RPC responds with a validatio
   assert.equal(result.checks.some(check => check.name === 'submit_order_to_kitchen' && check.ok), true)
   assert.equal(result.checks.find(check => check.name === 'restaurant_tables').messageKey, 'ok')
   assert.equal(result.checks.find(check => check.name === 'submit_order_to_kitchen').messageKey, 'available')
+})
+
+test('database health reports the actual missing schema-cache column', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'loyalty_cards',
+    missingColumn: 'cashback_type',
+  }))
+
+  const failed = result.failed.find(check => check.name === 'loyalty_cards')
+  assert.equal(result.ok, false)
+  assert.equal(failed.messageKey, 'missingColumn')
+  assert.equal(failed.detail, 'cashback_type')
 })
 
 test('database health reports missing tables and missing RPC', async () => {

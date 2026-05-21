@@ -54,6 +54,16 @@ function classifyError(error) {
   return 'error'
 }
 
+function missingColumnMessage(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`
+  const schemaCacheMatch = message.match(/["']([a-z0-9_]+)["']\s+column/i)
+  if (schemaCacheMatch?.[1]) return schemaCacheMatch[1]
+  const qualifiedMatch = message.match(/column\s+(?:[a-z0-9_]+\.)?([a-z0-9_]+)/i)
+  if (qualifiedMatch?.[1]) return qualifiedMatch[1]
+  const match = message.match(/column ["']?([a-z0-9_]+)["']?/i)
+  return match?.[1] || null
+}
+
 function makeCheck(name, ok, detail, required = true) {
   return { name, ok, detail, required }
 }
@@ -63,7 +73,7 @@ async function checkTable(name, select, required = true) {
   try {
     ;({ error } = await supabase
       .from(name)
-      .select(select, { head: true, count: 'exact' })
+      .select(select)
       .limit(1))
   } catch (err) {
     error = err
@@ -79,7 +89,9 @@ async function checkTable(name, select, required = true) {
     ? 'permission denied with anon key; rerun with SUPABASE_SERVICE_ROLE_KEY for a stronger check'
     : kind === 'network'
       ? `network/request failed: ${error.message}`
-    : `${error.code || 'ERROR'} ${error.message}`
+      : missingColumnMessage(error)
+        ? `missing column: ${missingColumnMessage(error)}`
+        : `${error.code || 'ERROR'} ${error.message}`
   return makeCheck(name, ok, hint, required)
 }
 
@@ -116,7 +128,7 @@ const checks = await Promise.all([
   checkTable('menu_items', 'id, category_id, name_uz, name_ru, name_en, price, available, sort_order'),
   checkTable('orders', 'id, table_id, table_name, status, payment_status, service_rate_pct, order_type, order_number, loyalty_card_number, loyalty_used_amount, cashback_earned'),
   checkTable('order_items', 'id, order_id, menu_item_id, status, order_type, item_type, is_counter_item'),
-  checkTable('business_settings', 'id, restaurant_name, service_rate_pct, cashback_percent, receipt_footer, auto_print'),
+  checkTable('business_settings', 'id, restaurant_name, service_rate_pct, receipt_footer, auto_print'),
   checkTable('order_payments', 'id, order_id, method, amount'),
   checkTable('loyalty_cards', 'id, card_number, public_token, customer_name, phone_number, cashback_type, balance, total_earned, total_redeemed, is_active, created_at, updated_at'),
   checkTable('loyalty_transactions', 'id, loyalty_card_id, order_id, type, amount, balance_before, balance_after, reason, created_by, cashback_percent_used, card_type_at_transaction, created_at'),

@@ -6,7 +6,6 @@ import {
 export const DEFAULT_SETTINGS = {
   restaurantName: 'Zar Kebab',
   serviceRate:    20,
-  cashbackPercent: 5,
   receiptFooter:  'Thank you for visiting!',
   autoPrint:      false,
 }

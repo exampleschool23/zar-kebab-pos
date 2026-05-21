@@ -151,7 +151,7 @@ export default function CashierBill() {
   const loyaltyAmt    = payment.loyaltyUsedAmount
   const loyaltyCashbackPercent = loyaltyCard
     ? getCashbackTypePercent(loyaltyCard.cashback_type || 'bronze')
-    : state.settings?.cashbackPercent ?? 5
+    : 0
   const cashbackToBeEarned = order
     ? calculateLoyaltyCashback(
         { ...order, loyalty_used_amount: loyaltyAmt, status: 'paid', payment_status: 'paid' },

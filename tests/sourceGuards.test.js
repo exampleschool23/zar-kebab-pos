@@ -283,9 +283,23 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   assert.match(admin, /canDeactivateLoyaltyCard/)
   assert.match(admin, /isMissingLoyaltySchemaColumn/)
   assert.match(admin, /setSupportsCashbackType\(false\)/)
+  assert.match(admin, /formatUzPhoneNumberInput/)
+  assert.match(admin, /cardFormRequired/)
   assert.match(db, /legacyTransactions/)
   assert.match(loyalty, /bronze: \{ label: 'Bronze', percent: 3 \}/)
   assert.match(loyalty, /black: \{ label: 'Black', percent: 15 \}/)
+})
+
+test('AdminSettings does not expose obsolete cashback percent setting', () => {
+  const settings = readSource('src/pages/AdminSettings.jsx')
+  const reducerDefaults = readSource('src/store/reducerHelpers.js')
+  const db = readSource('src/lib/db.js')
+
+  assert.doesNotMatch(settings, /Cashback Percent/)
+  assert.doesNotMatch(settings, /cashbackPercent/)
+  assert.doesNotMatch(reducerDefaults, /cashbackPercent/)
+  assert.doesNotMatch(db, /settings\.cashbackPercent/)
+  assert.doesNotMatch(db, /cashback_percent:\s*Number\.isFinite\(Number\(settings\.cashbackPercent\)\)/)
 })
 
 test('table management migration and health check include required columns', () => {
