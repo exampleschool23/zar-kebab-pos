@@ -107,6 +107,21 @@ export function getCashbackTypePercent(type = DEFAULT_CASHBACK_TYPE) {
   return CASHBACK_TYPES[normalizeCashbackType(type)].percent
 }
 
+export function getLoyaltyCardCashbackType(cardOrType = DEFAULT_CASHBACK_TYPE) {
+  if (typeof cardOrType === 'string') return normalizeCashbackType(cardOrType)
+  return normalizeCashbackType(
+    cardOrType?.cashback_type ??
+    cardOrType?.cashbackType ??
+    cardOrType?.card_type_at_transaction ??
+    cardOrType?.cardTypeAtTransaction ??
+    DEFAULT_CASHBACK_TYPE
+  )
+}
+
+export function getLoyaltyCardCashbackPercent(cardOrType = DEFAULT_CASHBACK_TYPE) {
+  return getCashbackTypePercent(getLoyaltyCardCashbackType(cardOrType))
+}
+
 export function normalizeMoneyAmount(value, { positive = false, allowZero = true } = {}) {
   const numberValue = Number(value)
   if (!Number.isFinite(numberValue)) fail('invalid_amount', 'Amount must be a valid number')
@@ -282,8 +297,8 @@ export function completeOrderCashback({ card, order, items = [], loyaltyUsedAmou
   if (order?.status === 'cancelled' || order?.payment_status === 'cancelled') fail('order_cancelled', 'Cancelled orders do not earn cashback')
   if (!isPaidOrder(order)) fail('order_not_completed', 'Cashback is created only after successful order completion')
 
-  const cardType = normalizeCashbackType(card.cashback_type || DEFAULT_CASHBACK_TYPE)
-  const percent = getCashbackTypePercent(cardType)
+  const cardType = getLoyaltyCardCashbackType(card)
+  const percent = getLoyaltyCardCashbackPercent(card)
   const cashback = calculateLoyaltyCashback(
     { ...order, loyalty_used_amount: normalizeMoneyAmount(loyaltyUsedAmount) },
     items,
@@ -333,7 +348,7 @@ export function getLoyaltyTransactionHistory(transactions = []) {
 export function getLoyaltyCardDisplay(card, lang = 'en') {
   const missingName = lang === 'uz' ? 'Nomsiz mijoz' : lang === 'ru' ? 'Клиент без имени' : 'Unnamed customer'
   const missingPhone = lang === 'uz' ? 'Telefon yo‘q' : lang === 'ru' ? 'Телефон не указан' : 'No phone'
-  const type = normalizeCashbackType(card?.cashback_type || DEFAULT_CASHBACK_TYPE)
+  const type = getLoyaltyCardCashbackType(card)
   return {
     cardNumber: String(card?.card_number || ''),
     customerName: card?.customer_name || missingName,
@@ -365,13 +380,15 @@ export function getPublicLoyaltyCardView({ card, transactions = [], orders = [],
   }
 }
 
-export function getLoyaltyCashbackPreview({ order, items = [], loyaltyUsedAmount = 0, cashbackType = DEFAULT_CASHBACK_TYPE } = {}) {
+export function getLoyaltyCashbackPreview({ order, items = [], loyaltyUsedAmount = 0, cashbackType = null, card = null } = {}) {
+  const percent = card || cashbackType ? getLoyaltyCardCashbackPercent(card || cashbackType) : 0
   return {
     summary: getOrderPaymentSummary({ ...order, loyalty_used_amount: loyaltyUsedAmount }, items),
     cashback: calculateLoyaltyCashback(
       { ...order, loyalty_used_amount: loyaltyUsedAmount, status: 'paid', payment_status: 'paid' },
       items,
-      getCashbackTypePercent(cashbackType)
+      percent
     ),
+    cashbackPercent: percent,
   }
 }

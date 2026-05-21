@@ -8,7 +8,7 @@ import {
   normalizeSplitPayments,
   validateLoyaltyRedeemAmount,
 } from './analytics.js'
-import { DEFAULT_CASHBACK_TYPE, getCashbackTypePercent } from './loyalty.js'
+import { getLoyaltyCardCashbackPercent, getLoyaltyCardCashbackType } from './loyalty.js'
 import { notifyTelegramOrderStatus } from './telegramNotifications.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
@@ -122,8 +122,12 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
   if (cardError) throw cardError
   if (!card || card.is_active === false) throw new Error('Loyalty card is not active')
 
-  const cardType = loyalty?.cashback_type || card.cashback_type || DEFAULT_CASHBACK_TYPE
-  const cashbackPercent = getCashbackTypePercent(cardType)
+  const cardType = getLoyaltyCardCashbackType({
+    ...card,
+    cashback_type: loyalty?.cashback_type ?? loyalty?.cashbackType ?? card.cashback_type,
+    cashbackType: loyalty?.cashbackType ?? card.cashbackType,
+  })
+  const cashbackPercent = getLoyaltyCardCashbackPercent(cardType)
   const balance = Math.max(0, Math.round(Number(card.balance ?? card.balance_amount ?? 0) || 0))
   const totalBeforeLoyalty = orderSummaries.reduce((sum, row) => sum + row.grossTotal, 0)
   const validation = validateLoyaltyRedeemAmount(requestedRedeemAmount, balance, totalBeforeLoyalty)

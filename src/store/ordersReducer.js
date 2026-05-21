@@ -14,6 +14,7 @@ import {
   recalcOrderTotals,
   serviceRatePctFromSettings,
 } from './reducerHelpers.js'
+import { getLoyaltyCardCashbackPercent } from '../lib/loyalty.js'
 
 export function ordersReducer(state, action) {
   switch (action.type) {
@@ -199,6 +200,7 @@ export function ordersReducer(state, action) {
       const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
       const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
       const paidAt = new Date().toISOString()
+      const cashbackPercent = getLoyaltyCardCashbackPercent(loyalty?.cashback_type || loyalty?.cashbackType || 'bronze')
       let remainingLoyalty = Math.max(0, Math.round(Number(loyalty?.loyalty_used_amount ?? loyalty?.loyalty_redeem_amount ?? 0) || 0))
       const activeOrderSummaries = state.orders
         .filter(o => (orderId ? o.id === orderId : o.table_id === tableId) && o.payment_status !== 'paid')
@@ -215,7 +217,7 @@ export function ordersReducer(state, action) {
           const cashbackEarned = calculateLoyaltyCashback(
             { ...o, loyalty_used_amount: loyaltyUsedAmount, status: 'paid', payment_status: 'paid' },
             o.items || [],
-            Number(loyalty?.cashback_percent) || 0
+            loyalty?.loyalty_card_number ? cashbackPercent : 0
           )
           const fields = getOrderPaymentFields(
             {
@@ -276,7 +278,7 @@ export function ordersReducer(state, action) {
             payment_method: finalPaymentMethod,
             payments: paymentAllocations.get(o.id) || [],
             loyalty_card_number: loyalty?.loyalty_card_number || null,
-            cashback_percent: Number(loyalty?.cashback_percent) || 0,
+            cashback_percent: loyalty?.loyalty_card_number ? cashbackPercent : 0,
             cashback_earned: activeSummary?.cashbackEarned || 0,
             ...paymentFields,
           }

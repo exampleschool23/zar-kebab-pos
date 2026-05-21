@@ -104,14 +104,14 @@ export function getLoyaltyUsedAmount(order) {
   ))
 }
 
-export function normalizeCashbackPercent(value, fallbackPct = 5) {
+export function normalizeCashbackPercent(value, fallbackPct = 0) {
   const pct = Number(value)
   if (Number.isFinite(pct)) return Math.max(0, Math.min(100, pct))
   const fallback = Number(fallbackPct)
-  return Number.isFinite(fallback) ? Math.max(0, Math.min(100, fallback)) : 5
+  return Number.isFinite(fallback) ? Math.max(0, Math.min(100, fallback)) : 0
 }
 
-export function calculateLoyaltyCashback(order, items = getOrderItems(order), cashbackPercent = 5) {
+export function calculateLoyaltyCashback(order, items = getOrderItems(order), cashbackPercent = 0) {
   if (order?.status === 'cancelled' || order?.payment_status === 'cancelled') return 0
   const summary = getOrderPaymentSummary(order, items)
   const loyaltyUsed = getLoyaltyUsedAmount(order)

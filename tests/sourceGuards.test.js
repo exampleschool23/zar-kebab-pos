@@ -211,6 +211,8 @@ test('CashierBill uses loyalty wallet controls instead of percent card discounts
   assert.match(source, /loyalty_used_amount/)
   assert.match(source, /cashback_earned/)
   assert.match(source, /getMaxLoyaltyRedeemAmount/)
+  assert.match(source, /getLoyaltyCardCashbackPercent\(loyaltyCard\)/)
+  assert.match(source, /getLoyaltyCardCashbackType\(loyaltyCard\)/)
   assert.match(source, /function fillMaxLoyaltyRedeem\(\)/)
   assert.match(source, /setLoyaltyRedeemAmount\(String\(maxLoyaltyRedeemAmount\)\)/)
   assert.match(source, /Tap balance to use max available/)
@@ -222,6 +224,24 @@ test('CashierBill uses loyalty wallet controls instead of percent card discounts
   assert.doesNotMatch(source, /lbl\.cashbackEarned/)
   assert.doesNotMatch(payMethodsBlock, /loyalty_card/)
   assert.doesNotMatch(payMethodsBlock, /Лояльность/)
+})
+
+test('active cashback calculation uses card type resolver instead of hardcoded default percent', () => {
+  const analytics = readSource('src/lib/analytics.js')
+  const loyalty = readSource('src/lib/loyalty.js')
+  const db = readSource('src/lib/db.js')
+  const cashier = readSource('src/pages/CashierBill.jsx')
+  const reducer = readSource('src/store/ordersReducer.js')
+
+  assert.match(loyalty, /getLoyaltyCardCashbackType/)
+  assert.match(loyalty, /cashbackType/)
+  assert.match(db, /getLoyaltyCardCashbackType/)
+  assert.match(cashier, /getLoyaltyCardCashbackPercent/)
+  assert.match(reducer, /getLoyaltyCardCashbackPercent/)
+  assert.doesNotMatch(analytics, /calculateLoyaltyCashback\(order, items = getOrderItems\(order\), cashbackPercent = 5\)/)
+  assert.doesNotMatch(analytics, /fallbackPct = 5/)
+  assert.doesNotMatch(cashier, /state\.settings\?\.cashbackPercent/)
+  assert.doesNotMatch(db, /state\.settings\?\.cashbackPercent/)
 })
 
 test('CashierBill keeps cashback preview visually after payable totals', () => {

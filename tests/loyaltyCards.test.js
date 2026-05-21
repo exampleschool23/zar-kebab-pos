@@ -16,6 +16,8 @@ import {
   editLoyaltyCardRecord,
   formatUzPhoneNumberInput,
   getCashbackTypePercent,
+  getLoyaltyCardCashbackPercent,
+  getLoyaltyCardCashbackType,
   getLoyaltyCardDisplay,
   getLoyaltyCashbackPreview,
   getLoyaltyTransactionHistory,
@@ -180,7 +182,60 @@ test('cashback types use fixed rates and reject invalid types', () => {
   assert.equal(getCashbackTypePercent('premium'), 10)
   assert.equal(getCashbackTypePercent('black'), 15)
   assert.equal(normalizeCashbackType('Gold'), 'gold')
+  assert.equal(getLoyaltyCardCashbackType({ cashbackType: 'Premium' }), 'premium')
+  assert.equal(getLoyaltyCardCashbackPercent({ cashbackType: 'Premium' }), 10)
+  assert.equal(getLoyaltyCardCashbackPercent({ cashback_type: 'black' }), 15)
   assertLoyaltyError(() => normalizeCashbackType('diamond'), 'invalid_cashback_type')
+})
+
+test('cashback preview uses selected loyalty card type for exact 151000 UZS bug regression', () => {
+  const rows = [
+    item({ id: 'menu-total', menu_item_id: 'menu-total', price: 151000 }),
+    item({ id: 'counter-total', menu_item_id: 'cola', price: 99000, item_type: 'counter', is_counter_item: true }),
+  ]
+  const order = paidOrder({ service_rate_pct: 15, tip_amount: 50000 })
+  const expectedByType = {
+    bronze: 4530,
+    silver: 7550,
+    gold: 10570,
+    premium: 15100,
+    black: 22650,
+  }
+
+  for (const [cashbackType, expected] of Object.entries(expectedByType)) {
+    const preview = getLoyaltyCashbackPreview({
+      order,
+      items: rows,
+      loyaltyUsedAmount: 0,
+      card: card({ cashback_type: undefined, cashbackType }),
+    })
+    assert.equal(preview.cashback, expected)
+  }
+
+  const premiumPreview = getLoyaltyCashbackPreview({
+    order,
+    items: rows,
+    loyaltyUsedAmount: 0,
+    card: card({ cashback_type: undefined, cashbackType: 'premium' }),
+  })
+  assert.equal(premiumPreview.cashback, 15100)
+  assert.notEqual(premiumPreview.cashback, 7550)
+
+  const premiumPartial = getLoyaltyCashbackPreview({
+    order,
+    items: rows,
+    loyaltyUsedAmount: 50000,
+    card: card({ cashback_type: undefined, cashbackType: 'premium' }),
+  })
+  assert.equal(premiumPartial.cashback, 10100)
+
+  const premiumOverRedeemed = getLoyaltyCashbackPreview({
+    order,
+    items: rows,
+    loyaltyUsedAmount: 200000,
+    card: card({ cashback_type: undefined, cashbackType: 'premium' }),
+  })
+  assert.equal(premiumOverRedeemed.cashback, 0)
 })
 
 test('owner can edit cashback type while old transaction snapshots keep historical rate and type', () => {
@@ -382,6 +437,29 @@ test('cashback calculation uses menu items minus loyalty only, floors integer UZ
   }).cashback, 0)
   assertLoyaltyError(() => completeOrderCashback({ card: card(), order: paidOrder(), items: [item()], loyaltyUsedAmount: -1 }), 'invalid_amount')
   assertLoyaltyError(() => completeOrderCashback({ card: card(), order: paidOrder(), items: [item()], loyaltyUsedAmount: 1.5 }), 'invalid_amount')
+})
+
+test('premium card completion matches preview and stores transaction snapshots', () => {
+  const rows = [item({ id: 'exact-premium', menu_item_id: 'exact-premium', price: 151000 })]
+  const premiumCard = card({ cashback_type: undefined, cashbackType: 'premium', balance: 0, total_earned: 0 })
+  const preview = getLoyaltyCashbackPreview({
+    order: paidOrder({ service_rate_pct: 15 }),
+    items: rows,
+    loyaltyUsedAmount: 0,
+    card: premiumCard,
+  })
+  const settlement = completeOrderCashback({
+    card: premiumCard,
+    order: paidOrder({ service_rate_pct: 15 }),
+    items: rows,
+    loyaltyUsedAmount: 0,
+  })
+
+  assert.equal(preview.cashback, 15100)
+  assert.equal(settlement.cashback, preview.cashback)
+  assert.equal(settlement.transaction.amount, 15100)
+  assert.equal(settlement.transaction.cashback_percent_used, 10)
+  assert.equal(settlement.transaction.card_type_at_transaction, 'premium')
 })
 
 test('order completion creates cashback only after successful paid order and stores order fields', () => {

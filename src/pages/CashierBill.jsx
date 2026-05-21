@@ -21,7 +21,7 @@ import {
   normalizeSplitPayments,
 } from '../lib/analytics'
 import { supabase } from '../lib/supabase'
-import { getCashbackTypePercent } from '../lib/loyalty'
+import { getLoyaltyCardCashbackPercent, getLoyaltyCardCashbackType } from '../lib/loyalty'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import StatusBadge from '../components/StatusBadge'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
@@ -150,7 +150,7 @@ export default function CashierBill() {
   const counterItemsSubtotal = payment.counterItemsSubtotal
   const loyaltyAmt    = payment.loyaltyUsedAmount
   const loyaltyCashbackPercent = loyaltyCard
-    ? getCashbackTypePercent(loyaltyCard.cashback_type || 'bronze')
+    ? getLoyaltyCardCashbackPercent(loyaltyCard)
     : 0
   const cashbackToBeEarned = order
     ? calculateLoyaltyCashback(
@@ -297,7 +297,7 @@ export default function CashierBill() {
           loyalty_redeem_amount: loyaltyAmt,
           cashback_earned: cashbackToBeEarned,
           cashback_percent: loyaltyCashbackPercent,
-          cashback_type: loyaltyCard?.cashback_type || null,
+          cashback_type: loyaltyCard ? getLoyaltyCardCashbackType(loyaltyCard) : null,
           discounted_subtotal: total,
           service_fee:             serviceFee,
           service_rate_pct:         serviceRatePct,
