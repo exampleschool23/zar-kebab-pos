@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from 'react'
-import { Plus, Edit2, Trash2, X, Table2, MapPin, Users, Hash, Power, PowerOff, Layers, CalendarClock } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import {
+  Plus, Edit2, Trash2, X, Table2, MapPin, Users, Hash, Power, PowerOff,
+  CalendarClock, Phone, CheckCircle2, ArrowUp, ArrowDown,
+} from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import AppShell from '../components/AppShell'
 import { canDeleteTable, canDisableTable } from '../lib/tableManagement'
+import { clearReservationPatch, compactTimelineLabels, getTodaysReservations } from '../lib/tableActivity'
 
 const DEFAULT_ZONES = ['Main Hall', 'VIP', 'Outdoor', 'Second Floor']
 
@@ -74,6 +79,23 @@ const L = {
     couldNotSave: 'Could not save table',
     tableAdded: 'Table added',
     tableUpdated: 'Table updated',
+    todaysReservations: 'Today’s Reservations',
+    noReservationsToday: 'No reservations today',
+    seat: 'Seat',
+    cancelReservation: 'Cancel reservation',
+    call: 'Call',
+    activity: 'Activity',
+    select: 'Select',
+    selected: count => `${count} selected`,
+    bulkActions: 'Bulk actions',
+    bulkZone: 'Set zone',
+    bulkCapacity: 'Set capacity',
+    applyBulk: 'Apply',
+    renumberSelected: 'Renumber',
+    clearSelection: 'Clear',
+    bulkUpdated: 'Tables updated',
+    moveUp: 'Move up',
+    moveDown: 'Move down',
   },
   ru: {
     title: 'Столы',
@@ -142,6 +164,23 @@ const L = {
     couldNotSave: 'Не удалось сохранить стол',
     tableAdded: 'Стол добавлен',
     tableUpdated: 'Стол обновлён',
+    todaysReservations: 'Брони сегодня',
+    noReservationsToday: 'Сегодня броней нет',
+    seat: 'Посадить',
+    cancelReservation: 'Отменить бронь',
+    call: 'Позвонить',
+    activity: 'История',
+    select: 'Выбрать',
+    selected: count => `Выбрано: ${count}`,
+    bulkActions: 'Массовые действия',
+    bulkZone: 'Зона',
+    bulkCapacity: 'Вместимость',
+    applyBulk: 'Применить',
+    renumberSelected: 'Перенумеровать',
+    clearSelection: 'Очистить',
+    bulkUpdated: 'Столы обновлены',
+    moveUp: 'Вверх',
+    moveDown: 'Вниз',
   },
   uz: {
     title: 'Stollar',
@@ -210,6 +249,23 @@ const L = {
     couldNotSave: 'Stol saqlanmadi',
     tableAdded: 'Stol qo‘shildi',
     tableUpdated: 'Stol yangilandi',
+    todaysReservations: 'Bugungi bronlar',
+    noReservationsToday: 'Bugun bron yo‘q',
+    seat: 'Joylashtirish',
+    cancelReservation: 'Bronni bekor qilish',
+    call: 'Qo‘ng‘iroq',
+    activity: 'Faollik',
+    select: 'Tanlash',
+    selected: count => `${count} tanlandi`,
+    bulkActions: 'Ommaviy amallar',
+    bulkZone: 'Zonani o‘zgartirish',
+    bulkCapacity: 'Sig‘imni o‘zgartirish',
+    applyBulk: 'Qo‘llash',
+    renumberSelected: 'Raqamlash',
+    clearSelection: 'Tozalash',
+    bulkUpdated: 'Stollar yangilandi',
+    moveUp: 'Yuqoriga',
+    moveDown: 'Pastga',
   },
 }
 
@@ -329,8 +385,78 @@ function SummaryCard({ icon: Icon, label, value, tone }) {
   )
 }
 
+function ReservationStrip({ reservations, labels, onSeat, onCancel, onCall }) {
+  return (
+    <div className="mb-5 rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+            <CalendarClock size={17} />
+          </span>
+          <div>
+            <p className="text-sm font-black text-[#1F2937]">{labels.todaysReservations}</p>
+            <p className="text-xs font-semibold text-gray-400">
+              {reservations.length > 0 ? `${reservations.length}` : labels.noReservationsToday}
+            </p>
+          </div>
+        </div>
+      </div>
+      {reservations.length > 0 && (
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          {reservations.map(({ table, reservation }) => (
+            <div key={table.id} className="min-w-[270px] rounded-2xl border border-purple-100 bg-purple-50/50 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-[#1F2937]">{table.name}</p>
+                  <p className="truncate text-xs font-bold text-purple-700">{reservation.name || '-'}</p>
+                </div>
+                <span className="rounded-full bg-white px-2 py-1 text-xs font-black text-purple-700">
+                  {new Date(reservation.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-1.5">
+                <button onClick={() => onSeat(table)} className="inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-purple-600 text-[11px] font-black text-white">
+                  <CheckCircle2 size={12} />
+                  {labels.seat}
+                </button>
+                <button onClick={() => onCancel(table)} className="h-8 rounded-lg border border-purple-100 bg-white text-[11px] font-black text-purple-700">
+                  {labels.cancelReservation}
+                </button>
+                <button
+                  onClick={() => onCall(reservation.phone)}
+                  disabled={!reservation.phone}
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-purple-100 bg-white text-[11px] font-black text-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Phone size={12} />
+                  {labels.call}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ActivityTimeline({ labels, table, orders }) {
+  const items = compactTimelineLabels(table, orders, 5)
+  if (items.length === 0) return null
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1">
+      <span className="text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.activity}</span>
+      {items.map(item => (
+        <span key={item} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
+          {item}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function AdminTables() {
   const { state, dispatch } = useApp()
+  const navigate = useNavigate()
   const lang = state.lang || 'en'
   const l = L[lang] || L.en
   const [modal, setModal] = useState(null)
@@ -340,6 +466,9 @@ export default function AdminTables() {
   const [errors, setErrors] = useState({})
   const [notice, setNotice] = useState(null)
   const [confirm, setConfirm] = useState(null)
+  const [selectedIds, setSelectedIds] = useState([])
+  const [bulkZoneId, setBulkZoneId] = useState('')
+  const [bulkCapacity, setBulkCapacity] = useState('')
 
   const tableZones = useMemo(() => {
     const stored = state.tableZones || []
@@ -394,6 +523,11 @@ export default function AdminTables() {
   const activeCount = state.tables.filter(table => table.is_active !== false).length
   const disabledCount = state.tables.length - activeCount
   const reservedCount = state.tables.filter(table => table.is_active !== false && table.status === 'reserved').length
+  const todaysReservations = useMemo(() => getTodaysReservations(state.tables, new Date()), [state.tables])
+  const selectedTables = useMemo(() =>
+    sortedTables.filter(table => selectedIds.includes(table.id)),
+    [selectedIds, sortedTables]
+  )
 
   function openNew() {
     const nextSort = state.tables.reduce((max, table) => Math.max(max, Number(table.sort_order) || 0), 0) + 1
@@ -576,6 +710,65 @@ export default function AdminTables() {
     })
   }
 
+  function toggleSelected(tableId) {
+    setSelectedIds(current => current.includes(tableId)
+      ? current.filter(id => id !== tableId)
+      : [...current, tableId]
+    )
+  }
+
+  function toggleAllSelected() {
+    if (selectedIds.length === sortedTables.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(sortedTables.map(table => table.id))
+    }
+  }
+
+  async function applyBulkUpdates({ renumber = false } = {}) {
+    if (selectedTables.length === 0) return
+    const selectedZone = tableZones.find(zone => zone.id === bulkZoneId)
+    const nextCapacity = bulkCapacity === '' ? null : Math.max(1, Math.round(Number(bulkCapacity) || 1))
+    for (let index = 0; index < selectedTables.length; index += 1) {
+      const table = selectedTables[index]
+      await dispatch({
+        type: 'UPDATE_TABLE',
+        payload: {
+          ...table,
+          ...(selectedZone ? { zone_id: selectedZone.id, zone_name: selectedZone.name } : {}),
+          ...(nextCapacity ? { capacity: nextCapacity } : {}),
+          ...(renumber ? { sort_order: index + 1 } : {}),
+        },
+      })
+    }
+    setNotice({ tone: 'success', message: l.bulkUpdated })
+  }
+
+  async function moveTable(table, direction) {
+    const zoneTables = sortedTables
+      .filter(row => (row.zone_id || row.zone_name) === (table.zone_id || table.zone_name))
+      .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
+    const index = zoneTables.findIndex(row => row.id === table.id)
+    const other = zoneTables[index + direction]
+    if (!other) return
+    await dispatch({ type: 'UPDATE_TABLE', payload: { ...table, sort_order: Number(other.sort_order) || 0 } })
+    await dispatch({ type: 'UPDATE_TABLE', payload: { ...other, sort_order: Number(table.sort_order) || 0 } })
+  }
+
+  function seatReservation(table) {
+    dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
+    navigate(`/waiter/order/${table.id}`)
+  }
+
+  function cancelReservation(table) {
+    dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
+  }
+
+  function callReservation(phone) {
+    if (!phone) return
+    window.location.href = `tel:${phone}`
+  }
+
   return (
     <AppShell title={l.title}>
       <div className="mx-auto max-w-[1180px] px-5 py-6">
@@ -610,6 +803,14 @@ export default function AdminTables() {
           <SummaryCard icon={PowerOff} label={l.disabled} value={disabledCount} tone="gray" />
         </div>
 
+        <ReservationStrip
+          reservations={todaysReservations}
+          labels={l}
+          onSeat={seatReservation}
+          onCancel={cancelReservation}
+          onCall={callReservation}
+        />
+
         <div className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -641,8 +842,47 @@ export default function AdminTables() {
           {zoneError && <p className="mt-2 text-xs font-bold text-red-600">{zoneError}</p>}
         </div>
 
+        {selectedIds.length > 0 && (
+          <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-[#1F2937]">{l.bulkActions}</p>
+                <p className="text-xs font-semibold text-blue-700">{l.selected(selectedIds.length)}</p>
+              </div>
+              <button onClick={() => setSelectedIds([])} className="rounded-xl border border-blue-100 bg-white px-3 py-2 text-xs font-black text-blue-700">
+                {l.clearSelection}
+              </button>
+            </div>
+            <div className="grid gap-2 md:grid-cols-[1fr_160px_auto_auto]">
+              <select
+                value={bulkZoneId}
+                onChange={e => setBulkZoneId(e.target.value)}
+                className="h-10 rounded-xl border border-blue-100 bg-white px-3 text-sm font-bold text-[#1F2937] outline-none"
+              >
+                <option value="">{l.bulkZone}</option>
+                {tableZones.map(zone => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
+              </select>
+              <input
+                type="number"
+                min="1"
+                value={bulkCapacity}
+                onChange={e => setBulkCapacity(e.target.value)}
+                placeholder={l.bulkCapacity}
+                className="h-10 rounded-xl border border-blue-100 bg-white px-3 text-sm font-bold text-[#1F2937] outline-none"
+              />
+              <button onClick={() => applyBulkUpdates()} className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-black text-white">
+                {l.applyBulk}
+              </button>
+              <button onClick={() => applyBulkUpdates({ renumber: true })} className="h-10 rounded-xl border border-blue-100 bg-white px-4 text-sm font-black text-blue-700">
+                {l.renumberSelected}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
-          <div className="hidden grid-cols-[1.3fr_1fr_0.7fr_1fr_0.7fr_120px] gap-3 border-b border-[#F3F4F6] bg-gray-50 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-gray-400 md:grid">
+          <div className="hidden grid-cols-[40px_1.3fr_1fr_0.7fr_1fr_0.7fr_150px] gap-3 border-b border-[#F3F4F6] bg-gray-50 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-gray-400 md:grid">
+            <button onClick={toggleAllSelected} className="text-left">{l.select}</button>
             <span>{l.tableName}</span>
             <span>{l.zoneSection}</span>
             <span>{l.capacity}</span>
@@ -654,8 +894,18 @@ export default function AdminTables() {
             {sortedTables.map(table => {
               const activeOrders = orderStats.active.has(table.id)
               const hasHistory = orderStats.history.has(table.id)
+              const selected = selectedIds.includes(table.id)
               return (
-                <div key={table.id} className={`grid gap-3 px-4 py-4 md:grid-cols-[1.3fr_1fr_0.7fr_1fr_0.7fr_120px] md:items-center ${table.is_active === false ? 'bg-gray-50/70' : 'bg-white'}`}>
+                <div key={table.id} className={`grid gap-3 px-4 py-4 md:grid-cols-[40px_1.3fr_1fr_0.7fr_1fr_0.7fr_150px] md:items-center ${table.is_active === false ? 'bg-gray-50/70' : selected ? 'bg-blue-50/40' : 'bg-white'}`}>
+                  <div>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleSelected(table.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-[#ff5a00]"
+                      aria-label={`${l.select} ${table.name}`}
+                    />
+                  </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black text-[#1F2937]">{table.name}</p>
                     <p className="mt-0.5 text-xs text-gray-400 md:hidden">{table.zone_name || 'Main Hall'} · sort {Number(table.sort_order) || 0}</p>
@@ -664,6 +914,7 @@ export default function AdminTables() {
                     {table.status === 'reserved' && table.reserved_for_name && (
                       <p className="mt-1 text-xs font-bold text-purple-600">{table.reserved_for_name}</p>
                     )}
+                    <ActivityTimeline labels={l} table={table} orders={state.orders} />
                   </div>
                   <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">
                     <MapPin size={14} className="text-gray-300" />
@@ -684,6 +935,20 @@ export default function AdminTables() {
                     {Number(table.sort_order) || 0}
                   </div>
                   <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => moveTable(table, -1)}
+                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                      title={l.moveUp}
+                    >
+                      <ArrowUp size={15} />
+                    </button>
+                    <button
+                      onClick={() => moveTable(table, 1)}
+                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                      title={l.moveDown}
+                    >
+                      <ArrowDown size={15} />
+                    </button>
                     <button
                       onClick={() => openEdit(table)}
                       className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-orange-50 hover:text-[#ff5a00]"

@@ -1,7 +1,7 @@
 import {
   getOrderPaymentFields,
   normalizeServiceRatePct,
-} from '../lib/analytics'
+} from '../lib/analytics.js'
 
 export const DEFAULT_SETTINGS = {
   restaurantName: 'Zar Kebab',

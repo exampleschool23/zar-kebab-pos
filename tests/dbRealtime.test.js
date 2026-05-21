@@ -24,11 +24,17 @@ function makeRealtimeClient() {
     },
     removed: false,
     from() {
+      const query = {
+        order() {
+          return query
+        },
+        then(resolve) {
+          return Promise.resolve({ data: [] }).then(resolve)
+        },
+      }
       return {
         select() {
-          return {
-            order: async () => ({ data: [] }),
-          }
+          return query
         },
       }
     },
@@ -78,6 +84,29 @@ test('business settings realtime updates active sessions', async () => {
 
   unsubscribe()
   assert.equal(dbClient.removed, true)
+})
+
+test('remote table updates show conflict feedback and refresh tables', async () => {
+  const dbClient = makeRealtimeClient()
+  const actions = []
+  const unsubscribe = subscribeToRealtime(action => actions.push(action), {
+    dbClient,
+    debounceMs: 0,
+    settingsLoader: async () => null,
+  })
+
+  await dbClient.handlers.get('restaurant_tables')({ eventType: 'UPDATE' })
+
+  assert.deepEqual(actions[0], {
+    type: 'SET_CONNECTION_NOTICE',
+    payload: {
+      tone: 'info',
+      message: 'Changed by another device. Refreshed the latest data.',
+    },
+  })
+  assert.deepEqual(actions[1], { type: 'SET_TABLES', payload: [] })
+
+  unsubscribe()
 })
 
 test('realtime channel errors surface a connection notice', () => {

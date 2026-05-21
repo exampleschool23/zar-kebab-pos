@@ -34,6 +34,9 @@ export default function AdminAudit() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [actionFilter, setActionFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   const l = {
     uz: {
@@ -50,6 +53,10 @@ export default function AdminAudit() {
       method: 'To‘lov',
       status: 'Status',
       time: 'Vaqt',
+      filters: 'Filtrlar',
+      searchPlaceholder: 'Buyurtma, foydalanuvchi yoki amal...',
+      allActions: 'Barcha amallar',
+      allStatuses: 'Barcha statuslar',
       migrationMissing: 'Audit jadvali hali bazada yaratilmagan. Supabase SQL editorida supabase/010_order_payment_audit_and_guards.sql migratsiyasini ishga tushiring.',
     },
     ru: {
@@ -66,6 +73,10 @@ export default function AdminAudit() {
       method: 'Оплата',
       status: 'Статус',
       time: 'Время',
+      filters: 'Фильтры',
+      searchPlaceholder: 'Заказ, пользователь или действие...',
+      allActions: 'Все действия',
+      allStatuses: 'Все статусы',
       migrationMissing: 'Таблица аудита ещё не создана в базе. Запустите миграцию supabase/010_order_payment_audit_and_guards.sql в Supabase SQL Editor.',
     },
     en: {
@@ -82,6 +93,10 @@ export default function AdminAudit() {
       method: 'Payment',
       status: 'Status',
       time: 'Time',
+      filters: 'Filters',
+      searchPlaceholder: 'Order, user, or action...',
+      allActions: 'All actions',
+      allStatuses: 'All statuses',
       migrationMissing: 'The audit table has not been created in the database yet. Run supabase/010_order_payment_audit_and_guards.sql in the Supabase SQL Editor.',
     },
   }[lang] || {}
@@ -108,6 +123,33 @@ export default function AdminAudit() {
     loadAudit()
   }, [])
 
+  const actions = useMemo(() => [...new Set(rows.map(row => row.action).filter(Boolean))].sort(), [rows])
+  const statuses = useMemo(() => [...new Set(rows.flatMap(row => [row.old_status, row.new_status, row.old_payment_status, row.new_payment_status]).filter(Boolean))].sort(), [rows])
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return rows.filter(row => {
+      const matchAction = actionFilter === 'all' || row.action === actionFilter
+      const matchStatus = statusFilter === 'all' ||
+        row.old_status === statusFilter ||
+        row.new_status === statusFilter ||
+        row.old_payment_status === statusFilter ||
+        row.new_payment_status === statusFilter
+      const haystack = [
+        row.order_id,
+        row.action,
+        row.changed_by,
+        row.old_status,
+        row.new_status,
+        row.old_payment_status,
+        row.new_payment_status,
+        row.old_payment_method,
+        row.new_payment_method,
+      ].join(' ').toLowerCase()
+      return matchAction && matchStatus && (!q || haystack.includes(q))
+    })
+  }, [actionFilter, rows, search, statusFilter])
+
   const content = useMemo(() => {
     if (loading) {
       return Array.from({ length: 5 }).map((_, idx) => (
@@ -133,7 +175,7 @@ export default function AdminAudit() {
       )
     }
 
-    if (rows.length === 0) {
+    if (filteredRows.length === 0) {
       return (
         <div className="rounded-2xl border border-[#E5E7EB] bg-white p-10 text-center shadow-sm">
           <ShieldCheck size={34} className="mx-auto mb-3 text-[#CBD5E1]" />
@@ -142,7 +184,7 @@ export default function AdminAudit() {
       )
     }
 
-    return rows.map(row => (
+    return filteredRows.map(row => (
       <div key={row.id} className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -167,7 +209,7 @@ export default function AdminAudit() {
         </div>
       </div>
     ))
-  }, [error, l, lang, loading, rows])
+  }, [error, filteredRows, l, lang, loading])
 
   return (
     <AppShell title={l.title}>
@@ -185,6 +227,33 @@ export default function AdminAudit() {
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             {l.refresh}
           </button>
+        </div>
+        <div className="mb-4 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+          <p className="mb-3 text-xs font-black uppercase tracking-widest text-[#9CA3AF]">{l.filters}</p>
+          <div className="grid gap-2 md:grid-cols-[1fr_220px_220px]">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={l.searchPlaceholder}
+              className="h-10 rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
+            />
+            <select
+              value={actionFilter}
+              onChange={e => setActionFilter(e.target.value)}
+              className="h-10 rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-bold text-[#1F2937] outline-none transition-all focus:border-[#ff5a00]"
+            >
+              <option value="all">{l.allActions}</option>
+              {actions.map(action => <option key={action} value={action}>{actionLabel(action, lang)}</option>)}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="h-10 rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-bold text-[#1F2937] outline-none transition-all focus:border-[#ff5a00]"
+            >
+              <option value="all">{l.allStatuses}</option>
+              {statuses.map(status => <option key={status} value={status}>{status}</option>)}
+            </select>
+          </div>
         </div>
         <div className="space-y-3">{content}</div>
       </div>

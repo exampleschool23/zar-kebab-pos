@@ -4,14 +4,14 @@ import {
   getPaymentMethodSummary,
   normalizeSplitPayments,
   removeSentCartItems,
-} from '../lib/analytics'
+} from '../lib/analytics.js'
 import {
   makeLocalId,
   makeTakeAwayOrderNumber,
   normalizeOrderType,
   recalcOrderTotals,
   serviceRatePctFromSettings,
-} from './reducerHelpers'
+} from './reducerHelpers.js'
 
 export function ordersReducer(state, action) {
   switch (action.type) {

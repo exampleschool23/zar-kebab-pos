@@ -10,6 +10,7 @@ import {
   Search, CreditCard, Settings, CalendarClock, Phone,
 } from 'lucide-react'
 import { getReservationSummary, getWaiterTableStatus } from '../lib/tableManagement'
+import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
@@ -51,6 +52,11 @@ const L = {
     guideNeedsBill: 'Guest requested the bill',
     takeAwayOrder: 'Take Away Order',
     manageTables: 'Manage tables',
+    todaysReservations: 'Today’s Reservations',
+    noReservationsToday: 'No reservations today',
+    seat: 'Seat',
+    cancelReservation: 'Cancel',
+    call: 'Call',
   },
   ru: {
     tables: 'Столы',
@@ -89,6 +95,11 @@ const L = {
     guideNeedsBill: 'Гость попросил счёт',
     takeAwayOrder: 'Заказ с собой',
     manageTables: 'Управление столами',
+    todaysReservations: 'Брони сегодня',
+    noReservationsToday: 'Сегодня броней нет',
+    seat: 'Посадить',
+    cancelReservation: 'Отменить',
+    call: 'Позвонить',
   },
   uz: {
     tables: 'Stollar',
@@ -127,6 +138,11 @@ const L = {
     guideNeedsBill: 'Mehmon hisob so\'radi',
     takeAwayOrder: 'Olib ketish buyurtmasi',
     manageTables: 'Stollarni boshqarish',
+    todaysReservations: 'Bugungi bronlar',
+    noReservationsToday: 'Bugun bron yo‘q',
+    seat: 'Joylashtirish',
+    cancelReservation: 'Bekor qilish',
+    call: 'Qo‘ng‘iroq',
   },
 }
 
@@ -494,6 +510,67 @@ function StatusGuide({ lang }) {
   )
 }
 
+function ReservationStrip({ reservations, lang, onSeat, onCancel, onCall }) {
+  if (reservations.length === 0) {
+    return (
+      <div className="mb-5 rounded-2xl border border-dashed border-purple-100 bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-2 text-sm font-black text-[#1F2937]">
+          <CalendarClock size={16} className="text-purple-500" />
+          {tr(lang, 'todaysReservations')}
+        </div>
+        <p className="mt-1 text-xs font-semibold text-gray-400">{tr(lang, 'noReservationsToday')}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-5 rounded-2xl border border-purple-100 bg-white p-3 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+            <CalendarClock size={17} />
+          </span>
+          <div>
+            <p className="text-sm font-black text-[#1F2937]">{tr(lang, 'todaysReservations')}</p>
+            <p className="text-xs font-semibold text-gray-400">{tableCountLabel(lang, reservations.length)}</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-3 overflow-x-auto pb-1">
+        {reservations.map(({ table, reservation }) => (
+          <div key={table.id} className="min-w-[260px] rounded-2xl border border-purple-100 bg-purple-50/50 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black text-[#1F2937]">{table.name}</p>
+                <p className="truncate text-xs font-bold text-purple-700">{reservation.name || '-'}</p>
+              </div>
+              <span className="rounded-full bg-white px-2 py-1 text-xs font-black text-purple-700">
+                {new Date(reservation.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-1.5">
+              <button onClick={() => onSeat(table)} className="h-8 rounded-lg bg-purple-600 text-[11px] font-black text-white">
+                {tr(lang, 'seat')}
+              </button>
+              <button onClick={() => onCancel(table)} className="h-8 rounded-lg border border-purple-100 bg-white text-[11px] font-black text-purple-700">
+                {tr(lang, 'cancelReservation')}
+              </button>
+              <button
+                onClick={() => onCall(reservation.phone)}
+                disabled={!reservation.phone}
+                className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-purple-100 bg-white text-[11px] font-black text-purple-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Phone size={12} />
+                {tr(lang, 'call')}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const FILTER_ORDER = ['all', 'available', 'reserved', 'waiting_kitchen', 'preparing', 'ready', 'needs_bill', 'occupied']
@@ -551,6 +628,11 @@ export default function WaiterTables() {
     [filtered]
   )
 
+  const todaysReservations = useMemo(() =>
+    getTodaysReservations(state.tables.filter(table => table.is_active !== false), new Date()),
+    [state.tables]
+  )
+
   function handleTable(table, status) {
     dispatch({ type: 'SET_TABLE', payload: table.id })
     dispatch({ type: 'CLEAR_CART' })
@@ -575,20 +657,23 @@ export default function WaiterTables() {
       return
     }
     if (status === 'reserved') {
-      dispatch({
-        type: 'UPDATE_TABLE',
-        payload: {
-          ...table,
-          status: 'available',
-          reserved_for_name: '',
-          reserved_for_phone: '',
-          reserved_at: null,
-          reserved_until: null,
-          reservation_notes: '',
-        },
-      })
+      dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
     }
     handleTable(table, status)
+  }
+
+  function seatReservation(table) {
+    dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
+    handleTable(table, 'reserved')
+  }
+
+  function cancelReservation(table) {
+    dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
+  }
+
+  function callReservation(phone) {
+    if (!phone) return
+    window.location.href = `tel:${phone}`
   }
 
   function handleTakeAway() {
@@ -648,6 +733,14 @@ export default function WaiterTables() {
               )}
             </div>
           </div>
+
+          <ReservationStrip
+            reservations={todaysReservations}
+            lang={lang}
+            onSeat={seatReservation}
+            onCancel={cancelReservation}
+            onCall={callReservation}
+          />
 
           {/* Filter chips */}
           <div className="mb-6 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">

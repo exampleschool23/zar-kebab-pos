@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Store, Percent, Globe, Printer, Bell, Shield, Table2,
-  Check, ChevronRight,
+  Check, ChevronRight, Activity, AlertTriangle, RefreshCw,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import AppShell from '../components/AppShell'
+import { runDbHealthChecks } from '../lib/dbHealth'
 
 function Section({ title, children }) {
   return (
@@ -60,6 +61,9 @@ export default function AdminSettings() {
   const [saved,          setSaved]          = useState(false)
   const [saving,         setSaving]         = useState(false)
   const [error,          setError]          = useState('')
+  const [health,         setHealth]         = useState(null)
+  const [healthLoading,  setHealthLoading]  = useState(false)
+  const [healthError,    setHealthError]    = useState('')
 
   useEffect(() => {
     setRestaurantName(settings.restaurantName)
@@ -84,6 +88,18 @@ export default function AdminSettings() {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  async function checkHealth() {
+    setHealthLoading(true)
+    setHealthError('')
+    try {
+      setHealth(await runDbHealthChecks())
+    } catch (err) {
+      setHealthError(err.message || 'Could not check system health')
+    } finally {
+      setHealthLoading(false)
+    }
+  }
+
   const L = {
     uz: {
       title:           'Sozlamalar',
@@ -105,6 +121,11 @@ export default function AdminSettings() {
       autoPrintSub:    'To\'lovdan keyin chekni avtomatik bosib chiqarish',
       notifications:   'Bildirishnomalar',
       notifSub:        'Yangi buyurtmalar uchun ovozli signal',
+      systemHealth:    'Tizim holati',
+      systemHealthSub: 'Baza jadvallari, ustunlari va RPC tekshiruvi',
+      runHealth:       'Tekshirish',
+      healthy:         'Hammasi joyida',
+      unhealthy:       'Muammo bor',
       save:            'Saqlash',
       saving:          'Saqlanmoqda...',
       saved:           'Saqlandi!',
@@ -130,6 +151,11 @@ export default function AdminSettings() {
       autoPrintSub:    'Печатать чек автоматически после оплаты',
       notifications:   'Уведомления',
       notifSub:        'Звук при новых заказах',
+      systemHealth:    'Состояние системы',
+      systemHealthSub: 'Проверка таблиц, колонок и RPC в базе',
+      runHealth:       'Проверить',
+      healthy:         'Всё в порядке',
+      unhealthy:       'Есть проблемы',
       save:            'Сохранить',
       saving:          'Сохранение...',
       saved:           'Сохранено!',
@@ -155,6 +181,11 @@ export default function AdminSettings() {
       autoPrintSub:    'Print receipt automatically after payment',
       notifications:   'Notifications',
       notifSub:        'Sound alert for new orders',
+      systemHealth:    'System health',
+      systemHealthSub: 'Checks database tables, columns, and RPCs',
+      runHealth:       'Check',
+      healthy:         'Healthy',
+      unhealthy:       'Needs attention',
       save:            'Save Changes',
       saving:          'Saving...',
       saved:           'Saved!',
@@ -248,6 +279,55 @@ export default function AdminSettings() {
           <SettingRow icon={Bell} label={l.notifications} sub={l.notifSub}>
             <Toggle value={notifications} onChange={setNotifications} />
           </SettingRow>
+        </Section>
+
+        <Section title={l.systemHealth}>
+          <div className="px-5 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#F3F4F6] bg-[#F9FAFB]">
+                  <Activity size={16} className="text-[#6B7280]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-[#1F2937]">{l.systemHealth}</p>
+                  <p className="mt-0.5 text-[12px] text-[#9CA3AF]">{l.systemHealthSub}</p>
+                </div>
+              </div>
+              <button
+                onClick={checkHealth}
+                disabled={healthLoading}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-gray-50 px-3 py-2 text-[13px] font-bold text-[#1F2937] transition-colors hover:bg-gray-100 disabled:opacity-60"
+              >
+                <RefreshCw size={14} className={healthLoading ? 'animate-spin' : ''} />
+                {l.runHealth}
+              </button>
+            </div>
+
+            {healthError && (
+              <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+                {healthError}
+              </p>
+            )}
+
+            {health && (
+              <div className="mt-4 rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-3">
+                <div className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black ${
+                  health.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  {health.ok ? <Check size={13} /> : <AlertTriangle size={13} />}
+                  {health.ok ? l.healthy : l.unhealthy}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {health.checks.map(check => (
+                    <div key={`${check.type}-${check.name}`} className="rounded-xl bg-white px-3 py-2 text-xs">
+                      <p className="font-black text-[#1F2937]">{check.name}</p>
+                      <p className={check.ok ? 'font-bold text-emerald-600' : 'font-bold text-red-600'}>{check.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* Save button */}

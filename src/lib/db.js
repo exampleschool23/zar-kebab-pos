@@ -229,6 +229,17 @@ export function subscribeToRealtime(dispatch, options = {}) {
   let ordersReloadQueued = false
   let settingsReloadTimer = null
 
+  function notifyRemoteChange(payload) {
+    if (!payload || payload.eventType !== 'UPDATE') return
+    dispatch({
+      type: 'SET_CONNECTION_NOTICE',
+      payload: {
+        tone: 'info',
+        message: 'Changed by another device. Refreshed the latest data.',
+      },
+    })
+  }
+
   async function reloadOrders() {
     if (ordersReloadInFlight) {
       ordersReloadQueued = true
@@ -245,7 +256,8 @@ export function subscribeToRealtime(dispatch, options = {}) {
     }
   }
 
-  function scheduleReloadOrders() {
+  function scheduleReloadOrders(payload) {
+    notifyRemoteChange(payload)
     if (ordersReloadTimer) clearTimeout(ordersReloadTimer)
     ordersReloadTimer = setTimeout(() => {
       ordersReloadTimer = null
@@ -256,7 +268,8 @@ export function subscribeToRealtime(dispatch, options = {}) {
     }, debounceMs)
   }
 
-  async function reloadTables() {
+  async function reloadTables(payload) {
+    notifyRemoteChange(payload)
     dispatch({ type: 'SET_TABLES', payload: await loadRestaurantTables(dbClient) })
   }
 
