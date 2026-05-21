@@ -15,7 +15,8 @@ alter table public.restaurant_tables
   add column if not exists reserved_for_phone text not null default '',
   add column if not exists reserved_at timestamptz,
   add column if not exists reserved_until timestamptz,
-  add column if not exists reservation_notes text not null default '';
+  add column if not exists reservation_notes text not null default '',
+  add column if not exists updated_at timestamptz not null default now();
 
 update public.restaurant_tables
 set
