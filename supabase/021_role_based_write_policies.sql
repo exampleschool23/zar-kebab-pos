@@ -1,5 +1,53 @@
 -- Tighten management writes by role while preserving operational table/order flow.
--- Run after 019_table_management.sql and 020_table_reservations.sql.
+-- This migration is intentionally defensive: production may have skipped older
+-- table-management/settings migrations, so create the policy target tables and
+-- metadata columns before dropping/creating policies.
+
+create table if not exists public.table_zones (
+  id         text        primary key,
+  name       text        not null unique,
+  sort_order integer     not null default 0,
+  is_active  boolean     not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.restaurant_tables
+  add column if not exists zone_id text references public.table_zones(id) on delete set null,
+  add column if not exists zone_name text not null default 'Main Hall',
+  add column if not exists capacity integer not null default 4 check (capacity > 0),
+  add column if not exists sort_order integer not null default 0,
+  add column if not exists is_active boolean not null default true,
+  add column if not exists updated_at timestamptz not null default now();
+
+insert into public.table_zones (id, name, sort_order, is_active) values
+  ('main-hall',    'Main Hall',    1, true),
+  ('vip',          'VIP',          2, true),
+  ('outdoor',      'Outdoor',      3, true),
+  ('second-floor', 'Second Floor', 4, true)
+on conflict (id) do update set
+  name = excluded.name,
+  sort_order = excluded.sort_order,
+  is_active = excluded.is_active,
+  updated_at = now();
+
+create table if not exists public.business_settings (
+  id               text primary key default 'default',
+  restaurant_name  text not null default 'Zar Kebab',
+  service_rate_pct integer not null default 20
+                   check (service_rate_pct between 0 and 100),
+  receipt_footer   text not null default 'Thank you for visiting!',
+  auto_print       boolean not null default false,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+insert into public.business_settings (id, restaurant_name, service_rate_pct, receipt_footer, auto_print)
+values ('default', 'Zar Kebab', 20, 'Thank you for visiting!', false)
+on conflict (id) do nothing;
+
+alter table public.table_zones enable row level security;
+alter table public.business_settings enable row level security;
 
 create or replace function public.current_staff_role()
 returns text
