@@ -219,3 +219,18 @@ test('table reservation migration and UI are wired', () => {
   assert.match(waiterTables, /getWaiterTableStatus/)
   assert.match(waiterTables, /seatReserved/)
 })
+
+test('AdminTables localizes visible management labels', () => {
+  const source = readSource('src/pages/AdminTables.jsx')
+
+  assert.match(source, /const L = \{/)
+  assert.match(source, /title: 'Tables'/)
+  assert.match(source, /title: 'Столы'/)
+  assert.match(source, /title: 'Stollar'/)
+  assert.match(source, /<AppShell title=\{l\.title\}>/)
+  assert.match(source, /label=\{l\.tableName\}/)
+  assert.match(source, /label=\{l\.zoneSection\}/)
+  assert.match(source, /label=\{l\.capacity\}/)
+  assert.doesNotMatch(source, />Add table</)
+  assert.doesNotMatch(source, />Zones</)
+})

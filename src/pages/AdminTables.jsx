@@ -6,6 +6,213 @@ import { canDeleteTable, canDisableTable } from '../lib/tableManagement'
 
 const DEFAULT_ZONES = ['Main Hall', 'VIP', 'Outdoor', 'Second Floor']
 
+const L = {
+  en: {
+    title: 'Tables',
+    description: 'Manage restaurant tables, zones, and availability',
+    addTable: 'Add table',
+    tables: 'Tables',
+    active: 'Active',
+    reserved: 'Reserved',
+    disabled: 'Disabled',
+    zones: 'Zones',
+    zonesDescription: 'Create sections like Main Hall, VIP, Outdoor, or Second Floor.',
+    addZonePlaceholder: 'Add zone, e.g. Patio',
+    addZone: 'Add zone',
+    tableName: 'Table name',
+    zoneSection: 'Zone / section',
+    capacity: 'Capacity',
+    status: 'Status',
+    sortOrder: 'Sort order',
+    actions: 'Actions',
+    hasActiveOrders: 'Has active orders',
+    hasOrderHistory: 'Has order history',
+    edit: 'Edit',
+    reserve: 'Reserve',
+    disable: 'Disable',
+    delete: 'Delete',
+    addTableTitle: 'Add table',
+    editTableTitle: 'Edit table',
+    modalDescription: 'Set table name, zone, capacity, ordering, and availability.',
+    tableNamePlaceholder: 'Table 1, VIP 1, Outdoor 3',
+    reservationDescription: 'Capture guest details for this table reservation.',
+    guestName: 'Guest name',
+    customerNamePlaceholder: 'Customer name',
+    phone: 'Phone',
+    reservationTime: 'Reservation time',
+    reservedUntil: 'Reserved until',
+    notes: 'Notes',
+    notesPlaceholder: 'Guest preferences, occasion, seating notes...',
+    activeDescription: 'Disabled tables do not appear for waiters.',
+    cancel: 'Cancel',
+    save: 'Save',
+    requiredTableName: 'Table name is required',
+    uniqueTableName: 'Table name must be unique',
+    positiveCapacity: 'Capacity should be a positive number',
+    numericSortOrder: 'Sort order should be a number',
+    requiredZone: 'Zone / section is required',
+    requiredGuestName: 'Guest name is required for reservations',
+    requiredReservationTime: 'Reservation time is required',
+    invalidReservationEnd: 'End time should be after reservation time',
+    requiredZoneName: 'Zone name is required',
+    uniqueZoneName: 'Zone name must be unique',
+    couldNotAddZone: 'Could not add zone',
+    zoneAdded: 'Zone added',
+    closeActiveBeforeDisable: 'Close active orders before disabling this table.',
+    disableTitle: name => `Disable ${name}?`,
+    disableMessage: 'Disabled tables stay visible here, keep their history, and disappear from the waiter Tables screen.',
+    disableTable: 'Disable table',
+    couldNotDisable: 'Could not disable table',
+    disabledNotice: name => `${name} disabled`,
+    activeOrdersDeleteBlock: 'Do not delete a table while it has active orders.',
+    historyDeleteBlock: 'This table has order history. You can disable it instead.',
+    deleteTitle: name => `Delete ${name}?`,
+    deleteMessage: 'This permanently removes the table. This is only allowed because it has no order history.',
+    deleteTable: 'Delete table',
+    couldNotDelete: 'Could not delete table',
+    deletedNotice: name => `${name} deleted`,
+    couldNotSave: 'Could not save table',
+    tableAdded: 'Table added',
+    tableUpdated: 'Table updated',
+  },
+  ru: {
+    title: 'Столы',
+    description: 'Управление столами, зонами и доступностью',
+    addTable: 'Добавить стол',
+    tables: 'Столы',
+    active: 'Активные',
+    reserved: 'Бронь',
+    disabled: 'Отключены',
+    zones: 'Зоны',
+    zonesDescription: 'Создавайте секции: основной зал, VIP, улица или второй этаж.',
+    addZonePlaceholder: 'Добавить зону, например Патио',
+    addZone: 'Добавить зону',
+    tableName: 'Название стола',
+    zoneSection: 'Зона / секция',
+    capacity: 'Мест',
+    status: 'Статус',
+    sortOrder: 'Порядок',
+    actions: 'Действия',
+    hasActiveOrders: 'Есть активные заказы',
+    hasOrderHistory: 'Есть история заказов',
+    edit: 'Изменить',
+    reserve: 'Забронировать',
+    disable: 'Отключить',
+    delete: 'Удалить',
+    addTableTitle: 'Добавить стол',
+    editTableTitle: 'Изменить стол',
+    modalDescription: 'Укажите название, зону, вместимость, порядок и доступность.',
+    tableNamePlaceholder: 'Стол 1, VIP 1, Улица 3',
+    reservationDescription: 'Сохраните данные гостя для брони этого стола.',
+    guestName: 'Имя гостя',
+    customerNamePlaceholder: 'Имя клиента',
+    phone: 'Телефон',
+    reservationTime: 'Время брони',
+    reservedUntil: 'Бронь до',
+    notes: 'Заметки',
+    notesPlaceholder: 'Пожелания гостя, повод, место посадки...',
+    activeDescription: 'Отключённые столы не показываются официантам.',
+    cancel: 'Отмена',
+    save: 'Сохранить',
+    requiredTableName: 'Название стола обязательно',
+    uniqueTableName: 'Название стола должно быть уникальным',
+    positiveCapacity: 'Вместимость должна быть положительным числом',
+    numericSortOrder: 'Порядок должен быть числом',
+    requiredZone: 'Зона / секция обязательна',
+    requiredGuestName: 'Для брони нужно имя гостя',
+    requiredReservationTime: 'Укажите время брони',
+    invalidReservationEnd: 'Время окончания должно быть позже начала',
+    requiredZoneName: 'Название зоны обязательно',
+    uniqueZoneName: 'Название зоны должно быть уникальным',
+    couldNotAddZone: 'Не удалось добавить зону',
+    zoneAdded: 'Зона добавлена',
+    closeActiveBeforeDisable: 'Закройте активные заказы перед отключением стола.',
+    disableTitle: name => `Отключить ${name}?`,
+    disableMessage: 'Отключённые столы остаются здесь, сохраняют историю и скрываются с экрана официанта.',
+    disableTable: 'Отключить стол',
+    couldNotDisable: 'Не удалось отключить стол',
+    disabledNotice: name => `${name} отключён`,
+    activeOrdersDeleteBlock: 'Нельзя удалять стол с активными заказами.',
+    historyDeleteBlock: 'У этого стола есть история заказов. Вместо удаления его можно отключить.',
+    deleteTitle: name => `Удалить ${name}?`,
+    deleteMessage: 'Стол будет удалён навсегда. Это разрешено только если у него нет истории заказов.',
+    deleteTable: 'Удалить стол',
+    couldNotDelete: 'Не удалось удалить стол',
+    deletedNotice: name => `${name} удалён`,
+    couldNotSave: 'Не удалось сохранить стол',
+    tableAdded: 'Стол добавлен',
+    tableUpdated: 'Стол обновлён',
+  },
+  uz: {
+    title: 'Stollar',
+    description: 'Restoran stollari, zonalari va mavjudligini boshqarish',
+    addTable: 'Stol qo‘shish',
+    tables: 'Stollar',
+    active: 'Faol',
+    reserved: 'Bron',
+    disabled: 'O‘chirilgan',
+    zones: 'Zonalar',
+    zonesDescription: 'Asosiy zal, VIP, tashqi hudud yoki ikkinchi qavat kabi bo‘limlar yarating.',
+    addZonePlaceholder: 'Zona qo‘shing, masalan Patio',
+    addZone: 'Zona qo‘shish',
+    tableName: 'Stol nomi',
+    zoneSection: 'Zona / bo‘lim',
+    capacity: 'Sig‘im',
+    status: 'Holat',
+    sortOrder: 'Tartib',
+    actions: 'Amallar',
+    hasActiveOrders: 'Faol buyurtmalar bor',
+    hasOrderHistory: 'Buyurtma tarixi bor',
+    edit: 'Tahrirlash',
+    reserve: 'Bron qilish',
+    disable: 'O‘chirish',
+    delete: 'O‘chirib tashlash',
+    addTableTitle: 'Stol qo‘shish',
+    editTableTitle: 'Stolni tahrirlash',
+    modalDescription: 'Stol nomi, zona, sig‘im, tartib va mavjudlikni sozlang.',
+    tableNamePlaceholder: 'Stol 1, VIP 1, Outdoor 3',
+    reservationDescription: 'Bu stol bron qilinishi uchun mehmon ma’lumotlarini kiriting.',
+    guestName: 'Mehmon ismi',
+    customerNamePlaceholder: 'Mijoz ismi',
+    phone: 'Telefon',
+    reservationTime: 'Bron vaqti',
+    reservedUntil: 'Bron tugashi',
+    notes: 'Izohlar',
+    notesPlaceholder: 'Mehmon istaklari, sabab, joylashuv izohlari...',
+    activeDescription: 'O‘chirilgan stollar ofitsiantlarga ko‘rinmaydi.',
+    cancel: 'Bekor qilish',
+    save: 'Saqlash',
+    requiredTableName: 'Stol nomi majburiy',
+    uniqueTableName: 'Stol nomi yagona bo‘lishi kerak',
+    positiveCapacity: 'Sig‘im musbat son bo‘lishi kerak',
+    numericSortOrder: 'Tartib raqam bo‘lishi kerak',
+    requiredZone: 'Zona / bo‘lim majburiy',
+    requiredGuestName: 'Bron uchun mehmon ismi kerak',
+    requiredReservationTime: 'Bron vaqti kerak',
+    invalidReservationEnd: 'Tugash vaqti bron vaqtidan keyin bo‘lishi kerak',
+    requiredZoneName: 'Zona nomi majburiy',
+    uniqueZoneName: 'Zona nomi yagona bo‘lishi kerak',
+    couldNotAddZone: 'Zona qo‘shilmadi',
+    zoneAdded: 'Zona qo‘shildi',
+    closeActiveBeforeDisable: 'Stolni o‘chirishdan oldin faol buyurtmalarni yoping.',
+    disableTitle: name => `${name} o‘chirilsinmi?`,
+    disableMessage: 'O‘chirilgan stollar shu yerda qoladi, tarixi saqlanadi va ofitsiant ekranidan yashiriladi.',
+    disableTable: 'Stolni o‘chirish',
+    couldNotDisable: 'Stolni o‘chirib bo‘lmadi',
+    disabledNotice: name => `${name} o‘chirildi`,
+    activeOrdersDeleteBlock: 'Faol buyurtmalari bor stolni o‘chirib tashlamang.',
+    historyDeleteBlock: 'Bu stolda buyurtma tarixi bor. Uni o‘chirib tashlash o‘rniga o‘chirib qo‘yishingiz mumkin.',
+    deleteTitle: name => `${name} o‘chirib tashlansinmi?`,
+    deleteMessage: 'Bu stol butunlay o‘chiriladi. Bu faqat buyurtma tarixi bo‘lmasa mumkin.',
+    deleteTable: 'Stolni o‘chirib tashlash',
+    couldNotDelete: 'Stol o‘chirilmadi',
+    deletedNotice: name => `${name} o‘chirib tashlandi`,
+    couldNotSave: 'Stol saqlanmadi',
+    tableAdded: 'Stol qo‘shildi',
+    tableUpdated: 'Stol yangilandi',
+  },
+}
+
 function slugify(value) {
   return String(value || '')
     .trim()
@@ -81,24 +288,24 @@ function Field({ label, error, children }) {
   )
 }
 
-function StatusPill({ table }) {
+function StatusPill({ table, labels }) {
   if (table.is_active === false) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-black text-gray-500">
-        <PowerOff size={11} /> Disabled
+        <PowerOff size={11} /> {labels.disabled}
       </span>
     )
   }
   if (table.status === 'reserved') {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-black text-purple-700">
-        <CalendarClock size={11} /> Reserved
+        <CalendarClock size={11} /> {labels.reserved}
       </span>
     )
   }
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700">
-      <Power size={11} /> Active
+      <Power size={11} /> {labels.active}
     </span>
   )
 }
@@ -124,6 +331,8 @@ function SummaryCard({ icon: Icon, label, value, tone }) {
 
 export default function AdminTables() {
   const { state, dispatch } = useApp()
+  const lang = state.lang || 'en'
+  const l = L[lang] || L.en
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(() => normalizeTable({}))
   const [zoneName, setZoneName] = useState('')
@@ -217,23 +426,23 @@ export default function AdminTables() {
   function validate(nextForm) {
     const nextErrors = {}
     const name = nextForm.name.trim()
-    if (!name) nextErrors.name = 'Table name is required'
+    if (!name) nextErrors.name = l.requiredTableName
     const duplicate = state.tables.some(table =>
       table.id !== nextForm.id && table.name.trim().toLowerCase() === name.toLowerCase()
     )
-    if (duplicate) nextErrors.name = 'Table name must be unique'
+    if (duplicate) nextErrors.name = l.uniqueTableName
     if (!Number.isFinite(Number(nextForm.capacity)) || Number(nextForm.capacity) <= 0) {
-      nextErrors.capacity = 'Capacity should be a positive number'
+      nextErrors.capacity = l.positiveCapacity
     }
     if (!Number.isFinite(Number(nextForm.sort_order))) {
-      nextErrors.sort_order = 'Sort order should be a number'
+      nextErrors.sort_order = l.numericSortOrder
     }
-    if (!nextForm.zone_name.trim()) nextErrors.zone = 'Zone / section is required'
+    if (!nextForm.zone_name.trim()) nextErrors.zone = l.requiredZone
     if (nextForm.status === 'reserved') {
-      if (!nextForm.reserved_for_name.trim()) nextErrors.reserved_for_name = 'Guest name is required for reservations'
-      if (!nextForm.reserved_at) nextErrors.reserved_at = 'Reservation time is required'
+      if (!nextForm.reserved_for_name.trim()) nextErrors.reserved_for_name = l.requiredGuestName
+      if (!nextForm.reserved_at) nextErrors.reserved_at = l.requiredReservationTime
       if (nextForm.reserved_until && nextForm.reserved_at && new Date(nextForm.reserved_until) <= new Date(nextForm.reserved_at)) {
-        nextErrors.reserved_until = 'End time should be after reservation time'
+        nextErrors.reserved_until = l.invalidReservationEnd
       }
     }
     return nextErrors
@@ -272,22 +481,22 @@ export default function AdminTables() {
 
     const result = await dispatch({ type: modal === 'new' ? 'ADD_TABLE' : 'UPDATE_TABLE', payload })
     if (result?.error) {
-      setNotice({ tone: 'error', message: result.error.message || 'Could not save table' })
+      setNotice({ tone: 'error', message: result.error.message || l.couldNotSave })
       return
     }
     setModal(null)
-    setNotice({ tone: 'success', message: modal === 'new' ? 'Table added' : 'Table updated' })
+    setNotice({ tone: 'success', message: modal === 'new' ? l.tableAdded : l.tableUpdated })
   }
 
   async function addZone() {
     const name = zoneName.trim()
     setZoneError('')
     if (!name) {
-      setZoneError('Zone name is required')
+      setZoneError(l.requiredZoneName)
       return
     }
     if (tableZones.some(zone => zone.name.toLowerCase() === name.toLowerCase())) {
-      setZoneError('Zone name must be unique')
+      setZoneError(l.uniqueZoneName)
       return
     }
     const payload = {
@@ -298,23 +507,23 @@ export default function AdminTables() {
     }
     const result = await dispatch({ type: 'ADD_TABLE_ZONE', payload })
     if (result?.error) {
-      setZoneError(result.error.message || 'Could not add zone')
+      setZoneError(result.error.message || l.couldNotAddZone)
       return
     }
     setZoneName('')
-    setNotice({ tone: 'success', message: 'Zone added' })
+    setNotice({ tone: 'success', message: l.zoneAdded })
   }
 
   function requestDisable(table) {
     const check = canDisableTable(table, state.orders)
     if (!check.ok && check.reason === 'active_orders') {
-      setNotice({ tone: 'error', message: 'Close active orders before disabling this table.' })
+      setNotice({ tone: 'error', message: l.closeActiveBeforeDisable })
       return
     }
     setConfirm({
-      title: `Disable ${table.name}?`,
-      message: 'Disabled tables stay visible here, keep their history, and disappear from the waiter Tables screen.',
-      actionLabel: 'Disable table',
+      title: l.disableTitle(table.name),
+      message: l.disableMessage,
+      actionLabel: l.disableTable,
       tone: 'orange',
       onConfirm: async () => {
         const result = await dispatch({
@@ -331,9 +540,9 @@ export default function AdminTables() {
           },
         })
         if (result?.error) {
-          setNotice({ tone: 'error', message: result.error.message || 'Could not disable table' })
+          setNotice({ tone: 'error', message: result.error.message || l.couldNotDisable })
         } else {
-          setNotice({ tone: 'success', message: `${table.name} disabled` })
+          setNotice({ tone: 'success', message: l.disabledNotice(table.name) })
         }
         setConfirm(null)
       },
@@ -343,24 +552,24 @@ export default function AdminTables() {
   function requestDelete(table) {
     const check = canDeleteTable(table, state.orders)
     if (!check.ok && check.reason === 'active_orders') {
-      setNotice({ tone: 'error', message: 'Do not delete a table while it has active orders.' })
+      setNotice({ tone: 'error', message: l.activeOrdersDeleteBlock })
       return
     }
     if (!check.ok && check.reason === 'order_history') {
-      setNotice({ tone: 'error', message: 'This table has order history. You can disable it instead.' })
+      setNotice({ tone: 'error', message: l.historyDeleteBlock })
       return
     }
     setConfirm({
-      title: `Delete ${table.name}?`,
-      message: 'This permanently removes the table. This is only allowed because it has no order history.',
-      actionLabel: 'Delete table',
+      title: l.deleteTitle(table.name),
+      message: l.deleteMessage,
+      actionLabel: l.deleteTable,
       tone: 'red',
       onConfirm: async () => {
         const result = await dispatch({ type: 'DELETE_TABLE', payload: table.id })
         if (result?.error) {
-          setNotice({ tone: 'error', message: result.error.message || 'Could not delete table' })
+          setNotice({ tone: 'error', message: result.error.message || l.couldNotDelete })
         } else {
-          setNotice({ tone: 'success', message: `${table.name} deleted` })
+          setNotice({ tone: 'success', message: l.deletedNotice(table.name) })
         }
         setConfirm(null)
       },
@@ -368,19 +577,19 @@ export default function AdminTables() {
   }
 
   return (
-    <AppShell title="Tables">
+    <AppShell title={l.title}>
       <div className="mx-auto max-w-[1180px] px-5 py-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-black text-[#1F2937]">Tables</h1>
-            <p className="mt-0.5 text-sm text-[#6B7280]">Manage restaurant tables, zones, and availability</p>
+            <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
+            <p className="mt-0.5 text-sm text-[#6B7280]">{l.description}</p>
           </div>
           <button
             onClick={openNew}
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-lg shadow-orange-100 transition-colors hover:bg-[#cc4800]"
           >
             <Plus size={16} />
-            Add table
+            {l.addTable}
           </button>
         </div>
 
@@ -395,17 +604,17 @@ export default function AdminTables() {
         )}
 
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryCard icon={Table2} label="Tables" value={state.tables.length} tone="orange" />
-          <SummaryCard icon={Power} label="Active" value={activeCount} tone="green" />
-          <SummaryCard icon={CalendarClock} label="Reserved" value={reservedCount} tone="purple" />
-          <SummaryCard icon={PowerOff} label="Disabled" value={disabledCount} tone="gray" />
+          <SummaryCard icon={Table2} label={l.tables} value={state.tables.length} tone="orange" />
+          <SummaryCard icon={Power} label={l.active} value={activeCount} tone="green" />
+          <SummaryCard icon={CalendarClock} label={l.reserved} value={reservedCount} tone="purple" />
+          <SummaryCard icon={PowerOff} label={l.disabled} value={disabledCount} tone="gray" />
         </div>
 
         <div className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-black text-[#1F2937]">Zones</p>
-              <p className="text-xs text-gray-500">Create sections like Main Hall, VIP, Outdoor, or Second Floor.</p>
+              <p className="text-sm font-black text-[#1F2937]">{l.zones}</p>
+              <p className="text-xs text-gray-500">{l.zonesDescription}</p>
             </div>
           </div>
           <div className="mb-3 flex flex-wrap gap-2">
@@ -419,14 +628,14 @@ export default function AdminTables() {
             <input
               value={zoneName}
               onChange={e => setZoneName(e.target.value)}
-              placeholder="Add zone, e.g. Patio"
+              placeholder={l.addZonePlaceholder}
               className="h-10 flex-1 rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
             />
             <button
               onClick={addZone}
               className="h-10 rounded-xl border border-[#E5E7EB] bg-gray-50 px-4 text-sm font-black text-[#1F2937] transition-colors hover:bg-gray-100"
             >
-              Add zone
+              {l.addZone}
             </button>
           </div>
           {zoneError && <p className="mt-2 text-xs font-bold text-red-600">{zoneError}</p>}
@@ -434,12 +643,12 @@ export default function AdminTables() {
 
         <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
           <div className="hidden grid-cols-[1.3fr_1fr_0.7fr_1fr_0.7fr_120px] gap-3 border-b border-[#F3F4F6] bg-gray-50 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-gray-400 md:grid">
-            <span>Table name</span>
-            <span>Zone / section</span>
-            <span>Capacity</span>
-            <span>Status</span>
-            <span>Sort order</span>
-            <span className="text-right">Actions</span>
+            <span>{l.tableName}</span>
+            <span>{l.zoneSection}</span>
+            <span>{l.capacity}</span>
+            <span>{l.status}</span>
+            <span>{l.sortOrder}</span>
+            <span className="text-right">{l.actions}</span>
           </div>
           <div className="divide-y divide-[#F3F4F6]">
             {sortedTables.map(table => {
@@ -450,8 +659,8 @@ export default function AdminTables() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black text-[#1F2937]">{table.name}</p>
                     <p className="mt-0.5 text-xs text-gray-400 md:hidden">{table.zone_name || 'Main Hall'} · sort {Number(table.sort_order) || 0}</p>
-                    {activeOrders && <p className="mt-1 text-xs font-bold text-orange-600">Has active orders</p>}
-                    {!activeOrders && hasHistory && <p className="mt-1 text-xs font-semibold text-gray-400">Has order history</p>}
+                    {activeOrders && <p className="mt-1 text-xs font-bold text-orange-600">{l.hasActiveOrders}</p>}
+                    {!activeOrders && hasHistory && <p className="mt-1 text-xs font-semibold text-gray-400">{l.hasOrderHistory}</p>}
                     {table.status === 'reserved' && table.reserved_for_name && (
                       <p className="mt-1 text-xs font-bold text-purple-600">{table.reserved_for_name}</p>
                     )}
@@ -465,7 +674,7 @@ export default function AdminTables() {
                     {Number(table.capacity) || 4}
                   </div>
                   <div>
-                    <StatusPill table={table} />
+                    <StatusPill table={table} labels={l} />
                     {table.status === 'reserved' && table.reserved_at && (
                       <p className="mt-1 text-xs font-semibold text-gray-400">{new Date(table.reserved_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</p>
                     )}
@@ -478,7 +687,7 @@ export default function AdminTables() {
                     <button
                       onClick={() => openEdit(table)}
                       className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-orange-50 hover:text-[#ff5a00]"
-                      title="Edit"
+                      title={l.edit}
                     >
                       <Edit2 size={15} />
                     </button>
@@ -486,7 +695,7 @@ export default function AdminTables() {
                       onClick={() => openEdit({ ...table, status: 'reserved' })}
                       disabled={activeOrders || table.is_active === false}
                       className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-purple-50 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-40"
-                      title="Reserve"
+                      title={l.reserve}
                     >
                       <CalendarClock size={15} />
                     </button>
@@ -494,14 +703,14 @@ export default function AdminTables() {
                       onClick={() => requestDisable(table)}
                       disabled={table.is_active === false}
                       className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
-                      title="Disable"
+                      title={l.disable}
                     >
                       <PowerOff size={15} />
                     </button>
                     <button
                       onClick={() => requestDelete(table)}
                       className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                      title="Delete"
+                      title={l.delete}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -515,21 +724,21 @@ export default function AdminTables() {
 
       {modal && (
         <Modal
-          title={modal === 'new' ? 'Add table' : 'Edit table'}
-          description="Set table name, zone, capacity, ordering, and availability."
+          title={modal === 'new' ? l.addTableTitle : l.editTableTitle}
+          description={l.modalDescription}
           onClose={() => setModal(null)}
         >
           <div className="space-y-4">
-            <Field label="Table name" error={errors.name}>
+            <Field label={l.tableName} error={errors.name}>
               <input
                 value={form.name}
                 onChange={e => setForm(current => ({ ...current, name: e.target.value }))}
-                placeholder="Table 1, VIP 1, Outdoor 3"
+                placeholder={l.tableNamePlaceholder}
                 className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
               />
             </Field>
 
-            <Field label="Zone / section" error={errors.zone}>
+            <Field label={l.zoneSection} error={errors.zone}>
               <select
                 value={form.zone_id}
                 onChange={e => updateZone(e.target.value)}
@@ -542,7 +751,7 @@ export default function AdminTables() {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Capacity" error={errors.capacity}>
+              <Field label={l.capacity} error={errors.capacity}>
                 <input
                   type="number"
                   min="1"
@@ -552,7 +761,7 @@ export default function AdminTables() {
                   className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
                 />
               </Field>
-              <Field label="Sort order" error={errors.sort_order}>
+              <Field label={l.sortOrder} error={errors.sort_order}>
                 <input
                   type="number"
                   value={form.sort_order}
@@ -566,8 +775,8 @@ export default function AdminTables() {
             <div className="rounded-2xl border border-[#E5E7EB] bg-gray-50 p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-black text-[#1F2937]">Reserved</p>
-                  <p className="text-xs text-gray-500">Capture guest details for this table reservation.</p>
+                  <p className="text-sm font-black text-[#1F2937]">{l.reserved}</p>
+                  <p className="text-xs text-gray-500">{l.reservationDescription}</p>
                 </div>
                 <Toggle
                   value={form.status === 'reserved'}
@@ -585,16 +794,16 @@ export default function AdminTables() {
               </div>
               {form.status === 'reserved' && (
                 <div className="grid gap-3">
-                  <Field label="Guest name" error={errors.reserved_for_name}>
+                  <Field label={l.guestName} error={errors.reserved_for_name}>
                     <input
                       value={form.reserved_for_name}
                       onChange={e => setForm(current => ({ ...current, reserved_for_name: e.target.value }))}
-                      placeholder="Customer name"
+                      placeholder={l.customerNamePlaceholder}
                       className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
                     />
                   </Field>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Field label="Phone">
+                    <Field label={l.phone}>
                       <input
                         value={form.reserved_for_phone}
                         onChange={e => setForm(current => ({ ...current, reserved_for_phone: e.target.value }))}
@@ -602,7 +811,7 @@ export default function AdminTables() {
                         className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
                       />
                     </Field>
-                    <Field label="Reservation time" error={errors.reserved_at}>
+                    <Field label={l.reservationTime} error={errors.reserved_at}>
                       <input
                         type="datetime-local"
                         value={form.reserved_at}
@@ -611,7 +820,7 @@ export default function AdminTables() {
                       />
                     </Field>
                   </div>
-                  <Field label="Reserved until" error={errors.reserved_until}>
+                  <Field label={l.reservedUntil} error={errors.reserved_until}>
                     <input
                       type="datetime-local"
                       value={form.reserved_until}
@@ -619,11 +828,11 @@ export default function AdminTables() {
                       className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
                     />
                   </Field>
-                  <Field label="Notes">
+                  <Field label={l.notes}>
                     <textarea
                       value={form.reservation_notes}
                       onChange={e => setForm(current => ({ ...current, reservation_notes: e.target.value }))}
-                      placeholder="Guest preferences, occasion, seating notes..."
+                      placeholder={l.notesPlaceholder}
                       rows={3}
                       className="w-full resize-none rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
                     />
@@ -634,8 +843,8 @@ export default function AdminTables() {
 
             <div className="flex items-center justify-between rounded-2xl border border-[#E5E7EB] bg-gray-50 px-4 py-3">
               <div>
-                <p className="text-sm font-black text-[#1F2937]">Active</p>
-                <p className="text-xs text-gray-500">Disabled tables do not appear for waiters.</p>
+                <p className="text-sm font-black text-[#1F2937]">{l.active}</p>
+                <p className="text-xs text-gray-500">{l.activeDescription}</p>
               </div>
               <Toggle
                 value={form.is_active !== false}
@@ -649,13 +858,13 @@ export default function AdminTables() {
                 onClick={() => setModal(null)}
                 className="h-11 flex-1 rounded-xl border-2 border-gray-200 text-sm font-black text-gray-600 transition-colors hover:bg-gray-50"
               >
-                Cancel
+                {l.cancel}
               </button>
               <button
                 onClick={save}
                 className="h-11 flex-1 rounded-xl bg-[#ff5a00] text-sm font-black text-white shadow-md shadow-orange-100 transition-colors hover:bg-[#cc4800]"
               >
-                Save
+                {l.save}
               </button>
             </div>
           </div>
@@ -669,7 +878,7 @@ export default function AdminTables() {
               onClick={() => setConfirm(null)}
               className="h-11 flex-1 rounded-xl border-2 border-gray-200 text-sm font-black text-gray-600 transition-colors hover:bg-gray-50"
             >
-              Cancel
+              {l.cancel}
             </button>
             <button
               onClick={confirm.onConfirm}
