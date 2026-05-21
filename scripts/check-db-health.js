@@ -110,7 +110,8 @@ async function checkRpc(name, invoke, expectedError, required = true) {
 
 const checks = await Promise.all([
   checkTable('profiles', 'id, role, status, full_name, email'),
-  checkTable('restaurant_tables', 'id, name, status, sort_order'),
+  checkTable('restaurant_tables', 'id, name, status, zone_id, zone_name, capacity, sort_order, is_active, created_at, updated_at'),
+  checkTable('table_zones', 'id, name, sort_order, is_active, created_at, updated_at'),
   checkTable('menu_categories', 'id, name_uz, name_ru, name_en, sort_order'),
   checkTable('menu_items', 'id, category_id, name_uz, name_ru, name_en, price, available, sort_order'),
   checkTable('orders', 'id, table_id, table_name, status, payment_status, service_rate_pct, order_type, order_number'),

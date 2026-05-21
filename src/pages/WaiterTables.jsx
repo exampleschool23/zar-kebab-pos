@@ -7,7 +7,7 @@ import AppShell from '../components/AppShell'
 import {
   UtensilsCrossed, Clock, ChefHat, CheckCircle2,
   Receipt, Coffee, RefreshCw, Layers, Plus,
-  Search, CreditCard,
+  Search, CreditCard, Settings,
 } from 'lucide-react'
 
 // ── Localization ──────────────────────────────────────────────────────────────
@@ -45,6 +45,7 @@ const L = {
     guideOccupied: 'Order delivered and eating',
     guideNeedsBill: 'Guest requested the bill',
     takeAwayOrder: 'Take Away Order',
+    manageTables: 'Manage tables',
   },
   ru: {
     tables: 'Столы',
@@ -78,6 +79,7 @@ const L = {
     guideOccupied: 'Заказ доставлен, гость ест',
     guideNeedsBill: 'Гость попросил счёт',
     takeAwayOrder: 'Заказ с собой',
+    manageTables: 'Управление столами',
   },
   uz: {
     tables: 'Stollar',
@@ -111,6 +113,7 @@ const L = {
     guideOccupied: 'Buyurtma yetkazildi, mehmon ovqatlanmoqda',
     guideNeedsBill: 'Mehmon hisob so\'radi',
     takeAwayOrder: 'Olib ketish buyurtmasi',
+    manageTables: 'Stollarni boshqarish',
   },
 }
 
@@ -454,14 +457,21 @@ export default function WaiterTables() {
   const [search, setSearch] = useState('')
 
   const waiterName = profile?.full_name || state.user?.name || 'Waiter'
+  const canManageTables = ['owner', 'admin'].includes((profile?.role || state.user?.role || '').toLowerCase())
 
   const tableInfos = useMemo(() =>
-    state.tables.map(table => {
-      const status = deriveStatus(table.id, state.orders)
-      const active = state.orders.filter(o => o.table_id === table.id && o.payment_status !== 'paid')
-      const counts = active.length > 0 ? getKitchenCounts(table.id, state.orders) : null
-      return { table, status, counts }
-    }),
+    state.tables
+      .filter(table => table.is_active !== false)
+      .sort((a, b) =>
+        (Number(a.sort_order) || 9999) - (Number(b.sort_order) || 9999) ||
+        String(a.name || '').localeCompare(String(b.name || ''))
+      )
+      .map(table => {
+        const status = deriveStatus(table.id, state.orders)
+        const active = state.orders.filter(o => o.table_id === table.id && o.payment_status !== 'paid')
+        const counts = active.length > 0 ? getKitchenCounts(table.id, state.orders) : null
+        return { table, status, counts }
+      }),
     [state.tables, state.orders]
   )
 
@@ -558,6 +568,15 @@ export default function WaiterTables() {
                 <Plus size={15} />
                 {tr(lang, 'takeAwayOrder')}
               </button>
+              {canManageTables && (
+                <button
+                  onClick={() => navigate('/admin/tables')}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-black hover:bg-black transition-colors shadow-sm"
+                >
+                  <Settings size={15} />
+                  {tr(lang, 'manageTables')}
+                </button>
+              )}
             </div>
           </div>
 

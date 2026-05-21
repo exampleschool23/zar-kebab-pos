@@ -15,6 +15,7 @@ const initialState = {
   settings:       { ...DEFAULT_SETTINGS, ...loadSettings() },
   user:           null,
   tables:         [],
+  tableZones:     [],
   menuItems:      [],
   categories:     [],
   orders:         [],
@@ -129,8 +130,9 @@ export function AppProvider({ children }) {
     let unsubscribe = () => {}
 
     loadPOSData()
-      .then(({ tables, categories, menuItems, orders, settings }) => {
+      .then(({ tables, tableZones, categories, menuItems, orders, settings }) => {
         dispatch({ type: 'SET_TABLES',     payload: tables })
+        dispatch({ type: 'SET_TABLE_ZONES', payload: tableZones || [] })
         dispatch({ type: 'SET_CATEGORIES', payload: categories })
         dispatch({ type: 'SET_MENU_ITEMS', payload: menuItems })
         dispatch({ type: 'SET_ORDERS',     payload: orders })

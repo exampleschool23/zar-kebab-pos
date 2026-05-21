@@ -175,3 +175,33 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(source, /showPaidToday/)
   assert.doesNotMatch(source, /filteredBills\.map\(order =>/)
 })
+
+test('WaiterTables hides disabled tables and links admins to management', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(source, /\.filter\(table => table\.is_active !== false\)/)
+  assert.match(source, /canManageTables/)
+  assert.match(source, /navigate\('\/admin\/tables'\)/)
+})
+
+test('AdminTables protects table history and manages zones', () => {
+  const source = readSource('src/pages/AdminTables.jsx')
+
+  assert.match(source, /This table has order history\. You can disable it instead\./)
+  assert.match(source, /Do not delete a table while it has active orders\./)
+  assert.match(source, /ADD_TABLE_ZONE/)
+  assert.match(source, /zone_id/)
+  assert.match(source, /is_active/)
+})
+
+test('table management migration and health check include required columns', () => {
+  const migration = readSource('supabase/019_table_management.sql')
+  const health = readSource('scripts/check-db-health.js')
+
+  assert.match(migration, /create table if not exists public\.table_zones/)
+  assert.match(migration, /add column if not exists zone_id/)
+  assert.match(migration, /add column if not exists capacity/)
+  assert.match(migration, /add column if not exists is_active/)
+  assert.match(health, /restaurant_tables', 'id, name, status, zone_id, zone_name, capacity, sort_order, is_active, created_at, updated_at'/)
+  assert.match(health, /table_zones', 'id, name, sort_order, is_active, created_at, updated_at'/)
+})

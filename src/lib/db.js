@@ -107,6 +107,36 @@ async function loadBusinessSettings(dbClient = supabase) {
   return normalizeBusinessSettings(data)
 }
 
+async function loadRestaurantTables(dbClient = supabase) {
+  const sorted = await dbClient
+    .from('restaurant_tables')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true })
+
+  if (!sorted.error) return sorted.data || []
+
+  console.warn('[db] table management columns unavailable, loading tables by id:', sorted.error.message)
+  const fallback = await dbClient.from('restaurant_tables').select('*').order('id')
+  if (fallback.error) throw fallback.error
+  return fallback.data || []
+}
+
+async function loadTableZones(dbClient = supabase) {
+  const { data, error } = await dbClient
+    .from('table_zones')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.warn('[db] table_zones unavailable, using table zone names only:', error.message)
+    return []
+  }
+
+  return data || []
+}
+
 async function fetchOrdersByPaymentStatus(paymentStatus, includeRecentPaidFilter = false) {
   const buildQuery = (select) => {
     let query = supabase.from('orders').select(select)
@@ -137,8 +167,9 @@ export async function loadOrders() {
 }
 
 export async function loadPOSData() {
-  const [tablesRes, categoriesRes, menuItemsRes, unpaidRes, paidRes, settings] = await Promise.all([
-    supabase.from('restaurant_tables').select('*').order('id'),
+  const [tables, tableZones, categoriesRes, menuItemsRes, unpaidRes, paidRes, settings] = await Promise.all([
+    loadRestaurantTables(),
+    loadTableZones(),
     supabase.from('menu_categories').select('*').order('sort_order'),
     supabase.from('menu_items').select('*').order('sort_order'),
     // All unpaid/active orders (no date limit)
@@ -149,7 +180,8 @@ export async function loadPOSData() {
   ])
 
   return {
-    tables:     tablesRes.data     || [],
+    tables,
+    tableZones,
     categories: categoriesRes.data || [],
     menuItems:  menuItemsRes.data  || [],
     orders:     [...(unpaidRes.data || []), ...(paidRes.data || [])],
@@ -197,8 +229,11 @@ export function subscribeToRealtime(dispatch, options = {}) {
   }
 
   async function reloadTables() {
-    const { data } = await dbClient.from('restaurant_tables').select('*').order('id')
-    if (data) dispatch({ type: 'SET_TABLES', payload: data })
+    dispatch({ type: 'SET_TABLES', payload: await loadRestaurantTables(dbClient) })
+  }
+
+  async function reloadTableZones() {
+    dispatch({ type: 'SET_TABLE_ZONES', payload: await loadTableZones(dbClient) })
   }
 
   function scheduleReloadSettings() {
@@ -219,6 +254,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_payments' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, reloadTables)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'table_zones' }, reloadTableZones)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'business_settings' }, scheduleReloadSettings)
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
@@ -647,18 +683,34 @@ export async function writeToSupabase(action, state) {
     }
 
     case 'ADD_TABLE': {
-      await supabase.from('restaurant_tables').insert(action.payload)
+      const { error } = await supabase.from('restaurant_tables').insert(action.payload)
+      if (error) throw error
       break
     }
 
     case 'UPDATE_TABLE': {
       const { id, ...fields } = action.payload
-      await supabase.from('restaurant_tables').update(fields).eq('id', id)
+      const { error } = await supabase.from('restaurant_tables').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
       break
     }
 
     case 'DELETE_TABLE': {
-      await supabase.from('restaurant_tables').delete().eq('id', action.payload)
+      const { error } = await supabase.from('restaurant_tables').delete().eq('id', action.payload)
+      if (error) throw error
+      break
+    }
+
+    case 'ADD_TABLE_ZONE': {
+      const { error } = await supabase.from('table_zones').insert(action.payload)
+      if (error) throw error
+      break
+    }
+
+    case 'UPDATE_TABLE_ZONE': {
+      const { id, ...fields } = action.payload
+      const { error } = await supabase.from('table_zones').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
       break
     }
 

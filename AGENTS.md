@@ -82,6 +82,8 @@ State changes are split by domain under `src/store/`:
 
 Selector hooks live in `src/store/appHooks.js`. Prefer adding focused hooks there, such as `useOrders`, `useCart`, `useSettings`, or `useAppDataStatus`, instead of spreading more direct state-shape knowledge into pages.
 
+Admin table management lives at `/admin/tables` (Settings → Tables) in `src/pages/AdminTables.jsx`. Waiter tables must stay operational only: disabled tables (`is_active === false`) are hidden from `src/pages/WaiterTables.jsx`, and edit/delete controls belong only in admin table management.
+
 ## Recent Regression Context
 
 These bugs were recently fixed and are now protected by tests:
@@ -125,6 +127,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/018_submit_order_to_kitchen_rpc.sql`
   Adds `submit_order_to_kitchen(payload jsonb)`. This atomically upserts the order/items/table status and rejects late inserts into already paid orders.
+
+- `supabase/019_table_management.sql`
+  Adds `table_zones` and table management fields on `restaurant_tables`: `zone_id`, `zone_name`, `capacity`, `sort_order`, `is_active`, and `updated_at`. Disabled tables remain in reports/history but are hidden from waiter ordering.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
@@ -207,6 +212,8 @@ npm run build
 - `ordersReducer` removes only sent snapshot cart items.
 - `AppContext` delegates state changes to domain reducers instead of growing a large switch.
 - Kitchen RPC rejects already paid/unavailable orders.
+- Disabled tables stay out of the waiter table grid.
+- Admin table management blocks hard delete when a table has active orders or order history.
 
 If these tests fail, understand why before changing the guard. They exist because these exact failures reached the user.
 
@@ -223,4 +230,5 @@ The Vite build currently emits a large chunk warning. That warning is known and 
 - Do not use blocking browser dialogs for operational errors; use visible UI state.
 - Do not clear the whole cart after async submits.
 - Do not assume applying migration `018` means the database has `011` or `012`.
+- Do not hard-delete tables with order history; disable them so reports and receipts stay intact.
 - Do not trust old browser console logs after hot reloads without checking timestamps.

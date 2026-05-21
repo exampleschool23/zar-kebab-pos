@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  Store, Percent, Globe, Printer, Bell, Shield,
+  Store, Percent, Globe, Printer, Bell, Shield, Table2,
   Check, ChevronRight,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -47,6 +48,7 @@ function Toggle({ value, onChange }) {
 
 export default function AdminSettings() {
   const { state, dispatch } = useApp()
+  const navigate = useNavigate()
   const lang     = state.lang
   const settings = state.settings
 
@@ -95,6 +97,8 @@ export default function AdminSettings() {
       receiptFooterL:  'Chek pastki qismi',
       receiptFooterSub: 'Chek pastida ko\'rsatiladigan matn',
       system:          'Tizim',
+      tableManagement: 'Stollar',
+      tableManagementSub: 'Restoran stollari, zonalari va sig‘imini boshqarish',
       language:        'Til',
       languageSub:     'Interfeys tili',
       autoPrint:       'Avtomatik bosib chiqarish',
@@ -118,6 +122,8 @@ export default function AdminSettings() {
       receiptFooterL:  'Нижняя часть чека',
       receiptFooterSub: 'Текст внизу каждого чека',
       system:          'Система',
+      tableManagement: 'Столы',
+      tableManagementSub: 'Управление столами, зонами и вместимостью',
       language:        'Язык',
       languageSub:     'Язык интерфейса',
       autoPrint:       'Автоматическая печать',
@@ -141,6 +147,8 @@ export default function AdminSettings() {
       receiptFooterL:  'Receipt Footer',
       receiptFooterSub: 'Text shown at the bottom of each receipt',
       system:          'System',
+      tableManagement: 'Tables',
+      tableManagementSub: 'Manage restaurant tables, zones, and capacity',
       language:        'Language',
       languageSub:     'Interface language',
       autoPrint:       'Auto-print Receipt',
@@ -210,6 +218,15 @@ export default function AdminSettings() {
 
         {/* System */}
         <Section title={l.system}>
+          <SettingRow icon={Table2} label={l.tableManagement} sub={l.tableManagementSub}>
+            <button
+              onClick={() => navigate('/admin/tables')}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-gray-50 px-3 py-2 text-[13px] font-bold text-[#1F2937] transition-colors hover:bg-gray-100"
+            >
+              Open
+              <ChevronRight size={14} />
+            </button>
+          </SettingRow>
           <SettingRow icon={Globe} label={l.language} sub={l.languageSub}>
             <div className="flex gap-1 bg-[#F3F4F6] p-1 rounded-xl">
               {['uz', 'ru', 'en'].map(lg => (
