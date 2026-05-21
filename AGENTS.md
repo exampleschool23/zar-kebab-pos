@@ -69,7 +69,16 @@ Role access rules are centralized in `src/lib/permissions.js`.
 - connection notice
 - loaded flag
 
-`AppProvider` hydrates from Supabase with `loadPOSData()`, subscribes with `subscribeToRealtime()`, and exposes `dispatch: dbDispatch`. `dbDispatch` is intentionally wrapped in `useCallback`; do not make it unstable or `ProfileSync` can re-dispatch forever and make the website load forever.
+State changes are split by domain under `src/store/`:
+- `settingsReducer.js` handles language and business settings.
+- `appMetaReducer.js` handles login/logout, selected table, loaded/error, and connection notices.
+- `tablesReducer.js` handles table CRUD and table status changes.
+- `menuReducer.js` handles categories, menu items, and reorder actions.
+- `cartReducer.js` handles waiter cart mutations.
+- `ordersReducer.js` handles kitchen submit, item status, billing, quick items, and payment actions.
+- `reducerHelpers.js` holds shared reducer defaults and pure helpers.
+
+`AppContext.jsx` should stay orchestration only: initial state, domain reducer pipeline, Supabase hydration/realtime, and `dbDispatch`. `AppProvider` hydrates from Supabase with `loadPOSData()`, subscribes with `subscribeToRealtime()`, and exposes `dispatch: dbDispatch`. `dbDispatch` is intentionally wrapped in `useCallback`; do not make it unstable or `ProfileSync` can re-dispatch forever and make the website load forever.
 
 Selector hooks live in `src/store/appHooks.js`. Prefer adding focused hooks there, such as `useOrders`, `useCart`, `useSettings`, or `useAppDataStatus`, instead of spreading more direct state-shape knowledge into pages.
 
@@ -147,6 +156,7 @@ Main UI files:
 - `src/pages/WaiterOrder.jsx`
 - `src/components/CartPanel.jsx`
 - `src/store/AppContext.jsx`
+- `src/store/ordersReducer.js`
 - `src/lib/db.js`
 - `supabase/018_submit_order_to_kitchen_rpc.sql`
 
@@ -194,7 +204,8 @@ npm run build
 - No blocking `alert()` calls in `src`.
 - `CartPanel` receives send state from its parent.
 - `WaiterOrder` blocks mutations while sending.
-- AppContext removes only sent snapshot cart items.
+- `ordersReducer` removes only sent snapshot cart items.
+- `AppContext` delegates state changes to domain reducers instead of growing a large switch.
 - Kitchen RPC rejects already paid/unavailable orders.
 
 If these tests fail, understand why before changing the guard. They exist because these exact failures reached the user.

@@ -120,11 +120,24 @@ test('WaiterOrder locks menu mutations while order send is pending', () => {
   assert.match(functionBody(source, 'handleDecrement'), /if \(isSendingOrder\) return/)
 })
 
-test('AppContext clears only the sent cart snapshot after kitchen submit', () => {
-  const source = readSource('src/store/AppContext.jsx')
+test('orders reducer clears only the sent cart snapshot after kitchen submit', () => {
+  const source = readSource('src/store/ordersReducer.js')
 
   assert.match(source, /removeSentCartItems\(state\.cart,\s*cartItems\)/)
   assert.doesNotMatch(source, /orders: nextOrders,\s*cart: \[\]/)
+})
+
+test('AppContext delegates state changes to domain reducers', () => {
+  const source = readSource('src/store/AppContext.jsx')
+
+  assert.match(source, /const domainReducers = \[/)
+  assert.match(source, /settingsReducer/)
+  assert.match(source, /appMetaReducer/)
+  assert.match(source, /tablesReducer/)
+  assert.match(source, /menuReducer/)
+  assert.match(source, /cartReducer/)
+  assert.match(source, /ordersReducer/)
+  assert.doesNotMatch(functionBody(source, 'reducer'), /switch \(action\.type\)/)
 })
 
 test('kitchen submit RPC migration protects paid orders from late item inserts', () => {
