@@ -51,6 +51,9 @@ export default function AdminLoyalty() {
       customerName: 'Mijoz ismi',
       phoneNumber: 'Telefon raqami',
       createCard: 'Sodiqlik kartasini yaratish',
+      profileTitle: 'Mijoz sodiqlik profili',
+      cardNo: 'Karta raqami',
+      balance: 'Balans',
       cashbackType: 'Cashback turi',
       cashbackRate: 'Cashback foizi',
       searchPlaceholder: 'Karta, ism yoki telefon bo‘yicha qidirish',
@@ -62,12 +65,24 @@ export default function AdminLoyalty() {
       totalEarned: 'Jami cashback',
       totalUsed: 'Jami ishlatilgan sodiqlik balansi',
       status: 'Status',
+      ownerActions: 'Owner moliyaviy amallari',
       manualAdjustment: 'Balansni qo‘lda tuzatish',
+      adjustmentHelper: 'Har bir qo‘lda tuzatish tranzaksiya yozuvini yaratadi.',
+      ownerAdjustOnly: 'Faqat owner sodiqlik balansini qo‘lda tuzatishi mumkin.',
+      ownerTypeOnly: 'Cashback turini faqat owner o‘zgartirishi mumkin.',
       amountPlaceholder: '+/- summa',
       reason: 'Sabab',
       apply: 'Qo‘llash',
       transactionHistory: 'Balans tranzaksiyalari tarixi',
       noTransactions: 'Hali tranzaksiyalar yo‘q.',
+      latestTransactions: 'So‘nggi tranzaksiyalar',
+      noCustomerName: 'Mijoz ismi yo‘q',
+      noPhoneNumber: 'Telefon raqami yo‘q',
+      orderPrefix: 'Buyurtma',
+      balanceFlow: 'Balans',
+      cashbackMeta: 'karta · Cashback',
+      usedForOrder: 'Buyurtma to‘lovi uchun ishlatildi',
+      manualAdjustmentDesc: 'Qo‘lda balans tuzatildi',
       selectCard: 'Sodiqlik kartasini tanlang',
       selectCardSub: 'Balans, buyurtma faoliyati va hamyon tranzaksiyalarini ko‘ring.',
       adjustmentRequired: 'Tuzatish summasi va sababini kiriting.',
@@ -91,6 +106,9 @@ export default function AdminLoyalty() {
       customerName: 'Имя клиента',
       phoneNumber: 'Номер телефона',
       createCard: 'Создать карту лояльности',
+      profileTitle: 'Профиль лояльности клиента',
+      cardNo: 'Карта №',
+      balance: 'Баланс',
       cashbackType: 'Тип кешбэка',
       cashbackRate: 'Процент кешбэка',
       searchPlaceholder: 'Поиск по карте, имени или телефону',
@@ -102,12 +120,24 @@ export default function AdminLoyalty() {
       totalEarned: 'Всего кешбэка начислено',
       totalUsed: 'Всего использовано с баланса',
       status: 'Статус',
+      ownerActions: 'Финансовые действия владельца',
       manualAdjustment: 'Ручная корректировка баланса',
+      adjustmentHelper: 'Каждая ручная корректировка создаёт запись транзакции.',
+      ownerAdjustOnly: 'Только владелец может вручную изменять баланс лояльности.',
+      ownerTypeOnly: 'Только владелец может менять тип кешбэка.',
       amountPlaceholder: '+/- сумма',
       reason: 'Причина',
       apply: 'Применить',
       transactionHistory: 'История транзакций баланса',
       noTransactions: 'Транзакций пока нет.',
+      latestTransactions: 'Последние транзакции',
+      noCustomerName: 'Имя клиента не указано',
+      noPhoneNumber: 'Номер телефона не указан',
+      orderPrefix: 'Заказ',
+      balanceFlow: 'Баланс',
+      cashbackMeta: 'карта · Кешбэк',
+      usedForOrder: 'Использовано для оплаты заказа',
+      manualAdjustmentDesc: 'Ручная корректировка баланса',
       selectCard: 'Выберите карту лояльности',
       selectCardSub: 'Просмотрите баланс, активность заказов и транзакции кошелька.',
       adjustmentRequired: 'Введите сумму корректировки и причину.',
@@ -131,6 +161,9 @@ export default function AdminLoyalty() {
       customerName: 'Customer name',
       phoneNumber: 'Phone number',
       createCard: 'Create loyalty card',
+      profileTitle: 'Customer Loyalty Profile',
+      cardNo: 'Card No',
+      balance: 'Balance',
       cashbackType: 'Cashback type',
       cashbackRate: 'Cashback rate',
       searchPlaceholder: 'Search card, name, phone',
@@ -142,12 +175,24 @@ export default function AdminLoyalty() {
       totalEarned: 'Total cashback earned',
       totalUsed: 'Total loyalty used',
       status: 'Status',
+      ownerActions: 'Owner financial actions',
       manualAdjustment: 'Manual balance adjustment',
+      adjustmentHelper: 'Every manual adjustment creates a transaction record.',
+      ownerAdjustOnly: 'Only owner can manually adjust loyalty balance.',
+      ownerTypeOnly: 'Only owner can change cashback type.',
       amountPlaceholder: '+/- amount',
       reason: 'Reason',
       apply: 'Apply',
       transactionHistory: 'Balance transaction history',
       noTransactions: 'No transactions yet.',
+      latestTransactions: 'Latest transactions',
+      noCustomerName: 'No customer name',
+      noPhoneNumber: 'No phone number',
+      orderPrefix: 'Order',
+      balanceFlow: 'Balance',
+      cashbackMeta: 'card · Cashback',
+      usedForOrder: 'Used for order payment',
+      manualAdjustmentDesc: 'Manual balance adjustment',
       selectCard: 'Select a loyalty card',
       selectCardSub: 'View balance, order activity, and wallet transactions.',
       adjustmentRequired: 'Enter an adjustment amount and reason.',
@@ -178,6 +223,49 @@ export default function AdminLoyalty() {
     const normalized = String(type || DEFAULT_CASHBACK_TYPE).toLowerCase()
     const config = CASHBACK_TYPES[normalized] || CASHBACK_TYPES[DEFAULT_CASHBACK_TYPE]
     return `${config.label} · ${config.percent}%`
+  }
+
+  function selectedName(card) {
+    return card?.customer_name || l.noCustomerName
+  }
+
+  function selectedPhone(card) {
+    return card?.phone_number || l.noPhoneNumber
+  }
+
+  function transactionAmount(tx) {
+    const amount = Number(tx.amount) || 0
+    const isCredit = tx.type === 'cashback_earned' || tx.type === 'manual_adjustment' && Number(tx.balance_after) >= Number(tx.balance_before)
+    return `${isCredit ? '+' : '-'}${formatCurrency(amount)}`
+  }
+
+  function transactionAmountClass(tx) {
+    return tx.type === 'cashback_earned' || tx.type === 'manual_adjustment' && Number(tx.balance_after) >= Number(tx.balance_before)
+      ? 'text-[#16A34A]'
+      : 'text-[#DC2626]'
+  }
+
+  function transactionDescription(tx) {
+    if (tx.reason) return tx.reason
+    if (tx.type === 'redeemed') return l.usedForOrder
+    if (tx.type === 'manual_adjustment') return l.manualAdjustmentDesc
+    return ''
+  }
+
+  function formatTransactionDate(value) {
+    if (!value) return ''
+    try {
+      return new Date(value).toLocaleString()
+    } catch {
+      return ''
+    }
+  }
+
+  function transactionCardType(tx) {
+    const type = tx.card_type_at_transaction || DEFAULT_CASHBACK_TYPE
+    const label = CASHBACK_TYPES[type]?.label || CASHBACK_TYPES[DEFAULT_CASHBACK_TYPE].label
+    const percent = tx.cashback_percent_used ?? getCashbackTypePercent(type)
+    return `${label} ${l.cashbackMeta} ${percent}%`
   }
 
   async function searchCards(term = query) {
@@ -421,61 +509,104 @@ export default function AdminLoyalty() {
 
           <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
             {selected ? (
-              <>
-                <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-[#9CA3AF]">{l.cashbackBalance}</p>
-                    <h2 className="mt-1 text-3xl font-black text-[#16A34A]">{formatCurrency(selected.balance || 0)}</h2>
-                    <p className="mt-1 text-sm font-semibold text-[#6B7280]">{selected.customer_name || l.unnamedCustomer} · {selected.phone_number || '—'} · {selected.card_number}</p>
-                  </div>
-                  <button onClick={() => deactivateCard(selected)} disabled={selected.is_active === false || !canDeactivate} className="flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-black text-red-600 disabled:opacity-40">
-                    <Ban size={15} /> {l.deactivate}
-                  </button>
-                </div>
-
-                <div className="mb-5 grid gap-3 md:grid-cols-4">
-                  <div className="rounded-xl bg-gray-50 p-4"><p className="text-xs font-bold text-[#6B7280]">{l.totalEarned}</p><p className="mt-1 font-black text-[#1F2937]">{formatCurrency(selected.total_earned || 0)}</p></div>
-                  <div className="rounded-xl bg-gray-50 p-4"><p className="text-xs font-bold text-[#6B7280]">{l.totalUsed}</p><p className="mt-1 font-black text-[#1F2937]">{formatCurrency(selected.total_redeemed || 0)}</p></div>
-                  <div className="rounded-xl bg-gray-50 p-4"><p className="text-xs font-bold text-[#6B7280]">{l.status}</p><p className="mt-1 font-black text-[#1F2937]">{statusLabel(selected)}</p></div>
-                  <div className="rounded-xl bg-gray-50 p-4">
-                    <p className="text-xs font-bold text-[#6B7280]">{l.cashbackType}</p>
-                    {canEdit ? (
-                      <select value={selected.cashback_type || DEFAULT_CASHBACK_TYPE} onChange={e => updateCashbackType(selected, e.target.value)} className="mt-1 w-full rounded-lg border border-[#E5E7EB] bg-white px-2 py-1 text-sm font-black text-[#1F2937]">
-                        {Object.entries(CASHBACK_TYPES).map(([key, config]) => (
-                          <option key={key} value={key}>{config.label} · {config.percent}%</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <p className="mt-1 font-black text-[#1F2937]">{cashbackTypeLabel(selected.cashback_type)}</p>
-                    )}
-                    <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{l.cashbackRate}: {getCashbackTypePercent(selected.cashback_type || DEFAULT_CASHBACK_TYPE)}%</p>
-                  </div>
-                </div>
-
-                <div className="mb-5 rounded-2xl border border-[#E5E7EB] p-4">
-                  <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-[#1F2937]"><BadgeDollarSign size={16} /> {l.manualAdjustment}</h3>
-                  <div className="grid gap-2 md:grid-cols-[160px_1fr_auto]">
-                    <input type="number" value={adjustment.amount} disabled={!canAdjust} onChange={e => setAdjustment({ ...adjustment, amount: e.target.value })} placeholder={l.amountPlaceholder} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50" />
-                    <input value={adjustment.reason} disabled={!canAdjust} onChange={e => setAdjustment({ ...adjustment, reason: e.target.value })} placeholder={l.reason} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50" />
-                    <button onClick={adjustBalance} disabled={!canAdjust} className="rounded-xl bg-[#0f3b2e] px-4 py-2 text-sm font-black text-white disabled:bg-gray-200 disabled:text-[#9CA3AF]">{l.apply}</button>
-                  </div>
-                </div>
-
-                <h3 className="mb-3 text-sm font-black text-[#1F2937]">{l.transactionHistory}</h3>
-                <div className="divide-y divide-gray-100 rounded-xl border border-[#E5E7EB]">
-                  {transactions.map(tx => (
-                    <div key={tx.id} className="grid gap-2 p-3 text-sm md:grid-cols-[1fr_auto_auto]">
-                      <div>
-                        <p className="font-black text-[#1F2937]">{transactionTypeLabel(tx.type)}</p>
-                        <p className="text-xs font-semibold text-[#6B7280]">{tx.reason || tx.order_id || ''}</p>
+              <div className="grid gap-4 xl:grid-cols-[minmax(320px,430px)_1fr]">
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-[#E5E7EB] bg-[#FBFCFE] p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-black uppercase tracking-widest text-[#9CA3AF]">{l.profileTitle}</p>
+                        <h2 className="mt-2 truncate text-2xl font-black text-[#1F2937]">{selectedName(selected)}</h2>
+                        <p className="mt-1 text-sm font-semibold text-[#6B7280]">{selectedPhone(selected)} · {l.cardNo}: {selected.card_number}</p>
                       </div>
-                      <p className="font-black text-[#1F2937]">{formatCurrency(tx.amount || 0)}</p>
-                      <p className="text-xs font-semibold text-[#6B7280]">{new Date(tx.created_at).toLocaleString()}</p>
+                      <span className={`rounded-full px-3 py-1 text-xs font-black ${selected.is_active === false ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                        {statusLabel(selected)}
+                      </span>
                     </div>
-                  ))}
-                  {transactions.length === 0 && <p className="p-4 text-sm font-semibold text-[#6B7280]">{l.noTransactions}</p>}
+
+                    <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4">
+                      <p className="text-xs font-black uppercase tracking-widest text-emerald-700">{l.balance}</p>
+                      <p className="mt-1 text-4xl font-black text-[#16A34A]">{formatCurrency(selected.balance || 0)}</p>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-widest text-[#9CA3AF]">{l.cashbackType}</p>
+                          <p className="mt-1 text-sm font-black text-[#1F2937]">{cashbackTypeLabel(selected.cashback_type)}</p>
+                        </div>
+                        <span className="rounded-full bg-[#fff1e8] px-3 py-1 text-xs font-black text-[#ff5a00]">{l.cashbackRate}: {getCashbackTypePercent(selected.cashback_type || DEFAULT_CASHBACK_TYPE)}%</span>
+                      </div>
+                      {canEdit ? (
+                        <select value={selected.cashback_type || DEFAULT_CASHBACK_TYPE} onChange={e => updateCashbackType(selected, e.target.value)} className="mt-3 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-black text-[#1F2937]">
+                          {Object.entries(CASHBACK_TYPES).map(([key, config]) => (
+                            <option key={key} value={key}>{config.label} · {config.percent}%</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs font-bold text-[#6B7280]">{l.ownerTypeOnly}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-gray-50 p-4"><p className="text-xs font-bold text-[#6B7280]">{l.totalEarned}</p><p className="mt-1 font-black text-[#1F2937]">{formatCurrency(selected.total_earned || 0)}</p></div>
+                    <div className="rounded-2xl bg-gray-50 p-4"><p className="text-xs font-bold text-[#6B7280]">{l.totalUsed}</p><p className="mt-1 font-black text-[#1F2937]">{formatCurrency(selected.total_redeemed || 0)}</p></div>
+                    <div className="rounded-2xl bg-gray-50 p-4"><p className="text-xs font-bold text-[#6B7280]">{l.status}</p><p className="mt-1 font-black text-[#1F2937]">{statusLabel(selected)}</p></div>
+                    <div className="rounded-2xl bg-gray-50 p-4"><p className="text-xs font-bold text-[#6B7280]">{l.cashbackType}</p><p className="mt-1 font-black text-[#1F2937]">{cashbackTypeLabel(selected.cashback_type)}</p></div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="flex items-center gap-2 text-sm font-black text-[#1F2937]"><BadgeDollarSign size={16} /> {l.ownerActions}</h3>
+                        <p className="mt-1 text-xs font-bold text-[#6B7280]">{l.manualAdjustment}</p>
+                      </div>
+                      <button onClick={() => deactivateCard(selected)} disabled={selected.is_active === false || !canDeactivate} className="flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40">
+                        <Ban size={14} /> {l.deactivate}
+                      </button>
+                    </div>
+                    <p className="mb-3 text-xs font-semibold text-[#9CA3AF]">{canAdjust ? l.adjustmentHelper : l.ownerAdjustOnly}</p>
+                    <div className="grid gap-2">
+                      <input type="number" value={adjustment.amount} disabled={!canAdjust} onChange={e => setAdjustment({ ...adjustment, amount: e.target.value })} placeholder={l.amountPlaceholder} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50" />
+                      <input value={adjustment.reason} disabled={!canAdjust} onChange={e => setAdjustment({ ...adjustment, reason: e.target.value })} placeholder={l.reason} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50" />
+                      <button onClick={adjustBalance} disabled={!canAdjust} className="rounded-xl bg-[#0f3b2e] px-4 py-2.5 text-sm font-black text-white disabled:bg-gray-200 disabled:text-[#9CA3AF]">{l.apply}</button>
+                    </div>
+                  </div>
                 </div>
-              </>
+
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#FBFCFE] p-5">
+                  <div className="mb-4">
+                    <h3 className="text-base font-black text-[#1F2937]">{l.transactionHistory}</h3>
+                    <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{l.latestTransactions}</p>
+                  </div>
+                  <div className="space-y-3">
+                    {transactions.map(tx => (
+                      <div key={tx.id} className="rounded-2xl border border-[#E5E7EB] bg-white p-4 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-black text-[#1F2937]">{transactionTypeLabel(tx.type)}</p>
+                            <p className="mt-1 text-xs font-semibold text-[#6B7280]">{transactionDescription(tx)}</p>
+                          </div>
+                          <p className={`text-base font-black ${transactionAmountClass(tx)}`}>{transactionAmount(tx)}</p>
+                        </div>
+                        {tx.type === 'cashback_earned' && (
+                          <p className="mt-3 text-xs font-bold text-[#92400E]">{transactionCardType(tx)}</p>
+                        )}
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-[#6B7280]">
+                          {tx.order_id && <span>{l.orderPrefix} #{tx.order_id}</span>}
+                          {tx.created_at && <span>{formatTransactionDate(tx.created_at)}</span>}
+                        </div>
+                        {tx.balance_before != null && tx.balance_after != null && (
+                          <p className="mt-2 text-xs font-bold text-[#1F2937]">{l.balanceFlow}: {formatCurrency(tx.balance_before)} -&gt; {formatCurrency(tx.balance_after)}</p>
+                        )}
+                      </div>
+                    ))}
+                    {transactions.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-[#D1D5DB] bg-white p-6 text-center text-sm font-semibold text-[#6B7280]">{l.noTransactions}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="flex min-h-[420px] items-center justify-center text-center">
                 <div>

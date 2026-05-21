@@ -290,6 +290,30 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   assert.match(loyalty, /black: \{ label: 'Black', percent: 15 \}/)
 })
 
+test('AdminLoyalty selected card uses compact profile and detailed transaction layout', () => {
+  const admin = readSource('src/pages/AdminLoyalty.jsx')
+
+  assert.match(admin, /Customer Loyalty Profile/)
+  assert.match(admin, /No customer name/)
+  assert.match(admin, /No phone number/)
+  assert.match(admin, /xl:grid-cols-\[minmax\(320px,430px\)_1fr\]/)
+  assert.match(admin, /selectedName\(selected\)/)
+  assert.match(admin, /selectedPhone\(selected\)/)
+  assert.match(admin, /l\.cardNo/)
+  assert.match(admin, /l\.balance/)
+  assert.match(admin, /l\.ownerActions/)
+  assert.match(admin, /l\.adjustmentHelper/)
+  assert.match(admin, /l\.ownerAdjustOnly/)
+  assert.match(admin, /l\.ownerTypeOnly/)
+  assert.match(admin, /transactionAmount\(tx\)/)
+  assert.match(admin, /transactionCardType\(tx\)/)
+  assert.match(admin, /tx\.balance_before/)
+  assert.match(admin, /tx\.balance_after/)
+  assert.match(admin, /l\.noTransactions/)
+  assert.match(admin, /disabled=\{!canAdjust\}/)
+  assert.match(admin, /disabled=\{selected\.is_active === false \|\| !canDeactivate\}/)
+})
+
 test('AdminSettings does not expose obsolete cashback percent setting', () => {
   const settings = readSource('src/pages/AdminSettings.jsx')
   const reducerDefaults = readSource('src/store/reducerHelpers.js')
