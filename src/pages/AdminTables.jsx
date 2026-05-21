@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react'
-import { Plus, Edit2, Trash2, X, Table2, MapPin, Users, Hash, Power, PowerOff, Layers } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Table2, MapPin, Users, Hash, Power, PowerOff, Layers, CalendarClock } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import AppShell from '../components/AppShell'
+import { canDeleteTable, canDisableTable } from '../lib/tableManagement'
 
 const DEFAULT_ZONES = ['Main Hall', 'VIP', 'Outdoor', 'Second Floor']
 
@@ -29,6 +30,11 @@ function normalizeTable(table, zones = []) {
     sort_order: Number(table.sort_order) || 0,
     status: table.status || 'available',
     is_active: table.is_active !== false,
+    reserved_for_name: table.reserved_for_name || '',
+    reserved_for_phone: table.reserved_for_phone || '',
+    reserved_at: table.reserved_at ? String(table.reserved_at).slice(0, 16) : '',
+    reserved_until: table.reserved_until ? String(table.reserved_until).slice(0, 16) : '',
+    reservation_notes: table.reservation_notes || '',
   }
 }
 
@@ -75,14 +81,24 @@ function Field({ label, error, children }) {
   )
 }
 
-function StatusPill({ active }) {
-  return active ? (
+function StatusPill({ table }) {
+  if (table.is_active === false) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-black text-gray-500">
+        <PowerOff size={11} /> Disabled
+      </span>
+    )
+  }
+  if (table.status === 'reserved') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-black text-purple-700">
+        <CalendarClock size={11} /> Reserved
+      </span>
+    )
+  }
+  return (
     <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700">
       <Power size={11} /> Active
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-black text-gray-500">
-      <PowerOff size={11} /> Disabled
     </span>
   )
 }
@@ -93,6 +109,7 @@ function SummaryCard({ icon: Icon, label, value, tone }) {
     green: 'bg-emerald-50 text-emerald-600',
     gray: 'bg-gray-100 text-gray-600',
     blue: 'bg-blue-50 text-blue-600',
+    purple: 'bg-purple-50 text-purple-600',
   }
   return (
     <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
@@ -167,6 +184,7 @@ export default function AdminTables() {
 
   const activeCount = state.tables.filter(table => table.is_active !== false).length
   const disabledCount = state.tables.length - activeCount
+  const reservedCount = state.tables.filter(table => table.is_active !== false && table.status === 'reserved').length
 
   function openNew() {
     const nextSort = state.tables.reduce((max, table) => Math.max(max, Number(table.sort_order) || 0), 0) + 1
@@ -180,6 +198,11 @@ export default function AdminTables() {
       sort_order: nextSort,
       status: 'available',
       is_active: true,
+      reserved_for_name: '',
+      reserved_for_phone: '',
+      reserved_at: '',
+      reserved_until: '',
+      reservation_notes: '',
     }, tableZones))
     setErrors({})
     setModal('new')
@@ -206,6 +229,13 @@ export default function AdminTables() {
       nextErrors.sort_order = 'Sort order should be a number'
     }
     if (!nextForm.zone_name.trim()) nextErrors.zone = 'Zone / section is required'
+    if (nextForm.status === 'reserved') {
+      if (!nextForm.reserved_for_name.trim()) nextErrors.reserved_for_name = 'Guest name is required for reservations'
+      if (!nextForm.reserved_at) nextErrors.reserved_at = 'Reservation time is required'
+      if (nextForm.reserved_until && nextForm.reserved_at && new Date(nextForm.reserved_until) <= new Date(nextForm.reserved_at)) {
+        nextErrors.reserved_until = 'End time should be after reservation time'
+      }
+    }
     return nextErrors
   }
 
@@ -228,8 +258,13 @@ export default function AdminTables() {
       zone_name: selectedZone?.name || form.zone_name.trim(),
       capacity: Math.max(1, Math.round(Number(form.capacity) || 1)),
       sort_order: Math.round(Number(form.sort_order) || 0),
-      status: form.status || 'available',
+      status: form.is_active === false ? 'available' : form.status || 'available',
       is_active: form.is_active !== false,
+      reserved_for_name: form.is_active !== false && form.status === 'reserved' ? form.reserved_for_name.trim() : '',
+      reserved_for_phone: form.is_active !== false && form.status === 'reserved' ? form.reserved_for_phone.trim() : '',
+      reserved_at: form.is_active !== false && form.status === 'reserved' && form.reserved_at ? form.reserved_at : null,
+      reserved_until: form.is_active !== false && form.status === 'reserved' && form.reserved_until ? form.reserved_until : null,
+      reservation_notes: form.is_active !== false && form.status === 'reserved' ? form.reservation_notes.trim() : '',
     }
     const nextErrors = validate(payload)
     setErrors(nextErrors)
@@ -271,7 +306,8 @@ export default function AdminTables() {
   }
 
   function requestDisable(table) {
-    if (orderStats.active.has(table.id)) {
+    const check = canDisableTable(table, state.orders)
+    if (!check.ok && check.reason === 'active_orders') {
       setNotice({ tone: 'error', message: 'Close active orders before disabling this table.' })
       return
     }
@@ -281,7 +317,19 @@ export default function AdminTables() {
       actionLabel: 'Disable table',
       tone: 'orange',
       onConfirm: async () => {
-        const result = await dispatch({ type: 'UPDATE_TABLE', payload: { ...table, is_active: false, status: 'available' } })
+        const result = await dispatch({
+          type: 'UPDATE_TABLE',
+          payload: {
+            ...table,
+            is_active: false,
+            status: 'available',
+            reserved_for_name: '',
+            reserved_for_phone: '',
+            reserved_at: null,
+            reserved_until: null,
+            reservation_notes: '',
+          },
+        })
         if (result?.error) {
           setNotice({ tone: 'error', message: result.error.message || 'Could not disable table' })
         } else {
@@ -293,11 +341,12 @@ export default function AdminTables() {
   }
 
   function requestDelete(table) {
-    if (orderStats.active.has(table.id)) {
+    const check = canDeleteTable(table, state.orders)
+    if (!check.ok && check.reason === 'active_orders') {
       setNotice({ tone: 'error', message: 'Do not delete a table while it has active orders.' })
       return
     }
-    if (orderStats.history.has(table.id)) {
+    if (!check.ok && check.reason === 'order_history') {
       setNotice({ tone: 'error', message: 'This table has order history. You can disable it instead.' })
       return
     }
@@ -348,8 +397,8 @@ export default function AdminTables() {
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <SummaryCard icon={Table2} label="Tables" value={state.tables.length} tone="orange" />
           <SummaryCard icon={Power} label="Active" value={activeCount} tone="green" />
+          <SummaryCard icon={CalendarClock} label="Reserved" value={reservedCount} tone="purple" />
           <SummaryCard icon={PowerOff} label="Disabled" value={disabledCount} tone="gray" />
-          <SummaryCard icon={Layers} label="Zones" value={tableZones.length} tone="blue" />
         </div>
 
         <div className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
@@ -384,7 +433,7 @@ export default function AdminTables() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
-          <div className="hidden grid-cols-[1.3fr_1fr_0.7fr_0.8fr_0.7fr_120px] gap-3 border-b border-[#F3F4F6] bg-gray-50 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-gray-400 md:grid">
+          <div className="hidden grid-cols-[1.3fr_1fr_0.7fr_1fr_0.7fr_120px] gap-3 border-b border-[#F3F4F6] bg-gray-50 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-gray-400 md:grid">
             <span>Table name</span>
             <span>Zone / section</span>
             <span>Capacity</span>
@@ -397,12 +446,15 @@ export default function AdminTables() {
               const activeOrders = orderStats.active.has(table.id)
               const hasHistory = orderStats.history.has(table.id)
               return (
-                <div key={table.id} className={`grid gap-3 px-4 py-4 md:grid-cols-[1.3fr_1fr_0.7fr_0.8fr_0.7fr_120px] md:items-center ${table.is_active === false ? 'bg-gray-50/70' : 'bg-white'}`}>
+                <div key={table.id} className={`grid gap-3 px-4 py-4 md:grid-cols-[1.3fr_1fr_0.7fr_1fr_0.7fr_120px] md:items-center ${table.is_active === false ? 'bg-gray-50/70' : 'bg-white'}`}>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-black text-[#1F2937]">{table.name}</p>
                     <p className="mt-0.5 text-xs text-gray-400 md:hidden">{table.zone_name || 'Main Hall'} · sort {Number(table.sort_order) || 0}</p>
                     {activeOrders && <p className="mt-1 text-xs font-bold text-orange-600">Has active orders</p>}
                     {!activeOrders && hasHistory && <p className="mt-1 text-xs font-semibold text-gray-400">Has order history</p>}
+                    {table.status === 'reserved' && table.reserved_for_name && (
+                      <p className="mt-1 text-xs font-bold text-purple-600">{table.reserved_for_name}</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">
                     <MapPin size={14} className="text-gray-300" />
@@ -412,7 +464,12 @@ export default function AdminTables() {
                     <Users size={14} className="text-gray-300" />
                     {Number(table.capacity) || 4}
                   </div>
-                  <StatusPill active={table.is_active !== false} />
+                  <div>
+                    <StatusPill table={table} />
+                    {table.status === 'reserved' && table.reserved_at && (
+                      <p className="mt-1 text-xs font-semibold text-gray-400">{new Date(table.reserved_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</p>
+                    )}
+                  </div>
                   <div className="hidden items-center gap-1.5 text-sm font-semibold text-gray-600 md:flex">
                     <Hash size={14} className="text-gray-300" />
                     {Number(table.sort_order) || 0}
@@ -424,6 +481,14 @@ export default function AdminTables() {
                       title="Edit"
                     >
                       <Edit2 size={15} />
+                    </button>
+                    <button
+                      onClick={() => openEdit({ ...table, status: 'reserved' })}
+                      disabled={activeOrders || table.is_active === false}
+                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-purple-50 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Reserve"
+                    >
+                      <CalendarClock size={15} />
                     </button>
                     <button
                       onClick={() => requestDisable(table)}
@@ -496,6 +561,75 @@ export default function AdminTables() {
                   className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
                 />
               </Field>
+            </div>
+
+            <div className="rounded-2xl border border-[#E5E7EB] bg-gray-50 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-[#1F2937]">Reserved</p>
+                  <p className="text-xs text-gray-500">Capture guest details for this table reservation.</p>
+                </div>
+                <Toggle
+                  value={form.status === 'reserved'}
+                  onChange={value => setForm(current => ({
+                    ...current,
+                    status: value ? 'reserved' : 'available',
+                    reserved_for_name: value ? current.reserved_for_name : '',
+                    reserved_for_phone: value ? current.reserved_for_phone : '',
+                    reserved_at: value ? current.reserved_at : '',
+                    reserved_until: value ? current.reserved_until : '',
+                    reservation_notes: value ? current.reservation_notes : '',
+                  }))}
+                  disabled={modal === 'edit' && orderStats.active.has(form.id)}
+                />
+              </div>
+              {form.status === 'reserved' && (
+                <div className="grid gap-3">
+                  <Field label="Guest name" error={errors.reserved_for_name}>
+                    <input
+                      value={form.reserved_for_name}
+                      onChange={e => setForm(current => ({ ...current, reserved_for_name: e.target.value }))}
+                      placeholder="Customer name"
+                      className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
+                    />
+                  </Field>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Phone">
+                      <input
+                        value={form.reserved_for_phone}
+                        onChange={e => setForm(current => ({ ...current, reserved_for_phone: e.target.value }))}
+                        placeholder="+998..."
+                        className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
+                      />
+                    </Field>
+                    <Field label="Reservation time" error={errors.reserved_at}>
+                      <input
+                        type="datetime-local"
+                        value={form.reserved_at}
+                        onChange={e => setForm(current => ({ ...current, reserved_at: e.target.value }))}
+                        className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Reserved until" error={errors.reserved_until}>
+                    <input
+                      type="datetime-local"
+                      value={form.reserved_until}
+                      onChange={e => setForm(current => ({ ...current, reserved_until: e.target.value }))}
+                      className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
+                    />
+                  </Field>
+                  <Field label="Notes">
+                    <textarea
+                      value={form.reservation_notes}
+                      onChange={e => setForm(current => ({ ...current, reservation_notes: e.target.value }))}
+                      placeholder="Guest preferences, occasion, seating notes..."
+                      rows={3}
+                      className="w-full resize-none rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
+                    />
+                  </Field>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between rounded-2xl border border-[#E5E7EB] bg-gray-50 px-4 py-3">

@@ -63,7 +63,17 @@ export function ordersReducer(state, action) {
             created_at: new Date().toISOString(),
           }]
       const updatedTables = isTakeAway ? state.tables : state.tables.map(t =>
-        t.id === state.currentTableId ? { ...t, status: 'occupied' } : t
+        t.id === state.currentTableId
+          ? {
+              ...t,
+              status: 'occupied',
+              reserved_for_name: '',
+              reserved_for_phone: '',
+              reserved_at: null,
+              reserved_until: null,
+              reservation_notes: '',
+            }
+          : t
       )
       return { ...state, orders: nextOrders, cart: removeSentCartItems(state.cart, cartItems), tables: updatedTables }
     }
@@ -215,7 +225,18 @@ export function ordersReducer(state, action) {
       })
       return {
         ...state,
-        tables: orderId ? state.tables : state.tables.map(t => t.id === tableId ? { ...t, status: 'available' } : t),
+        tables: orderId ? state.tables : state.tables.map(t => t.id === tableId
+          ? {
+              ...t,
+              status: 'available',
+              reserved_for_name: '',
+              reserved_for_phone: '',
+              reserved_at: null,
+              reserved_until: null,
+              reservation_notes: '',
+            }
+          : t
+        ),
         orders: state.orders.map(o => {
           if ((orderId ? o.id !== orderId : o.table_id !== tableId) || o.payment_status === 'paid') return o
           const isTakeAway = normalizeOrderType(o.order_type) === 'take_away'

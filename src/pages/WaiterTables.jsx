@@ -7,8 +7,9 @@ import AppShell from '../components/AppShell'
 import {
   UtensilsCrossed, Clock, ChefHat, CheckCircle2,
   Receipt, Coffee, RefreshCw, Layers, Plus,
-  Search, CreditCard, Settings,
+  Search, CreditCard, Settings, CalendarClock, Phone,
 } from 'lucide-react'
+import { getReservationSummary, getWaiterTableStatus } from '../lib/tableManagement'
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
@@ -23,8 +24,11 @@ const L = {
     preparing: 'Preparing',
     readyFromKitchen: 'Ready',
     occupied: 'Occupied',
+    reserved: 'Reserved',
     needsBill: 'Needs Bill',
     tapToStart: 'Tap to start order',
+    reservedFor: 'Reserved for',
+    seatReserved: 'Seat guest',
     itemsNew: n => `${n} new`,
     itemsPreparing: n => `${n} preparing`,
     itemsReady: n => `${n} ready`,
@@ -43,6 +47,7 @@ const L = {
     guidePreparing: 'Kitchen is preparing items',
     guideReady: 'All items ready — confirm delivery',
     guideOccupied: 'Order delivered and eating',
+    guideReserved: 'Reserved for an upcoming guest',
     guideNeedsBill: 'Guest requested the bill',
     takeAwayOrder: 'Take Away Order',
     manageTables: 'Manage tables',
@@ -57,8 +62,11 @@ const L = {
     preparing: 'Готовится',
     readyFromKitchen: 'Готово',
     occupied: 'Занят',
+    reserved: 'Бронь',
     needsBill: 'Счёт',
     tapToStart: 'Нажмите для заказа',
+    reservedFor: 'Бронь на',
+    seatReserved: 'Посадить гостя',
     itemsNew: n => `${n} новых`,
     itemsPreparing: n => `${n} готовится`,
     itemsReady: n => `${n} готово`,
@@ -77,6 +85,7 @@ const L = {
     guidePreparing: 'Кухня готовит блюда',
     guideReady: 'Всё готово — подтвердите доставку',
     guideOccupied: 'Заказ доставлен, гость ест',
+    guideReserved: 'Забронировано для гостя',
     guideNeedsBill: 'Гость попросил счёт',
     takeAwayOrder: 'Заказ с собой',
     manageTables: 'Управление столами',
@@ -91,8 +100,11 @@ const L = {
     preparing: 'Tayyorlanmoqda',
     readyFromKitchen: 'Tayyor',
     occupied: 'Band',
+    reserved: 'Band qilingan',
     needsBill: 'Hisob',
     tapToStart: 'Buyurtma boshlash uchun bosing',
+    reservedFor: 'Bron',
+    seatReserved: 'Mehmonni joylashtirish',
     itemsNew: n => `${n} yangi`,
     itemsPreparing: n => `${n} tayyorlanmoqda`,
     itemsReady: n => `${n} tayyor`,
@@ -111,6 +123,7 @@ const L = {
     guidePreparing: 'Oshxona tayyorlamoqda',
     guideReady: 'Hammasi tayyor — yetkazib berishni tasdiqlang',
     guideOccupied: 'Buyurtma yetkazildi, mehmon ovqatlanmoqda',
+    guideReserved: 'Keladigan mehmon uchun bron qilingan',
     guideNeedsBill: 'Mehmon hisob so\'radi',
     takeAwayOrder: 'Olib ketish buyurtmasi',
     manageTables: 'Stollarni boshqarish',
@@ -176,6 +189,16 @@ const STATUS_CFG = {
     chipBg: 'bg-indigo-100 text-indigo-700',
     chipActiveBg: 'bg-indigo-500 text-white',
   },
+  reserved: {
+    border: 'border-purple-200',
+    hoverBorder: 'hover:border-purple-400',
+    bg: 'bg-purple-50',
+    badge: 'bg-purple-100 text-purple-700 border border-purple-200',
+    dot: 'bg-purple-500',
+    icon: CalendarClock,
+    chipBg: 'bg-purple-100 text-purple-700 border border-purple-200',
+    chipActiveBg: 'bg-purple-500 text-white',
+  },
   needs_bill: {
     border: 'border-red-300',
     hoverBorder: 'hover:border-red-500',
@@ -215,6 +238,11 @@ function deriveStatus(tableId, orders) {
   if (hasReady || hasPreparing) return 'preparing'
 
   return 'waiting_kitchen'
+}
+
+function deriveStatusForTable(table, orders) {
+  const active = orders.filter(o => o.table_id === table.id && o.payment_status !== 'paid')
+  return getWaiterTableStatus(table, active, () => deriveStatus(table.id, orders))
 }
 
 function getKitchenCounts(tableId, orders) {
@@ -276,6 +304,7 @@ function statusLabel(lang, status) {
          status === 'waiting_kitchen' ? tr(lang, 'waitingKitchen')   :
          status === 'preparing'       ? tr(lang, 'preparing')         :
          status === 'ready'           ? tr(lang, 'readyFromKitchen')  :
+         status === 'reserved'        ? tr(lang, 'reserved')          :
          status === 'occupied'        ? tr(lang, 'occupied')          :
                                         tr(lang, 'needsBill')
 }
@@ -285,6 +314,7 @@ function actionForStatus(lang, status) {
   if (status === 'preparing') return { label: tr(lang, 'viewKitchen'), Icon: ChefHat, cls: 'bg-orange-500 text-white hover:bg-orange-600' }
   if (status === 'waiting_kitchen') return { label: tr(lang, 'viewOrder'), Icon: Clock, cls: 'bg-yellow-500 text-white hover:bg-yellow-600' }
   if (status === 'needs_bill') return { label: tr(lang, 'takePayment'), Icon: CreditCard, cls: 'bg-red-600 text-white hover:bg-red-700' }
+  if (status === 'reserved') return { label: tr(lang, 'seatReserved'), Icon: CalendarClock, cls: 'bg-purple-600 text-white hover:bg-purple-700' }
   if (status === 'occupied') return { label: tr(lang, 'viewTable'), Icon: UtensilsCrossed, cls: 'bg-indigo-600 text-white hover:bg-indigo-700' }
   return null
 }
@@ -295,6 +325,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction }) {
   const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt) : null
   const action = actionForStatus(lang, status)
   const ActionIcon = action?.Icon
+  const reservation = getReservationSummary(table)
 
   return (
     <div
@@ -324,6 +355,24 @@ function TableCard({ table, status, counts, lang, onClick, onAction }) {
       {/* State-specific content */}
       {status === 'available' && (
         <p className="text-xs text-gray-400 mt-auto">{tr(lang, 'tapToStart')}</p>
+      )}
+
+      {status === 'reserved' && reservation && (
+        <div className="mt-1 space-y-1.5">
+          <p className="text-sm font-black text-purple-700">{tr(lang, 'reservedFor')}: {reservation.name || '-'}</p>
+          {reservation.startsAt && (
+            <p className="flex items-center gap-1 text-xs font-semibold text-gray-500">
+              <Clock size={12} />
+              {new Date(reservation.startsAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+            </p>
+          )}
+          {reservation.phone && (
+            <p className="flex items-center gap-1 text-xs font-semibold text-gray-500">
+              <Phone size={12} />
+              {reservation.phone}
+            </p>
+          )}
+        </div>
       )}
 
       {(status === 'waiting_kitchen') && (
@@ -405,6 +454,7 @@ const STATUS_GUIDE_ITEMS = [
   { status: 'preparing',       guideKey: 'guidePreparing'  },
   { status: 'ready',           guideKey: 'guideReady'      },
   { status: 'occupied',        guideKey: 'guideOccupied'   },
+  { status: 'reserved',        guideKey: 'guideReserved'   },
   { status: 'needs_bill',      guideKey: 'guideNeedsBill'  },
 ]
 
@@ -424,6 +474,7 @@ function StatusGuide({ lang }) {
             status === 'waiting_kitchen' ? tr(lang, 'waitingKitchen')   :
             status === 'preparing'       ? tr(lang, 'preparing')         :
             status === 'ready'           ? tr(lang, 'readyFromKitchen')  :
+            status === 'reserved'        ? tr(lang, 'reserved')          :
             status === 'occupied'        ? tr(lang, 'occupied')          :
                                            tr(lang, 'needsBill')
           return (
@@ -445,8 +496,8 @@ function StatusGuide({ lang }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const FILTER_ORDER = ['all', 'available', 'waiting_kitchen', 'preparing', 'ready', 'needs_bill', 'occupied']
-const SECTION_ORDER = ['ready', 'preparing', 'waiting_kitchen', 'needs_bill', 'occupied', 'available']
+const FILTER_ORDER = ['all', 'available', 'reserved', 'waiting_kitchen', 'preparing', 'ready', 'needs_bill', 'occupied']
+const SECTION_ORDER = ['ready', 'preparing', 'waiting_kitchen', 'needs_bill', 'reserved', 'occupied', 'available']
 
 export default function WaiterTables() {
   const { state, dispatch } = useApp()
@@ -467,7 +518,7 @@ export default function WaiterTables() {
         String(a.name || '').localeCompare(String(b.name || ''))
       )
       .map(table => {
-        const status = deriveStatus(table.id, state.orders)
+        const status = deriveStatusForTable(table, state.orders)
         const active = state.orders.filter(o => o.table_id === table.id && o.payment_status !== 'paid')
         const counts = active.length > 0 ? getKitchenCounts(table.id, state.orders) : null
         return { table, status, counts }
@@ -518,6 +569,20 @@ export default function WaiterTables() {
     if (status === 'needs_bill') {
       navigate(`/cashier/bill/${table.id}`)
       return
+    }
+    if (status === 'reserved') {
+      dispatch({
+        type: 'UPDATE_TABLE',
+        payload: {
+          ...table,
+          status: 'available',
+          reserved_for_name: '',
+          reserved_for_phone: '',
+          reserved_at: null,
+          reserved_until: null,
+          reservation_notes: '',
+        },
+      })
     }
     handleTable(table, status)
   }
@@ -634,7 +699,7 @@ export default function WaiterTables() {
                         status={itemStatus}
                         counts={counts}
                         lang={lang}
-                        onClick={() => handleTable(table, itemStatus)}
+                        onClick={() => itemStatus === 'reserved' ? handleCardAction(itemStatus, table) : handleTable(table, itemStatus)}
                         onAction={handleCardAction}
                       />
                     ))}

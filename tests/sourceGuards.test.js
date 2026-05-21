@@ -150,14 +150,14 @@ test('kitchen submit RPC migration protects paid orders from late item inserts',
 test('WaiterTables keeps urgent status sections before available tables', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
 
-  assert.match(source, /const SECTION_ORDER = \['ready', 'preparing', 'waiting_kitchen', 'needs_bill', 'occupied', 'available'\]/)
+  assert.match(source, /const SECTION_ORDER = \['ready', 'preparing', 'waiting_kitchen', 'needs_bill', 'reserved', 'occupied', 'available'\]/)
   assert.match(source, /SECTION_ORDER\s*\n\s*\.map\(status =>/)
 })
 
 test('WaiterTables keeps filter chips in requested status order', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
 
-  assert.match(source, /const FILTER_ORDER = \['all', 'available', 'waiting_kitchen', 'preparing', 'ready', 'needs_bill', 'occupied'\]/)
+  assert.match(source, /const FILTER_ORDER = \['all', 'available', 'reserved', 'waiting_kitchen', 'preparing', 'ready', 'needs_bill', 'occupied'\]/)
 })
 
 test('WaiterTables uses responsive section grids instead of one flat table grid', () => {
@@ -202,6 +202,20 @@ test('table management migration and health check include required columns', () 
   assert.match(migration, /add column if not exists zone_id/)
   assert.match(migration, /add column if not exists capacity/)
   assert.match(migration, /add column if not exists is_active/)
-  assert.match(health, /restaurant_tables', 'id, name, status, zone_id, zone_name, capacity, sort_order, is_active, created_at, updated_at'/)
+  assert.match(health, /restaurant_tables', 'id, name, status, zone_id, zone_name, capacity, sort_order, is_active, reserved_for_name, reserved_for_phone, reserved_at, reserved_until, reservation_notes, created_at, updated_at'/)
   assert.match(health, /table_zones', 'id, name, sort_order, is_active, created_at, updated_at'/)
+})
+
+test('table reservation migration and UI are wired', () => {
+  const migration = readSource('supabase/020_table_reservations.sql')
+  const adminTables = readSource('src/pages/AdminTables.jsx')
+  const waiterTables = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(migration, /status in \('available', 'reserved', 'occupied', 'needs_bill'\)/)
+  assert.match(migration, /reserved_for_name/)
+  assert.match(migration, /reserved_for_phone/)
+  assert.match(migration, /reserved_at/)
+  assert.match(adminTables, /Guest name is required for reservations/)
+  assert.match(waiterTables, /getWaiterTableStatus/)
+  assert.match(waiterTables, /seatReserved/)
 })

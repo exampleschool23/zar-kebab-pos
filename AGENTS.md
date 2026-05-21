@@ -131,6 +131,9 @@ Run migrations in order. Important recent files:
 - `supabase/019_table_management.sql`
   Adds `table_zones` and table management fields on `restaurant_tables`: `zone_id`, `zone_name`, `capacity`, `sort_order`, `is_active`, and `updated_at`. Disabled tables remain in reports/history but are hidden from waiter ordering.
 
+- `supabase/020_table_reservations.sql`
+  Adds reserved table state and reservation details: `reserved_for_name`, `reserved_for_phone`, `reserved_at`, `reserved_until`, and `reservation_notes`. Seating/sending an order for a reserved table clears reservation details and moves the table to `occupied`.
+
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
 ## Supabase Notes
@@ -214,6 +217,7 @@ npm run build
 - Kitchen RPC rejects already paid/unavailable orders.
 - Disabled tables stay out of the waiter table grid.
 - Admin table management blocks hard delete when a table has active orders or order history.
+- Reserved tables show on the waiter grid with reservation details and convert to occupied when seated.
 
 If these tests fail, understand why before changing the guard. They exist because these exact failures reached the user.
 

@@ -45,6 +45,34 @@ function isMissingKitchenSubmitRpc(error) {
   )
 }
 
+function isMissingTableReservationColumn(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (
+    message.includes('schema cache') &&
+    (
+      message.includes('reserved_for_name') ||
+      message.includes('reserved_for_phone') ||
+      message.includes('reserved_at') ||
+      message.includes('reserved_until') ||
+      message.includes('reservation_notes')
+    )
+  )
+}
+
+async function updateRestaurantTableStatus(tableId, fields, fallbackFields = null) {
+  let { error } = await supabase
+    .from('restaurant_tables')
+    .update(fields)
+    .eq('id', tableId)
+  if (error && fallbackFields && isMissingTableReservationColumn(error)) {
+    ;({ error } = await supabase
+      .from('restaurant_tables')
+      .update(fallbackFields)
+      .eq('id', tableId))
+  }
+  if (error) throw error
+}
+
 function makeTakeAwayOrderNumber(orderId) {
   const suffix = String(orderId || Date.now()).replace(/\D/g, '').slice(-4).padStart(4, '0')
   return `TA-${suffix}`
@@ -379,10 +407,18 @@ export async function writeToSupabase(action, state) {
       if (itemInsertError) throw itemInsertError
 
       if (!isTakeAway) {
-        await supabase
-          .from('restaurant_tables')
-          .update({ status: 'occupied' })
-          .eq('id', tableId)
+        await updateRestaurantTableStatus(
+          tableId,
+          {
+            status: 'occupied',
+            reserved_for_name: '',
+            reserved_for_phone: '',
+            reserved_at: null,
+            reserved_until: null,
+            reservation_notes: '',
+          },
+          { status: 'occupied' }
+        )
       }
       break
     }
@@ -657,10 +693,18 @@ export async function writeToSupabase(action, state) {
       }
 
       if (!orderId) {
-        await supabase
-          .from('restaurant_tables')
-          .update({ status: 'available' })
-          .eq('id', tableId)
+        await updateRestaurantTableStatus(
+          tableId,
+          {
+            status: 'available',
+            reserved_for_name: '',
+            reserved_for_phone: '',
+            reserved_at: null,
+            reserved_until: null,
+            reservation_notes: '',
+          },
+          { status: 'available' }
+        )
       }
       break
     }
