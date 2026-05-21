@@ -47,6 +47,13 @@ function Toggle({ value, onChange }) {
   )
 }
 
+function healthMessage(check, labels) {
+  if (check.messageKey === 'ok') return labels.healthOk
+  if (check.messageKey === 'available') return labels.healthAvailable
+  if (check.messageKey === 'missingColumn') return labels.healthMissingColumn(check.detail)
+  return check.detail || labels.healthUnknownError
+}
+
 export default function AdminSettings() {
   const { state, dispatch } = useApp()
   const navigate = useNavigate()
@@ -126,6 +133,11 @@ export default function AdminSettings() {
       runHealth:       'Tekshirish',
       healthy:         'Hammasi joyida',
       unhealthy:       'Muammo bor',
+      healthOk:         'OK',
+      healthAvailable:  'Mavjud',
+      healthMissingColumn: column => `Ustun yo‘q: ${column}`,
+      healthUnknownError: 'Noma’lum xatolik',
+      open:             'Ochish',
       save:            'Saqlash',
       saving:          'Saqlanmoqda...',
       saved:           'Saqlandi!',
@@ -156,6 +168,11 @@ export default function AdminSettings() {
       runHealth:       'Проверить',
       healthy:         'Всё в порядке',
       unhealthy:       'Есть проблемы',
+      healthOk:         'OK',
+      healthAvailable:  'Доступно',
+      healthMissingColumn: column => `Нет колонки: ${column}`,
+      healthUnknownError: 'Неизвестная ошибка',
+      open:             'Открыть',
       save:            'Сохранить',
       saving:          'Сохранение...',
       saved:           'Сохранено!',
@@ -186,6 +203,11 @@ export default function AdminSettings() {
       runHealth:       'Check',
       healthy:         'Healthy',
       unhealthy:       'Needs attention',
+      healthOk:         'OK',
+      healthAvailable:  'Available',
+      healthMissingColumn: column => `Missing column: ${column}`,
+      healthUnknownError: 'Unknown error',
+      open:             'Open',
       save:            'Save Changes',
       saving:          'Saving...',
       saved:           'Saved!',
@@ -254,7 +276,7 @@ export default function AdminSettings() {
               onClick={() => navigate('/admin/tables')}
               className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-gray-50 px-3 py-2 text-[13px] font-bold text-[#1F2937] transition-colors hover:bg-gray-100"
             >
-              Open
+              {l.open}
               <ChevronRight size={14} />
             </button>
           </SettingRow>
@@ -321,7 +343,7 @@ export default function AdminSettings() {
                   {health.checks.map(check => (
                     <div key={`${check.type}-${check.name}`} className="rounded-xl bg-white px-3 py-2 text-xs">
                       <p className="font-black text-[#1F2937]">{check.name}</p>
-                      <p className={check.ok ? 'font-bold text-emerald-600' : 'font-bold text-red-600'}>{check.message}</p>
+                      <p className={check.ok ? 'font-bold text-emerald-600' : 'font-bold text-red-600'}>{healthMessage(check, l)}</p>
                     </div>
                   ))}
                 </div>

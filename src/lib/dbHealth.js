@@ -25,20 +25,21 @@ async function checkTable(dbClient, check) {
     .select(check.columns.join(','))
     .limit(1)
 
-  if (!error) return { type: 'table', name: check.name, ok: true, message: 'OK' }
+  if (!error) return { type: 'table', name: check.name, ok: true, messageKey: 'ok' }
 
   const missingColumn = missingColumnMessage(error)
   return {
     type: 'table',
     name: check.name,
     ok: false,
-    message: missingColumn ? `Missing column: ${missingColumn}` : error.message,
+    messageKey: missingColumn ? 'missingColumn' : 'rawError',
+    detail: missingColumn || error.message,
   }
 }
 
 async function checkKitchenRpc(dbClient) {
   const { error } = await dbClient.rpc('submit_order_to_kitchen', { payload: {} })
-  if (!error) return { type: 'rpc', name: 'submit_order_to_kitchen', ok: true, message: 'OK' }
+  if (!error) return { type: 'rpc', name: 'submit_order_to_kitchen', ok: true, messageKey: 'ok' }
   const message = `${error.code || ''} ${error.message || ''} ${error.details || ''}`.toLowerCase()
   const missing = message.includes('could not find the function') ||
     message.includes('schema cache') && message.includes('submit_order_to_kitchen') ||
@@ -47,7 +48,8 @@ async function checkKitchenRpc(dbClient) {
     type: 'rpc',
     name: 'submit_order_to_kitchen',
     ok: !missing,
-    message: missing ? error.message : 'Available',
+    messageKey: missing ? 'rawError' : 'available',
+    detail: missing ? error.message : null,
   }
 }
 

@@ -32,10 +32,13 @@ test('database health passes when tables exist and RPC responds with a validatio
   assert.equal(result.ok, true)
   assert.equal(result.failed.length, 0)
   assert.equal(result.checks.some(check => check.name === 'submit_order_to_kitchen' && check.ok), true)
+  assert.equal(result.checks.find(check => check.name === 'restaurant_tables').messageKey, 'ok')
+  assert.equal(result.checks.find(check => check.name === 'submit_order_to_kitchen').messageKey, 'available')
 })
 
 test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)
   assert.deepEqual(result.failed.map(check => check.name).sort(), ['order_payments', 'submit_order_to_kitchen'])
+  assert.equal(result.failed.find(check => check.name === 'order_payments').messageKey, 'rawError')
 })
