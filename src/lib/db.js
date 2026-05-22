@@ -106,6 +106,24 @@ function isMissingSchemaColumn(error, columnName) {
   return message.includes('schema cache') && message.includes(String(columnName || '').toLowerCase())
 }
 
+function isLegacyPositiveTransactionAmountConstraint(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (
+    message.includes('loyalty_transactions_amount_check') ||
+    message.includes('amount_check') ||
+    message.includes('amount > 0') ||
+    message.includes('check constraint') && message.includes('loyalty_transactions') && message.includes('amount')
+  )
+}
+
+function toLegacyPositiveTransactionAmounts(transactions) {
+  return transactions.map(row => (
+    row.type === 'redeemed' && Number(row.amount) < 0
+      ? { ...row, amount: Math.abs(Number(row.amount) || 0) }
+      : row
+  ))
+}
+
 async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt }) {
   const cardNumber = String(loyalty?.loyalty_card_number || loyalty?.cardNumber || '').trim()
   const requestedRedeemAmount = Math.max(0, Math.round(Number(loyalty?.loyalty_used_amount ?? loyalty?.loyalty_redeem_amount ?? 0) || 0))
@@ -210,6 +228,11 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
       let { error: transactionError } = await supabase
         .from('loyalty_transactions')
         .insert(transactions)
+      if (transactionError && isLegacyPositiveTransactionAmountConstraint(transactionError)) {
+        ;({ error: transactionError } = await supabase
+          .from('loyalty_transactions')
+          .insert(toLegacyPositiveTransactionAmounts(transactions)))
+      }
       if (
         transactionError &&
         (isMissingSchemaColumn(transactionError, 'cashback_percent_used') ||
@@ -223,6 +246,11 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
         ;({ error: transactionError } = await supabase
           .from('loyalty_transactions')
           .insert(legacyTransactions))
+        if (transactionError && isLegacyPositiveTransactionAmountConstraint(transactionError)) {
+          ;({ error: transactionError } = await supabase
+            .from('loyalty_transactions')
+            .insert(toLegacyPositiveTransactionAmounts(legacyTransactions)))
+        }
       }
       if (transactionError) {
         await supabase

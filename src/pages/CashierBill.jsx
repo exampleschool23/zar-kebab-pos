@@ -81,6 +81,7 @@ export default function CashierBill() {
   const [loyaltyRedeemAmount, setLoyaltyRedeemAmount] = useState('')
   const [loyaltyLookupMessage, setLoyaltyLookupMessage] = useState('')
   const [isCheckingLoyalty, setCheckingLoyalty] = useState(false)
+  const [isProcessingPayment, setProcessingPayment] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const menuItemMap = useMemo(() => {
@@ -177,7 +178,7 @@ export default function CashierBill() {
   const shortfall = paymentValidation.remainingAmount
   const overpaidAmount = paymentValidation.overpaidAmount
   const loyaltyReady = loyaltyAmt <= 0 || (loyaltyCard && loyaltyValidation.ok)
-  const canProcess = paymentValidation.canConfirmPayment && loyaltyReady
+  const canProcess = paymentValidation.canConfirmPayment && loyaltyReady && !isProcessingPayment
   const isOverpaid = paymentValidation.isOverpaid
   const isFullyPaid = paymentValidation.isFullyPaid
 
@@ -309,30 +310,36 @@ export default function CashierBill() {
     setLoyaltyLookupMessage('')
   }
 
-  function handlePaid() {
+  async function handlePaid() {
     if (!canProcess) return
-    dispatch({
-      type: 'MARK_ORDER_PAID',
-      payload: {
-        tableId,
-        orderId,
-        payment_method: finalPaymentMethod,
-        payments: appliedPayments,
-        loyalty: {
-          loyalty_card_number: loyaltyCard?.card_number || loyaltyCardNumber || null,
-          loyalty_used_amount: loyaltyAmt,
-          loyalty_redeem_amount: loyaltyAmt,
-          cashback_earned: cashbackToBeEarned,
-          cashback_percent: loyaltyCashbackPercent,
-          cashback_type: loyaltyCard ? getLoyaltyCardCashbackType(loyaltyCard) : null,
-          discounted_subtotal: total,
-          service_fee:             serviceFee,
-          service_rate_pct:         serviceRatePct,
-          total,
+    setProcessingPayment(true)
+    try {
+      const result = await dispatch({
+        type: 'MARK_ORDER_PAID',
+        payload: {
+          tableId,
+          orderId,
+          payment_method: finalPaymentMethod,
+          payments: appliedPayments,
+          loyalty: {
+            loyalty_card_number: loyaltyCard?.card_number || loyaltyCardNumber || null,
+            loyalty_used_amount: loyaltyAmt,
+            loyalty_redeem_amount: loyaltyAmt,
+            cashback_earned: cashbackToBeEarned,
+            cashback_percent: loyaltyCashbackPercent,
+            cashback_type: loyaltyCard ? getLoyaltyCardCashbackType(loyaltyCard) : null,
+            discounted_subtotal: total,
+            service_fee:             serviceFee,
+            service_rate_pct:         serviceRatePct,
+            total,
+          },
         },
-      },
-    })
-    navigate('/cashier/tables')
+      })
+      if (result?.error) return
+      navigate('/cashier/tables')
+    } finally {
+      setProcessingPayment(false)
+    }
   }
 
   function addQuickItem(item) {
@@ -394,6 +401,7 @@ export default function CashierBill() {
     quickAmt:     lang === 'uz' ? 'Tez summa' : lang === 'ru' ? 'Быстрая сумма' : 'Quick Amount',
     exact:        lang === 'uz' ? 'Aniq' : lang === 'ru' ? 'Точно' : 'Exact',
     confirmPay:   lang === 'uz' ? "To'lovni tasdiqlash" : lang === 'ru' ? 'Подтвердить оплату' : 'Confirm Payment',
+    processingPay: lang === 'uz' ? "To'lov saqlanmoqda" : lang === 'ru' ? 'Сохранение оплаты' : 'Saving payment',
     printBill:    lang === 'uz' ? 'Hisob chiqarish' : lang === 'ru' ? 'Распечатать счёт' : 'Print Bill',
     printReceipt: lang === 'uz' ? 'Chek chiqarish' : lang === 'ru' ? 'Распечатать чек' : 'Print Receipt',
     loyaltyLabel: lang === 'uz' ? 'Sodiqlik kartasi' : lang === 'ru' ? 'Карта лояльности' : 'Loyalty Card',
@@ -1122,7 +1130,7 @@ export default function CashierBill() {
                   }`}
                 >
                   <CheckCircle2 size={19} />
-                  {lbl.confirmPay}
+                  {isProcessingPayment ? lbl.processingPay : lbl.confirmPay}
                 </button>
 
                 <button
@@ -1150,7 +1158,7 @@ export default function CashierBill() {
             }`}
           >
             <CheckCircle2 size={19} />
-            {lbl.confirmPay}
+            {isProcessingPayment ? lbl.processingPay : lbl.confirmPay}
           </button>
         </div>
       </div>

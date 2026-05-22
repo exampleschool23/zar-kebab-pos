@@ -242,6 +242,8 @@ test('active cashback calculation uses card type resolver instead of hardcoded d
   assert.match(db, /rollbackLoyaltyWalletSettlement/)
   assert.match(db, /\.eq\('balance', balance\)/)
   assert.match(db, /amount: -row\.loyaltyUsedAmount/)
+  assert.match(db, /isLegacyPositiveTransactionAmountConstraint/)
+  assert.match(db, /toLegacyPositiveTransactionAmounts/)
   assert.match(cashier, /getLoyaltyCardCashbackPercent/)
   assert.match(reducer, /getLoyaltyCardCashbackPercent/)
   assert.doesNotMatch(analytics, /calculateLoyaltyCashback\(order, items = getOrderItems\(order\), cashbackPercent = 5\)/)
@@ -364,6 +366,21 @@ test('AdminSettings does not expose obsolete cashback percent setting', () => {
   assert.doesNotMatch(reducerDefaults, /cashbackPercent/)
   assert.doesNotMatch(db, /settings\.cashbackPercent/)
   assert.doesNotMatch(db, /cashback_percent:\s*Number\.isFinite\(Number\(settings\.cashbackPercent\)\)/)
+})
+
+test('cashier payment waits for database success and supports legacy loyalty transaction constraints', () => {
+  const cashier = readSource('src/pages/CashierBill.jsx')
+  const db = readSource('src/lib/db.js')
+
+  assert.match(cashier, /const \[isProcessingPayment, setProcessingPayment\]/)
+  assert.match(cashier, /async function handlePaid\(\)/)
+  assert.match(cashier, /const result = await dispatch\(\{/)
+  assert.match(cashier, /if \(result\?\.error\) return/)
+  assert.match(cashier, /navigate\('\/cashier\/tables'\)/)
+  assert.match(cashier, /processingPay/)
+  assert.match(db, /isLegacyPositiveTransactionAmountConstraint\(transactionError\)/)
+  assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(transactions\)\)/)
+  assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(legacyTransactions\)\)/)
 })
 
 test('table management migration and health check include required columns', () => {
