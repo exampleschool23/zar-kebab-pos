@@ -92,7 +92,6 @@ test('loyalty card registration is owner-only and preserves exact 8-digit card n
   const created = createLoyaltyCardRecord({
     role: 'owner',
     cardNumber: '00123456',
-    customerName: ' Ali Valiyev ',
     phoneNumber: ' +998901112233 ',
     publicToken: 'token-00123456',
     existingCardNumbers: [],
@@ -101,7 +100,7 @@ test('loyalty card registration is owner-only and preserves exact 8-digit card n
 
   assert.equal(created.card_number, '00123456')
   assert.equal(typeof created.card_number, 'string')
-  assert.equal(created.customer_name, 'Ali Valiyev')
+  assert.equal(created.customer_name, '')
   assert.equal(created.phone_number, '+998 90 111 22 33')
   assert.equal(created.cashback_type, DEFAULT_CASHBACK_TYPE)
   assert.equal(created.public_token, 'token-00123456')
@@ -119,19 +118,14 @@ test('loyalty card registration is owner-only and preserves exact 8-digit card n
     role: 'owner',
     cardNumber: '00123456',
     existingCardNumbers: ['00123456'],
-    customerName: 'Ali',
     phoneNumber: '+998 91 132 32 32',
   }), 'duplicate_card_number')
+  const withoutPhoneOrName = createLoyaltyCardRecord({ role: 'owner', cardNumber: '11112222' })
+  assert.equal(withoutPhoneOrName.customer_name, '')
+  assert.equal(withoutPhoneOrName.phone_number, '')
   assertLoyaltyError(() => createLoyaltyCardRecord({
     role: 'owner',
     cardNumber: '11112222',
-    customerName: '',
-    phoneNumber: '+998 91 132 32 32',
-  }), 'customer_name_required')
-  assertLoyaltyError(() => createLoyaltyCardRecord({
-    role: 'owner',
-    cardNumber: '11112222',
-    customerName: 'Ali',
     phoneNumber: '+998 91 132',
   }), 'invalid_phone_number')
   assert.equal(normalizeCardNumber('00000001'), '00000001')
@@ -238,7 +232,7 @@ test('cashback preview uses selected loyalty card type for exact 151000 UZS bug 
   assert.equal(premiumOverRedeemed.cashback, 0)
 })
 
-test('owner can edit cashback type while old transaction snapshots keep historical rate and type', () => {
+test('cashback type is immutable after registration while customer details remain editable', () => {
   const original = card({ cashback_type: 'bronze' })
   const oldSettlement = completeOrderCashback({
     card: original,
@@ -247,7 +241,11 @@ test('owner can edit cashback type while old transaction snapshots keep historic
     loyaltyUsedAmount: 0,
     now: '2026-05-20T12:00:00.000Z',
   })
-  const edited = editLoyaltyCardRecord({ role: 'owner', card: original, patch: { cashback_type: 'black' } })
+  const edited = editLoyaltyCardRecord({
+    role: 'owner',
+    card: original,
+    patch: { customer_name: 'New Name', phone_number: '+998 91 132 32 32' },
+  })
   const newSettlement = completeOrderCashback({
     card: edited,
     order: paidOrder({ id: 'order-2' }),
@@ -256,14 +254,19 @@ test('owner can edit cashback type while old transaction snapshots keep historic
     now: '2026-05-21T12:00:00.000Z',
   })
 
-  assert.equal(edited.cashback_type, 'black')
+  assert.equal(edited.customer_name, 'New Name')
+  assert.equal(edited.phone_number, '+998 91 132 32 32')
+  assert.equal(edited.cashback_type, 'bronze')
   assert.equal(oldSettlement.transaction.card_type_at_transaction, 'bronze')
   assert.equal(oldSettlement.transaction.cashback_percent_used, 3)
   assert.equal(oldSettlement.cashback, 2999)
-  assert.equal(newSettlement.transaction.card_type_at_transaction, 'black')
-  assert.equal(newSettlement.transaction.cashback_percent_used, 15)
-  assert.equal(newSettlement.cashback, 14999)
-  assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'admin', card: original, patch: { cashback_type: 'gold' } }), 'forbidden')
+  assert.equal(newSettlement.transaction.card_type_at_transaction, 'bronze')
+  assert.equal(newSettlement.transaction.cashback_percent_used, 3)
+  assert.equal(newSettlement.cashback, 2999)
+  assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { cashback_type: 'black' } }), 'cashback_type_locked')
+  assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { cashbackType: 'black' } }), 'cashback_type_locked')
+  assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { card_number: '87654321' } }), 'card_number_locked')
+  assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'admin', card: original, patch: { customer_name: 'Admin Edit' } }), 'forbidden')
 })
 
 test('manual balance adjustment is owner-only, reasoned, transactional and never negative', () => {

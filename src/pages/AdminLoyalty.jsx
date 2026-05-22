@@ -16,13 +16,10 @@ import {
   formatUzPhoneNumberInput,
   getCashbackTypePercent,
   isMissingLoyaltySchemaColumn,
+  normalizeCardNumber,
 } from '../lib/loyalty'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
-
-function makeCardNumber() {
-  return String(Math.floor(10000000 + Math.random() * 90000000))
-}
 
 export default function AdminLoyalty() {
   const { state } = useApp()
@@ -37,7 +34,8 @@ export default function AdminLoyalty() {
   const [cards, setCards] = useState([])
   const [selected, setSelected] = useState(null)
   const [transactions, setTransactions] = useState([])
-  const [form, setForm] = useState({ customer_name: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
+  const [form, setForm] = useState({ card_number: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
+  const [profileForm, setProfileForm] = useState({ customer_name: '', phone_number: '' })
   const [adjustment, setAdjustment] = useState({ amount: '', reason: '' })
   const [message, setMessage] = useState('')
   const [supportsCashbackType, setSupportsCashbackType] = useState(true)
@@ -48,9 +46,10 @@ export default function AdminLoyalty() {
       subtitle: 'Cashback hamyon balanslari va tranzaksiya tarixi',
       refresh: 'Yangilash',
       createTitle: 'Sodiqlik kartasini yaratish',
+      cardNumber: 'Karta raqami',
       customerName: 'Mijoz ismi',
       phoneNumber: 'Telefon raqami',
-      createCard: 'Sodiqlik kartasini yaratish',
+      createCard: 'Sodiqlik kartasini ro‘yxatdan o‘tkazish',
       profileTitle: 'Mijoz sodiqlik profili',
       cardNo: 'Karta raqami',
       balance: 'Balans',
@@ -69,7 +68,8 @@ export default function AdminLoyalty() {
       manualAdjustment: 'Balansni qo‘lda tuzatish',
       adjustmentHelper: 'Har bir qo‘lda tuzatish tranzaksiya yozuvini yaratadi.',
       ownerAdjustOnly: 'Faqat owner sodiqlik balansini qo‘lda tuzatishi mumkin.',
-      ownerTypeOnly: 'Cashback turini faqat owner o‘zgartirishi mumkin.',
+      ownerTypeOnly: 'Cashback turi ro‘yxatdan o‘tkazilgandan keyin qulflanadi, chunki u jismoniy kartaga bosilgan.',
+      saveCustomer: 'Mijoz ma’lumotlarini saqlash',
       amountPlaceholder: '+/- summa',
       reason: 'Sabab',
       apply: 'Qo‘llash',
@@ -89,7 +89,7 @@ export default function AdminLoyalty() {
       balanceNegative: 'Sodiqlik balansi manfiy bo‘la olmaydi.',
       ownerOnly: 'Bu amal faqat owner uchun ruxsat etilgan.',
       cashbackTypeUnavailable: 'Cashback turi ustuni hali bazada qo‘llanmagan. 022 migratsiyasini ishga tushiring.',
-      cardFormRequired: 'Mijoz ismi va +998 XX XXX XX XX formatidagi telefon raqamini kiriting.',
+      cardFormRequired: '8 xonali karta raqamini kiriting. Telefon ixtiyoriy, lekin kiritilsa +998 XX XXX XX XX formatida bo‘lishi kerak.',
       transactionTypes: {
         cashback_earned: 'Cashback hisoblandi',
         redeemed: 'Sodiqlik balansi ishlatildi',
@@ -103,9 +103,10 @@ export default function AdminLoyalty() {
       subtitle: 'Балансы кешбэк-кошельков и история транзакций',
       refresh: 'Обновить',
       createTitle: 'Создать карту лояльности',
+      cardNumber: 'Номер карты',
       customerName: 'Имя клиента',
       phoneNumber: 'Номер телефона',
-      createCard: 'Создать карту лояльности',
+      createCard: 'Зарегистрировать карту лояльности',
       profileTitle: 'Профиль лояльности клиента',
       cardNo: 'Карта №',
       balance: 'Баланс',
@@ -124,7 +125,8 @@ export default function AdminLoyalty() {
       manualAdjustment: 'Ручная корректировка баланса',
       adjustmentHelper: 'Каждая ручная корректировка создаёт запись транзакции.',
       ownerAdjustOnly: 'Только владелец может вручную изменять баланс лояльности.',
-      ownerTypeOnly: 'Только владелец может менять тип кешбэка.',
+      ownerTypeOnly: 'Тип кешбэка заблокирован после регистрации, потому что он напечатан на физической карте.',
+      saveCustomer: 'Сохранить данные клиента',
       amountPlaceholder: '+/- сумма',
       reason: 'Причина',
       apply: 'Применить',
@@ -144,7 +146,7 @@ export default function AdminLoyalty() {
       balanceNegative: 'Баланс лояльности не может быть отрицательным.',
       ownerOnly: 'Это действие доступно только владельцу.',
       cashbackTypeUnavailable: 'Колонка типа кешбэка ещё не применена в базе. Запустите миграцию 022.',
-      cardFormRequired: 'Введите имя клиента и телефон в формате +998 XX XXX XX XX.',
+      cardFormRequired: 'Введите 8-значный номер карты. Телефон необязателен, но если указан, должен быть в формате +998 XX XXX XX XX.',
       transactionTypes: {
         cashback_earned: 'Кешбэк начислен',
         redeemed: 'Использовано с баланса',
@@ -158,9 +160,10 @@ export default function AdminLoyalty() {
       subtitle: 'Cashback wallet balances and transaction history',
       refresh: 'Refresh',
       createTitle: 'Create loyalty card',
+      cardNumber: 'Card number',
       customerName: 'Customer name',
       phoneNumber: 'Phone number',
-      createCard: 'Create loyalty card',
+      createCard: 'Register loyalty card',
       profileTitle: 'Customer Loyalty Profile',
       cardNo: 'Card No',
       balance: 'Balance',
@@ -179,7 +182,8 @@ export default function AdminLoyalty() {
       manualAdjustment: 'Manual balance adjustment',
       adjustmentHelper: 'Every manual adjustment creates a transaction record.',
       ownerAdjustOnly: 'Only owner can manually adjust loyalty balance.',
-      ownerTypeOnly: 'Only owner can change cashback type.',
+      ownerTypeOnly: 'Cashback type is locked after card registration because it is printed on the physical card.',
+      saveCustomer: 'Save customer details',
       amountPlaceholder: '+/- amount',
       reason: 'Reason',
       apply: 'Apply',
@@ -199,7 +203,7 @@ export default function AdminLoyalty() {
       balanceNegative: 'Loyalty balance cannot go negative.',
       ownerOnly: 'Only the owner can perform this action.',
       cashbackTypeUnavailable: 'Cashback type is not available in the database yet. Run migration 022.',
-      cardFormRequired: 'Enter customer name and phone number in +998 XX XXX XX XX format.',
+      cardFormRequired: 'Enter an 8-digit card number. Phone is optional, but must match +998 XX XXX XX XX when provided.',
       transactionTypes: {
         cashback_earned: 'Cashback earned',
         redeemed: 'Loyalty balance used',
@@ -294,6 +298,10 @@ export default function AdminLoyalty() {
 
   async function loadTransactions(card) {
     setSelected(card)
+    setProfileForm({
+      customer_name: card.customer_name || '',
+      phone_number: card.phone_number || '',
+    })
     const { data, error } = await supabase
       .from('loyalty_transactions')
       .select('*')
@@ -319,15 +327,15 @@ export default function AdminLoyalty() {
     try {
       cardRecord = createLoyaltyCardRecord({
         role,
-        cardNumber: makeCardNumber(),
-        customerName: form.customer_name,
+        cardNumber: form.card_number,
+        customerName: '',
         phoneNumber: form.phone_number,
         cashbackType: form.cashback_type,
         existingCardNumbers: cards.map(card => card.card_number),
         now,
       })
     } catch (error) {
-      setMessage(['customer_name_required', 'invalid_phone_number'].includes(error.code) ? l.cardFormRequired : error.message)
+      setMessage(['invalid_card_number', 'invalid_phone_number'].includes(error.code) ? l.cardFormRequired : error.message)
       return
     }
     const { cashback_type: ignoredCashbackType, ...legacyCardRecord } = cardRecord
@@ -349,7 +357,7 @@ export default function AdminLoyalty() {
       setMessage(error.message)
       return
     }
-    setForm({ customer_name: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
+    setForm({ card_number: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
     setCards(prev => [data, ...prev])
     loadTransactions(data)
   }
@@ -373,43 +381,44 @@ export default function AdminLoyalty() {
     setSelected(data)
   }
 
-  async function updateCashbackType(card, cashbackType) {
+  async function updateCustomerProfile() {
+    if (!selected) return
     if (!canEdit) {
       setMessage(l.ownerOnly)
       return
     }
-    if (!supportsCashbackType) {
-      if (cashbackType === DEFAULT_CASHBACK_TYPE) {
-        const fallbackCard = { ...card, cashback_type: DEFAULT_CASHBACK_TYPE }
-        setSelected(fallbackCard)
-        setCards(prev => prev.map(row => row.id === card.id ? fallbackCard : row))
-        setMessage('')
-        return
-      }
-      setMessage(l.cashbackTypeUnavailable)
+    let next
+    try {
+      next = editLoyaltyCardRecord({
+        role,
+        card: selected,
+        patch: {
+          customer_name: profileForm.customer_name,
+          phone_number: profileForm.phone_number,
+        },
+      })
+    } catch (error) {
+      setMessage(error.code === 'invalid_phone_number' ? l.cardFormRequired : error.message)
       return
     }
-    const next = editLoyaltyCardRecord({ role, card, patch: { cashback_type: cashbackType } })
     const { data, error } = await supabase
       .from('loyalty_cards')
       .update({
-        cashback_type: next.cashback_type,
+        customer_name: next.customer_name,
+        phone_number: next.phone_number,
         updated_at: next.updated_at,
       })
-      .eq('id', card.id)
+      .eq('id', selected.id)
       .select('*')
       .single()
     if (error) {
-      if (isMissingLoyaltySchemaColumn(error, 'cashback_type')) {
-        setSupportsCashbackType(false)
-        setMessage(l.cashbackTypeUnavailable)
-        return
-      }
       setMessage(error.message)
       return
     }
     setCards(prev => prev.map(row => row.id === data.id ? data : row))
     setSelected(data)
+    setProfileForm({ customer_name: data.customer_name || '', phone_number: data.phone_number || '' })
+    setMessage('')
   }
 
   async function adjustBalance() {
@@ -476,7 +485,7 @@ export default function AdminLoyalty() {
           <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
             <h2 className="mb-3 text-sm font-black text-[#1F2937]">{l.createTitle}</h2>
             <div className="space-y-2">
-              <input value={form.customer_name} onChange={e => setForm({ ...form, customer_name: e.target.value })} placeholder={l.customerName} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
+              <input value={form.card_number} onChange={e => setForm({ ...form, card_number: normalizeCardNumber(e.target.value) })} placeholder={l.cardNumber} inputMode="numeric" maxLength={8} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
               <input value={form.phone_number} onChange={e => setForm({ ...form, phone_number: formatUzPhoneNumberInput(e.target.value) })} placeholder="+998 91 132 32 32" className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
               <select value={form.cashback_type} onChange={e => setForm({ ...form, cashback_type: e.target.value })} disabled={!canCreate} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50 disabled:text-[#9CA3AF]">
                 {Object.entries(CASHBACK_TYPES).map(([key, config]) => (
@@ -525,6 +534,23 @@ export default function AdminLoyalty() {
                       </span>
                     </div>
 
+                    <div className="mt-4 rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                      <p className="text-xs font-black uppercase tracking-widest text-[#9CA3AF]">{l.customerName}</p>
+                      {canEdit ? (
+                        <div className="mt-3 grid gap-2">
+                          <input value={profileForm.customer_name} onChange={e => setProfileForm({ ...profileForm, customer_name: e.target.value })} placeholder={l.noCustomerName} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
+                          <input value={profileForm.phone_number} onChange={e => setProfileForm({ ...profileForm, phone_number: formatUzPhoneNumberInput(e.target.value) })} placeholder="+998 91 132 32 32" className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
+                          <button onClick={updateCustomerProfile} className="rounded-xl bg-[#1F2937] px-4 py-2.5 text-sm font-black text-white">{l.saveCustomer}</button>
+                        </div>
+                      ) : (
+                        <div className="mt-3 space-y-1">
+                          <p className="text-sm font-black text-[#1F2937]">{selectedName(selected)}</p>
+                          <p className="text-sm font-semibold text-[#6B7280]">{selectedPhone(selected)}</p>
+                        </div>
+                      )}
+                      <p className="mt-3 text-xs font-bold text-[#9CA3AF]">{l.cardNo}: {selected.card_number}</p>
+                    </div>
+
                     <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-4">
                       <p className="text-xs font-black uppercase tracking-widest text-emerald-700">{l.balance}</p>
                       <p className="mt-1 text-4xl font-black text-[#16A34A]">{formatCurrency(selected.balance || 0)}</p>
@@ -538,15 +564,7 @@ export default function AdminLoyalty() {
                         </div>
                         <span className="rounded-full bg-[#fff1e8] px-3 py-1 text-xs font-black text-[#ff5a00]">{l.cashbackRate}: {getCashbackTypePercent(selected.cashback_type || DEFAULT_CASHBACK_TYPE)}%</span>
                       </div>
-                      {canEdit ? (
-                        <select value={selected.cashback_type || DEFAULT_CASHBACK_TYPE} onChange={e => updateCashbackType(selected, e.target.value)} className="mt-3 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-black text-[#1F2937]">
-                          {Object.entries(CASHBACK_TYPES).map(([key, config]) => (
-                            <option key={key} value={key}>{config.label} · {config.percent}%</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <p className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs font-bold text-[#6B7280]">{l.ownerTypeOnly}</p>
-                      )}
+                      <p className="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs font-bold text-[#6B7280]">{l.ownerTypeOnly}</p>
                     </div>
                   </div>
 

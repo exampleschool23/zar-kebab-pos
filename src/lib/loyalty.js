@@ -160,9 +160,9 @@ export function createLoyaltyCardRecord({
   requireLoyaltyPermission(role, 'create')
   const normalizedCardNumber = normalizeCardNumber(cardNumber)
   const normalizedCustomerName = String(customerName || '').trim()
-  const normalizedPhoneNumber = formatUzPhoneNumberInput(phoneNumber).trim()
-  if (!normalizedCustomerName) fail('customer_name_required', 'Customer name is required')
-  if (!isValidUzPhoneNumber(normalizedPhoneNumber)) fail('invalid_phone_number', 'Phone number must match +998 91 132 32 32')
+  const rawPhoneNumber = String(phoneNumber || '').trim()
+  const normalizedPhoneNumber = rawPhoneNumber ? formatUzPhoneNumberInput(rawPhoneNumber).trim() : ''
+  if (normalizedPhoneNumber && !isValidUzPhoneNumber(normalizedPhoneNumber)) fail('invalid_phone_number', 'Phone number must match +998 91 132 32 32')
   if (existingCardNumbers.map(String).includes(normalizedCardNumber)) {
     fail('duplicate_card_number', 'Duplicate loyalty card number', { status: 409 })
   }
@@ -185,10 +185,19 @@ export function createLoyaltyCardRecord({
 export function editLoyaltyCardRecord({ role = 'owner', card, patch = {}, now = new Date().toISOString() } = {}) {
   requireLoyaltyPermission(role, 'edit')
   const next = { ...card }
-  if (patch.card_number != null) next.card_number = normalizeCardNumber(patch.card_number)
+  if (patch.card_number != null && String(patch.card_number) !== String(card?.card_number || '')) {
+    fail('card_number_locked', 'Card number cannot be changed after registration')
+  }
+  if (patch.cashback_type != null || patch.cashbackType != null) {
+    fail('cashback_type_locked', 'Cashback type cannot be changed after card registration.')
+  }
   if (patch.customer_name != null) next.customer_name = String(patch.customer_name).trim()
-  if (patch.phone_number != null) next.phone_number = String(patch.phone_number).trim()
-  if (patch.cashback_type != null) next.cashback_type = normalizeCashbackType(patch.cashback_type)
+  if (patch.phone_number != null) {
+    const rawPhoneNumber = String(patch.phone_number || '').trim()
+    const normalizedPhone = rawPhoneNumber ? formatUzPhoneNumberInput(rawPhoneNumber).trim() : ''
+    if (normalizedPhone && !isValidUzPhoneNumber(normalizedPhone)) fail('invalid_phone_number', 'Phone number must match +998 91 132 32 32')
+    next.phone_number = normalizedPhone
+  }
   next.updated_at = now
   return next
 }

@@ -50,6 +50,22 @@ do $$ begin
     add constraint loyalty_transactions_amount_check check (amount <> 0);
 end $$;
 
+create or replace function public.prevent_loyalty_card_type_change()
+returns trigger as $$
+begin
+  if old.cashback_type is distinct from new.cashback_type then
+    raise exception 'Cashback type cannot be changed after card registration';
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists prevent_loyalty_card_type_change_trigger on public.loyalty_cards;
+create trigger prevent_loyalty_card_type_change_trigger
+before update on public.loyalty_cards
+for each row
+execute function public.prevent_loyalty_card_type_change();
+
 alter table public.orders
   add column if not exists loyalty_used_amount integer not null default 0 check (loyalty_used_amount >= 0),
   add column if not exists cashback_earned integer not null default 0 check (cashback_earned >= 0),
