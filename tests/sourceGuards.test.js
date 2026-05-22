@@ -410,6 +410,7 @@ test('AdminSettings does not expose obsolete cashback percent setting', () => {
 
 test('cashier payment waits for database success and supports legacy loyalty transaction constraints', () => {
   const cashier = readSource('src/pages/CashierBill.jsx')
+  const appContext = readSource('src/store/AppContext.jsx')
   const db = readSource('src/lib/db.js')
 
   assert.match(cashier, /const \[isProcessingPayment, setProcessingPayment\]/)
@@ -418,6 +419,9 @@ test('cashier payment waits for database success and supports legacy loyalty tra
   assert.match(cashier, /if \(result\?\.error\) return/)
   assert.match(cashier, /navigate\('\/cashier\/tables'\)/)
   assert.match(cashier, /processingPay/)
+  assert.match(cashier, /hasLoyaltyCardEntry/)
+  assert.match(cashier, /loyalty_card_number: loyaltyCard\?\.card_number \|\| null/)
+  assert.match(appContext, /enriched\.type === 'UPDATE_ORDER_ITEM_STATUS' \|\| enriched\.type === 'SEND_TO_KITCHEN' \|\| enriched\.type === 'MARK_ORDER_PAID'/)
   assert.match(db, /mergeOrderItemsByIdentity/)
   assert.match(db, /isLegacyPositiveTransactionAmountConstraint\(transactionError\)/)
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(transactions\)\)/)

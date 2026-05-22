@@ -78,7 +78,7 @@ export function AppProvider({ children }) {
           }
       : action
 
-    if (enriched.type === 'UPDATE_ORDER_ITEM_STATUS' || enriched.type === 'SEND_TO_KITCHEN') {
+    if (enriched.type === 'UPDATE_ORDER_ITEM_STATUS' || enriched.type === 'SEND_TO_KITCHEN' || enriched.type === 'MARK_ORDER_PAID') {
       return writeToSupabase(enriched, stateRef.current)
         .then(() => {
           dispatch(enriched)

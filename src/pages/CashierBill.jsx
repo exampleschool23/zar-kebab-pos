@@ -179,7 +179,10 @@ export default function CashierBill() {
   const finalPaymentMethod = getPaymentMethodSummary(appliedPayments, payMethod)
   const shortfall = paymentValidation.remainingAmount
   const overpaidAmount = paymentValidation.overpaidAmount
-  const loyaltyReady = loyaltyAmt <= 0 || (loyaltyCard && loyaltyValidation.ok)
+  const hasLoyaltyCardEntry = String(loyaltyCardNumber || '').trim().length > 0
+  const loyaltyReady = loyaltyAmt <= 0
+    ? (!hasLoyaltyCardEntry || !!loyaltyCard)
+    : (loyaltyCard && loyaltyValidation.ok)
   const canProcess = paymentValidation.canConfirmPayment && loyaltyReady && !isProcessingPayment
   const isOverpaid = paymentValidation.isOverpaid
   const isFullyPaid = paymentValidation.isFullyPaid
@@ -324,7 +327,7 @@ export default function CashierBill() {
           payment_method: finalPaymentMethod,
           payments: appliedPayments,
           loyalty: {
-            loyalty_card_number: loyaltyCard?.card_number || loyaltyCardNumber || null,
+            loyalty_card_number: loyaltyCard?.card_number || null,
             loyalty_used_amount: loyaltyAmt,
             loyalty_redeem_amount: loyaltyAmt,
             cashback_earned: cashbackToBeEarned,
