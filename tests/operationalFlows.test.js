@@ -69,6 +69,28 @@ test('kitchen can cancel one unavailable item without cancelling the rest of the
   assert.equal(cancelled.orders[0].status, 'sent_to_kitchen')
   assert.equal(cancelled.orders[0].items.find(i => i.id === 'i1').status, 'new')
   assert.equal(cancelled.orders[0].items.find(i => i.id === 'i2').status, 'cancelled')
+  assert.equal(cancelled.orders[0].subtotal, 100000)
+  assert.equal(cancelled.orders[0].total, 115000)
+  assert.equal(cancelled.tables[0].status, 'occupied')
+})
+
+test('kitchen cancelling every billable item removes the zero-value order from cashier flow', () => {
+  const sent = ordersReducer(state(), {
+    type: 'SEND_TO_KITCHEN',
+    _orderId: 'o1',
+    _items: [
+      { id: 'i1', menu_item_id: 'm1', name: 'Shashlik', price: 100000, quantity: 1, status: 'new' },
+    ],
+    payload: { orderType: 'dine_in' },
+  })
+
+  const cancelled = ordersReducer(sent, {
+    type: 'UPDATE_ORDER_ITEM_STATUS',
+    payload: { orderId: 'o1', orderItemId: 'i1', status: 'cancelled' },
+  })
+
+  assert.equal(cancelled.orders.length, 0)
+  assert.equal(cancelled.tables[0].status, 'available')
 })
 
 test('admin reservation and disable flow keeps history-safe table lifecycle', () => {

@@ -11,8 +11,10 @@ import {
   getGroupedOrderItems,
   getOrderDate,
   getOrderPaymentBreakdown,
+  getOrderPaymentSummary,
   getOrderTotal,
   groupOrdersBySession,
+  isCancelledOrderItem,
   isPaidOrder,
   toLocalDateStr,
 } from '../lib/analytics'
@@ -35,6 +37,19 @@ function timeLabel(iso) {
 
 function isTakeAwayBill(order) {
   return order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
+}
+
+function isCashierReadyTakeAway(order) {
+  const billableItems = (order?.items || []).filter(item => !isCancelledOrderItem(item))
+  if (billableItems.length === 0) return false
+  if (getOrderPaymentSummary(order, billableItems, order?.service_rate_pct).total <= 0) return false
+  return billableItems.every(item => ['ready', 'served'].includes(String(item.status || '').toLowerCase()))
+}
+
+function isCashierVisibleBill(order) {
+  if (!order || order.payment_status === 'paid' || order.status === 'cancelled') return false
+  if (isTakeAwayBill(order)) return isCashierReadyTakeAway(order)
+  return order.status === 'needs_bill' && getOrderPaymentSummary(order, order.items || [], order.service_rate_pct).total > 0
 }
 
 function countLabel(count, lang) {
@@ -246,7 +261,7 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
 
   const preview   = items.slice(0, 4)
   const moreCount = items.length - preview.length
-  const readyForCashier = isTakeAway || order.status === 'needs_bill'
+  const readyForCashier = isCashierVisibleBill(order)
 
   return (
     <div className={`rounded-2xl border flex flex-col transition-all ${
@@ -477,7 +492,7 @@ export default function CashierTables() {
 
   // ── Derive active bills — dine-in is merged per table; take-away stays one bill per order.
   const activeBills = useMemo(() => {
-    const raw = state.orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled')
+    const raw = state.orders.filter(isCashierVisibleBill)
     const grouped = {}
     raw.forEach(order => {
       const key = order.order_type === 'take_away' || !order.table_id
@@ -547,7 +562,6 @@ export default function CashierTables() {
   const statusOptions = [
     { value: 'all',        label: l.allStatus      },
     { value: 'needs_bill', label: l.needsBillBadge },
-    { value: 'occupied',   label: l.occupied       },
     { value: 'take_away',  label: l.takeAway       },
   ]
 
@@ -579,7 +593,7 @@ export default function CashierTables() {
         const isTakeAway = isTakeAwayBill(o)
         if (filterStatus === 'needs_bill') return !isTakeAway && o.status === 'needs_bill'
         if (filterStatus === 'take_away') return isTakeAway
-        return !isTakeAway && o.status !== 'needs_bill'
+        return false
       })
     }
 
@@ -601,12 +615,10 @@ export default function CashierTables() {
 
   const billSections = useMemo(() => {
     const needsBill = filteredBills.filter(o => !isTakeAwayBill(o) && o.status === 'needs_bill')
-    const active = filteredBills.filter(o => !isTakeAwayBill(o) && o.status !== 'needs_bill')
     const takeAway = filteredBills.filter(isTakeAwayBill)
 
     return [
       { key: 'needs_bill', title: l.needsBill, tone: 'red', icon: CreditCard, bills: needsBill },
-      { key: 'active', title: l.activeNotReady, tone: 'amber', icon: Clock, bills: active },
       { key: 'take_away', title: l.takeAwayBills, tone: 'blue', icon: Receipt, bills: takeAway },
     ].filter(section => section.bills.length > 0)
   }, [filteredBills, l])

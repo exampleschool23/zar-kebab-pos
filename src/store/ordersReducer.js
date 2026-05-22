@@ -4,6 +4,7 @@ import {
   getOrderPaymentFields,
   getOrderPaymentSummary,
   getPaymentMethodSummary,
+  isCancelledOrderItem,
   normalizeSplitPayments,
   removeSentCartItems,
 } from '../lib/analytics.js'
@@ -83,20 +84,32 @@ export function ordersReducer(state, action) {
 
     case 'UPDATE_ORDER_ITEM_STATUS': {
       const { orderId, orderItemId, menuItemId, status } = action.payload
+      let removedOrder = null
+      const orders = state.orders.flatMap(o => {
+        if (o.id !== orderId) return [o]
+        const nextItems = o.items.map(i =>
+          (orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
+            ? { ...i, status }
+            : i
+        )
+        const nextOrder = recalcOrderTotals({ ...o, items: nextItems }, state.settings)
+        const billableItems = nextItems.filter(item => !isCancelledOrderItem(item))
+        const shouldRemove = billableItems.length === 0 || getOrderPaymentSummary(nextOrder, nextItems, nextOrder.service_rate_pct).total <= 0
+        if (shouldRemove) {
+          removedOrder = nextOrder
+          return []
+        }
+        return [nextOrder]
+      })
+      const hasOtherActiveTableOrders = removedOrder?.table_id
+        ? orders.some(o => o.table_id === removedOrder.table_id && o.payment_status !== 'paid' && o.status !== 'cancelled')
+        : false
       return {
         ...state,
-        orders: state.orders.map(o =>
-          o.id === orderId
-            ? {
-                ...o,
-                items: o.items.map(i =>
-                  (orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
-                    ? { ...i, status }
-                    : i
-                ),
-              }
-            : o
-        ),
+        orders,
+        tables: removedOrder?.table_id && !hasOtherActiveTableOrders
+          ? state.tables.map(t => t.id === removedOrder.table_id ? { ...t, status: 'available' } : t)
+          : state.tables,
       }
     }
 

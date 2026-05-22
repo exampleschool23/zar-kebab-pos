@@ -663,6 +663,52 @@ export async function writeToSupabase(action, state) {
       query = orderItemId ? query.eq('id', orderItemId) : query.eq('menu_item_id', menuItemId)
       const { error } = await query
       if (error) throw error
+
+      const { data: order } = await supabase
+        .from('orders')
+        .select('*, items:order_items(*)')
+        .eq('id', orderId)
+        .maybeSingle()
+      if (order) {
+        const serviceRatePct = normalizeOrderType(order.order_type) === 'take_away' ? 0 : Number.isFinite(Number(order.service_rate_pct))
+          ? Number(order.service_rate_pct)
+          : serviceRatePctFromSettings(state.settings)
+        const paymentFields = getOrderPaymentFields(
+          { order_type: order.order_type, service_rate_pct: serviceRatePct },
+          order.items || [],
+          serviceRatePct
+        )
+        if (paymentFields.total <= 0) {
+          await supabase
+            .from('orders')
+            .update({
+              status: 'cancelled',
+              payment_status: 'cancelled',
+              subtotal: 0,
+              service_fee: 0,
+              total: 0,
+            })
+            .eq('id', orderId)
+          if (order.table_id) {
+            const { data: activeOrders } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('table_id', order.table_id)
+              .neq('id', orderId)
+              .eq('payment_status', 'unpaid')
+              .neq('status', 'cancelled')
+              .limit(1)
+            if (!activeOrders?.length) {
+              await updateRestaurantTableStatus(order.table_id, { status: 'available' }, { status: 'available' })
+            }
+          }
+        } else {
+          await supabase
+            .from('orders')
+            .update(paymentFields)
+            .eq('id', orderId)
+        }
+      }
       await notifyTelegramOrderStatus(orderId, status)
       break
     }
