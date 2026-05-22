@@ -171,8 +171,9 @@ export function getMaxPaymentAmount(remainingAmount) {
 }
 
 export function getOrderPaymentSummary(order, items = getOrderItems(order), fallbackServicePct = 20) {
-  const billableItems = (items || []).filter(item => !isCancelledOrderItem(item))
-  const hasItems = billableItems.length > 0
+  const sourceItems = items || []
+  const billableItems = sourceItems.filter(item => !isCancelledOrderItem(item))
+  const hasItems = sourceItems.length > 0
   const menuItemsSubtotal = billableItems.reduce(
     (s, i) => isCounterOrderItem(i) ? s : s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
     0
@@ -193,7 +194,7 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
       ? storedMenuSubtotal
       : Math.max(0, subtotal - counterSubtotal)
 
-  if (subtotal <= 0 && Number(order?.total) > 0) {
+  if (!hasItems && subtotal <= 0 && Number(order?.total) > 0) {
     const serviceRatePct = getOrderServiceRatePct(order, fallbackServicePct)
     const serviceFee = Number(order?.service_fee) || 0
     const loyaltyUsedAmount = getLoyaltyUsedAmount(order)
@@ -462,6 +463,8 @@ export function getGroupedOrderItems(items, resolveName) {
   const grouped = new Map()
 
   items.forEach((item, index) => {
+    if (isCancelledOrderItem(item)) return
+
     const productId = getOrderItemProductId(item)
     const key = productId != null
       ? `${productId}::${getOrderItemOptionsKey(item)}`

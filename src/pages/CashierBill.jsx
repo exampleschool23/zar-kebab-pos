@@ -18,6 +18,7 @@ import {
   getMaxLoyaltyRedeemAmount,
   clampMoneyInput,
   getMaxPaymentAmount,
+  isCancelledOrderItem,
   calculateLoyaltyCashback,
   normalizeServiceRatePct,
   normalizeSplitPayments,
@@ -103,13 +104,14 @@ export default function CashierBill() {
         ? { ...item, item_type: item.item_type || item.itemType || 'counter', is_counter_item: true }
         : item
     }))
-    const mergedItems = getGroupedOrderItems(allItems)
+    const billableItems = allItems.filter(item => !isCancelledOrderItem(item))
+    const mergedItems = getGroupedOrderItems(billableItems)
     const firstOrder = orders[0]
     const orderType = firstOrder?.order_type || (!firstOrder?.table_id && String(firstOrder?.table_name || '').toLowerCase().includes('take') ? 'take_away' : 'dine_in')
     const serviceRatePct = orderType === 'take_away'
       ? 0
       : orders.find(o => o.service_rate_pct != null)?.service_rate_pct ?? configuredServiceRatePct
-    const summary = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, allItems, configuredServiceRatePct)
+    const summary = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, billableItems, configuredServiceRatePct)
     return {
       ...orders[0],
       order_type: orderType,

@@ -208,6 +208,7 @@ test('WaiterTables lets occupied tables request the bill from the card action', 
 test('Kitchen can cancel unavailable items without billing them', () => {
   const kitchen = readSource('src/pages/Kitchen.jsx')
   const analytics = readSource('src/lib/analytics.js')
+  const cashierBill = readSource('src/pages/CashierBill.jsx')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
   const migration = readSource('supabase/023_order_item_cancel_status.sql')
 
@@ -216,7 +217,10 @@ test('Kitchen can cancel unavailable items without billing them', () => {
   assert.match(kitchen, /XCircle/)
   assert.match(kitchen, /!\['served', 'cancelled'\]\.includes\(i\.status\)/)
   assert.match(analytics, /function isCancelledOrderItem/)
-  assert.match(analytics, /billableItems = \(items \|\| \[\]\)\.filter\(item => !isCancelledOrderItem\(item\)\)/)
+  assert.match(analytics, /billableItems = sourceItems\.filter\(item => !isCancelledOrderItem\(item\)\)/)
+  assert.match(analytics, /if \(isCancelledOrderItem\(item\)\) return/)
+  assert.match(cashierBill, /billableItems = allItems\.filter\(item => !isCancelledOrderItem\(item\)\)/)
+  assert.match(cashierBill, /getGroupedOrderItems\(billableItems\)/)
   assert.match(waiterTables, /\.filter\(i => i\.status !== 'cancelled'\)/)
   assert.match(migration, /drop constraint if exists order_items_status_check/)
   assert.match(migration, /'cancelled'/)

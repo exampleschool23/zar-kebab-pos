@@ -111,6 +111,22 @@ test('cancelled kitchen items are excluded from service total and cashback', () 
   assert.equal(summary.serviceFee, 15000)
   assert.equal(summary.total, 115000)
   assert.equal(calculateLoyaltyCashback({ status: 'paid', payment_status: 'paid' }, rows, 10), 10000)
+
+  const grouped = getGroupedOrderItems(rows)
+  assert.equal(grouped.length, 1)
+  assert.equal(grouped[0].menu_item_id, 'kebab')
+})
+
+test('all-cancelled supplied items produce a zero bill instead of stale stored totals', () => {
+  const rows = [
+    item({ id: 'missing', menu_item_id: 'beef-shashlik', price: 25000, quantity: 1, status: 'cancelled' }),
+  ]
+  const summary = getOrderPaymentSummary({ subtotal: 25000, total: 30000, service_rate_pct: 20 }, rows, 20)
+
+  assert.equal(summary.subtotal, 0)
+  assert.equal(summary.serviceFee, 0)
+  assert.equal(summary.total, 0)
+  assert.equal(getGroupedOrderItems(rows).length, 0)
 })
 
 test('sent cart snapshot removal preserves items added while send is pending', () => {
