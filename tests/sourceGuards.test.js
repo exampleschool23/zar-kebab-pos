@@ -195,6 +195,7 @@ test('Kitchen can cancel unavailable items without billing them', () => {
   const kitchen = readSource('src/pages/Kitchen.jsx')
   const analytics = readSource('src/lib/analytics.js')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
+  const migration = readSource('supabase/023_order_item_cancel_status.sql')
 
   assert.match(kitchen, /handleMark\('cancelled'\)/)
   assert.match(kitchen, /unavailableLabel\(lang\)/)
@@ -203,6 +204,8 @@ test('Kitchen can cancel unavailable items without billing them', () => {
   assert.match(analytics, /function isCancelledOrderItem/)
   assert.match(analytics, /billableItems = \(items \|\| \[\]\)\.filter\(item => !isCancelledOrderItem\(item\)\)/)
   assert.match(waiterTables, /\.filter\(i => i\.status !== 'cancelled'\)/)
+  assert.match(migration, /drop constraint if exists order_items_status_check/)
+  assert.match(migration, /'cancelled'/)
 })
 
 test('AdminTables protects table history and manages zones', () => {
