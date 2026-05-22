@@ -11,6 +11,8 @@ import {
   getOrderPaymentSummary,
   getPaymentMethodSummary,
   getMaxLoyaltyRedeemAmount,
+  clampMoneyInput,
+  getMaxPaymentAmount,
   getSplitPaymentValidation,
   groupOrdersBySession,
   isActiveNeedsBillOrder,
@@ -75,6 +77,27 @@ test('service rate normalization preserves zero and clamps invalid settings', ()
   assert.equal(normalizeServiceRatePct(null, 15), 15)
   assert.equal(normalizeServiceRatePct(undefined, 15), 15)
   assert.equal(normalizeServiceRatePct('bad', 15), 15)
+})
+
+test('money input clamping prevents oversized loyalty and split payment amounts', () => {
+  assert.equal(clampMoneyInput('6666666643', getMaxLoyaltyRedeemAmount(70800, 231150)), 70800)
+  assert.equal(clampMoneyInput('999999', getMaxLoyaltyRedeemAmount(500000, 231150)), 231150)
+  assert.equal(clampMoneyInput('100000', getMaxLoyaltyRedeemAmount(70800, 70800)), 70800)
+  assert.equal(clampMoneyInput('10000', getMaxLoyaltyRedeemAmount(0, 231150)), 0)
+  assert.equal(clampMoneyInput('10000', getMaxLoyaltyRedeemAmount(70800, 0)), 0)
+  assert.equal(clampMoneyInput('-10000', getMaxLoyaltyRedeemAmount(70800, 231150)), 0)
+  assert.equal(clampMoneyInput('100.5', getMaxLoyaltyRedeemAmount(70800, 231150)), 0)
+  assert.equal(clampMoneyInput('abc', getMaxLoyaltyRedeemAmount(70800, 231150)), 0)
+  assert.equal(clampMoneyInput('1e9', getMaxLoyaltyRedeemAmount(70800, 231150)), 0)
+  assert.equal(clampMoneyInput('999999999999999999999999999999', getMaxLoyaltyRedeemAmount(70800, 231150)), 70800)
+
+  assert.equal(clampMoneyInput('312312312132', getMaxPaymentAmount(231150)), 231150)
+  assert.equal(clampMoneyInput('231150', getMaxPaymentAmount(231150)), 231150)
+  assert.equal(clampMoneyInput('150000', getMaxPaymentAmount(231150)), 150000)
+  assert.equal(clampMoneyInput('0', getMaxPaymentAmount(231150)), 0)
+  assert.equal(clampMoneyInput('-1', getMaxPaymentAmount(231150)), 0)
+  assert.equal(clampMoneyInput('10.5', getMaxPaymentAmount(231150)), 0)
+  assert.equal(clampMoneyInput('ten', getMaxPaymentAmount(231150)), 0)
 })
 
 test('sent cart snapshot removal preserves items added while send is pending', () => {

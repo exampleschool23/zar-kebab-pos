@@ -140,6 +140,32 @@ export function getMaxLoyaltyRedeemAmount(availableBalance, remainingOrderAmount
   return Math.min(balance, remaining)
 }
 
+export function clampMoneyInput(value, max) {
+  const safeMax = Math.max(0, Math.round(Number(max) || 0))
+  if (value == null || value === '') return 0
+
+  const raw = String(value).trim()
+  if (!raw) return 0
+  if (/[eE.+-]/.test(raw)) return 0
+
+  const normalized = raw.replace(/[\s,_]/g, '')
+  if (!/^\d+$/.test(normalized)) return 0
+  if (safeMax <= 0) return 0
+
+  try {
+    const typed = BigInt(normalized)
+    const maxInt = BigInt(safeMax)
+    if (typed > maxInt) return safeMax
+    return Number(typed)
+  } catch {
+    return safeMax
+  }
+}
+
+export function getMaxPaymentAmount(remainingAmount) {
+  return Math.max(0, Math.round(Number(remainingAmount) || 0))
+}
+
 export function getOrderPaymentSummary(order, items = getOrderItems(order), fallbackServicePct = 20) {
   const hasItems = items.length > 0
   const menuItemsSubtotal = items.reduce(

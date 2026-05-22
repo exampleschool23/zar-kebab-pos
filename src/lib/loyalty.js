@@ -133,6 +133,15 @@ export function normalizeMoneyAmount(value, { positive = false, allowZero = true
   return numberValue
 }
 
+export function normalizeTransactionAmount(value) {
+  const numberValue = Number(value)
+  if (!Number.isFinite(numberValue)) fail('invalid_amount', 'Amount must be a valid number')
+  if (!Number.isInteger(numberValue)) fail('invalid_amount', 'UZS amount must be an integer')
+  if (numberValue === 0) fail('invalid_amount', 'Transaction amount must be non-zero')
+  if (!Number.isSafeInteger(numberValue)) fail('invalid_amount', 'Amount is too large')
+  return numberValue
+}
+
 export function makePublicToken(seed = '') {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
   return `loyalty-${Date.now()}-${Math.random().toString(16).slice(2)}${seed ? `-${seed}` : ''}`
@@ -206,7 +215,7 @@ export function makeLoyaltyTransaction({
     loyalty_card_id: loyaltyCardId,
     order_id: orderId,
     type,
-    amount: normalizeMoneyAmount(amount, { positive: true }),
+    amount: normalizeTransactionAmount(amount),
     balance_before: normalizeMoneyAmount(balanceBefore),
     balance_after: normalizeMoneyAmount(balanceAfter),
     reason,
@@ -282,9 +291,10 @@ export function redeemLoyaltyBalance({ card, amount, remainingOrderAmount, order
       loyaltyCardId: card.id,
       orderId: order?.id || null,
       type: 'redeemed',
-      amount: redeemAmount,
+      amount: -redeemAmount,
       balanceBefore: before,
       balanceAfter: after,
+      reason: 'Loyalty used for order payment',
       createdBy,
       now,
     }),

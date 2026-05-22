@@ -153,18 +153,24 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
   const totalCashback = settled.reduce((sum, row) => sum + row.cashbackEarned, 0)
   const afterRedeem = balance - totalRedeemed
   const finalBalance = afterRedeem + totalCashback
+  const previousTotalEarned = Math.max(0, Math.round(Number(card.total_earned ?? 0) || 0))
+  const previousTotalRedeemed = Math.max(0, Math.round(Number(card.total_redeemed ?? 0) || 0))
 
   if (totalRedeemed > 0 || totalCashback > 0) {
-    const { error: updateError } = await supabase
+    const { data: updatedCard, error: updateError } = await supabase
       .from('loyalty_cards')
       .update({
         balance: finalBalance,
-        total_earned: Math.max(0, Math.round(Number(card.total_earned ?? 0) || 0)) + totalCashback,
-        total_redeemed: Math.max(0, Math.round(Number(card.total_redeemed ?? 0) || 0)) + totalRedeemed,
+        total_earned: previousTotalEarned + totalCashback,
+        total_redeemed: previousTotalRedeemed + totalRedeemed,
         updated_at: paidAt,
       })
       .eq('id', card.id)
+      .eq('balance', balance)
+      .select('id,balance')
+      .maybeSingle()
     if (updateError) throw updateError
+    if (!updatedCard) throw new Error('Loyalty balance changed. Refresh the card and try again.')
 
     const transactions = []
     let runningBalance = balance
@@ -174,10 +180,11 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
           loyalty_card_id: card.id,
           order_id: row.id,
           type: 'redeemed',
-          amount: row.loyaltyUsedAmount,
+          amount: -row.loyaltyUsedAmount,
           balance_before: runningBalance,
           balance_after: runningBalance - row.loyaltyUsedAmount,
-          reason: 'Order payment',
+          reason: 'Loyalty used for order payment',
+          created_at: paidAt,
         })
         runningBalance -= row.loyaltyUsedAmount
       }
@@ -194,6 +201,7 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
           reason: `Cashback ${cashbackPercent}%`,
           cashback_percent_used: cashbackPercent,
           card_type_at_transaction: cardType,
+          created_at: paidAt,
         })
         runningBalance += row.cashbackEarned
       }
@@ -216,7 +224,19 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
           .from('loyalty_transactions')
           .insert(legacyTransactions))
       }
-      if (transactionError) throw transactionError
+      if (transactionError) {
+        await supabase
+          .from('loyalty_cards')
+          .update({
+            balance,
+            total_earned: previousTotalEarned,
+            total_redeemed: previousTotalRedeemed,
+            updated_at: card.updated_at || paidAt,
+          })
+          .eq('id', card.id)
+          .eq('balance', finalBalance)
+        throw transactionError
+      }
     }
   }
 
@@ -224,7 +244,40 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
     ...row,
     loyaltyCardNumber: cardNumber,
     cashbackPercent,
+    loyaltyRollback: totalRedeemed > 0 || totalCashback > 0
+      ? {
+          cardId: card.id,
+          orderIds: settled.map(settledRow => settledRow.id),
+          createdAt: paidAt,
+          balanceBefore: balance,
+          totalEarnedBefore: previousTotalEarned,
+          totalRedeemedBefore: previousTotalRedeemed,
+          balanceAfter: finalBalance,
+          updatedAtBefore: card.updated_at || paidAt,
+        }
+      : null,
   }))
+}
+
+async function rollbackLoyaltyWalletSettlement(rollback) {
+  if (!rollback?.cardId) return
+  await supabase
+    .from('loyalty_transactions')
+    .delete()
+    .eq('loyalty_card_id', rollback.cardId)
+    .in('order_id', rollback.orderIds || [])
+    .eq('created_at', rollback.createdAt)
+
+  await supabase
+    .from('loyalty_cards')
+    .update({
+      balance: rollback.balanceBefore,
+      total_earned: rollback.totalEarnedBefore,
+      total_redeemed: rollback.totalRedeemedBefore,
+      updated_at: rollback.updatedAtBefore,
+    })
+    .eq('id', rollback.cardId)
+    .eq('balance', rollback.balanceAfter)
 }
 
 async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, isTakeAway, items, paymentFields, state, action }) {
@@ -788,97 +841,104 @@ export async function writeToSupabase(action, state) {
       const { data: unpaidOrders } = await unpaidQuery
 
       if (unpaidOrders?.length) {
-        const orderSummaries = unpaidOrders.map(o => {
-          const serviceRatePct = normalizeOrderType(o.order_type) === 'take_away' ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
-            ? Math.max(0, Math.min(100, Number(loyalty.service_rate_pct)))
-            : Number.isFinite(Number(o.service_rate_pct))
-              ? Math.max(0, Math.min(100, Number(o.service_rate_pct)))
-              : serviceRatePctFromSettings(state.settings)
-          const grossPaymentFields = getOrderPaymentFields(
-            { order_type: o.order_type, service_rate_pct: serviceRatePct },
-            o.items || [],
-            serviceRatePct
+        let loyaltyRollback = null
+        try {
+          const orderSummaries = unpaidOrders.map(o => {
+            const serviceRatePct = normalizeOrderType(o.order_type) === 'take_away' ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
+              ? Math.max(0, Math.min(100, Number(loyalty.service_rate_pct)))
+              : Number.isFinite(Number(o.service_rate_pct))
+                ? Math.max(0, Math.min(100, Number(o.service_rate_pct)))
+                : serviceRatePctFromSettings(state.settings)
+            const grossPaymentFields = getOrderPaymentFields(
+              { order_type: o.order_type, service_rate_pct: serviceRatePct },
+              o.items || [],
+              serviceRatePct
+            )
+            return {
+              id: o.id,
+              sourceOrder: { ...o, service_rate_pct: serviceRatePct },
+              serviceRatePct,
+              grossTotal: grossPaymentFields.total,
+            }
+          })
+          const settledSummaries = await applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt })
+          loyaltyRollback = settledSummaries.find(row => row.loyaltyRollback)?.loyaltyRollback || null
+          const finalSummaries = settledSummaries.map(row => {
+            const paymentFields = getOrderPaymentFields(
+              {
+                order_type: row.sourceOrder.order_type,
+                service_rate_pct: row.serviceRatePct,
+                loyalty_used_amount: row.loyaltyUsedAmount,
+                loyalty_redeem_amount: row.loyaltyUsedAmount,
+                cashback_earned: row.cashbackEarned,
+              },
+              row.sourceOrder.items || [],
+              row.serviceRatePct
+            )
+            return {
+              id: row.id,
+              paymentFields,
+              loyaltyCardNumber: row.loyaltyCardNumber || null,
+              cashbackEarned: row.cashbackEarned || 0,
+              cashbackPercent: row.cashbackPercent || 0,
+              total: paymentFields.total,
+            }
+          })
+          const totalDue = finalSummaries.reduce((sum, row) => sum + row.total, 0)
+          const normalizedPayments = normalizeSplitPayments(
+            requestedPayments || [{ method: payment_method || 'cash', amount: totalDue }],
+            totalDue
           )
-          return {
-            id: o.id,
-            sourceOrder: { ...o, service_rate_pct: serviceRatePct },
-            serviceRatePct,
-            grossTotal: grossPaymentFields.total,
-          }
-        })
-        const settledSummaries = await applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt })
-        const finalSummaries = settledSummaries.map(row => {
-          const paymentFields = getOrderPaymentFields(
-            {
-              order_type: row.sourceOrder.order_type,
-              service_rate_pct: row.serviceRatePct,
-              loyalty_used_amount: row.loyaltyUsedAmount,
-              loyalty_redeem_amount: row.loyaltyUsedAmount,
-              cashback_earned: row.cashbackEarned,
-            },
-            row.sourceOrder.items || [],
-            row.serviceRatePct
-          )
-          return {
-            id: row.id,
-            paymentFields,
-            loyaltyCardNumber: row.loyaltyCardNumber || null,
-            cashbackEarned: row.cashbackEarned || 0,
-            cashbackPercent: row.cashbackPercent || 0,
-            total: paymentFields.total,
-          }
-        })
-        const totalDue = finalSummaries.reduce((sum, row) => sum + row.total, 0)
-        const normalizedPayments = normalizeSplitPayments(
-          requestedPayments || [{ method: payment_method || 'cash', amount: totalDue }],
-          totalDue
-        )
-        const finalPaymentMethod = getPaymentMethodSummary(normalizedPayments, payment_method)
-        const paymentRows = allocateSplitPaymentsToOrders(finalSummaries, normalizedPayments)
+          const finalPaymentMethod = getPaymentMethodSummary(normalizedPayments, payment_method)
+          const paymentRows = allocateSplitPaymentsToOrders(finalSummaries, normalizedPayments)
 
-        if (paymentRows.length > 0) {
-          const { error: deletePaymentsError } = await supabase
-            .from('order_payments')
-            .delete()
-            .in('order_id', finalSummaries.map(row => row.id))
-          const paymentsTableMissing = deletePaymentsError && /order_payments|schema cache|relation/i.test(deletePaymentsError.message || '')
-          if (deletePaymentsError && !paymentsTableMissing) throw deletePaymentsError
-
-          if (!paymentsTableMissing) {
-            const { error: insertPaymentsError } = await supabase
+          if (paymentRows.length > 0) {
+            const { error: deletePaymentsError } = await supabase
               .from('order_payments')
-              .insert(paymentRows)
-            if (insertPaymentsError) throw insertPaymentsError
-          } else {
-            console.warn('[db] order_payments table is missing; paid order will keep only summary payment_method')
-          }
-        }
+              .delete()
+              .in('order_id', finalSummaries.map(row => row.id))
+            const paymentsTableMissing = deletePaymentsError && /order_payments|schema cache|relation/i.test(deletePaymentsError.message || '')
+            if (deletePaymentsError && !paymentsTableMissing) throw deletePaymentsError
 
-        for (const o of finalSummaries) {
-          const updateFields = {
-            status:         'paid',
-            payment_status: 'paid',
-            paid_at:        paidAt,
-            ...o.paymentFields,
-            loyalty_card_number: o.loyaltyCardNumber,
-            cashback_earned: o.cashbackEarned,
-            cashback_percent: o.cashbackPercent,
-            payment_method: finalPaymentMethod,
+            if (!paymentsTableMissing) {
+              const { error: insertPaymentsError } = await supabase
+                .from('order_payments')
+                .insert(paymentRows)
+              if (insertPaymentsError) throw insertPaymentsError
+            } else {
+              console.warn('[db] order_payments table is missing; paid order will keep only summary payment_method')
+            }
           }
-          let { error: updateError } = await supabase.from('orders').update(updateFields).eq('id', o.id)
-          if (updateError && isMissingLoyaltyColumn(updateError)) {
-            const {
-              loyalty_used_amount,
-              loyalty_redeem_amount,
-              loyalty_card_number,
-              cashback_earned,
-              cashback_percent,
-              ...fallbackFields
-            } = updateFields
-            ;({ error: updateError } = await supabase.from('orders').update(fallbackFields).eq('id', o.id))
+
+          for (const o of finalSummaries) {
+            const updateFields = {
+              status:         'paid',
+              payment_status: 'paid',
+              paid_at:        paidAt,
+              ...o.paymentFields,
+              loyalty_card_number: o.loyaltyCardNumber,
+              cashback_earned: o.cashbackEarned,
+              cashback_percent: o.cashbackPercent,
+              payment_method: finalPaymentMethod,
+            }
+            let { error: updateError } = await supabase.from('orders').update(updateFields).eq('id', o.id)
+            if (updateError && isMissingLoyaltyColumn(updateError)) {
+              const {
+                loyalty_used_amount,
+                loyalty_redeem_amount,
+                loyalty_card_number,
+                cashback_earned,
+                cashback_percent,
+                ...fallbackFields
+              } = updateFields
+              ;({ error: updateError } = await supabase.from('orders').update(fallbackFields).eq('id', o.id))
+            }
+            if (updateError) throw updateError
+            await notifyTelegramOrderStatus(o.id, 'completed')
           }
-          if (updateError) throw updateError
-          await notifyTelegramOrderStatus(o.id, 'completed')
+        } catch (error) {
+          await rollbackLoyaltyWalletSettlement(loyaltyRollback)
+          throw error
         }
       }
 

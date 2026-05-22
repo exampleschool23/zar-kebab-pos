@@ -357,12 +357,44 @@ test('successful loyalty redeem updates balance and history; failed redeem leave
   assert.equal(result.card.balance, 60000)
   assert.equal(result.card.total_redeemed, 35000)
   assert.equal(result.transaction.type, 'redeemed')
-  assert.equal(result.transaction.amount, 30000)
+  assert.equal(result.transaction.amount, -30000)
   assert.equal(result.transaction.balance_before, 90000)
   assert.equal(result.transaction.balance_after, 60000)
+  assert.equal(result.transaction.reason, 'Loyalty used for order payment')
   assert.equal(result.transaction.created_by, 'cashier-1')
   assertLoyaltyError(() => redeemLoyaltyBalance({ card: base, amount: 100000, remainingOrderAmount: 120000, order: unpaidOrder() }), 'exceeds_balance')
   assert.equal(base.balance, 90000)
+})
+
+test('redeem plus cashback produces ordered transactions and final wallet balance', () => {
+  const base = card({ balance: 70800, total_earned: 0, total_redeemed: 0, cashback_type: 'premium' })
+  const redeemed = redeemLoyaltyBalance({
+    card: base,
+    amount: 50000,
+    remainingOrderAmount: 231150,
+    order: unpaidOrder({ id: 'order-redeem' }),
+    now: '2026-05-22T10:00:00.000Z',
+  })
+  const cashback = completeOrderCashback({
+    card: redeemed.card,
+    order: paidOrder({ id: 'order-redeem', service_rate_pct: 0 }),
+    items: [item({ price: 281150 })],
+    loyaltyUsedAmount: 50000,
+    now: '2026-05-22T10:01:00.000Z',
+  })
+
+  assert.equal(redeemed.transaction.type, 'redeemed')
+  assert.equal(redeemed.transaction.amount, -50000)
+  assert.equal(redeemed.transaction.balance_before, 70800)
+  assert.equal(redeemed.transaction.balance_after, 20800)
+  assert.equal(cashback.cashback, 23115)
+  assert.equal(cashback.transaction.type, 'cashback_earned')
+  assert.equal(cashback.transaction.amount, 23115)
+  assert.equal(cashback.transaction.balance_before, 20800)
+  assert.equal(cashback.transaction.balance_after, 43915)
+  assert.equal(cashback.transaction.cashback_percent_used, 10)
+  assert.equal(cashback.transaction.card_type_at_transaction, 'premium')
+  assert.equal(cashback.card.balance, 43915)
 })
 
 test('tap-to-fill max loyalty amount uses min(balance, remaining bill) and does not auto-apply payment', () => {

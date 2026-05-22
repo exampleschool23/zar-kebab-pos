@@ -234,13 +234,15 @@ export default function AdminLoyalty() {
   }
 
   function transactionAmount(tx) {
-    const amount = Number(tx.amount) || 0
-    const isCredit = tx.type === 'cashback_earned' || tx.type === 'manual_adjustment' && Number(tx.balance_after) >= Number(tx.balance_before)
+    const signedAmount = Number(tx.amount) || 0
+    const amount = Math.abs(signedAmount)
+    const isCredit = signedAmount > 0 || (signedAmount === 0 && (tx.type === 'cashback_earned' || tx.type === 'manual_adjustment' && Number(tx.balance_after) >= Number(tx.balance_before)))
     return `${isCredit ? '+' : '-'}${formatCurrency(amount)}`
   }
 
   function transactionAmountClass(tx) {
-    return tx.type === 'cashback_earned' || tx.type === 'manual_adjustment' && Number(tx.balance_after) >= Number(tx.balance_before)
+    const signedAmount = Number(tx.amount) || 0
+    return signedAmount > 0 || (signedAmount === 0 && (tx.type === 'cashback_earned' || tx.type === 'manual_adjustment' && Number(tx.balance_after) >= Number(tx.balance_before)))
       ? 'text-[#16A34A]'
       : 'text-[#DC2626]'
   }

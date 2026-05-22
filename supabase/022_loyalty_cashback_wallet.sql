@@ -27,7 +27,7 @@ create table if not exists public.loyalty_transactions (
                     'refund_reversal',
                     'migrated_discount_card'
                   )),
-  amount          integer not null check (amount > 0),
+  amount          integer not null check (amount <> 0),
   balance_before  integer not null check (balance_before >= 0),
   balance_after   integer not null check (balance_after >= 0),
   reason          text,
@@ -43,6 +43,12 @@ alter table public.loyalty_cards
 alter table public.loyalty_transactions
   add column if not exists cashback_percent_used numeric,
   add column if not exists card_type_at_transaction text;
+
+do $$ begin
+  alter table public.loyalty_transactions drop constraint if exists loyalty_transactions_amount_check;
+  alter table public.loyalty_transactions
+    add constraint loyalty_transactions_amount_check check (amount <> 0);
+end $$;
 
 alter table public.orders
   add column if not exists loyalty_used_amount integer not null default 0 check (loyalty_used_amount >= 0),

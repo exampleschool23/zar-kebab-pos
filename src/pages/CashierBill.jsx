@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Printer, CheckCircle2, Banknote, CreditCard,
@@ -16,6 +16,8 @@ import {
   getSplitPaymentValidation,
   validateLoyaltyRedeemAmount,
   getMaxLoyaltyRedeemAmount,
+  clampMoneyInput,
+  getMaxPaymentAmount,
   calculateLoyaltyCashback,
   normalizeServiceRatePct,
   normalizeSplitPayments,
@@ -179,6 +181,22 @@ export default function CashierBill() {
   const isOverpaid = paymentValidation.isOverpaid
   const isFullyPaid = paymentValidation.isFullyPaid
 
+  useEffect(() => {
+    setSplitPayments(prev => {
+      let remaining = getMaxPaymentAmount(total)
+      let changed = false
+      const next = prev.map(row => {
+        if (row.amount === '') return row
+        const amount = clampMoneyInput(row.amount, remaining)
+        remaining = getMaxPaymentAmount(remaining - amount)
+        const nextAmount = amount > 0 ? String(amount) : ''
+        if (nextAmount !== row.amount) changed = true
+        return { ...row, amount: nextAmount }
+      })
+      return changed ? next : prev
+    })
+  }, [total])
+
   function applyPreset(p) {
     const remainingForActive = getMaxForPaymentRow(activePaymentId)
     updateActivePaymentAmount(p.exact ? remainingForActive : Math.min(p.value, remainingForActive))
@@ -188,22 +206,26 @@ export default function CashierBill() {
     const otherPaid = splitPayments.reduce((sum, row) => (
       row.id === id ? sum : sum + (Number(row.amount) || 0)
     ), 0)
-    return Math.max(0, total - otherPaid)
+    return getMaxPaymentAmount(total - otherPaid)
   }
 
   function updatePayment(id, patch) {
-    setSplitPayments(prev => prev.map(row => {
-      if (row.id !== id) return row
-      if (!Object.prototype.hasOwnProperty.call(patch, 'amount')) return { ...row, ...patch }
-      const amount = Math.max(0, Math.round(Number(patch.amount) || 0))
-      return { ...row, ...patch, amount: patch.amount === '' ? '' : String(amount) }
-    }))
+    setSplitPayments(prev => {
+      const otherPaid = prev.reduce((sum, row) => (
+        row.id === id ? sum : sum + (Number(row.amount) || 0)
+      ), 0)
+      const maxForRow = getMaxPaymentAmount(total - otherPaid)
+      return prev.map(row => {
+        if (row.id !== id) return row
+        if (!Object.prototype.hasOwnProperty.call(patch, 'amount')) return { ...row, ...patch }
+        const amount = clampMoneyInput(patch.amount, maxForRow)
+        return { ...row, ...patch, amount: patch.amount === '' ? '' : String(amount) }
+      })
+    })
   }
 
   function updateActivePaymentAmount(amount) {
-    setSplitPayments(prev => prev.map(row =>
-      row.id === activePaymentId ? { ...row, amount: String(Math.max(0, Math.round(Number(amount) || 0))) } : row
-    ))
+    updatePayment(activePaymentId, { amount: String(amount) })
   }
 
   function fillRemaining(id = activePaymentId) {
@@ -268,8 +290,13 @@ export default function CashierBill() {
   }
 
   function updateLoyaltyRedeem(value) {
-    const amount = Math.max(0, Math.round(Number(value) || 0))
-    setLoyaltyRedeemAmount(value === '' ? '' : String(amount))
+    if (value === '') {
+      setLoyaltyRedeemAmount('')
+      return
+    }
+    const amount = clampMoneyInput(value, maxLoyaltyRedeemAmount)
+    setLoyaltyRedeemAmount(amount > 0 ? String(amount) : '')
+    if (amount > 0) setLoyaltyLookupMessage('')
   }
 
   function fillMaxLoyaltyRedeem() {
@@ -278,7 +305,7 @@ export default function CashierBill() {
       setLoyaltyLookupMessage(lbl.noLoyaltyBalance)
       return
     }
-    setLoyaltyRedeemAmount(String(maxLoyaltyRedeemAmount))
+    setLoyaltyRedeemAmount(String(clampMoneyInput(maxLoyaltyRedeemAmount, maxLoyaltyRedeemAmount)))
     setLoyaltyLookupMessage('')
   }
 
@@ -850,9 +877,9 @@ export default function CashierBill() {
                 )}
                 <div className="mt-3">
                   <input
-                    type="number"
-                    min="0"
-                    max={maxLoyaltyRedeemAmount}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={loyaltyRedeemAmount}
                     onChange={e => updateLoyaltyRedeem(e.target.value)}
                     placeholder={lbl.useLoyalty}
@@ -989,9 +1016,9 @@ export default function CashierBill() {
                           </div>
                           <div className="relative flex-1">
                             <input
-                              type="number"
-                              min="0"
-                              max={maxForRow}
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
                               value={row.amount}
                               onChange={e => updatePayment(row.id, { amount: e.target.value })}
                               onFocus={() => {
