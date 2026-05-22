@@ -30,9 +30,9 @@ export default function AppShell({ children, title }) {
 
       {/* Mobile sidebar overlay */}
       {shouldShowSidebar && mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-50 flex h-[100dvh]">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <div className="relative z-10 h-full">
+          <div className="relative z-10 h-[100dvh] max-w-[85vw]">
             <UnifiedSidebar onClose={() => setMobileOpen(false)} />
           </div>
         </div>

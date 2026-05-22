@@ -137,7 +137,7 @@ export default function UnifiedSidebar({ onClose }) {
   }
 
   return (
-    <aside className="w-[220px] h-full bg-white border-r border-[#E5E7EB] flex flex-col flex-shrink-0 overflow-hidden">
+    <aside className="h-full max-h-[100dvh] w-[min(85vw,280px)] lg:w-[220px] bg-white border-r border-[#E5E7EB] flex flex-col flex-shrink-0 overflow-hidden">
 
       {/* Brand */}
       <div className="px-4 py-4 border-b border-[#E5E7EB] flex items-center gap-3 flex-shrink-0">

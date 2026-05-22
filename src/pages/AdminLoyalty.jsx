@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Search, BadgeDollarSign, Plus, Ban, RefreshCw } from 'lucide-react'
-import UnifiedSidebar from '../components/UnifiedSidebar'
+import { Search, BadgeDollarSign, Plus, Ban, RefreshCw, ChevronRight, ArrowLeft } from 'lucide-react'
+import AppShell from '../components/AppShell'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import {
@@ -16,7 +16,6 @@ import {
   formatUzPhoneNumberInput,
   getCashbackTypePercent,
   isMissingLoyaltySchemaColumn,
-  normalizeCardNumber,
 } from '../lib/loyalty'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -45,6 +44,8 @@ export default function AdminLoyalty() {
       title: 'Sodiqlik kartalari',
       subtitle: 'Cashback hamyon balanslari va tranzaksiya tarixi',
       refresh: 'Yangilash',
+      detailsTitle: 'Sodiqlik kartasi tafsilotlari',
+      back: 'Orqaga',
       createTitle: 'Sodiqlik kartasini yaratish',
       cardNumber: 'Karta raqami',
       customerName: 'Mijoz ismi',
@@ -102,6 +103,8 @@ export default function AdminLoyalty() {
       title: 'Карты лояльности',
       subtitle: 'Балансы кешбэк-кошельков и история транзакций',
       refresh: 'Обновить',
+      detailsTitle: 'Детали карты лояльности',
+      back: 'Назад',
       createTitle: 'Создать карту лояльности',
       cardNumber: 'Номер карты',
       customerName: 'Имя клиента',
@@ -159,6 +162,8 @@ export default function AdminLoyalty() {
       title: 'Loyalty Cards',
       subtitle: 'Cashback wallet balances and transaction history',
       refresh: 'Refresh',
+      detailsTitle: 'Loyalty card details',
+      back: 'Back',
       createTitle: 'Create loyalty card',
       cardNumber: 'Card number',
       customerName: 'Customer name',
@@ -466,11 +471,10 @@ export default function AdminLoyalty() {
   }, [])
 
   return (
-    <div className="flex min-h-screen bg-[#FAF7F0]">
-      <UnifiedSidebar />
-      <main className="flex-1 p-6">
+    <AppShell title={selected ? l.detailsTitle : l.title}>
+      <div className="w-full max-w-full overflow-x-hidden p-4 md:p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div className="hidden md:block">
             <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
             <p className="text-sm font-semibold text-[#6B7280]">{l.subtitle}</p>
           </div>
@@ -481,11 +485,11 @@ export default function AdminLoyalty() {
 
         {message && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">{message}</div>}
 
-        <div className="grid gap-4 lg:grid-cols-[380px_1fr]">
-          <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+        <div className="grid max-w-full gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
+          <section className={`${selected ? 'hidden lg:block' : ''} rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm md:p-5`}>
             <h2 className="mb-3 text-sm font-black text-[#1F2937]">{l.createTitle}</h2>
             <div className="space-y-2">
-              <input value={form.card_number} onChange={e => setForm({ ...form, card_number: normalizeCardNumber(e.target.value) })} placeholder={l.cardNumber} inputMode="numeric" maxLength={8} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
+              <input value={form.card_number} onChange={e => setForm({ ...form, card_number: String(e.target.value || '').replace(/\D/g, '').slice(0, 8) })} placeholder={l.cardNumber} inputMode="numeric" maxLength={8} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
               <input value={form.phone_number} onChange={e => setForm({ ...form, phone_number: formatUzPhoneNumberInput(e.target.value) })} placeholder="+998 91 132 32 32" className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
               <select value={form.cashback_type} onChange={e => setForm({ ...form, cashback_type: e.target.value })} disabled={!canCreate} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50 disabled:text-[#9CA3AF]">
                 {Object.entries(CASHBACK_TYPES).map(([key, config]) => (
@@ -510,17 +514,27 @@ export default function AdminLoyalty() {
                       <span className="font-black text-[#1F2937]">{card.card_number}</span>
                       <span className="text-sm font-black text-[#16A34A]">{formatCurrency(card.balance || 0)}</span>
                     </div>
-                    <p className="mt-1 text-xs font-semibold text-[#6B7280]">{card.customer_name || l.unnamedCustomer} · {statusLabel(card)}</p>
-                    <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{card.phone_number || '—'} · {cashbackTypeLabel(card.cashback_type)}</p>
+                    <div className="mt-1 flex min-w-0 items-end justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-[#6B7280]">{card.customer_name || l.unnamedCustomer} · {statusLabel(card)}</p>
+                        <p className="mt-1 truncate text-xs font-bold text-[#9CA3AF]">{card.phone_number || l.noPhoneNumber} · {cashbackTypeLabel(card.cashback_type)}</p>
+                      </div>
+                      <ChevronRight size={16} className="flex-shrink-0 text-[#9CA3AF] lg:hidden" />
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
           </section>
 
-          <section className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+          <section className={`${selected ? '' : 'hidden lg:block'} min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm md:p-5`}>
             {selected ? (
-              <div className="grid gap-4 xl:grid-cols-[minmax(320px,430px)_1fr]">
+              <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(320px,430px)_minmax(0,1fr)]">
+                <div className="xl:col-span-2 lg:hidden">
+                  <button onClick={() => setSelected(null)} className="mb-3 flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-black text-[#1F2937]">
+                    <ArrowLeft size={16} /> {l.back}
+                  </button>
+                </div>
                 <div className="space-y-4">
                   <div className="rounded-2xl border border-[#E5E7EB] bg-[#FBFCFE] p-5">
                     <div className="flex items-start justify-between gap-3">
@@ -638,7 +652,7 @@ export default function AdminLoyalty() {
             )}
           </section>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

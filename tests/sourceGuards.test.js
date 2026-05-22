@@ -78,6 +78,20 @@ test('AppContext exposes a stable dbDispatch callback', () => {
   assert.match(source, /import React, \{[^}]*useCallback[^}]*\} from 'react'/)
 })
 
+test('global AppShell mobile drawer overlays content consistently', () => {
+  const shell = readSource('src/components/AppShell.jsx')
+  const sidebar = readSource('src/components/UnifiedSidebar.jsx')
+
+  assert.match(shell, /hidden lg:block/)
+  assert.match(shell, /lg:hidden fixed inset-0 z-50 flex h-\[100dvh\]/)
+  assert.match(shell, /absolute inset-0 bg-black\/40/)
+  assert.match(shell, /onClick=\{\(\) => setMobileOpen\(false\)\}/)
+  assert.match(shell, /max-w-\[85vw\]/)
+  assert.match(sidebar, /max-h-\[100dvh\]/)
+  assert.match(sidebar, /w-\[min\(85vw,280px\)\] lg:w-\[220px\]/)
+  assert.match(sidebar, /overflow-y-auto/)
+})
+
 test('realtime subscription uses unique channel names', () => {
   const source = readSource('src/lib/db.js')
 
@@ -332,7 +346,7 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   assert.match(admin, /setSupportsCashbackType\(false\)/)
   assert.match(admin, /formatUzPhoneNumberInput/)
   assert.match(admin, /cardFormRequired/)
-  assert.match(admin, /normalizeCardNumber/)
+  assert.match(admin, /replace\(\/\\D\/g, ''\)\.slice\(0, 8\)/)
   assert.match(admin, /Register loyalty card/)
   assert.doesNotMatch(admin, /function updateCashbackType/)
   assert.match(db, /legacyTransactions/)
@@ -346,7 +360,12 @@ test('AdminLoyalty selected card uses compact profile and detailed transaction l
   assert.match(admin, /Customer Loyalty Profile/)
   assert.match(admin, /No customer name/)
   assert.match(admin, /No phone number/)
-  assert.match(admin, /xl:grid-cols-\[minmax\(320px,430px\)_1fr\]/)
+  assert.match(admin, /<AppShell title=\{selected \? l\.detailsTitle : l\.title\}>/)
+  assert.match(admin, /selected \? 'hidden lg:block' : ''/)
+  assert.match(admin, /selected \? '' : 'hidden lg:block'/)
+  assert.match(admin, /setSelected\(null\)/)
+  assert.match(admin, /ChevronRight/)
+  assert.match(admin, /xl:grid-cols-\[minmax\(320px,430px\)_minmax\(0,1fr\)\]/)
   assert.match(admin, /selectedName\(selected\)/)
   assert.match(admin, /selectedPhone\(selected\)/)
   assert.match(admin, /l\.cardNo/)
