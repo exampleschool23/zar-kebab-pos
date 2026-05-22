@@ -14,6 +14,7 @@ import {
   clampMoneyInput,
   getMaxPaymentAmount,
   getSplitPaymentValidation,
+  mergeOrderItemsByIdentity,
   groupOrdersBySession,
   isActiveNeedsBillOrder,
   isPaidOrder,
@@ -110,7 +111,7 @@ test('cancelled kitchen items are excluded from service total and cashback', () 
   assert.equal(summary.subtotal, 100000)
   assert.equal(summary.serviceFee, 15000)
   assert.equal(summary.total, 115000)
-  assert.equal(calculateLoyaltyCashback({ status: 'paid', payment_status: 'paid' }, rows, 10), 10000)
+  assert.equal(calculateLoyaltyCashback({ status: 'paid', payment_status: 'paid', service_rate_pct: 15 }, rows, 10), 11500)
 
   const grouped = getGroupedOrderItems(rows)
   assert.equal(grouped.length, 1)
@@ -227,7 +228,7 @@ test('cashier-entered loyalty redeem amount reduces remaining payable total', ()
   assert.equal(summary.total, 73650)
 })
 
-test('dine-in counter items are included in total but cashback excludes counter items', () => {
+test('dine-in counter items are included in subtotal cashback while excluded from service fee', () => {
   const rows = [
     item({ id: 'chicken', menu_item_id: 'chicken', quantity: 1, price: 22000 }),
     item({ id: 'beef', menu_item_id: 'beef', quantity: 1, price: 25000 }),
@@ -247,7 +248,11 @@ test('dine-in counter items are included in total but cashback excludes counter 
   assert.equal(summary.discountBase, 81650)
   assert.equal(summary.discountAmount, 8000)
   assert.equal(summary.total, 88650)
-  assert.equal(calculateLoyaltyCashback({ ...summary, status: 'paid', payment_status: 'paid' }, rows, 10), 6300)
+  assert.equal(calculateLoyaltyCashback(
+    { status: 'paid', payment_status: 'paid', service_rate_pct: 15, loyalty_used_amount: 8000 },
+    rows,
+    10
+  ), 8865)
 })
 
 test('take-away loyalty wallet redemption has no service fee', () => {
@@ -286,7 +291,7 @@ test('counter-only order has no service fee and no loyalty discount', () => {
   assert.equal(summary.total, 20000)
 })
 
-test('cashback uses integer UZS from menu items minus loyalty used', () => {
+test('cashback uses integer UZS from subtotal plus service minus loyalty used', () => {
   const rows = [item({ id: 'rounding', menu_item_id: 'rounding', quantity: 1, price: 33333 })]
   const summary = getOrderPaymentSummary(
     { order_type: 'dine_in', service_rate_pct: 15, loyalty_used_amount: 3333 },
@@ -298,7 +303,54 @@ test('cashback uses integer UZS from menu items minus loyalty used', () => {
   assert.equal(summary.discountBase, 38333)
   assert.equal(summary.discountAmount, 3333)
   assert.equal(summary.total, 35000)
-  assert.equal(calculateLoyaltyCashback({ loyalty_used_amount: 3333, status: 'paid', payment_status: 'paid' }, rows, 10), 3000)
+  assert.equal(calculateLoyaltyCashback(
+    { order_type: 'dine_in', service_rate_pct: 15, loyalty_used_amount: 3333, status: 'paid', payment_status: 'paid' },
+    rows,
+    10
+  ), 3500)
+})
+
+test('cashback reward base is subtotal plus service fee from the cashier total block', () => {
+  const rows = [
+    item({ id: 'menu-a', menu_item_id: 'menu-a', quantity: 1, price: 176000 }),
+  ]
+  const summary = getOrderPaymentSummary({ order_type: 'dine_in', service_rate_pct: 20 }, rows, 20)
+
+  assert.equal(summary.subtotal, 176000)
+  assert.equal(summary.serviceFee, 35200)
+  assert.equal(summary.grossAmount, 211200)
+  assert.equal(calculateLoyaltyCashback(
+    { order_type: 'dine_in', service_rate_pct: 20, status: 'paid', payment_status: 'paid' },
+    rows,
+    10
+  ), 21120)
+})
+
+test('cashback settlement uses fresh cashier items when database relation fetch is stale', () => {
+  const staleDbItems = [
+    item({ id: 'lula', menu_item_id: 'lula', quantity: 1, price: 24000 }),
+    item({ id: 'chicken', menu_item_id: 'chicken', quantity: 1, price: 22000 }),
+    item({ id: 'beef', menu_item_id: 'beef', quantity: 1, price: 25000 }),
+    item({ id: 'orbit', menu_item_id: 'orbit', quantity: 1, price: 8000, item_type: 'counter', is_counter_item: true }),
+  ]
+  const freshCashierItems = [
+    ...staleDbItems,
+    item({ id: 'zar-kebab', menu_item_id: 'zar-kebab', quantity: 1, price: 80000 }),
+  ]
+  const mergedItems = mergeOrderItemsByIdentity(staleDbItems, freshCashierItems)
+  const order = {
+    order_type: 'take_away',
+    status: 'paid',
+    payment_status: 'paid',
+    loyalty_used_amount: 25100,
+  }
+
+  const summary = getOrderPaymentSummary(order, mergedItems, 0)
+
+  assert.equal(summary.subtotal, 159000)
+  assert.equal(summary.menuItemsSubtotal, 151000)
+  assert.equal(calculateLoyaltyCashback(order, mergedItems, 10), 13390)
+  assert.notEqual(calculateLoyaltyCashback(order, mergedItems, 10), 4590)
 })
 
 test('payment validation follows the helper total after loyalty wallet redemption', () => {

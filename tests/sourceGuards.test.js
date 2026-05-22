@@ -418,6 +418,7 @@ test('cashier payment waits for database success and supports legacy loyalty tra
   assert.match(cashier, /if \(result\?\.error\) return/)
   assert.match(cashier, /navigate\('\/cashier\/tables'\)/)
   assert.match(cashier, /processingPay/)
+  assert.match(db, /mergeOrderItemsByIdentity/)
   assert.match(db, /isLegacyPositiveTransactionAmountConstraint\(transactionError\)/)
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(transactions\)\)/)
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(legacyTransactions\)\)/)

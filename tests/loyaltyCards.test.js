@@ -182,18 +182,18 @@ test('cashback types use fixed rates and reject invalid types', () => {
   assertLoyaltyError(() => normalizeCashbackType('diamond'), 'invalid_cashback_type')
 })
 
-test('cashback preview uses selected loyalty card type for exact 151000 UZS bug regression', () => {
+test('cashback preview uses selected loyalty card type against subtotal plus service', () => {
   const rows = [
     item({ id: 'menu-total', menu_item_id: 'menu-total', price: 151000 }),
     item({ id: 'counter-total', menu_item_id: 'cola', price: 99000, item_type: 'counter', is_counter_item: true }),
   ]
   const order = paidOrder({ service_rate_pct: 15, tip_amount: 50000 })
   const expectedByType = {
-    bronze: 4530,
-    silver: 7550,
-    gold: 10570,
-    premium: 15100,
-    black: 22650,
+    bronze: 8179,
+    silver: 13632,
+    gold: 19085,
+    premium: 27265,
+    black: 40897,
   }
 
   for (const [cashbackType, expected] of Object.entries(expectedByType)) {
@@ -212,7 +212,7 @@ test('cashback preview uses selected loyalty card type for exact 151000 UZS bug 
     loyaltyUsedAmount: 0,
     card: card({ cashback_type: undefined, cashbackType: 'premium' }),
   })
-  assert.equal(premiumPreview.cashback, 15100)
+  assert.equal(premiumPreview.cashback, 27265)
   assert.notEqual(premiumPreview.cashback, 7550)
 
   const premiumPartial = getLoyaltyCashbackPreview({
@@ -221,12 +221,12 @@ test('cashback preview uses selected loyalty card type for exact 151000 UZS bug 
     loyaltyUsedAmount: 50000,
     card: card({ cashback_type: undefined, cashbackType: 'premium' }),
   })
-  assert.equal(premiumPartial.cashback, 10100)
+  assert.equal(premiumPartial.cashback, 22265)
 
   const premiumOverRedeemed = getLoyaltyCashbackPreview({
     order,
     items: rows,
-    loyaltyUsedAmount: 200000,
+    loyaltyUsedAmount: 300000,
     card: card({ cashback_type: undefined, cashbackType: 'premium' }),
   })
   assert.equal(premiumOverRedeemed.cashback, 0)
@@ -259,10 +259,10 @@ test('cashback type is immutable after registration while customer details remai
   assert.equal(edited.cashback_type, 'bronze')
   assert.equal(oldSettlement.transaction.card_type_at_transaction, 'bronze')
   assert.equal(oldSettlement.transaction.cashback_percent_used, 3)
-  assert.equal(oldSettlement.cashback, 2999)
+  assert.equal(oldSettlement.cashback, 3449)
   assert.equal(newSettlement.transaction.card_type_at_transaction, 'bronze')
   assert.equal(newSettlement.transaction.cashback_percent_used, 3)
-  assert.equal(newSettlement.cashback, 2999)
+  assert.equal(newSettlement.cashback, 3449)
   assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { cashback_type: 'black' } }), 'cashback_type_locked')
   assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { cashbackType: 'black' } }), 'cashback_type_locked')
   assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { card_number: '87654321' } }), 'card_number_locked')
@@ -435,13 +435,13 @@ test('cashier split payment validation supports loyalty-reduced totals and rejec
   assert.equal(getSplitPaymentValidation([{ method: 'cash', amount: 107001 }], summary.total).canConfirmPayment, false)
 })
 
-test('cashback calculation uses menu items minus loyalty only, floors integer UZS and excludes counter/service/tip', () => {
+test('cashback calculation uses subtotal plus service minus loyalty, floors integer UZS and excludes tips', () => {
   const rates = [
-    ['bronze', 2999],
-    ['silver', 4999],
-    ['gold', 6999],
-    ['premium', 9999],
-    ['black', 14999],
+    ['bronze', 6449],
+    ['silver', 10749],
+    ['gold', 15049],
+    ['premium', 21499],
+    ['black', 32249],
   ]
 
   for (const [type, expected] of rates) {
@@ -462,7 +462,7 @@ test('cashback calculation uses menu items minus loyalty only, floors integer UZ
     card: card({ cashback_type: 'black' }),
     order: paidOrder(),
     items: [item({ price: 99999 })],
-    loyaltyUsedAmount: 99999,
+    loyaltyUsedAmount: 114999,
   }).cashback, 0)
   assert.equal(completeOrderCashback({
     card: card({ cashback_type: 'black' }),
@@ -490,9 +490,9 @@ test('premium card completion matches preview and stores transaction snapshots',
     loyaltyUsedAmount: 0,
   })
 
-  assert.equal(preview.cashback, 15100)
+  assert.equal(preview.cashback, 17365)
   assert.equal(settlement.cashback, preview.cashback)
-  assert.equal(settlement.transaction.amount, 15100)
+  assert.equal(settlement.transaction.amount, 17365)
   assert.equal(settlement.transaction.cashback_percent_used, 10)
   assert.equal(settlement.transaction.card_type_at_transaction, 'premium')
 })
@@ -508,11 +508,11 @@ test('order completion creates cashback only after successful paid order and sto
     loyaltyUsedAmount: 25000,
   })
 
-  assert.equal(partial.cashback, 3750)
-  assert.equal(partial.card.balance, 13750)
-  assert.equal(partial.card.total_earned, 3750)
+  assert.equal(partial.cashback, 4500)
+  assert.equal(partial.card.balance, 14500)
+  assert.equal(partial.card.total_earned, 4500)
   assert.equal(partial.order.loyalty_used_amount, 25000)
-  assert.equal(partial.order.cashback_earned, 3750)
+  assert.equal(partial.order.cashback_earned, 4500)
   assert.equal(partial.order.cashback_percent, 5)
   assert.equal(partial.transaction.type, 'cashback_earned')
 
@@ -522,8 +522,8 @@ test('order completion creates cashback only after successful paid order and sto
     items: [item({ item_type: 'counter', is_counter_item: true })],
     loyaltyUsedAmount: 0,
   })
-  assert.equal(counterOnly.cashback, 0)
-  assert.equal(counterOnly.transaction, null)
+  assert.equal(counterOnly.cashback, 15000)
+  assert.equal(counterOnly.transaction.type, 'cashback_earned')
 })
 
 test('transaction history is newest first and preserves amount signs, balances, rates and card type snapshots', () => {
@@ -572,7 +572,7 @@ test('old discount-card regression: loyalty wallet does not apply percent discou
   assert.equal(wallet.total, 95000)
 })
 
-test('counter items update payable total and remaining amount without increasing cashback or service fee', () => {
+test('counter items update payable total and cashback subtotal without increasing service fee', () => {
   const mealOnly = [item({ price: 100000 })]
   const withCounter = [
     item({ price: 100000 }),
@@ -583,8 +583,8 @@ test('counter items update payable total and remaining amount without increasing
 
   assert.equal(before.summary.serviceFee, 15000)
   assert.equal(after.summary.serviceFee, 15000)
-  assert.equal(before.cashback, 5000)
-  assert.equal(after.cashback, 5000)
+  assert.equal(before.cashback, 5750)
+  assert.equal(after.cashback, 6350)
   assert.equal(after.summary.total - before.summary.total, 12000)
   assert.equal(getMaxLoyaltyRedeemAmount(200000, after.summary.grossAmount), after.summary.grossAmount)
 })

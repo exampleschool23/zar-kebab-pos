@@ -24,6 +24,25 @@ export function getOrderItems(o) {
   return o?.items || o?.order_items || []
 }
 
+export function mergeOrderItemsByIdentity(primaryItems = [], fallbackItems = []) {
+  const merged = []
+  const seen = new Set()
+
+  const append = item => {
+    if (!item) return
+    const key = item.id || item.order_item_id || item.orderItemId
+    if (key) {
+      if (seen.has(key)) return
+      seen.add(key)
+    }
+    merged.push(item)
+  }
+
+  primaryItems.forEach(append)
+  fallbackItems.forEach(append)
+  return merged
+}
+
 export function isCancelledOrderItem(item) {
   return String(item?.status || '').toLowerCase() === 'cancelled'
 }
@@ -119,7 +138,7 @@ export function calculateLoyaltyCashback(order, items = getOrderItems(order), ca
   if (order?.status === 'cancelled' || order?.payment_status === 'cancelled') return 0
   const summary = getOrderPaymentSummary(order, items)
   const loyaltyUsed = getLoyaltyUsedAmount(order)
-  const cashbackBase = Math.max(0, summary.menuItemsSubtotal - loyaltyUsed)
+  const cashbackBase = Math.max(0, summary.grossAmount - loyaltyUsed)
   return Math.floor(cashbackBase * normalizeCashbackPercent(cashbackPercent) / 100)
 }
 

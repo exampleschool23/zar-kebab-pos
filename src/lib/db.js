@@ -3,6 +3,7 @@ import {
   allocateSplitPaymentsToOrders,
   calculateLoyaltyCashback,
   getOrderPaymentFields,
+  mergeOrderItemsByIdentity,
   getPaymentMethodSummary,
   normalizeServiceRatePct,
   normalizeSplitPayments,
@@ -872,6 +873,8 @@ export async function writeToSupabase(action, state) {
         let loyaltyRollback = null
         try {
           const orderSummaries = unpaidOrders.map(o => {
+            const stateOrder = state.orders.find(row => row.id === o.id)
+            const freshItems = mergeOrderItemsByIdentity(o.items || [], stateOrder?.items || [])
             const serviceRatePct = normalizeOrderType(o.order_type) === 'take_away' ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
               ? Math.max(0, Math.min(100, Number(loyalty.service_rate_pct)))
               : Number.isFinite(Number(o.service_rate_pct))
@@ -879,12 +882,12 @@ export async function writeToSupabase(action, state) {
                 : serviceRatePctFromSettings(state.settings)
             const grossPaymentFields = getOrderPaymentFields(
               { order_type: o.order_type, service_rate_pct: serviceRatePct },
-              o.items || [],
+              freshItems,
               serviceRatePct
             )
             return {
               id: o.id,
-              sourceOrder: { ...o, service_rate_pct: serviceRatePct },
+              sourceOrder: { ...o, items: freshItems, service_rate_pct: serviceRatePct },
               serviceRatePct,
               grossTotal: grossPaymentFields.total,
             }
