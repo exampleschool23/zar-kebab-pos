@@ -191,6 +191,20 @@ test('WaiterTables lets occupied tables request the bill from the card action', 
   assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'occupied'\) \{[\s\S]*MARK_TABLE_NEEDS_BILL/)
 })
 
+test('Kitchen can cancel unavailable items without billing them', () => {
+  const kitchen = readSource('src/pages/Kitchen.jsx')
+  const analytics = readSource('src/lib/analytics.js')
+  const waiterTables = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(kitchen, /handleMark\('cancelled'\)/)
+  assert.match(kitchen, /unavailableLabel\(lang\)/)
+  assert.match(kitchen, /XCircle/)
+  assert.match(kitchen, /!\['served', 'cancelled'\]\.includes\(i\.status\)/)
+  assert.match(analytics, /function isCancelledOrderItem/)
+  assert.match(analytics, /billableItems = \(items \|\| \[\]\)\.filter\(item => !isCancelledOrderItem\(item\)\)/)
+  assert.match(waiterTables, /\.filter\(i => i\.status !== 'cancelled'\)/)
+})
+
 test('AdminTables protects table history and manages zones', () => {
   const source = readSource('src/pages/AdminTables.jsx')
 

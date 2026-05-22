@@ -238,7 +238,7 @@ function deriveStatus(tableId, orders) {
   // delivered = waiter confirmed → occupied (eating)
   if (active.every(o => o.status === 'delivered')) return 'occupied'
 
-  const allItems = active.flatMap(o => o.items || [])
+  const allItems = active.flatMap(o => o.items || []).filter(i => i.status !== 'cancelled')
   if (allItems.length === 0) return 'waiting_kitchen'
 
   const statuses = allItems.map(i => i.status || 'new')
@@ -263,7 +263,7 @@ function deriveStatusForTable(table, orders) {
 
 function getKitchenCounts(tableId, orders) {
   const active = orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
-  const items = active.flatMap(o => o.items || [])
+  const items = active.flatMap(o => o.items || []).filter(i => i.status !== 'cancelled')
   return {
     newCount: items.filter(i => (i.status || 'new') === 'new').length,
     preparingCount: items.filter(i => i.status === 'preparing').length,

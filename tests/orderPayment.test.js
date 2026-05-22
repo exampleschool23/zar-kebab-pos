@@ -100,6 +100,19 @@ test('money input clamping prevents oversized loyalty and split payment amounts'
   assert.equal(clampMoneyInput('ten', getMaxPaymentAmount(231150)), 0)
 })
 
+test('cancelled kitchen items are excluded from service total and cashback', () => {
+  const rows = [
+    item({ id: 'kept', menu_item_id: 'kebab', price: 100000, quantity: 1, status: 'ready' }),
+    item({ id: 'missing', menu_item_id: 'soup', price: 50000, quantity: 1, status: 'cancelled' }),
+  ]
+  const summary = getOrderPaymentSummary({ order_type: 'dine_in', service_rate_pct: 15 }, rows, 15)
+
+  assert.equal(summary.subtotal, 100000)
+  assert.equal(summary.serviceFee, 15000)
+  assert.equal(summary.total, 115000)
+  assert.equal(calculateLoyaltyCashback({ status: 'paid', payment_status: 'paid' }, rows, 10), 10000)
+})
+
 test('sent cart snapshot removal preserves items added while send is pending', () => {
   const cart = [
     item({ id: 'lula-current', menu_item_id: 'lula', quantity: 3, price: 24000 }),

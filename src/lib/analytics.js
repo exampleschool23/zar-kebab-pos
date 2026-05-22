@@ -24,6 +24,10 @@ export function getOrderItems(o) {
   return o?.items || o?.order_items || []
 }
 
+export function isCancelledOrderItem(item) {
+  return String(item?.status || '').toLowerCase() === 'cancelled'
+}
+
 export function isCounterOrderItem(item) {
   const typeText = String(item?.item_type || item?.itemType || '').toLowerCase()
   return !!(
@@ -167,12 +171,13 @@ export function getMaxPaymentAmount(remainingAmount) {
 }
 
 export function getOrderPaymentSummary(order, items = getOrderItems(order), fallbackServicePct = 20) {
-  const hasItems = items.length > 0
-  const menuItemsSubtotal = items.reduce(
+  const billableItems = (items || []).filter(item => !isCancelledOrderItem(item))
+  const hasItems = billableItems.length > 0
+  const menuItemsSubtotal = billableItems.reduce(
     (s, i) => isCounterOrderItem(i) ? s : s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
     0
   )
-  const counterItemsSubtotal = items.reduce(
+  const counterItemsSubtotal = billableItems.reduce(
     (s, i) => isCounterOrderItem(i) ? s + (Number(i.price) || 0) * (Number(i.quantity) || 1) : s,
     0
   )

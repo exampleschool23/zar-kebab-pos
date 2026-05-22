@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   UtensilsCrossed, Clock, CheckCircle2, AlertCircle, ArrowLeft,
   Bell, BellRing, ChefHat, Loader2, LogOut, Volume2, VolumeX,
+  XCircle,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,6 +18,7 @@ const STATUS_BADGE = {
   preparing: 'bg-[#FFF1E8] text-[#FF5A00] border border-[#FDBA74]',
   ready:     'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE]',
   served:    'bg-gray-100 text-gray-500 border border-gray-200',
+  cancelled: 'bg-red-50 text-red-600 border border-red-200',
 }
 
 const ORDER_TYPE_LABEL = {
@@ -41,11 +43,15 @@ function elapsedSince(iso) {
 
 function statusLabel(status, lang) {
   const map = {
-    uz: { new: 'Yangi', preparing: 'Tayyorlanmoqda', ready: 'Tayyor', served: 'Berildi' },
-    ru: { new: 'Новый', preparing: 'Готовится',      ready: 'Готово',  served: 'Подано'  },
-    en: { new: 'New',   preparing: 'Preparing',       ready: 'Ready',   served: 'Served'  },
+    uz: { new: 'Yangi', preparing: 'Tayyorlanmoqda', ready: 'Tayyor', served: 'Berildi', cancelled: 'Bekor qilindi' },
+    ru: { new: 'Новый', preparing: 'Готовится',      ready: 'Готово',  served: 'Подано', cancelled: 'Отменено' },
+    en: { new: 'New',   preparing: 'Preparing',       ready: 'Ready',   served: 'Served', cancelled: 'Cancelled' },
   }
   return (map[lang] || map.en)[status] || status
+}
+
+function unavailableLabel(lang) {
+  return lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Нет в наличии' : 'Unavailable'
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -257,33 +263,57 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
 
         {/* Action button */}
         {isNew && (
-          <button
-            onClick={() => handleMark('preparing')}
-            disabled={pending}
-            className={`w-full py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
-              pending
-                ? 'bg-orange-300 text-white cursor-not-allowed'
-                : 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-sm shadow-orange-200'
-            }`}
-          >
-            {pending ? <Spinner /> : null}
-            {statusLabel('preparing', lang)}
-          </button>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <button
+              onClick={() => handleMark('preparing')}
+              disabled={pending}
+              className={`py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
+                pending
+                  ? 'bg-orange-300 text-white cursor-not-allowed'
+                  : 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-sm shadow-orange-200'
+              }`}
+            >
+              {pending ? <Spinner /> : null}
+              {statusLabel('preparing', lang)}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleMark('cancelled')}
+              disabled={pending}
+              title={unavailableLabel(lang)}
+              aria-label={unavailableLabel(lang)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <XCircle size={18} />
+            </button>
+          </div>
         )}
 
         {isPreparing && (
-          <button
-            onClick={() => handleMark('ready')}
-            disabled={pending}
-            className={`w-full py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
-              pending
-                ? 'bg-blue-100 text-blue-400 cursor-not-allowed border border-blue-200'
-                : 'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE] hover:bg-[#2563EB] hover:text-white'
-            }`}
-          >
-            {pending ? <Spinner color="text-blue-500" /> : null}
-            {statusLabel('ready', lang)}
-          </button>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <button
+              onClick={() => handleMark('ready')}
+              disabled={pending}
+              className={`py-2.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.97] ${
+                pending
+                  ? 'bg-blue-100 text-blue-400 cursor-not-allowed border border-blue-200'
+                  : 'bg-[#DBEAFE] text-[#2563EB] border border-[#BFDBFE] hover:bg-[#2563EB] hover:text-white'
+              }`}
+            >
+              {pending ? <Spinner color="text-blue-500" /> : null}
+              {statusLabel('ready', lang)}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleMark('cancelled')}
+              disabled={pending}
+              title={unavailableLabel(lang)}
+              aria-label={unavailableLabel(lang)}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <XCircle size={18} />
+            </button>
+          </div>
         )}
 
         {isReady && (
@@ -685,7 +715,7 @@ export default function Kitchen() {
           // Tag each item with its real orderId so UPDATE_ORDER_ITEM_STATUS works.
           // Hide already-served rounds when a table sends more food later.
           items: (order.items || [])
-            .filter(i => i.status !== 'served')
+            .filter(i => !['served', 'cancelled'].includes(i.status))
             .map(i => ({ ...i, order_type: getOrderType({ ...i, order_type: i.order_type || order.order_type }), _orderId: order.id })),
         }
       } else {
@@ -693,7 +723,7 @@ export default function Kitchen() {
         grouped[key].items = [
           ...grouped[key].items,
           ...(order.items || [])
-            .filter(i => i.status !== 'served')
+            .filter(i => !['served', 'cancelled'].includes(i.status))
             .map(i => ({ ...i, order_type: getOrderType({ ...i, order_type: i.order_type || order.order_type }), _orderId: order.id })),
         ]
         // Keep the earliest created_at for sorting

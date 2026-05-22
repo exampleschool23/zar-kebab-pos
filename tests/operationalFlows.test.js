@@ -50,6 +50,27 @@ test('end-to-end floor flow: waiter sends, kitchen marks ready, waiter requests 
   assert.equal(paid.orders[0].payment_method, 'cash')
 })
 
+test('kitchen can cancel one unavailable item without cancelling the rest of the order', () => {
+  const sent = ordersReducer(state(), {
+    type: 'SEND_TO_KITCHEN',
+    _orderId: 'o1',
+    _items: [
+      { id: 'i1', menu_item_id: 'm1', name: 'Shashlik', price: 100000, quantity: 1, status: 'new' },
+      { id: 'i2', menu_item_id: 'm2', name: 'Lagman', price: 50000, quantity: 1, status: 'new' },
+    ],
+    payload: { orderType: 'dine_in' },
+  })
+
+  const cancelled = ordersReducer(sent, {
+    type: 'UPDATE_ORDER_ITEM_STATUS',
+    payload: { orderId: 'o1', orderItemId: 'i2', status: 'cancelled' },
+  })
+
+  assert.equal(cancelled.orders[0].status, 'sent_to_kitchen')
+  assert.equal(cancelled.orders[0].items.find(i => i.id === 'i1').status, 'new')
+  assert.equal(cancelled.orders[0].items.find(i => i.id === 'i2').status, 'cancelled')
+})
+
 test('admin reservation and disable flow keeps history-safe table lifecycle', () => {
   const reserved = tablesReducer(state(), {
     type: 'UPDATE_TABLE',
