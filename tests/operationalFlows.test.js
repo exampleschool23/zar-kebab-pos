@@ -68,10 +68,18 @@ test('kitchen can cancel one unavailable item without cancelling the rest of the
 
   assert.equal(cancelled.orders[0].status, 'sent_to_kitchen')
   assert.equal(cancelled.orders[0].items.find(i => i.id === 'i1').status, 'new')
-  assert.equal(cancelled.orders[0].items.find(i => i.id === 'i2').status, 'cancelled')
+  assert.equal(cancelled.orders[0].items.some(i => i.id === 'i2'), false)
   assert.equal(cancelled.orders[0].subtotal, 100000)
   assert.equal(cancelled.orders[0].total, 115000)
   assert.equal(cancelled.tables[0].status, 'occupied')
+
+  const allPreparing = ordersReducer(cancelled, {
+    type: 'UPDATE_ORDER_ITEM_STATUS',
+    payload: { orderId: 'o1', orderItemId: 'i1', status: 'preparing' },
+  })
+  assert.equal(allPreparing.orders[0].items.length, 1)
+  assert.equal(allPreparing.orders[0].items[0].id, 'i1')
+  assert.equal(allPreparing.orders[0].items[0].status, 'preparing')
 })
 
 test('kitchen cancelling every billable item removes the zero-value order from cashier flow', () => {

@@ -78,6 +78,37 @@ test('AppContext exposes a stable dbDispatch callback', () => {
   assert.match(source, /import React, \{[^}]*useCallback[^}]*\} from 'react'/)
 })
 
+test('new signed-up users always start as guest', () => {
+  const auth = readSource('src/contexts/AuthContext.jsx')
+  const migration = readSource('supabase/024_profiles_force_guest_signup.sql')
+
+  assert.match(auth, /options: \{ data: \{ full_name: fullName, role: 'guest' \} \}/)
+  assert.match(migration, /alter column role set default 'guest'/)
+  assert.match(migration, /public\.handle_new_user/)
+  assert.match(migration, /'guest',\s*\n\s*'active'/)
+  assert.doesNotMatch(migration, /raw_user_meta_data->>'role'/)
+})
+
+test('AdminUsers can delete profiles without touching historical order names', () => {
+  const adminUsers = readSource('src/pages/AdminUsers.jsx')
+  const supabase = readSource('src/lib/supabase.js')
+  const permissions = readSource('src/lib/permissions.js')
+  const migration = readSource('supabase/025_owner_delete_profiles.sql')
+
+  assert.match(adminUsers, /deleteProfile/)
+  assert.match(adminUsers, /canDeleteTeamMember/)
+  assert.match(adminUsers, /confirmDeleteId/)
+  assert.match(adminUsers, /Names already stored on old orders stay preserved/)
+  assert.match(supabase, /\.from\('profiles'\)[\s\S]*\.delete\(\)[\s\S]*\.eq\('id', userId\)/)
+  assert.match(permissions, /function canDeleteTeamMember/)
+  assert.match(permissions, /viewer !== 'owner'/)
+  assert.match(permissions, /\['owner', 'stakeholder'\]\.includes\(target\)/)
+  assert.match(migration, /on public\.profiles for delete/)
+  assert.match(migration, /waiter_name/)
+  assert.doesNotMatch(adminUsers, /\.from\('orders'\)\.delete/)
+  assert.doesNotMatch(adminUsers, /deleteUser/)
+})
+
 test('global AppShell mobile drawer overlays content consistently', () => {
   const shell = readSource('src/components/AppShell.jsx')
   const sidebar = readSource('src/components/UnifiedSidebar.jsx')
@@ -229,14 +260,24 @@ test('Kitchen can cancel unavailable items without billing them', () => {
   assert.match(analytics, /if \(isCancelledOrderItem\(item\)\) return/)
   assert.match(cashierBill, /billableItems = allItems\.filter\(item => !isCancelledOrderItem\(item\)\)/)
   assert.match(cashierBill, /getGroupedOrderItems\(billableItems\)/)
+  assert.match(ordersReducer, /status === 'cancelled'[\s\S]*o\.items\.filter\(i => !matchesItem\(i\)\)/)
   assert.match(ordersReducer, /flatMap\(o =>/)
   assert.match(ordersReducer, /shouldRemove/)
   assert.match(ordersReducer, /getOrderPaymentSummary\(nextOrder, nextItems/)
+  assert.match(db, /status === 'cancelled'[\s\S]*\.from\('order_items'\)\.delete\(\)/)
   assert.match(db, /paymentFields\.total <= 0/)
   assert.match(db, /payment_status: 'cancelled'/)
   assert.match(waiterTables, /\.filter\(i => i\.status !== 'cancelled'\)/)
   assert.match(migration, /drop constraint if exists order_items_status_check/)
   assert.match(migration, /'cancelled'/)
+})
+
+test('completed order details do not show kitchen-cancelled items', () => {
+  const reports = readSource('src/pages/Reports.jsx')
+
+  assert.match(reports, /isCancelledOrderItem/)
+  assert.match(reports, /\(fetchedItems \|\| getOrderItems\(order\)\)\.filter\(item => !isCancelledOrderItem\(item\)\)/)
+  assert.match(reports, /Ordered Items'} \(\{items\.length\}\)/)
 })
 
 test('AdminTables protects table history and manages zones', () => {
@@ -374,6 +415,15 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
 test('AdminLoyalty selected card uses compact profile and detailed transaction layout', () => {
   const admin = readSource('src/pages/AdminLoyalty.jsx')
 
+  assert.match(admin, /CARD_PAGE_SIZE = 20/)
+  assert.match(admin, /CARD_SELECT_COLUMNS/)
+  assert.match(admin, /TRANSACTION_SELECT_COLUMNS/)
+  assert.match(admin, /\.range\(from, to\)/)
+  assert.match(admin, /setTimeout\(\(\) => \{[\s\S]*searchCards\(query, \{ reset: true \}\)[\s\S]*250/)
+  assert.match(admin, /cardSearchRequestRef/)
+  assert.match(admin, /hasMoreCards/)
+  assert.match(admin, /l\.loadMore/)
+  assert.doesNotMatch(admin, /\.select\('\*'\)/)
   assert.match(admin, /Customer Loyalty Profile/)
   assert.match(admin, /No customer name/)
   assert.match(admin, /No phone number/)
@@ -409,6 +459,22 @@ test('AdminLoyalty selected card uses compact profile and detailed transaction l
   assert.doesNotMatch(cashbackSection, /<select value=\{selected\.cashback_type/)
 })
 
+test('AdminAudit localizes money audit labels statuses and payment methods', () => {
+  const audit = readSource('src/pages/AdminAudit.jsx')
+
+  assert.match(audit, /function paymentMethodLabel/)
+  assert.match(audit, /function statusLabel/)
+  assert.match(audit, /fmtDate\(value, lang = 'ru'\)/)
+  assert.match(audit, /before: 'Oldin'/)
+  assert.match(audit, /before: 'Было'/)
+  assert.match(audit, /before: 'Before'/)
+  assert.match(audit, /cash: \{ uz: 'Naqd', ru: 'Наличные', en: 'Cash' \}/)
+  assert.match(audit, /paid: \{ uz: 'To‘landi', ru: 'Оплачен', en: 'Paid' \}/)
+  assert.match(audit, /statusLabel\(status, lang\)/)
+  assert.match(audit, /paymentMethodLabel\(row\.old_payment_method, lang\)/)
+  assert.match(audit, /beforeLabel=\{l\.before\}/)
+})
+
 test('AdminSettings does not expose obsolete cashback percent setting', () => {
   const settings = readSource('src/pages/AdminSettings.jsx')
   const reducerDefaults = readSource('src/store/reducerHelpers.js')
@@ -419,6 +485,15 @@ test('AdminSettings does not expose obsolete cashback percent setting', () => {
   assert.doesNotMatch(reducerDefaults, /cashbackPercent/)
   assert.doesNotMatch(db, /settings\.cashbackPercent/)
   assert.doesNotMatch(db, /cashback_percent:\s*Number\.isFinite\(Number\(settings\.cashbackPercent\)\)/)
+})
+
+test('AdminSettings does not expose receipt footer editing', () => {
+  const settings = readSource('src/pages/AdminSettings.jsx')
+
+  assert.doesNotMatch(settings, /Receipt Footer/)
+  assert.doesNotMatch(settings, /receiptFooterL/)
+  assert.doesNotMatch(settings, /setReceiptFooter/)
+  assert.doesNotMatch(settings, /payload: \{ restaurantName, serviceRate, receiptFooter, autoPrint \}/)
 })
 
 test('cashier payment waits for database success and supports legacy loyalty transaction constraints', () => {

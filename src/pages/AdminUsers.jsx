@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../store/AppContext'
-import { getAllProfiles, updateProfile } from '../lib/supabase'
+import { deleteProfile, getAllProfiles, updateProfile } from '../lib/supabase'
 import AppShell from '../components/AppShell'
 import StatusBadge from '../components/StatusBadge'
-import { canEditTeamMember, assignableRoles } from '../lib/permissions'
-import { Search, RefreshCw, UserCircle2, Loader2, Eye } from 'lucide-react'
+import { canDeleteTeamMember, canEditTeamMember, assignableRoles } from '../lib/permissions'
+import { Search, RefreshCw, UserCircle2, Loader2, Eye, Trash2, X, Check } from 'lucide-react'
 
 const ROLES    = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder', 'guest']
 const STATUSES = ['pending', 'active', 'disabled']
@@ -47,6 +47,13 @@ const L = {
     status:      'Holat',
     role:        'Lavozim',
     accountStatus: 'Hisob holati',
+    actions:     'Amallar',
+    delete:      'O‘chirish',
+    confirmDelete: 'Tasdiqlash',
+    cancel:      'Bekor qilish',
+    deleteHint:  'Foydalanuvchi profili o‘chiriladi. Eski buyurtmalardagi ismlar saqlanadi.',
+    deleteError: 'Foydalanuvchini o‘chirib bo‘lmadi',
+    deleted:     'Foydalanuvchi o‘chirildi',
     noUsers:     'Foydalanuvchilar topilmadi',
     you:         '(siz)',
     members:     n => `${n} ta a'zo`,
@@ -61,6 +68,13 @@ const L = {
     status:      'Статус',
     role:        'Роль',
     accountStatus: 'Статус аккаунта',
+    actions:     'Действия',
+    delete:      'Удалить',
+    confirmDelete: 'Подтвердить',
+    cancel:      'Отмена',
+    deleteHint:  'Профиль пользователя будет удалён. Имена в старых заказах сохранятся.',
+    deleteError: 'Не удалось удалить пользователя',
+    deleted:     'Пользователь удалён',
     noUsers:     'Пользователи не найдены',
     you:         '(вы)',
     members:     n => `${n} участников`,
@@ -75,6 +89,13 @@ const L = {
     status:      'Status',
     role:        'Role',
     accountStatus: 'Account Status',
+    actions:     'Actions',
+    delete:      'Delete',
+    confirmDelete: 'Confirm',
+    cancel:      'Cancel',
+    deleteHint:  'This removes the user profile. Names already stored on old orders stay preserved.',
+    deleteError: 'Could not delete user',
+    deleted:     'User deleted',
     noUsers:     'No users found',
     you:         '(you)',
     members:     n => `${n} member${n !== 1 ? 's' : ''}`,
@@ -97,6 +118,9 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter]     = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [saving, setSaving]             = useState(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [deleting, setDeleting]         = useState(null)
+  const [notice, setNotice]             = useState(null)
 
   async function loadUsers() {
     setLoading(true)
@@ -121,6 +145,22 @@ export default function AdminUsers() {
     setSaving(null)
   }
 
+  async function handleDelete(user) {
+    if (!canDeleteTeamMember(myRole, user.role, user.id === myProfile?.id)) return
+    setDeleting(user.id)
+    setNotice(null)
+    const { error } = await deleteProfile(user.id)
+    if (error) {
+      setNotice({ tone: 'error', message: error.message || l.deleteError })
+      setDeleting(null)
+      return
+    }
+    setUsers(list => list.filter(row => row.id !== user.id))
+    setConfirmDeleteId(null)
+    setDeleting(null)
+    setNotice({ tone: 'success', message: l.deleted })
+  }
+
   const filtered = users.filter(u => {
     const matchSearch = !search ||
       u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -143,6 +183,16 @@ export default function AdminUsers() {
                : lang === 'ru' ? 'Только просмотр — изменение ролей недоступно.'
                : 'View-only access — you cannot change roles or account statuses.'}
             </span>
+          </div>
+        )}
+
+        {notice && (
+          <div className={`mb-4 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+            notice.tone === 'error'
+              ? 'border-red-100 bg-red-50 text-red-700'
+              : 'border-green-100 bg-green-50 text-green-700'
+          }`}>
+            {notice.message}
           </div>
         )}
 
@@ -203,12 +253,12 @@ export default function AdminUsers() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             {/* Table header */}
-            <div className="hidden sm:grid grid-cols-[1fr_120px_140px_140px_40px] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100">
+            <div className="hidden sm:grid grid-cols-[1fr_120px_140px_140px_150px] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{l.nameEmail}</p>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{l.status}</p>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{l.role}</p>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{l.accountStatus}</p>
-              <div />
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{l.actions}</p>
             </div>
 
             {/* Rows */}
@@ -218,13 +268,16 @@ export default function AdminUsers() {
                 const isSaving   = saving === user.id
                 // Can this viewer edit this specific user's role/status?
                 const canEdit    = !isMe && canEditTeamMember(myRole, user.role)
+                const canDelete  = canDeleteTeamMember(myRole, user.role, isMe)
+                const isDeleting = deleting === user.id
+                const isConfirmingDelete = confirmDeleteId === user.id
                 const roleLabel  = (ROLE_LABELS[user.role]?.[lang] || ROLE_LABELS[user.role]?.en) ?? user.role
                 const statusLabel = (STATUS_LABELS[user.status]?.[lang] || STATUS_LABELS[user.status]?.en) ?? user.status
 
                 return (
                   <div
                     key={user.id}
-                    className={`grid grid-cols-1 sm:grid-cols-[1fr_120px_140px_140px_40px] gap-3 sm:gap-4 items-center px-5 py-4 transition-colors ${
+                    className={`grid grid-cols-1 sm:grid-cols-[1fr_120px_140px_140px_150px] gap-3 sm:gap-4 items-center px-5 py-4 transition-colors ${
                       isSaving ? 'bg-orange-50/50' : 'hover:bg-gray-50/50'
                     }`}
                   >
@@ -294,10 +347,53 @@ export default function AdminUsers() {
                       </span>
                     )}
 
-                    {/* Loading indicator */}
-                    <div className="flex items-center justify-center">
+                    {/* Actions */}
+                    <div className="flex items-center justify-start gap-2">
                       {isSaving && <Loader2 size={15} className="animate-spin text-[#ff5a00]" />}
+                      {canDelete && !isConfirmingDelete && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmDeleteId(user.id)
+                            setNotice(null)
+                          }}
+                          disabled={isDeleting}
+                          title={l.delete}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          <span className="sm:hidden lg:inline">{l.delete}</span>
+                        </button>
+                      )}
+                      {canDelete && isConfirmingDelete && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(user)}
+                            disabled={isDeleting}
+                            title={l.confirmDelete}
+                            className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-600 px-2.5 py-2 text-xs font-black text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                            {l.confirmDelete}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            disabled={isDeleting}
+                            title={l.cancel}
+                            className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-xs font-black text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
+                    {canDelete && isConfirmingDelete && (
+                      <p className="sm:col-start-5 text-xs font-medium leading-snug text-red-500">
+                        {l.deleteHint}
+                      </p>
+                    )}
                   </div>
                 )
               })}

@@ -23,7 +23,7 @@ import {
   removeSentCartItems,
   validateLoyaltyRedeemAmount,
 } from '../src/lib/analytics.js'
-import { defaultPath, isPublicOnlyRole } from '../src/lib/permissions.js'
+import { canDeleteTeamMember, defaultPath, isPublicOnlyRole } from '../src/lib/permissions.js'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../src/lib/menuItems.js'
 
 const screenshotItems = [
@@ -46,6 +46,18 @@ test('signed-in internal roles resolve to workspace routes while guest stays pub
   assert.equal(defaultPath('waiter'), '/waiter/tables')
   assert.equal(defaultPath('kitchen'), '/kitchen')
   assert.equal(defaultPath('guest'), '/menu')
+})
+
+test('only owner can delete non-protected team profiles and cannot delete self', () => {
+  assert.equal(canDeleteTeamMember('owner', 'waiter'), true)
+  assert.equal(canDeleteTeamMember('owner', 'cashier'), true)
+  assert.equal(canDeleteTeamMember('owner', 'admin'), true)
+  assert.equal(canDeleteTeamMember('owner', 'guest'), true)
+  assert.equal(canDeleteTeamMember('owner', 'owner'), false)
+  assert.equal(canDeleteTeamMember('owner', 'stakeholder'), false)
+  assert.equal(canDeleteTeamMember('owner', 'waiter', true), false)
+  assert.equal(canDeleteTeamMember('admin', 'waiter'), false)
+  assert.equal(canDeleteTeamMember('cashier', 'guest'), false)
 })
 
 test('order subtotal is calculated from item rows, not stale stored subtotal', () => {

@@ -66,7 +66,6 @@ export default function AdminSettings() {
 
   const [restaurantName, setRestaurantName] = useState(settings.restaurantName)
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
-  const [receiptFooter,  setReceiptFooter]  = useState(settings.receiptFooter)
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
   const [notifications,  setNotifications]  = useState(true)
   const [saved,          setSaved]          = useState(false)
@@ -79,16 +78,15 @@ export default function AdminSettings() {
   useEffect(() => {
     setRestaurantName(settings.restaurantName)
     setServiceRate(settings.serviceRate)
-    setReceiptFooter(settings.receiptFooter)
     setAutoPrint(settings.autoPrint)
-  }, [settings.restaurantName, settings.serviceRate, settings.receiptFooter, settings.autoPrint])
+  }, [settings.restaurantName, settings.serviceRate, settings.autoPrint])
 
   async function handleSave() {
     setSaving(true)
     setError('')
     const result = await dispatch({
       type: 'SET_SETTINGS',
-      payload: { restaurantName, serviceRate, receiptFooter, autoPrint },
+      payload: { restaurantName, serviceRate, autoPrint },
     })
     setSaving(false)
     if (result?.error) {
@@ -121,8 +119,6 @@ export default function AdminSettings() {
       billing:         'Hisob-kitob',
       serviceCharge:   'Xizmat to\'lovi',
       serviceChargeSub: 'Barcha buyurtmalarga qo\'shiladi',
-      receiptFooterL:  'Chek pastki qismi',
-      receiptFooterSub: 'Chek pastida ko\'rsatiladigan matn',
       system:          'Tizim',
       tableManagement: 'Stollar',
       tableManagementSub: 'Restoran stollari, zonalari va sig‘imini boshqarish',
@@ -171,8 +167,6 @@ export default function AdminSettings() {
       billing:         'Выставление счётов',
       serviceCharge:   'Сервисный сбор',
       serviceChargeSub: 'Добавляется ко всем заказам',
-      receiptFooterL:  'Нижняя часть чека',
-      receiptFooterSub: 'Текст внизу каждого чека',
       system:          'Система',
       tableManagement: 'Столы',
       tableManagementSub: 'Управление столами, зонами и вместимостью',
@@ -221,8 +215,6 @@ export default function AdminSettings() {
       billing:         'Billing',
       serviceCharge:   'Service Charge',
       serviceChargeSub: 'Added to all orders',
-      receiptFooterL:  'Receipt Footer',
-      receiptFooterSub: 'Text shown at the bottom of each receipt',
       system:          'System',
       tableManagement: 'Tables',
       tableManagementSub: 'Manage restaurant tables, zones, and capacity',
@@ -307,14 +299,6 @@ export default function AdminSettings() {
                 ))}
               </div>
             </div>
-          </SettingRow>
-          <SettingRow icon={Printer} label={l.receiptFooterL} sub={l.receiptFooterSub}>
-            <input
-              type="text"
-              value={receiptFooter}
-              onChange={e => setReceiptFooter(e.target.value)}
-              className="w-[200px] border border-[#E5E7EB] rounded-xl px-3 py-2 text-[13px] text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all text-right"
-            />
           </SettingRow>
         </Section>
 

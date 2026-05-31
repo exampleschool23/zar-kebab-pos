@@ -11,6 +11,7 @@ import {
   getOrderPaymentSummary,
   getOrderTotal,
   groupOrdersBySession,
+  isCancelledOrderItem,
   isPaidOrder,
   matchesRange,
   normalizeServiceRatePct,
@@ -617,7 +618,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
 
   if (!order) return null
 
-  const items    = fetchedItems || getOrderItems(order)
+  const items    = (fetchedItems || getOrderItems(order)).filter(item => !isCancelledOrderItem(item))
   const payment = getOrderPaymentSummary(order, items, serviceRatePct)
   const subtotal = payment.subtotal
   const loyaltyUsed = payment.loyaltyUsedAmount || payment.discountAmount

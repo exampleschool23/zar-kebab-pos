@@ -659,7 +659,9 @@ export async function writeToSupabase(action, state) {
 
     case 'UPDATE_ORDER_ITEM_STATUS': {
       const { orderId, orderItemId, menuItemId, status } = action.payload
-      let query = supabase.from('order_items').update({ status }).eq('order_id', orderId)
+      let query = status === 'cancelled'
+        ? supabase.from('order_items').delete().eq('order_id', orderId)
+        : supabase.from('order_items').update({ status }).eq('order_id', orderId)
       query = orderItemId ? query.eq('id', orderItemId) : query.eq('menu_item_id', menuItemId)
       const { error } = await query
       if (error) throw error

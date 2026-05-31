@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Search, BadgeDollarSign, Plus, Ban, RefreshCw, ChevronRight, ArrowLeft } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { supabase } from '../lib/supabase'
@@ -20,6 +20,10 @@ import {
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 
+const CARD_PAGE_SIZE = 20
+const CARD_SELECT_COLUMNS = 'id, card_number, public_token, customer_name, phone_number, cashback_type, balance, total_earned, total_redeemed, is_active, created_at, updated_at'
+const TRANSACTION_SELECT_COLUMNS = 'id, loyalty_card_id, order_id, type, amount, balance_before, balance_after, reason, created_by, cashback_percent_used, card_type_at_transaction, created_at'
+
 export default function AdminLoyalty() {
   const { state } = useApp()
   const { profile } = useAuth()
@@ -38,12 +42,19 @@ export default function AdminLoyalty() {
   const [adjustment, setAdjustment] = useState({ amount: '', reason: '' })
   const [message, setMessage] = useState('')
   const [supportsCashbackType, setSupportsCashbackType] = useState(true)
+  const [loadingCards, setLoadingCards] = useState(false)
+  const [cardPage, setCardPage] = useState(0)
+  const [hasMoreCards, setHasMoreCards] = useState(false)
+  const cardSearchRequestRef = useRef(0)
 
   const L = {
     uz: {
       title: 'Sodiqlik kartalari',
       subtitle: 'Cashback hamyon balanslari va tranzaksiya tarixi',
       refresh: 'Yangilash',
+      loadMore: 'Yana yuklash',
+      loading: 'Yuklanmoqda...',
+      noCards: 'Sodiqlik kartalari topilmadi',
       detailsTitle: 'Sodiqlik kartasi tafsilotlari',
       back: 'Orqaga',
       createTitle: 'Sodiqlik kartasini yaratish',
@@ -103,6 +114,9 @@ export default function AdminLoyalty() {
       title: 'Карты лояльности',
       subtitle: 'Балансы кешбэк-кошельков и история транзакций',
       refresh: 'Обновить',
+      loadMore: 'Загрузить ещё',
+      loading: 'Загрузка...',
+      noCards: 'Карты лояльности не найдены',
       detailsTitle: 'Детали карты лояльности',
       back: 'Назад',
       createTitle: 'Создать карту лояльности',
@@ -162,6 +176,9 @@ export default function AdminLoyalty() {
       title: 'Loyalty Cards',
       subtitle: 'Cashback wallet balances and transaction history',
       refresh: 'Refresh',
+      loadMore: 'Load more',
+      loading: 'Loading...',
+      noCards: 'No loyalty cards found',
       detailsTitle: 'Loyalty card details',
       back: 'Back',
       createTitle: 'Create loyalty card',
@@ -279,18 +296,27 @@ export default function AdminLoyalty() {
     return `${label} ${l.cashbackMeta} ${percent}%`
   }
 
-  async function searchCards(term = query) {
+  async function searchCards(term = query, { reset = true } = {}) {
+    const requestId = cardSearchRequestRef.current + 1
+    cardSearchRequestRef.current = requestId
     setMessage('')
+    setLoadingCards(true)
+    const nextPage = reset ? 0 : cardPage + 1
+    const from = nextPage * CARD_PAGE_SIZE
+    const to = from + CARD_PAGE_SIZE - 1
     let request = supabase
       .from('loyalty_cards')
-      .select('*')
+      .select(CARD_SELECT_COLUMNS)
       .order('updated_at', { ascending: false })
-      .limit(25)
+      .range(from, to)
     const trimmed = term.trim()
     if (trimmed) {
-      request = request.or(`card_number.ilike.%${trimmed}%,customer_name.ilike.%${trimmed}%,phone_number.ilike.%${trimmed}%`)
+      const safeTerm = trimmed.replace(/[%,]/g, '')
+      request = request.or(`card_number.ilike.%${safeTerm}%,customer_name.ilike.%${safeTerm}%,phone_number.ilike.%${safeTerm}%`)
     }
     const { data, error } = await request
+    if (requestId !== cardSearchRequestRef.current) return
+    setLoadingCards(false)
     if (error) {
       setMessage(error.message)
       return
@@ -298,7 +324,9 @@ export default function AdminLoyalty() {
     if ((data || []).some(card => !Object.prototype.hasOwnProperty.call(card, 'cashback_type'))) {
       setSupportsCashbackType(false)
     }
-    setCards(data || [])
+    setCards(prev => reset ? (data || []) : [...prev, ...(data || [])])
+    setCardPage(nextPage)
+    setHasMoreCards((data || []).length === CARD_PAGE_SIZE)
   }
 
   async function loadTransactions(card) {
@@ -309,7 +337,7 @@ export default function AdminLoyalty() {
     })
     const { data, error } = await supabase
       .from('loyalty_transactions')
-      .select('*')
+      .select(TRANSACTION_SELECT_COLUMNS)
       .eq('loyalty_card_id', card.id)
       .order('created_at', { ascending: false })
       .limit(50)
@@ -348,14 +376,14 @@ export default function AdminLoyalty() {
     let { data, error } = await supabase
       .from('loyalty_cards')
       .insert(insertRecord)
-      .select('*')
+      .select(CARD_SELECT_COLUMNS)
       .single()
     if (error && isMissingLoyaltySchemaColumn(error, 'cashback_type')) {
       setSupportsCashbackType(false)
       ;({ data, error } = await supabase
         .from('loyalty_cards')
         .insert(legacyCardRecord)
-        .select('*')
+        .select(CARD_SELECT_COLUMNS)
         .single())
     }
     if (error) {
@@ -376,7 +404,7 @@ export default function AdminLoyalty() {
       .from('loyalty_cards')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', card.id)
-      .select('*')
+      .select(CARD_SELECT_COLUMNS)
       .single()
     if (error) {
       setMessage(error.message)
@@ -414,7 +442,7 @@ export default function AdminLoyalty() {
         updated_at: next.updated_at,
       })
       .eq('id', selected.id)
-      .select('*')
+      .select(CARD_SELECT_COLUMNS)
       .single()
     if (error) {
       setMessage(error.message)
@@ -454,7 +482,7 @@ export default function AdminLoyalty() {
         updated_at: settlement.card.updated_at,
       })
       .eq('id', selected.id)
-      .select('*')
+      .select(CARD_SELECT_COLUMNS)
       .single()
     if (error) {
       setMessage(error.message)
@@ -467,8 +495,11 @@ export default function AdminLoyalty() {
   }
 
   useEffect(() => {
-    searchCards('')
-  }, [])
+    const timer = setTimeout(() => {
+      searchCards(query, { reset: true })
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [query])
 
   return (
     <AppShell title={selected ? l.detailsTitle : l.title}>
@@ -478,8 +509,8 @@ export default function AdminLoyalty() {
             <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
             <p className="text-sm font-semibold text-[#6B7280]">{l.subtitle}</p>
           </div>
-          <button onClick={() => searchCards()} className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-black text-[#1F2937]">
-            <RefreshCw size={15} /> {l.refresh}
+          <button onClick={() => searchCards(query, { reset: true })} disabled={loadingCards} className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-black text-[#1F2937] disabled:opacity-60">
+            <RefreshCw size={15} className={loadingCards ? 'animate-spin' : ''} /> {l.refresh}
           </button>
         </div>
 
@@ -505,7 +536,7 @@ export default function AdminLoyalty() {
             <div className="mt-5">
               <div className="mb-3 flex items-center gap-2 rounded-xl border border-[#E5E7EB] px-3 py-2">
                 <Search size={15} className="text-[#9CA3AF]" />
-                <input value={query} onChange={e => { setQuery(e.target.value); searchCards(e.target.value) }} placeholder={l.searchPlaceholder} className="min-w-0 flex-1 text-sm font-semibold outline-none" />
+                <input value={query} onChange={e => setQuery(e.target.value)} placeholder={l.searchPlaceholder} className="min-w-0 flex-1 text-sm font-semibold outline-none" />
               </div>
               <div className="space-y-2">
                 {cards.map(card => (
@@ -523,6 +554,22 @@ export default function AdminLoyalty() {
                     </div>
                   </button>
                 ))}
+                {!loadingCards && cards.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-[#D1D5DB] bg-white p-5 text-center text-sm font-bold text-[#6B7280]">
+                    {l.noCards}
+                  </div>
+                )}
+                {hasMoreCards && (
+                  <button
+                    type="button"
+                    onClick={() => searchCards(query, { reset: false })}
+                    disabled={loadingCards}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-sm font-black text-[#1F2937] disabled:opacity-60"
+                  >
+                    <RefreshCw size={14} className={loadingCards ? 'animate-spin' : ''} />
+                    {loadingCards ? l.loading : l.loadMore}
+                  </button>
+                )}
               </div>
             </div>
           </section>

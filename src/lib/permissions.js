@@ -40,6 +40,19 @@ export function canEditTeamMember(viewerRole, targetRole) {
   return false
 }
 
+/**
+ * Returns whether `viewerRole` can permanently remove a profile row.
+ * Historical orders keep denormalized names such as waiter_name, so profile deletion
+ * must not cascade into order/report records.
+ */
+export function canDeleteTeamMember(viewerRole, targetRole, isSelf = false) {
+  const viewer = (viewerRole || '').toLowerCase()
+  const target = (targetRole || '').toLowerCase()
+  if (isSelf) return false
+  if (viewer !== 'owner') return false
+  return !['owner', 'stakeholder'].includes(target)
+}
+
 /** Roles the viewer is allowed to assign. Owner can assign any role; admin cannot assign owner. */
 export function assignableRoles(viewerRole) {
   const all = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder', 'guest']

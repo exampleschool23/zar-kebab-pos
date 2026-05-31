@@ -37,6 +37,14 @@ export async function updateProfile(userId, updates) {
   return { data, error }
 }
 
+export async function deleteProfile(userId) {
+  const { error } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', userId)
+  return { error }
+}
+
 export async function getAllProfiles() {
   const { data, error } = await supabase
     .from('profiles')

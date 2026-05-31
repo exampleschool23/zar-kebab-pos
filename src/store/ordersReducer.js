@@ -87,11 +87,10 @@ export function ordersReducer(state, action) {
       let removedOrder = null
       const orders = state.orders.flatMap(o => {
         if (o.id !== orderId) return [o]
-        const nextItems = o.items.map(i =>
-          (orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId)
-            ? { ...i, status }
-            : i
-        )
+        const matchesItem = i => orderItemId ? i.id === orderItemId : i.menu_item_id === menuItemId
+        const nextItems = status === 'cancelled'
+          ? o.items.filter(i => !matchesItem(i))
+          : o.items.map(i => matchesItem(i) ? { ...i, status } : i)
         const nextOrder = recalcOrderTotals({ ...o, items: nextItems }, state.settings)
         const billableItems = nextItems.filter(item => !isCancelledOrderItem(item))
         const shouldRemove = billableItems.length === 0 || getOrderPaymentSummary(nextOrder, nextItems, nextOrder.service_rate_pct).total <= 0

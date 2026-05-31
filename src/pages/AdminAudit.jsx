@@ -5,11 +5,12 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../lib/formatCurrency'
 
-function fmtDate(value) {
+function fmtDate(value, lang = 'ru') {
   if (!value) return '—'
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('ru-RU', {
+  const locale = lang === 'uz' ? 'uz-UZ' : lang === 'en' ? 'en-US' : 'ru-RU'
+  return d.toLocaleString(locale, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -24,8 +25,40 @@ function actionLabel(action, lang) {
     payment_fields_changed: { uz: 'To‘lov summasi o‘zgardi', ru: 'Изменены суммы оплаты', en: 'Payment fields changed' },
     status_changed: { uz: 'Status o‘zgardi', ru: 'Статус изменён', en: 'Status changed' },
     reopen_paid_order: { uz: 'To‘langan buyurtma ochildi', ru: 'Оплаченный заказ открыт', en: 'Paid order reopened' },
+    order_item_deleted: { uz: 'Taom o‘chirildi', ru: 'Блюдо удалено', en: 'Order item deleted' },
+    order_cancelled: { uz: 'Buyurtma bekor qilindi', ru: 'Заказ отменён', en: 'Order cancelled' },
   }
   return labels[action]?.[lang] || action || '—'
+}
+
+function paymentMethodLabel(method, lang) {
+  const labels = {
+    cash: { uz: 'Naqd', ru: 'Наличные', en: 'Cash' },
+    card: { uz: 'Karta', ru: 'Карта', en: 'Card' },
+    terminal: { uz: 'Terminal', ru: 'Терминал', en: 'Terminal' },
+    qr: { uz: 'QR kod', ru: 'QR-код', en: 'QR Code' },
+    qr_code: { uz: 'QR kod', ru: 'QR-код', en: 'QR Code' },
+    loyalty: { uz: 'Sodiqlik balansi', ru: 'Баланс лояльности', en: 'Loyalty balance' },
+    split: { uz: 'Bo‘lingan to‘lov', ru: 'Раздельная оплата', en: 'Split payment' },
+  }
+  if (!method) return '—'
+  return labels[method]?.[lang] || method
+}
+
+function statusLabel(status, lang) {
+  const labels = {
+    active: { uz: 'Faol', ru: 'Активен', en: 'Active' },
+    preparing: { uz: 'Tayyorlanmoqda', ru: 'Готовится', en: 'Preparing' },
+    ready: { uz: 'Tayyor', ru: 'Готов', en: 'Ready' },
+    served: { uz: 'Berildi', ru: 'Подано', en: 'Served' },
+    needs_bill: { uz: 'Hisob kerak', ru: 'Нужен счёт', en: 'Needs bill' },
+    paid: { uz: 'To‘landi', ru: 'Оплачен', en: 'Paid' },
+    cancelled: { uz: 'Bekor qilingan', ru: 'Отменён', en: 'Cancelled' },
+    unpaid: { uz: 'To‘lanmagan', ru: 'Не оплачен', en: 'Unpaid' },
+    pending: { uz: 'Kutilmoqda', ru: 'Ожидает', en: 'Pending' },
+  }
+  if (!status) return '—'
+  return labels[status]?.[lang] || status
 }
 
 export default function AdminAudit() {
@@ -53,6 +86,8 @@ export default function AdminAudit() {
       method: 'To‘lov',
       status: 'Status',
       time: 'Vaqt',
+      before: 'Oldin',
+      after: 'Keyin',
       filters: 'Filtrlar',
       searchPlaceholder: 'Buyurtma, foydalanuvchi yoki amal...',
       allActions: 'Barcha amallar',
@@ -73,6 +108,8 @@ export default function AdminAudit() {
       method: 'Оплата',
       status: 'Статус',
       time: 'Время',
+      before: 'Было',
+      after: 'Стало',
       filters: 'Фильтры',
       searchPlaceholder: 'Заказ, пользователь или действие...',
       allActions: 'Все действия',
@@ -93,6 +130,8 @@ export default function AdminAudit() {
       method: 'Payment',
       status: 'Status',
       time: 'Time',
+      before: 'Before',
+      after: 'After',
       filters: 'Filters',
       searchPlaceholder: 'Order, user, or action...',
       allActions: 'All actions',
@@ -197,14 +236,14 @@ export default function AdminAudit() {
         </div>
 
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-3 xl:grid-cols-6">
-          <AuditValue label={l.total} oldValue={formatCurrency(row.old_total || 0)} newValue={formatCurrency(row.new_total || 0)} />
-          <AuditValue label={l.service} oldValue={formatCurrency(row.old_service_fee || 0)} newValue={formatCurrency(row.new_service_fee || 0)} />
-          <AuditValue label={l.discount} oldValue={formatCurrency(row.old_discount_amount || 0)} newValue={formatCurrency(row.new_discount_amount || 0)} />
-          <AuditValue label={l.method} oldValue={row.old_payment_method || '—'} newValue={row.new_payment_method || '—'} />
-          <AuditValue label={l.status} oldValue={`${row.old_status || '—'} / ${row.old_payment_status || '—'}`} newValue={`${row.new_status || '—'} / ${row.new_payment_status || '—'}`} />
+          <AuditValue label={l.total} oldValue={formatCurrency(row.old_total || 0)} newValue={formatCurrency(row.new_total || 0)} beforeLabel={l.before} afterLabel={l.after} />
+          <AuditValue label={l.service} oldValue={formatCurrency(row.old_service_fee || 0)} newValue={formatCurrency(row.new_service_fee || 0)} beforeLabel={l.before} afterLabel={l.after} />
+          <AuditValue label={l.discount} oldValue={formatCurrency(row.old_discount_amount || 0)} newValue={formatCurrency(row.new_discount_amount || 0)} beforeLabel={l.before} afterLabel={l.after} />
+          <AuditValue label={l.method} oldValue={paymentMethodLabel(row.old_payment_method, lang)} newValue={paymentMethodLabel(row.new_payment_method, lang)} beforeLabel={l.before} afterLabel={l.after} />
+          <AuditValue label={l.status} oldValue={`${statusLabel(row.old_status, lang)} / ${statusLabel(row.old_payment_status, lang)}`} newValue={`${statusLabel(row.new_status, lang)} / ${statusLabel(row.new_payment_status, lang)}`} beforeLabel={l.before} afterLabel={l.after} />
           <div>
             <p className="text-[11px] font-black uppercase tracking-widest text-[#9CA3AF]">{l.time}</p>
-            <p className="mt-1 font-semibold text-[#1F2937]">{fmtDate(row.changed_at)}</p>
+            <p className="mt-1 font-semibold text-[#1F2937]">{fmtDate(row.changed_at, lang)}</p>
           </div>
         </div>
       </div>
@@ -251,7 +290,7 @@ export default function AdminAudit() {
               className="h-10 rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-bold text-[#1F2937] outline-none transition-all focus:border-[#ff5a00]"
             >
               <option value="all">{l.allStatuses}</option>
-              {statuses.map(status => <option key={status} value={status}>{status}</option>)}
+              {statuses.map(status => <option key={status} value={status}>{statusLabel(status, lang)}</option>)}
             </select>
           </div>
         </div>
@@ -261,12 +300,12 @@ export default function AdminAudit() {
   )
 }
 
-function AuditValue({ label, oldValue, newValue }) {
+function AuditValue({ label, oldValue, newValue, beforeLabel = '', afterLabel = '' }) {
   return (
     <div>
       <p className="text-[11px] font-black uppercase tracking-widest text-[#9CA3AF]">{label}</p>
-      <p className="mt-1 truncate text-[#64748B]">{oldValue}</p>
-      <p className="truncate font-black text-[#1F2937]">{newValue}</p>
+      <p className="mt-1 truncate text-[#64748B]">{beforeLabel ? `${beforeLabel}: ` : ''}{oldValue}</p>
+      <p className="truncate font-black text-[#1F2937]">{afterLabel ? `${afterLabel}: ` : ''}{newValue}</p>
     </div>
   )
 }
