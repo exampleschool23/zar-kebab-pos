@@ -618,3 +618,30 @@ test('AdminTables localizes visible management labels', () => {
   assert.doesNotMatch(source, />Add table</)
   assert.doesNotMatch(source, />Zones</)
 })
+
+test('starter cafe menu expansion seeds polished categories and items', () => {
+  const migration = readSource('supabase/030_starter_cafe_menu_expansion.sql')
+  const mockData = readSource('src/data/mockData.js')
+
+  for (const category of ['combos', 'sides', 'desserts']) {
+    assert.match(migration, new RegExp(`'${category}'`))
+    assert.match(mockData, new RegExp(`id: '${category}'`))
+  }
+
+  for (const item of [
+    'zk_mixed_grill',
+    'zk_family_grill_set',
+    'zk_takeaway_box',
+    'zk_shorva',
+    'zk_plov',
+    'zk_qurutob',
+    'zk_fries',
+    'zk_ayran',
+    'zk_baklava',
+  ]) {
+    assert.match(migration, new RegExp(`'${item}'`))
+    assert.match(mockData, new RegExp(`id: '${item}'`))
+  }
+
+  assert.match(migration, /on conflict \(id\) do nothing/)
+})
