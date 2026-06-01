@@ -54,6 +54,10 @@ function unavailableLabel(lang) {
   return lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Нет в наличии' : 'Unavailable'
 }
 
+function unavailableReasonPlaceholder(lang) {
+  return lang === 'uz' ? 'Sabab: mahsulot tugadi...' : lang === 'ru' ? 'Причина: закончилось...' : 'Reason: sold out...'
+}
+
 // ── Sidebar ────────────────────────────────────────────────────────────────────
 // ── Header ─────────────────────────────────────────────────────────────────────
 function KitchenHeader({
@@ -186,6 +190,9 @@ function getOrderType(item) {
 // ── Kitchen item row ───────────────────────────────────────────────────────────
 function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) {
   const [flash,   setFlash]   = useState(false)  // card highlight on status change
+  const [showCancel, setShowCancel] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [markMenuUnavailable, setMarkMenuUnavailable] = useState(true)
   const prevStatus = useRef(item.status)
 
   // Flash the card whenever status changes (driven by parent state update)
@@ -198,10 +205,15 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
     }
   }, [item.status])
 
-  async function handleMark(nextStatus) {
+  async function handleMark(nextStatus, details = {}) {
     if (pending) return
     // Use item._orderId (real order) when items are merged across orders
-    await onMark(orderId, item, nextStatus, item._orderId || orderId)
+    await onMark(orderId, item, nextStatus, item._orderId || orderId, details)
+  }
+
+  async function handleUnavailable() {
+    const reason = cancelReason.trim() || unavailableLabel(lang)
+    await handleMark('cancelled', { reason, markMenuUnavailable })
   }
 
   const isNew       = item.status === 'new'
@@ -276,16 +288,7 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
               {pending ? <Spinner /> : null}
               {statusLabel('preparing', lang)}
             </button>
-            <button
-              type="button"
-              onClick={() => handleMark('cancelled')}
-              disabled={pending}
-              title={unavailableLabel(lang)}
-              aria-label={unavailableLabel(lang)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <XCircle size={18} />
-            </button>
+            <UnavailableButton lang={lang} pending={pending} onClick={() => setShowCancel(value => !value)} />
           </div>
         )}
 
@@ -303,15 +306,29 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
               {pending ? <Spinner color="text-blue-500" /> : null}
               {statusLabel('ready', lang)}
             </button>
+            <UnavailableButton lang={lang} pending={pending} onClick={() => setShowCancel(value => !value)} />
+          </div>
+        )}
+
+        {showCancel && (isNew || isPreparing) && (
+          <div className="mt-2 rounded-xl border border-red-100 bg-red-50 p-2">
+            <input
+              value={cancelReason}
+              onChange={event => setCancelReason(event.target.value)}
+              placeholder={unavailableReasonPlaceholder(lang)}
+              className="mb-2 w-full rounded-lg border border-red-100 bg-white px-2 py-1.5 text-xs font-semibold outline-none"
+            />
+            <label className="mb-2 flex items-center gap-2 text-[11px] font-bold text-red-700">
+              <input type="checkbox" checked={markMenuUnavailable} onChange={event => setMarkMenuUnavailable(event.target.checked)} />
+              {lang === 'uz' ? 'Menyuda ham mavjud emas qilish' : lang === 'ru' ? 'Также скрыть из меню' : 'Also mark unavailable in menu'}
+            </label>
             <button
               type="button"
-              onClick={() => handleMark('cancelled')}
+              onClick={handleUnavailable}
               disabled={pending}
-              title={unavailableLabel(lang)}
-              aria-label={unavailableLabel(lang)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg bg-red-600 px-3 py-2 text-xs font-black text-white disabled:opacity-60"
             >
-              <XCircle size={18} />
+              {unavailableLabel(lang)}
             </button>
           </div>
         )}
@@ -329,6 +346,21 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
         )}
       </div>
     </div>
+  )
+}
+
+function UnavailableButton({ lang, pending, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      title={unavailableLabel(lang)}
+      aria-label={unavailableLabel(lang)}
+      className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-all hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <XCircle size={18} />
+    </button>
   )
 }
 
@@ -736,7 +768,7 @@ export default function Kitchen() {
     return Object.values(grouped).filter(order => order.items.length > 0)
   }, [state.orders])
 
-  const markItem = useCallback(async (cardOrderId, item, status, realOrderId) => {
+  const markItem = useCallback(async (cardOrderId, item, status, realOrderId, details = {}) => {
     const itemId = kitchenItemKey(cardOrderId, item)
     if (pendingIdsRef.current.has(itemId)) return
 
@@ -761,6 +793,8 @@ export default function Kitchen() {
           orderItemId: item.id,
           menuItemId: item.menu_item_id,
           status,
+          reason: details.reason || '',
+          markMenuUnavailable: !!details.markMenuUnavailable,
         },
       })
       if (result?.error) throw result.error

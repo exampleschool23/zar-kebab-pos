@@ -54,6 +54,10 @@ function healthMessage(check, labels) {
   return check.detail || labels.healthUnknownError
 }
 
+function healthHint(check) {
+  return check.hint || ''
+}
+
 function healthCheckName(check, labels) {
   return labels.healthNames?.[check.name] || check.name
 }
@@ -377,6 +381,9 @@ export default function AdminSettings() {
                     <div key={`${check.type}-${check.name}`} className="rounded-xl bg-white px-3 py-2 text-xs">
                       <p className="font-black text-[#1F2937]">{healthCheckName(check, l)}</p>
                       <p className={check.ok ? 'font-bold text-emerald-600' : 'font-bold text-red-600'}>{healthMessage(check, l)}</p>
+                      {!check.ok && healthHint(check) && (
+                        <p className="mt-1 font-mono text-[11px] font-bold text-[#6B7280]">{healthHint(check)}</p>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -58,6 +58,11 @@ test('database health reports the actual missing schema-cache column', async () 
 test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)
-  assert.deepEqual(result.failed.map(check => check.name).sort(), ['order_payments', 'submit_order_to_kitchen'])
+  assert.deepEqual(result.failed.map(check => check.name).sort(), [
+    'order_payments',
+    'settle_loyalty_wallet_payment',
+    'submit_order_to_kitchen',
+  ])
   assert.equal(result.failed.find(check => check.name === 'order_payments').messageKey, 'rawError')
+  assert.match(result.failed.find(check => check.name === 'settle_loyalty_wallet_payment').hint, /027_atomic_loyalty_wallet_settlement/)
 })

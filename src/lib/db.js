@@ -49,6 +49,16 @@ function isMissingKitchenSubmitRpc(error) {
   )
 }
 
+function isMissingRpc(error, functionName) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (
+    message.includes(String(functionName || '').toLowerCase()) ||
+    message.includes('schema cache') ||
+    message.includes('could not find the function') ||
+    message.includes('function') && message.includes('not found')
+  )
+}
+
 function isMissingTableReservationColumn(error) {
   const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
   return (
@@ -206,21 +216,6 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
   const previousTotalRedeemed = Math.max(0, Math.round(Number(card.total_redeemed ?? 0) || 0))
 
   if (totalRedeemed > 0 || totalCashback > 0) {
-    const { data: updatedCard, error: updateError } = await supabase
-      .from('loyalty_cards')
-      .update({
-        balance: finalBalance,
-        total_earned: previousTotalEarned + totalCashback,
-        total_redeemed: previousTotalRedeemed + totalRedeemed,
-        updated_at: paidAt,
-      })
-      .eq('id', card.id)
-      .eq('balance', balance)
-      .select('id,balance')
-      .maybeSingle()
-    if (updateError) throw updateError
-    if (!updatedCard) throw new Error('Loyalty balance changed. Refresh the card and try again.')
-
     const transactions = []
     let runningBalance = balance
     for (const row of settled) {
@@ -255,6 +250,55 @@ async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, pa
         runningBalance += row.cashbackEarned
       }
     }
+
+    const { error: rpcError } = await supabase.rpc('settle_loyalty_wallet_payment', {
+      payload: {
+        card_id: card.id,
+        card_number: cardNumber,
+        expected_balance: balance,
+        final_balance: finalBalance,
+        total_redeemed: totalRedeemed,
+        total_cashback: totalCashback,
+        cashback_percent: cashbackPercent,
+        card_type: cardType,
+        paid_at: paidAt,
+        transactions,
+      },
+    })
+    if (rpcError && !isMissingRpc(rpcError, 'settle_loyalty_wallet_payment')) throw rpcError
+    if (!rpcError) {
+      return settled.map(row => ({
+        ...row,
+        loyaltyCardNumber: cardNumber,
+        cashbackPercent,
+        loyaltyRollback: {
+          cardId: card.id,
+          orderIds: settled.map(settledRow => settledRow.id),
+          createdAt: paidAt,
+          balanceBefore: balance,
+          totalEarnedBefore: previousTotalEarned,
+          totalRedeemedBefore: previousTotalRedeemed,
+          balanceAfter: finalBalance,
+          updatedAtBefore: card.updated_at || paidAt,
+        },
+      }))
+    }
+
+    const { data: updatedCard, error: updateError } = await supabase
+      .from('loyalty_cards')
+      .update({
+        balance: finalBalance,
+        total_earned: previousTotalEarned + totalCashback,
+        total_redeemed: previousTotalRedeemed + totalRedeemed,
+        updated_at: paidAt,
+      })
+      .eq('id', card.id)
+      .eq('balance', balance)
+      .select('id,balance')
+      .maybeSingle()
+    if (updateError) throw updateError
+    if (!updatedCard) throw new Error('Loyalty balance changed. Refresh the card and try again.')
+
     if (transactions.length > 0) {
       let { error: transactionError } = await supabase
         .from('loyalty_transactions')
@@ -690,7 +734,22 @@ export async function writeToSupabase(action, state) {
     }
 
     case 'UPDATE_ORDER_ITEM_STATUS': {
-      const { orderId, orderItemId, menuItemId, status } = action.payload
+      const { orderId, orderItemId, menuItemId, status, reason, markMenuUnavailable } = action.payload
+      if (status === 'cancelled') {
+        const { error: cancellationError } = await supabase.from('order_item_cancellations').insert({
+          order_id: orderId,
+          order_item_id: orderItemId || null,
+          menu_item_id: menuItemId || null,
+          reason: reason || 'Unavailable',
+          created_at: new Date().toISOString(),
+        })
+        if (cancellationError && !/order_item_cancellations|schema cache|relation/i.test(cancellationError.message || '')) {
+          throw cancellationError
+        }
+        if (markMenuUnavailable && menuItemId) {
+          await supabase.from('menu_items').update({ available: false }).eq('id', menuItemId)
+        }
+      }
       let query = status === 'cancelled'
         ? supabase.from('order_items').delete().eq('order_id', orderId)
         : supabase.from('order_items').update({ status }).eq('order_id', orderId)

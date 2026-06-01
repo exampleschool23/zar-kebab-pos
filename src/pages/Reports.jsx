@@ -27,6 +27,7 @@ import {
   Monitor, QrCode, Banknote, UtensilsCrossed,
   BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle,
 } from 'lucide-react'
+import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -959,13 +960,18 @@ export default function Reports() {
   const kpiItemsSold = filteredForAnalytics.reduce(
     (s, o) => s + getOrderItems(o).reduce((a, i) => a + (Number(i.quantity) || 1), 0), 0
   )
+  const closeout = useMemo(() => getDailyCloseout(state.orders, dateTo), [state.orders, dateTo])
+
+  function exportCloseout() {
+    downloadCsv(`zar-kebab-closeout-${closeout.date}.csv`, closeoutToCsv(closeout))
+  }
 
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Jami daromad', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Общая выручка',  numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Total Revenue',  numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold',allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Jami daromad', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', loyaltyUsed: 'Sodiqlik ishlatildi', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Общая выручка',  numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', loyaltyUsed: 'Использовано лояльности', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Total Revenue',  numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold',allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', loyaltyUsed: 'Loyalty used', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled' },
   }
   const l = L[lang] || L.en
 
@@ -1068,7 +1074,7 @@ export default function Reports() {
                     <option value="all">{l.allWaiters}</option>
                     {uniqueWaiters.map(w => <option key={w} value={w}>{w}</option>)}
                   </select>
-                  <button className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E5E7EB] rounded-xl text-sm font-semibold text-[#6B7280] hover:bg-gray-50 shadow-sm">
+                  <button onClick={exportCloseout} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E5E7EB] rounded-xl text-sm font-semibold text-[#6B7280] hover:bg-gray-50 shadow-sm">
                     <Download size={14} />{l.export}
                   </button>
                 </div>
@@ -1081,6 +1087,28 @@ export default function Reports() {
               <KpiCard icon={ShoppingBag} iconCls="bg-orange-50 text-[#ff5a00]"  label={l.numOrders} value={kpiOrders} />
               <KpiCard icon={BarChart2}   iconCls="bg-blue-50 text-blue-600"     label={l.avgOrder}  value={formatCurrency(kpiAvg)} />
               <KpiCard icon={Package}     iconCls="bg-purple-50 text-purple-600" label={l.itemsSold} value={kpiItemsSold} />
+            </div>
+
+            <div className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-[#1F2937]">{l.closeout}</p>
+                  <p className="text-xs font-semibold text-[#9CA3AF]">{closeout.date}</p>
+                </div>
+                <button onClick={exportCloseout} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-xs font-black text-[#6B7280]">
+                  <Download size={13} className="mr-1 inline" />{l.export}
+                </button>
+              </div>
+              <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <SummaryRow label="Cash" value={formatCurrency(closeout.totals.cash)} />
+                <SummaryRow label="Card" value={formatCurrency(closeout.totals.card)} />
+                <SummaryRow label="Terminal" value={formatCurrency(closeout.totals.terminal)} />
+                <SummaryRow label="QR" value={formatCurrency(closeout.totals.qr)} />
+                <SummaryRow label={l.loyaltyUsed} value={formatCurrency(closeout.loyaltyUsed)} />
+                <SummaryRow label={l.cashbackIssued} value={formatCurrency(closeout.cashbackIssued)} />
+                <SummaryRow label={l.cancelled} value={closeout.cancelledCount} />
+                <SummaryRow label="Variance" value={formatCurrency(closeout.variance)} />
+              </div>
             </div>
 
             {/* Tab bar — scrolls horizontally when tabs don't fit */}

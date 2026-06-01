@@ -144,6 +144,7 @@ export function AppProvider({ children }) {
     let mounted = true
     let hydrateInFlight = false
     let reconnectTimer = null
+    let backOnlineTimer = null
     let lastResumeAt = 0
 
     async function hydratePOSData() {
@@ -177,9 +178,37 @@ export function AppProvider({ children }) {
       if (reconnectTimer) clearTimeout(reconnectTimer)
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null
+        dispatch({
+          type: 'SET_CONNECTION_NOTICE',
+          payload: {
+            tone: 'info',
+            message: stateRef.current.lang === 'ru'
+              ? 'Восстанавливаем соединение...'
+              : stateRef.current.lang === 'uz'
+                ? 'Ulanish tiklanmoqda...'
+                : 'Reconnecting...',
+          },
+        })
         hydratePOSData()
           .then(() => {
             if (mounted) connectRealtime()
+            if (!mounted) return
+            if (backOnlineTimer) clearTimeout(backOnlineTimer)
+            dispatch({
+              type: 'SET_CONNECTION_NOTICE',
+              payload: {
+                tone: 'success',
+                message: stateRef.current.lang === 'ru'
+                  ? 'Соединение восстановлено.'
+                  : stateRef.current.lang === 'uz'
+                    ? 'Ulanish tiklandi.'
+                    : 'Back online.',
+              },
+            })
+            backOnlineTimer = setTimeout(() => {
+              backOnlineTimer = null
+              if (mounted) dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
+            }, 2200)
           })
           .catch(err => {
             console.error('[db] idle recovery failed:', err)
@@ -229,6 +258,7 @@ export function AppProvider({ children }) {
       mounted = false
       recoverFromIdleRef.current = () => {}
       if (reconnectTimer) clearTimeout(reconnectTimer)
+      if (backOnlineTimer) clearTimeout(backOnlineTimer)
       if (typeof window !== 'undefined') {
         window.removeEventListener('online', handleResume)
         window.removeEventListener('focus', handleResume)
@@ -246,7 +276,9 @@ export function AppProvider({ children }) {
         <div className={`fixed top-3 left-1/2 z-[9999] -translate-x-1/2 rounded-xl px-4 py-2 text-sm font-semibold shadow-lg ${
           state.connectionNotice.tone === 'error'
             ? 'bg-red-600 text-white'
-            : 'bg-[#1F2937] text-white'
+            : state.connectionNotice.tone === 'success'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-[#1F2937] text-white'
         }`}>
           {state.connectionNotice.message}
         </div>

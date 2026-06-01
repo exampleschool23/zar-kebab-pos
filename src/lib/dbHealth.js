@@ -13,7 +13,20 @@ const TABLE_CHECKS = [
   { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'sort_order'] },
   { name: 'profiles', columns: ['id', 'role', 'full_name'] },
   { name: 'order_payment_audit', columns: ['id', 'order_id', 'action', 'changed_at'] },
+  { name: 'profile_audit', columns: ['id', 'profile_id', 'action', 'changed_at'] },
 ]
+
+const MIGRATION_HINTS = {
+  order_payments: 'Run supabase/012_split_order_payments.sql',
+  business_settings: 'Run supabase/011_business_settings.sql',
+  table_zones: 'Run supabase/019_table_management.sql',
+  loyalty_cards: 'Run supabase/022_loyalty_cashback_wallet.sql',
+  loyalty_transactions: 'Run supabase/022_loyalty_cashback_wallet.sql',
+  order_payment_audit: 'Run supabase/010_order_payment_audit_and_guards.sql',
+  profile_audit: 'Run supabase/028_profile_role_audit.sql',
+  submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
+  settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
+}
 
 function missingColumnMessage(error) {
   const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`
@@ -40,29 +53,32 @@ async function checkTable(dbClient, check) {
     ok: false,
     messageKey: missingColumn ? 'missingColumn' : 'rawError',
     detail: missingColumn || error.message,
+    hint: MIGRATION_HINTS[check.name] || null,
   }
 }
 
-async function checkKitchenRpc(dbClient) {
-  const { error } = await dbClient.rpc('submit_order_to_kitchen', { payload: {} })
-  if (!error) return { type: 'rpc', name: 'submit_order_to_kitchen', ok: true, messageKey: 'ok' }
+async function checkRpc(dbClient, name) {
+  const { error } = await dbClient.rpc(name, { payload: {} })
+  if (!error) return { type: 'rpc', name, ok: true, messageKey: 'ok' }
   const message = `${error.code || ''} ${error.message || ''} ${error.details || ''}`.toLowerCase()
   const missing = message.includes('could not find the function') ||
-    message.includes('schema cache') && message.includes('submit_order_to_kitchen') ||
+    message.includes('schema cache') && message.includes(name) ||
     message.includes('function') && message.includes('not found')
   return {
     type: 'rpc',
-    name: 'submit_order_to_kitchen',
+    name,
     ok: !missing,
     messageKey: missing ? 'rawError' : 'available',
     detail: missing ? error.message : null,
+    hint: missing ? MIGRATION_HINTS[name] : null,
   }
 }
 
 export async function runDbHealthChecks(dbClient = supabase) {
   const startedAt = new Date().toISOString()
   const checks = await Promise.all(TABLE_CHECKS.map(check => checkTable(dbClient, check)))
-  checks.push(await checkKitchenRpc(dbClient))
+  checks.push(await checkRpc(dbClient, 'submit_order_to_kitchen'))
+  checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))
   const failed = checks.filter(check => !check.ok)
   return {
     ok: failed.length === 0,

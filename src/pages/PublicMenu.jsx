@@ -166,6 +166,9 @@ export default function PublicMenu() {
             <p className="text-xs font-bold uppercase tracking-wider text-[#ff5a00]">
               {lang === 'uz' ? 'Menyu' : lang === 'ru' ? 'Меню' : 'Menu'}
             </p>
+            <p className="hidden text-xs font-semibold text-[#8A94A6] sm:block">
+              {lang === 'uz' ? 'Buyurtma berish uchun ofitsiantga murojaat qiling.' : lang === 'ru' ? 'Для заказа обратитесь к официанту.' : 'Please ask your waiter to order.'}
+            </p>
           </div>
           <LanguageSwitcher />
         </div>
