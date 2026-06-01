@@ -74,17 +74,26 @@ function isMissingTableReservationColumn(error) {
 }
 
 async function updateRestaurantTableStatus(tableId, fields, fallbackFields = null) {
-  let { error } = await supabase
+  let { data, error } = await supabase
     .from('restaurant_tables')
     .update(fields)
     .eq('id', tableId)
+    .select('id')
   if (error && fallbackFields && isMissingTableReservationColumn(error)) {
-    ;({ error } = await supabase
+    ;({ data, error } = await supabase
       .from('restaurant_tables')
       .update(fallbackFields)
-      .eq('id', tableId))
+      .eq('id', tableId)
+      .select('id'))
   }
   if (error) throw error
+  assertUpdatedRows(data, `Table ${tableId} was not updated. Refresh and try again.`)
+}
+
+function assertUpdatedRows(data, message) {
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(message)
+  }
 }
 
 function makeTakeAwayOrderNumber(orderId) {
@@ -817,10 +826,20 @@ export async function writeToSupabase(action, state) {
       if (tableOrdersError) throw tableOrdersError
       if (tableOrders?.length) {
         const ids = tableOrders.map(o => o.id)
-        const { error: ordersError } = await supabase.from('orders').update({ status: 'delivered' }).in('id', ids)
+        const { data: deliveredOrders, error: ordersError } = await supabase
+          .from('orders')
+          .update({ status: 'delivered' })
+          .in('id', ids)
+          .select('id')
         if (ordersError) throw ordersError
-        const { error: itemsError } = await supabase.from('order_items').update({ status: 'served' }).in('order_id', ids)
+        assertUpdatedRows(deliveredOrders, 'Order was not marked served. Refresh and try again.')
+        const { data: servedItems, error: itemsError } = await supabase
+          .from('order_items')
+          .update({ status: 'served' })
+          .in('order_id', ids)
+          .select('id')
         if (itemsError) throw itemsError
+        assertUpdatedRows(servedItems, 'Order items were not marked served. Refresh and try again.')
         await Promise.all(ids.map(id => notifyTelegramOrderStatus(id, 'completed')))
       }
       break
@@ -828,17 +847,15 @@ export async function writeToSupabase(action, state) {
 
     case 'MARK_TABLE_NEEDS_BILL': {
       const tableId = action.payload
-      const { error: ordersError } = await supabase
+      const { data: billOrders, error: ordersError } = await supabase
         .from('orders')
         .update({ status: 'needs_bill' })
         .eq('table_id', tableId)
         .eq('payment_status', 'unpaid')
+        .select('id')
       if (ordersError) throw ordersError
-      const { error: tableError } = await supabase
-        .from('restaurant_tables')
-        .update({ status: 'needs_bill' })
-        .eq('id', tableId)
-      if (tableError) throw tableError
+      assertUpdatedRows(billOrders, 'Order was not moved to bill. Refresh and try again.')
+      await updateRestaurantTableStatus(tableId, { status: 'needs_bill' }, { status: 'needs_bill' })
       break
     }
 
@@ -1067,6 +1084,21 @@ export async function writeToSupabase(action, state) {
           const finalPaymentMethod = getPaymentMethodSummary(normalizedPayments, payment_method)
           const paymentRows = allocateSplitPaymentsToOrders(finalSummaries, normalizedPayments)
 
+          if (!orderId) {
+            await updateRestaurantTableStatus(
+              tableId,
+              {
+                status: 'available',
+                reserved_for_name: '',
+                reserved_for_phone: '',
+                reserved_at: null,
+                reserved_until: null,
+                reservation_notes: '',
+              },
+              { status: 'available' }
+            )
+          }
+
           if (paymentRows.length > 0) {
             const { error: deletePaymentsError } = await supabase
               .from('order_payments')
@@ -1096,7 +1128,11 @@ export async function writeToSupabase(action, state) {
               cashback_percent: o.cashbackPercent,
               payment_method: finalPaymentMethod,
             }
-            let { error: updateError } = await supabase.from('orders').update(updateFields).eq('id', o.id)
+            let { data: paidRows, error: updateError } = await supabase
+              .from('orders')
+              .update(updateFields)
+              .eq('id', o.id)
+              .select('id')
             if (updateError && isMissingLoyaltyColumn(updateError)) {
               const {
                 loyalty_used_amount,
@@ -1106,9 +1142,14 @@ export async function writeToSupabase(action, state) {
                 cashback_percent,
                 ...fallbackFields
               } = updateFields
-              ;({ error: updateError } = await supabase.from('orders').update(fallbackFields).eq('id', o.id))
+              ;({ data: paidRows, error: updateError } = await supabase
+                .from('orders')
+                .update(fallbackFields)
+                .eq('id', o.id)
+                .select('id'))
             }
             if (updateError) throw updateError
+            assertUpdatedRows(paidRows, `Order ${o.id} was not marked paid. Refresh and try again.`)
             await notifyTelegramOrderStatus(o.id, 'completed')
           }
         } catch (error) {
@@ -1117,20 +1158,6 @@ export async function writeToSupabase(action, state) {
         }
       }
 
-      if (!orderId) {
-        await updateRestaurantTableStatus(
-          tableId,
-          {
-            status: 'available',
-            reserved_for_name: '',
-            reserved_for_phone: '',
-            reserved_at: null,
-            reserved_until: null,
-            reservation_notes: '',
-          },
-          { status: 'available' }
-        )
-      }
       break
     }
 

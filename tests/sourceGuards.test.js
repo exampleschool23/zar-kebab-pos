@@ -275,8 +275,9 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(source, /function PaidTodaySummary/)
   assert.match(source, /showPaidToday/)
   assert.doesNotMatch(source, /filteredBills\.map\(order =>/)
-  assert.match(db, /case 'CONFIRM_ORDER_DELIVERED':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*if \(itemsError\) throw itemsError/)
-  assert.match(db, /case 'MARK_TABLE_NEEDS_BILL':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*if \(tableError\) throw tableError/)
+  assert.match(db, /function assertUpdatedRows/)
+  assert.match(db, /case 'CONFIRM_ORDER_DELIVERED':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*assertUpdatedRows\(deliveredOrders[\s\S]*if \(itemsError\) throw itemsError[\s\S]*assertUpdatedRows\(servedItems/)
+  assert.match(db, /case 'MARK_TABLE_NEEDS_BILL':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*assertUpdatedRows\(billOrders[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'needs_bill' \}/)
 })
 
 test('WaiterTables hides disabled tables and links admins to management', () => {
@@ -568,6 +569,7 @@ test('cashier payment waits for database success and supports legacy loyalty tra
   assert.match(appContext, /WRITE_BEFORE_LOCAL_ACTIONS\.has\(enriched\.type\)/)
   assert.match(appContext, /'MARK_ORDER_PAID'/)
   assert.match(db, /mergeOrderItemsByIdentity/)
+  assert.match(db, /case 'MARK_ORDER_PAID':[\s\S]*updateRestaurantTableStatus\([\s\S]*status: 'available'[\s\S]*\.update\(updateFields\)[\s\S]*\.select\('id'\)[\s\S]*assertUpdatedRows\(paidRows/)
   assert.match(db, /isLegacyPositiveTransactionAmountConstraint\(transactionError\)/)
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(transactions\)\)/)
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(legacyTransactions\)\)/)
