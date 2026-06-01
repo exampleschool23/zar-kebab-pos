@@ -277,7 +277,8 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.doesNotMatch(source, /filteredBills\.map\(order =>/)
   assert.match(db, /function assertUpdatedRows/)
   assert.match(db, /case 'CONFIRM_ORDER_DELIVERED':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*assertUpdatedRows\(deliveredOrders[\s\S]*if \(itemsError\) throw itemsError[\s\S]*assertUpdatedRows\(servedItems/)
-  assert.match(db, /case 'MARK_TABLE_NEEDS_BILL':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*assertUpdatedRows\(billOrders[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'needs_bill' \}/)
+  // Bug fix (Jun 2026): uses neq('payment_status','paid') + null fallback so legacy orders are never skipped
+  assert.match(db, /case 'MARK_TABLE_NEEDS_BILL':[\s\S]*\.neq\('payment_status', 'paid'\)[\s\S]*\.is\('payment_status', null\)[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'needs_bill' \}/)
 })
 
 test('WaiterTables hides disabled tables and links admins to management', () => {

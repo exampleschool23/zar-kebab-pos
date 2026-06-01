@@ -128,7 +128,11 @@ export function ordersReducer(state, action) {
       return {
         ...state,
         tables: state.tables.map(t => t.id === action.payload ? { ...t, status: 'needs_bill' } : t),
-        orders: state.orders.map(o => o.table_id === action.payload ? { ...o, status: 'needs_bill' } : o),
+        orders: state.orders.map(o =>
+          o.table_id === action.payload && o.payment_status !== 'paid'
+            ? { ...o, status: 'needs_bill' }
+            : o
+        ),
       }
 
     case 'ADD_QUICK_ITEM_TO_ORDER': {
@@ -254,20 +258,42 @@ export function ordersReducer(state, action) {
       allocateSplitPaymentsToOrders(activeOrderSummaries, payments).forEach(row => {
         paymentAllocations.get(row.order_id)?.push({ method: row.method, amount: row.amount })
       })
+      // IDs of orders being paid in this action
+      const paidOrderIds = new Set(
+        state.orders
+          .filter(o => (orderId ? o.id === orderId : o.table_id === tableId) && o.payment_status !== 'paid')
+          .map(o => o.id)
+      )
+
+      // Reset table to available when it has no remaining unpaid orders after this payment.
+      // For tableId-based payments we reset directly (original behaviour, no table left behind).
+      // For orderId-based payments we must check that no OTHER unpaid orders exist for the same table.
+      const tableResetFields = {
+        status: 'available',
+        reserved_for_name: '',
+        reserved_for_phone: '',
+        reserved_at: null,
+        reserved_until: null,
+        reservation_notes: '',
+      }
+
+      const updatedTables = state.tables.map(t => {
+        if (!orderId) {
+          // tableId-based: reset the one table directly
+          return t.id === tableId ? { ...t, ...tableResetFields } : t
+        }
+        // orderId-based: find out which table the paid order belongs to
+        const paidOrderForTable = state.orders.find(o => paidOrderIds.has(o.id) && o.table_id === t.id)
+        if (!paidOrderForTable) return t
+        const hasOtherUnpaid = state.orders.some(
+          o => o.table_id === t.id && o.payment_status !== 'paid' && !paidOrderIds.has(o.id)
+        )
+        return hasOtherUnpaid ? t : { ...t, ...tableResetFields }
+      })
+
       return {
         ...state,
-        tables: orderId ? state.tables : state.tables.map(t => t.id === tableId
-          ? {
-              ...t,
-              status: 'available',
-              reserved_for_name: '',
-              reserved_for_phone: '',
-              reserved_at: null,
-              reserved_until: null,
-              reservation_notes: '',
-            }
-          : t
-        ),
+        tables: updatedTables,
         orders: state.orders.map(o => {
           if ((orderId ? o.id !== orderId : o.table_id !== tableId) || o.payment_status === 'paid') return o
           const isTakeAway = normalizeOrderType(o.order_type) === 'take_away'

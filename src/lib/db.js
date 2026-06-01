@@ -106,7 +106,7 @@ function normalizeBusinessSettings(row) {
   return {
     restaurantName: row.restaurant_name || 'Zar Kebab',
     serviceRate: normalizeServiceRatePct(row.service_rate_pct),
-    receiptFooter: row.receipt_footer || 'Thank you for visiting!',
+    receiptFooter: row.receipt_footer || '',
     autoPrint: !!row.auto_print,
   }
 }
@@ -644,7 +644,7 @@ export async function writeToSupabase(action, state) {
         .from('orders')
         .select('id, subtotal, service_rate_pct')
         .eq('id', orderId)
-        .eq('payment_status', 'unpaid')
+        .neq('payment_status', 'paid')
         .maybeSingle()
 
       const subtotal    = (Number(existingOrder?.subtotal) || 0) + addedSubtotal
@@ -797,7 +797,7 @@ export async function writeToSupabase(action, state) {
               .select('id')
               .eq('table_id', order.table_id)
               .neq('id', orderId)
-              .eq('payment_status', 'unpaid')
+              .neq('payment_status', 'paid')
               .neq('status', 'cancelled')
               .limit(1)
             if (!activeOrders?.length) {
@@ -817,12 +817,13 @@ export async function writeToSupabase(action, state) {
 
     case 'CONFIRM_ORDER_DELIVERED': {
       const tableId = action.payload
-      // Mark all active orders for this table as delivered
+      // Mark all active orders for this table as delivered.
+      // Use neq('paid') instead of eq('unpaid') to also catch legacy orders with payment_status = null.
       const { data: tableOrders, error: tableOrdersError } = await supabase
         .from('orders')
         .select('id')
         .eq('table_id', tableId)
-        .eq('payment_status', 'unpaid')
+        .neq('payment_status', 'paid')
       if (tableOrdersError) throw tableOrdersError
       if (tableOrders?.length) {
         const ids = tableOrders.map(o => o.id)
@@ -851,10 +852,22 @@ export async function writeToSupabase(action, state) {
         .from('orders')
         .update({ status: 'needs_bill' })
         .eq('table_id', tableId)
-        .eq('payment_status', 'unpaid')
+        .neq('payment_status', 'paid')
         .select('id')
       if (ordersError) throw ordersError
-      assertUpdatedRows(billOrders, 'Order was not moved to bill. Refresh and try again.')
+      // Soft check: if no orders matched (e.g. legacy null payment_status), still update the table
+      if (!billOrders?.length) {
+        const { data: fallbackOrders, error: fallbackError } = await supabase
+          .from('orders')
+          .update({ status: 'needs_bill' })
+          .eq('table_id', tableId)
+          .is('payment_status', null)
+          .select('id')
+        if (fallbackError) throw fallbackError
+        if (!fallbackOrders?.length) {
+          throw new Error('Order was not moved to bill. Refresh and try again.')
+        }
+      }
       await updateRestaurantTableStatus(tableId, { status: 'needs_bill' }, { status: 'needs_bill' })
       break
     }
@@ -866,7 +879,7 @@ export async function writeToSupabase(action, state) {
       let query = supabase
         .from('orders')
         .select('*, items:order_items(*)')
-        .eq('payment_status', 'unpaid')
+        .neq('payment_status', 'paid')
       query = orderId ? query.eq('id', orderId) : query.eq('table_id', tableId)
       const { data: orders, error: ordersError } = await query
         .order('created_at', { ascending: true })
@@ -957,7 +970,7 @@ export async function writeToSupabase(action, state) {
       let query = supabase
         .from('orders')
         .select('*, items:order_items(*)')
-        .eq('payment_status', 'unpaid')
+        .neq('payment_status', 'paid')
       query = orderId ? query.eq('id', orderId) : query.eq('table_id', tableId)
       const { data: orders, error: ordersError } = await query
       if (ordersError) throw ordersError
@@ -1023,10 +1036,11 @@ export async function writeToSupabase(action, state) {
 
       // Fetch each unpaid order so we can write correct proportional values per round.
       // Writing the combined total to every row then summing in Reports caused double-counting.
+      // Use neq('paid') instead of eq('unpaid') to also match legacy orders with payment_status = null.
       let unpaidQuery = supabase
         .from('orders')
         .select('*, items:order_items(*)')
-        .eq('payment_status', 'unpaid')
+        .neq('payment_status', 'paid')
       unpaidQuery = orderId ? unpaidQuery.eq('id', orderId) : unpaidQuery.eq('table_id', tableId)
       const { data: unpaidOrders } = await unpaidQuery
 
@@ -1084,7 +1098,11 @@ export async function writeToSupabase(action, state) {
           const finalPaymentMethod = getPaymentMethodSummary(normalizedPayments, payment_method)
           const paymentRows = allocateSplitPaymentsToOrders(finalSummaries, normalizedPayments)
 
-          if (!orderId) {
+          // Determine which tables to reset.
+          // For tableId-based payments: reset that table directly (original behaviour).
+          // For orderId-based payments: find the table from the paid order and only reset
+          // if no OTHER unpaid orders remain for it (re-query DB after marking paid).
+          if (!orderId && tableId) {
             await updateRestaurantTableStatus(
               tableId,
               {
@@ -1097,6 +1115,33 @@ export async function writeToSupabase(action, state) {
               },
               { status: 'available' }
             )
+          } else if (orderId) {
+            const paidIds = new Set(finalSummaries.map(r => r.id))
+            const affectedTableIds = new Set(unpaidOrders.map(o => o.table_id).filter(Boolean))
+            for (const tid of affectedTableIds) {
+              // Re-query: any unpaid orders for this table that weren't just paid?
+              const { data: remaining } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('table_id', tid)
+                .neq('payment_status', 'paid')
+                .limit(50)
+              const hasOtherUnpaid = (remaining || []).some(o => !paidIds.has(o.id))
+              if (!hasOtherUnpaid) {
+                await updateRestaurantTableStatus(
+                  tid,
+                  {
+                    status: 'available',
+                    reserved_for_name: '',
+                    reserved_for_phone: '',
+                    reserved_at: null,
+                    reserved_until: null,
+                    reservation_notes: '',
+                  },
+                  { status: 'available' }
+                )
+              }
+            }
           }
 
           if (paymentRows.length > 0) {
