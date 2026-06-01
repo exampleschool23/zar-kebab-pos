@@ -153,6 +153,30 @@ test('all-cancelled supplied items produce a zero bill instead of stale stored t
   assert.equal(getGroupedOrderItems(rows).length, 0)
 })
 
+test('ready waiter cards and cashier totals ignore stale stored totals when item rows exist', () => {
+  const rows = [
+    item({ id: 'chicken', menu_item_id: 'chicken', price: 22000, quantity: 1, status: 'ready' }),
+    item({ id: 'zar', menu_item_id: 'zar-kebab', price: 80000, quantity: 1, status: 'ready' }),
+    item({ id: 'beef', menu_item_id: 'beef', price: 25000, quantity: 1, status: 'ready' }),
+    item({ id: 'dolma', menu_item_id: 'dolma', price: 25000, quantity: 1, status: 'ready' }),
+    item({ id: 'lula', menu_item_id: 'lula', price: 24000, quantity: 1, status: 'ready' }),
+  ]
+  const staleOrder = {
+    order_type: 'dine_in',
+    service_rate_pct: 20,
+    subtotal: 777000,
+    service_fee: 155400,
+    total: 932400,
+  }
+
+  const summary = getOrderPaymentSummary(staleOrder, rows, 20)
+
+  assert.equal(summary.subtotal, 176000)
+  assert.equal(summary.serviceFee, 35200)
+  assert.equal(summary.total, 211200)
+  assert.equal(getOrderTotal({ ...staleOrder, items: rows }), 211200)
+})
+
 test('sent cart snapshot removal preserves items added while send is pending', () => {
   const cart = [
     item({ id: 'lula-current', menu_item_id: 'lula', quantity: 3, price: 24000 }),

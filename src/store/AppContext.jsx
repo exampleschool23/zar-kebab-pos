@@ -10,6 +10,14 @@ import { tablesReducer } from './tablesReducer'
 
 const AppContext = createContext(null)
 
+const WRITE_BEFORE_LOCAL_ACTIONS = new Set([
+  'UPDATE_ORDER_ITEM_STATUS',
+  'SEND_TO_KITCHEN',
+  'CONFIRM_ORDER_DELIVERED',
+  'MARK_TABLE_NEEDS_BILL',
+  'MARK_ORDER_PAID',
+])
+
 const initialState = {
   lang:           loadInitialLang(),
   settings:       { ...DEFAULT_SETTINGS, ...loadSettings() },
@@ -91,7 +99,7 @@ export function AppProvider({ children }) {
           }
       : action
 
-    if (enriched.type === 'UPDATE_ORDER_ITEM_STATUS' || enriched.type === 'SEND_TO_KITCHEN' || enriched.type === 'MARK_ORDER_PAID') {
+    if (WRITE_BEFORE_LOCAL_ACTIONS.has(enriched.type)) {
       return writeWithIdleRecovery(enriched, stateRef.current)
         .then(() => {
           dispatch(enriched)

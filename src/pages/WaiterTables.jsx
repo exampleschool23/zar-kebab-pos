@@ -9,6 +9,7 @@ import {
   Receipt, Coffee, RefreshCw, Layers, Plus,
   Search, CreditCard, Settings, CalendarClock, Phone,
 } from 'lucide-react'
+import { getOrderTotal } from '../lib/analytics'
 import { getReservationSummary, getWaiterTableStatus } from '../lib/tableManagement'
 import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
 
@@ -269,7 +270,7 @@ function getKitchenCounts(tableId, orders) {
     preparingCount: items.filter(i => i.status === 'preparing').length,
     readyCount: items.filter(i => i.status === 'ready').length,
     itemCount: items.reduce((s, i) => s + (Number(i.quantity) || 1), 0),
-    total: active.reduce((s, o) => s + (Number(o.total) || 0), 0) || items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 1), 0),
+    total: active.reduce((s, o) => s + getOrderTotal(o), 0),
     createdAt: active.reduce((earliest, o) =>
       new Date(o.created_at) < new Date(earliest) ? o.created_at : earliest,
       active[0]?.created_at

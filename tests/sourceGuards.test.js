@@ -138,6 +138,9 @@ test('AppContext recovers Supabase after browser idle or resume', () => {
   assert.match(db, /function refreshSupabaseSession/)
   assert.match(db, /onConnectionIssue\(status\)/)
   assert.match(appContext, /writeWithIdleRecovery/)
+  assert.match(appContext, /WRITE_BEFORE_LOCAL_ACTIONS/)
+  assert.match(appContext, /'CONFIRM_ORDER_DELIVERED'/)
+  assert.match(appContext, /'MARK_TABLE_NEEDS_BILL'/)
   assert.match(appContext, /isRecoverableIdleError\(error\)/)
   assert.match(appContext, /refreshSupabaseSession\(\)/)
   assert.match(appContext, /function scheduleIdleRecovery/)
@@ -236,6 +239,15 @@ test('WaiterTables keeps urgent status sections before available tables', () => 
   assert.match(source, /SECTION_ORDER\s*\n\s*\.map\(status =>/)
 })
 
+test('WaiterTables ready-card total uses shared payment math instead of stale stored totals', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+  const getKitchenCounts = functionBody(source, 'getKitchenCounts')
+
+  assert.match(source, /import \{ getOrderTotal \} from '\.\.\/lib\/analytics'/)
+  assert.match(getKitchenCounts, /total: active\.reduce\(\(s, o\) => s \+ getOrderTotal\(o\), 0\)/)
+  assert.doesNotMatch(getKitchenCounts, /Number\(o\.total\)/)
+})
+
 test('WaiterTables keeps filter chips in requested status order', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
 
@@ -251,6 +263,7 @@ test('WaiterTables uses responsive section grids instead of one flat table grid'
 
 test('CashierTables groups bills by cashier urgency', () => {
   const source = readSource('src/pages/CashierTables.jsx')
+  const db = readSource('src/lib/db.js')
 
   assert.match(source, /function isCashierVisibleBill/)
   assert.match(source, /function isCashierReadyTakeAway/)
@@ -262,6 +275,8 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(source, /function PaidTodaySummary/)
   assert.match(source, /showPaidToday/)
   assert.doesNotMatch(source, /filteredBills\.map\(order =>/)
+  assert.match(db, /case 'CONFIRM_ORDER_DELIVERED':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*if \(itemsError\) throw itemsError/)
+  assert.match(db, /case 'MARK_TABLE_NEEDS_BILL':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*if \(tableError\) throw tableError/)
 })
 
 test('WaiterTables hides disabled tables and links admins to management', () => {
@@ -550,7 +565,8 @@ test('cashier payment waits for database success and supports legacy loyalty tra
   assert.match(cashier, /processingPay/)
   assert.match(cashier, /hasLoyaltyCardEntry/)
   assert.match(cashier, /loyalty_card_number: loyaltyCard\?\.card_number \|\| null/)
-  assert.match(appContext, /enriched\.type === 'UPDATE_ORDER_ITEM_STATUS' \|\| enriched\.type === 'SEND_TO_KITCHEN' \|\| enriched\.type === 'MARK_ORDER_PAID'/)
+  assert.match(appContext, /WRITE_BEFORE_LOCAL_ACTIONS\.has\(enriched\.type\)/)
+  assert.match(appContext, /'MARK_ORDER_PAID'/)
   assert.match(db, /mergeOrderItemsByIdentity/)
   assert.match(db, /isLegacyPositiveTransactionAmountConstraint\(transactionError\)/)
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(transactions\)\)/)

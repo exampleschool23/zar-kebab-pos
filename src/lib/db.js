@@ -809,15 +809,18 @@ export async function writeToSupabase(action, state) {
     case 'CONFIRM_ORDER_DELIVERED': {
       const tableId = action.payload
       // Mark all active orders for this table as delivered
-      const { data: tableOrders } = await supabase
+      const { data: tableOrders, error: tableOrdersError } = await supabase
         .from('orders')
         .select('id')
         .eq('table_id', tableId)
         .eq('payment_status', 'unpaid')
+      if (tableOrdersError) throw tableOrdersError
       if (tableOrders?.length) {
         const ids = tableOrders.map(o => o.id)
-        await supabase.from('orders').update({ status: 'delivered' }).in('id', ids)
-        await supabase.from('order_items').update({ status: 'served' }).in('order_id', ids)
+        const { error: ordersError } = await supabase.from('orders').update({ status: 'delivered' }).in('id', ids)
+        if (ordersError) throw ordersError
+        const { error: itemsError } = await supabase.from('order_items').update({ status: 'served' }).in('order_id', ids)
+        if (itemsError) throw itemsError
         await Promise.all(ids.map(id => notifyTelegramOrderStatus(id, 'completed')))
       }
       break
@@ -825,15 +828,17 @@ export async function writeToSupabase(action, state) {
 
     case 'MARK_TABLE_NEEDS_BILL': {
       const tableId = action.payload
-      await supabase
-        .from('restaurant_tables')
-        .update({ status: 'needs_bill' })
-        .eq('id', tableId)
-      await supabase
+      const { error: ordersError } = await supabase
         .from('orders')
         .update({ status: 'needs_bill' })
         .eq('table_id', tableId)
         .eq('payment_status', 'unpaid')
+      if (ordersError) throw ordersError
+      const { error: tableError } = await supabase
+        .from('restaurant_tables')
+        .update({ status: 'needs_bill' })
+        .eq('id', tableId)
+      if (tableError) throw tableError
       break
     }
 
