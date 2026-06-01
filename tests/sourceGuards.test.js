@@ -149,6 +149,21 @@ test('AppContext recovers Supabase after browser idle or resume', () => {
   assert.match(appContext, /unsubscribe\(\)/)
 })
 
+test('PublicMenu is read-only for QR customers', () => {
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const productCards = readSource('src/components/MenuProductCards.jsx')
+
+  assert.doesNotMatch(publicMenu, /useNavigate/)
+  assert.doesNotMatch(publicMenu, /useAuth/)
+  assert.doesNotMatch(publicMenu, /LogIn/)
+  assert.doesNotMatch(publicMenu, /\/login/)
+  assert.match(publicMenu, /readOnly/)
+  assert.match(productCards, /readOnly = false/)
+  assert.match(productCards, /const inCart = !readOnly && qty > 0/)
+  assert.match(productCards, /\{readOnly \? null : inCart \?/)
+  assert.match(productCards, /!\s*readOnly && \(/)
+})
+
 test('source does not use console.log debugging', () => {
   const offenders = sourceFiles()
     .filter(file => /console\.log\(/.test(readFileSync(file, 'utf8')))

@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { LogIn, Search, UtensilsCrossed } from 'lucide-react'
+import { Search, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
 import { useApp } from '../store/AppContext'
-import { useAuth } from '../contexts/AuthContext'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import {
@@ -43,9 +41,7 @@ async function loadPublicMenuData() {
 }
 
 export default function PublicMenu() {
-  const navigate = useNavigate()
   const { state } = useApp()
-  const { session } = useAuth()
   const lang = state.lang || 'ru'
 
   const [categories, setCategories] = useState([])
@@ -139,10 +135,6 @@ export default function PublicMenu() {
     setDetailItem(null)
   }
 
-  function handleOrderIntent() {
-    navigate('/login')
-  }
-
   if (detailItem) {
     return (
       <div className="h-screen bg-[#FAF6EE]">
@@ -154,7 +146,8 @@ export default function PublicMenu() {
           lang={lang}
           onBack={closeDetail}
           onCancel={closeDetail}
-          onAddToCart={handleOrderIntent}
+          onAddToCart={() => {}}
+          readOnly
         />
       </div>
     )
@@ -175,15 +168,6 @@ export default function PublicMenu() {
             </p>
           </div>
           <LanguageSwitcher />
-          <button
-            onClick={() => navigate(session ? '/' : '/login')}
-            className="flex items-center gap-2 rounded-2xl border border-[#E5E7EB] bg-white px-3 py-2 text-sm font-bold text-[#64748B] hover:bg-[#F8FAFC]"
-          >
-            <LogIn size={16} />
-            {session
-              ? (lang === 'uz' ? 'Kabinet' : lang === 'ru' ? 'Кабинет' : 'Workspace')
-              : (lang === 'uz' ? 'Kirish' : lang === 'ru' ? 'Войти' : 'Sign in')}
-          </button>
         </div>
       </header>
 
@@ -274,10 +258,8 @@ export default function PublicMenu() {
                         item={item}
                         qty={0}
                         lang={lang}
-                        onAdd={handleOrderIntent}
-                        onIncrement={handleOrderIntent}
-                        onDecrement={handleOrderIntent}
                         onOpenDetail={openDetail}
+                        readOnly
                       />
                     ))}
                   </div>
@@ -292,10 +274,8 @@ export default function PublicMenu() {
                   item={item}
                   qty={0}
                   lang={lang}
-                  onAdd={handleOrderIntent}
-                  onIncrement={handleOrderIntent}
-                  onDecrement={handleOrderIntent}
                   onOpenDetail={openDetail}
+                  readOnly
                 />
               ))}
             </div>

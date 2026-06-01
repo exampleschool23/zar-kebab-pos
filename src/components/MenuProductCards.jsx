@@ -77,8 +77,8 @@ export function CategoryCard({ cat, active, onClick, lang }) {
   )
 }
 
-export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang }) {
-  const inCart = qty > 0
+export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false }) {
+  const inCart = !readOnly && qty > 0
 
   return (
     <div
@@ -115,7 +115,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         )}
         <p className="font-black text-[16px] text-[#ff5a00] mb-2.5">{formatCurrency(item.price)}</p>
 
-        {inCart ? (
+        {readOnly ? null : inCart ? (
           <div
             onClick={e => e.stopPropagation()}
             className="flex items-center justify-between bg-[#fff1e8] rounded-xl px-2 py-1 border border-[#ff5a00]/20"
@@ -149,7 +149,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   )
 }
 
-export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart }) {
+export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false }) {
   const [qty, setQty] = useState(Math.max(1, currentQty))
   const [notes, setNotes] = useState(currentNotes || '')
 
@@ -198,7 +198,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 pb-28">
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 ${readOnly ? 'pb-6' : 'pb-28'}`}>
         <div className="mx-auto w-full max-w-[1120px]">
           <section className="grid gap-5 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm md:grid-cols-[minmax(320px,0.9fr)_minmax(360px,1.1fr)] md:p-5 lg:gap-6">
             <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[22px] bg-orange-50 md:max-h-[360px]">
@@ -227,6 +227,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                 </p>
               </div>
 
+              {!readOnly && (
               <div className="rounded-[22px] border border-[#E5E7EB] bg-[#FBFCFE] p-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -250,7 +251,9 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                   </div>
                 </div>
               </div>
+              )}
 
+              {!readOnly && (
               <div className="rounded-[22px] border border-[#E5E7EB] bg-[#FBFCFE] p-4">
                 <div className="mb-3">
                   <h3 className="text-base font-black text-[#111827]">{labels.notes}</h3>
@@ -264,11 +267,13 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                   className="w-full resize-none rounded-[18px] border border-[#E5E7EB] bg-white px-4 py-3 text-[14px] leading-6 text-[#1F2937] placeholder-[#9CA3AF] transition-all focus:border-[#ff5a00] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/15"
                 />
               </div>
+              )}
             </div>
           </section>
         </div>
       </div>
 
+      {!readOnly && (
       <div className="sticky bottom-0 z-20 border-t border-[#E5E7EB] bg-white/95 px-4 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
         <div className="mx-auto flex w-full max-w-[1120px] gap-3">
           <button
@@ -285,6 +290,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
           </button>
         </div>
       </div>
+      )}
     </div>
   )
 }
