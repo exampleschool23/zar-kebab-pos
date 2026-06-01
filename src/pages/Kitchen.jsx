@@ -192,7 +192,6 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
   const [flash,   setFlash]   = useState(false)  // card highlight on status change
   const [showCancel, setShowCancel] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
-  const [markMenuUnavailable, setMarkMenuUnavailable] = useState(true)
   const prevStatus = useRef(item.status)
 
   // Flash the card whenever status changes (driven by parent state update)
@@ -213,7 +212,7 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
 
   async function handleUnavailable() {
     const reason = cancelReason.trim() || unavailableLabel(lang)
-    await handleMark('cancelled', { reason, markMenuUnavailable })
+    await handleMark('cancelled', { reason })
   }
 
   const isNew       = item.status === 'new'
@@ -318,10 +317,6 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
               placeholder={unavailableReasonPlaceholder(lang)}
               className="mb-2 w-full rounded-lg border border-red-100 bg-white px-2 py-1.5 text-xs font-semibold outline-none"
             />
-            <label className="mb-2 flex items-center gap-2 text-[11px] font-bold text-red-700">
-              <input type="checkbox" checked={markMenuUnavailable} onChange={event => setMarkMenuUnavailable(event.target.checked)} />
-              {lang === 'uz' ? 'Menyuda ham mavjud emas qilish' : lang === 'ru' ? 'Также скрыть из меню' : 'Also mark unavailable in menu'}
-            </label>
             <button
               type="button"
               onClick={handleUnavailable}
@@ -794,7 +789,6 @@ export default function Kitchen() {
           menuItemId: item.menu_item_id,
           status,
           reason: details.reason || '',
-          markMenuUnavailable: !!details.markMenuUnavailable,
         },
       })
       if (result?.error) throw result.error
