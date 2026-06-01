@@ -65,8 +65,8 @@ create policy "Users: update own safe fields"
     status = (select status from public.profiles where id = auth.uid())
   );
 
--- 7. Owner can update any profile. Admin can update only non-owner/non-stakeholder users
--- and cannot assign owner/stakeholder. Frontend checks are convenience; RLS is authority.
+-- 7. Owner can update any profile. Admin can update only users below admin
+-- and cannot assign owner/admin/stakeholder. Frontend checks are convenience; RLS is authority.
 drop policy if exists "Admin: update any profile" on public.profiles;
 drop policy if exists "Owner: update any profile" on public.profiles;
 drop policy if exists "Admin: update staff profiles" on public.profiles;
@@ -82,12 +82,12 @@ create policy "Admin: update staff profiles"
     public.is_admin()
     and not public.is_owner()
     and id <> auth.uid()
-    and role not in ('owner', 'stakeholder')
+    and role not in ('owner', 'admin', 'stakeholder')
   )
   with check (
     public.is_admin()
     and not public.is_owner()
-    and role not in ('owner', 'stakeholder')
+    and role not in ('owner', 'admin', 'stakeholder')
   );
 
 -- 7. Trigger: auto-create profile when user signs up

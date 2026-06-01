@@ -130,6 +130,25 @@ test('realtime subscription uses unique channel names', () => {
   assert.doesNotMatch(source, /\.channel\('pos-realtime'\)/)
 })
 
+test('AppContext recovers Supabase after browser idle or resume', () => {
+  const appContext = readSource('src/store/AppContext.jsx')
+  const db = readSource('src/lib/db.js')
+
+  assert.match(db, /function isRecoverableIdleError/)
+  assert.match(db, /function refreshSupabaseSession/)
+  assert.match(db, /onConnectionIssue\(status\)/)
+  assert.match(appContext, /writeWithIdleRecovery/)
+  assert.match(appContext, /isRecoverableIdleError\(error\)/)
+  assert.match(appContext, /refreshSupabaseSession\(\)/)
+  assert.match(appContext, /function scheduleIdleRecovery/)
+  assert.match(appContext, /function handleResume/)
+  assert.match(appContext, /window\.addEventListener\('online', handleResume\)/)
+  assert.match(appContext, /window\.addEventListener\('focus', handleResume\)/)
+  assert.match(appContext, /document\.addEventListener\('visibilitychange', handleResume\)/)
+  assert.match(appContext, /connectRealtime\(\)/)
+  assert.match(appContext, /unsubscribe\(\)/)
+})
+
 test('source does not use console.log debugging', () => {
   const offenders = sourceFiles()
     .filter(file => /console\.log\(/.test(readFileSync(file, 'utf8')))

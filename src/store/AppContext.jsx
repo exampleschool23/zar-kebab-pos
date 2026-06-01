@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react'
-import { loadPOSData, writeToSupabase, subscribeToRealtime } from '../lib/db'
+import { isRecoverableIdleError, loadPOSData, refreshSupabaseSession, writeToSupabase, subscribeToRealtime } from '../lib/db'
 import { appMetaReducer } from './appMetaReducer'
 import { cartReducer } from './cartReducer'
 import { menuReducer } from './menuReducer'
@@ -50,6 +50,19 @@ export function AppProvider({ children }) {
   const stateRef = useRef(state)
   useEffect(() => { stateRef.current = state }, [state])
 
+  const recoverFromIdleRef = useRef(() => {})
+
+  async function writeWithIdleRecovery(action, stateSnapshot) {
+    try {
+      await writeToSupabase(action, stateSnapshot)
+    } catch (error) {
+      if (!isRecoverableIdleError(error)) throw error
+      await refreshSupabaseSession()
+      recoverFromIdleRef.current?.()
+      await writeToSupabase(action, stateRef.current)
+    }
+  }
+
   // dbDispatch: optimistic local update + async Supabase write
   const dbDispatch = useCallback(function dbDispatch(action) {
     // Pre-inject a stable orderId so reducer and Supabase writer share it
@@ -79,7 +92,7 @@ export function AppProvider({ children }) {
       : action
 
     if (enriched.type === 'UPDATE_ORDER_ITEM_STATUS' || enriched.type === 'SEND_TO_KITCHEN' || enriched.type === 'MARK_ORDER_PAID') {
-      return writeToSupabase(enriched, stateRef.current)
+      return writeWithIdleRecovery(enriched, stateRef.current)
         .then(() => {
           dispatch(enriched)
           dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
@@ -103,7 +116,7 @@ export function AppProvider({ children }) {
     }
 
     dispatch(enriched)
-    return writeToSupabase(enriched, stateRef.current)
+    return writeWithIdleRecovery(enriched, stateRef.current)
       .then(() => {
         dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
         return { error: null }
@@ -128,9 +141,18 @@ export function AppProvider({ children }) {
   // Load from Supabase on mount + subscribe to realtime
   useEffect(() => {
     let unsubscribe = () => {}
+    let mounted = true
+    let hydrateInFlight = false
+    let reconnectTimer = null
+    let lastResumeAt = 0
 
-    loadPOSData()
-      .then(({ tables, tableZones, categories, menuItems, orders, settings }) => {
+    async function hydratePOSData() {
+      if (hydrateInFlight) return
+      hydrateInFlight = true
+      try {
+        await refreshSupabaseSession()
+        const { tables, tableZones, categories, menuItems, orders, settings } = await loadPOSData()
+        if (!mounted) return
         dispatch({ type: 'SET_TABLES',     payload: tables })
         dispatch({ type: 'SET_TABLE_ZONES', payload: tableZones || [] })
         dispatch({ type: 'SET_CATEGORIES', payload: categories })
@@ -138,14 +160,84 @@ export function AppProvider({ children }) {
         dispatch({ type: 'SET_ORDERS',     payload: orders })
         if (settings) dispatch({ type: 'SET_SETTINGS', payload: settings })
         dispatch({ type: 'SET_LOADED' })
-        unsubscribe = subscribeToRealtime(dispatch)
+        dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
+      } finally {
+        hydrateInFlight = false
+      }
+    }
+
+    function connectRealtime() {
+      unsubscribe()
+      unsubscribe = subscribeToRealtime(dispatch, {
+        onConnectionIssue: () => scheduleIdleRecovery(1000),
+      })
+    }
+
+    function scheduleIdleRecovery(delay = 0) {
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        hydratePOSData()
+          .then(() => {
+            if (mounted) connectRealtime()
+          })
+          .catch(err => {
+            console.error('[db] idle recovery failed:', err)
+            dispatch({
+              type: 'SET_CONNECTION_NOTICE',
+              payload: {
+                tone: 'error',
+                message: stateRef.current.lang === 'ru'
+                  ? 'Соединение устарело. Обновите страницу, если данные не обновятся.'
+                  : stateRef.current.lang === 'uz'
+                    ? 'Ulanish eskirdi. Ma’lumotlar yangilanmasa, sahifani yangilang.'
+                    : 'Connection was stale. Refresh the page if data does not update.',
+              },
+            })
+          })
+      }, delay)
+    }
+
+    function handleResume() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      const now = Date.now()
+      if (now - lastResumeAt < 5000) return
+      lastResumeAt = now
+      scheduleIdleRecovery(0)
+    }
+
+    recoverFromIdleRef.current = () => scheduleIdleRecovery(0)
+
+    hydratePOSData()
+      .then(() => {
+        if (mounted) connectRealtime()
       })
       .catch(err => {
         console.error('[db] initial load failed:', err)
         dispatch({ type: 'SET_LOAD_ERROR', payload: err?.message || 'Failed to load POS data' })
       })
 
-    return () => unsubscribe()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleResume)
+      window.addEventListener('focus', handleResume)
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleResume)
+    }
+
+    return () => {
+      mounted = false
+      recoverFromIdleRef.current = () => {}
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleResume)
+        window.removeEventListener('focus', handleResume)
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleResume)
+      }
+      unsubscribe()
+    }
   }, [])
 
   return (

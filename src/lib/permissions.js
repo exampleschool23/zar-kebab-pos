@@ -31,12 +31,14 @@ export function isPublicOnlyRole(role) {
 /**
  * Returns whether `viewerRole` can change the role/status of a user who currently has `targetRole`.
  * - owner   → can edit anyone except themselves (handled separately)
- * - admin   → can edit non-owner users only
+ * - admin   → can edit staff below admin only
  * - others  → view-only, no edits
  */
 export function canEditTeamMember(viewerRole, targetRole) {
-  if (viewerRole === 'owner') return true
-  if (viewerRole === 'admin') return targetRole !== 'owner'
+  const viewer = (viewerRole || '').toLowerCase()
+  const target = (targetRole || '').toLowerCase()
+  if (viewer === 'owner') return true
+  if (viewer === 'admin') return !['owner', 'admin', 'stakeholder'].includes(target)
   return false
 }
 

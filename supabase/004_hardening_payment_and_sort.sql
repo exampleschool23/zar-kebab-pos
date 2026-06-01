@@ -50,10 +50,10 @@ create policy "Admin: update staff profiles"
     public.is_admin()
     and not public.is_owner()
     and id <> auth.uid()
-    and role not in ('owner', 'stakeholder')
+    and role not in ('owner', 'admin', 'stakeholder')
   )
   with check (
     public.is_admin()
     and not public.is_owner()
-    and role not in ('owner', 'stakeholder')
+    and role not in ('owner', 'admin', 'stakeholder')
   );

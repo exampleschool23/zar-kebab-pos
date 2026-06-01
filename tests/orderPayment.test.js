@@ -23,7 +23,7 @@ import {
   removeSentCartItems,
   validateLoyaltyRedeemAmount,
 } from '../src/lib/analytics.js'
-import { canDeleteTeamMember, defaultPath, isPublicOnlyRole } from '../src/lib/permissions.js'
+import { canDeleteTeamMember, canEditTeamMember, defaultPath, isPublicOnlyRole } from '../src/lib/permissions.js'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../src/lib/menuItems.js'
 
 const screenshotItems = [
@@ -58,6 +58,17 @@ test('only owner can delete non-protected team profiles and cannot delete self',
   assert.equal(canDeleteTeamMember('owner', 'waiter', true), false)
   assert.equal(canDeleteTeamMember('admin', 'waiter'), false)
   assert.equal(canDeleteTeamMember('cashier', 'guest'), false)
+})
+
+test('admins cannot change roles or statuses of other admins', () => {
+  assert.equal(canEditTeamMember('owner', 'admin'), true)
+  assert.equal(canEditTeamMember('admin', 'waiter'), true)
+  assert.equal(canEditTeamMember('admin', 'cashier'), true)
+  assert.equal(canEditTeamMember('admin', 'kitchen'), true)
+  assert.equal(canEditTeamMember('admin', 'guest'), true)
+  assert.equal(canEditTeamMember('admin', 'admin'), false)
+  assert.equal(canEditTeamMember('admin', 'owner'), false)
+  assert.equal(canEditTeamMember('admin', 'stakeholder'), false)
 })
 
 test('order subtotal is calculated from item rows, not stale stored subtotal', () => {

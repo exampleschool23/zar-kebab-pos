@@ -117,6 +117,36 @@ function isLegacyPositiveTransactionAmountConstraint(error) {
   )
 }
 
+export function isRecoverableIdleError(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (
+    message.includes('jwt') ||
+    message.includes('token') ||
+    message.includes('session') ||
+    message.includes('failed to fetch') ||
+    message.includes('fetch failed') ||
+    message.includes('network') ||
+    message.includes('timeout') ||
+    message.includes('timed out') ||
+    message.includes('connection') ||
+    message.includes('websocket')
+  )
+}
+
+export async function refreshSupabaseSession(dbClient = supabase) {
+  const auth = dbClient?.auth
+  if (!auth?.getSession) return null
+  try {
+    const { data } = await auth.getSession()
+    if (data?.session && auth.refreshSession) {
+      await auth.refreshSession()
+    }
+    return data?.session || null
+  } catch {
+    return null
+  }
+}
+
 function toLegacyPositiveTransactionAmounts(transactions) {
   return transactions.map(row => (
     row.type === 'redeemed' && Number(row.amount) < 0
@@ -444,6 +474,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
   const dbClient = options.dbClient || supabase
   const settingsLoader = options.settingsLoader || (() => loadBusinessSettings(dbClient))
   const debounceMs = options.debounceMs ?? 250
+  const onConnectionIssue = options.onConnectionIssue || (() => {})
 
   let ordersReloadTimer = null
   let ordersReloadInFlight = false
@@ -523,6 +554,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
         dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         console.warn('[db] realtime channel status:', status)
+        onConnectionIssue(status)
         dispatch({
           type: 'SET_CONNECTION_NOTICE',
           payload: {
