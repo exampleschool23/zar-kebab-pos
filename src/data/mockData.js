@@ -6,9 +6,9 @@ export const categories = [
   { id: 'salads', name_uz: 'Salatlar', name_ru: 'Салаты', name_en: 'Salads', image_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&q=80', sort_order: 4 },
   { id: 'drinks', name_uz: 'Ichimliklar', name_ru: 'Напитки', name_en: 'Drinks', image_url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=200&q=80', sort_order: 5 },
   { id: 'bread', name_uz: 'Non', name_ru: 'Хлеб', name_en: 'Bread', image_url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&q=80', sort_order: 6 },
-  { id: 'combos', name_uz: 'Setlar', name_ru: 'Комбо-сеты', name_en: 'Combo Sets', image_url: 'https://source.unsplash.com/200x200/?kebab,plate', sort_order: 2 },
-  { id: 'sides', name_uz: 'Garnirlar', name_ru: 'Гарниры', name_en: 'Sides', image_url: 'https://source.unsplash.com/200x200/?fries,rice', sort_order: 7 },
-  { id: 'desserts', name_uz: 'Shirinliklar', name_ru: 'Десерты', name_en: 'Desserts', image_url: 'https://source.unsplash.com/200x200/?dessert,baklava', sort_order: 8 },
+  { id: 'combos', name_uz: 'Setlar', name_ru: 'Комбо-сеты', name_en: 'Combo Sets', image_url: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=200&q=80', sort_order: 2 },
+  { id: 'sides', name_uz: 'Garnirlar', name_ru: 'Гарниры', name_en: 'Sides', image_url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&q=80', sort_order: 7 },
+  { id: 'desserts', name_uz: 'Shirinliklar', name_ru: 'Десерты', name_en: 'Desserts', image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=200&q=80', sort_order: 8 },
 ]
 
 export const menuItems = [
@@ -132,7 +132,7 @@ export const menuItems = [
     name_uz: "Qo'y qovurg'a", name_ru: 'Бараньи ребрышки', name_en: 'Lamb ribs',
     description_uz: "Mangalda pishgan qovurg'a, piyoz va ko'kat bilan", description_ru: 'Ребрышки на мангале с луком и зеленью', description_en: 'Grilled lamb ribs with onion and herbs',
     price: 42000,
-    image_url: 'https://source.unsplash.com/400x400/?lamb,ribs,grill',
+    image_url: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&q=80',
     available: true,
   },
   {
@@ -140,7 +140,7 @@ export const menuItems = [
     name_uz: 'Tovuq qanotlari', name_ru: 'Куриные крылышки', name_en: 'Chicken wings',
     description_uz: "Marinadlangan qanotlar, yengil achchiq ta'm", description_ru: 'Маринованные крылышки с легкой остротой', description_en: 'Marinated wings with a gentle spicy kick',
     price: 28000,
-    image_url: 'https://source.unsplash.com/400x400/?chicken,wings,grill',
+    image_url: 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&q=80',
     available: true,
   },
   {
@@ -148,7 +148,7 @@ export const menuItems = [
     name_uz: 'Jigar shashlik', name_ru: 'Шашлык из печени', name_en: 'Liver shashlik',
     description_uz: 'Mayin jigar shashlik, piyoz bilan', description_ru: 'Нежный шашлык из печени с луком', description_en: 'Tender liver shashlik with onion',
     price: 23000,
-    image_url: 'https://source.unsplash.com/400x400/?liver,skewer',
+    image_url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80',
     available: true,
   },
   {
@@ -156,7 +156,7 @@ export const menuItems = [
     name_uz: 'Sabzavot shashlik', name_ru: 'Овощной шашлык', name_en: 'Vegetable shashlik',
     description_uz: 'Mangalda qizargan mavsumiy sabzavotlar', description_ru: 'Овощи на мангале', description_en: 'Grilled seasonal vegetables on skewers',
     price: 18000,
-    image_url: 'https://source.unsplash.com/400x400/?grilled,vegetables',
+    image_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80',
     available: true,
   },
   {
@@ -164,7 +164,7 @@ export const menuItems = [
     name_uz: 'Assorti grill', name_ru: 'Гриль ассорти', name_en: 'Mixed grill plate',
     description_uz: 'Mol, tovuq, lula va sabzavotlardan katta likopcha', description_ru: 'Большое ассорти из говядины, курицы, люля и овощей', description_en: 'A generous plate of beef, chicken, lula, and vegetables',
     price: 155000,
-    image_url: 'https://source.unsplash.com/400x400/?mixed,grill,kebab',
+    image_url: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&q=80',
     available: true,
   },
   {
@@ -172,7 +172,7 @@ export const menuItems = [
     name_uz: 'Tushlik kebab set', name_ru: 'Обеденный кебаб-сет', name_en: 'Lunch kebab set',
     description_uz: 'Shashlik, salat, non va choy', description_ru: 'Шашлык, салат, лепешка и чай', description_en: 'Shashlik, salad, flatbread, and tea',
     price: 59000,
-    image_url: 'https://source.unsplash.com/400x400/?kebab,lunch',
+    image_url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80',
     available: true,
   },
   {
@@ -180,7 +180,7 @@ export const menuItems = [
     name_uz: 'Student set', name_ru: 'Студенческий сет', name_en: 'Student set',
     description_uz: 'Lula kebab, fri va ichimlik', description_ru: 'Люля-кебаб, фри и напиток', description_en: 'Lula kebab, fries, and a drink',
     price: 45000,
-    image_url: 'https://source.unsplash.com/400x400/?kebab,fries',
+    image_url: 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=400&q=80',
     available: true,
   },
   {
@@ -188,7 +188,7 @@ export const menuItems = [
     name_uz: 'Oilaviy grill set', name_ru: 'Семейный гриль-сет', name_en: 'Family grill set',
     description_uz: '4 kishilik shashlik assorti, salat va non', description_ru: 'Ассорти шашлыков на 4 персоны, салат и лепешка', description_en: 'Mixed shashlik for 4 people with salad and flatbread',
     price: 285000,
-    image_url: 'https://source.unsplash.com/400x400/?family,grill',
+    image_url: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&q=80',
     available: true,
   },
   {
@@ -196,7 +196,7 @@ export const menuItems = [
     name_uz: 'Olib ketish kebab box', name_ru: 'Кебаб-бокс с собой', name_en: 'Take away kebab box',
     description_uz: 'Shashlik, garnir va sous bilan qulay box', description_ru: 'Удобный бокс с шашлыком, гарниром и соусом', description_en: 'A convenient box with shashlik, side, and sauce',
     price: 52000,
-    image_url: 'https://source.unsplash.com/400x400/?takeaway,kebab,box',
+    image_url: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80',
     available: true,
   },
   {
@@ -204,7 +204,7 @@ export const menuItems = [
     name_uz: "Sho'rva", name_ru: 'Шурпа', name_en: 'Shorva',
     description_uz: "Mol go'shti, kartoshka va sabzavotli to'yimli sho'rva", description_ru: 'Сытная шурпа с говядиной, картофелем и овощами', description_en: 'Hearty beef soup with potatoes and vegetables',
     price: 30000,
-    image_url: 'https://source.unsplash.com/400x400/?beef,soup',
+    image_url: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&q=80',
     available: true,
   },
   {
@@ -212,7 +212,7 @@ export const menuItems = [
     name_uz: 'Mastava', name_ru: 'Мастава', name_en: 'Mastava',
     description_uz: "Guruchli, sabzavotli va go'shtli milliy sho'rva", description_ru: 'Национальный суп с рисом, овощами и мясом', description_en: 'Traditional rice soup with vegetables and meat',
     price: 28000,
-    image_url: 'https://source.unsplash.com/400x400/?rice,soup',
+    image_url: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&q=80',
     available: true,
   },
   {
@@ -220,7 +220,7 @@ export const menuItems = [
     name_uz: 'Osh', name_ru: 'Плов', name_en: 'Plov',
     description_uz: "Sabzi, guruch va mayin go'shtdan klassik osh", description_ru: 'Классический плов с морковью, рисом и нежным мясом', description_en: 'Classic plov with carrots, rice, and tender meat',
     price: 38000,
-    image_url: 'https://source.unsplash.com/400x400/?plov,rice',
+    image_url: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80',
     available: true,
   },
   {
@@ -228,7 +228,7 @@ export const menuItems = [
     name_uz: 'Qurutob', name_ru: 'Курутоб', name_en: 'Qurutob',
     description_uz: "Qurut, non, ko'kat va sabzavotli yengil taom", description_ru: 'Курут, лепешка, зелень и овощи', description_en: 'A light dish with qurut, flatbread, herbs, and vegetables',
     price: 34000,
-    image_url: 'https://source.unsplash.com/400x400/?salad,bread',
+    image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400&q=80',
     available: true,
   },
   {
@@ -236,7 +236,7 @@ export const menuItems = [
     name_uz: 'Tovuqli guruch', name_ru: 'Курица с рисом', name_en: 'Chicken with rice',
     description_uz: "Qovurilgan tovuq va xushbo'y guruch", description_ru: 'Жареная курица с ароматным рисом', description_en: 'Roasted chicken with fragrant rice',
     price: 36000,
-    image_url: 'https://source.unsplash.com/400x400/?chicken,rice',
+    image_url: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80',
     available: true,
   },
   {
@@ -244,7 +244,7 @@ export const menuItems = [
     name_uz: 'Qozon kabob', name_ru: 'Казан-кебаб', name_en: 'Kazan kebab',
     description_uz: "Qozonda pishgan go'sht va kartoshka", description_ru: 'Мясо и картофель, приготовленные в казане', description_en: 'Cauldron-cooked meat and potatoes',
     price: 52000,
-    image_url: 'https://source.unsplash.com/400x400/?meat,potatoes',
+    image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400&q=80',
     available: true,
   },
   {
@@ -252,7 +252,7 @@ export const menuItems = [
     name_uz: 'Fresh salat', name_ru: 'Свежий салат', name_en: 'Fresh garden salad',
     description_uz: "Bodring, pomidor, ko'kat va limonli sous", description_ru: 'Огурцы, помидоры, зелень и лимонная заправка', description_en: 'Cucumber, tomato, herbs, and lemon dressing',
     price: 18000,
-    image_url: 'https://source.unsplash.com/400x400/?fresh,salad',
+    image_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80',
     available: true,
   },
   {
@@ -260,7 +260,7 @@ export const menuItems = [
     name_uz: 'Suzma salat', name_ru: 'Салат с сюзьмой', name_en: 'Suzma salad',
     description_uz: "Suzma, bodring va ko'katli salqin salat", description_ru: 'Освежающий салат с сюзьмой, огурцами и зеленью', description_en: 'Refreshing suzma, cucumber, and herb salad',
     price: 19000,
-    image_url: 'https://source.unsplash.com/400x400/?yogurt,salad',
+    image_url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&q=80',
     available: true,
   },
   {
@@ -268,7 +268,7 @@ export const menuItems = [
     name_uz: 'Achchiq sabzi', name_ru: 'Острая морковь', name_en: 'Spicy carrot salad',
     description_uz: 'Koreyscha uslubdagi achchiq sabzi', description_ru: 'Острая морковь по-корейски', description_en: 'Korean-style spicy carrot salad',
     price: 14000,
-    image_url: 'https://source.unsplash.com/400x400/?carrot,salad',
+    image_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80',
     available: true,
   },
   {
@@ -276,7 +276,7 @@ export const menuItems = [
     name_uz: 'Fri kartoshka', name_ru: 'Картофель фри', name_en: 'French fries',
     description_uz: 'Qarsildoq fri kartoshka', description_ru: 'Хрустящий картофель фри', description_en: 'Crispy French fries',
     price: 16000,
-    image_url: 'https://source.unsplash.com/400x400/?french,fries',
+    image_url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80',
     available: true,
   },
   {
@@ -284,7 +284,7 @@ export const menuItems = [
     name_uz: 'Guruch', name_ru: 'Рис', name_en: 'Rice',
     description_uz: "Xushbo'y oq guruch", description_ru: 'Ароматный белый рис', description_en: 'Fragrant white rice',
     price: 12000,
-    image_url: 'https://source.unsplash.com/400x400/?rice,bowl',
+    image_url: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80',
     available: true,
   },
   {
@@ -292,7 +292,7 @@ export const menuItems = [
     name_uz: 'Grill sabzavot', name_ru: 'Овощи гриль', name_en: 'Grilled vegetables',
     description_uz: 'Mangalda pishgan sabzavotlar', description_ru: 'Овощи, приготовленные на мангале', description_en: 'Vegetables cooked over the grill',
     price: 22000,
-    image_url: 'https://source.unsplash.com/400x400/?grilled,vegetables',
+    image_url: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80',
     available: true,
   },
   {
@@ -300,7 +300,7 @@ export const menuItems = [
     name_uz: 'Tuzlama assorti', name_ru: 'Ассорти солений', name_en: 'Pickles plate',
     description_uz: 'Tuzlangan bodring, pomidor va karam', description_ru: 'Соленые огурцы, помидоры и капуста', description_en: 'Pickled cucumber, tomato, and cabbage',
     price: 15000,
-    image_url: 'https://source.unsplash.com/400x400/?pickles',
+    image_url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&q=80',
     available: true,
   },
   {
@@ -308,7 +308,7 @@ export const menuItems = [
     name_uz: 'Ayran', name_ru: 'Айран', name_en: 'Ayran',
     description_uz: 'Salqin yogurtli ichimlik', description_ru: 'Освежающий кисломолочный напиток', description_en: 'Refreshing yogurt drink',
     price: 10000,
-    image_url: 'https://source.unsplash.com/400x400/?ayran,yogurt,drink',
+    image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80',
     available: true,
   },
   {
@@ -316,7 +316,7 @@ export const menuItems = [
     name_uz: 'Kompot', name_ru: 'Компот', name_en: 'Compote',
     description_uz: 'Uy sharoitida tayyorlangan mevali kompot', description_ru: 'Домашний фруктовый компот', description_en: 'Homemade fruit compote',
     price: 12000,
-    image_url: 'https://source.unsplash.com/400x400/?fruit,drink',
+    image_url: 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&q=80',
     available: true,
   },
   {
@@ -324,7 +324,7 @@ export const menuItems = [
     name_uz: 'Limonad', name_ru: 'Лимонад', name_en: 'Fresh lemonade',
     description_uz: 'Limon va yalpizli salqin ichimlik', description_ru: 'Освежающий лимонад с мятой', description_en: 'Refreshing lemon and mint drink',
     price: 18000,
-    image_url: 'https://source.unsplash.com/400x400/?lemonade,mint',
+    image_url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80',
     available: true,
   },
   {
@@ -332,7 +332,7 @@ export const menuItems = [
     name_uz: 'Chak-chak', name_ru: 'Чак-чак', name_en: 'Chak-chak',
     description_uz: 'Asal bilan tayyorlangan milliy shirinlik', description_ru: 'Национальный десерт с медом', description_en: 'Traditional honey dessert',
     price: 18000,
-    image_url: 'https://source.unsplash.com/400x400/?honey,dessert',
+    image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400&q=80',
     available: true,
   },
   {
@@ -340,7 +340,7 @@ export const menuItems = [
     name_uz: 'Medovik', name_ru: 'Медовик', name_en: 'Honey cake',
     description_uz: 'Yumshoq asal torti', description_ru: 'Нежный медовый торт', description_en: 'Soft layered honey cake',
     price: 24000,
-    image_url: 'https://source.unsplash.com/400x400/?honey,cake',
+    image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400&q=80',
     available: true,
   },
   {
@@ -348,7 +348,7 @@ export const menuItems = [
     name_uz: 'Baklava', name_ru: 'Пахлава', name_en: 'Baklava',
     description_uz: "Yong'oqli va asalli qatlama shirinlik", description_ru: 'Слоеный десерт с орехами и медом', description_en: 'Layered pastry with nuts and honey',
     price: 22000,
-    image_url: 'https://source.unsplash.com/400x400/?baklava',
+    image_url: 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400&q=80',
     available: true,
   },
   {
@@ -356,7 +356,7 @@ export const menuItems = [
     name_uz: 'Muzqaymoq', name_ru: 'Мороженое', name_en: 'Ice cream',
     description_uz: 'Vanilli muzqaymoq, sous bilan', description_ru: 'Ванильное мороженое с соусом', description_en: 'Vanilla ice cream with sauce',
     price: 16000,
-    image_url: 'https://source.unsplash.com/400x400/?ice,cream',
+    image_url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=400&q=80',
     available: true,
   },
   {

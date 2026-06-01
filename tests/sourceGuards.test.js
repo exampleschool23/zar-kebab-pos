@@ -621,6 +621,7 @@ test('AdminTables localizes visible management labels', () => {
 
 test('starter cafe menu expansion seeds polished categories and items', () => {
   const migration = readSource('supabase/030_starter_cafe_menu_expansion.sql')
+  const repairMigration = readSource('supabase/031_fix_starter_menu_image_urls.sql')
   const mockData = readSource('src/data/mockData.js')
 
   for (const category of ['combos', 'sides', 'desserts']) {
@@ -644,4 +645,11 @@ test('starter cafe menu expansion seeds polished categories and items', () => {
   }
 
   assert.match(migration, /on conflict \(id\) do nothing/)
+  assert.doesNotMatch(migration, /source\.unsplash\.com/)
+  assert.doesNotMatch(mockData, /source\.unsplash\.com/)
+  assert.doesNotMatch(repairMigration, /source\.unsplash\.com/)
+  assert.match(repairMigration, /update public\.menu_categories/)
+  assert.match(repairMigration, /update public\.menu_items/)
+  assert.match(repairMigration, /'combos'/)
+  assert.match(repairMigration, /'zk_mixed_grill'/)
 })
