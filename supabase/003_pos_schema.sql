@@ -34,6 +34,7 @@ create table if not exists public.menu_items (
   description_ru   text        default '',
   description_en   text        default '',
   price            integer     not null default 0,
+  kcal             integer     not null default 0,
   image_url        text        default '',
   available        boolean     not null default true,
   sort_order       integer     not null default 0,
@@ -158,22 +159,22 @@ on conflict (id) do nothing;
 
 -- Menu items
 insert into public.menu_items
-  (id, category_id, name_uz, name_ru, name_en, description_uz, description_ru, description_en, price, image_url, available, sort_order)
+  (id, category_id, name_uz, name_ru, name_en, description_uz, description_ru, description_en, price, kcal, image_url, available, sort_order)
 values
-  ('m1',  'kebab',  'ZAR KEBAB',            'ZAR KEBAB',             'ZAR KEBAB',          'Maxsus ZAR kebab',            'Фирменный ZAR кебаб',           'Our signature ZAR kebab',           80000, 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&q=80', true,  1),
-  ('m2',  'kebab',  'Lula kebab',            'Люля-кебаб',            'Lula kebab',         'Mol go''shtidan',             'Из говядины',                   'Beef minced kebab',                 24000, 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=400&q=80', true,  2),
-  ('m3',  'kebab',  'Shashlik mol go''shti', 'Шашлык из говядины',    'Shashlik beef',      'Mol go''shtidan shashlik',    'Шашлык из говядины на мангале', 'Beef shashlik on the grill',        25000, 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80', true,  3),
-  ('m4',  'kebab',  'Shashlik tovuq',        'Шашлык из курицы',      'Shashlik chicken',   'Tovuq go''shtidan shashlik',  'Шашлык из курицы',              'Chicken shashlik',                  22000, 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&q=80', true,  4),
-  ('m5',  'main',   'Chiroqchi',             'Чироқчи',               'Chiroqchi',          'Maxsus chiroqchi taomi',      'Фирменное блюдо Чироқчи',       'Special Chiroqchi dish',            17000, 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80', true,  5),
-  ('m6',  'main',   'Do''lma',               'Долма',                 'Dolma',              'An''anaviy do''lma',           'Традиционная долма',             'Traditional dolma',                 25000, 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400&q=80', true,  6),
-  ('m7',  'first',  'Lag''mon',              'Лагман',                'Lagman',             'Uyda tayyorlangan lag''mon',  'Домашний лагман',               'Homemade lagman noodle soup',       32000, 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&q=80', true,  7),
-  ('m8',  'first',  'Chechevitsa',           'Чечевица',              'Lentil Soup',        'Yasmiq sho''rva',             'Суп из чечевицы',               'Traditional lentil soup',           25000, 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&q=80', true,  8),
-  ('m9',  'salads', 'Achichuk salat',        'Салат Ачичук',          'Achichuk salad',     'Pomidor va piyozdan',         'Из помидоров и лука',           'Tomato and onion salad',            15000, 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&q=80', true,  9),
-  ('m10', 'salads', 'Yapon salati',          'Японский салат',        'Japanese salad',     'Yapon uslubidagi salat',      'Салат в японском стиле',        'Japanese style salad',              25000, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80', true, 10),
-  ('m11', 'drinks', 'Choy',                  'Чай',                   'Tea',                'Issiq choy',                  'Горячий чай',                   'Hot tea',                            8000, 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80', true, 11),
-  ('m12', 'drinks', 'Coca-Cola 0.5L',        'Кока-Кола 0.5L',        'Coca-Cola 0.5L',     '0.5L shisha',                 '0.5L бутылка',                  '0.5L bottle',                       12000, 'https://images.unsplash.com/photo-1554866585-cd94860890b7?w=400&q=80', true, 12),
-  ('m13', 'drinks', 'Sok',                   'Сок',                   'Juice',              'Tabiiy meva sharbati',        'Натуральный фруктовый сок',     'Natural fruit juice',               20000, 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&q=80', true, 13),
-  ('m14', 'bread',  'Non',                   'Лепёшка',               'Flatbread',          'Tandirda pishirilgan non',    'Лепёшка из тандыра',            'Freshly baked tandoor flatbread',    5000, 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80', true, 14)
+  ('m1',  'kebab',  'ZAR KEBAB',            'ZAR KEBAB',             'ZAR KEBAB',          'Maxsus ZAR kebab',            'Фирменный ZAR кебаб',           'Our signature ZAR kebab',           80000, 980, 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=400&q=80', true,  1),
+  ('m2',  'kebab',  'Lula kebab',            'Люля-кебаб',            'Lula kebab',         'Mol go''shtidan',             'Из говядины',                   'Beef minced kebab',                 24000, 360, 'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=400&q=80', true,  2),
+  ('m3',  'kebab',  'Shashlik mol go''shti', 'Шашлык из говядины',    'Shashlik beef',      'Mol go''shtidan shashlik',    'Шашлык из говядины на мангале', 'Beef shashlik on the grill',        25000, 420, 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80', true,  3),
+  ('m4',  'kebab',  'Shashlik tovuq',        'Шашлык из курицы',      'Shashlik chicken',   'Tovuq go''shtidan shashlik',  'Шашлык из курицы',              'Chicken shashlik',                  22000, 330, 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&q=80', true,  4),
+  ('m5',  'main',   'Chiroqchi',             'Чироқчи',               'Chiroqchi',          'Maxsus chiroqchi taomi',      'Фирменное блюдо Чироқчи',       'Special Chiroqchi dish',            17000, 520, 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&q=80', true,  5),
+  ('m6',  'main',   'Do''lma',               'Долма',                 'Dolma',              'An''anaviy do''lma',           'Традиционная долма',             'Traditional dolma',                 25000, 460, 'https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400&q=80', true,  6),
+  ('m7',  'first',  'Lag''mon',              'Лагман',                'Lagman',             'Uyda tayyorlangan lag''mon',  'Домашний лагман',               'Homemade lagman noodle soup',       32000, 610, 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&q=80', true,  7),
+  ('m8',  'first',  'Chechevitsa',           'Чечевица',              'Lentil Soup',        'Yasmiq sho''rva',             'Суп из чечевицы',               'Traditional lentil soup',           25000, 340, 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&q=80', true,  8),
+  ('m9',  'salads', 'Achichuk salat',        'Салат Ачичук',          'Achichuk salad',     'Pomidor va piyozdan',         'Из помидоров и лука',           'Tomato and onion salad',            15000, 120, 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&q=80', true,  9),
+  ('m10', 'salads', 'Yapon salati',          'Японский салат',        'Japanese salad',     'Yapon uslubidagi salat',      'Салат в японском стиле',        'Japanese style salad',              25000, 260, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80', true, 10),
+  ('m11', 'drinks', 'Choy',                  'Чай',                   'Tea',                'Issiq choy',                  'Горячий чай',                   'Hot tea',                            8000, 0, 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80', true, 11),
+  ('m12', 'drinks', 'Coca-Cola 0.5L',        'Кока-Кола 0.5L',        'Coca-Cola 0.5L',     '0.5L shisha',                 '0.5L бутылка',                  '0.5L bottle',                       12000, 210, 'https://images.unsplash.com/photo-1554866585-cd94860890b7?w=400&q=80', true, 12),
+  ('m13', 'drinks', 'Sok',                   'Сок',                   'Juice',              'Tabiiy meva sharbati',        'Натуральный фруктовый сок',     'Natural fruit juice',               20000, 180, 'https://images.unsplash.com/photo-1600271886742-f049cd451bba?w=400&q=80', true, 13),
+  ('m14', 'bread',  'Non',                   'Лепёшка',               'Flatbread',          'Tandirda pishirilgan non',    'Лепёшка из тандыра',            'Freshly baked tandoor flatbread',    5000, 260, 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80', true, 14)
 on conflict (id) do nothing;
 
 -- Tables (all start available — real status is managed by the app)

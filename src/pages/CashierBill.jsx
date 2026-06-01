@@ -9,6 +9,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getItemName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import { kcalLabel } from '../lib/nutrition'
 import {
   getGroupedOrderItems,
   getPaymentMethodSummary,
@@ -612,6 +613,7 @@ export default function CashierBill() {
                   {order.items.map((item, i) => {
                     const mi   = menuItemMap[item.menu_item_id]
                     const desc = getDesc(mi, lang)
+                    const kcal = kcalLabel(mi, lang)
                     const isCounter = isCashierQuickItem(mi)
                     return (
                       <div
@@ -638,6 +640,11 @@ export default function CashierBill() {
                             <p className="font-bold text-sm text-[#1F2937] line-clamp-1">{item.name}</p>
                             {desc && (
                               <p className="text-[11px] text-[#6B7280] line-clamp-1 mt-0.5">{desc}</p>
+                            )}
+                            {kcal && (
+                              <span className="mt-1 inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                                {kcal}
+                              </span>
                             )}
                             {item.notes && (
                               <p className="text-[11px] text-amber-600 mt-0.5 line-clamp-1">

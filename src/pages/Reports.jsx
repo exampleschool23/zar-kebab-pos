@@ -4,6 +4,7 @@ import { useApp } from '../store/AppContext'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import { kcalLabel } from '../lib/nutrition'
 import {
   getOrderDate,
   getOrderItems,
@@ -679,6 +680,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
           <div className="space-y-3">
             {items.map((item, i) => {
               const mi = menuItemMap[item.menu_item_id]
+              const kcal = kcalLabel(mi || item, lang)
               return (
                 <div key={i} className="flex items-start gap-3">
                   <div className="w-12 h-12 rounded-xl overflow-hidden bg-orange-50 border border-gray-100 flex-shrink-0">
@@ -692,6 +694,11 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-[#1F2937] truncate">{item.name || mi?.name_en || 'Item'}</p>
+                    {kcal && (
+                      <span className="mt-1 inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                        {kcal}
+                      </span>
+                    )}
                     {item.notes && <p className="text-[11px] text-[#9CA3AF]">{item.notes}</p>}
                     <p className="text-[11px] text-[#6B7280] mt-0.5">
                       {lang === 'uz' ? 'Dona' : lang === 'ru' ? 'Кол' : 'Qty'} {item.quantity} × {formatCurrency(item.price || 0)}

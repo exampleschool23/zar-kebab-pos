@@ -11,6 +11,7 @@ import UnifiedSidebar from '../components/UnifiedSidebar'
 import { loadOrders } from '../lib/db'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
+import { kcalLabel } from '../lib/nutrition'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_BADGE = {
@@ -226,6 +227,7 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
   const desc = menuItem
     ? (menuItem[`description_${lang}`] || menuItem.description_en || menuItem.description_uz || '')
     : ''
+  const kcal = kcalLabel(menuItem, lang)
 
   return (
     <div className={`flex gap-3 rounded-2xl border p-3 transition-all duration-300 ${
@@ -262,7 +264,12 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
         <p className="font-bold text-base text-[#1F2937] leading-tight whitespace-normal break-words line-clamp-3 mb-1">{title}</p>
 
         {desc && (
-          <p className="text-xs text-[#6B7280] line-clamp-2 leading-snug mb-1.5">{desc}</p>
+          <p className="text-xs text-[#6B7280] line-clamp-2 leading-snug mb-1">{desc}</p>
+        )}
+        {kcal && (
+          <span className="mb-2 inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+            {kcal}
+          </span>
         )}
 
         {item.notes && (

@@ -9,7 +9,7 @@ const TABLE_CHECKS = [
   { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name'] },
   { name: 'loyalty_cards', columns: ['id', 'card_number', 'cashback_type', 'balance', 'total_earned', 'total_redeemed', 'is_active'] },
   { name: 'loyalty_transactions', columns: ['id', 'loyalty_card_id', 'type', 'amount', 'balance_before', 'balance_after', 'cashback_percent_used', 'card_type_at_transaction'] },
-  { name: 'menu_items', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'price', 'sort_order'] },
+  { name: 'menu_items', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'price', 'kcal', 'sort_order'] },
   { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'sort_order'] },
   { name: 'profiles', columns: ['id', 'role', 'full_name'] },
   { name: 'order_payment_audit', columns: ['id', 'order_id', 'action', 'changed_at'] },

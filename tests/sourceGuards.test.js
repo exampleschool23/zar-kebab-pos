@@ -653,3 +653,29 @@ test('starter cafe menu expansion seeds polished categories and items', () => {
   assert.match(repairMigration, /'combos'/)
   assert.match(repairMigration, /'zk_mixed_grill'/)
 })
+
+test('menu items support and display kcal nutrition values', () => {
+  const schema = readSource('supabase/003_pos_schema.sql')
+  const migration = readSource('supabase/032_menu_item_kcal.sql')
+  const mockData = readSource('src/data/mockData.js')
+  const dbHealth = readSource('src/lib/dbHealth.js')
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const productCards = readSource('src/components/MenuProductCards.jsx')
+  const cartPanel = readSource('src/components/CartPanel.jsx')
+  const kitchen = readSource('src/pages/Kitchen.jsx')
+  const cashierBill = readSource('src/pages/CashierBill.jsx')
+  const reports = readSource('src/pages/Reports.jsx')
+
+  assert.match(schema, /kcal\s+integer\s+not null default 0/)
+  assert.match(migration, /add column if not exists kcal integer not null default 0/)
+  assert.match(migration, /menu_items_kcal_nonnegative/)
+  assert.match(migration, /'zk_mixed_grill', 1650/)
+  assert.match(mockData, /id: 'm1'[\s\S]*?kcal: 980/)
+  assert.match(mockData, /id: 'zk_family_grill_set'[\s\S]*?kcal: 3200/)
+  assert.match(dbHealth, /'kcal'/)
+  assert.match(adminMenu, /setF\('kcal'\)/)
+  assert.match(adminMenu, /Math\.max\(0, Math\.round\(Number\(form\.kcal\) \|\| 0\)\)/)
+  for (const source of [adminMenu, productCards, cartPanel, kitchen, cashierBill, reports]) {
+    assert.match(source, /kcalLabel/)
+  }
+})

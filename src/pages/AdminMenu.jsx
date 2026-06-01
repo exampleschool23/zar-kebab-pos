@@ -11,6 +11,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useApp } from '../store/AppContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import { kcalLabel } from '../lib/nutrition'
 import AppShell from '../components/AppShell'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
@@ -226,7 +227,14 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
             {getCategoryName(cat, lang)}
           </p>
         )}
-        <p className="text-[#ff5a00] font-black text-[16px] mb-2">{formatCurrency(item.price)}</p>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <p className="text-[#ff5a00] font-black text-[16px]">{formatCurrency(item.price)}</p>
+          {kcalLabel(item, lang) && (
+            <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+              {kcalLabel(item, lang)}
+            </span>
+          )}
+        </div>
         <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit mb-3 ${
           item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
         }`}>
@@ -398,7 +406,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  price: '', image_url: '', available: true, sort_order: '',
+  price: '', kcal: '', image_url: '', available: true, sort_order: '',
   show_in_cashier_quick_items: false,
   send_to_kitchen: false,
   quick_item_sort_order: '',
@@ -507,6 +515,7 @@ export default function AdminMenu() {
       payload: {
         ...form,
         price: Number(form.price),
+        kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
         sort_order: Number(form.sort_order) || 0,
         quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
         show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
@@ -758,6 +767,9 @@ export default function AdminMenu() {
                     <div className="p-2.5">
                       <p className="font-black text-gray-900 text-[12px] truncate">{getItemName(activeItem, lang)}</p>
                       <p className="text-[#ff5a00] font-black text-xs">{formatCurrency(activeItem.price)}</p>
+                      {kcalLabel(activeItem, lang) && (
+                        <p className="text-[#64748B] font-black text-[10px]">{kcalLabel(activeItem, lang)}</p>
+                      )}
                     </div>
                   </div>
                 ) : null
@@ -1096,6 +1108,7 @@ export default function AdminMenu() {
             <Field label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} />
             <Field label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} />
             <Field label={`${t(lang, 'price')} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="25000" />
+            <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />
             <ImageUploadField label={t(lang, 'imageUrl')} value={form.image_url} onChange={setF('image_url')} />
             <Field label="Sort order" type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
             <Field
