@@ -8,13 +8,14 @@ import {
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { PAGE_ACCESS } from '../lib/permissions'
+import { t } from '../lib/i18n'
 
 // ── Nav definition — roles come from PAGE_ACCESS to stay in sync ───────────────
 const NAV = [
   {
     key: 'dashboard',
     icon: LayoutDashboard,
-    labels: { uz: 'Dashboard', ru: 'Dashboard', en: 'Dashboard' },
+    labels: { uz: 'Boshqaruv', ru: 'Панель', en: 'Dashboard' },
     path: '/admin',
     roles: PAGE_ACCESS.dashboard,
   },
@@ -152,7 +153,7 @@ export default function UnifiedSidebar({ onClose }) {
         </div>
         {role === 'stakeholder' && (
           <span className="ml-auto flex-shrink-0 text-[9px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md px-1.5 py-0.5 leading-none uppercase tracking-wide">
-            Viewer
+            {t(lang, 'viewer')}
           </span>
         )}
       </div>
@@ -208,7 +209,7 @@ export default function UnifiedSidebar({ onClose }) {
             <span className="text-[#6B7280] text-xs font-black">{initial}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[#1F2937] text-xs font-semibold truncate">{displayName || 'User'}</p>
+            <p className="text-[#1F2937] text-xs font-semibold truncate">{displayName || t(lang, 'user')}</p>
             <p className="text-[#9CA3AF] text-[10px] truncate">{profile?.email || ''}</p>
           </div>
         </div>

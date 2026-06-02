@@ -469,9 +469,9 @@ export default function WaiterOrder() {
       <div className="min-h-screen bg-[#FAF7F0] flex items-center justify-center">
         <div className="text-center">
           <UtensilsCrossed size={40} className="mx-auto mb-3 text-gray-200" />
-          <p className="mb-4 text-sm text-gray-400">Table not found</p>
+          <p className="mb-4 text-sm text-gray-400">{t(lang, 'tableNotFound')}</p>
           <button onClick={() => navigate('/waiter/tables')} className="text-[#ff5a00] font-semibold hover:underline text-sm">
-            Back
+            {t(lang, 'back')}
           </button>
         </div>
       </div>

@@ -212,7 +212,7 @@ function LoginCard({
                 type="button"
                 onClick={() => setShowPass(s => !s)}
                 className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55 transition-colors hover:text-[#D4AF37]"
-                aria-label={showPass ? 'Hide password' : 'Show password'}
+                aria-label={showPass ? t(lang, 'hidePassword') : t(lang, 'showPassword')}
               >
                 {showPass ? <EyeOff size={21} /> : <Eye size={21} />}
               </button>
@@ -240,7 +240,7 @@ function LoginCard({
                 type="button"
                 onClick={() => setShowConfirmPass(s => !s)}
                 className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55 transition-colors hover:text-[#D4AF37]"
-                aria-label={showConfirmPass ? 'Hide password' : 'Show password'}
+                aria-label={showConfirmPass ? t(lang, 'hidePassword') : t(lang, 'showPassword')}
               >
                 {showConfirmPass ? <EyeOff size={21} /> : <Eye size={21} />}
               </button>
@@ -697,7 +697,7 @@ export default function Login() {
                         type="button"
                         onClick={() => setShowPass(s => !s)}
                         className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55 transition-colors hover:text-[#D4AF37]"
-                        aria-label={showPass ? 'Hide password' : 'Show password'}
+                        aria-label={showPass ? t(lang, 'hidePassword') : t(lang, 'showPassword')}
                       >
                         {showPass ? <EyeOff size={21} /> : <Eye size={21} />}
                       </button>
@@ -725,7 +725,7 @@ export default function Login() {
                         type="button"
                         onClick={() => setShowConfirmPass(s => !s)}
                         className="absolute right-5 top-1/2 -translate-y-1/2 text-[#F5EBD4]/55 transition-colors hover:text-[#D4AF37]"
-                        aria-label={showConfirmPass ? 'Hide password' : 'Show password'}
+                        aria-label={showConfirmPass ? t(lang, 'hidePassword') : t(lang, 'showPassword')}
                       >
                         {showConfirmPass ? <EyeOff size={21} /> : <Eye size={21} />}
                       </button>

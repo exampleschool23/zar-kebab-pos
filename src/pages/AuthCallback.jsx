@@ -2,9 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Loader2 } from 'lucide-react'
+import { useApp } from '../store/AppContext'
+import { t } from '../lib/i18n'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
+  const { state } = useApp()
+  const lang = state.lang || 'ru'
   const [errorMsg, setErrorMsg] = useState('')
   const [debugLog, setDebugLog] = useState([])
 
@@ -70,9 +74,9 @@ export default function AuthCallback() {
       <div className="min-h-screen flex items-center justify-center bg-[#faf9f7] p-4">
         <div className="bg-white rounded-2xl border border-red-100 shadow-xl p-8 text-center max-w-sm w-full">
           <div className="text-3xl mb-3">⚠️</div>
-          <h2 className="font-black text-[#141414] mb-2">Sign-in failed</h2>
+          <h2 className="font-black text-[#141414] mb-2">{t(lang, 'signInFailed')}</h2>
           <p className="text-sm text-red-500 mb-2">{errorMsg}</p>
-          <p className="text-xs text-gray-400">Redirecting to login...</p>
+          <p className="text-xs text-gray-400">{t(lang, 'redirectingToLogin')}</p>
         </div>
       </div>
     )
@@ -82,7 +86,7 @@ export default function AuthCallback() {
     <div className="min-h-screen flex items-center justify-center bg-[#faf9f7]">
       <div className="text-center max-w-sm w-full px-4">
         <Loader2 size={32} className="animate-spin text-[#ff5a00] mx-auto mb-3" />
-        <p className="text-sm text-gray-500 mb-4">Signing you in...</p>
+        <p className="text-sm text-gray-500 mb-4">{t(lang, 'signingIn')}</p>
 
         {/* Debug log — visible on screen so you can report what's happening */}
         {debugLog.length > 0 && (

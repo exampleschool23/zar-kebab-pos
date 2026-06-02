@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppProvider, useApp } from './store/AppContext'
 import { defaultPath as roleDefaultPath, isPublicOnlyRole, PAGE_ACCESS } from './lib/permissions'
+import { t } from './lib/i18n'
 
 import Login          from './pages/Login'
 import AuthCallback   from './pages/AuthCallback'
@@ -61,21 +62,24 @@ function Spinner() {
 
 // Disabled account screen
 function DisabledAccount({ signOut }) {
+  const { state } = useApp()
+  const lang = state.lang || 'ru'
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#faf9f7] p-4">
       <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-10 text-center max-w-sm w-full">
         <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
           <span className="text-2xl">🚫</span>
         </div>
-        <h2 className="font-black text-[#141414] text-lg mb-2">Account disabled</h2>
+        <h2 className="font-black text-[#141414] text-lg mb-2">{t(lang, 'accountDisabled')}</h2>
         <p className="text-sm text-gray-500 mb-6">
-          Your account has been disabled. Please contact the restaurant owner.
+          {t(lang, 'accountDisabledMessage')}
         </p>
         <button
           onClick={signOut}
           className="w-full bg-[#141414] text-white rounded-xl py-3 font-bold text-sm hover:bg-black transition-colors"
         >
-          Sign out
+          {t(lang, 'logout')}
         </button>
       </div>
     </div>
@@ -143,6 +147,8 @@ function RoleRedirect() {
   const { session, profile, loading, signOut } = useAuth()
   const navigate = useNavigate()
   const [profileTimeout, setProfileTimeout] = React.useState(false)
+  const { state } = useApp()
+  const lang = state.lang || 'ru'
 
   useEffect(() => {
     if (loading) return
@@ -169,11 +175,11 @@ function RoleRedirect() {
       <div className="min-h-screen flex items-center justify-center bg-[#faf9f7] p-4">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-8 text-center max-w-sm w-full">
           <div className="text-3xl mb-4">⚠️</div>
-          <h2 className="font-black text-[#141414] mb-2">Could not load your profile</h2>
-          <p className="text-sm text-gray-500 mb-6">There was a problem connecting to the database.</p>
+          <h2 className="font-black text-[#141414] mb-2">{t(lang, 'profileLoadFailed')}</h2>
+          <p className="text-sm text-gray-500 mb-6">{t(lang, 'profileLoadFailedMessage')}</p>
           <button onClick={signOut}
             className="w-full bg-[#141414] text-white rounded-xl py-3 font-bold text-sm hover:bg-black transition-colors">
-            Sign out and try again
+            {t(lang, 'signOutAndTryAgain')}
           </button>
         </div>
       </div>

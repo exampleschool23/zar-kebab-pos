@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { ArrowLeft, LayoutGrid, Minus, Plus, UtensilsCrossed } from 'lucide-react'
-import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
+import { getCategoryName, getItemDesc, getItemName, t } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import ImageLoadShimmer from './ImageLoadShimmer'
@@ -189,6 +189,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     quantitySub: lang === 'uz' ? 'Porsiyalar sonini tanlang' : lang === 'ru' ? 'Выберите количество порций' : 'Choose how many portions',
     notes: lang === 'uz' ? 'Maxsus izohlar' : lang === 'ru' ? 'Особые заметки' : 'Special notes',
     notesSub: lang === 'uz' ? 'Oshxona uchun ixtiyoriy ko‘rsatma' : lang === 'ru' ? 'Дополнительная инструкция для кухни' : 'Optional kitchen instruction',
+    notesPlaceholder: lang === 'uz' ? 'Masalan: piyozsiz, yaxshi pishiring...' : lang === 'ru' ? 'Например: без лука, хорошо прожарить...' : 'For example: no onion, well done...',
     cancel: lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel',
     add: lang === 'uz' ? "Savatga qo'shish" : lang === 'ru' ? 'Добавить в корзину' : 'Add to Cart',
   }
@@ -318,7 +319,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
-                  placeholder="Например: без лука, хорошо прожарить..."
+                  placeholder={labels.notesPlaceholder}
                   rows={3}
                   className="w-full resize-none rounded-[18px] border border-[#E5E7EB] bg-white px-4 py-3 text-[14px] leading-6 text-[#1F2937] placeholder-[#9CA3AF] transition-all focus:border-[#ff5a00] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/15"
                 />
@@ -336,7 +337,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
             onClick={onCancel}
             className="h-14 flex-1 rounded-2xl border border-[#E5E7EB] bg-white text-sm font-black text-[#64748B] hover:bg-[#F8FAFC] active:scale-[0.99] transition-all"
           >
-            {labels.cancel}
+              {t(lang, 'cancel')}
           </button>
           <button
             onClick={() => onAddToCart(item, qty, notes)}

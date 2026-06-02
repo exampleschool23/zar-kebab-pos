@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
-import { getItemName } from '../lib/i18n'
+import { getItemName, t } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
 import { ArrowLeft, Printer } from 'lucide-react'
 import {
@@ -751,13 +751,16 @@ function ReceiptShell({ lang, dispatch, onBack, autoPrint, children }) {
 }
 
 function NotFound({ onBack }) {
+  const { state } = useApp()
+  const lang = state.lang || 'ru'
+
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white rounded-2xl p-10 text-center shadow-lg max-w-xs">
         <p className="text-4xl mb-3">🧾</p>
-        <p className="text-gray-600 font-semibold">Order not found</p>
+        <p className="text-gray-600 font-semibold">{t(lang, 'orderNotFound')}</p>
         <button onClick={onBack} className="mt-5 text-[#ff5a00] font-bold hover:underline text-sm">
-          ← Back
+          ← {t(lang, 'back')}
         </button>
       </div>
     </div>

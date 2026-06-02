@@ -2,9 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Loader2, LockKeyhole } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useApp } from '../store/AppContext'
+import { t } from '../lib/i18n'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
+  const { state } = useApp()
+  const lang = state.lang || 'ru'
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -21,7 +25,7 @@ export default function ResetPassword() {
       if (!alive) return
       setChecking(false)
       if (!session) {
-        setError('Ссылка недействительна или уже истекла. Запросите новую ссылку восстановления.')
+        setError(t(lang, 'resetPasswordInvalidLink'))
       }
     }
 
@@ -38,11 +42,11 @@ export default function ResetPassword() {
     setInfo('')
 
     if (password.length < 6) {
-      setError('Пароль должен быть не короче 6 символов.')
+      setError(t(lang, 'resetPasswordMinLength'))
       return
     }
     if (password !== confirm) {
-      setError('Пароли не совпадают.')
+      setError(t(lang, 'authPasswordMismatch'))
       return
     }
 
@@ -55,7 +59,7 @@ export default function ResetPassword() {
       return
     }
 
-    setInfo('Пароль обновлен. Теперь войдите с новым паролем.')
+    setInfo(t(lang, 'resetPasswordUpdated'))
     await supabase.auth.signOut()
     setTimeout(() => navigate('/login', { replace: true }), 1200)
   }
@@ -67,15 +71,15 @@ export default function ResetPassword() {
           <LockKeyhole size={22} className="text-[#ff5a00]" />
         </div>
 
-        <h1 className="text-xl font-black text-[#141414]">Создайте новый пароль</h1>
+        <h1 className="text-xl font-black text-[#141414]">{t(lang, 'resetPasswordTitle')}</h1>
         <p className="text-sm text-gray-400 mt-1 mb-6">
-          Введите новый пароль для входа по email.
+          {t(lang, 'resetPasswordSubtitle')}
         </p>
 
         {checking ? (
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <Loader2 size={15} className="animate-spin" />
-            Проверяем ссылку...
+            {t(lang, 'resetPasswordChecking')}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -91,7 +95,7 @@ export default function ResetPassword() {
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">Новый пароль</label>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t(lang, 'newPassword')}</label>
               <div className="relative">
                 <input
                   type={showPass ? 'text' : 'password'}
@@ -104,6 +108,7 @@ export default function ResetPassword() {
                 <button
                   type="button"
                   onClick={() => setShowPass(s => !s)}
+                  aria-label={showPass ? t(lang, 'hidePassword') : t(lang, 'showPassword')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -112,7 +117,7 @@ export default function ResetPassword() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">Повторите пароль</label>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">{t(lang, 'repeatPassword')}</label>
               <input
                 type={showPass ? 'text' : 'password'}
                 value={confirm}
@@ -129,7 +134,7 @@ export default function ResetPassword() {
               className="w-full bg-[#ff5a00] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#cc4800] transition-colors disabled:opacity-60 shadow-lg shadow-orange-100 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={15} className="animate-spin" />}
-              Сохранить пароль
+              {t(lang, 'savePassword')}
             </button>
 
             <button
@@ -137,7 +142,7 @@ export default function ResetPassword() {
               onClick={() => navigate('/login', { replace: true })}
               className="w-full text-sm text-[#ff5a00] font-semibold hover:underline"
             >
-              Вернуться ко входу
+              {t(lang, 'backToSignIn')}
             </button>
           </form>
         )}

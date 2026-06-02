@@ -32,6 +32,7 @@ import AppShell from '../components/AppShell'
 // ── Localisation ──────────────────────────────────────────────────────────────
 const L = {
   uz: {
+    title:          'Boshqaruv paneli',
     greeting:       n => `Xush kelibsiz, ${n}! 👋`,
     subtitle:       "Bugun Zar Kebab'da nima bo'layotganini ko'rishingiz mumkin.",
     todayRevenue:   'Bugungi daromad',
@@ -88,6 +89,7 @@ const L = {
     noData:         "Ma'lumot yo'q",
   },
   ru: {
+    title:          'Панель управления',
     greeting:       n => `Добро пожаловать, ${n}! 👋`,
     subtitle:       'Вот что сегодня происходит в Zar Kebab.',
     todayRevenue:   'Доход сегодня',
@@ -144,6 +146,7 @@ const L = {
     noData:         'Нет данных',
   },
   en: {
+    title:          'Dashboard',
     greeting:       n => `Welcome back, ${n}! 👋`,
     subtitle:       "Here's what's happening at Zar Kebab today.",
     todayRevenue:   "Today's Revenue",
@@ -678,7 +681,7 @@ export default function AdminDashboard() {
 
   if (!state.loaded) {
     return (
-      <AppShell title="Dashboard">
+      <AppShell title={l.title}>
         <div className="flex flex-col items-center justify-center h-64 gap-3">
           <Loader2 size={28} className="animate-spin text-[#ff5a00]" />
           <p className="text-sm text-gray-400">{l.loading}</p>

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
-import { getItemName } from '../lib/i18n'
+import { getItemName, t, tf } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import {
@@ -52,12 +52,12 @@ function payLabel(m, lang) {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function elapsedSince(iso) {
+function elapsedSince(iso, lang) {
   if (!iso) return null
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1)  return '< 1 min ago'
-  if (m < 60) return `${m} min ago`
-  return `${Math.floor(m / 60)}h ${m % 60}m ago`
+  if (m < 1)  return t(lang, 'justNow')
+  if (m < 60) return tf(lang, 'minutesAgo', m)
+  return tf(lang, 'hoursMinutesAgo', Math.floor(m / 60), m % 60)
 }
 
 function getDesc(menuItem, lang) {
@@ -432,6 +432,7 @@ export default function CashierBill() {
     counterItems: lang === 'uz' ? 'Kassa mahsulotlari' : lang === 'ru' ? 'Товары у кассы' : 'Counter Items',
     counterItemsSub: lang === 'uz' ? 'Bu hisobga tezkor kassa mahsulotlarini qo‘shing' : lang === 'ru' ? 'Добавьте быстрые товары кассы к этому счёту' : 'Add quick cashier items to this bill',
     noTable:      lang === 'uz' ? 'Stol tanlanmagan' : lang === 'ru' ? 'Стол не выбран' : 'No table selected',
+    removePayment: t(lang, 'removePayment'),
   }
 
   if (!loaded || loadError) {
@@ -579,7 +580,7 @@ export default function CashierBill() {
                         {order.created_at && (
                           <span className="flex items-center gap-1">
                             <Clock size={11} />
-                            {lbl.opened}: {elapsedSince(order.created_at)}
+                            {lbl.opened}: {elapsedSince(order.created_at, lang)}
                           </span>
                         )}
                       </div>
@@ -1078,7 +1079,7 @@ export default function CashierBill() {
                                 removePaymentRow(row.id)
                               }}
                               className="w-8 h-8 rounded-lg border border-[#E5E7EB] text-[#9CA3AF] hover:text-red-600 hover:border-red-200"
-                              aria-label="Remove payment"
+                              aria-label={lbl.removePayment}
                             >
                               ×
                             </button>

@@ -20,12 +20,77 @@ import {
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
   ImagePlus, Loader2,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import ImageLoadShimmer from '../components/ImageLoadShimmer'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
+
+const MAX_UPLOAD_IMAGE_SIZE = 5 * 1024 * 1024
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    const objectUrl = URL.createObjectURL(file)
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      resolve(image)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Could not read image'))
+    }
+    image.src = objectUrl
+  })
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not compress image')), type, quality)
+  })
+}
+
+async function compressMenuImage(file) {
+  if (!file.type.startsWith('image/')) throw new Error('Only image uploads are allowed')
+  if (file.size > MAX_UPLOAD_IMAGE_SIZE) throw new Error('Image must be 5 MB or smaller')
+
+  const image = await loadImage(file)
+  const maxWidth = 900
+  const scale = Math.min(1, maxWidth / image.naturalWidth)
+  const width = Math.max(1, Math.round(image.naturalWidth * scale))
+  const height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  context.drawImage(image, 0, 0, width, height)
+  const blob = await canvasToBlob(canvas, 'image/webp', 0.82)
+  return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
+}
+
+async function uploadMenuImageToR2({ file, type, entityId }) {
+  const body = new FormData()
+  body.append('file', file)
+  body.append('type', type)
+  if (entityId) body.append('entityId', entityId)
+
+  const response = await fetch('/api/menu-image/upload', {
+    method: 'POST',
+    body,
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || 'Could not upload image')
+  return data
+}
+
+async function deleteMenuImageFromR2(imageUrl) {
+  if (!imageUrl) return
+  await fetch('/api/menu-image/delete', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: imageUrl }),
+  })
+}
 
 function SafeMenuImage({ src, alt = '', className = '', fallbackClassName = '', iconSize = 28 }) {
   return (
@@ -76,7 +141,7 @@ function Field({ label, type = 'text', value, onChange, placeholder, ...inputPro
   )
 }
 
-function ImageUploadField({ label, value, onChange }) {
+function ImageUploadField({ label, value, onChange, lang, type, entityId }) {
   const fileRef = useRef(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -88,23 +153,11 @@ function ImageUploadField({ label, value, onChange }) {
     setUploading(true)
     setError('')
     try {
-      const ext  = file.name.split('.').pop()
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      // Create bucket if it doesn't exist yet
-      const { data: buckets } = await supabase.storage.listBuckets()
-      if (!buckets?.find(b => b.name === 'menu-images')) {
-        await supabase.storage.createBucket('menu-images', { public: true })
-      }
-
-      const { error: uploadError } = await supabase.storage.from('menu-images').upload(path, file, { upsert: true })
-      if (uploadError) {
-        setError('Upload failed: ' + uploadError.message)
-        return
-      }
-      const { data } = supabase.storage.from('menu-images').getPublicUrl(path)
-      onChange({ target: { value: data.publicUrl } })
+      const compressed = await compressMenuImage(file)
+      const data = await uploadMenuImageToR2({ file: compressed, type, entityId })
+      onChange({ target: { value: data.url } })
     } catch (err) {
-      setError('Upload error: ' + err.message)
+      setError(`${t(lang, 'uploadError')}: ${err.message}`)
     } finally {
       setUploading(false)
       input.value = ''
@@ -122,7 +175,7 @@ function ImageUploadField({ label, value, onChange }) {
           className="flex-shrink-0 flex items-center gap-1.5 border-2 border-dashed border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-500 hover:border-[#ff5a00] hover:text-[#ff5a00] transition-colors disabled:opacity-50"
         >
           {uploading ? <Loader2 size={15} className="animate-spin" /> : <ImagePlus size={15} />}
-          {uploading ? 'Uploading…' : 'Upload'}
+          {uploading ? t(lang, 'uploading') : t(lang, 'upload')}
         </button>
         <input
           type="text"
@@ -134,7 +187,7 @@ function ImageUploadField({ label, value, onChange }) {
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
       </div>
       {value && (
-        <img src={value} alt="preview" className="mt-2 h-20 w-20 object-cover rounded-xl border border-gray-200" />
+        <img src={value} alt={t(lang, 'imagePreview')} className="mt-2 h-20 w-20 object-cover rounded-xl border border-gray-200" />
       )}
       {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
@@ -511,9 +564,12 @@ export default function AdminMenu() {
     })
     setItemModal('edit')
   }
-  function saveItem() {
+  async function saveItem() {
     if (!form.name_uz || !form.price || !form.category_id) return
-    dispatch({
+    const oldImageUrl = itemModal === 'edit'
+      ? state.menuItems.find(item => item.id === form.id)?.image_url
+      : ''
+    const result = await dispatch({
       type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
       payload: {
         ...form,
@@ -527,6 +583,9 @@ export default function AdminMenu() {
         send_to_kitchen: !!form.send_to_kitchen,
       },
     })
+    if (!result?.error && oldImageUrl && oldImageUrl !== form.image_url) {
+      await deleteMenuImageFromR2(oldImageUrl)
+    }
     setItemModal(null)
   }
   function deleteItem(id) {
@@ -541,12 +600,18 @@ export default function AdminMenu() {
     setCatModal('new')
   }
   function openEditCat(c) { setCatForm({ ...c, sort_order: c.sort_order ?? 0 }); setCatModal('edit') }
-  function saveCat() {
+  async function saveCat() {
     if (!catForm.name_uz) return
-    dispatch({
+    const oldImageUrl = catModal === 'edit'
+      ? state.categories.find(category => category.id === catForm.id)?.image_url
+      : ''
+    const result = await dispatch({
       type: catModal === 'new' ? 'ADD_CATEGORY' : 'UPDATE_CATEGORY',
       payload: { ...catForm, sort_order: Number(catForm.sort_order) || 0 },
     })
+    if (!result?.error && oldImageUrl && oldImageUrl !== catForm.image_url) {
+      await deleteMenuImageFromR2(oldImageUrl)
+    }
     setCatModal(null)
   }
   function deleteCat(id) {
@@ -1122,8 +1187,15 @@ export default function AdminMenu() {
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
             <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
             <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />
-            <ImageUploadField label={t(lang, 'imageUrl')} value={form.image_url} onChange={setF('image_url')} />
-            <Field label="Sort order" type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
+            <ImageUploadField
+              label={t(lang, 'imageUrl')}
+              value={form.image_url}
+              onChange={setF('image_url')}
+              lang={lang}
+              type="product"
+              entityId={form.id}
+            />
+            <Field label={t(lang, 'sortOrder')} type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
             <Field
               label={lang === 'uz' ? 'Tezkor mahsulot tartibi' : lang === 'ru' ? 'Порядок быстрого товара' : 'Quick item order'}
               type="number"
@@ -1187,8 +1259,15 @@ export default function AdminMenu() {
             <Field label={t(lang, 'nameUz')} value={catForm.name_uz} onChange={setCF('name_uz')} />
             <Field label={t(lang, 'nameRu')} value={catForm.name_ru} onChange={setCF('name_ru')} />
             <Field label={t(lang, 'nameEn')} value={catForm.name_en} onChange={setCF('name_en')} />
-            <ImageUploadField label={t(lang, 'imageUrl')} value={catForm.image_url} onChange={setCF('image_url')} />
-            <Field label="Sort order" type="number" value={catForm.sort_order} onChange={setCF('sort_order')} placeholder="1" />
+            <ImageUploadField
+              label={t(lang, 'imageUrl')}
+              value={catForm.image_url}
+              onChange={setCF('image_url')}
+              lang={lang}
+              type="category"
+              entityId={catForm.id}
+            />
+            <Field label={t(lang, 'sortOrder')} type="number" value={catForm.sort_order} onChange={setCF('sort_order')} placeholder="1" />
             <div className="flex gap-2 pt-2">
               <button onClick={() => setCatModal(null)} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                 {t(lang, 'cancel')}
