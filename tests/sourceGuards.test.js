@@ -622,11 +622,9 @@ test('AdminTables localizes visible management labels', () => {
 test('starter cafe menu expansion seeds polished categories and items', () => {
   const migration = readSource('supabase/030_starter_cafe_menu_expansion.sql')
   const repairMigration = readSource('supabase/031_fix_starter_menu_image_urls.sql')
-  const mockData = readSource('src/data/mockData.js')
 
   for (const category of ['combos', 'sides', 'desserts']) {
     assert.match(migration, new RegExp(`'${category}'`))
-    assert.match(mockData, new RegExp(`id: '${category}'`))
   }
 
   for (const item of [
@@ -641,12 +639,10 @@ test('starter cafe menu expansion seeds polished categories and items', () => {
     'zk_baklava',
   ]) {
     assert.match(migration, new RegExp(`'${item}'`))
-    assert.match(mockData, new RegExp(`id: '${item}'`))
   }
 
   assert.match(migration, /on conflict \(id\) do nothing/)
   assert.doesNotMatch(migration, /source\.unsplash\.com/)
-  assert.doesNotMatch(mockData, /source\.unsplash\.com/)
   assert.doesNotMatch(repairMigration, /source\.unsplash\.com/)
   assert.match(repairMigration, /update public\.menu_categories/)
   assert.match(repairMigration, /update public\.menu_items/)
@@ -654,28 +650,53 @@ test('starter cafe menu expansion seeds polished categories and items', () => {
   assert.match(repairMigration, /'zk_mixed_grill'/)
 })
 
-test('menu items support and display kcal nutrition values', () => {
+test('menu items support and display nutrition values', () => {
   const schema = readSource('supabase/003_pos_schema.sql')
   const migration = readSource('supabase/032_menu_item_kcal.sql')
-  const mockData = readSource('src/data/mockData.js')
+  const gramsMigration = readSource('supabase/033_menu_item_grams.sql')
+  const millilitresMigration = readSource('supabase/034_menu_item_millilitres.sql')
   const dbHealth = readSource('src/lib/dbHealth.js')
   const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const categoryScroller = readSource('src/components/MenuCategoryScroller.jsx')
   const productCards = readSource('src/components/MenuProductCards.jsx')
   const cartPanel = readSource('src/components/CartPanel.jsx')
   const kitchen = readSource('src/pages/Kitchen.jsx')
   const cashierBill = readSource('src/pages/CashierBill.jsx')
   const reports = readSource('src/pages/Reports.jsx')
+  const telegramMiniApp = readSource('src/pages/TelegramMiniApp.jsx')
+  const nutrition = readSource('src/lib/nutrition.js')
 
   assert.match(schema, /kcal\s+integer\s+not null default 0/)
+  assert.match(schema, /grams\s+integer\s+not null default 0/)
+  assert.match(schema, /millilitres\s+integer\s+not null default 0/)
   assert.match(migration, /add column if not exists kcal integer not null default 0/)
   assert.match(migration, /menu_items_kcal_nonnegative/)
   assert.match(migration, /'zk_mixed_grill', 1650/)
-  assert.match(mockData, /id: 'm1'[\s\S]*?kcal: 980/)
-  assert.match(mockData, /id: 'zk_family_grill_set'[\s\S]*?kcal: 3200/)
+  assert.match(gramsMigration, /add column if not exists grams integer not null default 0/)
+  assert.match(gramsMigration, /menu_items_grams_nonnegative/)
+  assert.match(gramsMigration, /'zk_mixed_grill', 900/)
+  assert.match(millilitresMigration, /add column if not exists millilitres integer not null default 0/)
+  assert.match(millilitresMigration, /menu_items_millilitres_nonnegative/)
+  assert.match(millilitresMigration, /'m12', 500/)
+  assert.match(schema, /'m1'[\s\S]*?80000, 450, 0, 980/)
+  assert.match(migration, /'zk_family_grill_set', 3200/)
+  assert.match(gramsMigration, /'zk_family_grill_set', 1900/)
   assert.match(dbHealth, /'kcal'/)
+  assert.match(dbHealth, /'grams'/)
+  assert.match(dbHealth, /'millilitres'/)
+  assert.match(nutrition, /function gramsLabel/)
+  assert.match(nutrition, /function millilitresLabel/)
+  assert.match(nutrition, /millilitres >= 1000/)
   assert.match(adminMenu, /setF\('kcal'\)/)
+  assert.match(adminMenu, /setF\('grams'\)/)
+  assert.match(adminMenu, /setF\('millilitres'\)/)
   assert.match(adminMenu, /Math\.max\(0, Math\.round\(Number\(form\.kcal\) \|\| 0\)\)/)
-  for (const source of [adminMenu, productCards, cartPanel, kitchen, cashierBill, reports]) {
+  assert.match(adminMenu, /Math\.max\(0, Math\.round\(Number\(form\.grams\) \|\| 0\)\)/)
+  assert.match(adminMenu, /Math\.max\(0, Math\.round\(Number\(form\.millilitres\) \|\| 0\)\)/)
+  assert.match(categoryScroller, /text-sm font-black tabular-nums/)
+  for (const source of [adminMenu, productCards, cartPanel, kitchen, cashierBill, reports, telegramMiniApp]) {
     assert.match(source, /kcalLabel/)
+    assert.match(source, /gramsLabel/)
+    assert.match(source, /millilitresLabel/)
   }
 })

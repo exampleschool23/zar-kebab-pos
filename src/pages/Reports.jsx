@@ -4,7 +4,7 @@ import { useApp } from '../store/AppContext'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { kcalLabel } from '../lib/nutrition'
+import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import {
   getOrderDate,
   getOrderItems,
@@ -680,6 +680,8 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
           <div className="space-y-3">
             {items.map((item, i) => {
               const mi = menuItemMap[item.menu_item_id]
+              const grams = gramsLabel(mi || item, lang)
+              const millilitres = millilitresLabel(mi || item, lang)
               const kcal = kcalLabel(mi || item, lang)
               return (
                 <div key={i} className="flex items-start gap-3">
@@ -694,10 +696,24 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-[#1F2937] truncate">{item.name || mi?.name_en || 'Item'}</p>
-                    {kcal && (
-                      <span className="mt-1 inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
-                        {kcal}
-                      </span>
+                    {(grams || millilitres || kcal) && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {grams && (
+                          <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                            {grams}
+                          </span>
+                        )}
+                        {millilitres && (
+                          <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                            {millilitres}
+                          </span>
+                        )}
+                        {kcal && (
+                          <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                            {kcal}
+                          </span>
+                        )}
+                      </div>
                     )}
                     {item.notes && <p className="text-[11px] text-[#9CA3AF]">{item.notes}</p>}
                     <p className="text-[11px] text-[#6B7280] mt-0.5">

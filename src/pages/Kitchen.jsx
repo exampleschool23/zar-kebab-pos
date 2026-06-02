@@ -11,7 +11,7 @@ import UnifiedSidebar from '../components/UnifiedSidebar'
 import { loadOrders } from '../lib/db'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
-import { kcalLabel } from '../lib/nutrition'
+import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_BADGE = {
@@ -227,6 +227,8 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
   const desc = menuItem
     ? (menuItem[`description_${lang}`] || menuItem.description_en || menuItem.description_uz || '')
     : ''
+  const grams = gramsLabel(menuItem, lang)
+  const millilitres = millilitresLabel(menuItem, lang)
   const kcal = kcalLabel(menuItem, lang)
 
   return (
@@ -266,10 +268,24 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
         {desc && (
           <p className="text-xs text-[#6B7280] line-clamp-2 leading-snug mb-1">{desc}</p>
         )}
-        {kcal && (
-          <span className="mb-2 inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
-            {kcal}
-          </span>
+        {(grams || millilitres || kcal) && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {grams && (
+              <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {grams}
+              </span>
+            )}
+            {millilitres && (
+              <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {millilitres}
+              </span>
+            )}
+            {kcal && (
+              <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {kcal}
+              </span>
+            )}
+          </div>
         )}
 
         {item.notes && (

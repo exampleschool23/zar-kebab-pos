@@ -11,7 +11,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useApp } from '../store/AppContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { kcalLabel } from '../lib/nutrition'
+import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import AppShell from '../components/AppShell'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
@@ -69,7 +69,7 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-function Field({ label, type = 'text', value, onChange, placeholder }) {
+function Field({ label, type = 'text', value, onChange, placeholder, ...inputProps }) {
   return (
     <div>
       <label className="block text-xs text-gray-500 font-semibold mb-1.5">{label}</label>
@@ -78,6 +78,7 @@ function Field({ label, type = 'text', value, onChange, placeholder }) {
         value={value}
         onChange={onChange}
         placeholder={placeholder}
+        {...inputProps}
         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
       />
     </div>
@@ -229,6 +230,16 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
         )}
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <p className="text-[#ff5a00] font-black text-[16px]">{formatCurrency(item.price)}</p>
+          {gramsLabel(item, lang) && (
+            <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+              {gramsLabel(item, lang)}
+            </span>
+          )}
+          {millilitresLabel(item, lang) && (
+            <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+              {millilitresLabel(item, lang)}
+            </span>
+          )}
           {kcalLabel(item, lang) && (
             <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
               {kcalLabel(item, lang)}
@@ -406,7 +417,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  price: '', kcal: '', image_url: '', available: true, sort_order: '',
+  price: '', grams: '', millilitres: '', kcal: '', image_url: '', available: true, sort_order: '',
   show_in_cashier_quick_items: false,
   send_to_kitchen: false,
   quick_item_sort_order: '',
@@ -501,6 +512,7 @@ export default function AdminMenu() {
     setForm({
       ...blankItem,
       ...i,
+      millilitres: i.millilitres ?? i.milliliters ?? (Number(i.litres ?? i.liters) > 0 ? Math.round(Number(i.litres ?? i.liters) * 1000) : ''),
       sort_order: i.sort_order ?? 0,
       show_in_cashier_quick_items: isCashierQuickItem(i),
       send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
@@ -515,6 +527,8 @@ export default function AdminMenu() {
       payload: {
         ...form,
         price: Number(form.price),
+        grams: Math.max(0, Math.round(Number(form.grams) || 0)),
+        millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
         kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
         sort_order: Number(form.sort_order) || 0,
         quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
@@ -767,6 +781,12 @@ export default function AdminMenu() {
                     <div className="p-2.5">
                       <p className="font-black text-gray-900 text-[12px] truncate">{getItemName(activeItem, lang)}</p>
                       <p className="text-[#ff5a00] font-black text-xs">{formatCurrency(activeItem.price)}</p>
+                      {gramsLabel(activeItem, lang) && (
+                        <p className="text-[#64748B] font-black text-[10px]">{gramsLabel(activeItem, lang)}</p>
+                      )}
+                      {millilitresLabel(activeItem, lang) && (
+                        <p className="text-[#64748B] font-black text-[10px]">{millilitresLabel(activeItem, lang)}</p>
+                      )}
                       {kcalLabel(activeItem, lang) && (
                         <p className="text-[#64748B] font-black text-[10px]">{kcalLabel(activeItem, lang)}</p>
                       )}
@@ -1108,6 +1128,8 @@ export default function AdminMenu() {
             <Field label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} />
             <Field label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} />
             <Field label={`${t(lang, 'price')} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="25000" />
+            <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
+            <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
             <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />
             <ImageUploadField label={t(lang, 'imageUrl')} value={form.image_url} onChange={setF('image_url')} />
             <Field label="Sort order" type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />

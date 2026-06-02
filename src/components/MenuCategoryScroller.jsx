@@ -90,7 +90,7 @@ function CategoryChip({ category, active, title, count, onClick }) {
       </span>
       <span className="max-w-none flex-shrink-0 whitespace-nowrap text-[12px] leading-tight">{title}</span>
       {Number.isFinite(count) && (
-        <span className={`flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-black ${active ? 'bg-white/80 text-[#ff4d00]' : 'bg-gray-100 text-[#8A94A6]'}`}>
+        <span className={`flex h-6 min-w-6 flex-shrink-0 items-center justify-center rounded-lg px-2 text-sm font-black tabular-nums leading-none ${active ? 'bg-white/90 text-[#ff4d00]' : 'bg-[#E8F1FF] text-[#2563EB]'}`}>
           {count}
         </span>
       )}

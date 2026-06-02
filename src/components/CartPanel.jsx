@@ -4,7 +4,7 @@ import { useApp } from '../store/AppContext'
 import { t, getItemDesc } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
-import { kcalLabel } from '../lib/nutrition'
+import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 
 // Delivery tab removed — only Dine In and Take Away
 const ORDER_TYPES = [
@@ -19,6 +19,8 @@ function orderTypeLabel(ot, lang) {
 // ── Cart item row ──────────────────────────────────────────────────────────────
 function CartItemRow({ item, lang, dispatch, menuItem }) {
   const desc = menuItem ? getItemDesc(menuItem, lang) : null
+  const grams = gramsLabel(menuItem, lang)
+  const millilitres = millilitresLabel(menuItem, lang)
   const kcal = kcalLabel(menuItem, lang)
 
   function decrement() {
@@ -60,10 +62,24 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
         </div>
 
         {desc && <p className="text-[12px] text-[#9CA3AF] line-clamp-1 mb-1.5">{desc}</p>}
-        {kcal && (
-          <span className="mb-2 inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
-            {kcal}
-          </span>
+        {(grams || millilitres || kcal) && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {grams && (
+              <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {grams}
+              </span>
+            )}
+            {millilitres && (
+              <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {millilitres}
+              </span>
+            )}
+            {kcal && (
+              <span className="inline-flex rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {kcal}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Qty stepper + price */}

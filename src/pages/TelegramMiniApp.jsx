@@ -18,6 +18,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
+import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import {
   getStoredTelegramSession,
   initTelegramWebApp,
@@ -233,6 +234,9 @@ function BottomNav({ active, onSelect, cartCount, lang }) {
 function ProductCard({ item, lang, quantity, onAdd, onIncrement, onDecrement }) {
   const l = tr(lang)
   const name = getItemName(item, lang)
+  const grams = gramsLabel(item, lang)
+  const millilitres = millilitresLabel(item, lang)
+  const kcal = kcalLabel(item, lang)
   return (
     <article className="overflow-hidden rounded-[8px] border border-[#E8DED2] bg-white shadow-sm">
       <div className="aspect-[4/3]">
@@ -241,6 +245,25 @@ function ProductCard({ item, lang, quantity, onAdd, onIncrement, onDecrement }) 
       <div className="flex min-h-[152px] flex-col p-3">
         <h3 className="line-clamp-2 text-[15px] font-black leading-snug text-[#1E2B24]">{name}</h3>
         <p className="mt-1 line-clamp-1 text-[12px] font-semibold text-[#8B9388]">{getItemDesc(item, lang)}</p>
+        {(grams || millilitres || kcal) && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {grams && (
+              <span className="rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {grams}
+              </span>
+            )}
+            {millilitres && (
+              <span className="rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {millilitres}
+              </span>
+            )}
+            {kcal && (
+              <span className="rounded-full bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                {kcal}
+              </span>
+            )}
+          </div>
+        )}
         <p className="mt-auto text-[16px] font-black text-[#FF5A00]">{formatCurrency(item.price)}</p>
         {quantity > 0 ? (
           <div className="mt-3 flex h-10 items-center justify-between rounded-[8px] border border-[#F7C7A6] bg-[#FFF3EA] p-1">

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { ArrowLeft, LayoutGrid, Minus, Plus, UtensilsCrossed } from 'lucide-react'
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { kcalLabel } from '../lib/nutrition'
+import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 
 function MenuImageFallback({ iconSize = 32, active = false }) {
   return (
@@ -81,6 +81,8 @@ export function CategoryCard({ cat, active, onClick, lang }) {
 export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false }) {
   const inCart = !readOnly && qty > 0
   const kcal = kcalLabel(item, lang)
+  const grams = gramsLabel(item, lang)
+  const millilitres = millilitresLabel(item, lang)
 
   return (
     <div
@@ -117,10 +119,24 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         )}
         <div className="mb-2.5 flex items-center justify-between gap-2">
           <p className="font-black text-[16px] text-[#ff5a00]">{formatCurrency(item.price)}</p>
-          {kcal && (
-            <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
-              {kcal}
-            </span>
+          {(grams || millilitres || kcal) && (
+            <div className="flex flex-wrap justify-end gap-1">
+              {grams && (
+                <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                  {grams}
+                </span>
+              )}
+              {millilitres && (
+                <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                  {millilitres}
+                </span>
+              )}
+              {kcal && (
+                <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                  {kcal}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -173,6 +189,8 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const desc = getItemDesc(item, lang)
   const total = item.price * qty
   const kcal = kcalLabel(item, lang)
+  const grams = gramsLabel(item, lang)
+  const millilitres = millilitresLabel(item, lang)
   const labels = {
     back: lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Назад в меню' : 'Back to menu',
     description: lang === 'uz' ? 'Tavsif' : lang === 'ru' ? 'Описание' : 'Description',
@@ -207,10 +225,24 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
           <p className="whitespace-nowrap text-xl sm:text-2xl font-black text-[#FF4D00] tabular-nums">
             {formatCurrency(item.price)}
           </p>
-          {kcal && (
-            <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
-              {kcal}
-            </span>
+          {(grams || millilitres || kcal) && (
+            <div className="flex flex-wrap justify-end gap-1">
+              {grams && (
+                <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                  {grams}
+                </span>
+              )}
+              {millilitres && (
+                <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                  {millilitres}
+                </span>
+              )}
+              {kcal && (
+                <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                  {kcal}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -236,6 +268,16 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                 <h2 className="text-2xl font-black uppercase tracking-tight text-[#111827] sm:text-3xl">{name}</h2>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <p className="text-lg font-black text-[#FF4D00]">{formatCurrency(item.price)}</p>
+                  {grams && (
+                    <span className="rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00] ring-1 ring-[#FFD8BF]">
+                      {grams}
+                    </span>
+                  )}
+                  {millilitres && (
+                    <span className="rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00] ring-1 ring-[#FFD8BF]">
+                      {millilitres}
+                    </span>
+                  )}
                   {kcal && (
                     <span className="rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00] ring-1 ring-[#FFD8BF]">
                       {kcal}
