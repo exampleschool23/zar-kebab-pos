@@ -23,31 +23,22 @@ import {
 import { supabase } from '../lib/supabase'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
+import ImageLoadShimmer from '../components/ImageLoadShimmer'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
 function SafeMenuImage({ src, alt = '', className = '', fallbackClassName = '', iconSize = 28 }) {
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    setFailed(false)
-  }, [src])
-
-  if (!src || failed) {
-    return (
-      <div className={`bg-orange-50 flex items-center justify-center ${fallbackClassName}`}>
-        <UtensilsCrossed size={iconSize} className="text-orange-200" />
-      </div>
-    )
-  }
-
   return (
-    <img
+    <ImageLoadShimmer
       src={src}
       alt={alt}
       className={className}
-      loading="lazy"
-      onError={() => setFailed(true)}
+      containerClassName={fallbackClassName || 'h-full w-full'}
+      fallback={
+        <div className={`bg-orange-50 flex items-center justify-center ${fallbackClassName}`}>
+          <UtensilsCrossed size={iconSize} className="text-orange-200" />
+        </div>
+      }
     />
   )
 }

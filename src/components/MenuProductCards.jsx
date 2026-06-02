@@ -3,6 +3,7 @@ import { ArrowLeft, LayoutGrid, Minus, Plus, UtensilsCrossed } from 'lucide-reac
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
+import ImageLoadShimmer from './ImageLoadShimmer'
 
 function MenuImageFallback({ iconSize = 32, active = false }) {
   return (
@@ -13,23 +14,12 @@ function MenuImageFallback({ iconSize = 32, active = false }) {
 }
 
 function SafeMenuImage({ src, alt, className = '', fallbackIconSize = 32, active = false }) {
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    setFailed(false)
-  }, [src])
-
-  if (!src || failed) {
-    return <MenuImageFallback iconSize={fallbackIconSize} active={active} />
-  }
-
   return (
-    <img
+    <ImageLoadShimmer
       src={src}
       alt={alt}
       className={className}
-      loading="lazy"
-      onError={() => setFailed(true)}
+      fallback={<MenuImageFallback iconSize={fallbackIconSize} active={active} />}
     />
   )
 }

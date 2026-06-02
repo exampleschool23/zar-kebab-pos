@@ -1,33 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGrid, UtensilsCrossed } from 'lucide-react'
 import { getCategoryName } from '../lib/i18n'
+import ImageLoadShimmer from './ImageLoadShimmer'
 
 export function menuCategorySectionId(prefix, categoryId) {
   return `${prefix}-${String(categoryId).replace(/[^a-zA-Z0-9_-]/g, '-')}`
 }
 
 function CategoryImage({ src, alt, active }) {
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    setFailed(false)
-  }, [src])
-
-  if (!src || failed) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-orange-50">
-        <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
-      </div>
-    )
-  }
-
   return (
-    <img
+    <ImageLoadShimmer
       src={src}
       alt={alt}
       className="h-full w-full object-cover object-center"
-      loading="lazy"
-      onError={() => setFailed(true)}
+      fallback={
+        <div className="flex h-full w-full items-center justify-center bg-orange-50">
+          <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
+        </div>
+      }
     />
   )
 }

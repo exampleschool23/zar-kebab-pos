@@ -19,6 +19,7 @@ import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
+import ImageLoadShimmer from '../components/ImageLoadShimmer'
 import {
   getStoredTelegramSession,
   initTelegramWebApp,
@@ -186,15 +187,18 @@ function tr(lang) {
 }
 
 function SafeImage({ src, alt }) {
-  const [failed, setFailed] = useState(false)
-  if (!src || failed) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-[#F4EFE7]">
-        <UtensilsCrossed size={30} className="text-[#D39D70]" />
-      </div>
-    )
-  }
-  return <img src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" onError={() => setFailed(true)} />
+  return (
+    <ImageLoadShimmer
+      src={src}
+      alt={alt}
+      className="h-full w-full object-cover"
+      fallback={
+        <div className="flex h-full w-full items-center justify-center bg-[#F4EFE7]">
+          <UtensilsCrossed size={30} className="text-[#D39D70]" />
+        </div>
+      }
+    />
+  )
 }
 
 function BottomNav({ active, onSelect, cartCount, lang }) {
