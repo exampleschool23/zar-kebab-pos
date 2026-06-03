@@ -1,11 +1,13 @@
 import { json, methodNotAllowed } from '../telegram/_lib/http.js'
 import { readMultipart } from './_lib/multipart.js'
 import { assertImageFile, makeObjectKey, uploadToR2 } from './_lib/r2.js'
+import { requireAdminRole } from './_lib/auth.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
   try {
+    await requireAdminRole(req)
     const { fields, file } = await readMultipart(req)
     const type = String(fields.type || '')
     assertImageFile(file)
@@ -22,6 +24,6 @@ export default async function handler(req, res) {
     })
     return json(res, 200, result)
   } catch (error) {
-    return json(res, 400, { error: error.message || 'Could not upload menu image' })
+    return json(res, error.status || 400, { error: error.message || 'Could not upload menu image' })
   }
 }

@@ -1,0 +1,33 @@
+import { createClient } from '@supabase/supabase-js'
+
+const ALLOWED_ROLES = new Set(['owner', 'admin'])
+
+function getSupabaseAuthClient() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw Object.assign(new Error('Server misconfigured'), { status: 500 })
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+}
+
+export async function requireAdminRole(req) {
+  const header = req.headers.authorization || ''
+  const match = header.match(/^Bearer\s+(.+)$/i)
+  const token = match ? match[1] : ''
+  if (!token) throw Object.assign(new Error('Authentication required'), { status: 401 })
+
+  const supabase = getSupabaseAuthClient()
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) throw Object.assign(new Error('Invalid or expired session'), { status: 401 })
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (!profile || !ALLOWED_ROLES.has(profile.role)) {
+    throw Object.assign(new Error('Forbidden'), { status: 403 })
+  }
+
+  return user
+}

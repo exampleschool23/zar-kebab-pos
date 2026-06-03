@@ -23,6 +23,7 @@ import {
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import ImageLoadShimmer from '../components/ImageLoadShimmer'
+import { supabase } from '../lib/supabase'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -68,7 +69,13 @@ async function compressMenuImage(file) {
   return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
 }
 
+async function getAuthToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.access_token || ''
+}
+
 async function uploadMenuImageToR2({ file, type, entityId }) {
+  const token = await getAuthToken()
   const body = new FormData()
   body.append('file', file)
   body.append('type', type)
@@ -76,6 +83,7 @@ async function uploadMenuImageToR2({ file, type, entityId }) {
 
   const response = await fetch('/api/menu-image/upload', {
     method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body,
   })
   const data = await response.json().catch(() => ({}))
@@ -85,9 +93,13 @@ async function uploadMenuImageToR2({ file, type, entityId }) {
 
 async function deleteMenuImageFromR2(imageUrl) {
   if (!imageUrl) return
+  const token = await getAuthToken()
   await fetch('/api/menu-image/delete', {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ url: imageUrl }),
   })
 }
