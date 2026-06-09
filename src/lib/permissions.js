@@ -6,7 +6,6 @@ export const PAGE_ACCESS = {
   dashboard: ['owner', 'admin', 'cashier', 'stakeholder'],
   tables:    ['owner', 'admin', 'waiter',  'cashier'],
   menu:      ['owner', 'admin'],
-  kitchen:   ['owner', 'admin'],
   cashier:   ['owner', 'admin', 'cashier'],
   loyalty:   ['owner', 'admin', 'cashier'],
   team:      ['owner', 'admin', 'waiter', 'cashier', 'stakeholder'],
@@ -21,7 +20,6 @@ export function canViewPage(role, page) {
 
 export function canEditMenu(role)          { return ['owner', 'admin'].includes(role) }
 export function canManageSettings(role)    { return ['owner', 'admin'].includes(role) }
-export function canUseKitchenActions(role) { return ['owner', 'admin'].includes(role) }
 export function canUseCashierActions(role) { return ['owner', 'admin', 'cashier'].includes(role) }
 export function isReadOnlyUser(role)       { return role === 'stakeholder' }
 export function isPublicOnlyRole(role) {

@@ -28,6 +28,11 @@ test('kitchen profile role retirement removes it from assignable database roles'
   assert.doesNotMatch(removeKitchenRoleSql, /'owner', 'admin', 'waiter', 'cashier', 'kitchen'/)
 })
 
+test('waiters can write item cancellation records for unavailable order items', () => {
+  assert.match(removeKitchenRoleSql, /order_item_cancellations/)
+  assert.match(removeKitchenRoleSql, /array\['owner','admin','waiter'\]/)
+})
+
 test('owner delete profile policy preserves protected users and historical order names', () => {
   assert.match(deleteProfilesSql, /on public\.profiles for delete/)
   assert.match(deleteProfilesSql, /public\.is_owner\(\)/)

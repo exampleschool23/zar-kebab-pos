@@ -1246,7 +1246,7 @@ export default function AdminMenu() {
                 className="accent-[#ff5a00] w-4 h-4"
               />
               <label htmlFor="sendToKitchen" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Qo‘shilganda oshxonaga yuborish' : lang === 'ru' ? 'Отправлять на кухню при добавлении' : 'Send to kitchen when added'}
+                {lang === 'uz' ? 'Qo‘shilganda tayyorlashga yuborish' : lang === 'ru' ? 'Отправлять на подготовку при добавлении' : 'Needs preparation when added'}
               </label>
             </div>
             <div className="flex gap-2 pt-2">

@@ -7,6 +7,8 @@ export default function ImageLoadShimmer({
   containerClassName = 'h-full w-full',
   fallback = null,
   loading = 'lazy',
+  fetchPriority,
+  timeoutMs = 3500,
 }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -14,7 +16,10 @@ export default function ImageLoadShimmer({
   useEffect(() => {
     setLoaded(false)
     setFailed(false)
-  }, [src])
+    if (!src || !timeoutMs) return undefined
+    const timer = window.setTimeout(() => setFailed(true), timeoutMs)
+    return () => window.clearTimeout(timer)
+  }, [src, timeoutMs])
 
   if (!src || failed) {
     return fallback
@@ -30,6 +35,7 @@ export default function ImageLoadShimmer({
         alt={alt}
         className={`block ${className} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading={loading}
+        fetchPriority={fetchPriority}
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
       />

@@ -39,17 +39,10 @@ function isTakeAwayBill(order) {
   return order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
 }
 
-function isCashierReadyTakeAway(order) {
-  const billableItems = (order?.items || []).filter(item => !isCancelledOrderItem(item))
-  if (billableItems.length === 0) return false
-  if (getOrderPaymentSummary(order, billableItems, order?.service_rate_pct).total <= 0) return false
-  return billableItems.every(item => ['ready', 'served'].includes(String(item.status || '').toLowerCase()))
-}
-
 function isCashierVisibleBill(order) {
   if (!order || order.payment_status === 'paid' || order.status === 'cancelled') return false
-  if (isTakeAwayBill(order)) return isCashierReadyTakeAway(order)
-  return order.status === 'needs_bill' && getOrderPaymentSummary(order, order.items || [], order.service_rate_pct).total > 0
+  const billableItems = (order.items || []).filter(item => !isCancelledOrderItem(item))
+  return getOrderPaymentSummary(order, billableItems, order.service_rate_pct).total > 0
 }
 
 function countLabel(count, lang) {
@@ -83,6 +76,7 @@ const L = {
     allStatus:       'Barcha holat',
     occupied:        'Band',
     activeNotReady:  'Faol, hisobga tayyor emas',
+    activeTableBills: 'Faol stol hisoblari',
     takeAwayBills:   'Olib ketish hisoblari',
     needsBillBadge:  'Hisob kerak',
     newestFirst:     'Yangi avval',
@@ -103,8 +97,8 @@ const L = {
     showPaid:         "To'langanlarni ko'rsatish",
     hidePaid:         "To'langanlarni yashirish",
     noTable:          'Stolsiz',
-    waitingKitchen:  'Oshxona tayyorlayapti',
-    waitingKitchenSub: 'Ofitsiant hisob so\'rashini kuting',
+    waitingKitchen:  'Tayyorlanmoqda',
+    waitingKitchenSub: 'Buyurtma kassirda ochiq',
     payments:        n => `${n} ta to'lov`,
     ofTodayRev:      'bugungi daromaddan',
   },
@@ -126,6 +120,7 @@ const L = {
     allStatus:       'Все статусы',
     occupied:        'Занят',
     activeNotReady:  'Активные, счёт не готов',
+    activeTableBills: 'Активные счета столов',
     takeAwayBills:   'Счета с собой',
     needsBillBadge:  'Нужен счёт',
     newestFirst:     'Сначала новые',
@@ -146,8 +141,8 @@ const L = {
     showPaid:         'Показать оплаченные',
     hidePaid:         'Скрыть оплаченные',
     noTable:          'Без стола',
-    waitingKitchen:  'Готовится на кухне',
-    waitingKitchenSub: 'Ожидайте запроса счёта от официанта',
+    waitingKitchen:  'Готовится',
+    waitingKitchenSub: 'Заказ уже открыт у кассира',
     payments:        n => `${n} платёж${n === 1 ? '' : n < 5 ? 'а' : 'ей'}`,
     ofTodayRev:      'от дневной выручки',
   },
@@ -169,6 +164,7 @@ const L = {
     allStatus:       'All Status',
     occupied:        'Occupied',
     activeNotReady:  'Active, not bill-ready',
+    activeTableBills: 'Active table bills',
     takeAwayBills:   'Take-away bills',
     needsBillBadge:  'Needs Bill',
     newestFirst:     'Newest First',
@@ -189,8 +185,8 @@ const L = {
     showPaid:         'Show paid today',
     hidePaid:         'Hide paid today',
     noTable:          'No table',
-    waitingKitchen:  'Waiting for kitchen',
-    waitingKitchenSub: 'Waiter must request the bill first',
+    waitingKitchen:  'Preparing',
+    waitingKitchenSub: 'Order is already open for cashier',
     payments:        n => `${n} payment${n === 1 ? '' : 's'}`,
     ofTodayRev:      "of today's revenue",
   },
@@ -562,6 +558,7 @@ export default function CashierTables() {
   const statusOptions = [
     { value: 'all',        label: l.allStatus      },
     { value: 'needs_bill', label: l.needsBillBadge },
+    { value: 'active',     label: l.activeNotReady },
     { value: 'take_away',  label: l.takeAway       },
   ]
 
@@ -592,6 +589,7 @@ export default function CashierTables() {
       result = result.filter(o => {
         const isTakeAway = isTakeAwayBill(o)
         if (filterStatus === 'needs_bill') return !isTakeAway && o.status === 'needs_bill'
+        if (filterStatus === 'active') return !isTakeAway && o.status !== 'needs_bill'
         if (filterStatus === 'take_away') return isTakeAway
         return false
       })
@@ -615,10 +613,12 @@ export default function CashierTables() {
 
   const billSections = useMemo(() => {
     const needsBill = filteredBills.filter(o => !isTakeAwayBill(o) && o.status === 'needs_bill')
+    const active = filteredBills.filter(o => !isTakeAwayBill(o) && o.status !== 'needs_bill')
     const takeAway = filteredBills.filter(isTakeAwayBill)
 
     return [
       { key: 'needs_bill', title: l.needsBill, tone: 'red', icon: CreditCard, bills: needsBill },
+      { key: 'active', title: l.activeTableBills, tone: 'amber', icon: Receipt, bills: active },
       { key: 'take_away', title: l.takeAwayBills, tone: 'blue', icon: Receipt, bills: takeAway },
     ].filter(section => section.bills.length > 0)
   }, [filteredBills, l])

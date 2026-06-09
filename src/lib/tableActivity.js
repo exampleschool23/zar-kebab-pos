@@ -64,7 +64,7 @@ export function getTableActivityTimeline(table, orders = []) {
   push('seated', 'Seated', eventTime(firstOrder?.created_at), 'indigo')
 
   const sentOrder = tableOrders.find(order => ['sent_to_kitchen', 'preparing', 'delivered', 'needs_bill', 'paid'].includes(order.status))
-  push('sent_to_kitchen', 'Sent to kitchen', eventTime(sentOrder?.sent_at, sentOrder?.created_at), 'orange')
+  push('sent_to_kitchen', 'Order sent', eventTime(sentOrder?.sent_at, sentOrder?.created_at), 'orange')
 
   const allItems = tableOrders.flatMap(order => order.items || [])
   const readyItem = allItems.find(item => item.status === 'ready' || item.status === 'served')

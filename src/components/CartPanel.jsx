@@ -106,7 +106,7 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
           </span>
         </div>
 
-        {/* Kitchen note */}
+        {/* Order note */}
         <input
           type="text"
           placeholder={t(lang, 'notes') || (lang === 'uz' ? 'Izoh...' : lang === 'ru' ? 'Заметка...' : 'Notes (optional)')}
@@ -158,20 +158,20 @@ export default function CartPanel({
         setMessage({
           tone: 'error',
           text: lang === 'uz'
-            ? 'Buyurtmani oshxonaga yuborib bo‘lmadi.'
+            ? 'Buyurtmani yuborib bo‘lmadi.'
             : lang === 'ru'
-              ? 'Не удалось отправить заказ на кухню.'
-              : 'Could not send the order to kitchen.',
+              ? 'Не удалось отправить заказ.'
+              : 'Could not submit the order.',
         })
         return
       }
       setMessage({
         tone: 'success',
         text: lang === 'uz'
-          ? 'Buyurtma oshxonaga yuborildi.'
+          ? 'Buyurtma yuborildi.'
           : lang === 'ru'
-            ? 'Заказ отправлен на кухню.'
-            : 'Order sent to kitchen.',
+            ? 'Заказ отправлен.'
+            : 'Order submitted.',
       })
       onClose?.()
     } finally {
@@ -311,7 +311,7 @@ export default function CartPanel({
           {isSending ? <Loader2 size={17} className="animate-spin" /> : <UtensilsCrossed size={17} />}
           {isSending
             ? (lang === 'uz' ? 'Yuborilmoqda...' : lang === 'ru' ? 'Отправка...' : 'Sending...')
-            : (lang === 'uz' ? 'Oshxonaga yuborish' : lang === 'ru' ? 'Отправить на кухню' : 'Send to Kitchen')}
+            : (lang === 'uz' ? 'Buyurtmani yuborish' : lang === 'ru' ? 'Отправить заказ' : 'Submit order')}
         </button>
       </div>
     </div>

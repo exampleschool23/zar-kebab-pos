@@ -13,18 +13,20 @@ function MenuImageFallback({ iconSize = 32, active = false }) {
   )
 }
 
-function SafeMenuImage({ src, alt, className = '', fallbackIconSize = 32, active = false }) {
+function SafeMenuImage({ src, alt, className = '', fallbackIconSize = 32, active = false, loading = 'lazy', fetchPriority }) {
   return (
     <ImageLoadShimmer
       src={src}
       alt={alt}
       className={className}
+      loading={loading}
+      fetchPriority={fetchPriority}
       fallback={<MenuImageFallback iconSize={fallbackIconSize} active={active} />}
     />
   )
 }
 
-export function CategoryCard({ cat, active, onClick, lang }) {
+export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
   const isAll = cat.id === 'all'
   const title = isAll
     ? (lang === 'uz' ? 'Barchasi' : lang === 'ru' ? 'Все' : 'All')
@@ -53,6 +55,8 @@ export function CategoryCard({ cat, active, onClick, lang }) {
             className="h-full w-full object-cover object-center"
             fallbackIconSize={28}
             active={active}
+            loading={eager ? 'eager' : 'lazy'}
+            fetchPriority={eager ? 'high' : undefined}
           />
         ) : (
           <MenuImageFallback iconSize={28} active={active} />
@@ -68,7 +72,7 @@ export function CategoryCard({ cat, active, onClick, lang }) {
   )
 }
 
-export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false }) {
+export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false }) {
   const inCart = !readOnly && qty > 0
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
@@ -92,6 +96,8 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           alt={getItemName(item, lang)}
           className="h-full w-full object-cover object-center"
           fallbackIconSize={34}
+          loading={eager ? 'eager' : 'lazy'}
+          fetchPriority={eager ? 'high' : undefined}
         />
         {inCart && (
           <div className="absolute top-2 right-2 bg-[#ff5a00] text-white text-[11px] font-black rounded-full w-6 h-6 flex items-center justify-center shadow">
@@ -188,7 +194,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     quantity: lang === 'uz' ? 'Miqdor' : lang === 'ru' ? 'Количество' : 'Quantity',
     quantitySub: lang === 'uz' ? 'Porsiyalar sonini tanlang' : lang === 'ru' ? 'Выберите количество порций' : 'Choose how many portions',
     notes: lang === 'uz' ? 'Maxsus izohlar' : lang === 'ru' ? 'Особые заметки' : 'Special notes',
-    notesSub: lang === 'uz' ? 'Oshxona uchun ixtiyoriy ko‘rsatma' : lang === 'ru' ? 'Дополнительная инструкция для кухни' : 'Optional kitchen instruction',
+    notesSub: lang === 'uz' ? 'Buyurtma uchun ixtiyoriy ko‘rsatma' : lang === 'ru' ? 'Дополнительная инструкция к заказу' : 'Optional order instruction',
     notesPlaceholder: lang === 'uz' ? 'Masalan: piyozsiz, yaxshi pishiring...' : lang === 'ru' ? 'Например: без лука, хорошо прожарить...' : 'For example: no onion, well done...',
     cancel: lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel',
     add: lang === 'uz' ? "Savatga qo'shish" : lang === 'ru' ? 'Добавить в корзину' : 'Add to Cart',

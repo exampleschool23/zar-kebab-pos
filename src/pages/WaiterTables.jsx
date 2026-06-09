@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../lib/formatCurrency'
 import AppShell from '../components/AppShell'
 import {
-  UtensilsCrossed, Clock, ChefHat, CheckCircle2,
+  UtensilsCrossed, Clock, CheckCircle2,
   Receipt, Coffee, RefreshCw, Layers, Plus,
   Search, CreditCard, Settings, CalendarClock, Phone,
 } from 'lucide-react'
@@ -40,13 +40,13 @@ const L = {
     tablePlural: 'tables',
     searchPlaceholder: 'Search table...',
     confirmServed: 'Confirm served',
-    viewKitchen: 'View kitchen',
+    viewKitchen: 'View orders',
     viewTable: 'View table',
     takePayment: 'Take payment',
     statusGuide: 'Table Status Guide',
     guideAvailable: 'Table is free — tap to take a new order',
-    guideWaiting: 'Order sent, kitchen not yet started',
-    guidePreparing: 'Kitchen is preparing items',
+    guideWaiting: 'Order sent and waiting',
+    guidePreparing: 'Items are being prepared',
     guideReady: 'All items ready — confirm delivery',
     guideOccupied: 'Order delivered and eating',
     guideReserved: 'Reserved for an upcoming guest',
@@ -83,13 +83,13 @@ const L = {
     tablePlural: 'столов',
     searchPlaceholder: 'Поиск стола...',
     confirmServed: 'Подтвердить подачу',
-    viewKitchen: 'Кухня',
+    viewKitchen: 'Заказы',
     viewTable: 'Открыть стол',
     takePayment: 'Оплата',
     statusGuide: 'Статусы столов',
     guideAvailable: 'Стол свободен — нажмите для нового заказа',
-    guideWaiting: 'Заказ отправлен, кухня ещё не начала',
-    guidePreparing: 'Кухня готовит блюда',
+    guideWaiting: 'Заказ отправлен и ожидает',
+    guidePreparing: 'Позиции готовятся',
     guideReady: 'Всё готово — подтвердите доставку',
     guideOccupied: 'Заказ доставлен, гость ест',
     guideReserved: 'Забронировано для гостя',
@@ -126,13 +126,13 @@ const L = {
     tablePlural: 'stol',
     searchPlaceholder: 'Stol qidirish...',
     confirmServed: 'Yetkazildi',
-    viewKitchen: 'Oshxona',
+    viewKitchen: 'Buyurtmalar',
     viewTable: 'Stolni ko‘rish',
     takePayment: 'To‘lov olish',
     statusGuide: 'Stol holatlari',
     guideAvailable: 'Stol bo\'sh — yangi buyurtma boshlash uchun bosing',
-    guideWaiting: 'Buyurtma yuborildi, oshxona hali boshlamadi',
-    guidePreparing: 'Oshxona tayyorlamoqda',
+    guideWaiting: 'Buyurtma yuborildi va kutilmoqda',
+    guidePreparing: 'Mahsulotlar tayyorlanmoqda',
     guideReady: 'Hammasi tayyor — yetkazib berishni tasdiqlang',
     guideOccupied: 'Buyurtma yetkazildi, mehmon ovqatlanmoqda',
     guideReserved: 'Keladigan mehmon uchun bron qilingan',
@@ -182,7 +182,7 @@ const STATUS_CFG = {
     bg: 'bg-orange-50',
     badge: 'bg-orange-100 text-orange-700',
     dot: 'bg-orange-400',
-    icon: ChefHat,
+    icon: Clock,
     chipBg: 'bg-orange-100 text-orange-700',
     chipActiveBg: 'bg-orange-500 text-white',
   },
@@ -262,7 +262,7 @@ function deriveStatusForTable(table, orders) {
   return getWaiterTableStatus(table, active, () => deriveStatus(table.id, orders))
 }
 
-function getKitchenCounts(tableId, orders) {
+function getPreparationCounts(tableId, orders) {
   const active = orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
   const items = active.flatMap(o => o.items || []).filter(i => i.status !== 'cancelled')
   return {
@@ -304,7 +304,7 @@ function FilterChip({ label, count, active, cfg, onClick }) {
   )
 }
 
-function KitchenChip({ label, color }) {
+function StatusChip({ label, color }) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${color}`}>
       {label}
@@ -328,8 +328,8 @@ function statusLabel(lang, status) {
 
 function actionForStatus(lang, status) {
   if (status === 'ready') return { label: tr(lang, 'confirmServed'), Icon: CheckCircle2, cls: 'bg-blue-600 text-white hover:bg-blue-700' }
-  if (status === 'preparing') return { label: tr(lang, 'viewKitchen'), Icon: ChefHat, cls: 'bg-orange-500 text-white hover:bg-orange-600' }
-  if (status === 'waiting_kitchen') return { label: tr(lang, 'viewOrder'), Icon: Clock, cls: 'bg-yellow-500 text-white hover:bg-yellow-600' }
+  if (status === 'preparing') return { label: tr(lang, 'viewKitchen'), Icon: Clock, cls: 'bg-orange-500 text-white hover:bg-orange-600' }
+  if (status === 'waiting_kitchen') return { label: tr(lang, 'requestBill'), Icon: Receipt, cls: 'bg-yellow-500 text-white hover:bg-yellow-600' }
   if (status === 'needs_bill') return { label: tr(lang, 'takePayment'), Icon: CreditCard, cls: 'bg-red-600 text-white hover:bg-red-700' }
   if (status === 'reserved') return { label: tr(lang, 'seatReserved'), Icon: CalendarClock, cls: 'bg-purple-600 text-white hover:bg-purple-700' }
   if (status === 'occupied') return { label: tr(lang, 'requestBill'), Icon: Receipt, cls: 'bg-indigo-600 text-white hover:bg-indigo-700' }
@@ -395,7 +395,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction }) {
       {(status === 'waiting_kitchen') && (
         <div className="flex flex-wrap gap-1 mt-1">
           {counts.newCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-yellow-100 text-yellow-700 border border-yellow-200" />
+            <StatusChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-yellow-100 text-yellow-700 border border-yellow-200" />
           )}
           <div className="mt-2 flex w-full items-center justify-between gap-2">
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-600">×{counts.itemCount}</span>
@@ -407,13 +407,13 @@ function TableCard({ table, status, counts, lang, onClick, onAction }) {
       {(status === 'preparing') && (
         <div className="flex flex-wrap gap-1 mt-1">
           {counts.newCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-yellow-100 text-yellow-700 border border-yellow-200" />
+            <StatusChip label={tr(lang, 'itemsNew', counts.newCount)} color="bg-yellow-100 text-yellow-700 border border-yellow-200" />
           )}
           {counts.preparingCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsPreparing', counts.preparingCount)} color="bg-orange-100 text-orange-700" />
+            <StatusChip label={tr(lang, 'itemsPreparing', counts.preparingCount)} color="bg-orange-100 text-orange-700" />
           )}
           {counts.readyCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-blue-100 text-blue-700 border border-blue-200" />
+            <StatusChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-blue-100 text-blue-700 border border-blue-200" />
           )}
           <div className="mt-2 flex w-full items-center justify-between gap-2">
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-600">×{counts.itemCount}</span>
@@ -425,7 +425,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction }) {
       {status === 'ready' && (
         <div className="mt-1">
           {counts.readyCount > 0 && (
-            <KitchenChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-blue-100 text-blue-700 border border-blue-200" />
+            <StatusChip label={tr(lang, 'itemsReady', counts.readyCount)} color="bg-blue-100 text-blue-700 border border-blue-200" />
           )}
           <div className="mt-2 flex w-full items-center justify-between gap-2">
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-600">×{counts.itemCount}</span>
@@ -598,7 +598,7 @@ export default function WaiterTables() {
       .map(table => {
         const status = deriveStatusForTable(table, state.orders)
         const active = state.orders.filter(o => o.table_id === table.id && o.payment_status !== 'paid')
-        const counts = active.length > 0 ? getKitchenCounts(table.id, state.orders) : null
+        const counts = active.length > 0 ? getPreparationCounts(table.id, state.orders) : null
         return { table, status, counts }
       }),
     [state.tables, state.orders]
@@ -645,12 +645,13 @@ export default function WaiterTables() {
       dispatch({ type: 'CONFIRM_ORDER_DELIVERED', payload: table.id })
       return
     }
-    if (status === 'preparing') {
-      navigate('/kitchen')
-      return
-    }
+    if (status === 'preparing') return
     if (status === 'needs_bill') {
       navigate(`/cashier/bill/${table.id}`)
+      return
+    }
+    if (status === 'waiting_kitchen') {
+      dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: table.id })
       return
     }
     if (status === 'occupied') {

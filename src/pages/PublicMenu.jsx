@@ -255,12 +255,13 @@ export default function PublicMenu() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                    {section.items.map(item => (
+                    {section.items.map((item, index) => (
                       <MenuProductCard
                         key={item.id}
                         item={item}
                         qty={0}
                         lang={lang}
+                        eager={groupedSections[0]?.cat.id === section.cat.id && index < 6}
                         onOpenDetail={openDetail}
                         readOnly
                       />
@@ -271,12 +272,13 @@ export default function PublicMenu() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-              {filteredItems.map(item => (
+              {filteredItems.map((item, index) => (
                 <MenuProductCard
                   key={item.id}
                   item={item}
                   qty={0}
                   lang={lang}
+                  eager={index < 8}
                   onOpenDetail={openDetail}
                   readOnly
                 />

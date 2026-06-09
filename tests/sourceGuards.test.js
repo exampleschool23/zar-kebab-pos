@@ -241,11 +241,11 @@ test('WaiterTables keeps urgent status sections before available tables', () => 
 
 test('WaiterTables ready-card total uses shared payment math instead of stale stored totals', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
-  const getKitchenCounts = functionBody(source, 'getKitchenCounts')
+  const getPreparationCounts = functionBody(source, 'getPreparationCounts')
 
   assert.match(source, /import \{ getOrderTotal \} from '\.\.\/lib\/analytics'/)
-  assert.match(getKitchenCounts, /total: active\.reduce\(\(s, o\) => s \+ getOrderTotal\(o\), 0\)/)
-  assert.doesNotMatch(getKitchenCounts, /Number\(o\.total\)/)
+  assert.match(getPreparationCounts, /total: active\.reduce\(\(s, o\) => s \+ getOrderTotal\(o\), 0\)/)
+  assert.doesNotMatch(getPreparationCounts, /Number\(o\.total\)/)
 })
 
 test('WaiterTables keeps filter chips in requested status order', () => {
@@ -266,12 +266,13 @@ test('CashierTables groups bills by cashier urgency', () => {
   const db = readSource('src/lib/db.js')
 
   assert.match(source, /function isCashierVisibleBill/)
-  assert.match(source, /function isCashierReadyTakeAway/)
-  assert.match(source, /return order\.status === 'needs_bill'/)
-  assert.match(source, /billableItems\.every\(item => \['ready', 'served'\]/)
+  assert.match(source, /const billableItems = \(order\.items \|\| \[\]\)\.filter\(item => !isCancelledOrderItem\(item\)\)/)
+  assert.match(source, /return getOrderPaymentSummary\(order, billableItems, order\.service_rate_pct\)\.total > 0/)
+  assert.doesNotMatch(source, /function isCashierReadyTakeAway/)
+  assert.doesNotMatch(source, /billableItems\.every\(item => \['ready', 'served'\]/)
   assert.match(source, /const raw = state\.orders\.filter\(isCashierVisibleBill\)/)
-  assert.match(source, /key: 'needs_bill'[\s\S]*key: 'take_away'/)
-  assert.doesNotMatch(source, /key: 'active'/)
+  assert.match(source, /key: 'needs_bill'[\s\S]*key: 'active'[\s\S]*key: 'take_away'/)
+  assert.match(source, /filterStatus === 'active'/)
   assert.match(source, /function PaidTodaySummary/)
   assert.match(source, /showPaidToday/)
   assert.doesNotMatch(source, /filteredBills\.map\(order =>/)
@@ -294,6 +295,26 @@ test('WaiterTables lets occupied tables request the bill from the card action', 
 
   assert.match(source, /status === 'occupied'\) return \{ label: tr\(lang, 'requestBill'\)/)
   assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'occupied'\) \{[\s\S]*MARK_TABLE_NEEDS_BILL/)
+})
+
+test('WaiterTables lets waiting kitchen orders move to cashier from the card action', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(source, /status === 'waiting_kitchen'\) return \{ label: tr\(lang, 'requestBill'\)/)
+  assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'waiting_kitchen'\) \{[\s\S]*MARK_TABLE_NEEDS_BILL/)
+})
+
+test('WaiterOrder lets waiters remove unavailable active order items', () => {
+  const source = readSource('src/pages/WaiterOrder.jsx')
+  const panel = functionBody(source, 'OrderActionPanel')
+
+  assert.match(source, /Trash2/)
+  assert.match(source, /menuItemMap/)
+  assert.match(source, /order_id: item\.order_id \|\| o\.id/)
+  assert.match(panel, /function handleRemoveItem\(item\)/)
+  assert.match(panel, /type: 'UPDATE_ORDER_ITEM_STATUS'/)
+  assert.match(panel, /status: 'cancelled'/)
+  assert.match(panel, /reason: l\.removeReason/)
 })
 
 test('Kitchen can cancel unavailable items without billing them', () => {

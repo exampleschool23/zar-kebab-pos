@@ -57,4 +57,4 @@ create policy "Staff: read order item cancellations"
 drop policy if exists "Kitchen: insert order item cancellations" on public.order_item_cancellations;
 create policy "Kitchen: insert order item cancellations"
   on public.order_item_cancellations for insert
-  with check (public.current_staff_has_role(array['owner','admin']));
+  with check (public.current_staff_has_role(array['owner','admin','waiter']));

@@ -13,6 +13,7 @@ const STATUS_MAP = {
   pending:    { labelKey: 'pending',    classes: 'bg-amber-50 text-amber-700 border-amber-200'  },
   disabled:   { labelKey: 'disabled',   classes: 'bg-red-50 text-red-600 border-red-200'        },
   // Order statuses
+  sent_to_kitchen: { labelKey: 'sent', classes: 'bg-blue-50 text-blue-700 border-blue-200' },
   new:        { labelKey: 'new',        classes: 'bg-blue-50 text-blue-700 border-blue-200'     },
   preparing:  { labelKey: 'preparing',  classes: 'bg-orange-50 text-orange-700 border-orange-200' },
   ready:      { labelKey: 'ready',      classes: 'bg-blue-50 text-blue-700 border-blue-200'     },

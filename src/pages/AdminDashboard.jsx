@@ -381,13 +381,12 @@ const ROLE_BADGE = {
   admin:       'bg-blue-100 text-blue-700 border-blue-200',
   waiter:      'bg-green-100 text-green-700 border-green-200',
   cashier:     'bg-teal-100 text-teal-700 border-teal-200',
-  kitchen:     'bg-yellow-100 text-yellow-700 border-yellow-200',
   stakeholder: 'bg-indigo-100 text-indigo-700 border-indigo-200',
 }
 
 const ROLE_LABEL = {
   owner: 'Owner', admin: 'Admin', waiter: 'Waiter',
-  cashier: 'Cashier', kitchen: 'Kitchen', stakeholder: 'Stakeholder',
+  cashier: 'Cashier', stakeholder: 'Stakeholder',
 }
 
 function DonutChart({ slices }) {

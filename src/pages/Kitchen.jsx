@@ -73,13 +73,13 @@ function KitchenHeader({
   const { dispatch } = useApp()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
-  const title = lang === 'uz' ? 'Oshxona Displey' : lang === 'ru' ? 'Дисплей кухни' : 'Kitchen Display'
+  const title = lang === 'uz' ? 'Buyurtmalar Displeyi' : lang === 'ru' ? 'Дисплей заказов' : 'Order Display'
   const soundLabel = soundEnabled
     ? (lang === 'uz' ? 'Ovoz: ON' : lang === 'ru' ? 'Звук: ON' : 'Sound: ON')
     : (lang === 'uz' ? 'Ovoz: OFF' : lang === 'ru' ? 'Звук: OFF' : 'Sound: OFF')
   const enableSoundLabel = lang === 'uz'
-    ? 'Oshxona ovozini yoqish'
-    : lang === 'ru' ? 'Включить звук кухни' : 'Enable kitchen sound'
+    ? 'Buyurtma ovozini yoqish'
+    : lang === 'ru' ? 'Включить звук заказов' : 'Enable order sound'
 
   function handleSignOut() {
     dispatch({ type: 'LOGOUT' })
@@ -866,12 +866,12 @@ export default function Kitchen() {
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-5">
           {!loaded ? (
             <OperationalLoading
-              title={lang === 'uz' ? 'Oshxona yuklanmoqda' : lang === 'ru' ? 'Загрузка кухни' : 'Loading kitchen'}
+              title={lang === 'uz' ? 'Buyurtmalar yuklanmoqda' : lang === 'ru' ? 'Загрузка заказов' : 'Loading orders'}
               description={lang === 'uz' ? 'Buyurtmalar va menyu maʼlumotlari olinmoqda.' : lang === 'ru' ? 'Получаем заказы и меню.' : 'Fetching orders and menu data.'}
             />
           ) : loadError ? (
             <OperationalError
-              title={lang === 'uz' ? 'Oshxonani yuklab bo‘lmadi' : lang === 'ru' ? 'Не удалось загрузить кухню' : 'Could not load kitchen'}
+              title={lang === 'uz' ? 'Buyurtmalarni yuklab bo‘lmadi' : lang === 'ru' ? 'Не удалось загрузить заказы' : 'Could not load orders'}
               description={loadError}
               actionLabel={lang === 'uz' ? 'Qayta yuklash' : lang === 'ru' ? 'Перезагрузить' : 'Reload'}
               onAction={() => window.location.reload()}
@@ -883,7 +883,7 @@ export default function Kitchen() {
                   <UtensilsCrossed size={30} className="text-orange-300" />
                 </div>
                 <p className="font-black text-[#1F2937] text-base mb-1">
-                  {lang === 'uz' ? "Faol buyurtmalar yo'q" : lang === 'ru' ? 'Нет активных заказов' : 'No active kitchen orders'}
+                  {lang === 'uz' ? "Faol buyurtmalar yo'q" : lang === 'ru' ? 'Нет активных заказов' : 'No active orders'}
                 </p>
                 <p className="text-sm text-[#6B7280] leading-snug">
                   {lang === 'uz'

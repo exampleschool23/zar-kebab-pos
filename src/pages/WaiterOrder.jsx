@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Search, ShoppingCart, Plus, UtensilsCrossed,
   Menu as MenuIcon, X, CheckCircle2, Clock,
-  ChefHat, Receipt, Loader2, ArrowLeft, LogOut,
+  Receipt, Loader2, ArrowLeft, LogOut, Trash2,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,8 +18,9 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
-function OrderActionPanel({ order, tableId, lang, dispatch, cartCount }) {
+function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap }) {
   const [busy, setBusy] = useState(false)
+  const [removingItemId, setRemovingItemId] = useState(null)
 
   if (!order) return null
   if (cartCount > 0) return null
@@ -28,15 +29,15 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount }) {
   const newCount    = items.filter(i => i.status === 'new').length
   const prepCount   = items.filter(i => i.status === 'preparing').length
   const readyCount  = items.filter(i => i.status === 'ready').length
-  const inKitchen   = newCount > 0 || prepCount > 0
-  const allReady    = items.length > 0 && !inKitchen
-  const isDelivered = !inKitchen && order.status === 'delivered'
-  const isNeedsBill = !inKitchen && order.status === 'needs_bill'
+  const inPreparation = newCount > 0 || prepCount > 0
+  const allReady    = items.length > 0 && !inPreparation
+  const isDelivered = !inPreparation && order.status === 'delivered'
+  const isNeedsBill = !inPreparation && order.status === 'needs_bill'
 
   const L = {
     uz: {
-      kitchenTitle: 'Oshxonada tayyorlanmoqda',
-      kitchenSub: (n, p) => [n > 0 && `${n} yangi`, p > 0 && `${p} tayyorlanmoqda`].filter(Boolean).join(' · '),
+      preparationTitle: 'Buyurtma tayyorlanmoqda',
+      preparationSub: (n, p) => [n > 0 && `${n} yangi`, p > 0 && `${p} tayyorlanmoqda`].filter(Boolean).join(' · '),
       readyTitle: 'Barcha taomlar tayyor!',
       readySub: 'Mijozga yetkazilganini tasdiqlang',
       confirmBtn: 'Yetkazildi ✓',
@@ -45,10 +46,13 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount }) {
       billBtn: 'Hisob so\'rash',
       needsBillTitle: 'Hisob so\'raldi',
       needsBillSub: 'Kassir to\'lovni qayta ishlaydi',
+      removeItem: 'Olib tashlash',
+      missingItem: 'Menyuda yo‘q',
+      removeReason: 'Menyuda mavjud emas',
     },
     ru: {
-      kitchenTitle: 'Готовится на кухне',
-      kitchenSub: (n, p) => [n > 0 && `${n} новых`, p > 0 && `${p} готовится`].filter(Boolean).join(' · '),
+      preparationTitle: 'Заказ готовится',
+      preparationSub: (n, p) => [n > 0 && `${n} новых`, p > 0 && `${p} готовится`].filter(Boolean).join(' · '),
       readyTitle: 'Все блюда готовы!',
       readySub: 'Подтвердите, что заказ подан гостю',
       confirmBtn: 'Подано ✓',
@@ -57,10 +61,13 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount }) {
       billBtn: 'Запросить счёт',
       needsBillTitle: 'Счёт запрошен',
       needsBillSub: 'Кассир обрабатывает оплату',
+      removeItem: 'Убрать',
+      missingItem: 'Нет в меню',
+      removeReason: 'Нет в меню',
     },
     en: {
-      kitchenTitle: 'Kitchen is preparing',
-      kitchenSub: (n, p) => [n > 0 && `${n} new`, p > 0 && `${p} preparing`].filter(Boolean).join(' · '),
+      preparationTitle: 'Order is preparing',
+      preparationSub: (n, p) => [n > 0 && `${n} new`, p > 0 && `${p} preparing`].filter(Boolean).join(' · '),
       readyTitle: 'All items ready!',
       readySub: 'Confirm the order has been served to the guest',
       confirmBtn: 'Mark as Served ✓',
@@ -69,9 +76,36 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount }) {
       billBtn: 'Request Bill',
       needsBillTitle: 'Bill Requested',
       needsBillSub: 'Cashier is processing payment',
+      removeItem: 'Remove',
+      missingItem: 'Not in menu',
+      removeReason: 'Not present in menu',
     },
   }
   const l = L[lang] || L.en
+
+  const removableItems = items.filter(item => !['served', 'cancelled'].includes(String(item.status || '').toLowerCase()))
+
+  async function handleRemoveItem(item) {
+    const itemKey = item.id || item.menu_item_id
+    const sourceOrderId = item.order_id || item._orderId || order.id
+    if (!sourceOrderId || !itemKey || removingItemId) return
+    setRemovingItemId(itemKey)
+    const result = await dispatch({
+      type: 'UPDATE_ORDER_ITEM_STATUS',
+      payload: {
+        orderId: sourceOrderId,
+        orderItemId: item.id,
+        menuItemId: item.menu_item_id,
+        status: 'cancelled',
+        reason: l.removeReason,
+      },
+    })
+    if (result?.error) {
+      setTimeout(() => setRemovingItemId(null), 700)
+      return
+    }
+    setRemovingItemId(null)
+  }
 
   function handleConfirmDelivery() {
     if (busy) return
@@ -86,20 +120,52 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount }) {
     setTimeout(() => setBusy(false), 700)
   }
 
-  if (inKitchen) {
+  if (inPreparation) {
     return (
-      <div className="mx-4 mb-3 rounded-2xl border border-orange-100 bg-[#fff7ed] px-4 py-3 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
-          <ChefHat size={16} className="text-[#ff5a00]" />
+      <div className="mx-4 mb-3 rounded-2xl border border-orange-100 bg-[#fff7ed] px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+            <Clock size={16} className="text-[#ff5a00]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-[#ff5a00]">{l.preparationTitle}</p>
+            <p className="text-[11px] text-[#9CA3AF] mt-0.5">{l.preparationSub(newCount, prepCount)}</p>
+          </div>
+          {readyCount > 0 && (
+            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full flex-shrink-0">
+              {readyCount} {lang === 'uz' ? 'tayyor' : lang === 'ru' ? 'готово' : 'ready'}
+            </span>
+          )}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-bold text-[#ff5a00]">{l.kitchenTitle}</p>
-          <p className="text-[11px] text-[#9CA3AF] mt-0.5">{l.kitchenSub(newCount, prepCount)}</p>
-        </div>
-        {readyCount > 0 && (
-          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full flex-shrink-0">
-            {readyCount} {lang === 'uz' ? 'tayyor' : lang === 'ru' ? 'готово' : 'ready'}
-          </span>
+        {removableItems.length > 0 && (
+          <div className="mt-3 space-y-2 border-t border-orange-100 pt-3">
+            {removableItems.map(item => {
+              const itemKey = item.id || item.menu_item_id
+              const menuItem = menuItemMap?.[item.menu_item_id]
+              const missing = !menuItem || menuItem.available === false
+              const removing = removingItemId === itemKey
+              return (
+                <div key={itemKey} className="flex items-center gap-2 rounded-xl bg-white/75 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-black text-[#1F2937]">{item.name}</p>
+                    <p className="text-[10px] font-bold text-[#9CA3AF]">
+                      ×{item.quantity || 1}
+                      {missing ? ` · ${l.missingItem}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(item)}
+                    disabled={removingItemId && !removing}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-[11px] font-black text-red-600 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+                  >
+                    {removing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    {l.removeItem}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
     )
@@ -201,7 +267,7 @@ function BottomTableChips({ currentTableId, onNewOrder }) {
   if (chips.length === 0) return null
 
   const STATUS_LABEL = {
-    sent_to_kitchen: { en: 'Kitchen', uz: 'Oshxona', ru: 'Кухня',   cls: 'bg-orange-100 text-[#ff5a00]' },
+    sent_to_kitchen: { en: 'Sent', uz: 'Yuborildi', ru: 'Отправлен', cls: 'bg-orange-100 text-[#ff5a00]' },
     preparing:       { en: 'Cooking', uz: 'Pishirilmoqda', ru: 'Готовится', cls: 'bg-yellow-100 text-yellow-700' },
     delivered:       { en: 'Served',  uz: 'Yetkazildi', ru: 'Подано', cls: 'bg-green-100 text-green-700' },
     needs_bill:      { en: 'Bill',    uz: 'Hisob', ru: 'Счёт',      cls: 'bg-red-100 text-red-600' },
@@ -254,7 +320,7 @@ function BottomTableChips({ currentTableId, onNewOrder }) {
 }
 
 // ── Product section (used inside "All" grouped view) ──────────────────────────
-function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDecrement, onOpenDetail }) {
+function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDecrement, onOpenDetail, eagerCount = 0 }) {
   return (
     <div>
       <div className="flex items-center gap-2.5 mb-4">
@@ -264,12 +330,13 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
         </span>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-        {items.map(item => (
+        {items.map((item, index) => (
           <ProductCard
             key={item.id}
             item={item}
             qty={cartQtyMap[item.id] || 0}
             lang={lang}
+            eager={index < eagerCount}
             onAdd={onAdd}
             onIncrement={onIncrement}
             onDecrement={onDecrement}
@@ -312,7 +379,11 @@ export default function WaiterOrder() {
     const orders = state.orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
     if (orders.length === 0) return null
     const merged = { ...orders[0] }
-    merged.items = orders.flatMap(o => o.items || [])
+    merged.items = orders.flatMap(o => (o.items || []).map(item => ({
+      ...item,
+      order_id: item.order_id || o.id,
+      _orderId: o.id,
+    })))
     const priority = ['needs_bill', 'preparing', 'sent_to_kitchen', 'delivered']
     for (const p of priority) {
       if (orders.some(o => o.status === p)) { merged.status = p; break }
@@ -386,6 +457,12 @@ export default function WaiterOrder() {
     state.categories.forEach(c => { map[c.id] = c })
     return map
   }, [state.categories])
+
+  const menuItemMap = useMemo(() => {
+    const map = {}
+    state.menuItems.forEach(item => { map[item.id] = item })
+    return map
+  }, [state.menuItems])
 
   // ── Cart handlers ──────────────────────────────────────────────────────────
 
@@ -651,6 +728,7 @@ export default function WaiterOrder() {
                   <ProductSection
                     cat={cat}
                     items={items}
+                    eagerCount={sections[0]?.cat.id === cat.id ? 6 : 0}
                     {...cardProps}
                   />
                 </div>
@@ -659,12 +737,13 @@ export default function WaiterOrder() {
           ) : (
             // Flat grid for specific category or search results
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {filteredItems.map(item => (
+              {filteredItems.map((item, index) => (
                 <ProductCard
                   key={item.id}
                   item={item}
                   qty={cartQtyMap[item.id] || 0}
                   lang={lang}
+                  eager={index < 8}
                   onAdd={handleAdd}
                   onIncrement={handleIncrement}
                   onDecrement={handleDecrement}
@@ -698,6 +777,7 @@ export default function WaiterOrder() {
                 lang={lang}
                 dispatch={dispatch}
                 cartCount={cartCount}
+                menuItemMap={menuItemMap}
               />
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">

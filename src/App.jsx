@@ -16,7 +16,6 @@ import PendingApproval from './pages/PendingApproval'
 
 const WaiterTables = lazy(() => import('./pages/WaiterTables'))
 const WaiterOrder = lazy(() => import('./pages/WaiterOrder'))
-const Kitchen = lazy(() => import('./pages/Kitchen'))
 const CashierTables = lazy(() => import('./pages/CashierTables'))
 const CashierBill = lazy(() => import('./pages/CashierBill'))
 const Receipt = lazy(() => import('./pages/Receipt'))
@@ -203,7 +202,7 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
 
-        {/* Waiter — tables & order flow only; no kitchen or cashier */}
+        {/* Waiter — tables & order flow only; no cashier */}
         <Route path="/waiter/tables" element={
           <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterTables /></LazyProtectedRoute>
         } />
@@ -214,10 +213,7 @@ function AppRoutes() {
           <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></LazyProtectedRoute>
         } />
 
-        {/* Kitchen — admin/owner only */}
-        <Route path="/kitchen" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.kitchen}><Kitchen /></LazyProtectedRoute>
-        } />
+        <Route path="/kitchen" element={<Navigate to="/admin" replace />} />
 
         {/* Cashier — cashier + admin/owner; waiters are redirected */}
         <Route path="/cashier/tables" element={
