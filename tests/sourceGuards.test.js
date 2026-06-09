@@ -304,6 +304,15 @@ test('WaiterTables lets waiting kitchen orders move to cashier from the card act
   assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'waiting_kitchen'\) \{[\s\S]*MARK_TABLE_NEEDS_BILL/)
 })
 
+test('WaiterTables keeps an explicit manage path for active waiting orders', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+  const card = functionBody(source, 'TableCard')
+
+  assert.match(source, /manageOrder: 'Manage order'/)
+  assert.match(card, /const canManageActiveOrder = \['waiting_kitchen', 'preparing'\]\.includes\(status\)/)
+  assert.match(card, /onClick\?\.\(\)/)
+})
+
 test('WaiterOrder lets waiters remove unavailable active order items', () => {
   const source = readSource('src/pages/WaiterOrder.jsx')
   const panel = functionBody(source, 'OrderActionPanel')

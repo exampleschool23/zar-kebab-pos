@@ -35,6 +35,7 @@ const L = {
     itemsPreparing: n => `${n} preparing`,
     itemsReady: n => `${n} ready`,
     viewOrder: 'View Order',
+    manageOrder: 'Manage order',
     requestBill: 'Request Bill',
     tableSingular: 'table',
     tablePlural: 'tables',
@@ -78,6 +79,7 @@ const L = {
     itemsPreparing: n => `${n} готовится`,
     itemsReady: n => `${n} готово`,
     viewOrder: 'Посмотреть',
+    manageOrder: 'Управлять',
     requestBill: 'Запросить счёт',
     tableSingular: 'стол',
     tablePlural: 'столов',
@@ -121,6 +123,7 @@ const L = {
     itemsPreparing: n => `${n} tayyorlanmoqda`,
     itemsReady: n => `${n} tayyor`,
     viewOrder: 'Ko\'rish',
+    manageOrder: 'Buyurtma',
     requestBill: 'Hisob so\'rash',
     tableSingular: 'stol',
     tablePlural: 'stol',
@@ -343,6 +346,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction }) {
   const action = actionForStatus(lang, status)
   const ActionIcon = action?.Icon
   const reservation = getReservationSummary(table)
+  const canManageActiveOrder = ['waiting_kitchen', 'preparing'].includes(status)
 
   return (
     <div
@@ -448,18 +452,35 @@ function TableCard({ table, status, counts, lang, onClick, onAction }) {
         </div>
       )}
 
-      {action && (
-        <button
-          type="button"
-          onClick={e => {
-            e.stopPropagation()
-            onAction?.(status, table)
-          }}
-          className={`mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-sm font-black transition-all active:scale-[0.98] ${action.cls}`}
-        >
-          <ActionIcon size={15} />
-          {action.label}
-        </button>
+      {(action || canManageActiveOrder) && (
+        <div className="mt-4 grid grid-cols-1 gap-2">
+          {canManageActiveOrder && (
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation()
+                onClick?.()
+              }}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-black text-gray-700 transition-all hover:bg-gray-50 active:scale-[0.98]"
+            >
+              <Search size={15} />
+              {tr(lang, 'manageOrder')}
+            </button>
+          )}
+          {action && (
+            <button
+              type="button"
+              onClick={e => {
+                e.stopPropagation()
+                onAction?.(status, table)
+              }}
+              className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl px-3 text-sm font-black transition-all active:scale-[0.98] ${action.cls}`}
+            >
+              <ActionIcon size={15} />
+              {action.label}
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
