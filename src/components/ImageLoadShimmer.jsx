@@ -8,16 +8,18 @@ export default function ImageLoadShimmer({
   fallback = null,
   loading = 'lazy',
   fetchPriority,
-  timeoutMs = 3500,
+  timeoutMs = 12000,
 }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
 
   useEffect(() => {
     setLoaded(false)
     setFailed(false)
+    setTimedOut(false)
     if (!src || !timeoutMs) return undefined
-    const timer = window.setTimeout(() => setFailed(true), timeoutMs)
+    const timer = window.setTimeout(() => setTimedOut(true), timeoutMs)
     return () => window.clearTimeout(timer)
   }, [src, timeoutMs])
 
@@ -27,14 +29,20 @@ export default function ImageLoadShimmer({
 
   return (
     <div className={`relative overflow-hidden bg-orange-50 ${containerClassName}`}>
-      {!loaded && (
+      {!loaded && !timedOut && (
         <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-orange-50 via-white to-orange-100" />
+      )}
+      {timedOut && !loaded && fallback && (
+        <div className="absolute inset-0 z-10">
+          {fallback}
+        </div>
       )}
       <img
         src={src}
         alt={alt}
         className={`block ${className} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading={loading}
+        decoding="async"
         fetchPriority={fetchPriority}
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}

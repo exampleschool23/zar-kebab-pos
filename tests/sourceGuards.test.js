@@ -691,6 +691,16 @@ test('starter cafe menu expansion seeds polished categories and items', () => {
   assert.match(repairMigration, /'zk_mixed_grill'/)
 })
 
+test('ImageLoadShimmer keeps slow menu images loading after timeout', () => {
+  const source = readSource('src/components/ImageLoadShimmer.jsx')
+
+  assert.match(source, /timeoutMs = 12000/)
+  assert.match(source, /setTimedOut\(true\)/)
+  assert.doesNotMatch(source, /setTimeout\(\(\) => setFailed\(true\)/)
+  assert.match(source, /<img[\s\S]*src=\{src\}/)
+  assert.match(source, /decoding="async"/)
+})
+
 test('menu items support and display nutrition values', () => {
   const schema = readSource('supabase/003_pos_schema.sql')
   const migration = readSource('supabase/032_menu_item_kcal.sql')
