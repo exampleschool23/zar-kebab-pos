@@ -894,6 +894,12 @@ export default function AdminTables() {
             {sortedTables.map(table => {
               const activeOrders = orderStats.active.has(table.id)
               const hasHistory = orderStats.history.has(table.id)
+              const canHardDelete = !activeOrders && !hasHistory
+              const deleteTitle = activeOrders
+                ? l.activeOrdersDeleteBlock
+                : hasHistory
+                  ? l.historyDeleteBlock
+                  : l.delete
               const selected = selectedIds.includes(table.id)
               return (
                 <div key={table.id} className={`grid gap-3 px-4 py-4 md:grid-cols-[40px_1.3fr_1fr_0.7fr_1fr_0.7fr_150px] md:items-center ${table.is_active === false ? 'bg-gray-50/70' : selected ? 'bg-blue-50/40' : 'bg-white'}`}>
@@ -974,8 +980,10 @@ export default function AdminTables() {
                     </button>
                     <button
                       onClick={() => requestDelete(table)}
-                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                      title={l.delete}
+                      disabled={!canHardDelete}
+                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                      title={deleteTitle}
+                      aria-label={deleteTitle}
                     >
                       <Trash2 size={15} />
                     </button>

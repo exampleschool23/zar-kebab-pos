@@ -387,6 +387,8 @@ test('AdminTables protects table history and manages zones', () => {
   assert.match(source, /ADD_TABLE_ZONE/)
   assert.match(source, /zone_id/)
   assert.match(source, /is_active/)
+  assert.match(source, /const canHardDelete = !activeOrders && !hasHistory/)
+  assert.match(source, /disabled=\{!canHardDelete\}/)
 })
 
 test('CashierBill uses loyalty wallet controls instead of percent card discounts', () => {
