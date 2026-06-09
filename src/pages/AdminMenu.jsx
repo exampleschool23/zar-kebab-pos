@@ -28,6 +28,8 @@ import { supabase } from '../lib/supabase'
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
 const MAX_UPLOAD_IMAGE_SIZE = 5 * 1024 * 1024
+const MAX_MENU_IMAGE_DIMENSION = 700
+const MENU_IMAGE_WEBP_QUALITY = 0.75
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {
@@ -56,8 +58,7 @@ async function compressMenuImage(file) {
   if (file.size > MAX_UPLOAD_IMAGE_SIZE) throw new Error('Image must be 5 MB or smaller')
 
   const image = await loadImage(file)
-  const maxWidth = 900
-  const scale = Math.min(1, maxWidth / image.naturalWidth)
+  const scale = Math.min(1, MAX_MENU_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight))
   const width = Math.max(1, Math.round(image.naturalWidth * scale))
   const height = Math.max(1, Math.round(image.naturalHeight * scale))
   const canvas = document.createElement('canvas')
@@ -65,7 +66,7 @@ async function compressMenuImage(file) {
   canvas.height = height
   const context = canvas.getContext('2d')
   context.drawImage(image, 0, 0, width, height)
-  const blob = await canvasToBlob(canvas, 'image/webp', 0.82)
+  const blob = await canvasToBlob(canvas, 'image/webp', MENU_IMAGE_WEBP_QUALITY)
   return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
 }
 
