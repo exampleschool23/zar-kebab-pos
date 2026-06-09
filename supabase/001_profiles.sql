@@ -10,7 +10,7 @@ create table if not exists public.profiles (
   full_name   text        default '',
   phone       text        default '',
   role        text        not null default 'guest'
-                          check (role in ('owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder', 'guest')),
+                          check (role in ('owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest')),
   status      text        not null default 'active'
                           check (status in ('pending', 'active', 'disabled')),
   created_at  timestamptz not null default now()

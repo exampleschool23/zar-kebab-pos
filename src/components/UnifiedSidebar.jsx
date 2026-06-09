@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   UtensilsCrossed, LayoutDashboard, Table2, BookOpen,
-  ChefHat, Receipt, Users, BarChart2, ShieldCheck, Settings, LogOut,
+  Receipt, Users, BarChart2, ShieldCheck, Settings, LogOut,
   BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -32,13 +32,6 @@ const NAV = [
     labels: { uz: 'Menyu', ru: 'Меню', en: 'Menu' },
     path: '/admin/menu',
     roles: PAGE_ACCESS.menu,
-  },
-  {
-    key: 'kitchen',
-    icon: ChefHat,
-    labels: { uz: 'Oshxona', ru: 'Кухня', en: 'Kitchen' },
-    path: '/kitchen',
-    roles: PAGE_ACCESS.kitchen,
   },
   {
     key: 'cashier',
@@ -89,7 +82,6 @@ const ROLE_LABELS = {
   admin:       { uz: 'Admin',       ru: 'Администратор', en: 'Admin'        },
   waiter:      { uz: 'Ofitsiant',   ru: 'Официант',      en: 'Waiter'       },
   cashier:     { uz: 'Kassir',      ru: 'Кассир',        en: 'Cashier'      },
-  kitchen:     { uz: 'Oshxona',     ru: 'Кухня',         en: 'Kitchen'      },
   stakeholder: { uz: 'Stakeholder', ru: 'Стейкхолдер',   en: 'Stakeholder'  },
   guest:       { uz: 'Mehmon',      ru: 'Гость',         en: 'Guest'        },
 }
@@ -98,7 +90,6 @@ const ROLE_LABELS = {
 function activeKey(pathname) {
   if (pathname.startsWith('/waiter/order'))   return 'tables'
   if (pathname.startsWith('/waiter/tables'))  return 'tables'
-  if (pathname.startsWith('/kitchen'))        return 'kitchen'
   if (pathname.startsWith('/cashier'))        return 'cashier'
   if (pathname.startsWith('/admin/loyalty'))  return 'loyalty'
   if (pathname.startsWith('/admin/menu'))     return 'menu'

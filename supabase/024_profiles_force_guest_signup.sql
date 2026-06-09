@@ -8,7 +8,7 @@ alter table public.profiles
 
 alter table public.profiles
   add constraint profiles_role_check
-  check (role in ('owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder', 'guest'));
+  check (role in ('owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest'));
 
 create or replace function public.handle_new_user()
 returns trigger

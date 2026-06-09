@@ -86,7 +86,7 @@ drop policy if exists "owner_admin_write_menu_items" on public.menu_items;
 create policy "staff_read_menu_categories"
   on public.menu_categories for select
   to authenticated
-  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','kitchen','stakeholder']));
+  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','stakeholder']));
 
 create policy "owner_admin_write_menu_categories"
   on public.menu_categories for all
@@ -97,7 +97,7 @@ create policy "owner_admin_write_menu_categories"
 create policy "staff_read_menu_items"
   on public.menu_items for select
   to authenticated
-  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','kitchen','stakeholder']));
+  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','stakeholder']));
 
 create policy "owner_admin_write_menu_items"
   on public.menu_items for all
@@ -105,7 +105,7 @@ create policy "owner_admin_write_menu_items"
   using (public.current_staff_has_role(array['owner','admin']))
   with check (public.current_staff_has_role(array['owner','admin']));
 
--- Zones are management data, not waiter/kitchen data.
+-- Zones are management data, not staff operational data.
 drop policy if exists "staff_all_table_zones" on public.table_zones;
 drop policy if exists "staff_read_table_zones" on public.table_zones;
 drop policy if exists "owner_admin_write_table_zones" on public.table_zones;
@@ -113,7 +113,7 @@ drop policy if exists "owner_admin_write_table_zones" on public.table_zones;
 create policy "staff_read_table_zones"
   on public.table_zones for select
   to authenticated
-  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','kitchen','stakeholder']));
+  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','stakeholder']));
 
 create policy "owner_admin_write_table_zones"
   on public.table_zones for all
@@ -121,7 +121,7 @@ create policy "owner_admin_write_table_zones"
   using (public.current_staff_has_role(array['owner','admin']))
   with check (public.current_staff_has_role(array['owner','admin']));
 
--- Tables need operational writes from waiter/cashier/kitchen, but metadata management
+-- Tables need operational writes from waiter/cashier, but metadata management
 -- belongs to owner/admin. App-level permissions still hide edit/delete from staff.
 drop policy if exists "staff_all_tables" on public.restaurant_tables;
 drop policy if exists "staff_read_restaurant_tables" on public.restaurant_tables;
@@ -131,7 +131,7 @@ drop policy if exists "staff_update_restaurant_table_status" on public.restauran
 create policy "staff_read_restaurant_tables"
   on public.restaurant_tables for select
   to authenticated
-  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','kitchen','stakeholder']));
+  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','stakeholder']));
 
 create policy "owner_admin_manage_restaurant_tables"
   on public.restaurant_tables for all
@@ -142,8 +142,8 @@ create policy "owner_admin_manage_restaurant_tables"
 create policy "staff_update_restaurant_table_status"
   on public.restaurant_tables for update
   to authenticated
-  using (public.current_staff_has_role(array['waiter','cashier','kitchen']))
-  with check (public.current_staff_has_role(array['waiter','cashier','kitchen']));
+  using (public.current_staff_has_role(array['waiter','cashier']))
+  with check (public.current_staff_has_role(array['waiter','cashier']));
 
 -- Settings writes should stay owner/admin-only. Keep reads open to staff so service
 -- rate and receipt behavior hydrate consistently across pages.
@@ -153,7 +153,7 @@ drop policy if exists "owner_admin_manage_business_settings" on public.business_
 create policy "staff_read_business_settings"
   on public.business_settings for select
   to authenticated
-  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','kitchen','stakeholder']));
+  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','stakeholder']));
 
 create policy "owner_admin_manage_business_settings"
   on public.business_settings for all

@@ -290,7 +290,7 @@ export default function WaiterOrder() {
   const { profile, signOut } = useAuth()
   const lang                = state.lang
   const role                = (profile?.role || state.user?.role || '').toLowerCase()
-  const shouldShowSidebar   = !['kitchen', 'waiter'].includes(role)
+  const shouldShowSidebar   = role !== 'waiter'
   const [search,        setSearch]       = useState('')
   const [activeCategory,setCategory]     = useState('all')
   const [cartOpen,      setCartOpen]     = useState(false)

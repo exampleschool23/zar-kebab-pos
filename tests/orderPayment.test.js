@@ -44,7 +44,7 @@ test('signed-in internal roles resolve to workspace routes while guest stays pub
   assert.equal(defaultPath('admin'), '/admin')
   assert.equal(defaultPath('cashier'), '/cashier/tables')
   assert.equal(defaultPath('waiter'), '/waiter/tables')
-  assert.equal(defaultPath('kitchen'), '/kitchen')
+  assert.equal(defaultPath('kitchen'), '/pending-approval')
   assert.equal(defaultPath('guest'), '/menu')
 })
 
@@ -64,7 +64,6 @@ test('admins cannot change roles or statuses of other admins', () => {
   assert.equal(canEditTeamMember('owner', 'admin'), true)
   assert.equal(canEditTeamMember('admin', 'waiter'), true)
   assert.equal(canEditTeamMember('admin', 'cashier'), true)
-  assert.equal(canEditTeamMember('admin', 'kitchen'), true)
   assert.equal(canEditTeamMember('admin', 'guest'), true)
   assert.equal(canEditTeamMember('admin', 'admin'), false)
   assert.equal(canEditTeamMember('admin', 'owner'), false)

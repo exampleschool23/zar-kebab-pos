@@ -608,7 +608,7 @@ export default function Kitchen() {
   const { profile } = useAuth()
   const lang = state.lang
   const role = (profile?.role || state.user?.role || '').toLowerCase()
-  const shouldShowSidebar = !['kitchen', 'waiter'].includes(role)
+  const shouldShowSidebar = role !== 'waiter'
   const [pendingIds, setPendingIds] = useState(() => new Set())
   const [itemErrors, setItemErrors] = useState({})
   const [screenError, setScreenError] = useState('')

@@ -2,14 +2,14 @@
 // All sidebar visibility and route protection should reference these — never hardcode role arrays elsewhere.
 
 export const PAGE_ACCESS = {
-  publicMenu: ['guest', 'owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder'],
+  publicMenu: ['guest', 'owner', 'admin', 'waiter', 'cashier', 'stakeholder'],
   dashboard: ['owner', 'admin', 'cashier', 'stakeholder'],
   tables:    ['owner', 'admin', 'waiter',  'cashier'],
   menu:      ['owner', 'admin'],
-  kitchen:   ['owner', 'admin', 'kitchen'],
+  kitchen:   ['owner', 'admin'],
   cashier:   ['owner', 'admin', 'cashier'],
   loyalty:   ['owner', 'admin', 'cashier'],
-  team:      ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder'],
+  team:      ['owner', 'admin', 'waiter', 'cashier', 'stakeholder'],
   reports:   ['owner', 'admin', 'cashier', 'stakeholder'],
   audit:     ['owner', 'admin'],
   settings:  ['owner', 'admin'],
@@ -21,7 +21,7 @@ export function canViewPage(role, page) {
 
 export function canEditMenu(role)          { return ['owner', 'admin'].includes(role) }
 export function canManageSettings(role)    { return ['owner', 'admin'].includes(role) }
-export function canUseKitchenActions(role) { return ['owner', 'admin', 'kitchen'].includes(role) }
+export function canUseKitchenActions(role) { return ['owner', 'admin'].includes(role) }
 export function canUseCashierActions(role) { return ['owner', 'admin', 'cashier'].includes(role) }
 export function isReadOnlyUser(role)       { return role === 'stakeholder' }
 export function isPublicOnlyRole(role) {
@@ -57,7 +57,7 @@ export function canDeleteTeamMember(viewerRole, targetRole, isSelf = false) {
 
 /** Roles the viewer is allowed to assign. Owner can assign any role; admin cannot assign owner. */
 export function assignableRoles(viewerRole) {
-  const all = ['owner', 'admin', 'waiter', 'cashier', 'kitchen', 'stakeholder', 'guest']
+  const all = ['owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest']
   if (viewerRole === 'owner') return all
   if (viewerRole === 'admin') return all.filter(r => r !== 'owner' && r !== 'stakeholder')
   return []
@@ -68,6 +68,6 @@ export function defaultPath(role) {
   if (['owner', 'admin', 'stakeholder'].includes(role)) return '/admin'
   if (role === 'cashier')  return '/cashier/tables'
   if (role === 'waiter')   return '/waiter/tables'
-  if (role === 'kitchen')  return '/kitchen'
+  if (role === 'kitchen')  return '/pending-approval'
   return '/menu'
 }

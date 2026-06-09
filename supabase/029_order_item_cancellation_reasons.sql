@@ -19,9 +19,9 @@ alter table public.order_item_cancellations enable row level security;
 drop policy if exists "Staff: read order item cancellations" on public.order_item_cancellations;
 create policy "Staff: read order item cancellations"
   on public.order_item_cancellations for select
-  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','kitchen','stakeholder']));
+  using (public.current_staff_has_role(array['owner','admin','waiter','cashier','stakeholder']));
 
 drop policy if exists "Kitchen: insert order item cancellations" on public.order_item_cancellations;
 create policy "Kitchen: insert order item cancellations"
   on public.order_item_cancellations for insert
-  with check (public.current_staff_has_role(array['owner','admin','kitchen']));
+  with check (public.current_staff_has_role(array['owner','admin']));

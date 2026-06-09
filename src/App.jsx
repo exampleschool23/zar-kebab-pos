@@ -214,12 +214,12 @@ function AppRoutes() {
           <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></LazyProtectedRoute>
         } />
 
-        {/* Kitchen — kitchen role + admin/owner only */}
+        {/* Kitchen — admin/owner only */}
         <Route path="/kitchen" element={
           <LazyProtectedRoute roles={PAGE_ACCESS.kitchen}><Kitchen /></LazyProtectedRoute>
         } />
 
-        {/* Cashier — cashier + admin/owner; waiters and kitchen are redirected */}
+        {/* Cashier — cashier + admin/owner; waiters are redirected */}
         <Route path="/cashier/tables" element={
           <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><CashierTables /></LazyProtectedRoute>
         } />

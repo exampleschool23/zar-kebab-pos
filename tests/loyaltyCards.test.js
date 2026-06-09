@@ -296,7 +296,7 @@ test('manual balance adjustment is owner-only, reasoned, transactional and never
   assert.equal(debit.transaction.balance_before, 75000)
   assert.equal(debit.transaction.balance_after, 65000)
 
-  for (const role of ['admin', 'cashier', 'waiter', 'kitchen']) {
+  for (const role of ['admin', 'cashier', 'waiter', 'stakeholder']) {
     assertLoyaltyError(() => adjustLoyaltyBalance({ role, card: base, amount: 1000, reason: 'Nope' }), 'forbidden')
   }
   assertLoyaltyError(() => adjustLoyaltyBalance({ role: 'owner', card: base, amount: 1000, reason: '' }), 'reason_required')
@@ -314,7 +314,7 @@ test('loyalty permissions enforce owner mutations and admin read-only behavior',
   assert.equal(canAdjustLoyaltyBalance('owner'), true)
   assert.equal(canDeactivateLoyaltyCard('owner'), true)
 
-  for (const role of ['admin', 'cashier', 'waiter', 'kitchen', 'guest']) {
+  for (const role of ['admin', 'cashier', 'waiter', 'stakeholder', 'guest']) {
     assert.equal(canCreateLoyaltyCard(role), false)
     assert.equal(canEditLoyaltyCard(role), false)
     assert.equal(canAdjustLoyaltyBalance(role), false)

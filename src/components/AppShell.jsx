@@ -11,7 +11,7 @@ export default function AppShell({ children, title }) {
 
   const displayName = profile?.full_name || state.user?.name || profile?.email || ''
   const role = (profile?.role || state.user?.role || '').toLowerCase()
-  const shouldShowSidebar = !['kitchen', 'waiter'].includes(role)
+  const shouldShowSidebar = role !== 'waiter'
 
   function handleSignOut() {
     dispatch({ type: 'LOGOUT' })
