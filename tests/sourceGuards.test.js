@@ -310,7 +310,16 @@ test('WaiterTables keeps an explicit manage path for active waiting orders', () 
 
   assert.match(source, /manageOrder: 'Manage order'/)
   assert.match(card, /const canManageActiveOrder = \['waiting_kitchen', 'preparing'\]\.includes\(status\)/)
-  assert.match(card, /onClick\?\.\(\)/)
+  assert.match(card, /onManage\?\.\(table\)/)
+  assert.match(functionBody(source, 'handleManageOrder'), /navigate\(`\/waiter\/order\/\$\{table\.id\}\?panel=order`\)/)
+})
+
+test('WaiterOrder opens the cart drawer from manage-order links', () => {
+  const source = readSource('src/pages/WaiterOrder.jsx')
+
+  assert.match(source, /useSearchParams/)
+  assert.match(source, /searchParams\.get\('panel'\) === 'order'/)
+  assert.match(source, /setCartOpen\(true\)/)
 })
 
 test('WaiterOrder lets waiters remove unavailable active order items', () => {

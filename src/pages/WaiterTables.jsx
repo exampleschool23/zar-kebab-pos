@@ -339,7 +339,7 @@ function actionForStatus(lang, status) {
   return null
 }
 
-function TableCard({ table, status, counts, lang, onClick, onAction }) {
+function TableCard({ table, status, counts, lang, onClick, onAction, onManage }) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.available
   const StatusIcon = cfg.icon
   const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt) : null
@@ -459,7 +459,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction }) {
               type="button"
               onClick={e => {
                 e.stopPropagation()
-                onClick?.()
+                onManage?.(table)
               }}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-black text-gray-700 transition-all hover:bg-gray-50 active:scale-[0.98]"
             >
@@ -661,6 +661,12 @@ export default function WaiterTables() {
     navigate(`/waiter/order/${table.id}`)
   }
 
+  function handleManageOrder(table) {
+    dispatch({ type: 'SET_TABLE', payload: table.id })
+    dispatch({ type: 'CLEAR_CART' })
+    navigate(`/waiter/order/${table.id}?panel=order`)
+  }
+
   function handleCardAction(status, table) {
     if (status === 'ready') {
       dispatch({ type: 'CONFIRM_ORDER_DELIVERED', payload: table.id })
@@ -821,6 +827,7 @@ export default function WaiterTables() {
                         lang={lang}
                         onClick={() => itemStatus === 'reserved' ? handleCardAction(itemStatus, table) : handleTable(table, itemStatus)}
                         onAction={handleCardAction}
+                        onManage={handleManageOrder}
                       />
                     ))}
                   </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Search, ShoppingCart, Plus, UtensilsCrossed,
   Menu as MenuIcon, X, CheckCircle2, Clock,
@@ -352,6 +352,7 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
 export default function WaiterOrder() {
   const { tableId }         = useParams()
   const navigate            = useNavigate()
+  const [searchParams]      = useSearchParams()
   const { state, dispatch } = useApp()
   const { loaded, loadError } = useAppDataStatus()
   const { profile, signOut } = useAuth()
@@ -367,6 +368,7 @@ export default function WaiterOrder() {
   const [orderType,     setOrderType]    = useState(isTakeAwayFlow ? 'take_away' : 'dine_in')
   const [detailItem,    setDetailItem]   = useState(null)
   const productScrollRef = useRef(null)
+  const shouldOpenOrderPanel = searchParams.get('panel') === 'order'
 
   const table = isTakeAwayFlow ? null : state.tables.find(t => t.id === tableId)
   const orderTitle = isTakeAwayFlow
@@ -390,6 +392,11 @@ export default function WaiterOrder() {
     }
     return merged
   }, [state.orders, tableId, isTakeAwayFlow])
+
+  useEffect(() => {
+    if (!shouldOpenOrderPanel || detailItem) return
+    setCartOpen(true)
+  }, [shouldOpenOrderPanel, detailItem, activeOrder?.id])
 
   // Cart lookups
   const cartQtyMap = useMemo(() => {
