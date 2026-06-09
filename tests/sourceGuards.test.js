@@ -263,11 +263,14 @@ test('WaiterTables uses responsive section grids instead of one flat table grid'
 
 test('CashierTables groups bills by cashier urgency', () => {
   const source = readSource('src/pages/CashierTables.jsx')
+  const cashierBills = readSource('src/lib/cashierBills.js')
   const db = readSource('src/lib/db.js')
 
-  assert.match(source, /function isCashierVisibleBill/)
-  assert.match(source, /const billableItems = \(order\.items \|\| \[\]\)\.filter\(item => !isCancelledOrderItem\(item\)\)/)
-  assert.match(source, /return getOrderPaymentSummary\(order, billableItems, order\.service_rate_pct\)\.total > 0/)
+  assert.match(source, /from '\.\.\/lib\/cashierBills'/)
+  assert.doesNotMatch(source, /function isCashierVisibleBill/)
+  assert.match(cashierBills, /function isCashierVisibleBill/)
+  assert.match(cashierBills, /if \(billableItems\.length === 0\) return false/)
+  assert.match(cashierBills, /getOrderPaymentSummary\(order, billableItems, order\.service_rate_pct\)\.total > 0/)
   assert.doesNotMatch(source, /function isCashierReadyTakeAway/)
   assert.doesNotMatch(source, /billableItems\.every\(item => \['ready', 'served'\]/)
   assert.match(source, /const raw = state\.orders\.filter\(isCashierVisibleBill\)/)

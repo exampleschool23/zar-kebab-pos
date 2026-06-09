@@ -11,13 +11,12 @@ import {
   getGroupedOrderItems,
   getOrderDate,
   getOrderPaymentBreakdown,
-  getOrderPaymentSummary,
   getOrderTotal,
   groupOrdersBySession,
-  isCancelledOrderItem,
   isPaidOrder,
   toLocalDateStr,
 } from '../lib/analytics'
+import { isCashierVisibleBill, isTakeAwayBill } from '../lib/cashierBills'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -33,16 +32,6 @@ function elapsedSince(iso) {
 function timeLabel(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function isTakeAwayBill(order) {
-  return order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
-}
-
-function isCashierVisibleBill(order) {
-  if (!order || order.payment_status === 'paid' || order.status === 'cancelled') return false
-  const billableItems = (order.items || []).filter(item => !isCancelledOrderItem(item))
-  return getOrderPaymentSummary(order, billableItems, order.service_rate_pct).total > 0
 }
 
 function countLabel(count, lang) {
