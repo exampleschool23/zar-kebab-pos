@@ -348,6 +348,27 @@ test('WaiterOrder lets waiters remove unavailable active order items', () => {
   assert.match(panel, /reason: l\.removeReason/)
 })
 
+test('WaiterOrder prints cook checks by submitted order round', () => {
+  const source = readSource('src/pages/WaiterOrder.jsx')
+  const cartPanel = readSource('src/components/CartPanel.jsx')
+  const reducer = readSource('src/store/ordersReducer.js')
+  const db = readSource('src/lib/db.js')
+  const panel = functionBody(source, 'OrderActionPanel')
+
+  assert.match(source, /getKitchenCheckGroups/)
+  assert.match(source, /buildKitchenCheckHtml/)
+  assert.match(cartPanel, /_kitchenRoundId/)
+  assert.match(reducer, /submitted_at: submittedAt/)
+  assert.match(db, /submitted_at: submittedAt/)
+  assert.match(source, /order_number: item\.order_number \|\| o\.order_number/)
+  assert.match(source, /waiter_name: item\.waiter_name \|\| o\.waiter_name/)
+  assert.match(panel, /const kitchenCheckGroups = getKitchenCheckGroups\(order\)/)
+  assert.match(panel, /function handlePrintKitchenCheck\(group\)/)
+  assert.match(panel, /kitchenCheckGroups\.map\(\(group, index\)/)
+  assert.match(panel, /key=\{group\.roundId\}/)
+  assert.doesNotMatch(panel, /buildKitchenCheckHtml\(\{ group: order/)
+})
+
 test('Kitchen can cancel unavailable items without billing them', () => {
   const kitchen = readSource('src/pages/Kitchen.jsx')
   const analytics = readSource('src/lib/analytics.js')

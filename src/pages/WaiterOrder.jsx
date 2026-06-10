@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Search, ShoppingCart, Plus, UtensilsCrossed,
   Menu as MenuIcon, X, CheckCircle2, Clock,
-  Receipt, Loader2, ArrowLeft, LogOut, Trash2,
+  Receipt, Loader2, ArrowLeft, LogOut, Trash2, Printer,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -16,9 +16,10 @@ import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuC
 import { ProductCard, ProductDetailPage } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
+import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
-function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap }) {
+function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName }) {
   const [busy, setBusy] = useState(false)
   const [removingItemId, setRemovingItemId] = useState(null)
 
@@ -47,6 +48,8 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       needsBillTitle: 'Hisob so\'raldi',
       needsBillSub: 'Kassir to\'lovni qayta ishlaydi',
       removeItem: 'Olib tashlash',
+      printCheck: 'Chek chiqarish',
+      roundLabel: n => `Buyurtma ${n}`,
       missingItem: 'Menyuda yo‘q',
       removeReason: 'Menyuda mavjud emas',
     },
@@ -62,6 +65,8 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       needsBillTitle: 'Счёт запрошен',
       needsBillSub: 'Кассир обрабатывает оплату',
       removeItem: 'Убрать',
+      printCheck: 'Печать чека',
+      roundLabel: n => `Заказ ${n}`,
       missingItem: 'Нет в меню',
       removeReason: 'Нет в меню',
     },
@@ -77,6 +82,8 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       needsBillTitle: 'Bill Requested',
       needsBillSub: 'Cashier is processing payment',
       removeItem: 'Remove',
+      printCheck: 'Print check',
+      roundLabel: n => `Order ${n}`,
       missingItem: 'Not in menu',
       removeReason: 'Not present in menu',
     },
@@ -84,6 +91,20 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   const l = L[lang] || L.en
 
   const removableItems = items.filter(item => !['served', 'cancelled'].includes(String(item.status || '').toLowerCase()))
+  const kitchenCheckGroups = getKitchenCheckGroups(order)
+
+  function handlePrintKitchenCheck(group) {
+    const printWindow = window.open('', '_blank', 'width=420,height=640')
+    if (!printWindow) return
+    printWindow.document.open()
+    printWindow.document.write(buildKitchenCheckHtml({ group, lang, restaurantName }))
+    printWindow.document.close()
+    printWindow.focus()
+    window.setTimeout(() => {
+      printWindow.print()
+      printWindow.close()
+    }, 300)
+  }
 
   async function handleRemoveItem(item) {
     const itemKey = item.id || item.menu_item_id
@@ -139,6 +160,21 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
         </div>
         {removableItems.length > 0 && (
           <div className="mt-3 space-y-2 border-t border-orange-100 pt-3">
+            {kitchenCheckGroups.length > 0 && (
+              <div className="mb-2 grid grid-cols-1 gap-2">
+                {kitchenCheckGroups.map((group, index) => (
+                  <button
+                    key={group.roundId}
+                    type="button"
+                    onClick={() => handlePrintKitchenCheck(group)}
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-white px-3 text-[12px] font-black text-[#ff5a00] transition-colors hover:bg-orange-50"
+                  >
+                    <Printer size={14} />
+                    {l.printCheck} · {l.roundLabel(index + 1)}
+                  </button>
+                ))}
+              </div>
+            )}
             {removableItems.map(item => {
               const itemKey = item.id || item.menu_item_id
               const menuItem = menuItemMap?.[item.menu_item_id]
@@ -385,6 +421,10 @@ export default function WaiterOrder() {
       ...item,
       order_id: item.order_id || o.id,
       _orderId: o.id,
+      order_number: item.order_number || o.order_number,
+      table_name: item.table_name || o.table_name,
+      waiter_name: item.waiter_name || o.waiter_name,
+      created_at: item.created_at || o.created_at,
     })))
     const priority = ['needs_bill', 'preparing', 'sent_to_kitchen', 'delivered']
     for (const p of priority) {
@@ -785,6 +825,7 @@ export default function WaiterOrder() {
                 dispatch={dispatch}
                 cartCount={cartCount}
                 menuItemMap={menuItemMap}
+                restaurantName={state.settings?.restaurantName}
               />
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">

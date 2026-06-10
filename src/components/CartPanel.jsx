@@ -152,8 +152,15 @@ export default function CartPanel({
     if (cart.length === 0 || isSending) return
     setMessage(null)
     onSendingChange?.(true)
+    const submittedAt = new Date().toISOString()
+    const kitchenRoundId = `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
     try {
-      const result = await dispatch({ type: 'SEND_TO_KITCHEN', payload: { orderType } })
+      const result = await dispatch({
+        type: 'SEND_TO_KITCHEN',
+        payload: { orderType },
+        _kitchenRoundId: kitchenRoundId,
+        _submittedAt: submittedAt,
+      })
       if (result?.error) {
         setMessage({
           tone: 'error',

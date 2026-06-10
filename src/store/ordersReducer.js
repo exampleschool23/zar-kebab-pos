@@ -28,7 +28,17 @@ export function ordersReducer(state, action) {
       const table = isTakeAway ? null : state.tables.find(t => t.id === state.currentTableId)
       if ((!isTakeAway && !table) || state.cart.length === 0) return state
       const orderId = action._orderId || ('o' + Date.now())
-      const cartItems = action._items || state.cart.map(i => ({ ...i, id: makeLocalId(), status: 'new', order_type: orderType }))
+      const submittedAt = action._submittedAt || new Date().toISOString()
+      const kitchenRoundId = action._kitchenRoundId || `${orderId}-${submittedAt}`
+      const cartItems = action._items || state.cart.map(i => ({
+        ...i,
+        id: makeLocalId(),
+        status: 'new',
+        order_type: orderType,
+        kitchen_round_id: kitchenRoundId,
+        submitted_at: submittedAt,
+        created_at: submittedAt,
+      }))
       const addedSubtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0)
       const activeOrder = state.orders.find(o =>
         o.id === orderId ||

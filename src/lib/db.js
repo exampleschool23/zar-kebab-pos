@@ -638,7 +638,16 @@ export async function writeToSupabase(action, state) {
       const table    = isTakeAway ? null : state.tables.find(t => t.id === tableId)
       if ((!isTakeAway && !table) || state.cart.length === 0) return
 
-      const items = action._items || state.cart.map(i => ({ ...i, status: 'new', order_type: orderType }))
+      const submittedAt = action._submittedAt || new Date().toISOString()
+      const kitchenRoundId = action._kitchenRoundId || `${orderId}-${submittedAt}`
+      const items = action._items || state.cart.map(i => ({
+        ...i,
+        status: 'new',
+        order_type: orderType,
+        kitchen_round_id: kitchenRoundId,
+        submitted_at: submittedAt,
+        created_at: submittedAt,
+      }))
       const addedSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
       const { data: existingOrder } = await supabase
         .from('orders')
