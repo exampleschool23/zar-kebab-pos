@@ -97,7 +97,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     const printWindow = window.open('', '_blank', 'width=420,height=640')
     if (!printWindow) return
     printWindow.document.open()
-    printWindow.document.write(buildKitchenCheckHtml({ group, lang, restaurantName }))
+    printWindow.document.write(buildKitchenCheckHtml({ group, lang: 'ru', restaurantName }))
     printWindow.document.close()
     printWindow.focus()
     window.setTimeout(() => {

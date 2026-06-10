@@ -80,3 +80,20 @@ test('cook check print html contains item notes but no prices', () => {
   assert.doesNotMatch(html, /18000/)
   assert.doesNotMatch(html, /UZS/)
 })
+
+test('cook check can render the required Russian print copy', () => {
+  const [group] = getKitchenCheckGroups({
+    id: 'order-1',
+    table_name: 'Table 3',
+    waiter_name: 'Jasurbek',
+    items: [
+      item({ id: 'a', order_id: 'order-1', name: 'Chicken', quantity: 1 }),
+    ],
+  })
+  const html = buildKitchenCheckHtml({ group, lang: 'ru', restaurantName: 'Zar Kebab' })
+
+  assert.match(html, /Чек для повара/)
+  assert.match(html, /Официант/)
+  assert.match(html, /Заказ/)
+  assert.match(html, /Время/)
+})

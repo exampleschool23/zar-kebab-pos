@@ -364,6 +364,7 @@ test('WaiterOrder prints cook checks by submitted order round', () => {
   assert.match(source, /waiter_name: item\.waiter_name \|\| o\.waiter_name/)
   assert.match(panel, /const kitchenCheckGroups = getKitchenCheckGroups\(order\)/)
   assert.match(panel, /function handlePrintKitchenCheck\(group\)/)
+  assert.match(panel, /buildKitchenCheckHtml\(\{ group, lang: 'ru', restaurantName \}\)/)
   assert.match(panel, /kitchenCheckGroups\.map\(\(group, index\)/)
   assert.match(panel, /key=\{group\.roundId\}/)
   assert.doesNotMatch(panel, /buildKitchenCheckHtml\(\{ group: order/)
