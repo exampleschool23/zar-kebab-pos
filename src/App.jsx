@@ -91,6 +91,7 @@ function ProtectedRoute({ children, roles }) {
 
   if (loading) return <Spinner />
   if (!session) return <Navigate to="/menu" replace />
+  if (!profile) return <Spinner />
 
   const role = (profile?.role || 'guest').toLowerCase()
 
@@ -152,6 +153,7 @@ function RoleRedirect() {
   useEffect(() => {
     if (loading) return
     if (!session) { navigate('/menu', { replace: true }); return }
+    if (!profile) return
     const role = (profile?.role || 'guest').toLowerCase()
     if (profile?.status === 'disabled') return
     if (profile?.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
@@ -184,6 +186,8 @@ function RoleRedirect() {
       </div>
     )
   }
+
+  if (!profile) return <Spinner />
 
   return <Spinner />
 }

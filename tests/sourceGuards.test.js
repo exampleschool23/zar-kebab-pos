@@ -81,6 +81,15 @@ test('App ProfileSync depends on stable profile fields and dispatch', () => {
   assert.match(body, /\[profile\?\.id,\s*profile\?\.role,\s*profile\?\.full_name,\s*profile\?\.email,\s*dispatch\]/)
 })
 
+test('App waits for profile before role-based route redirects', () => {
+  const source = readSource('src/App.jsx')
+  const protectedRoute = functionBody(source, 'ProtectedRoute')
+  const roleRedirect = functionBody(source, 'RoleRedirect')
+
+  assert.match(protectedRoute, /if \(!profile\) return <Spinner \/>/)
+  assert.match(roleRedirect, /if \(!profile\) return/)
+})
+
 test('AppContext exposes a stable dbDispatch callback', () => {
   const source = readSource('src/store/AppContext.jsx')
 
@@ -178,6 +187,27 @@ test('PublicMenu is read-only for QR customers', () => {
   assert.match(productCards, /const inCart = !readOnly && qty > 0/)
   assert.match(productCards, /\{readOnly \? null : inCart \?/)
   assert.match(productCards, /!\s*readOnly && \(/)
+})
+
+test('MenuCategoryScroller collapsed chips do not overlap expanded category cards', () => {
+  const source = readSource('src/components/MenuCategoryScroller.jsx')
+
+  assert.doesNotMatch(source, /-mt-\[61px\]/)
+  assert.match(source, /const COLLAPSED_BAR_HEIGHT = 72/)
+  assert.match(source, /const FIXED_COLLAPSED_GAP = 12/)
+  assert.match(source, /maxHeight: collapsedPosition === 'fixed' \|\| collapsed \? COLLAPSED_BAR_HEIGHT : 0/)
+  assert.match(source, /height: collapsed \? COLLAPSED_BAR_HEIGHT \+ FIXED_COLLAPSED_GAP : 0/)
+  assert.match(source, /scrollOffset \+ 8/)
+  assert.doesNotMatch(source, /\+ 82/)
+  assert.match(source, /aria-pressed=\{active\}/)
+})
+
+test('PublicMenu enables tappable fixed collapsed categories', () => {
+  const source = readSource('src/pages/PublicMenu.jsx')
+
+  assert.match(source, /collapsedPosition="fixed"/)
+  assert.match(source, /collapsedClassName="z-50/)
+  assert.match(source, /scrollOffset=\{116\}/)
 })
 
 test('source does not use console.log debugging', () => {

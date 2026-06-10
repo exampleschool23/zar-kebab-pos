@@ -7,6 +7,9 @@ export function menuCategorySectionId(prefix, categoryId) {
   return `${prefix}-${String(categoryId).replace(/[^a-zA-Z0-9_-]/g, '-')}`
 }
 
+const COLLAPSED_BAR_HEIGHT = 72
+const FIXED_COLLAPSED_GAP = 12
+
 function CategoryImage({ src, alt, active }) {
   return (
     <ImageLoadShimmer
@@ -29,6 +32,7 @@ function LargeCategoryCard({ category, active, title, onClick }) {
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={`min-w-[124px] w-[124px] flex-shrink-0 overflow-hidden rounded-[20px] border-2 text-center transition-all active:scale-[0.98] ${
         active
           ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-[0_8px_18px_rgba(255,90,31,0.16)]'
@@ -63,6 +67,7 @@ function CategoryChip({ category, active, title, count, onClick }) {
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={`flex h-14 w-auto min-w-[104px] max-w-none flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border px-3 py-2 text-sm font-black transition-all ${
         active
           ? 'border-[#ff5a1f] bg-[#fff4ed] text-[#ff4d00] shadow-sm'
@@ -171,7 +176,7 @@ export default function MenuCategoryScroller({
       }
 
       if (!onActiveCategoryChange || !sectionPrefix) return
-      const threshold = (root === window ? topOffset : scroller.getBoundingClientRect().top) + 82
+      const threshold = (root === window ? topOffset : scroller.getBoundingClientRect().top) + scrollOffset + 8
       let nextActive = 'all'
 
       for (const category of cards) {
@@ -196,7 +201,7 @@ export default function MenuCategoryScroller({
       root.removeEventListener('scroll', handleScroll)
       window.removeEventListener('resize', handleScroll)
     }
-  }, [cards, onActiveCategoryChange, scrollContainerRef, sectionPrefix, topOffset])
+  }, [cards, onActiveCategoryChange, scrollContainerRef, scrollOffset, sectionPrefix, topOffset])
 
   return (
     <>
@@ -218,10 +223,13 @@ export default function MenuCategoryScroller({
       </div>
 
       <div
-        className={`${collapsedPosition === 'fixed' ? 'fixed left-0 right-0' : 'sticky -mx-1 -mt-[61px]'} z-30 border-b border-[#E5E7EB] bg-[#FAF6EE]/95 px-1 py-2 backdrop-blur transition-all duration-200 ${
+        className={`${collapsedPosition === 'fixed' ? 'fixed left-0 right-0' : 'sticky -mx-1 overflow-hidden'} z-30 border-b border-[#E5E7EB] bg-[#FAF6EE]/95 px-1 py-2 backdrop-blur transition-all duration-200 ${
           collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
         } ${collapsedClassName}`}
-        style={{ top: topOffset }}
+        style={{
+          top: topOffset,
+          maxHeight: collapsedPosition === 'fixed' || collapsed ? COLLAPSED_BAR_HEIGHT : 0,
+        }}
       >
         <div className="flex gap-2 overflow-x-auto overflow-y-hidden px-1" style={{ scrollbarWidth: 'none' }}>
           {cards.map(category => {
@@ -239,6 +247,14 @@ export default function MenuCategoryScroller({
           })}
         </div>
       </div>
+
+      {collapsedPosition === 'fixed' && (
+        <div
+          aria-hidden="true"
+          className="transition-[height] duration-200"
+          style={{ height: collapsed ? COLLAPSED_BAR_HEIGHT + FIXED_COLLAPSED_GAP : 0 }}
+        />
+      )}
     </>
   )
 }

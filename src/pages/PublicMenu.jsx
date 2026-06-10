@@ -196,10 +196,10 @@ export default function PublicMenu() {
           itemCounts={itemCounts}
           sectionPrefix="public-menu-category"
           topOffset={73}
-          scrollOffset={96}
+          scrollOffset={116}
           className="mb-5 mt-3 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm"
           collapsedPosition="fixed"
-          collapsedClassName="z-30 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1180px] sm:-translate-x-1/2"
+          collapsedClassName="z-50 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1180px] sm:-translate-x-1/2"
         />
 
         {loading ? (
