@@ -1,4 +1,6 @@
 const CANCELLED_STATUS = 'cancelled'
+const DEFAULT_TITLE = 'ЧЕК ДЛЯ КУХНИ'
+const SEPARATOR = '━━━━━━━━━━━━━━━━━━━━'
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -27,6 +29,35 @@ function orderItemRoundId(item, fallbackOrderId) {
 
 function itemCreatedAt(item) {
   return item?.submitted_at || item?.submittedAt || item?.created_at || item?.createdAt || ''
+}
+
+function formatKitchenTime(value) {
+  const date = value ? new Date(value) : new Date()
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function formatKitchenOrderNumber(group) {
+  const raw = group?.orderNumber || group?.orderId || ''
+  if (!raw) return ''
+  const text = String(raw)
+  if (text.startsWith('#')) return text
+  const numericSuffix = text.match(/\d+$/)?.[0]
+  return `#${numericSuffix || text}`
+}
+
+function formatKitchenTableName(value) {
+  const text = String(value || '-').trim()
+  const tableNumber = text.match(/^(table|стол)\s+(.+)$/i)?.[2]
+  return tableNumber ? `СТОЛ ${tableNumber}` : text.toLocaleUpperCase('ru-RU')
+}
+
+function kitchenItemName(item) {
+  return String(item?.name || '').trim().toLocaleUpperCase('ru-RU')
 }
 
 export function getKitchenCheckGroups(order) {
@@ -92,51 +123,63 @@ export function kitchenCheckLabels(lang = 'en') {
 }
 
 export function buildKitchenCheckHtml({ group, lang = 'en', restaurantName = 'Zar Kebab' }) {
-  const l = kitchenCheckLabels(lang)
-  const date = group?.createdAt
-    ? new Date(group.createdAt).toLocaleString()
-    : new Date().toLocaleString()
+  const title = DEFAULT_TITLE
+  const time = formatKitchenTime(group?.createdAt)
+  const orderNumber = formatKitchenOrderNumber(group)
+  const tableName = formatKitchenTableName(group?.tableName)
+  const waiterName = group?.waiterName || '-'
 
   const rows = (group?.items || []).map(item => `
-    <tr>
-      <td class="qty">${escapeHtml(item.quantity || 1)}</td>
-      <td>
-        <div class="name">${escapeHtml(item.name)}</div>
-        ${item.notes ? `<div class="notes">${escapeHtml(l.notes)}: ${escapeHtml(item.notes)}</div>` : ''}
-      </td>
-    </tr>
+    <div class="item">
+      ${escapeHtml(item.quantity || 1)} × ${escapeHtml(kitchenItemName(item))}
+      ${item.notes ? `<div class="notes">${escapeHtml(item.notes)}</div>` : ''}
+    </div>
   `).join('')
 
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>${escapeHtml(l.title)}</title>
+  <title>${escapeHtml(title)}</title>
   <style>
     @page { size: 80mm auto; margin: 0; }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 4mm; width: 80mm; font-family: Arial, sans-serif; color: #000; }
-    h1 { margin: 0 0 6px; text-align: center; font-size: 18px; text-transform: uppercase; }
-    .brand { text-align: center; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
-    .meta { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 6px 0; margin-bottom: 8px; font-size: 12px; }
-    .meta div { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    td { padding: 6px 0; border-bottom: 1px dashed #999; vertical-align: top; }
-    .qty { width: 28px; font-weight: 800; font-size: 15px; }
-    .name { font-weight: 800; }
-    .notes { margin-top: 2px; font-size: 11px; }
+    body {
+      margin: 0;
+      padding: 5mm 4mm;
+      width: 80mm;
+      font-family: "Courier New", monospace;
+      color: #000;
+      font-size: 15px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+    h1 {
+      margin: 0 0 14px;
+      text-align: center;
+      font-size: 18px;
+      line-height: 1.1;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+    .meta { margin-bottom: 13px; }
+    .line { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
+    .separator { margin: 12px 0; text-align: center; font-weight: 900; }
+    .items { margin: 0; }
+    .item { margin: 0 0 16px; font-size: 16px; font-weight: 900; }
+    .item:last-child { margin-bottom: 0; }
+    .notes { margin: 3px 0 0 28px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
   </style>
 </head>
 <body>
-  <h1>${escapeHtml(l.title)}</h1>
-  <div class="brand">${escapeHtml(restaurantName)}</div>
+  <h1>${escapeHtml(title)}</h1>
   <div class="meta">
-    <div><strong>${escapeHtml(l.table)}</strong><span>${escapeHtml(group?.tableName || '-')}</span></div>
-    <div><strong>${escapeHtml(l.waiter)}</strong><span>${escapeHtml(group?.waiterName || '-')}</span></div>
-    <div><strong>${escapeHtml(l.order)}</strong><span>${escapeHtml(group?.orderNumber || group?.orderId || '-')}</span></div>
-    <div><strong>${escapeHtml(l.time)}</strong><span>${escapeHtml(date)}</span></div>
+    <div class="line"><span>${escapeHtml(tableName)}</span><span>${escapeHtml(orderNumber)}</span></div>
+    <div class="line"><span>${escapeHtml(time)}</span><span>${escapeHtml(waiterName)}</span></div>
   </div>
-  <table>${rows}</table>
+  <div class="separator">${SEPARATOR}</div>
+  <div class="items">${rows}</div>
+  <div class="separator">${SEPARATOR}</div>
 </body>
 </html>`
 }

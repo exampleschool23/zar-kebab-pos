@@ -96,8 +96,17 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   function handlePrintKitchenCheck(group) {
     const printWindow = window.open('', '_blank', 'width=420,height=640')
     if (!printWindow) return
+    const russianGroup = {
+      ...group,
+      items: group.items.map(item => ({
+        ...item,
+        name: menuItemMap?.[item.menu_item_id]
+          ? getItemName(menuItemMap[item.menu_item_id], 'ru')
+          : item.name,
+      })),
+    }
     printWindow.document.open()
-    printWindow.document.write(buildKitchenCheckHtml({ group, lang: 'ru', restaurantName }))
+    printWindow.document.write(buildKitchenCheckHtml({ group: russianGroup, lang: 'ru', restaurantName }))
     printWindow.document.close()
     printWindow.focus()
     window.setTimeout(() => {

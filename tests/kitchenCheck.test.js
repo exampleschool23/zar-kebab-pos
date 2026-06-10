@@ -62,38 +62,44 @@ test('cook checks exclude cancelled unavailable items', () => {
 
 test('cook check print html contains item notes but no prices', () => {
   const [group] = getKitchenCheckGroups({
-    id: 'order-1',
+    id: 'order-173',
     table_name: 'Table 3',
     waiter_name: 'Jasurbek',
-    order_number: 'TA-100',
     created_at: '2026-06-10T10:00:00.000Z',
     items: [
-      item({ id: 'a', order_id: 'order-1', name: 'Minced Meat Shashlik', quantity: 2, notes: 'No onion', price: 18000 }),
+      item({ id: 'a', order_id: 'order-173', name: 'Молотый шашлык', quantity: 2, notes: 'No onion', price: 18000 }),
     ],
   })
   const html = buildKitchenCheckHtml({ group, lang: 'en', restaurantName: 'Zar Kebab' })
 
-  assert.match(html, /Cook Check/)
-  assert.match(html, /Table 3/)
-  assert.match(html, /Minced Meat Shashlik/)
+  assert.match(html, /ЧЕК ДЛЯ КУХНИ/)
+  assert.match(html, /СТОЛ 3/)
+  assert.match(html, /#173/)
+  assert.match(html, /2 × МОЛОТЫЙ ШАШЛЫК/)
   assert.match(html, /No onion/)
   assert.doesNotMatch(html, /18000/)
   assert.doesNotMatch(html, /UZS/)
 })
 
-test('cook check can render the required Russian print copy', () => {
+test('cook check renders the compact Russian kitchen slip format', () => {
   const [group] = getKitchenCheckGroups({
-    id: 'order-1',
-    table_name: 'Table 3',
+    id: 'order-173',
+    table_name: 'Table 10',
     waiter_name: 'Jasurbek',
+    created_at: '2026-06-10T04:34:00.000Z',
     items: [
-      item({ id: 'a', order_id: 'order-1', name: 'Chicken', quantity: 1 }),
+      item({ id: 'a', order_id: 'order-173', name: 'Куриные крылышки', quantity: 1 }),
+      item({ id: 'b', order_id: 'order-173', name: 'Шашлык из говядины', quantity: 1 }),
+      item({ id: 'c', order_id: 'order-173', name: 'Молотый шашлык', quantity: 1 }),
     ],
   })
   const html = buildKitchenCheckHtml({ group, lang: 'ru', restaurantName: 'Zar Kebab' })
 
-  assert.match(html, /Чек для повара/)
-  assert.match(html, /Официант/)
-  assert.match(html, /Заказ/)
-  assert.match(html, /Время/)
+  assert.match(html, /<h1>ЧЕК ДЛЯ КУХНИ<\/h1>/)
+  assert.match(html, /<div class="line"><span>СТОЛ 10<\/span><span>#173<\/span><\/div>/)
+  assert.match(html, /<div class="line"><span>09:34<\/span><span>Jasurbek<\/span><\/div>/)
+  assert.match(html, /━━━━━━━━━━━━━━━━━━━━/)
+  assert.match(html, /1 × КУРИНЫЕ КРЫЛЫШКИ/)
+  assert.match(html, /1 × ШАШЛЫК ИЗ ГОВЯДИНЫ/)
+  assert.match(html, /1 × МОЛОТЫЙ ШАШЛЫК/)
 })
