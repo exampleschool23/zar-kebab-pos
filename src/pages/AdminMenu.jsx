@@ -12,6 +12,7 @@ import { useApp } from '../store/AppContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
+import { getMenuPricing } from '../lib/menuPricing'
 import AppShell from '../components/AppShell'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
@@ -236,6 +237,23 @@ function DragHandle({ listeners, attributes }) {
   )
 }
 
+function MenuPrice({ item, size = 'base', align = 'left' }) {
+  const pricing = getMenuPricing(item)
+  const currentSize = size === 'sm' ? 'text-xs' : size === 'row' ? 'text-sm' : 'text-[16px]'
+  const oldSize = size === 'sm' ? 'text-[10px]' : 'text-[11px]'
+
+  return (
+    <div className={`flex flex-col ${align === 'right' ? 'items-end' : 'items-start'} flex-shrink-0 leading-tight`}>
+      {pricing.discounted && (
+        <span className={`${oldSize} font-bold text-[#9CA3AF] line-through`}>{formatCurrency(pricing.oldPrice)}</span>
+      )}
+      <span className={`${currentSize} font-black ${pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'}`}>
+        {formatCurrency(pricing.price)}
+      </span>
+    </div>
+  )
+}
+
 // ── Sortable grid card ────────────────────────────────────────────────────────
 
 function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging: _isDragging }) {
@@ -286,7 +304,7 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
           </p>
         )}
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <p className="text-[#ff5a00] font-black text-[16px]">{formatCurrency(item.price)}</p>
+          <MenuPrice item={item} />
           {gramsLabel(item, lang) && (
             <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
               {gramsLabel(item, lang)}
@@ -364,7 +382,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, categories }) {
         <p className="font-bold text-gray-900 text-sm truncate">{getItemName(item, lang)}</p>
         {cat && <p className="text-xs text-gray-400">{getCategoryName(cat, lang)}</p>}
       </div>
-      <p className="text-[#ff5a00] font-black text-sm flex-shrink-0">{formatCurrency(item.price)}</p>
+      <MenuPrice item={item} size="row" align="right" />
       <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ${
         item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
       }`}>
@@ -474,7 +492,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  price: '', grams: '', millilitres: '', kcal: '', image_url: '', available: true, sort_order: '',
+  price: '', old_price: '', grams: '', millilitres: '', kcal: '', image_url: '', available: true, sort_order: '',
   show_in_cashier_quick_items: false,
   send_to_kitchen: false,
   quick_item_sort_order: '',
@@ -587,6 +605,7 @@ export default function AdminMenu() {
       payload: {
         ...form,
         price: Number(form.price),
+        old_price: Math.max(0, Math.round(Number(form.old_price) || 0)),
         grams: Math.max(0, Math.round(Number(form.grams) || 0)),
         millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
         kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
@@ -849,7 +868,7 @@ export default function AdminMenu() {
                     />
                     <div className="p-2.5">
                       <p className="font-black text-gray-900 text-[12px] truncate">{getItemName(activeItem, lang)}</p>
-                      <p className="text-[#ff5a00] font-black text-xs">{formatCurrency(activeItem.price)}</p>
+                      <MenuPrice item={activeItem} size="sm" />
                       {gramsLabel(activeItem, lang) && (
                         <p className="text-[#64748B] font-black text-[10px]">{gramsLabel(activeItem, lang)}</p>
                       )}
@@ -1160,7 +1179,7 @@ export default function AdminMenu() {
                           />
                           <div className="p-2.5">
                             <p className="font-black text-gray-900 text-[12px] truncate">{getItemName(activeItem, lang)}</p>
-                            <p className="text-[#ff5a00] font-black text-xs">{formatCurrency(activeItem.price)}</p>
+                            <MenuPrice item={activeItem} size="sm" />
                           </div>
                         </div>
                       )}
@@ -1196,7 +1215,8 @@ export default function AdminMenu() {
             <Field label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} />
             <Field label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} />
             <Field label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} />
-            <Field label={`${t(lang, 'price')} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="25000" />
+            <Field label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="35000" />
+            <Field label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} type="number" value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
             <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
             <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />

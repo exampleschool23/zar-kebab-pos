@@ -19,6 +19,7 @@ import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
+import { getMenuPricing } from '../lib/menuPricing'
 import ImageLoadShimmer from '../components/ImageLoadShimmer'
 import {
   getStoredTelegramSession,
@@ -241,6 +242,7 @@ function ProductCard({ item, lang, quantity, onAdd, onIncrement, onDecrement }) 
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
   const kcal = kcalLabel(item, lang)
+  const pricing = getMenuPricing(item)
   return (
     <article className="overflow-hidden rounded-[8px] border border-[#E8DED2] bg-white shadow-sm">
       <div className="aspect-[4/3]">
@@ -268,7 +270,14 @@ function ProductCard({ item, lang, quantity, onAdd, onIncrement, onDecrement }) 
             )}
           </div>
         )}
-        <p className="mt-auto text-[16px] font-black text-[#FF5A00]">{formatCurrency(item.price)}</p>
+        <div className="mt-auto">
+          {pricing.discounted && (
+            <p className="text-[12px] font-bold text-[#8B9388] line-through">{formatCurrency(pricing.oldPrice)}</p>
+          )}
+          <p className={`${pricing.discounted ? 'text-red-600' : 'text-[#FF5A00]'} text-[16px] font-black`}>
+            {formatCurrency(pricing.price)}
+          </p>
+        </div>
         {quantity > 0 ? (
           <div className="mt-3 flex h-10 items-center justify-between rounded-[8px] border border-[#F7C7A6] bg-[#FFF3EA] p-1">
             <button onClick={() => onDecrement(item)} className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-white text-[#6F766D] shadow-sm">

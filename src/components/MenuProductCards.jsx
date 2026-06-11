@@ -3,6 +3,7 @@ import { ArrowLeft, LayoutGrid, Minus, Plus, UtensilsCrossed } from 'lucide-reac
 import { getCategoryName, getItemDesc, getItemName, t } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
+import { getMenuPricing } from '../lib/menuPricing'
 import ImageLoadShimmer from './ImageLoadShimmer'
 
 function MenuImageFallback({ iconSize = 32, active = false }) {
@@ -77,6 +78,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
+  const pricing = getMenuPricing(item)
 
   return (
     <div
@@ -113,8 +115,15 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         {getItemDesc(item, lang) && (
           <p className="text-[12px] text-[#9CA3AF] line-clamp-1 mb-1.5">{getItemDesc(item, lang)}</p>
         )}
-        <div className="mb-2.5 flex items-center justify-between gap-2">
-          <p className="font-black text-[16px] text-[#ff5a00]">{formatCurrency(item.price)}</p>
+        <div className="mb-2.5 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            {pricing.discounted && (
+              <p className="text-[12px] font-bold text-[#9CA3AF] line-through">{formatCurrency(pricing.oldPrice)}</p>
+            )}
+            <p className={`${pricing.discounted ? 'text-[17px] text-red-600' : 'text-[16px] text-[#ff5a00]'} font-black`}>
+              {formatCurrency(pricing.price)}
+            </p>
+          </div>
           {(grams || millilitres || kcal) && (
             <div className="flex flex-wrap justify-end gap-1">
               {grams && (
@@ -187,6 +196,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
+  const pricing = getMenuPricing(item)
   const labels = {
     back: lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Назад в меню' : 'Back to menu',
     description: lang === 'uz' ? 'Tavsif' : lang === 'ru' ? 'Описание' : 'Description',
@@ -219,8 +229,13 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
           )}
         </div>
         <div className="flex flex-col items-end gap-1">
-          <p className="whitespace-nowrap text-xl sm:text-2xl font-black text-[#FF4D00] tabular-nums">
-            {formatCurrency(item.price)}
+          {pricing.discounted && (
+            <p className="whitespace-nowrap text-sm font-bold text-[#9CA3AF] line-through tabular-nums">
+              {formatCurrency(pricing.oldPrice)}
+            </p>
+          )}
+          <p className={`whitespace-nowrap text-xl sm:text-2xl font-black tabular-nums ${pricing.discounted ? 'text-red-600' : 'text-[#FF4D00]'}`}>
+            {formatCurrency(pricing.price)}
           </p>
           {(grams || millilitres || kcal) && (
             <div className="flex flex-wrap justify-end gap-1">
@@ -264,7 +279,12 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                 )}
                 <h2 className="text-2xl font-black uppercase tracking-tight text-[#111827] sm:text-3xl">{name}</h2>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <p className="text-lg font-black text-[#FF4D00]">{formatCurrency(item.price)}</p>
+                  {pricing.discounted && (
+                    <p className="text-sm font-bold text-[#9CA3AF] line-through">{formatCurrency(pricing.oldPrice)}</p>
+                  )}
+                  <p className={`${pricing.discounted ? 'text-xl text-red-600' : 'text-lg text-[#FF4D00]'} font-black`}>
+                    {formatCurrency(pricing.price)}
+                  </p>
                   {grams && (
                     <span className="rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00] ring-1 ring-[#FFD8BF]">
                       {grams}

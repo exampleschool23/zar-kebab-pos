@@ -210,6 +210,29 @@ test('PublicMenu enables tappable fixed collapsed categories', () => {
   assert.match(source, /scrollOffset=\{116\}/)
 })
 
+test('menu item discounts use old_price for display and public deals', () => {
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const productCards = readSource('src/components/MenuProductCards.jsx')
+  const telegram = readSource('src/pages/TelegramMiniApp.jsx')
+  const dbHealth = readSource('src/lib/dbHealth.js')
+  const schema = readSource('supabase/003_pos_schema.sql')
+  const migration = readSource('supabase/036_menu_item_old_price.sql')
+
+  assert.match(adminMenu, /old_price: ''/)
+  assert.match(adminMenu, /old_price: Math\.max\(0, Math\.round\(Number\(form\.old_price\) \|\| 0\)\)/)
+  assert.match(adminMenu, /onChange=\{setF\('old_price'\)\}/)
+  assert.match(productCards, /line-through/)
+  assert.match(productCards, /text-red-600/)
+  assert.match(telegram, /getMenuPricing/)
+  assert.match(publicMenu, /const dealItems = useMemo/)
+  assert.match(publicMenu, /id="public-menu-deals"/)
+  assert.match(publicMenu, /key=\{`deal-\$\{item\.id\}`\}/)
+  assert.match(schema, /old_price\s+integer\s+not null default 0/)
+  assert.match(migration, /add column if not exists old_price integer not null default 0/)
+  assert.match(dbHealth, /'old_price'/)
+})
+
 test('source does not use console.log debugging', () => {
   const offenders = sourceFiles()
     .filter(file => /console\.log\(/.test(readFileSync(file, 'utf8')))

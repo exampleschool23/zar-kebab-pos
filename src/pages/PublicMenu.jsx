@@ -3,6 +3,7 @@ import { Search, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
+import { getMenuPricing } from '../lib/menuPricing'
 import { useApp } from '../store/AppContext'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
@@ -120,6 +121,13 @@ export default function PublicMenu() {
 
     return sections
   }, [categories, filteredItems])
+
+  const dealItems = useMemo(() =>
+    filteredItems.filter(item => getMenuPricing(item).discounted),
+    [filteredItems]
+  )
+
+  const dealsTitle = lang === 'uz' ? 'Chegirmalar' : lang === 'ru' ? 'Акции' : 'Deals'
 
   const categoryMap = useMemo(() => {
     const map = {}
@@ -240,6 +248,31 @@ export default function PublicMenu() {
         ) : (
           groupedSections ? (
             <div className="space-y-8">
+              {dealItems.length > 0 && (
+                <section id="public-menu-deals" className="scroll-mt-32">
+                  <div className="mb-3 flex items-center gap-2.5">
+                    <h2 className="text-xl font-black uppercase tracking-tight text-red-600">
+                      {dealsTitle}
+                    </h2>
+                    <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-bold text-red-600">
+                      {dealItems.length} {lang === 'uz' ? 'ta' : lang === 'ru' ? 'шт' : 'items'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                    {dealItems.map((item, index) => (
+                      <MenuProductCard
+                        key={`deal-${item.id}`}
+                        item={item}
+                        qty={0}
+                        lang={lang}
+                        eager={index < 4}
+                        onOpenDetail={openDetail}
+                        readOnly
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
               {groupedSections.map(section => (
                 <section
                   key={section.cat.id}

@@ -9,7 +9,7 @@ const TABLE_CHECKS = [
   { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name'] },
   { name: 'loyalty_cards', columns: ['id', 'card_number', 'cashback_type', 'balance', 'total_earned', 'total_redeemed', 'is_active'] },
   { name: 'loyalty_transactions', columns: ['id', 'loyalty_card_id', 'type', 'amount', 'balance_before', 'balance_after', 'cashback_percent_used', 'card_type_at_transaction'] },
-  { name: 'menu_items', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'price', 'grams', 'millilitres', 'kcal', 'sort_order'] },
+  { name: 'menu_items', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'price', 'old_price', 'grams', 'millilitres', 'kcal', 'sort_order'] },
   { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'sort_order'] },
   { name: 'profiles', columns: ['id', 'role', 'full_name'] },
   { name: 'order_payment_audit', columns: ['id', 'order_id', 'action', 'changed_at'] },
@@ -24,7 +24,7 @@ const MIGRATION_HINTS = {
   loyalty_transactions: 'Run supabase/022_loyalty_cashback_wallet.sql',
   order_payment_audit: 'Run supabase/010_order_payment_audit_and_guards.sql',
   profile_audit: 'Run supabase/028_profile_role_audit.sql',
-  menu_items: 'Run supabase/033_menu_item_grams.sql and supabase/034_menu_item_millilitres.sql',
+  menu_items: 'Run supabase/033_menu_item_grams.sql, supabase/034_menu_item_millilitres.sql, and supabase/036_menu_item_old_price.sql',
   submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
 }

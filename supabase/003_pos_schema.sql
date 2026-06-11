@@ -34,6 +34,7 @@ create table if not exists public.menu_items (
   description_ru   text        default '',
   description_en   text        default '',
   price            integer     not null default 0,
+  old_price        integer     not null default 0,
   grams            integer     not null default 0,
   millilitres      integer     not null default 0,
   kcal             integer     not null default 0,
