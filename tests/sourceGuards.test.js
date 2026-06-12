@@ -233,6 +233,24 @@ test('menu item discounts use old_price for display and public deals', () => {
   assert.match(dbHealth, /'old_price'/)
 })
 
+test('menu items expose an editable external provider id', () => {
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const dbHealth = readSource('src/lib/dbHealth.js')
+  const schema = readSource('supabase/003_pos_schema.sql')
+  const migration = readSource('supabase/037_menu_item_external_id.sql')
+
+  assert.match(adminMenu, /external_id: ''/)
+  assert.match(adminMenu, /external_id: String\(form\.external_id \|\| ''\)\.trim\(\)/)
+  assert.match(adminMenu, /onChange=\{setF\('external_id'\)\}/)
+  assert.match(adminMenu, /function ExternalIdBadge/)
+  assert.match(adminMenu, /externalId\.includes\(q\)/)
+  assert.match(schema, /external_id\s+text\s+not null default ''/)
+  assert.match(schema, /idx_menu_items_external_id_unique/)
+  assert.match(migration, /add column if not exists external_id text not null default ''/)
+  assert.match(migration, /where external_id <> ''/)
+  assert.match(dbHealth, /'external_id'/)
+})
+
 test('source does not use console.log debugging', () => {
   const offenders = sourceFiles()
     .filter(file => /console\.log\(/.test(readFileSync(file, 'utf8')))

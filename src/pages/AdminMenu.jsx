@@ -254,6 +254,20 @@ function MenuPrice({ item, size = 'base', align = 'left' }) {
   )
 }
 
+function ExternalIdBadge({ item, compact = false }) {
+  const externalId = String(item.external_id || item.externalId || '').trim()
+  if (!externalId) return null
+
+  return (
+    <span className={`inline-flex w-fit max-w-full items-center rounded-lg bg-[#EEF2FF] font-black text-[#4F46E5] ring-1 ring-[#C7D2FE] ${
+      compact ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]'
+    }`}>
+      <span className="mr-1 text-[#818CF8]">ID</span>
+      <span className="truncate">{externalId}</span>
+    </span>
+  )
+}
+
 // ── Sortable grid card ────────────────────────────────────────────────────────
 
 function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging: _isDragging }) {
@@ -303,6 +317,9 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
             {getCategoryName(cat, lang)}
           </p>
         )}
+        <div className="mb-2">
+          <ExternalIdBadge item={item} />
+        </div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <MenuPrice item={item} />
           {gramsLabel(item, lang) && (
@@ -380,7 +397,10 @@ function SortableItemRow({ item, lang, onEdit, onDelete, categories }) {
       )}
       <div className="flex-1 min-w-0">
         <p className="font-bold text-gray-900 text-sm truncate">{getItemName(item, lang)}</p>
-        {cat && <p className="text-xs text-gray-400">{getCategoryName(cat, lang)}</p>}
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+          {cat && <p className="text-xs text-gray-400">{getCategoryName(cat, lang)}</p>}
+          <ExternalIdBadge item={item} compact />
+        </div>
       </div>
       <MenuPrice item={item} size="row" align="right" />
       <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ${
@@ -492,7 +512,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  price: '', old_price: '', grams: '', millilitres: '', kcal: '', image_url: '', available: true, sort_order: '',
+  external_id: '', price: '', old_price: '', grams: '', millilitres: '', kcal: '', image_url: '', available: true, sort_order: '',
   show_in_cashier_quick_items: false,
   send_to_kitchen: false,
   quick_item_sort_order: '',
@@ -550,7 +570,8 @@ export default function AdminMenu() {
     return sortedItems.filter(item => {
       const matchAvail  = filterAvail === 'all' || (filterAvail === 'available' ? item.available : !item.available)
       const q           = search.trim().toLowerCase()
-      const matchSearch = !q || getItemName(item, lang).toLowerCase().includes(q)
+      const externalId  = String(item.external_id || item.externalId || '').toLowerCase()
+      const matchSearch = !q || getItemName(item, lang).toLowerCase().includes(q) || externalId.includes(q)
       return matchAvail && matchSearch
     })
   }, [sortedItems, filterAvail, search, lang])
@@ -604,6 +625,7 @@ export default function AdminMenu() {
       type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
       payload: {
         ...form,
+        external_id: String(form.external_id || '').trim(),
         price: Number(form.price),
         old_price: Math.max(0, Math.round(Number(form.old_price) || 0)),
         grams: Math.max(0, Math.round(Number(form.grams) || 0)),
@@ -1212,6 +1234,7 @@ export default function AdminMenu() {
             <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} />
             <Field label={t(lang, 'nameRu')} value={form.name_ru} onChange={setF('name_ru')} />
             <Field label={t(lang, 'nameEn')} value={form.name_en} onChange={setF('name_en')} />
+            <Field label={lang === 'uz' ? 'Tashqi ID' : lang === 'ru' ? 'Внешний ID' : 'External ID'} value={form.external_id} onChange={setF('external_id')} placeholder="DELIVERY-001" />
             <Field label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} />
             <Field label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} />
             <Field label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} />
