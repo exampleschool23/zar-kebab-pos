@@ -13,6 +13,7 @@ import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
+import { generateMenuExternalId } from '../lib/menuExternalId'
 import AppShell from '../components/AppShell'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
@@ -586,7 +587,7 @@ export default function AdminMenu() {
   function openNewItem() {
     const maxOrder = state.menuItems.length > 0
       ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
-    setForm({ ...blankItem, id: 'i' + Date.now(), sort_order: maxOrder + 1 })
+    setForm({ ...blankItem, id: 'i' + Date.now(), external_id: generateMenuExternalId(), sort_order: maxOrder + 1 })
     setItemModal('new')
   }
   function openNewQuickItem() {
@@ -597,6 +598,7 @@ export default function AdminMenu() {
     setForm({
       ...blankItem,
       id: 'i' + Date.now(),
+      external_id: generateMenuExternalId(),
       sort_order: maxOrder + 1,
       show_in_cashier_quick_items: true,
       send_to_kitchen: false,
@@ -625,7 +627,7 @@ export default function AdminMenu() {
       type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
       payload: {
         ...form,
-        external_id: String(form.external_id || '').trim(),
+        external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
         price: Number(form.price),
         old_price: Math.max(0, Math.round(Number(form.old_price) || 0)),
         grams: Math.max(0, Math.round(Number(form.grams) || 0)),
@@ -1234,7 +1236,12 @@ export default function AdminMenu() {
             <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} />
             <Field label={t(lang, 'nameRu')} value={form.name_ru} onChange={setF('name_ru')} />
             <Field label={t(lang, 'nameEn')} value={form.name_en} onChange={setF('name_en')} />
-            <Field label={lang === 'uz' ? 'Tashqi ID' : lang === 'ru' ? 'Внешний ID' : 'External ID'} value={form.external_id} onChange={setF('external_id')} placeholder="DELIVERY-001" />
+            <div className="rounded-xl border border-[#C7D2FE] bg-[#EEF2FF] px-3 py-2.5">
+              <p className="mb-1 text-[11px] font-black uppercase tracking-wide text-[#818CF8]">
+                {lang === 'uz' ? 'Tashqi ID' : lang === 'ru' ? 'Внешний ID' : 'External ID'}
+              </p>
+              <p className="font-black text-[#4F46E5]">{form.external_id || '—'}</p>
+            </div>
             <Field label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} />
             <Field label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} />
             <Field label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} />

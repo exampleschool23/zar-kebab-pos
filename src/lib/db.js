@@ -1271,6 +1271,8 @@ export async function writeToSupabase(action, state) {
 
     case 'UPDATE_MENU_ITEM': {
       const { id, ...fields } = action.payload
+      delete fields.external_id
+      delete fields.externalId
       await supabase.from('menu_items').update(fields).eq('id', id)
       break
     }

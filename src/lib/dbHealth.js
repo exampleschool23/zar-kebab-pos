@@ -24,7 +24,7 @@ const MIGRATION_HINTS = {
   loyalty_transactions: 'Run supabase/022_loyalty_cashback_wallet.sql',
   order_payment_audit: 'Run supabase/010_order_payment_audit_and_guards.sql',
   profile_audit: 'Run supabase/028_profile_role_audit.sql',
-  menu_items: 'Run supabase/033_menu_item_grams.sql, supabase/034_menu_item_millilitres.sql, supabase/036_menu_item_old_price.sql, and supabase/037_menu_item_external_id.sql',
+  menu_items: 'Run supabase/033_menu_item_grams.sql, supabase/034_menu_item_millilitres.sql, supabase/036_menu_item_old_price.sql, supabase/037_menu_item_external_id.sql, and supabase/038_generate_immutable_menu_item_external_ids.sql',
   submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
 }

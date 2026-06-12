@@ -16,7 +16,14 @@ export function menuReducer(state, action) {
     }
 
     case 'UPDATE_MENU_ITEM':
-      return { ...state, menuItems: state.menuItems.map(i => i.id === action.payload.id ? action.payload : i) }
+      return {
+        ...state,
+        menuItems: state.menuItems.map(i =>
+          i.id === action.payload.id
+            ? { ...action.payload, external_id: i.external_id || action.payload.external_id || '' }
+            : i
+        ),
+      }
 
     case 'DELETE_MENU_ITEM':
       return { ...state, menuItems: state.menuItems.filter(i => i.id !== action.payload) }

@@ -23,10 +23,32 @@ create table if not exists public.menu_categories (
   created_at timestamptz not null default now()
 );
 
+create or replace function public.generate_menu_item_external_id()
+returns text
+language sql
+as $$
+  select 'MI-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
+$$;
+
+create or replace function public.set_menu_item_external_id()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.external_id := coalesce(nullif(new.external_id, ''), public.generate_menu_item_external_id());
+    return new;
+  end if;
+
+  new.external_id := coalesce(nullif(old.external_id, ''), public.generate_menu_item_external_id());
+  return new;
+end;
+$$;
+
 -- 3. Menu items
 create table if not exists public.menu_items (
   id               text        primary key,
-  external_id      text        not null default '',
+  external_id      text        not null default public.generate_menu_item_external_id(),
   category_id      text        references public.menu_categories(id) on delete set null,
   name_uz          text        default '',
   name_ru          text        default '',
@@ -88,6 +110,11 @@ create index if not exists idx_menu_items_cat     on public.menu_items(category_
 create unique index if not exists idx_menu_items_external_id_unique
   on public.menu_items(external_id)
   where external_id <> '';
+
+drop trigger if exists trg_menu_items_external_id on public.menu_items;
+create trigger trg_menu_items_external_id
+  before insert or update on public.menu_items
+  for each row execute function public.set_menu_item_external_id();
 
 -- ── Row-Level Security ────────────────────────────────────────────────────────
 alter table public.restaurant_tables enable row level security;
