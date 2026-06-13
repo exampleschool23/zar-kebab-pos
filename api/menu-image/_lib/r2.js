@@ -34,8 +34,12 @@ export function getR2Client() {
 
 export function assertImageFile(file) {
   if (!file?.buffer?.length) throw new Error('Image file is required')
-  if (!String(file.contentType || '').startsWith('image/')) throw new Error('Only image uploads are allowed')
+  if (String(file.contentType || '').toLowerCase() !== 'image/webp') throw new Error('Only WebP menu images are allowed')
   if (file.buffer.length > MAX_FILE_SIZE) throw new Error('Image must be 5 MB or smaller')
+  const header = file.buffer.subarray(0, 12)
+  if (header.toString('ascii', 0, 4) !== 'RIFF' || header.toString('ascii', 8, 12) !== 'WEBP') {
+    throw new Error('Uploaded WebP file is invalid')
+  }
 }
 
 function safeSlug(value) {

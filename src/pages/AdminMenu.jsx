@@ -69,6 +69,12 @@ async function compressMenuImage(file) {
   const context = canvas.getContext('2d')
   context.drawImage(image, 0, 0, width, height)
   const blob = await canvasToBlob(canvas, 'image/webp', MENU_IMAGE_WEBP_QUALITY)
+  if (blob.type !== 'image/webp') {
+    if (file.type === 'image/webp') {
+      return new File([file], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
+    }
+    throw new Error('This browser cannot compress menu images to WebP. Please upload a WebP image or use Chrome.')
+  }
   if (file.type === 'image/webp' && file.size <= blob.size) {
     return new File([file], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
   }

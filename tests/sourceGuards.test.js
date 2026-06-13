@@ -58,6 +58,8 @@ test('AdminMenu compresses uploaded menu images to card-sized assets', () => {
   assert.match(source, /const MENU_IMAGE_WEBP_QUALITY = 0\.62/)
   assert.match(compressor, /MAX_MENU_IMAGE_DIMENSION \/ Math\.max\(image\.naturalWidth, image\.naturalHeight\)/)
   assert.match(compressor, /canvasToBlob\(canvas, 'image\/webp', MENU_IMAGE_WEBP_QUALITY\)/)
+  assert.match(compressor, /blob\.type !== 'image\/webp'/)
+  assert.match(compressor, /This browser cannot compress menu images to WebP/)
   assert.match(compressor, /file\.type === 'image\/webp' && file\.size <= blob\.size/)
   assert.match(compressor, /new File\(\[file\]/)
 })
@@ -66,6 +68,15 @@ test('R2 menu image uploads use long-lived immutable browser caching', () => {
   const r2 = readSource('api/menu-image/_lib/r2.js')
 
   assert.match(r2, /CacheControl: 'public, max-age=31536000, immutable'/)
+})
+
+test('R2 menu image uploads reject mislabeled non-WebP bytes', () => {
+  const r2 = readSource('api/menu-image/_lib/r2.js')
+
+  assert.match(r2, /Only WebP menu images are allowed/)
+  assert.match(r2, /header\.toString\('ascii', 0, 4\) !== 'RIFF'/)
+  assert.match(r2, /header\.toString\('ascii', 8, 12\) !== 'WEBP'/)
+  assert.match(r2, /Uploaded WebP file is invalid/)
 })
 
 test('AdminMenu sortable item card does not reference upload error state', () => {
