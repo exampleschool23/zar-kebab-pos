@@ -88,6 +88,18 @@ test('AdminMenu explains fake WebP upload failures in staff-friendly text', () =
   assert.match(source, /formatMenuImageUploadError\(lang, err\.message\)/)
 })
 
+test('menu image optimization script targets real WebP files under 50 KB', () => {
+  const pkg = JSON.parse(readSource('package.json'))
+  const script = readSource('scripts/optimize-menu-images.js')
+
+  assert.equal(pkg.scripts['optimize:menu-images'], 'node scripts/optimize-menu-images.js')
+  assert.match(script, /import sharp from 'sharp'/)
+  assert.match(script, /const DEFAULT_TARGET_BYTES = 50 \* 1024/)
+  assert.match(script, /\.webp\(\{\s*quality,/)
+  assert.match(script, /isRealWebp\(image\.buffer\) && image\.buffer\.length <= targetBytes/)
+  assert.match(script, /Rerun with --apply to update images/)
+})
+
 test('AdminMenu sortable item card does not reference upload error state', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const body = functionBody(source, 'SortableItemCard')

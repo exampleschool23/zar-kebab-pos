@@ -8,6 +8,7 @@
     "bot:telegram": "node bots/telegram-bot.js",
     "db:health": "node scripts/check-db-health.js",
     "migrate:menu-images:r2": "node scripts/migrate-menu-images-to-r2.js",
+    "optimize:menu-images": "node scripts/optimize-menu-images.js",
     "test": "node --test",
     "build": "vite build",
     "preview": "vite preview"
@@ -21,7 +22,8 @@
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0"
+    "react-router-dom": "^6.22.0",
+    "sharp": "^0.35.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
