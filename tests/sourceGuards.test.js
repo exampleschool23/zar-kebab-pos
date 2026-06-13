@@ -76,7 +76,16 @@ test('R2 menu image uploads reject mislabeled non-WebP bytes', () => {
   assert.match(r2, /Only WebP menu images are allowed/)
   assert.match(r2, /header\.toString\('ascii', 0, 4\) !== 'RIFF'/)
   assert.match(r2, /header\.toString\('ascii', 8, 12\) !== 'WEBP'/)
-  assert.match(r2, /Uploaded WebP file is invalid/)
+  assert.match(r2, /This file is named WebP but contains different image data/)
+})
+
+test('AdminMenu explains fake WebP upload failures in staff-friendly text', () => {
+  const source = readSource('src/pages/AdminMenu.jsx')
+
+  assert.match(source, /function formatMenuImageUploadError/)
+  assert.match(source, /Файл называется WebP, но внутри не WebP/)
+  assert.match(source, /This file is named WebP, but its contents are not WebP/)
+  assert.match(source, /formatMenuImageUploadError\(lang, err\.message\)/)
 })
 
 test('AdminMenu sortable item card does not reference upload error state', () => {

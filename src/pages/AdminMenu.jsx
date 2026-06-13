@@ -103,6 +103,21 @@ async function uploadMenuImageToR2({ file, type, entityId }) {
   return data
 }
 
+function formatMenuImageUploadError(lang, message) {
+  const text = String(message || '')
+  if (/Uploaded WebP file is invalid|named WebP but contains different image data/i.test(text)) {
+    if (lang === 'ru') return 'Файл называется WebP, но внутри не WebP. Загрузите исходный WebP или заново конвертируйте изображение в настоящий WebP.'
+    if (lang === 'uz') return 'Fayl WebP deb nomlangan, lekin ichida WebP emas. Asl WebP faylni yuklang yoki rasmni qaytadan haqiqiy WebP formatiga o‘tkazing.'
+    return 'This file is named WebP, but its contents are not WebP. Upload the original WebP or convert the image again to real WebP.'
+  }
+  if (/Only WebP menu images are allowed/i.test(text)) {
+    if (lang === 'ru') return 'Для меню можно загружать только WebP изображения.'
+    if (lang === 'uz') return 'Menyu uchun faqat WebP rasmlarni yuklash mumkin.'
+    return 'Only WebP images can be uploaded for menu items.'
+  }
+  return text
+}
+
 async function deleteMenuImageFromR2(imageUrl) {
   if (!imageUrl) return
   const token = await getAuthToken()
@@ -181,7 +196,7 @@ function ImageUploadField({ label, value, onChange, lang, type, entityId }) {
       const data = await uploadMenuImageToR2({ file: compressed, type, entityId })
       onChange({ target: { value: data.url } })
     } catch (err) {
-      setError(`${t(lang, 'uploadError')}: ${err.message}`)
+      setError(`${t(lang, 'uploadError')}: ${formatMenuImageUploadError(lang, err.message)}`)
     } finally {
       setUploading(false)
       input.value = ''
