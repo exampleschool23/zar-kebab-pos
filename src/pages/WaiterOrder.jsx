@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Search, ShoppingCart, Plus, UtensilsCrossed,
   Menu as MenuIcon, X, CheckCircle2, Clock,
-  Receipt, Loader2, ArrowLeft, LogOut, Trash2, Printer,
+  Receipt, Loader2, ArrowLeft, LogOut, Minus, Printer,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -19,9 +19,9 @@ import { useAppDataStatus } from '../store/appHooks'
 import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
-function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName }) {
+function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName, viewerRole }) {
   const [busy, setBusy] = useState(false)
-  const [removingItemId, setRemovingItemId] = useState(null)
+  const [updatingItemId, setUpdatingItemId] = useState(null)
 
   if (!order) return null
   if (cartCount > 0) return null
@@ -34,6 +34,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   const allReady    = items.length > 0 && !inPreparation
   const isDelivered = !inPreparation && order.status === 'delivered'
   const isNeedsBill = !inPreparation && order.status === 'needs_bill'
+  const canEditRequestedBill = ['admin', 'owner'].includes(String(viewerRole || '').toLowerCase())
 
   const L = {
     uz: {
@@ -48,6 +49,8 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       needsBillTitle: 'Hisob so\'raldi',
       needsBillSub: 'Kassir to\'lovni qayta ishlaydi',
       removeItem: 'Olib tashlash',
+      decreaseItem: 'Kamaytirish',
+      increaseItem: 'Ko‘paytirish',
       printCheck: 'Chek chiqarish',
       roundLabel: n => `Buyurtma ${n}`,
       missingItem: 'Menyuda yo‘q',
@@ -65,6 +68,8 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       needsBillTitle: 'Счёт запрошен',
       needsBillSub: 'Кассир обрабатывает оплату',
       removeItem: 'Убрать',
+      decreaseItem: 'Уменьшить',
+      increaseItem: 'Увеличить',
       printCheck: 'Печать чека',
       roundLabel: n => `Заказ ${n}`,
       missingItem: 'Нет в меню',
@@ -82,6 +87,8 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       needsBillTitle: 'Bill Requested',
       needsBillSub: 'Cashier is processing payment',
       removeItem: 'Remove',
+      decreaseItem: 'Decrease',
+      increaseItem: 'Increase',
       printCheck: 'Print check',
       roundLabel: n => `Order ${n}`,
       missingItem: 'Not in menu',
@@ -90,7 +97,10 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   }
   const l = L[lang] || L.en
 
-  const removableItems = items.filter(item => !['served', 'cancelled'].includes(String(item.status || '').toLowerCase()))
+  const preparationEditableItems = items.filter(item => !['served', 'cancelled'].includes(String(item.status || '').toLowerCase()))
+  const requestedBillEditableItems = canEditRequestedBill
+    ? items.filter(item => String(item.status || '').toLowerCase() !== 'cancelled')
+    : []
   const kitchenCheckGroups = getKitchenCheckGroups(order)
 
   function handlePrintKitchenCheck(group) {
@@ -115,26 +125,67 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     }, 300)
   }
 
-  async function handleRemoveItem(item) {
+  async function handleUpdateItemQty(item, qty) {
     const itemKey = item.id || item.menu_item_id
     const sourceOrderId = item.order_id || item._orderId || order.id
-    if (!sourceOrderId || !itemKey || removingItemId) return
-    setRemovingItemId(itemKey)
+    if (!sourceOrderId || !itemKey || updatingItemId) return
+    setUpdatingItemId(itemKey)
     const result = await dispatch({
-      type: 'UPDATE_ORDER_ITEM_STATUS',
+      type: 'UPDATE_BILL_ITEM_QTY',
       payload: {
+        tableId,
         orderId: sourceOrderId,
         orderItemId: item.id,
         menuItemId: item.menu_item_id,
-        status: 'cancelled',
-        reason: l.removeReason,
+        sourceItemIds: item.source_item_ids || item.sourceItemIds || [],
+        qty,
       },
     })
     if (result?.error) {
-      setTimeout(() => setRemovingItemId(null), 700)
+      setTimeout(() => setUpdatingItemId(null), 700)
       return
     }
-    setRemovingItemId(null)
+    setUpdatingItemId(null)
+  }
+
+  function OrderItemQtyRow({ item }) {
+    const itemKey = item.id || item.menu_item_id
+    const menuItem = menuItemMap?.[item.menu_item_id]
+    const missing = !menuItem || menuItem.available === false
+    const updating = updatingItemId === itemKey
+    const quantity = Number(item.quantity) || 1
+    return (
+      <div className="flex items-center gap-2 rounded-xl bg-white/75 px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12px] font-black text-[#1F2937]">{item.name}</p>
+          <p className="text-[10px] font-bold text-[#9CA3AF]">
+            ×{quantity}
+            {missing ? ` · ${l.missingItem}` : ''}
+          </p>
+        </div>
+        <div className="flex h-9 flex-shrink-0 items-center gap-1 rounded-lg border border-orange-100 bg-white p-1">
+          <button
+            type="button"
+            onClick={() => handleUpdateItemQty(item, quantity - 1)}
+            disabled={!!updatingItemId}
+            title={l.decreaseItem}
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-red-100 bg-red-50 text-red-600 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+          >
+            {updating ? <Loader2 size={12} className="animate-spin" /> : <Minus size={12} />}
+          </button>
+          <span className="min-w-6 text-center text-[12px] font-black tabular-nums text-[#1F2937]">{quantity}</span>
+          <button
+            type="button"
+            onClick={() => handleUpdateItemQty(item, quantity + 1)}
+            disabled={!!updatingItemId}
+            title={l.increaseItem}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-[#ff5a00] text-white transition-colors hover:bg-[#cc4800] disabled:cursor-wait disabled:opacity-50"
+          >
+            <Plus size={12} />
+          </button>
+        </div>
+      </div>
+    )
   }
 
   function handleConfirmDelivery() {
@@ -167,7 +218,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
             </span>
           )}
         </div>
-        {removableItems.length > 0 && (
+        {preparationEditableItems.length > 0 && (
           <div className="mt-3 space-y-2 border-t border-orange-100 pt-3">
             {kitchenCheckGroups.length > 0 && (
               <div className="mb-2 grid grid-cols-1 gap-2">
@@ -184,32 +235,9 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
                 ))}
               </div>
             )}
-            {removableItems.map(item => {
-              const itemKey = item.id || item.menu_item_id
-              const menuItem = menuItemMap?.[item.menu_item_id]
-              const missing = !menuItem || menuItem.available === false
-              const removing = removingItemId === itemKey
-              return (
-                <div key={itemKey} className="flex items-center gap-2 rounded-xl bg-white/75 px-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[12px] font-black text-[#1F2937]">{item.name}</p>
-                    <p className="text-[10px] font-bold text-[#9CA3AF]">
-                      ×{item.quantity || 1}
-                      {missing ? ` · ${l.missingItem}` : ''}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItem(item)}
-                    disabled={removingItemId && !removing}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-[11px] font-black text-red-600 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
-                  >
-                    {removing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                    {l.removeItem}
-                  </button>
-                </div>
-              )
-            })}
+            {preparationEditableItems.map(item => (
+              <OrderItemQtyRow key={item.id || item.menu_item_id} item={item} />
+            ))}
           </div>
         )}
       </div>
@@ -267,14 +295,23 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   }
   if (isNeedsBill) {
     return (
-      <div className="mx-4 mb-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
-          <Clock size={16} className="text-[#DC2626]" />
+      <div className="mx-4 mb-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+            <Clock size={16} className="text-[#DC2626]" />
+          </div>
+          <div>
+            <p className="text-[13px] font-bold text-[#DC2626]">{l.needsBillTitle}</p>
+            <p className="text-[11px] text-[#9CA3AF] mt-0.5">{l.needsBillSub}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-[13px] font-bold text-[#DC2626]">{l.needsBillTitle}</p>
-          <p className="text-[11px] text-[#9CA3AF] mt-0.5">{l.needsBillSub}</p>
-        </div>
+        {requestedBillEditableItems.length > 0 && (
+          <div className="mt-3 space-y-2 border-t border-red-100 pt-3">
+            {requestedBillEditableItems.map(item => (
+              <OrderItemQtyRow key={item.id || item.menu_item_id} item={item} />
+            ))}
+          </div>
+        )}
       </div>
     )
   }
@@ -826,7 +863,7 @@ export default function WaiterOrder() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-slate-900/30" onClick={() => { if (!isSendingOrder) setCartOpen(false) }} />
           <div className="relative flex h-full w-full max-w-full flex-col overflow-hidden bg-white shadow-[-12px_0_32px_rgba(15,23,42,0.16)] sm:max-w-[420px] lg:max-w-[460px]">
-            <div className="flex-shrink-0">
+            <div className="max-h-[48dvh] flex-shrink-0 overflow-y-auto overscroll-contain">
               <OrderActionPanel
                 order={activeOrder}
                 tableId={tableId}
@@ -835,6 +872,7 @@ export default function WaiterOrder() {
                 cartCount={cartCount}
                 menuItemMap={menuItemMap}
                 restaurantName={state.settings?.restaurantName}
+                viewerRole={role}
               />
             </div>
             <div className="flex-1 min-h-0 overflow-hidden">

@@ -196,17 +196,18 @@ export function ordersReducer(state, action) {
       const { tableId, orderId, orderItemId, menuItemId, qty } = action.payload
       const sourceItemIds = new Set(action.payload.sourceItemIds || [])
       const nextQty = Math.max(0, Number(qty) || 0)
+      let removedOrder = null
 
       return {
         ...state,
-        orders: state.orders.map(o => {
-          if ((orderId ? o.id !== orderId : o.table_id !== tableId) || o.payment_status === 'paid') return o
+        orders: state.orders.flatMap(o => {
+          if ((orderId ? o.id !== orderId : o.table_id !== tableId) || o.payment_status === 'paid') return [o]
           const matchesItem = i => orderItemId
             ? i.id === orderItemId || sourceItemIds.has(i.id)
             : i.menu_item_id === menuItemId
           const target = (o.items || []).find(matchesItem)
           const hasItem = !!target
-          if (!hasItem) return o
+          if (!hasItem) return [o]
           const nextItems = nextQty <= 0
             ? (o.items || []).filter(i => !matchesItem(i))
             : (o.items || []).flatMap(i => {
@@ -214,8 +215,23 @@ export function ordersReducer(state, action) {
                 if (i.id !== target.id) return []
                 return [{ ...i, quantity: nextQty }]
               })
-          return recalcOrderTotals({ ...o, items: nextItems }, state.settings)
+          const nextOrder = recalcOrderTotals({ ...o, items: nextItems }, state.settings)
+          const billableItems = nextItems.filter(item => !isCancelledOrderItem(item))
+          const shouldRemove = billableItems.length === 0 || getOrderPaymentSummary(nextOrder, nextItems, nextOrder.service_rate_pct).total <= 0
+          if (shouldRemove) {
+            removedOrder = nextOrder
+            return []
+          }
+          return [nextOrder]
         }),
+        tables: removedOrder?.table_id && !state.orders.some(o =>
+          o.id !== removedOrder.id &&
+          o.table_id === removedOrder.table_id &&
+          o.payment_status !== 'paid' &&
+          o.status !== 'cancelled'
+        )
+          ? state.tables.map(t => t.id === removedOrder.table_id ? { ...t, status: 'available' } : t)
+          : state.tables,
       }
     }
 

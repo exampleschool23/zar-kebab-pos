@@ -962,11 +962,34 @@ export async function writeToSupabase(action, state) {
         nextItems,
         serviceRatePct
       )
+      const orderUpdateFields = paymentFields.total <= 0
+        ? {
+            status: 'cancelled',
+            payment_status: 'cancelled',
+            subtotal: 0,
+            service_fee: 0,
+            total: 0,
+          }
+        : paymentFields
       const { error: orderUpdateError } = await supabase
         .from('orders')
-        .update(paymentFields)
+        .update(orderUpdateFields)
         .eq('id', order.id)
       if (orderUpdateError) throw orderUpdateError
+      if (paymentFields.total <= 0 && order.table_id) {
+        const { data: activeOrders, error: activeOrdersError } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('table_id', order.table_id)
+          .neq('id', order.id)
+          .neq('payment_status', 'paid')
+          .neq('status', 'cancelled')
+          .limit(1)
+        if (activeOrdersError) throw activeOrdersError
+        if (!activeOrders?.length) {
+          await updateRestaurantTableStatus(order.table_id, { status: 'available' }, { status: 'available' })
+        }
+      }
       break
     }
 

@@ -101,6 +101,58 @@ test('kitchen cancelling every billable item removes the zero-value order from c
   assert.equal(cancelled.tables[0].status, 'available')
 })
 
+test('requested-bill quantity edits can reduce or remove served items before payment', () => {
+  const base = {
+    ...state(),
+    tables: [{ id: 't1', name: 'Table 1', status: 'needs_bill', is_active: true }],
+    orders: [
+      {
+        id: 'o1',
+        table_id: 't1',
+        status: 'needs_bill',
+        payment_status: 'unpaid',
+        order_type: 'dine_in',
+        service_rate_pct: 15,
+        items: [
+          { id: 'i1', menu_item_id: 'm1', name: 'Shashlik', price: 100000, quantity: 3, status: 'served' },
+          { id: 'i2', menu_item_id: 'm2', name: 'Tea', price: 10000, quantity: 1, status: 'served' },
+        ],
+        subtotal: 310000,
+        service_fee: 46500,
+        total: 356500,
+      },
+    ],
+    cart: [],
+  }
+
+  const reduced = ordersReducer(base, {
+    type: 'UPDATE_BILL_ITEM_QTY',
+    payload: { tableId: 't1', orderId: 'o1', orderItemId: 'i1', menuItemId: 'm1', qty: 2 },
+  })
+
+  assert.equal(reduced.orders[0].items.find(i => i.id === 'i1').quantity, 2)
+  assert.equal(reduced.orders[0].subtotal, 210000)
+  assert.equal(reduced.orders[0].total, 241500)
+  assert.equal(reduced.tables[0].status, 'needs_bill')
+
+  const removedOne = ordersReducer(reduced, {
+    type: 'UPDATE_BILL_ITEM_QTY',
+    payload: { tableId: 't1', orderId: 'o1', orderItemId: 'i2', menuItemId: 'm2', qty: 0 },
+  })
+
+  assert.equal(removedOne.orders[0].items.some(i => i.id === 'i2'), false)
+  assert.equal(removedOne.orders[0].subtotal, 200000)
+  assert.equal(removedOne.orders[0].total, 230000)
+
+  const removedLast = ordersReducer(removedOne, {
+    type: 'UPDATE_BILL_ITEM_QTY',
+    payload: { tableId: 't1', orderId: 'o1', orderItemId: 'i1', menuItemId: 'm1', qty: 0 },
+  })
+
+  assert.equal(removedLast.orders.length, 0)
+  assert.equal(removedLast.tables[0].status, 'available')
+})
+
 test('admin reservation and disable flow keeps history-safe table lifecycle', () => {
   const reserved = tablesReducer(state(), {
     type: 'UPDATE_TABLE',

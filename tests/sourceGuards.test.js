@@ -414,17 +414,20 @@ test('WaiterOrder opens the cart drawer from manage-order links', () => {
   assert.match(source, /setCartOpen\(true\)/)
 })
 
-test('WaiterOrder lets waiters remove unavailable active order items', () => {
+test('WaiterOrder lets active and requested-bill order items be quantity-adjusted', () => {
   const source = readSource('src/pages/WaiterOrder.jsx')
   const panel = functionBody(source, 'OrderActionPanel')
 
-  assert.match(source, /Trash2/)
+  assert.match(source, /Minus/)
+  assert.match(source, /Plus/)
   assert.match(source, /menuItemMap/)
   assert.match(source, /order_id: item\.order_id \|\| o\.id/)
-  assert.match(panel, /function handleRemoveItem\(item\)/)
-  assert.match(panel, /type: 'UPDATE_ORDER_ITEM_STATUS'/)
-  assert.match(panel, /status: 'cancelled'/)
-  assert.match(panel, /reason: l\.removeReason/)
+  assert.match(panel, /canEditRequestedBill = \['admin', 'owner'\]/)
+  assert.match(panel, /function handleUpdateItemQty\(item, qty\)/)
+  assert.match(panel, /type: 'UPDATE_BILL_ITEM_QTY'/)
+  assert.match(panel, /requestedBillEditableItems/)
+  assert.match(panel, /<OrderItemQtyRow key=\{item\.id \|\| item\.menu_item_id\} item=\{item\} \/>/)
+  assert.match(source, /max-h-\[48dvh\][^"]*overflow-y-auto/)
 })
 
 test('WaiterOrder prints cook checks by submitted order round', () => {
