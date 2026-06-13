@@ -110,6 +110,16 @@ test('menu image optimization apply mode rejects publishable keys before uploads
   assert.ok(script.indexOf('if (apply) await assertApplyCanUpdateRows()') < script.indexOf('const totals = {'))
 })
 
+test('ImageLoadShimmer shows cached images that loaded before onLoad fires', () => {
+  const source = readSource('src/components/ImageLoadShimmer.jsx')
+
+  assert.match(source, /useRef/)
+  assert.match(source, /const imageRef = useRef\(null\)/)
+  assert.match(source, /image\?\.complete && image\.naturalWidth > 0/)
+  assert.match(source, /setLoaded\(true\)/)
+  assert.match(source, /ref=\{imageRef\}/)
+})
+
 test('AdminMenu sortable item card does not reference upload error state', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const body = functionBody(source, 'SortableItemCard')

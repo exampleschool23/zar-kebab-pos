@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 export default function ImageLoadShimmer({
   src,
@@ -10,6 +10,7 @@ export default function ImageLoadShimmer({
   fetchPriority,
   timeoutMs = 12000,
 }) {
+  const imageRef = useRef(null)
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
@@ -19,6 +20,11 @@ export default function ImageLoadShimmer({
     setFailed(false)
     setTimedOut(false)
     if (!src || !timeoutMs) return undefined
+    const image = imageRef.current
+    if (image?.complete && image.naturalWidth > 0) {
+      setLoaded(true)
+      return undefined
+    }
     const timer = window.setTimeout(() => setTimedOut(true), timeoutMs)
     return () => window.clearTimeout(timer)
   }, [src, timeoutMs])
@@ -38,6 +44,7 @@ export default function ImageLoadShimmer({
         </div>
       )}
       <img
+        ref={imageRef}
         src={src}
         alt={alt}
         className={`block ${className} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
