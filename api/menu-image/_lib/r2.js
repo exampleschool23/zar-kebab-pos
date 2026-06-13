@@ -61,6 +61,7 @@ export async function uploadToR2({ key, file }) {
     Key: key,
     Body: file.buffer,
     ContentType: file.contentType || 'image/webp',
+    CacheControl: 'public, max-age=31536000, immutable',
   }))
   return {
     key,

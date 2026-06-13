@@ -43,7 +43,7 @@ export default function ImageLoadShimmer({
         className={`block ${className} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading={loading}
         decoding="async"
-        fetchPriority={fetchPriority}
+        fetchpriority={fetchPriority}
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
       />

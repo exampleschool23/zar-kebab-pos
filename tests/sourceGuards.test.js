@@ -54,10 +54,18 @@ test('AdminMenu compresses uploaded menu images to card-sized assets', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const compressor = functionBody(source, 'compressMenuImage')
 
-  assert.match(source, /const MAX_MENU_IMAGE_DIMENSION = 700/)
-  assert.match(source, /const MENU_IMAGE_WEBP_QUALITY = 0\.75/)
+  assert.match(source, /const MAX_MENU_IMAGE_DIMENSION = 520/)
+  assert.match(source, /const MENU_IMAGE_WEBP_QUALITY = 0\.62/)
   assert.match(compressor, /MAX_MENU_IMAGE_DIMENSION \/ Math\.max\(image\.naturalWidth, image\.naturalHeight\)/)
   assert.match(compressor, /canvasToBlob\(canvas, 'image\/webp', MENU_IMAGE_WEBP_QUALITY\)/)
+  assert.match(compressor, /file\.type === 'image\/webp' && file\.size <= blob\.size/)
+  assert.match(compressor, /new File\(\[file\]/)
+})
+
+test('R2 menu image uploads use long-lived immutable browser caching', () => {
+  const r2 = readSource('api/menu-image/_lib/r2.js')
+
+  assert.match(r2, /CacheControl: 'public, max-age=31536000, immutable'/)
 })
 
 test('AdminMenu sortable item card does not reference upload error state', () => {
