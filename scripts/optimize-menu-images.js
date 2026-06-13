@@ -60,6 +60,11 @@ if (apply && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1)
 }
 
+if (apply && /^sb_publish/i.test(String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim())) {
+  console.error('SUPABASE_SERVICE_ROLE_KEY is set to a publishable key. Use the private service_role key from Supabase Project Settings > API.')
+  process.exit(1)
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
@@ -156,6 +161,19 @@ async function updateImageUrl(table, id, imageUrl) {
   if (!data || data.image_url !== imageUrl) throw new Error('database update did not persist the new image URL')
 }
 
+async function assertApplyCanUpdateRows() {
+  const tableInfo = IMAGE_TABLES[0]
+  const rows = await loadRows(tableInfo.table)
+  const row = rows[0]
+  if (!row) throw new Error(`No ${tableInfo.table} image rows found for update preflight`)
+
+  try {
+    await updateImageUrl(tableInfo.table, row.id, row.image_url)
+  } catch (error) {
+    throw new Error(`Apply preflight failed. Check SUPABASE_SERVICE_ROLE_KEY; it must be the private service_role key, not the publishable or anon key. ${error.message}`)
+  }
+}
+
 async function encodeWebpUnderTarget(inputBuffer) {
   let best = null
   const metadata = await sharp(inputBuffer, { animated: false }).metadata()
@@ -242,6 +260,7 @@ async function optimizeRow(row, tableInfo) {
 
 async function main() {
   getR2Config()
+  if (apply) await assertApplyCanUpdateRows()
 
   const totals = {
     scanned: 0,

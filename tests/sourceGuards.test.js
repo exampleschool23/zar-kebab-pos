@@ -100,6 +100,16 @@ test('menu image optimization script targets real WebP files under 50 KB', () =>
   assert.match(script, /Rerun with --apply to update images/)
 })
 
+test('menu image optimization apply mode rejects publishable keys before uploads', () => {
+  const script = readSource('scripts/optimize-menu-images.js')
+
+  assert.match(script, /\^sb_publish/i)
+  assert.match(script, /Use the private service_role key/)
+  assert.match(script, /async function assertApplyCanUpdateRows/)
+  assert.match(script, /Apply preflight failed/)
+  assert.ok(script.indexOf('if (apply) await assertApplyCanUpdateRows()') < script.indexOf('const totals = {'))
+})
+
 test('AdminMenu sortable item card does not reference upload error state', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const body = functionBody(source, 'SortableItemCard')
