@@ -13,6 +13,7 @@ import ResetPassword  from './pages/ResetPassword'
 import PublicMenu     from './pages/PublicMenu'
 import TelegramMiniApp from './pages/TelegramMiniApp'
 import PendingApproval from './pages/PendingApproval'
+import CateringPage from './pages/CateringPage'
 
 const WaiterTables = lazy(() => import('./pages/WaiterTables'))
 const WaiterOrder = lazy(() => import('./pages/WaiterOrder'))
@@ -212,6 +213,7 @@ function AppRoutes() {
         <Route path="/"              element={<RoleRedirect />} />
         <Route path="/menu"          element={<PublicMenuRoute><PublicMenu /></PublicMenuRoute>} />
         <Route path="/menu/item/:itemId" element={<PublicMenu />} />
+        <Route path="/catering"      element={<CateringPage />} />
         <Route path="/telegram"      element={<TelegramMiniApp />} />
         <Route path="/login"         element={<SignedOutRoute><Login /></SignedOutRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />

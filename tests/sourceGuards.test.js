@@ -297,6 +297,19 @@ test('PublicMenu is read-only for QR customers', () => {
   assert.match(productCards, /!\s*readOnly && \(/)
 })
 
+test('Catering public page is routed and has Russian SEO and contact CTAs', () => {
+  const app = readSource('src/App.jsx')
+  const page = readSource('src/pages/CateringPage.jsx')
+
+  assert.match(app, /path="\/catering"/)
+  assert.match(page, /Кейтеринг и корпоративное питание от Zar Kebab/)
+  assert.match(page, /Кейтеринг и корпоративное питание в Ташкенте \| Zar Kebab/)
+  assert.match(page, /tel:\+998905095545/)
+  assert.match(page, /https:\/\/www\.instagram\.com\/zarkebab/)
+  assert.match(page, /Ташкент, Матбуотчилар, 17/)
+  assert.match(page, /кейтеринг Ташкент, корпоративное питание Ташкент/)
+})
+
 test('PublicMenu supports direct product links and copyable item URLs', () => {
   const app = readSource('src/App.jsx')
   const publicMenu = readSource('src/pages/PublicMenu.jsx')
