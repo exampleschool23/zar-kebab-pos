@@ -2,6 +2,15 @@ import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024
 const VALID_TYPES = new Set(['product', 'category'])
+const IMAGE_EXTENSIONS = {
+  'image/avif': 'avif',
+  'image/gif': 'gif',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/svg+xml': 'svg',
+  'image/webp': 'webp',
+}
 
 function requiredEnv(name) {
   const value = process.env[name]
@@ -34,12 +43,20 @@ export function getR2Client() {
 
 export function assertImageFile(file) {
   if (!file?.buffer?.length) throw new Error('Image file is required')
-  if (String(file.contentType || '').toLowerCase() !== 'image/webp') throw new Error('Only WebP menu images are allowed')
+  if (!String(file.contentType || '').toLowerCase().startsWith('image/')) throw new Error('Only image uploads are allowed')
   if (file.buffer.length > MAX_FILE_SIZE) throw new Error('Image must be 5 MB or smaller')
-  const header = file.buffer.subarray(0, 12)
-  if (header.toString('ascii', 0, 4) !== 'RIFF' || header.toString('ascii', 8, 12) !== 'WEBP') {
+  if (String(file.contentType || '').toLowerCase() === 'image/webp' && !isWebpBuffer(file.buffer)) {
     throw new Error('This file is named WebP but contains different image data')
   }
+}
+
+function isWebpBuffer(buffer) {
+  const header = buffer.subarray(0, 12)
+  return header.toString('ascii', 0, 4) === 'RIFF' && header.toString('ascii', 8, 12) === 'WEBP'
+}
+
+function extensionForContentType(contentType) {
+  return IMAGE_EXTENSIONS[String(contentType || '').toLowerCase()] || 'img'
 }
 
 function safeSlug(value) {
@@ -50,12 +67,12 @@ function safeSlug(value) {
     .slice(0, 80) || 'temp'
 }
 
-export function makeObjectKey({ type, entityId }) {
+export function makeObjectKey({ type, entityId, contentType }) {
   if (!VALID_TYPES.has(type)) throw new Error('Image type must be product or category')
   const folder = type === 'category' ? 'categories' : 'products'
   const timestamp = Date.now()
   const random = Math.random().toString(36).slice(2, 10)
-  return `menu/${folder}/${safeSlug(entityId)}-${timestamp}-${random}.webp`
+  return `menu/${folder}/${safeSlug(entityId)}-${timestamp}-${random}.${extensionForContentType(contentType)}`
 }
 
 export async function uploadToR2({ key, file }) {

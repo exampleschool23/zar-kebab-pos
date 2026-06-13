@@ -14,6 +14,7 @@ export default async function handler(req, res) {
     const key = makeObjectKey({
       type,
       entityId: fields.entityId,
+      contentType: file.contentType,
     })
     const result = await uploadToR2({
       key,
