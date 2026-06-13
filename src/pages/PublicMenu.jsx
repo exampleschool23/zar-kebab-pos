@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Search, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
 import { getMenuPricing } from '../lib/menuPricing'
 import { useApp } from '../store/AppContext'
+import { findMenuItemByLinkKey, getMenuItemPublicPath } from '../lib/menuLinks'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import {
@@ -42,6 +44,8 @@ async function loadPublicMenuData() {
 }
 
 export default function PublicMenu() {
+  const { itemId } = useParams()
+  const navigate = useNavigate()
   const { state } = useApp()
   const lang = state.lang || 'ru'
 
@@ -52,6 +56,7 @@ export default function PublicMenu() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [detailItem, setDetailItem] = useState(null)
+  const [missingItemLink, setMissingItemLink] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -85,6 +90,18 @@ export default function PublicMenu() {
     loadMenu()
     return () => { cancelled = true }
   }, [lang])
+
+  useEffect(() => {
+    if (loading) return
+    if (!itemId) {
+      setDetailItem(null)
+      setMissingItemLink(false)
+      return
+    }
+    const linkedItem = findMenuItemByLinkKey(items, itemId)
+    setDetailItem(linkedItem)
+    setMissingItemLink(!linkedItem)
+  }, [itemId, items, loading])
 
   const q = search.trim().toLowerCase()
   const categoryCards = useMemo(() => [{ id: 'all' }, ...categories], [categories])
@@ -137,10 +154,13 @@ export default function PublicMenu() {
 
   function openDetail(item) {
     setDetailItem(item)
+    navigate(getMenuItemPublicPath(item))
   }
 
   function closeDetail() {
     setDetailItem(null)
+    setMissingItemLink(false)
+    navigate('/menu')
   }
 
   if (detailItem) {
@@ -231,6 +251,24 @@ export default function PublicMenu() {
               className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-black text-red-700 shadow-sm"
             >
               {lang === 'uz' ? 'Qayta urinish' : lang === 'ru' ? 'Попробовать снова' : 'Try again'}
+            </button>
+          </div>
+        ) : missingItemLink ? (
+          <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
+              <UtensilsCrossed size={28} className="text-orange-300" />
+            </div>
+            <p className="font-black text-[#1F2937]">
+              {lang === 'uz' ? 'Bu mahsulot topilmadi' : lang === 'ru' ? 'Позиция не найдена' : 'Item not found'}
+            </p>
+            <p className="mt-1 text-sm text-[#8A94A6]">
+              {lang === 'uz' ? 'U o‘chirilgan yoki hozir mavjud emas.' : lang === 'ru' ? 'Возможно, она удалена или сейчас недоступна.' : 'It may have been removed or is not currently available.'}
+            </p>
+            <button
+              onClick={() => navigate('/menu')}
+              className="mt-4 rounded-xl bg-[#ff5a00] px-4 py-2 text-sm font-black text-white shadow-sm"
+            >
+              {lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Вернуться в меню' : 'Back to menu'}
             </button>
           </div>
         ) : filteredItems.length === 0 ? (

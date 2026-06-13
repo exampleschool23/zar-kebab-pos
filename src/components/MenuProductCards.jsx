@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowLeft, LayoutGrid, Minus, Plus, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, Check, Copy, LayoutGrid, Minus, Plus, UtensilsCrossed } from 'lucide-react'
 import { getCategoryName, getItemDesc, getItemName, t } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
+import { getMenuItemPublicUrl } from '../lib/menuLinks'
 import ImageLoadShimmer from './ImageLoadShimmer'
 
 function MenuImageFallback({ iconSize = 32, active = false }) {
@@ -25,6 +26,26 @@ function SafeMenuImage({ src, alt, className = '', fallbackIconSize = 32, active
       fallback={<MenuImageFallback iconSize={fallbackIconSize} active={active} />}
     />
   )
+}
+
+async function copyTextToClipboard(text) {
+  if (globalThis.navigator?.clipboard?.writeText) {
+    try {
+      await globalThis.navigator.clipboard.writeText(text)
+      return
+    } catch {
+      // Some embedded browsers expose clipboard APIs but reject writes.
+    }
+  }
+  const textarea = globalThis.document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  globalThis.document.body.appendChild(textarea)
+  textarea.select()
+  globalThis.document.execCommand('copy')
+  globalThis.document.body.removeChild(textarea)
 }
 
 export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
@@ -75,10 +96,22 @@ export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
 
 export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false }) {
   const inCart = !readOnly && qty > 0
+  const [copied, setCopied] = useState(false)
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const labels = {
+    copy: lang === 'uz' ? 'Havolani nusxalash' : lang === 'ru' ? 'Скопировать ссылку' : 'Copy link',
+    copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
+  }
+
+  async function copyProductLink(event) {
+    event.stopPropagation()
+    await copyTextToClipboard(getMenuItemPublicUrl(item))
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1400)
+  }
 
   return (
     <div
@@ -105,6 +138,17 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           <div className="absolute top-2 right-2 bg-[#ff5a00] text-white text-[11px] font-black rounded-full w-6 h-6 flex items-center justify-center shadow">
             {qty}
           </div>
+        )}
+        {readOnly && (
+          <button
+            type="button"
+            onClick={copyProductLink}
+            title={copied ? labels.copied : labels.copy}
+            aria-label={copied ? labels.copied : labels.copy}
+            className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-xl border border-white/80 bg-white/95 text-[#1F2937] shadow-sm backdrop-blur transition-colors hover:bg-[#fff4ed] hover:text-[#ff5a00]"
+          >
+            {copied ? <Check size={16} /> : <Copy size={15} />}
+          </button>
         )}
       </div>
 
@@ -182,6 +226,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
 export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false }) {
   const [qty, setQty] = useState(Math.max(1, currentQty))
   const [notes, setNotes] = useState(currentNotes || '')
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     setQty(Math.max(1, currentQty))
@@ -208,6 +253,14 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     notesPlaceholder: lang === 'uz' ? 'Masalan: piyozsiz, yaxshi pishiring...' : lang === 'ru' ? 'Например: без лука, хорошо прожарить...' : 'For example: no onion, well done...',
     cancel: lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel',
     add: lang === 'uz' ? "Savatga qo'shish" : lang === 'ru' ? 'Добавить в корзину' : 'Add to Cart',
+    copy: lang === 'uz' ? 'Havolani nusxalash' : lang === 'ru' ? 'Скопировать ссылку' : 'Copy link',
+    copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
+  }
+
+  async function copyProductLink() {
+    await copyTextToClipboard(getMenuItemPublicUrl(item))
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1400)
   }
 
   return (
@@ -229,6 +282,16 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
           )}
         </div>
         <div className="flex flex-col items-end gap-1">
+          {readOnly && (
+            <button
+              type="button"
+              onClick={copyProductLink}
+              className="mb-1 inline-flex h-9 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[12px] font-black text-[#1F2937] shadow-sm transition-colors hover:border-orange-200 hover:bg-[#fff4ed] hover:text-[#ff5a00]"
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              <span className="hidden sm:inline">{copied ? labels.copied : labels.copy}</span>
+            </button>
+          )}
           {pricing.discounted && (
             <p className="whitespace-nowrap text-sm font-bold text-[#9CA3AF] line-through tabular-nums">
               {formatCurrency(pricing.oldPrice)}

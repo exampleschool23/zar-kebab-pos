@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -31,6 +31,13 @@ const AdminSettings = lazy(() => import('./pages/AdminSettings'))
 
 function defaultPath(role) {
   return roleDefaultPath(role)
+}
+
+function sanitizeReturnTo(value) {
+  const raw = String(value || '').trim()
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
+  if (raw.startsWith('/login') || raw.startsWith('/auth/callback')) return ''
+  return raw
 }
 
 // Syncs the Supabase profile into AppContext so POS pages keep working
@@ -88,9 +95,11 @@ function DisabledAccount({ signOut }) {
 // Route guard: requires authentication + optional role check
 function ProtectedRoute({ children, roles }) {
   const { session, profile, loading } = useAuth()
+  const location = useLocation()
+  const returnTo = `${location.pathname}${location.search}${location.hash}`
 
   if (loading) return <Spinner />
-  if (!session) return <Navigate to="/menu" replace />
+  if (!session) return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />
   if (!profile) return <Spinner />
 
   const role = (profile?.role || 'guest').toLowerCase()
@@ -125,11 +134,13 @@ function PublicMenuRoute({ children }) {
 
 function SignedOutRoute({ children }) {
   const { session, profile, loading } = useAuth()
+  const [searchParams] = useSearchParams()
+  const returnTo = sanitizeReturnTo(searchParams.get('returnTo'))
 
   if (loading) return <Spinner />
   if (!session) return children
   if (!profile) return <Spinner />
-  return <Navigate to={defaultPath(profile?.role || 'guest')} replace />
+  return <Navigate to={returnTo || defaultPath(profile?.role || 'guest')} replace />
 }
 
 function LazyProtectedRoute({ roles, children }) {
@@ -200,6 +211,7 @@ function AppRoutes() {
         {/* Public */}
         <Route path="/"              element={<RoleRedirect />} />
         <Route path="/menu"          element={<PublicMenuRoute><PublicMenu /></PublicMenuRoute>} />
+        <Route path="/menu/item/:itemId" element={<PublicMenu />} />
         <Route path="/telegram"      element={<TelegramMiniApp />} />
         <Route path="/login"         element={<SignedOutRoute><Login /></SignedOutRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />

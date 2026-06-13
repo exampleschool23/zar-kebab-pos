@@ -90,6 +90,22 @@ test('App waits for profile before role-based route redirects', () => {
   assert.match(roleRedirect, /if \(!profile\) return/)
 })
 
+test('protected deep links preserve their target through login', () => {
+  const app = readSource('src/App.jsx')
+  const login = readSource('src/pages/Login.jsx')
+  const auth = readSource('src/contexts/AuthContext.jsx')
+  const callback = readSource('src/pages/AuthCallback.jsx')
+  const protectedRoute = functionBody(app, 'ProtectedRoute')
+
+  assert.match(app, /function sanitizeReturnTo/)
+  assert.match(protectedRoute, /const returnTo = `\$\{location\.pathname\}\$\{location\.search\}\$\{location\.hash\}`/)
+  assert.match(protectedRoute, /\/login\?returnTo=\$\{encodeURIComponent\(returnTo\)\}/)
+  assert.match(login, /navigate\(returnTo \|\| '\/', \{ replace: true \}\)/)
+  assert.match(login, /signInWithGoogle\(returnTo\)/)
+  assert.match(auth, /redirectUrl\.searchParams\.set\('returnTo', returnTo\)/)
+  assert.match(callback, /navigate\(returnTo \|\| '\/', \{ replace: true \}\)/)
+})
+
 test('AppContext exposes a stable dbDispatch callback', () => {
   const source = readSource('src/store/AppContext.jsx')
 
@@ -178,7 +194,6 @@ test('PublicMenu is read-only for QR customers', () => {
   const publicMenu = readSource('src/pages/PublicMenu.jsx')
   const productCards = readSource('src/components/MenuProductCards.jsx')
 
-  assert.doesNotMatch(publicMenu, /useNavigate/)
   assert.doesNotMatch(publicMenu, /useAuth/)
   assert.doesNotMatch(publicMenu, /LogIn/)
   assert.doesNotMatch(publicMenu, /\/login/)
@@ -187,6 +202,24 @@ test('PublicMenu is read-only for QR customers', () => {
   assert.match(productCards, /const inCart = !readOnly && qty > 0/)
   assert.match(productCards, /\{readOnly \? null : inCart \?/)
   assert.match(productCards, /!\s*readOnly && \(/)
+})
+
+test('PublicMenu supports direct product links and copyable item URLs', () => {
+  const app = readSource('src/App.jsx')
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const productCards = readSource('src/components/MenuProductCards.jsx')
+  const menuLinks = readSource('src/lib/menuLinks.js')
+
+  assert.match(app, /path="\/menu\/item\/:itemId"/)
+  assert.match(publicMenu, /useParams/)
+  assert.match(publicMenu, /findMenuItemByLinkKey\(items, itemId\)/)
+  assert.match(publicMenu, /navigate\(getMenuItemPublicPath\(item\)\)/)
+  assert.match(productCards, /getMenuItemPublicUrl\(item\)/)
+  assert.match(productCards, /copyTextToClipboard/)
+  assert.match(productCards, /<Copy size=\{15\}/)
+  assert.match(productCards, /<Copy size=\{14\}/)
+  assert.match(menuLinks, /external_id \|\| item\?\.externalId \|\| item\?\.id/)
+  assert.match(menuLinks, /\/menu\/item\/\$\{encodeURIComponent\(key\)\}/)
 })
 
 test('MenuCategoryScroller collapsed chips do not overlap expanded category cards', () => {

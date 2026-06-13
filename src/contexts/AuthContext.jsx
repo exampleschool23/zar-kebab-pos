@@ -78,10 +78,12 @@ export function AuthProvider({ children }) {
     })
   }
 
-  async function signInWithGoogle() {
+  async function signInWithGoogle(returnTo = '') {
+    const redirectUrl = new URL('/auth/callback', window.location.origin)
+    if (returnTo) redirectUrl.searchParams.set('returnTo', returnTo)
     return supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: redirectUrl.toString() },
     })
   }
 

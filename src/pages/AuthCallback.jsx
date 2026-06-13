@@ -21,6 +21,7 @@ export default function AuthCallback() {
     const oauthError   = url.searchParams.get('error')
     const oauthErrDesc = url.searchParams.get('error_description')
     const code         = url.searchParams.get('code')
+    const returnTo     = sanitizeReturnTo(url.searchParams.get('returnTo'))
 
     log(`URL params — code: ${!!code}, error: ${oauthError || 'none'}`)
 
@@ -49,7 +50,7 @@ export default function AuthCallback() {
           navigate('/reset-password', { replace: true })
           return
         }
-        navigate('/', { replace: true })
+        navigate(returnTo || '/', { replace: true })
       }
     })
 
@@ -59,7 +60,7 @@ export default function AuthCallback() {
       if (session) {
         clearTimeout(giveUp)
         subscription.unsubscribe()
-        navigate('/', { replace: true })
+        navigate(returnTo || '/', { replace: true })
       }
     })
 
@@ -99,4 +100,11 @@ export default function AuthCallback() {
       </div>
     </div>
   )
+}
+
+function sanitizeReturnTo(value) {
+  const raw = String(value || '').trim()
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
+  if (raw.startsWith('/login') || raw.startsWith('/auth/callback')) return ''
+  return raw
 }

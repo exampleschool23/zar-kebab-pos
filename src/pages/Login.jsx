@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowRight, Eye, EyeOff, Leaf, Loader2, Lock,
   Mail, ShieldCheck, User, UserRound, Utensils,
@@ -344,7 +344,9 @@ export default function Login() {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuth()
   const { state } = useApp()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const lang = state.lang || 'ru'
+  const returnTo = sanitizeReturnTo(searchParams.get('returnTo'))
 
   const [mode, setMode]         = useState('signin')
   const [name, setName]         = useState('')
@@ -438,13 +440,13 @@ export default function Login() {
     const { error } = await signInWithEmail(loginId, password)
     setLoading(false)
     if (error) return setError(t(lang, 'invalidCredentials'))
-    navigate('/', { replace: true })
+    navigate(returnTo || '/', { replace: true })
   }
 
   async function handleGoogle() {
     clearMessages()
     setGoogleLoading(true)
-    const { error } = await signInWithGoogle()
+    const { error } = await signInWithGoogle(returnTo)
     if (error) {
       setGoogleLoading(false)
       setError(error.message)
@@ -832,4 +834,11 @@ export default function Login() {
       </div>
     </div>
   )
+}
+
+function sanitizeReturnTo(value) {
+  const raw = String(value || '').trim()
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
+  if (raw.startsWith('/login') || raw.startsWith('/auth/callback')) return ''
+  return raw
 }
