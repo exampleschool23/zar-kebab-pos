@@ -131,6 +131,28 @@ test('ImageLoadShimmer shows cached images that loaded before onLoad fires', () 
   assert.match(source, /ref=\{imageRef\}/)
 })
 
+test('AdminMenu item descriptions support multiline text and bold markup', () => {
+  const source = readSource('src/pages/AdminMenu.jsx')
+  const body = functionBody(source, 'DescriptionField')
+
+  assert.match(source, /Bold/)
+  assert.match(body, /<textarea/)
+  assert.match(body, /rows=\{4\}/)
+  assert.match(body, /\*\*\$\{selected\}\*\*/)
+  assert.match(source, /<DescriptionField label=\{t\(lang, 'descUz'\)\}/)
+  assert.doesNotMatch(source, /<Field label=\{t\(lang, 'descUz'\)\}/)
+})
+
+test('menu product descriptions render new lines and bold safely', () => {
+  const source = readSource('src/components/MenuProductCards.jsx')
+
+  assert.match(source, /function FormattedMenuText/)
+  assert.match(source, /split\('\\n'\)/)
+  assert.match(source, /<strong/)
+  assert.match(source, /whitespace-pre-wrap/)
+  assert.match(source, /function plainMenuText/)
+})
+
 test('AdminMenu sortable item card does not reference upload error state', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const body = functionBody(source, 'SortableItemCard')

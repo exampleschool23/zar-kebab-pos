@@ -28,6 +28,28 @@ function SafeMenuImage({ src, alt, className = '', fallbackIconSize = 32, active
   )
 }
 
+function plainMenuText(text) {
+  return String(text || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\s+/g, ' ').trim()
+}
+
+function FormattedMenuText({ text, fallback }) {
+  const value = String(text || fallback || '')
+  return value.split('\n').map((line, lineIndex) => {
+    const parts = line.split(/(\*\*[^*]+\*\*)/g).filter(Boolean)
+    return (
+      <React.Fragment key={lineIndex}>
+        {lineIndex > 0 && <br />}
+        {parts.map((part, partIndex) => {
+          const boldMatch = part.match(/^\*\*([^*]+)\*\*$/)
+          return boldMatch
+            ? <strong key={partIndex} className="font-black text-[#1F2937]">{boldMatch[1]}</strong>
+            : <React.Fragment key={partIndex}>{part}</React.Fragment>
+        })}
+      </React.Fragment>
+    )
+  })
+}
+
 async function copyTextToClipboard(text) {
   if (globalThis.navigator?.clipboard?.writeText) {
     try {
@@ -157,7 +179,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           {getItemName(item, lang)}
         </h3>
         {getItemDesc(item, lang) && (
-          <p className="text-[12px] text-[#9CA3AF] line-clamp-1 mb-1.5">{getItemDesc(item, lang)}</p>
+          <p className="text-[12px] text-[#9CA3AF] line-clamp-1 mb-1.5">{plainMenuText(getItemDesc(item, lang))}</p>
         )}
         <div className="mb-2.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -368,8 +390,8 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
 
               <div className="border-t border-[#EEF2F6] pt-4">
                 <p className="mb-2 text-[11px] font-black uppercase tracking-[0.22em] text-[#8EA0BB]">{labels.description}</p>
-                <p className="text-[14px] leading-6 text-[#475569]">
-                  {desc || labels.noDescription}
+                <p className="whitespace-pre-wrap text-[14px] leading-6 text-[#475569]">
+                  <FormattedMenuText text={desc} fallback={labels.noDescription} />
                 </p>
               </div>
 

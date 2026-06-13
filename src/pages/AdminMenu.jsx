@@ -20,7 +20,7 @@ import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
-  ImagePlus, Loader2,
+  ImagePlus, Loader2, Bold,
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -172,6 +172,57 @@ function Field({ label, type = 'text', value, onChange, placeholder, ...inputPro
         placeholder={placeholder}
         {...inputProps}
         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
+      />
+    </div>
+  )
+}
+
+function DescriptionField({ label, value, onChange, lang }) {
+  const textareaRef = useRef(null)
+  const boldLabel = lang === 'uz' ? 'Qalin' : lang === 'ru' ? 'Жирный' : 'Bold'
+
+  function updateValue(nextValue) {
+    onChange({ target: { value: nextValue } })
+  }
+
+  function applyBold() {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const current = String(value || '')
+    const selected = current.slice(start, end)
+    const insert = selected ? `**${selected}**` : '**bold**'
+    const nextValue = `${current.slice(0, start)}${insert}${current.slice(end)}`
+    updateValue(nextValue)
+    window.requestAnimationFrame(() => {
+      textarea.focus()
+      const cursorStart = selected ? start + insert.length : start + 2
+      const cursorEnd = selected ? cursorStart : start + 6
+      textarea.setSelectionRange(cursorStart, cursorEnd)
+    })
+  }
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <label className="block text-xs text-gray-500 font-semibold">{label}</label>
+        <button
+          type="button"
+          onClick={applyBold}
+          title={boldLabel}
+          aria-label={boldLabel}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:border-[#ff5a00]/40 hover:bg-[#fff4ed] hover:text-[#ff5a00]"
+        >
+          <Bold size={15} />
+        </button>
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={onChange}
+        rows={4}
+        className="min-h-[112px] w-full resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-6 transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
       />
     </div>
   )
@@ -1263,9 +1314,9 @@ export default function AdminMenu() {
               </p>
               <p className="font-black text-[#4F46E5]">{form.external_id || '—'}</p>
             </div>
-            <Field label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} />
-            <Field label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} />
-            <Field label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} />
+            <DescriptionField label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} lang={lang} />
+            <DescriptionField label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} lang={lang} />
+            <DescriptionField label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} lang={lang} />
             <Field label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="35000" />
             <Field label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} type="number" value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
