@@ -50,7 +50,7 @@ function loadEnvFile(path) {
 function parseArgs(argv) {
   const args = {
     apply: false,
-    cutoff: '2026-06-12T19:00:00.000Z',
+    cutoff: '2026-06-11T19:00:00.000Z',
   }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
@@ -72,8 +72,8 @@ function printHelp() {
   node scripts/cleanup-test-operations.js [--apply] [--cutoff ISO_DATE]
 
 Default cutoff:
-  2026-06-12T19:00:00.000Z
-  This is 2026-06-13 00:00 in Asia/Tashkent, so it deletes operations through June 12.
+  2026-06-11T19:00:00.000Z
+  This is 2026-06-12 00:00 in Asia/Tashkent, so it preserves real data from June 12 onward.
 
 Dry-run is the default. Use --apply only after reviewing the report.
 `)
@@ -182,7 +182,7 @@ async function localPreview(supabase, cutoff) {
     apply: false,
     rpcInstalled: false,
     cutoffUtc: cutoff,
-    cutoffMeaning: 'default equals 2026-06-13 00:00 Asia/Tashkent; matching rows are before this timestamp',
+    cutoffMeaning: 'default equals 2026-06-12 00:00 Asia/Tashkent; matching rows are before this timestamp',
     matchedProfiles: profiles,
     matchedWaiterNames: testNames,
     ordersToDelete: orderIds.length,

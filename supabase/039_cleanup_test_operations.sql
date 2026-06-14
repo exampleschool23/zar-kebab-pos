@@ -1,11 +1,11 @@
 -- Cleanup old/test operational data.
 --
 -- Intended for one-off production cleanup after test activity.
--- Default cutoff is the start of June 13, 2026 in Asia/Tashkent
--- (2026-06-12 19:00:00 UTC), which removes operations through June 12.
+-- Default cutoff is the start of June 12, 2026 in Asia/Tashkent
+-- (2026-06-11 19:00:00 UTC), which preserves real data from June 12 onward.
 
 create or replace function public.cleanup_test_operations(
-  p_cutoff timestamptz default '2026-06-12 19:00:00+00',
+  p_cutoff timestamptz default '2026-06-11 19:00:00+00',
   p_test_emails text[] default array[
     'kanochiy6611@gmail.com',
     'sherzodovna.0208@gmail.com',
@@ -79,7 +79,7 @@ begin
   v_counts := jsonb_build_object(
     'apply', p_apply,
     'cutoffUtc', p_cutoff,
-    'cutoffMeaning', 'delete operations created before this timestamp; default equals 2026-06-13 00:00 Asia/Tashkent',
+    'cutoffMeaning', 'delete operations created before this timestamp; default equals 2026-06-12 00:00 Asia/Tashkent',
     'matchedProfiles', (
       select coalesce(jsonb_agg(jsonb_build_object(
         'id', id,
