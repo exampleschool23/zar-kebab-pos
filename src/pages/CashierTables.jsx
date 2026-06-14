@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import {
   Receipt, CreditCard, Menu as MenuIcon, Clock, Users, Search,
   ChevronDown, Table2, Banknote, Monitor, QrCode,
-  UtensilsCrossed, ArrowUpDown, X, HelpCircle,
+  UtensilsCrossed, ArrowUpDown, X, HelpCircle, Trash2,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../lib/formatCurrency'
 import {
   getGroupedOrderItems,
@@ -96,6 +97,8 @@ const L = {
     infoBar:         "Buyurtma tafsilotlarini ko'rish, to'lovni qayta ishlash va chek chiqarish uchun stol hisobini tanlang.",
     viewAllTables:   "Barcha stollarni ko'rish",
     noPayData:       "To'lov ma'lumotlari yo'q",
+    deleteOrder:     "Buyurtmani o'chirish",
+    confirmDelete:   "O'chirishni tasdiqlash",
     takeAway:         'Olib ketish',
     delivery:         'Yetkazib berish',
     showPaid:         "To'langanlarni ko'rsatish",
@@ -142,6 +145,8 @@ const L = {
     infoBar:         'Выберите счёт стола, чтобы просмотреть детали заказа, обработать оплату и распечатать чек.',
     viewAllTables:   'Все столы',
     noPayData:       'Нет данных об оплате',
+    deleteOrder:     'Удалить заказ',
+    confirmDelete:   'Подтвердить удаление',
     takeAway:         'Заказ с собой',
     delivery:         'Доставка',
     showPaid:         'Показать оплаченные',
@@ -188,6 +193,8 @@ const L = {
     infoBar:         'Select a table bill to view order details, process payment and print receipt.',
     viewAllTables:   'View All Tables',
     noPayData:       'No payments today yet',
+    deleteOrder:     'Delete order',
+    confirmDelete:   'Confirm delete',
     takeAway:         'Take Away',
     delivery:         'Delivery',
     showPaid:         'Show paid today',
@@ -262,7 +269,7 @@ function TableStatusBadge({ status, lang }) {
   )
 }
 
-function BillCard({ order, table, menuItemMap, lang, onOpen }) {
+function BillCard({ order, table, menuItemMap, lang, onOpen, canDelete, onDelete, confirmDelete, isDeleting }) {
   const l = L[lang] || L.en
   const isTakeAway = isTakeAwayBill(order)
   const isDelivery = isDeliveryOrderType(inferOrderType(order))
@@ -358,13 +365,30 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
       {/* Open bill button */}
       <div className="px-5 pb-5 mt-auto pt-3">
         {readyForCashier ? (
-          <button
-            onClick={() => onOpen(order)}
-            className="w-full flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-3 text-[14px] font-bold hover:bg-[#cc4800] active:scale-[0.98] transition-all shadow-sm shadow-orange-200"
-          >
-            <Receipt size={16} />
-            {l.openBill}
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => onOpen(order)}
+              className="w-full flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-3 text-[14px] font-bold hover:bg-[#cc4800] active:scale-[0.98] transition-all shadow-sm shadow-orange-200"
+            >
+              <Receipt size={16} />
+              {l.openBill}
+            </button>
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(order)}
+                disabled={isDeleting}
+                className={`w-full flex items-center justify-center gap-2 rounded-xl border py-2.5 text-[13px] font-black transition-all disabled:opacity-60 ${
+                  confirmDelete
+                    ? 'border-red-200 bg-red-600 text-white hover:bg-red-700'
+                    : 'border-red-100 bg-red-50 text-red-600 hover:border-red-200 hover:bg-red-100'
+                }`}
+              >
+                <Trash2 size={15} />
+                {confirmDelete ? l.confirmDelete : l.deleteOrder}
+              </button>
+            )}
+          </div>
         ) : (
           <div className="w-full flex flex-col items-center justify-center gap-1 bg-gray-100 rounded-xl py-3 px-4 text-center">
             <p className="text-[13px] font-bold text-[#9CA3AF]">{l.waitingKitchen}</p>
@@ -486,6 +510,7 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CashierTables() {
   const { state, dispatch } = useApp()
+  const { profile } = useAuth()
   const navigate            = useNavigate()
   const lang                = state.lang
   const l                   = L[lang] || L.en
@@ -496,6 +521,9 @@ export default function CashierTables() {
   const [filterStatus,setFilterStatus]= useState('all')
   const [sortKey,     setSortKey]     = useState('newest')
   const [showPaidToday, setShowPaidToday] = useState(false)
+  const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
+  const [deletingOrderId, setDeletingOrderId] = useState('')
+  const isOwner = profile?.role === 'owner' || state.user?.role === 'owner'
 
   // ── Menu item lookup map ────────────────────────────────────────────────────
   const menuItemMap = useMemo(() =>
@@ -646,6 +674,25 @@ export default function CashierTables() {
   }, [filteredBills, l])
 
   const visibleBillCount = billSections.reduce((sum, section) => sum + section.bills.length, 0)
+
+  async function handleDeleteOrder(order) {
+    if (!isOwner || !order?.id || deletingOrderId) return
+    if (confirmDeleteOrderId !== order.id) {
+      setConfirmDeleteOrderId(order.id)
+      return
+    }
+
+    setDeletingOrderId(order.id)
+    try {
+      const result = await dispatch({
+        type: 'DELETE_ORDER',
+        payload: { orderId: order.id },
+      })
+      if (!result?.error) setConfirmDeleteOrderId('')
+    } finally {
+      setDeletingOrderId('')
+    }
+  }
 
   return (
     <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
@@ -825,6 +872,10 @@ export default function CashierTables() {
                       ? `/cashier/bill/order/${bill.id}`
                       : `/cashier/bill/${bill.table_id}`
                     )}
+                    canDelete={isOwner}
+                    onDelete={handleDeleteOrder}
+                    confirmDelete={confirmDeleteOrderId === order.id}
+                    isDeleting={deletingOrderId === order.id}
                   />
                 ))}
               </BillsSection>
