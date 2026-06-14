@@ -9,6 +9,7 @@
     "db:health": "node scripts/check-db-health.js",
     "migrate:menu-images:r2": "node scripts/migrate-menu-images-to-r2.js",
     "optimize:menu-images": "node scripts/optimize-menu-images.js",
+    "cleanup:test-operations": "node scripts/cleanup-test-operations.js",
     "test": "node --test",
     "build": "vite build",
     "preview": "vite preview"
