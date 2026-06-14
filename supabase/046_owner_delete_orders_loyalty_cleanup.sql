@@ -1,5 +1,5 @@
--- Owner-only operational order deletion.
--- Used for removing test orders before or after completion while keeping table state sane.
+-- Ensure owner order deletion removes all order-linked loyalty side effects too.
+-- Apply after 043_owner_delete_orders.sql.
 
 create or replace function public.delete_order_owner(p_order_id text)
 returns jsonb
