@@ -228,7 +228,7 @@ function DescriptionField({ label, value, onChange, lang }) {
   )
 }
 
-function ImageUploadField({ label, value, onChange, lang, type, entityId }) {
+function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type, entityId }) {
   const fileRef = useRef(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -240,9 +240,11 @@ function ImageUploadField({ label, value, onChange, lang, type, entityId }) {
     setUploading(true)
     setError('')
     try {
+      const previousUrl = value
       const compressed = await compressMenuImage(file)
       const data = await uploadMenuImageToR2({ file: compressed, type, entityId })
       onChange({ target: { value: data.url } })
+      await onUploadComplete?.({ newUrl: data.url, previousUrl })
     } catch (err) {
       setError(`${t(lang, 'uploadError')}: ${formatMenuImageUploadError(lang, err.message)}`)
     } finally {
@@ -610,6 +612,8 @@ export default function AdminMenu() {
   const [filterAvail,setFilterAvail]= useState('all')
   const [gridView,   setGridView]   = useState(true)
   const [activeId,   setActiveId]   = useState(null) // drag overlay
+  const uploadedItemImageUrlsRef = useRef(new Set())
+  const uploadedCatImageUrlsRef = useRef(new Set())
 
   // Sensors: pointer (mouse/trackpad) + touch
   const sensors = useSensors(
@@ -655,14 +659,31 @@ export default function AdminMenu() {
     return m
   }, [state.menuItems])
 
+  async function cleanupTrackedUploads(ref, keepUrls = []) {
+    const keep = new Set(keepUrls.filter(Boolean))
+    const staleUrls = [...ref.current].filter(url => !keep.has(url))
+    ref.current.clear()
+    await Promise.allSettled(staleUrls.map(url => deleteMenuImageFromR2(url)))
+  }
+
+  async function handleTrackedUpload(ref, { newUrl, previousUrl }) {
+    if (newUrl) ref.current.add(newUrl)
+    if (previousUrl && previousUrl !== newUrl && ref.current.has(previousUrl)) {
+      ref.current.delete(previousUrl)
+      await deleteMenuImageFromR2(previousUrl).catch(() => {})
+    }
+  }
+
   // ── Item CRUD ──────────────────────────────────────────────────────────────
   function openNewItem() {
+    uploadedItemImageUrlsRef.current.clear()
     const maxOrder = state.menuItems.length > 0
       ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
     setForm({ ...blankItem, id: 'i' + Date.now(), external_id: generateMenuExternalId(), sort_order: maxOrder + 1 })
     setItemModal('new')
   }
   function openNewQuickItem() {
+    uploadedItemImageUrlsRef.current.clear()
     const maxOrder = state.menuItems.length > 0
       ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
     const maxQuickOrder = quickItems.length > 0
@@ -679,6 +700,7 @@ export default function AdminMenu() {
     setItemModal('new')
   }
   function openEditItem(i) {
+    uploadedItemImageUrlsRef.current.clear()
     setForm({
       ...blankItem,
       ...i,
@@ -689,6 +711,10 @@ export default function AdminMenu() {
       quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
     })
     setItemModal('edit')
+  }
+  async function closeItemModal() {
+    await cleanupTrackedUploads(uploadedItemImageUrlsRef)
+    setItemModal(null)
   }
   async function saveItem() {
     if (!form.name_uz || !form.price || !form.category_id) return
@@ -711,10 +737,13 @@ export default function AdminMenu() {
         send_to_kitchen: !!form.send_to_kitchen,
       },
     })
-    if (!result?.error && oldImageUrl && oldImageUrl !== form.image_url) {
-      await deleteMenuImageFromR2(oldImageUrl)
+    if (!result?.error) {
+      await cleanupTrackedUploads(uploadedItemImageUrlsRef, [form.image_url])
+      if (oldImageUrl && oldImageUrl !== form.image_url) {
+        await deleteMenuImageFromR2(oldImageUrl)
+      }
+      setItemModal(null)
     }
-    setItemModal(null)
   }
   function deleteItem(id) {
     if (window.confirm('Delete this item?')) dispatch({ type: 'DELETE_MENU_ITEM', payload: id })
@@ -722,12 +751,21 @@ export default function AdminMenu() {
 
   // ── Category CRUD ──────────────────────────────────────────────────────────
   function openNewCat() {
+    uploadedCatImageUrlsRef.current.clear()
     const maxOrder = realSortedCats.length > 0
       ? Math.max(...realSortedCats.map(c => c.sort_order ?? 0)) : 0
     setCatForm({ ...blankCat, id: 'c' + Date.now(), sort_order: maxOrder + 1 })
     setCatModal('new')
   }
-  function openEditCat(c) { setCatForm({ ...c, sort_order: c.sort_order ?? 0 }); setCatModal('edit') }
+  function openEditCat(c) {
+    uploadedCatImageUrlsRef.current.clear()
+    setCatForm({ ...c, sort_order: c.sort_order ?? 0 })
+    setCatModal('edit')
+  }
+  async function closeCatModal() {
+    await cleanupTrackedUploads(uploadedCatImageUrlsRef)
+    setCatModal(null)
+  }
   async function saveCat() {
     if (!catForm.name_uz) return
     const oldImageUrl = catModal === 'edit'
@@ -737,10 +775,13 @@ export default function AdminMenu() {
       type: catModal === 'new' ? 'ADD_CATEGORY' : 'UPDATE_CATEGORY',
       payload: { ...catForm, sort_order: Number(catForm.sort_order) || 0 },
     })
-    if (!result?.error && oldImageUrl && oldImageUrl !== catForm.image_url) {
-      await deleteMenuImageFromR2(oldImageUrl)
+    if (!result?.error) {
+      await cleanupTrackedUploads(uploadedCatImageUrlsRef, [catForm.image_url])
+      if (oldImageUrl && oldImageUrl !== catForm.image_url) {
+        await deleteMenuImageFromR2(oldImageUrl)
+      }
+      setCatModal(null)
     }
-    setCatModal(null)
   }
   function deleteCat(id) {
     if (id === 'all') return
@@ -1290,7 +1331,7 @@ export default function AdminMenu() {
 
       {/* ── Item modal ──────────────────────────────────────────────────────── */}
       {itemModal && (
-        <Modal title={itemModal === 'new' ? t(lang, 'addItem') : t(lang, 'editItem')} onClose={() => setItemModal(null)}>
+        <Modal title={itemModal === 'new' ? t(lang, 'addItem') : t(lang, 'editItem')} onClose={closeItemModal}>
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-gray-500 font-semibold mb-1.5">{t(lang, 'category')}</label>
@@ -1326,6 +1367,7 @@ export default function AdminMenu() {
               label={t(lang, 'imageUrl')}
               value={form.image_url}
               onChange={setF('image_url')}
+              onUploadComplete={upload => handleTrackedUpload(uploadedItemImageUrlsRef, upload)}
               lang={lang}
               type="product"
               entityId={form.id}
@@ -1373,7 +1415,7 @@ export default function AdminMenu() {
               </label>
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={() => setItemModal(null)} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+              <button onClick={closeItemModal} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                 {t(lang, 'cancel')}
               </button>
               <button onClick={saveItem} className="flex-1 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200">
@@ -1388,7 +1430,7 @@ export default function AdminMenu() {
       {catModal && (
         <Modal
           title={catModal === 'new' ? t(lang, 'addCategory') : (lang === 'uz' ? 'Kategoriyani tahrirlash' : lang === 'ru' ? 'Редактировать категорию' : 'Edit Category')}
-          onClose={() => setCatModal(null)}
+          onClose={closeCatModal}
         >
           <div className="space-y-3">
             <Field label={t(lang, 'nameUz')} value={catForm.name_uz} onChange={setCF('name_uz')} />
@@ -1398,13 +1440,14 @@ export default function AdminMenu() {
               label={t(lang, 'imageUrl')}
               value={catForm.image_url}
               onChange={setCF('image_url')}
+              onUploadComplete={upload => handleTrackedUpload(uploadedCatImageUrlsRef, upload)}
               lang={lang}
               type="category"
               entityId={catForm.id}
             />
             <Field label={t(lang, 'sortOrder')} type="number" value={catForm.sort_order} onChange={setCF('sort_order')} placeholder="1" />
             <div className="flex gap-2 pt-2">
-              <button onClick={() => setCatModal(null)} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+              <button onClick={closeCatModal} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                 {t(lang, 'cancel')}
               </button>
               <button onClick={saveCat} className="flex-1 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200">

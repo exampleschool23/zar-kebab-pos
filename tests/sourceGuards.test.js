@@ -99,6 +99,23 @@ test('AdminMenu explains fake WebP upload failures in staff-friendly text', () =
   assert.match(source, /formatMenuImageUploadError\(lang, err\.message\)/)
 })
 
+test('AdminMenu cleans up replaced or cancelled uploaded menu images', () => {
+  const source = readSource('src/pages/AdminMenu.jsx')
+  const uploadField = functionBody(source, 'ImageUploadField')
+  const adminMenu = functionBody(source, 'AdminMenu')
+
+  assert.match(uploadField, /const previousUrl = value/)
+  assert.match(uploadField, /onUploadComplete\?\.\(\{ newUrl: data\.url, previousUrl \}\)/)
+  assert.match(adminMenu, /uploadedItemImageUrlsRef = useRef\(new Set\(\)\)/)
+  assert.match(adminMenu, /uploadedCatImageUrlsRef = useRef\(new Set\(\)\)/)
+  assert.match(adminMenu, /async function cleanupTrackedUploads/)
+  assert.match(adminMenu, /async function handleTrackedUpload/)
+  assert.match(adminMenu, /onClose=\{closeItemModal\}/)
+  assert.match(adminMenu, /onClose=\{closeCatModal\}/)
+  assert.match(adminMenu, /onUploadComplete=\{upload => handleTrackedUpload\(uploadedItemImageUrlsRef, upload\)\}/)
+  assert.match(adminMenu, /onUploadComplete=\{upload => handleTrackedUpload\(uploadedCatImageUrlsRef, upload\)\}/)
+})
+
 test('menu image optimization script targets real WebP files under 50 KB', () => {
   const pkg = JSON.parse(readSource('package.json'))
   const script = readSource('scripts/optimize-menu-images.js')
