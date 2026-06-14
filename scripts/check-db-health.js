@@ -127,7 +127,7 @@ const checks = await Promise.all([
   checkTable('menu_categories', 'id, name_uz, name_ru, name_en, sort_order'),
   checkTable('menu_items', 'id, category_id, name_uz, name_ru, name_en, price, available, sort_order'),
   checkTable('orders', 'id, table_id, table_name, status, payment_status, service_rate_pct, order_type, order_number, loyalty_card_number, loyalty_used_amount, cashback_earned'),
-  checkTable('order_items', 'id, order_id, menu_item_id, status, order_type, item_type, is_counter_item'),
+  checkTable('order_items', 'id, order_id, menu_item_id, status, order_type, kitchen_round_id, submitted_at, item_type, is_counter_item'),
   checkTable('business_settings', 'id, restaurant_name, service_rate_pct, receipt_footer, auto_print'),
   checkTable('order_payments', 'id, order_id, method, amount'),
   checkTable('loyalty_cards', 'id, card_number, public_token, customer_name, phone_number, cashback_type, balance, total_earned, total_redeemed, is_active, created_at, updated_at'),

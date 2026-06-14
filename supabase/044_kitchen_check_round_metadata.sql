@@ -1,4 +1,18 @@
--- Atomic waiter submit: order totals, kitchen items, and table status commit together.
+-- Persist waiter submission rounds so cook checks stay split after reloads.
+
+alter table public.order_items
+  add column if not exists kitchen_round_id text;
+
+alter table public.order_items
+  add column if not exists submitted_at timestamptz;
+
+update public.order_items
+  set submitted_at = created_at
+  where submitted_at is null;
+
+create index if not exists idx_order_items_kitchen_round
+  on public.order_items(order_id, kitchen_round_id, submitted_at);
+
 create or replace function public.submit_order_to_kitchen(payload jsonb)
 returns void
 language plpgsql

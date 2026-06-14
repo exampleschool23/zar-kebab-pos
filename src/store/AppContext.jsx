@@ -75,31 +75,39 @@ export function AppProvider({ children }) {
 
   // dbDispatch: optimistic local update + async Supabase write
   const dbDispatch = useCallback(function dbDispatch(action) {
-    // Pre-inject a stable orderId so reducer and Supabase writer share it
-      const enriched = action.type === 'SEND_TO_KITCHEN'
-      ? {
-          ...action,
-          _orderId: normalizeOrderType(action.payload?.orderType) === 'take_away'
-            ? `ta-${Date.now()}`
-            : stateRef.current.orders.find(o =>
-              o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
-            )?.id || 'o' + Date.now(),
-          _orderNumber: normalizeOrderType(action.payload?.orderType) === 'take_away'
-            ? makeTakeAwayOrderNumber(Date.now())
-            : undefined,
-          _items: stateRef.current.cart.map(i => ({
-            ...i,
-            id: makeLocalId('oi'),
-            status: 'new',
-            order_type: normalizeOrderType(action.payload?.orderType),
-          })),
-        }
-      : action.type === 'ADD_QUICK_ITEM_TO_ORDER'
-        ? {
-            ...action,
-            _itemId: makeLocalId('oi'),
-          }
-      : action
+    let enriched = action
+    if (action.type === 'SEND_TO_KITCHEN') {
+      const orderType = normalizeOrderType(action.payload?.orderType)
+      const submittedAt = action._submittedAt || new Date().toISOString()
+      const kitchenRoundId = action._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
+      enriched = {
+        ...action,
+        _submittedAt: submittedAt,
+        _kitchenRoundId: kitchenRoundId,
+        _orderId: orderType === 'take_away'
+          ? `ta-${Date.now()}`
+          : stateRef.current.orders.find(o =>
+            o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
+          )?.id || 'o' + Date.now(),
+        _orderNumber: orderType === 'take_away'
+          ? makeTakeAwayOrderNumber(Date.now())
+          : undefined,
+        _items: stateRef.current.cart.map(i => ({
+          ...i,
+          id: makeLocalId('oi'),
+          status: 'new',
+          order_type: orderType,
+          kitchen_round_id: kitchenRoundId,
+          submitted_at: submittedAt,
+          created_at: submittedAt,
+        })),
+      }
+    } else if (action.type === 'ADD_QUICK_ITEM_TO_ORDER') {
+      enriched = {
+        ...action,
+        _itemId: makeLocalId('oi'),
+      }
+    }
 
     if (WRITE_BEFORE_LOCAL_ACTIONS.has(enriched.type)) {
       return writeWithIdleRecovery(enriched, stateRef.current)

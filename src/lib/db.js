@@ -35,7 +35,9 @@ function isMissingOptionalOrderTypeColumn(error) {
       message.includes('order_type') ||
       message.includes('order_number') ||
       message.includes('item_type') ||
-      message.includes('is_counter_item')
+      message.includes('is_counter_item') ||
+      message.includes('kitchen_round_id') ||
+      message.includes('submitted_at')
     )
   )
 }
@@ -416,6 +418,8 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, isT
       order_type: normalizeOrderType(i.order_type || orderType),
       item_type: i.item_type || i.itemType || 'menu',
       is_counter_item: !!(i.is_counter_item ?? i.isCounterItem),
+      kitchen_round_id: i.kitchen_round_id || i.kitchenRoundId || '',
+      submitted_at: i.submitted_at || i.submittedAt || i.created_at || i.createdAt || null,
     })),
     table_status: isTakeAway ? null : 'occupied',
   }
@@ -720,13 +724,15 @@ export async function writeToSupabase(action, state) {
         notes:        i.notes || '',
         status:       'new',
         order_type:   normalizeOrderType(i.order_type || orderType),
+        kitchen_round_id: i.kitchen_round_id || i.kitchenRoundId || '',
+        submitted_at: i.submitted_at || i.submittedAt || i.created_at || i.createdAt || null,
       }))
       let { data: insertedItems, error: itemInsertError } = await supabase
         .from('order_items')
         .insert(rows)
         .select('*')
       if (itemInsertError && isMissingOptionalOrderTypeColumn(itemInsertError)) {
-        const fallbackRows = rows.map(({ order_type, ...row }) => row)
+        const fallbackRows = rows.map(({ order_type, kitchen_round_id, submitted_at, ...row }) => row)
         ;({ data: insertedItems, error: itemInsertError } = await supabase
           .from('order_items')
           .insert(fallbackRows)
