@@ -233,8 +233,17 @@ const STATUS_CFG = {
 
 // ── Status derivation ─────────────────────────────────────────────────────────
 
+function getVisibleActiveOrdersForTable(tableId, orders) {
+  return orders.filter(o =>
+    o.table_id === tableId &&
+    o.payment_status !== 'paid' &&
+    o.status !== 'cancelled' &&
+    getOrderTotal(o) > 0
+  )
+}
+
 function deriveStatus(tableId, orders) {
-  const active = orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
+  const active = getVisibleActiveOrdersForTable(tableId, orders)
   if (active.length === 0) return 'available'
 
   // needs_bill takes top priority
@@ -261,12 +270,12 @@ function deriveStatus(tableId, orders) {
 }
 
 function deriveStatusForTable(table, orders) {
-  const active = orders.filter(o => o.table_id === table.id && o.payment_status !== 'paid')
+  const active = getVisibleActiveOrdersForTable(table.id, orders)
   return getWaiterTableStatus(table, active, () => deriveStatus(table.id, orders))
 }
 
 function getPreparationCounts(tableId, orders) {
-  const active = orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
+  const active = getVisibleActiveOrdersForTable(tableId, orders)
   const items = active.flatMap(o => o.items || []).filter(i => i.status !== 'cancelled')
   return {
     newCount: items.filter(i => (i.status || 'new') === 'new').length,
@@ -618,7 +627,7 @@ export default function WaiterTables() {
       )
       .map(table => {
         const status = deriveStatusForTable(table, state.orders)
-        const active = state.orders.filter(o => o.table_id === table.id && o.payment_status !== 'paid')
+        const active = getVisibleActiveOrdersForTable(table.id, state.orders)
         const counts = active.length > 0 ? getPreparationCounts(table.id, state.orders) : null
         return { table, status, counts }
       }),

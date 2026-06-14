@@ -476,6 +476,19 @@ test('WaiterTables ready-card total uses shared payment math instead of stale st
   assert.doesNotMatch(getPreparationCounts, /Number\(o\.total\)/)
 })
 
+test('WaiterTables hides zero-value active orders from table cards', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+  const activeOrdersFilter = functionBody(source, 'getVisibleActiveOrdersForTable')
+
+  assert.match(activeOrdersFilter, /payment_status !== 'paid'/)
+  assert.match(activeOrdersFilter, /o\.status !== 'cancelled'/)
+  assert.match(activeOrdersFilter, /getOrderTotal\(o\) > 0/)
+  assert.match(functionBody(source, 'deriveStatus'), /getVisibleActiveOrdersForTable\(tableId, orders\)/)
+  assert.match(functionBody(source, 'deriveStatusForTable'), /getVisibleActiveOrdersForTable\(table\.id, orders\)/)
+  assert.match(functionBody(source, 'getPreparationCounts'), /getVisibleActiveOrdersForTable\(tableId, orders\)/)
+  assert.match(source, /const active = getVisibleActiveOrdersForTable\(table\.id, state\.orders\)/)
+})
+
 test('WaiterTables keeps filter chips in requested status order', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
 
