@@ -2,33 +2,29 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
-const TEST_USER_EMAILS = [
-  'kanochiy6611@gmail.com',
-  'sherzodovna.0208@gmail.com',
-  'ddk9499@gmail.com',
-  'yogam1.ddk@gmail.com',
-  'javoxirbekshomurodov@gmail.com',
-  'ustozkamolovad@gmail.com',
-  'shomurodovamaftuna2007@gmail.com',
-  'jasurbek@snoonu.com',
-  'ustozkamolova@gmail.com',
-  'dildoravlogs@gmail.com',
-  'dildoramuqumova12@gmail.com',
+const KEEP_USER_EMAILS = [
+  'b6575842@gmail.com',
+  'off25781@gmail.com',
+  'xusnidamaulenbergenova16@gmail.com',
+  'baxtiyormirzaev840@gmail.com',
 ]
 
-const FALLBACK_TEST_NAMES = [
-  'Izzatilla Ismatov',
-  'Mehrinoz Amondullayeva',
-  'Dostonbek K',
-  'Dostonbek Kamalov',
-  'Javoxirbek Shomurodov',
-  'Дилрабо Камолова',
-  'Maftuna Shomurodova',
-  'Jasurbek Shomurodov',
-  'Диля Камолова',
-  'Dildora Vlogs',
-  'Dildora Muqumova',
+const FALLBACK_KEEP_NAMES = [
+  'Baxti',
+  'Off',
+  'Xusnida Maulenbergenova',
+  'Xusnida',
+  'Baxtiyor',
 ]
+
+function compactUnique(values) {
+  return [...new Set(values.map(value => String(value || '').trim()).filter(Boolean))]
+}
+
+function waiterNameMatches(waiterName, keepNames) {
+  const normalized = String(waiterName || '').trim().toLowerCase()
+  return normalized && keepNames.some(name => name.toLowerCase() === normalized)
+}
 
 function loadEnvFile(path) {
   if (!existsSync(path)) return
@@ -116,18 +112,19 @@ async function countIn(supabase, table, column, values) {
 }
 
 async function localPreview(supabase, cutoff) {
-  const { data: profiles, error: profileError } = await supabase
+  const { data: keepProfiles, error: profileError } = await supabase
     .from('profiles')
     .select('id,email,full_name,role,status,created_at')
-    .in('email', TEST_USER_EMAILS)
+    .in('email', KEEP_USER_EMAILS)
     .order('full_name', { ascending: true })
   if (profileError) throw profileError
 
-  const profileIds = profiles.map(profile => profile.id)
-  const testNames = [...new Set([
-    ...profiles.map(profile => profile.full_name).filter(Boolean),
-    ...FALLBACK_TEST_NAMES,
-  ])]
+  const keepProfileIds = keepProfiles.map(profile => profile.id)
+  const keepNames = compactUnique([
+    ...keepProfiles.map(profile => profile.full_name).filter(Boolean),
+    ...keepProfiles.map(profile => String(profile.full_name || '').trim().split(/\s+/)[0]).filter(Boolean),
+    ...FALLBACK_KEEP_NAMES,
+  ])
 
   const orders = await fetchAll(() => supabase
     .from('orders')
@@ -136,7 +133,7 @@ async function localPreview(supabase, cutoff) {
   const cutoffMs = Date.parse(cutoff)
   const matchedOrders = orders.filter(order => {
     const createdAt = Date.parse(order.created_at)
-    return createdAt < cutoffMs || testNames.includes(order.waiter_name)
+    return createdAt < cutoffMs || !waiterNameMatches(order.waiter_name, keepNames)
   })
   const orderIds = matchedOrders.map(order => order.id)
 
@@ -153,11 +150,11 @@ async function localPreview(supabase, cutoff) {
     .from('order_item_cancellations')
     .select('id,order_id,created_by,created_at'))
   const orderIdSet = new Set(orderIds)
-  const profileIdSet = new Set(profileIds)
+  const keepProfileIdSet = new Set(keepProfileIds)
   const orderItemCancellationsToDelete = cancellationRows.filter(row => (
     Date.parse(row.created_at) < cutoffMs ||
     orderIdSet.has(row.order_id) ||
-    profileIdSet.has(row.created_by)
+    !keepProfileIdSet.has(row.created_by)
   )).length
 
   const profileAuditRows = await fetchAll(() => supabase
@@ -165,8 +162,8 @@ async function localPreview(supabase, cutoff) {
     .select('id,profile_id,actor_id,changed_at'))
   const profileAuditToDelete = profileAuditRows.filter(row => (
     Date.parse(row.changed_at) < cutoffMs ||
-    profileIdSet.has(row.profile_id) ||
-    profileIdSet.has(row.actor_id)
+    (row.profile_id && !keepProfileIdSet.has(row.profile_id)) ||
+    (row.actor_id && !keepProfileIdSet.has(row.actor_id))
   )).length
 
   const loyaltyRows = await fetchAll(() => supabase
@@ -175,7 +172,7 @@ async function localPreview(supabase, cutoff) {
   const loyaltyTransactionsPreserved = loyaltyRows.filter(row => (
     Date.parse(row.created_at) < cutoffMs ||
     orderIdSet.has(row.order_id) ||
-    profileIdSet.has(row.created_by)
+    !keepProfileIdSet.has(row.created_by)
   )).length
 
   return {
@@ -183,8 +180,8 @@ async function localPreview(supabase, cutoff) {
     rpcInstalled: false,
     cutoffUtc: cutoff,
     cutoffMeaning: 'default equals 2026-06-12 00:00 Asia/Tashkent; matching rows are before this timestamp',
-    matchedProfiles: profiles,
-    matchedWaiterNames: testNames,
+    keptProfiles: keepProfiles,
+    keptWaiterNames: keepNames,
     ordersToDelete: orderIds.length,
     orderItemsToDelete,
     orderPaymentsToDelete,
@@ -195,7 +192,7 @@ async function localPreview(supabase, cutoff) {
     sampleOrders: matchedOrders
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
       .slice(0, 20),
-    note: 'Install supabase/039_cleanup_test_operations.sql before applying. Loyalty transactions are intentionally preserved to avoid corrupting wallet balances.',
+    note: 'Install supabase/040_cleanup_preserve_real_operations.sql before applying. Loyalty transactions are intentionally preserved to avoid corrupting wallet balances.',
   }
 }
 
@@ -216,15 +213,15 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 })
 
 let report
-const { data, error } = await supabase.rpc('cleanup_test_operations', {
+const { data, error } = await supabase.rpc('cleanup_preserve_real_operations', {
   p_cutoff: args.cutoff,
-  p_test_emails: TEST_USER_EMAILS,
+  p_keep_emails: KEEP_USER_EMAILS,
   p_apply: args.apply,
 })
 
 if (error && isMissingRpc(error)) {
   if (args.apply) {
-    console.error('cleanup_test_operations RPC is not installed. Run supabase/039_cleanup_test_operations.sql in Supabase SQL Editor first, then rerun with --apply.')
+    console.error('cleanup_preserve_real_operations RPC is not installed. Run supabase/040_cleanup_preserve_real_operations.sql in Supabase SQL Editor first, then rerun with --apply.')
     process.exit(1)
   }
   report = await localPreview(supabase, args.cutoff)
