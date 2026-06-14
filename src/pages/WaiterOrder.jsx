@@ -17,7 +17,7 @@ import { ProductCard, ProductDetailPage } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
-import { isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
 function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName, viewerRole }) {
@@ -452,6 +452,9 @@ export default function WaiterOrder() {
   const [detailItem,    setDetailItem]   = useState(null)
   const productScrollRef = useRef(null)
   const shouldOpenOrderPanel = searchParams.get('panel') === 'order'
+  const routeOrderType = isTakeAwayFlow
+    ? normalizeOrderType(searchParams.get('orderType') || searchParams.get('type') || 'take_away')
+    : 'dine_in'
 
   const table = isTakeAwayFlow ? null : state.tables.find(t => t.id === tableId)
   const orderTitle = isTakeAwayFlow
@@ -602,11 +605,11 @@ export default function WaiterOrder() {
 
   React.useEffect(() => {
     dispatch({ type: 'SET_TABLE', payload: isTakeAwayFlow ? null : tableId })
-    if (isTakeAwayFlow) setOrderType('take_away')
+    if (isTakeAwayFlow) setOrderType(routeOrderType)
     return () => dispatch({ type: 'CLEAR_CART' })
     // dispatch is intentionally omitted because AppContext recreates dbDispatch after state updates.
     // Including it here would clear the cart after every add/increment render.
-  }, [isTakeAwayFlow, tableId])
+  }, [isTakeAwayFlow, tableId, routeOrderType])
 
   if (!loaded || loadError) {
     return (

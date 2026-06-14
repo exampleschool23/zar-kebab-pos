@@ -53,6 +53,7 @@ const L = {
     guideReserved: 'Reserved for an upcoming guest',
     guideNeedsBill: 'Guest requested the bill',
     takeAwayOrder: 'Take Away Order',
+    deliveryOrder: 'Delivery Order',
     manageTables: 'Manage tables',
     todaysReservations: 'Today’s Reservations',
     noReservationsToday: 'No reservations today',
@@ -97,6 +98,7 @@ const L = {
     guideReserved: 'Забронировано для гостя',
     guideNeedsBill: 'Гость попросил счёт',
     takeAwayOrder: 'Заказ с собой',
+    deliveryOrder: 'Доставка',
     manageTables: 'Управление столами',
     todaysReservations: 'Брони сегодня',
     noReservationsToday: 'Сегодня броней нет',
@@ -141,6 +143,7 @@ const L = {
     guideReserved: 'Keladigan mehmon uchun bron qilingan',
     guideNeedsBill: 'Mehmon hisob so\'radi',
     takeAwayOrder: 'Olib ketish buyurtmasi',
+    deliveryOrder: 'Yetkazib berish',
     manageTables: 'Stollarni boshqarish',
     todaysReservations: 'Bugungi bronlar',
     noReservationsToday: 'Bugun bron yo‘q',
@@ -720,6 +723,12 @@ export default function WaiterTables() {
     navigate('/waiter/take-away')
   }
 
+  function handleDelivery() {
+    dispatch({ type: 'SET_TABLE', payload: null })
+    dispatch({ type: 'CLEAR_CART' })
+    navigate('/waiter/take-away?orderType=delivery')
+  }
+
   const allCfg = {
     chipBg: 'bg-gray-100 text-gray-600',
     chipActiveBg: 'bg-gray-800 text-white',
@@ -759,6 +768,13 @@ export default function WaiterTables() {
               >
                 <Plus size={15} />
                 {tr(lang, 'takeAwayOrder')}
+              </button>
+              <button
+                onClick={handleDelivery}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-black hover:bg-purple-700 transition-colors shadow-sm shadow-purple-100"
+              >
+                <Plus size={15} />
+                {tr(lang, 'deliveryOrder')}
               </button>
               {canManageTables && (
                 <button
