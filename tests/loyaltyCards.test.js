@@ -88,7 +88,7 @@ function paidOrder(overrides = {}) {
   }
 }
 
-test('loyalty card registration is owner-only and preserves exact 8-digit card numbers', () => {
+test('loyalty card registration is owner/admin and preserves exact 8-digit card numbers', () => {
   const created = createLoyaltyCardRecord({
     role: 'owner',
     cardNumber: '00123456',
@@ -109,7 +109,8 @@ test('loyalty card registration is owner-only and preserves exact 8-digit card n
   assert.equal(created.total_redeemed, 0)
   assert.equal(created.is_active, true)
 
-  assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'admin', cardNumber: '11112222' }), 'forbidden')
+  const adminCreated = createLoyaltyCardRecord({ role: 'admin', cardNumber: '11112222' })
+  assert.equal(adminCreated.card_number, '11112222')
   assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'cashier', cardNumber: '11112222' }), 'forbidden')
   assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'owner', cardNumber: '1234567' }), 'invalid_card_number')
   assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'owner', cardNumber: '123456789' }), 'invalid_card_number')
@@ -304,18 +305,22 @@ test('manual balance adjustment is owner-only, reasoned, transactional and never
   assert.equal(base.balance, 50000)
 })
 
-test('loyalty permissions enforce owner mutations and admin read-only behavior', () => {
+test('loyalty permissions allow admin creation while keeping financial mutations owner-only', () => {
   assert.equal(canViewLoyaltyCards('owner'), true)
   assert.equal(canViewLoyaltyCards('admin'), true)
   assert.equal(canViewLoyaltyCards('cashier'), true)
   assert.equal(canViewLoyaltyCards('waiter'), false)
   assert.equal(canCreateLoyaltyCard('owner'), true)
+  assert.equal(canCreateLoyaltyCard('admin'), true)
   assert.equal(canEditLoyaltyCard('owner'), true)
   assert.equal(canAdjustLoyaltyBalance('owner'), true)
   assert.equal(canDeactivateLoyaltyCard('owner'), true)
 
-  for (const role of ['admin', 'cashier', 'waiter', 'stakeholder', 'guest']) {
+  for (const role of ['cashier', 'waiter', 'stakeholder', 'guest']) {
     assert.equal(canCreateLoyaltyCard(role), false)
+  }
+
+  for (const role of ['admin', 'cashier', 'waiter', 'stakeholder', 'guest']) {
     assert.equal(canEditLoyaltyCard(role), false)
     assert.equal(canAdjustLoyaltyBalance(role), false)
     assert.equal(canDeactivateLoyaltyCard(role), false)

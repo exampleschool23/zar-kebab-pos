@@ -27,6 +27,7 @@ function actionLabel(action, lang) {
     reopen_paid_order: { uz: 'To‘langan buyurtma ochildi', ru: 'Оплаченный заказ открыт', en: 'Paid order reopened' },
     order_item_deleted: { uz: 'Taom o‘chirildi', ru: 'Блюдо удалено', en: 'Order item deleted' },
     order_cancelled: { uz: 'Buyurtma bekor qilindi', ru: 'Заказ отменён', en: 'Order cancelled' },
+    settle_loyalty_wallet_payment: { uz: 'Sodiqlik to‘lovi hisoblandi', ru: 'Расчёт оплаты лояльностью', en: 'Loyalty wallet payment settled' },
   }
   return labels[action]?.[lang] || action || '—'
 }
@@ -39,6 +40,7 @@ function paymentMethodLabel(method, lang) {
     qr: { uz: 'QR kod', ru: 'QR-код', en: 'QR Code' },
     qr_code: { uz: 'QR kod', ru: 'QR-код', en: 'QR Code' },
     loyalty: { uz: 'Sodiqlik balansi', ru: 'Баланс лояльности', en: 'Loyalty balance' },
+    loyalty_card: { uz: 'Sodiqlik kartasi', ru: 'Карта лояльности', en: 'Loyalty card' },
     split: { uz: 'Bo‘lingan to‘lov', ru: 'Раздельная оплата', en: 'Split payment' },
   }
   if (!method) return '—'
@@ -56,6 +58,8 @@ function statusLabel(status, lang) {
     cancelled: { uz: 'Bekor qilingan', ru: 'Отменён', en: 'Cancelled' },
     unpaid: { uz: 'To‘lanmagan', ru: 'Не оплачен', en: 'Unpaid' },
     pending: { uz: 'Kutilmoqda', ru: 'Ожидает', en: 'Pending' },
+    take_away: { uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
+    'Take Away': { uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
   }
   if (!status) return '—'
   return labels[status]?.[lang] || status

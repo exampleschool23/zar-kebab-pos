@@ -44,7 +44,7 @@ export function canViewLoyaltyCards(role) {
 }
 
 export function canCreateLoyaltyCard(role) {
-  return normalizeRole(role) === 'owner'
+  return ['owner', 'admin'].includes(normalizeRole(role))
 }
 
 export function canEditLoyaltyCard(role) {

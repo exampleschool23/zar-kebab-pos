@@ -733,6 +733,7 @@ test('CashierBill keeps counter items in main content above loyalty and out of p
 
 test('loyalty cashback wallet migration and admin route are wired', () => {
   const migration = readSource('supabase/022_loyalty_cashback_wallet.sql')
+  const adminCreateMigration = readSource('supabase/041_admin_create_loyalty_cards.sql')
   const app = readSource('src/App.jsx')
   const admin = readSource('src/pages/AdminLoyalty.jsx')
   const loyalty = readSource('src/lib/loyalty.js')
@@ -746,6 +747,8 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   assert.match(migration, /cashback_percent_used/)
   assert.match(migration, /card_type_at_transaction/)
   assert.match(migration, /owner_create_loyalty_cards/)
+  assert.match(adminCreateMigration, /owner_admin_create_loyalty_cards/)
+  assert.match(adminCreateMigration, /array\['owner','admin'\]/)
   assert.match(migration, /owner_cashier_update_loyalty_cards/)
   assert.match(migration, /owner_cashier_insert_loyalty_transactions/)
   assert.doesNotMatch(migration, /staff_all_loyalty_cards on public\.loyalty_cards\s+for all/)
@@ -827,7 +830,10 @@ test('AdminAudit localizes money audit labels statuses and payment methods', () 
   assert.match(audit, /before: 'Было'/)
   assert.match(audit, /before: 'Before'/)
   assert.match(audit, /cash: \{ uz: 'Naqd', ru: 'Наличные', en: 'Cash' \}/)
+  assert.match(audit, /loyalty_card: \{ uz: 'Sodiqlik kartasi', ru: 'Карта лояльности', en: 'Loyalty card' \}/)
+  assert.match(audit, /settle_loyalty_wallet_payment: \{ uz: 'Sodiqlik to‘lovi hisoblandi', ru: 'Расчёт оплаты лояльностью', en: 'Loyalty wallet payment settled' \}/)
   assert.match(audit, /paid: \{ uz: 'To‘landi', ru: 'Оплачен', en: 'Paid' \}/)
+  assert.match(audit, /take_away: \{ uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' \}/)
   assert.match(audit, /statusLabel\(status, lang\)/)
   assert.match(audit, /paymentMethodLabel\(row\.old_payment_method, lang\)/)
   assert.match(audit, /beforeLabel=\{l\.before\}/)
@@ -843,6 +849,16 @@ test('AdminSettings does not expose obsolete cashback percent setting', () => {
   assert.doesNotMatch(reducerDefaults, /cashbackPercent/)
   assert.doesNotMatch(db, /settings\.cashbackPercent/)
   assert.doesNotMatch(db, /cashback_percent:\s*Number\.isFinite\(Number\(settings\.cashbackPercent\)\)/)
+})
+
+test('AdminSettings persists service rate immediately when a preset is selected', () => {
+  const settings = readSource('src/pages/AdminSettings.jsx')
+
+  assert.match(settings, /async function saveSettings\(overrides = \{\}\)/)
+  assert.match(settings, /async function handleServiceRateChange\(nextRate\)/)
+  assert.match(settings, /setServiceRate\(nextRate\)/)
+  assert.match(settings, /saveSettings\(\{ serviceRate: nextRate \}\)/)
+  assert.match(settings, /onClick=\{\(\) => handleServiceRateChange\(v\)\}/)
 })
 
 test('AdminSettings does not expose receipt footer editing', () => {

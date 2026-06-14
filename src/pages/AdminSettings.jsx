@@ -85,12 +85,13 @@ export default function AdminSettings() {
     setAutoPrint(settings.autoPrint)
   }, [settings.restaurantName, settings.serviceRate, settings.autoPrint])
 
-  async function handleSave() {
+  async function saveSettings(overrides = {}) {
     setSaving(true)
     setError('')
+    const nextSettings = { restaurantName, serviceRate, autoPrint, ...overrides }
     const result = await dispatch({
       type: 'SET_SETTINGS',
-      payload: { restaurantName, serviceRate, autoPrint },
+      payload: nextSettings,
     })
     setSaving(false)
     if (result?.error) {
@@ -99,6 +100,15 @@ export default function AdminSettings() {
     }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleSave() {
+    await saveSettings()
+  }
+
+  async function handleServiceRateChange(nextRate) {
+    setServiceRate(nextRate)
+    await saveSettings({ serviceRate: nextRate })
   }
 
   async function checkHealth() {
@@ -291,7 +301,7 @@ export default function AdminSettings() {
                 {[0, 10, 15, 20].map(v => (
                   <button
                     key={v}
-                    onClick={() => setServiceRate(v)}
+                    onClick={() => handleServiceRateChange(v)}
                     className={`px-2.5 py-1.5 rounded-lg text-[12px] font-bold transition-all ${
                       serviceRate === v
                         ? 'bg-[#ff5a00] text-white'
