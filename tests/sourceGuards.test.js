@@ -570,6 +570,14 @@ test('delivery order type is wired through POS surfaces and reports', () => {
   assert.match(telegramOrder, /normalizeOrderType\(body\.orderType\)/)
 })
 
+test('local menu image upload API receives server auth env from Vite', () => {
+  const viteConfig = readSource('vite.config.js')
+
+  assert.match(viteConfig, /'VITE_SUPABASE_URL'/)
+  assert.match(viteConfig, /'SUPABASE_URL'/)
+  assert.match(viteConfig, /'SUPABASE_SERVICE_ROLE_KEY'/)
+})
+
 test('WaiterTables hides disabled tables and links admins to management', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
 

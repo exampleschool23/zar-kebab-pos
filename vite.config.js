@@ -4,6 +4,9 @@ import uploadMenuImage from './api/menu-image/upload.js'
 import deleteMenuImage from './api/menu-image/delete.js'
 
 const SERVER_ENV_KEYS = [
+  'VITE_SUPABASE_URL',
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
   'R2_ACCOUNT_ID',
   'R2_ACCESS_KEY_ID',
   'R2_SECRET_ACCESS_KEY',

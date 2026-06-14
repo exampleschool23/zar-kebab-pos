@@ -5,7 +5,13 @@ const ALLOWED_ROLES = new Set(['owner', 'admin'])
 function getSupabaseAuthClient() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) throw Object.assign(new Error('Server misconfigured'), { status: 500 })
+  const missing = [
+    !url && 'SUPABASE_URL or VITE_SUPABASE_URL',
+    !key && 'SUPABASE_SERVICE_ROLE_KEY',
+  ].filter(Boolean)
+  if (missing.length) {
+    throw Object.assign(new Error(`Server misconfigured: missing ${missing.join(', ')}`), { status: 500 })
+  }
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
