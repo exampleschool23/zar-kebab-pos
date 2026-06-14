@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
@@ -26,7 +27,7 @@ import {
   Download, X, Printer, Eye, ChevronLeft, ChevronRight,
   Search, SlidersHorizontal, CreditCard,
   Monitor, QrCode, Banknote, UtensilsCrossed,
-  BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle,
+  BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2,
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 
@@ -618,7 +619,7 @@ function WaiterPerformanceTab({ orders, lang }) {
 // TAB 6 — ORDER HISTORY
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRatePct }) {
+function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRatePct, canDeleteOrder, onDeleteOrder, deletingOrderId, confirmDeleteOrderId, onCancelDeleteOrder }) {
   const [fetchedItems, setFetchedItems] = useState(null)
 
   useEffect(() => {
@@ -777,6 +778,34 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
           <Printer size={14} />
           {lang === 'uz' ? 'Bosish' : lang === 'ru' ? 'Печать' : 'Print'}
         </button>
+        {canDeleteOrder && (
+          <div className="col-span-2 grid gap-2">
+            <button
+              onClick={() => onDeleteOrder(order)}
+              disabled={deletingOrderId === order.id}
+              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-black disabled:opacity-60 transition-colors ${
+                confirmDeleteOrderId === order.id
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'border border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+              }`}
+            >
+              <Trash2 size={14} />
+              {deletingOrderId === order.id
+                ? (lang === 'uz' ? 'O‘chirilmoqda...' : lang === 'ru' ? 'Удаление...' : 'Deleting...')
+                : confirmDeleteOrderId === order.id
+                  ? (lang === 'uz' ? 'O‘chirishni tasdiqlash' : lang === 'ru' ? 'Подтвердить удаление' : 'Confirm delete')
+                  : (lang === 'uz' ? 'Buyurtmani o‘chirish' : lang === 'ru' ? 'Удалить заказ' : 'Delete order')}
+            </button>
+            {confirmDeleteOrderId === order.id && (
+              <button
+                onClick={onCancelDeleteOrder}
+                className="rounded-xl border border-[#E5E7EB] py-2 text-xs font-black text-[#6B7280] hover:bg-gray-50"
+              >
+                {lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -941,11 +970,13 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Reports() {
-  const { state }    = useApp()
+  const { state, dispatch } = useApp()
+  const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const navigate     = useNavigate()
   const lang         = state.lang
   const serviceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
+  const canDeleteOrder = (profile?.role || state.user?.role) === 'owner'
 
   const [activeTab,     setActiveTab]     = useState('order_history')
   const [dateFrom, setDateFrom] = useState(todayStr())
@@ -953,6 +984,8 @@ export default function Reports() {
   const [tableFilter,   setTableFilter]   = useState('all')
   const [waiterFilter,  setWaiterFilter]  = useState('all')
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [deletingOrderId, setDeletingOrderId] = useState('')
+  const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
 
   // ── Lookups ────────────────────────────────────────────────────────────────
 
@@ -1001,6 +1034,24 @@ export default function Reports() {
 
   function exportCloseout() {
     downloadCsv(`zar-kebab-closeout-${closeout.date}.csv`, closeoutToCsv(closeout))
+  }
+
+  async function deleteOrder(order) {
+    if (!canDeleteOrder || !order?.id || deletingOrderId) return
+    if (confirmDeleteOrderId !== order.id) {
+      setConfirmDeleteOrderId(order.id)
+      return
+    }
+    setDeletingOrderId(order.id)
+    try {
+      const result = await dispatch({ type: 'DELETE_ORDER', payload: { orderId: order.id } })
+      if (!result?.error) {
+        setSelectedOrder(null)
+        setConfirmDeleteOrderId('')
+      }
+    } finally {
+      setDeletingOrderId('')
+    }
   }
 
   const showDrawer = !!selectedOrder
@@ -1208,6 +1259,11 @@ export default function Reports() {
                 navigate={navigate}
                 lang={lang}
                 serviceRatePct={serviceRatePct}
+                canDeleteOrder={canDeleteOrder}
+                onDeleteOrder={deleteOrder}
+                deletingOrderId={deletingOrderId}
+                confirmDeleteOrderId={confirmDeleteOrderId}
+                onCancelDeleteOrder={() => setConfirmDeleteOrderId('')}
               />
             </div>
           </>

@@ -1238,6 +1238,14 @@ export async function writeToSupabase(action, state) {
       break
     }
 
+    case 'DELETE_ORDER': {
+      const orderId = typeof action.payload === 'string' ? action.payload : action.payload?.orderId
+      if (!orderId) return
+      const { error } = await supabase.rpc('delete_order_owner', { p_order_id: orderId })
+      if (error) throw error
+      break
+    }
+
     case 'SET_SETTINGS': {
       const settings = action.payload || {}
       const serviceRatePct = serviceRatePctFromSettings({ serviceRate: settings.serviceRate })

@@ -900,6 +900,29 @@ test('cashier payment waits for database success and supports legacy loyalty tra
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(legacyTransactions\)\)/)
 })
 
+test('owner order deletion is routed through an owner-only RPC and wired to cashier and reports', () => {
+  const appContext = readSource('src/store/AppContext.jsx')
+  const reducer = readSource('src/store/ordersReducer.js')
+  const db = readSource('src/lib/db.js')
+  const migration = readSource('supabase/043_owner_delete_orders.sql')
+  const cashier = readSource('src/pages/CashierBill.jsx')
+  const reports = readSource('src/pages/Reports.jsx')
+
+  assert.match(appContext, /'DELETE_ORDER'/)
+  assert.match(reducer, /case 'DELETE_ORDER'/)
+  assert.match(db, /case 'DELETE_ORDER':[\s\S]*delete_order_owner/)
+  assert.match(migration, /delete_order_owner/)
+  assert.match(migration, /current_staff_has_role\(array\['owner'\]\)/)
+  assert.match(migration, /disable trigger guard_paid_order_items/)
+  assert.match(migration, /delete from public\.orders/)
+  assert.match(migration, /status = 'available'/)
+  assert.match(cashier, /isOwner/)
+  assert.match(cashier, /confirmDeleteOrder/)
+  assert.match(cashier, /type: 'DELETE_ORDER'/)
+  assert.match(reports, /canDeleteOrder/)
+  assert.match(reports, /type: 'DELETE_ORDER'/)
+})
+
 test('table management migration and health check include required columns', () => {
   const migration = readSource('supabase/019_table_management.sql')
   const health = readSource('scripts/check-db-health.js')

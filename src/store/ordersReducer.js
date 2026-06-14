@@ -350,6 +350,38 @@ export function ordersReducer(state, action) {
       }
     }
 
+    case 'DELETE_ORDER': {
+      const orderId = typeof action.payload === 'string' ? action.payload : action.payload?.orderId
+      if (!orderId) return state
+      const removedOrder = state.orders.find(o => o.id === orderId)
+      const orders = state.orders.filter(o => o.id !== orderId)
+      const hasOtherActiveTableOrders = removedOrder?.table_id
+        ? orders.some(o =>
+            o.table_id === removedOrder.table_id &&
+            o.payment_status !== 'paid' &&
+            o.status !== 'cancelled'
+          )
+        : false
+      return {
+        ...state,
+        orders,
+        tables: removedOrder?.table_id && !hasOtherActiveTableOrders
+          ? state.tables.map(t => t.id === removedOrder.table_id
+              ? {
+                  ...t,
+                  status: 'available',
+                  reserved_for_name: '',
+                  reserved_for_phone: '',
+                  reserved_at: null,
+                  reserved_until: null,
+                  reservation_notes: '',
+                }
+              : t
+            )
+          : state.tables,
+      }
+    }
+
     default:
       return state
   }

@@ -70,8 +70,10 @@ export default function CashierBill() {
   const { tableId, orderId }  = useParams()
   const navigate     = useNavigate()
   const { state, dispatch } = useApp()
+  const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
+  const isOwner = (profile?.role || state.user?.role) === 'owner'
 
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
 
@@ -84,6 +86,8 @@ export default function CashierBill() {
   const [loyaltyLookupMessage, setLoyaltyLookupMessage] = useState('')
   const [isCheckingLoyalty, setCheckingLoyalty] = useState(false)
   const [isProcessingPayment, setProcessingPayment] = useState(false)
+  const [isDeletingOrder, setDeletingOrder] = useState(false)
+  const [confirmDeleteOrder, setConfirmDeleteOrder] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const menuItemMap = useMemo(() => {
@@ -348,6 +352,25 @@ export default function CashierBill() {
     }
   }
 
+  async function handleDeleteOrder() {
+    if (!isOwner || !order?.id || isDeletingOrder) return
+    if (!confirmDeleteOrder) {
+      setConfirmDeleteOrder(true)
+      return
+    }
+    setDeletingOrder(true)
+    try {
+      const result = await dispatch({
+        type: 'DELETE_ORDER',
+        payload: { orderId: order.id },
+      })
+      if (result?.error) return
+      navigate('/cashier/tables')
+    } finally {
+      setDeletingOrder(false)
+    }
+  }
+
   function addQuickItem(item) {
     dispatch({
       type: 'ADD_QUICK_ITEM_TO_ORDER',
@@ -410,6 +433,10 @@ export default function CashierBill() {
     processingPay: lang === 'uz' ? "To'lov saqlanmoqda" : lang === 'ru' ? 'Сохранение оплаты' : 'Saving payment',
     printBill:    lang === 'uz' ? 'Hisob chiqarish' : lang === 'ru' ? 'Распечатать счёт' : 'Print Bill',
     printReceipt: lang === 'uz' ? 'Chek chiqarish' : lang === 'ru' ? 'Распечатать чек' : 'Print Receipt',
+    deleteOrder:  lang === 'uz' ? 'Buyurtmani o‘chirish' : lang === 'ru' ? 'Удалить заказ' : 'Delete order',
+    confirmDeleteOrder: lang === 'uz' ? 'O‘chirishni tasdiqlash' : lang === 'ru' ? 'Подтвердить удаление' : 'Confirm delete',
+    deletingOrder: lang === 'uz' ? 'O‘chirilmoqda...' : lang === 'ru' ? 'Удаление...' : 'Deleting...',
+    cancelDelete: lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel',
     loyaltyLabel: lang === 'uz' ? 'Sodiqlik kartasi' : lang === 'ru' ? 'Карта лояльности' : 'Loyalty Card',
     cashbackBalance: lang === 'uz' ? 'Cashback balansi' : lang === 'ru' ? 'Баланс кешбэка' : 'Cashback balance',
     useLoyalty:   lang === 'uz' ? 'Ishlatiladigan sodiqlik summasi' : lang === 'ru' ? 'Сумма лояльности к списанию' : 'Loyalty amount to use',
@@ -1169,6 +1196,31 @@ export default function CashierBill() {
                   <Printer size={16} />
                   {lbl.printReceipt}
                 </button>
+
+                {isOwner && (
+                  <div className="grid gap-2">
+                    <button
+                      onClick={handleDeleteOrder}
+                      disabled={isDeletingOrder}
+                      className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-colors ${
+                        confirmDeleteOrder
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'border-2 border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                      } disabled:opacity-60`}
+                    >
+                      <Trash2 size={16} />
+                      {isDeletingOrder ? lbl.deletingOrder : confirmDeleteOrder ? lbl.confirmDeleteOrder : lbl.deleteOrder}
+                    </button>
+                    {confirmDeleteOrder && (
+                      <button
+                        onClick={() => setConfirmDeleteOrder(false)}
+                        className="w-full rounded-xl border border-[#E5E7EB] py-2 text-xs font-black text-[#6B7280] hover:bg-gray-50"
+                      >
+                        {lbl.cancelDelete}
+                      </button>
+                    )}
+                  </div>
+                )}
 
               </div>
             </div>

@@ -17,6 +17,7 @@ const WRITE_BEFORE_LOCAL_ACTIONS = new Set([
   'MARK_TABLE_NEEDS_BILL',
   'UPDATE_BILL_ITEM_QTY',
   'MARK_ORDER_PAID',
+  'DELETE_ORDER',
 ])
 
 const initialState = {

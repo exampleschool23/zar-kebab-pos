@@ -153,6 +153,30 @@ test('requested-bill quantity edits can reduce or remove served items before pay
   assert.equal(removedLast.tables[0].status, 'available')
 })
 
+test('owner order deletion removes the order and resets table only when no active orders remain', () => {
+  const base = {
+    ...state(),
+    tables: [{ id: 't1', name: 'Table 1', status: 'needs_bill', is_active: true }],
+    orders: [
+      { id: 'o1', table_id: 't1', status: 'needs_bill', payment_status: 'unpaid', items: [] },
+      { id: 'o2', table_id: 't1', status: 'sent_to_kitchen', payment_status: 'unpaid', items: [] },
+      { id: 'o3', table_id: null, table_name: 'Take Away', status: 'paid', payment_status: 'paid', items: [] },
+    ],
+  }
+
+  const firstDelete = ordersReducer(base, { type: 'DELETE_ORDER', payload: { orderId: 'o1' } })
+  assert.deepEqual(firstDelete.orders.map(order => order.id), ['o2', 'o3'])
+  assert.equal(firstDelete.tables[0].status, 'needs_bill')
+
+  const secondDelete = ordersReducer(firstDelete, { type: 'DELETE_ORDER', payload: { orderId: 'o2' } })
+  assert.deepEqual(secondDelete.orders.map(order => order.id), ['o3'])
+  assert.equal(secondDelete.tables[0].status, 'available')
+
+  const takeAwayDelete = ordersReducer(secondDelete, { type: 'DELETE_ORDER', payload: { orderId: 'o3' } })
+  assert.equal(takeAwayDelete.orders.length, 0)
+  assert.equal(takeAwayDelete.tables[0].status, 'available')
+})
+
 test('admin reservation and disable flow keeps history-safe table lifecycle', () => {
   const reserved = tablesReducer(state(), {
     type: 'UPDATE_TABLE',
