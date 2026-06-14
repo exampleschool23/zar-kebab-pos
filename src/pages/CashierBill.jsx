@@ -127,7 +127,7 @@ export default function CashierBill() {
   const table = state.tables.find(t => t.id === tableId)
   const isTakeAway = order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
   const orderLabel = isTakeAway
-    ? `${lang === 'uz' ? 'Olib ketish' : lang === 'ru' ? 'С собой' : 'Take Away'} · ${order?.order_number || order?.id || ''}`
+    ? `${lang === 'uz' ? 'Olib ketish' : lang === 'ru' ? 'Заказ с собой' : 'Take Away'} · ${order?.order_number || order?.id || ''}`
     : table?.name
 
   const quickItems = useMemo(() =>

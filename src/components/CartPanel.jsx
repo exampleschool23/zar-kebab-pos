@@ -9,7 +9,7 @@ import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 // Delivery tab removed — only Dine In and Take Away
 const ORDER_TYPES = [
   { key: 'dine_in',  uz: 'Zalda',      ru: 'В зале',  en: 'Dine In'  },
-  { key: 'take_away', uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
+  { key: 'take_away', uz: 'Olib ketish', ru: 'Заказ с собой', en: 'Take Away' },
 ]
 
 function orderTypeLabel(ot, lang) {

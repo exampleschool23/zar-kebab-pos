@@ -106,7 +106,7 @@ const T = {
     back: 'Назад',
     checkoutTitle: 'Оформление',
     orderType: 'Тип заказа',
-    takeaway: 'С собой',
+    takeaway: 'Заказ с собой',
     dineIn: 'В зале',
     delivery: 'Доставка',
     loyaltyCard: 'Карта лояльности',

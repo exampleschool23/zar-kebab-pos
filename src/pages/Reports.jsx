@@ -89,6 +89,20 @@ function fmtDate(iso) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}  ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function takeAwayLabel(lang) {
+  if (lang === 'uz') return 'Olib ketish'
+  if (lang === 'ru') return 'Заказ с собой'
+  return 'Take Away'
+}
+
+function isTakeAwayOrder(order) {
+  return order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
+}
+
+function orderTableLabel(order, lang) {
+  return isTakeAwayOrder(order) ? takeAwayLabel(lang) : (order?.table_name || '—')
+}
+
 function StatusBadge({ status, lang }) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.unpaid
   return (
@@ -658,7 +672,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
         {/* Order meta */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: lang === 'uz' ? 'Stol'      : lang === 'ru' ? 'Стол'      : 'Table',    value: order.table_name || '—' },
+            { label: lang === 'uz' ? 'Stol'      : lang === 'ru' ? 'Стол'      : 'Table',    value: orderTableLabel(order, lang) },
             { label: lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант'  : 'Waiter',   value: order.waiter_name || '—' },
             { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PayBadge method={order.payment_method} lang={lang} /> },
             { label: lang === 'uz' ? 'Yaratildi' : lang === 'ru' ? 'Создан'    : 'Created',  value: fmtDate(order.created_at) },
@@ -780,7 +794,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
       const matchPay = filterPay === 'all' || (getPaymentMethod(o) || '').toLowerCase() === filterPay
       const matchQ   = !q ||
         (o.id          && String(o.id).toLowerCase().includes(q)) ||
-        (o.table_name  && o.table_name.toLowerCase().includes(q)) ||
+        (orderTableLabel(o, lang).toLowerCase().includes(q)) ||
         (o.waiter_name && o.waiter_name.toLowerCase().includes(q)) ||
         getOrderItems(o).some(i => (i.name || '').toLowerCase().includes(q))
       return matchPay && matchQ
@@ -855,7 +869,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                         <span className="text-[9px] font-black bg-orange-100 text-[#ff5a00] rounded px-1 py-0.5 leading-none">+{sessionCnt - 1}</span>
                       )}
                     </span>
-                    <span className="text-sm font-medium text-[#1F2937] truncate">{order.table_name || '—'}</span>
+                    <span className="text-sm font-medium text-[#1F2937] truncate">{orderTableLabel(order, lang)}</span>
                     <span className="text-sm text-[#6B7280] truncate">{(order.waiter_name || '—').split(' ')[0]}</span>
                     <span className="text-[12px] text-[#6B7280]">{fmtDate(getOrderDate(order))}</span>
                     <span><StatusBadge status={status} lang={lang} /></span>
@@ -884,7 +898,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                         <span className="font-black text-[#ff5a00] text-sm">{orderNum}</span>
                         <StatusBadge status={status} lang={lang} />
                       </div>
-                      <p className="text-sm font-medium text-[#1F2937]">{order.table_name} · {(order.waiter_name || '').split(' ')[0]}</p>
+                      <p className="text-sm font-medium text-[#1F2937]">{orderTableLabel(order, lang)} · {(order.waiter_name || '').split(' ')[0]}</p>
                       <p className="text-[11px] text-[#9CA3AF] mt-0.5">{fmtDate(getOrderDate(order))}</p>
                       <div className="mt-1.5"><PayBadge method={order.payment_method} lang={lang} /></div>
                     </div>

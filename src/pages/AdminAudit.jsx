@@ -58,8 +58,8 @@ function statusLabel(status, lang) {
     cancelled: { uz: 'Bekor qilingan', ru: 'Отменён', en: 'Cancelled' },
     unpaid: { uz: 'To‘lanmagan', ru: 'Не оплачен', en: 'Unpaid' },
     pending: { uz: 'Kutilmoqda', ru: 'Ожидает', en: 'Pending' },
-    take_away: { uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
-    'Take Away': { uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
+    take_away: { uz: 'Olib ketish', ru: 'Заказ с собой', en: 'Take Away' },
+    'Take Away': { uz: 'Olib ketish', ru: 'Заказ с собой', en: 'Take Away' },
   }
   if (!status) return '—'
   return labels[status]?.[lang] || status

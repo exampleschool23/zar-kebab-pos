@@ -24,7 +24,7 @@ const STATUS_BADGE = {
 
 const ORDER_TYPE_LABEL = {
   dine_in:   { uz: 'Zalda',      ru: 'В зале',  en: 'Dine In' },
-  take_away: { uz: 'Olib ketish', ru: 'С собой', en: 'Take Away' },
+  take_away: { uz: 'Olib ketish', ru: 'Заказ с собой', en: 'Take Away' },
 }
 
 const KITCHEN_SOUND_PREF_KEY = 'zk_kitchen_sound_enabled'

@@ -131,6 +131,17 @@ function combineReceiptOrders(orders) {
   }
 }
 
+function receiptTakeAwayLabel(lang) {
+  if (lang === 'uz') return 'Olib ketish'
+  if (lang === 'ru') return 'Заказ с собой'
+  return 'Take Away'
+}
+
+function receiptTableLabel(order, table, lang, fallback) {
+  const isTakeAway = order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
+  return isTakeAway ? receiptTakeAwayLabel(lang) : (table?.name || order?.table_name || fallback)
+}
+
 function payMethodLabel(method, lang) {
   const labels = {
     cash: { uz: 'Naqd', ru: 'Наличные', en: 'Cash' },
@@ -575,7 +586,7 @@ export function TableReceipt() {
     )
 
     return {
-      tableName:  table?.name || orders[0]?.table_name || tableId,
+      tableName:  receiptTableLabel(orders[0], table, lang, tableId),
       waiterName: orders[0]?.waiter_name || '—',
       createdAt:  orders[0]?.created_at,
       items,
@@ -656,7 +667,7 @@ export default function Receipt() {
     const table      = state.tables.find(t => t.id === order.table_id)
 
     return {
-      tableName:  table?.name || order.table_name || '—',
+      tableName:  receiptTableLabel(order, table, lang, '—'),
       waiterName: order.waiter_name || '—',
       createdAt:  order.created_at,
       items,

@@ -225,6 +225,17 @@ function elapsedSince(iso) {
   return `${Math.floor(diff / 60)}h ${diff % 60}m`
 }
 
+function takeAwayLabel(lang) {
+  if (lang === 'uz') return 'Olib ketish'
+  if (lang === 'ru') return 'Заказ с собой'
+  return 'Take Away'
+}
+
+function orderTableLabel(order, lang, fallback) {
+  const isTakeAway = order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
+  return isTakeAway ? takeAwayLabel(lang) : (order?.table_name || fallback)
+}
+
 function shortLabel(ds, mode) {
   const d = new Date(ds + 'T12:00:00')
   if (mode === 'today')  return `${ds.slice(11, 16)}` // hour label passed in directly
@@ -322,7 +333,7 @@ function RecentOrderRow({ order, lang, methodLabel, onPrintBill, onView }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap min-w-0">
               <p className="text-base font-black text-[#1F2937] leading-none flex-shrink-0">#{shortId}</p>
-              <p className="text-sm text-[#718096] truncate min-w-0 max-w-[140px]">{order.table_name || l.table}</p>
+              <p className="text-sm text-[#718096] truncate min-w-0 max-w-[140px]">{orderTableLabel(order, lang, l.table)}</p>
               <RecentStatusPill status={isNeedsBill ? 'needs_bill' : 'paid'} lang={lang} />
             </div>
 
