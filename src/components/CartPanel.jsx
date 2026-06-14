@@ -5,16 +5,13 @@ import { t, getItemDesc } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
+import { ORDER_TYPE_LABELS, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 
-// Delivery tab removed — only Dine In and Take Away
 const ORDER_TYPES = [
-  { key: 'dine_in',  uz: 'Zalda',      ru: 'В зале',  en: 'Dine In'  },
-  { key: 'take_away', uz: 'Olib ketish', ru: 'Заказ с собой', en: 'Take Away' },
+  { key: 'dine_in', ...ORDER_TYPE_LABELS.dine_in },
+  { key: 'take_away', ...ORDER_TYPE_LABELS.take_away },
+  { key: 'delivery', ...ORDER_TYPE_LABELS.delivery },
 ]
-
-function orderTypeLabel(ot, lang) {
-  return ot[lang] || ot.en
-}
 
 // ── Cart item row ──────────────────────────────────────────────────────────────
 function CartItemRow({ item, lang, dispatch, menuItem }) {
@@ -141,7 +138,7 @@ export default function CartPanel({
   }, [state.menuItems])
 
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
-  const serviceRatePct = orderType === 'take_away' ? 0 : configuredServiceRatePct
+  const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : configuredServiceRatePct
   const payment = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, cart, configuredServiceRatePct)
   const subtotal  = payment.subtotal
   const service   = payment.serviceFee
@@ -207,7 +204,7 @@ export default function CartPanel({
                 <p className="font-black text-[#1F2937] text-[18px] leading-tight">{tableName}</p>
                 {orderType && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E8FFF0] text-green-700 border border-green-100 flex-shrink-0">
-                    {ORDER_TYPES.find(o => o.key === orderType)?.[lang] || 'Dine In'}
+                    {orderTypeLabel(orderType, lang)}
                   </span>
                 )}
               </div>
@@ -234,7 +231,7 @@ export default function CartPanel({
                     : 'text-[#9CA3AF] hover:text-[#6B7280]'
                 }`}
               >
-                {orderTypeLabel(ot, lang)}
+                {ot[lang] || ot.en}
               </button>
             ))}
           </div>

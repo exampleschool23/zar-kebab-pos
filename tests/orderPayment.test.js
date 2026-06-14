@@ -1020,6 +1020,29 @@ test('take-away orders with null table_id stay separate in cashier reports sessi
   assert.equal(paidRevenue(sessions), 32000)
 })
 
+test('delivery orders have no service fee and stay separate in report sessions', () => {
+  const order = {
+    id: 'delivery-1',
+    table_id: null,
+    table_name: 'Delivery',
+    order_type: 'delivery',
+    service_rate_pct: 20,
+    status: 'paid',
+    payment_status: 'paid',
+    created_at: '2026-05-16T10:00:00.000Z',
+    paid_at: '2026-05-16T10:20:00.000Z',
+    items: [item({ id: 'del-item', menu_item_id: 'kebab', quantity: 2, price: 25000, order_type: 'delivery' })],
+  }
+  const summary = getOrderPaymentSummary(order, order.items, 20)
+  const grouped = groupOrdersBySession([order])
+
+  assert.equal(summary.subtotal, 50000)
+  assert.equal(summary.serviceFee, 0)
+  assert.equal(summary.total, 50000)
+  assert.equal(grouped.length, 1)
+  assert.equal(grouped[0].order_type, 'delivery')
+})
+
 test('dine-in-only order shows table context and calculates correct total', () => {
   const order = paidOrder({
     id: 'dine-only',

@@ -7,7 +7,7 @@ alter table public.order_items
 
 alter table public.order_items
   add constraint order_items_order_type_check
-  check (order_type in ('dine_in', 'take_away'));
+  check (order_type in ('dine_in', 'take_away', 'delivery'));
 
 create index if not exists idx_order_items_order_type
   on public.order_items(order_type);

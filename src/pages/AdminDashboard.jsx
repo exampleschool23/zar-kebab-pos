@@ -28,6 +28,7 @@ import {
   isOrderInDashboardPeriod,
 } from '../lib/dashboardAnalytics'
 import AppShell from '../components/AppShell'
+import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 const L = {
@@ -225,15 +226,9 @@ function elapsedSince(iso) {
   return `${Math.floor(diff / 60)}h ${diff % 60}m`
 }
 
-function takeAwayLabel(lang) {
-  if (lang === 'uz') return 'Olib ketish'
-  if (lang === 'ru') return 'Заказ с собой'
-  return 'Take Away'
-}
-
 function orderTableLabel(order, lang, fallback) {
-  const isTakeAway = order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
-  return isTakeAway ? takeAwayLabel(lang) : (order?.table_name || fallback)
+  const orderType = inferOrderType(order)
+  return isOffPremiseOrderType(orderType) ? orderTypeLabel(orderType, lang) : (order?.table_name || fallback)
 }
 
 function shortLabel(ds, mode) {

@@ -4,9 +4,10 @@ import { appMetaReducer } from './appMetaReducer'
 import { cartReducer } from './cartReducer'
 import { menuReducer } from './menuReducer'
 import { ordersReducer } from './ordersReducer'
-import { DEFAULT_SETTINGS, loadInitialLang, loadSettings, makeLocalId, makeTakeAwayOrderNumber, normalizeOrderType } from './reducerHelpers'
+import { DEFAULT_SETTINGS, loadInitialLang, loadSettings, makeLocalId, makeOrderNumber, normalizeOrderType } from './reducerHelpers'
 import { settingsReducer } from './settingsReducer'
 import { tablesReducer } from './tablesReducer'
+import { isOffPremiseOrderType } from '../lib/orderTypes'
 
 const AppContext = createContext(null)
 
@@ -78,19 +79,20 @@ export function AppProvider({ children }) {
     let enriched = action
     if (action.type === 'SEND_TO_KITCHEN') {
       const orderType = normalizeOrderType(action.payload?.orderType)
+      const isOffPremise = isOffPremiseOrderType(orderType)
       const submittedAt = action._submittedAt || new Date().toISOString()
       const kitchenRoundId = action._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
       enriched = {
         ...action,
         _submittedAt: submittedAt,
         _kitchenRoundId: kitchenRoundId,
-        _orderId: orderType === 'take_away'
-          ? `ta-${Date.now()}`
+        _orderId: isOffPremise
+          ? `${orderType === 'delivery' ? 'dl' : 'ta'}-${Date.now()}`
           : stateRef.current.orders.find(o =>
             o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
           )?.id || 'o' + Date.now(),
-        _orderNumber: orderType === 'take_away'
-          ? makeTakeAwayOrderNumber(Date.now())
+        _orderNumber: isOffPremise
+          ? makeOrderNumber(Date.now(), orderType)
           : undefined,
         _items: stateRef.current.cart.map(i => ({
           ...i,

@@ -9,13 +9,14 @@ import {
   removeSentCartItems,
 } from '../lib/analytics.js'
 import {
+  makeOrderNumber,
   makeLocalId,
-  makeTakeAwayOrderNumber,
   normalizeOrderType,
   recalcOrderTotals,
   serviceRatePctFromSettings,
 } from './reducerHelpers.js'
 import { getLoyaltyCardCashbackPercent } from '../lib/loyalty.js'
+import { isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes.js'
 
 export function ordersReducer(state, action) {
   switch (action.type) {
@@ -24,9 +25,9 @@ export function ordersReducer(state, action) {
 
     case 'SEND_TO_KITCHEN': {
       const orderType = normalizeOrderType(action.payload?.orderType)
-      const isTakeAway = orderType === 'take_away'
-      const table = isTakeAway ? null : state.tables.find(t => t.id === state.currentTableId)
-      if ((!isTakeAway && !table) || state.cart.length === 0) return state
+      const isOffPremise = isOffPremiseOrderType(orderType)
+      const table = isOffPremise ? null : state.tables.find(t => t.id === state.currentTableId)
+      if ((!isOffPremise && !table) || state.cart.length === 0) return state
       const orderId = action._orderId || ('o' + Date.now())
       const submittedAt = action._submittedAt || new Date().toISOString()
       const kitchenRoundId = action._kitchenRoundId || `${orderId}-${submittedAt}`
@@ -42,10 +43,10 @@ export function ordersReducer(state, action) {
       const addedSubtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0)
       const activeOrder = state.orders.find(o =>
         o.id === orderId ||
-        (!isTakeAway && o.table_id === state.currentTableId && o.payment_status !== 'paid')
+        (!isOffPremise && o.table_id === state.currentTableId && o.payment_status !== 'paid')
       )
       const subtotal = (Number(activeOrder?.subtotal) || 0) + addedSubtotal
-      const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(activeOrder?.service_rate_pct))
+      const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(activeOrder?.service_rate_pct))
         ? Number(activeOrder.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
       const paymentFields = getOrderPaymentFields(
@@ -65,10 +66,10 @@ export function ordersReducer(state, action) {
           )
         : [...state.orders, {
             id: orderId,
-            order_number: isTakeAway ? (action._orderNumber || makeTakeAwayOrderNumber(orderId)) : undefined,
+            order_number: isOffPremise ? (action._orderNumber || makeOrderNumber(orderId, orderType)) : undefined,
             order_type: orderType,
-            table_id: isTakeAway ? null : state.currentTableId,
-            table_name: isTakeAway ? 'Take Away' : table.name,
+            table_id: isOffPremise ? null : state.currentTableId,
+            table_name: isOffPremise ? orderTypeLabel(orderType, 'en') : table.name,
             waiter_name: state.user?.name || 'Waiter',
             status: 'sent_to_kitchen',
             payment_status: 'unpaid',
@@ -76,7 +77,7 @@ export function ordersReducer(state, action) {
             ...paymentFields,
             created_at: new Date().toISOString(),
           }]
-      const updatedTables = isTakeAway ? state.tables : state.tables.map(t =>
+      const updatedTables = isOffPremise ? state.tables : state.tables.map(t =>
         t.id === state.currentTableId
           ? {
               ...t,
@@ -247,8 +248,8 @@ export function ordersReducer(state, action) {
       const activeOrderSummaries = state.orders
         .filter(o => (orderId ? o.id === orderId : o.table_id === tableId) && o.payment_status !== 'paid')
         .map(o => {
-          const isTakeAway = normalizeOrderType(o.order_type) === 'take_away'
-          const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
+          const isOffPremise = isOffPremiseOrderType(o.order_type)
+          const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
             ? Number(loyalty.service_rate_pct)
             : Number.isFinite(Number(o.service_rate_pct))
               ? Number(o.service_rate_pct)
@@ -322,8 +323,8 @@ export function ordersReducer(state, action) {
         tables: updatedTables,
         orders: state.orders.map(o => {
           if ((orderId ? o.id !== orderId : o.table_id !== tableId) || o.payment_status === 'paid') return o
-          const isTakeAway = normalizeOrderType(o.order_type) === 'take_away'
-          const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
+          const isOffPremise = isOffPremiseOrderType(o.order_type)
+          const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
             ? Number(loyalty.service_rate_pct)
             : Number.isFinite(Number(o.service_rate_pct))
               ? Number(o.service_rate_pct)

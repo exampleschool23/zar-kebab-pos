@@ -17,6 +17,7 @@ import { ProductCard, ProductDetailPage } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
+import { isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
 function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName, viewerRole }) {
@@ -454,7 +455,7 @@ export default function WaiterOrder() {
 
   const table = isTakeAwayFlow ? null : state.tables.find(t => t.id === tableId)
   const orderTitle = isTakeAwayFlow
-    ? (lang === 'uz' ? 'Olib ketish buyurtmasi' : lang === 'ru' ? 'Заказ с собой' : 'Take Away Order')
+    ? orderTypeLabel(orderType, lang)
     : table?.name
 
   // Merge all active orders for this table
@@ -500,7 +501,7 @@ export default function WaiterOrder() {
   const cartCount = state.cart.reduce((s, i) => s + i.quantity, 0)
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const cartSummary = useMemo(() => {
-    const serviceRatePct = orderType === 'take_away' ? 0 : configuredServiceRatePct
+    const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : configuredServiceRatePct
     return getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, state.cart, configuredServiceRatePct)
   }, [configuredServiceRatePct, orderType, state.cart])
 
@@ -880,7 +881,7 @@ export default function WaiterOrder() {
                 tableName={orderTitle}
                 orderType={orderType}
                 onOrderTypeChange={setOrderType}
-                allowOrderTypeChange={!isTakeAwayFlow}
+                allowOrderTypeChange
                 isSending={isSendingOrder}
                 onSendingChange={setSendingOrder}
                 onClose={() => { if (!isSendingOrder) setCartOpen(false) }}

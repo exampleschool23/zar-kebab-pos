@@ -11,6 +11,12 @@ import {
 } from './analytics.js'
 import { getLoyaltyCardCashbackPercent, getLoyaltyCardCashbackType } from './loyalty.js'
 import { notifyTelegramOrderStatus } from './telegramNotifications.js'
+import {
+  isOffPremiseOrderType,
+  normalizeOrderType,
+  orderTypeLabel,
+  orderTypePrefix,
+} from './orderTypes.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -20,11 +26,6 @@ function startOfYear() {
 
 function serviceRatePctFromSettings(settings) {
   return normalizeServiceRatePct(settings?.serviceRate)
-}
-
-function normalizeOrderType(value) {
-  const raw = String(value || '').toLowerCase()
-  return raw.includes('take') || raw.includes('away') ? 'take_away' : 'dine_in'
 }
 
 function isMissingOptionalOrderTypeColumn(error) {
@@ -98,9 +99,9 @@ function assertUpdatedRows(data, message) {
   }
 }
 
-function makeTakeAwayOrderNumber(orderId) {
+function makeOrderNumber(orderId, orderType = 'take_away') {
   const suffix = String(orderId || Date.now()).replace(/\D/g, '').slice(-4).padStart(4, '0')
-  return `TA-${suffix}`
+  return `${orderTypePrefix(orderType)}-${suffix}`
 }
 
 function normalizeBusinessSettings(row) {
@@ -394,17 +395,18 @@ async function rollbackLoyaltyWalletSettlement(rollback) {
     .eq('balance', rollback.balanceAfter)
 }
 
-async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, isTakeAway, items, paymentFields, state, action }) {
+async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, items, paymentFields, state, action }) {
+  const isOffPremise = isOffPremiseOrderType(orderType)
   const payload = {
     order: {
       id: orderId,
-      table_id: isTakeAway ? null : tableId,
-      table_name: isTakeAway ? 'Take Away' : table.name,
+      table_id: isOffPremise ? null : tableId,
+      table_name: isOffPremise ? orderTypeLabel(orderType, 'en') : table.name,
       waiter_name: state.user?.name || 'Waiter',
       status: 'sent_to_kitchen',
       payment_status: 'unpaid',
       order_type: orderType,
-      order_number: isTakeAway ? (action._orderNumber || makeTakeAwayOrderNumber(orderId)) : null,
+      order_number: isOffPremise ? (action._orderNumber || makeOrderNumber(orderId, orderType)) : null,
       ...paymentFields,
     },
     items: items.map(i => ({
@@ -421,7 +423,7 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, isT
       kitchen_round_id: i.kitchen_round_id || i.kitchenRoundId || '',
       submitted_at: i.submitted_at || i.submittedAt || i.created_at || i.createdAt || null,
     })),
-    table_status: isTakeAway ? null : 'occupied',
+    table_status: isOffPremise ? null : 'occupied',
   }
 
   const { error } = await supabase.rpc('submit_order_to_kitchen', { payload })
@@ -638,9 +640,9 @@ export async function writeToSupabase(action, state) {
       const orderId  = action._orderId
       const tableId  = state.currentTableId
       const orderType = normalizeOrderType(action.payload?.orderType)
-      const isTakeAway = orderType === 'take_away'
-      const table    = isTakeAway ? null : state.tables.find(t => t.id === tableId)
-      if ((!isTakeAway && !table) || state.cart.length === 0) return
+      const isOffPremise = isOffPremiseOrderType(orderType)
+      const table    = isOffPremise ? null : state.tables.find(t => t.id === tableId)
+      if ((!isOffPremise && !table) || state.cart.length === 0) return
 
       const submittedAt = action._submittedAt || new Date().toISOString()
       const kitchenRoundId = action._kitchenRoundId || `${orderId}-${submittedAt}`
@@ -661,7 +663,7 @@ export async function writeToSupabase(action, state) {
         .maybeSingle()
 
       const subtotal    = (Number(existingOrder?.subtotal) || 0) + addedSubtotal
-      const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(existingOrder?.service_rate_pct))
+      const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(existingOrder?.service_rate_pct))
         ? Number(existingOrder.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
       const paymentFields = getOrderPaymentFields(
@@ -675,7 +677,6 @@ export async function writeToSupabase(action, state) {
         table,
         tableId,
         orderType,
-        isTakeAway,
         items,
         paymentFields,
         state,
@@ -693,19 +694,19 @@ export async function writeToSupabase(action, state) {
       } else {
         const orderInsert = {
           id:             orderId,
-          table_id:       isTakeAway ? null : tableId,
-          table_name:     isTakeAway ? 'Take Away' : table.name,
+          table_id:       isOffPremise ? null : tableId,
+          table_name:     isOffPremise ? orderTypeLabel(orderType, 'en') : table.name,
           waiter_name:    state.user?.name || 'Waiter',
           status:         'sent_to_kitchen',
           payment_status: 'unpaid',
           ...paymentFields,
         }
-        if (isTakeAway) {
-          orderInsert.order_number = action._orderNumber || makeTakeAwayOrderNumber(orderId)
+        if (isOffPremise) {
+          orderInsert.order_number = action._orderNumber || makeOrderNumber(orderId, orderType)
           orderInsert.order_type = orderType
         }
         let { data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(orderInsert).select('*').maybeSingle()
-        if (orderInsertError && isTakeAway && isMissingOptionalOrderTypeColumn(orderInsertError)) {
+        if (orderInsertError && isOffPremise && isMissingOptionalOrderTypeColumn(orderInsertError)) {
           // Backward-compatible fallback while the take-away migration is being applied.
           // table_id=null + service_fee=0 still lets the order reach kitchen/cashier.
           const { order_type, order_number, ...fallbackOrderInsert } = orderInsert
@@ -740,7 +741,7 @@ export async function writeToSupabase(action, state) {
       }
       if (itemInsertError) throw itemInsertError
 
-      if (!isTakeAway) {
+      if (!isOffPremise) {
         await updateRestaurantTableStatus(
           tableId,
           {
@@ -787,7 +788,7 @@ export async function writeToSupabase(action, state) {
         .eq('id', orderId)
         .maybeSingle()
       if (order) {
-        const serviceRatePct = normalizeOrderType(order.order_type) === 'take_away' ? 0 : Number.isFinite(Number(order.service_rate_pct))
+        const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
           ? Number(order.service_rate_pct)
           : serviceRatePctFromSettings(state.settings)
         const paymentFields = getOrderPaymentFields(
@@ -960,7 +961,7 @@ export async function writeToSupabase(action, state) {
         nextItems = [...(order.items || []), row]
       }
 
-      const serviceRatePct = normalizeOrderType(order.order_type) === 'take_away' ? 0 : Number.isFinite(Number(order.service_rate_pct))
+      const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
         ? Number(order.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
       const paymentFields = getOrderPaymentFields(
@@ -1047,7 +1048,7 @@ export async function writeToSupabase(action, state) {
             if (row.id !== target.id) return []
             return [{ ...row, quantity: nextQty }]
           })
-      const serviceRatePct = normalizeOrderType(order.order_type) === 'take_away' ? 0 : Number.isFinite(Number(order.service_rate_pct))
+      const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
         ? Number(order.service_rate_pct)
         : serviceRatePctFromSettings(state.settings)
       const paymentFields = getOrderPaymentFields(
@@ -1088,7 +1089,7 @@ export async function writeToSupabase(action, state) {
           const orderSummaries = unpaidOrders.map(o => {
             const stateOrder = state.orders.find(row => row.id === o.id)
             const freshItems = mergeOrderItemsByIdentity(o.items || [], stateOrder?.items || [])
-            const serviceRatePct = normalizeOrderType(o.order_type) === 'take_away' ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
+            const serviceRatePct = isOffPremiseOrderType(o.order_type) ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
               ? Math.max(0, Math.min(100, Number(loyalty.service_rate_pct)))
               : Number.isFinite(Number(o.service_rate_pct))
                 ? Math.max(0, Math.min(100, Number(o.service_rate_pct)))

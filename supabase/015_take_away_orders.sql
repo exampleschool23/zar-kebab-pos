@@ -12,7 +12,7 @@ begin
   ) then
     alter table public.orders
       add constraint orders_order_type_check
-      check (order_type in ('dine_in', 'take_away')) not valid;
+      check (order_type in ('dine_in', 'take_away', 'delivery')) not valid;
   end if;
 end $$;
 

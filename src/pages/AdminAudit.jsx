@@ -4,6 +4,7 @@ import AppShell from '../components/AppShell'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../lib/formatCurrency'
+import { ORDER_TYPE_LABELS } from '../lib/orderTypes'
 
 function fmtDate(value, lang = 'ru') {
   if (!value) return '—'
@@ -58,8 +59,10 @@ function statusLabel(status, lang) {
     cancelled: { uz: 'Bekor qilingan', ru: 'Отменён', en: 'Cancelled' },
     unpaid: { uz: 'To‘lanmagan', ru: 'Не оплачен', en: 'Unpaid' },
     pending: { uz: 'Kutilmoqda', ru: 'Ожидает', en: 'Pending' },
-    take_away: { uz: 'Olib ketish', ru: 'Заказ с собой', en: 'Take Away' },
-    'Take Away': { uz: 'Olib ketish', ru: 'Заказ с собой', en: 'Take Away' },
+    take_away: ORDER_TYPE_LABELS.take_away,
+    delivery: ORDER_TYPE_LABELS.delivery,
+    'Take Away': ORDER_TYPE_LABELS.take_away,
+    Delivery: ORDER_TYPE_LABELS.delivery,
   }
   if (!status) return '—'
   return labels[status]?.[lang] || status

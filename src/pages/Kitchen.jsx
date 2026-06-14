@@ -12,6 +12,7 @@ import { loadOrders } from '../lib/db'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
+import { ORDER_TYPE_LABELS, inferOrderType, isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_BADGE = {
@@ -23,8 +24,9 @@ const STATUS_BADGE = {
 }
 
 const ORDER_TYPE_LABEL = {
-  dine_in:   { uz: 'Zalda',      ru: 'В зале',  en: 'Dine In' },
-  take_away: { uz: 'Olib ketish', ru: 'Заказ с собой', en: 'Take Away' },
+  dine_in: ORDER_TYPE_LABELS.dine_in,
+  take_away: ORDER_TYPE_LABELS.take_away,
+  delivery: ORDER_TYPE_LABELS.delivery,
 }
 
 const KITCHEN_SOUND_PREF_KEY = 'zk_kitchen_sound_enabled'
@@ -181,8 +183,9 @@ function getOrderType(item) {
     item.fulfillment_type ||
     item.fulfillmentType
 
-  const value = String(raw || '').toLowerCase()
-  if (value.includes('take') || value.includes('away') || item.is_takeaway || item.isTakeAway) {
+  const value = normalizeOrderType(raw)
+  if (value === 'delivery') return 'delivery'
+  if (value === 'take_away' || item.is_takeaway || item.isTakeAway) {
     return 'take_away'
   }
   return 'dine_in'
@@ -399,6 +402,10 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
     () => sortedItems.filter(i => getOrderType(i) === 'take_away'),
     [sortedItems]
   )
+  const deliveryItems = useMemo(
+    () => sortedItems.filter(i => getOrderType(i) === 'delivery'),
+    [sortedItems]
+  )
 
   const newCount       = order.items.filter(i => i.status === 'new').length
   const preparingCount = order.items.filter(i => i.status === 'preparing').length
@@ -406,9 +413,9 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
   const allReady       = newCount === 0 && preparingCount === 0
 
   const waiterLabel = lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант' : 'Waiter'
-  const isTakeAway = order.order_type === 'take_away' || (!order.table_id && String(order.table_name || '').toLowerCase().includes('take'))
-  const orderTitle = isTakeAway
-    ? `${ORDER_TYPE_LABEL.take_away[lang] || ORDER_TYPE_LABEL.take_away.en} · ${order.order_number || order.id}`
+  const orderType = inferOrderType(order)
+  const orderTitle = isOffPremiseOrderType(orderType)
+    ? `${orderTypeLabel(orderType, lang)} · ${order.order_number || order.id}`
     : order.table_name
 
   const markAllLabel = {
@@ -534,6 +541,26 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
               {ORDER_TYPE_LABEL.take_away[lang] || ORDER_TYPE_LABEL.take_away.en}
             </div>
             {takeAwayItems.map(item => (
+              <KitchenItem
+                key={kitchenItemKey(order.id, item)}
+                item={item}
+                orderId={order.id}
+                menuItem={menuItemMap[item.menu_item_id]}
+                lang={lang}
+                onMark={onMark}
+                pending={pendingIds.has(kitchenItemKey(order.id, item))}
+                error={itemErrors[kitchenItemKey(order.id, item)]}
+              />
+            ))}
+          </>
+        )}
+
+        {deliveryItems.length > 0 && (
+          <>
+            <div className="text-sm font-bold text-purple-700 mt-4 mb-2">
+              {ORDER_TYPE_LABEL.delivery[lang] || ORDER_TYPE_LABEL.delivery.en}
+            </div>
+            {deliveryItems.map(item => (
               <KitchenItem
                 key={kitchenItemKey(order.id, item)}
                 item={item}
@@ -756,7 +783,7 @@ export default function Kitchen() {
     // Merge dine-in orders with the same table_id; keep take-away orders separate.
     const grouped = {}
     raw.forEach(order => {
-      const key = order.order_type === 'take_away' || !order.table_id
+      const key = isOffPremiseOrderType(inferOrderType(order)) || !order.table_id
         ? `order:${order.id}`
         : `table:${order.table_id}`
       if (!grouped[key]) {

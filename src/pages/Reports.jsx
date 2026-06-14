@@ -27,9 +27,10 @@ import {
   Download, X, Printer, Eye, ChevronLeft, ChevronRight,
   Search, SlidersHorizontal, CreditCard,
   Monitor, QrCode, Banknote, UtensilsCrossed,
-  BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2,
+  BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck,
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
+import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -55,6 +56,7 @@ const TABS = [
   { key: 'by_category',        label: { uz: 'Kategoriya',         ru: 'По категории',   en: 'Sales by Category'  }, Icon: Tag         },
   { key: 'by_hour',            label: { uz: 'Soat bo\'yicha',     ru: 'По часам',       en: 'Sales by Hour'      }, Icon: Clock       },
   { key: 'payment_methods',    label: { uz: 'To\'lov usullari',   ru: 'Методы оплаты',  en: 'Payment Methods'    }, Icon: CreditCard  },
+  { key: 'order_types',        label: { uz: 'Buyurtma turi',      ru: 'Типы заказов',   en: 'Order Types'        }, Icon: Truck       },
   { key: 'waiter_performance', label: { uz: 'Ofitsiantlar',       ru: 'Официанты',      en: 'Waiter Performance' }, Icon: Users       },
   { key: 'order_history',      label: { uz: 'Buyurtmalar',        ru: 'История',        en: 'Order History'      }, Icon: ListOrdered },
 ]
@@ -90,18 +92,9 @@ function fmtDate(iso) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}  ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function takeAwayLabel(lang) {
-  if (lang === 'uz') return 'Olib ketish'
-  if (lang === 'ru') return 'Заказ с собой'
-  return 'Take Away'
-}
-
-function isTakeAwayOrder(order) {
-  return order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
-}
-
 function orderTableLabel(order, lang) {
-  return isTakeAwayOrder(order) ? takeAwayLabel(lang) : (order?.table_name || '—')
+  const orderType = inferOrderType(order)
+  return orderType === 'dine_in' ? (order?.table_name || '—') : orderTypeLabel(orderType, lang)
 }
 
 function StatusBadge({ status, lang }) {
@@ -530,7 +523,83 @@ function PaymentMethodsTab({ orders, lang }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TAB 5 — WAITER PERFORMANCE
+// TAB 5 — ORDER TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
+function OrderTypesTab({ orders, lang }) {
+  const data = useMemo(() => {
+    const totalRevenue = orders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+    return ['dine_in', 'take_away', 'delivery']
+      .map(type => {
+        const rows = orders.filter(order => inferOrderType(order) === type)
+        const revenue = rows.reduce((sum, order) => sum + getOrderTotal(order), 0)
+        const items = rows.reduce(
+          (sum, order) => sum + getOrderItems(order).reduce((itemSum, item) => itemSum + (Number(item.quantity) || 1), 0),
+          0
+        )
+        return {
+          type,
+          label: ORDER_TYPE_LABELS[type]?.[lang] || ORDER_TYPE_LABELS[type]?.en || type,
+          orders: rows.length,
+          revenue,
+          items,
+          pct: totalRevenue > 0 ? Math.round(revenue / totalRevenue * 100) : 0,
+        }
+      })
+  }, [orders, lang])
+
+  if (orders.length === 0) return <EmptyState lang={lang} />
+
+  const colors = {
+    dine_in: '#ff5a00',
+    take_away: '#2563EB',
+    delivery: '#7C3AED',
+  }
+  const total = data.reduce((sum, row) => sum + row.revenue, 0)
+  const maxRev = Math.max(...data.map(row => row.revenue), 1)
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        {data.map(row => (
+          <div key={row.type} className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm font-black text-[#1F2937]">{row.label}</p>
+              <span className="rounded-full bg-gray-50 px-2.5 py-1 text-[11px] font-black text-[#6B7280]">{row.pct}%</span>
+            </div>
+            <p className="text-2xl font-black text-[#ff5a00]">{formatCurrency(row.revenue)}</p>
+            <p className="mt-1 text-[12px] font-semibold text-[#9CA3AF]">
+              {row.orders} {lang === 'uz' ? 'buyurtma' : lang === 'ru' ? 'заказов' : 'orders'} · {row.items} {lang === 'uz' ? 'dona' : lang === 'ru' ? 'поз.' : 'items'}
+            </p>
+            <ProgressBar pct={Math.round(row.revenue / maxRev * 100)} color={colors[row.type]} />
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
+        {data.map(row => (
+          <div key={row.type} className="flex items-center gap-4 border-b border-[#F9FAFB] px-5 py-4 last:border-0">
+            <span className="h-3 w-3 flex-shrink-0 rounded-full" style={{ background: colors[row.type] }} />
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-[#1F2937]">{row.label}</p>
+                <p className="text-sm font-black text-[#ff5a00]">{formatCurrency(row.revenue)}</p>
+              </div>
+              <ProgressBar pct={total > 0 ? row.pct : 0} color={colors[row.type]} />
+            </div>
+            <div className="min-w-[88px] text-right">
+              <p className="text-[12px] font-black text-[#1F2937]">{row.pct}%</p>
+              <p className="text-[11px] text-[#9CA3AF]">{row.orders} {lang === 'ru' ? 'зак.' : lang === 'uz' ? 'brt.' : 'orders'}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB 6 — WAITER PERFORMANCE
 // ─────────────────────────────────────────────────────────────────────────────
 
 function WaiterPerformanceTab({ orders, lang }) {
@@ -1227,6 +1296,9 @@ export default function Reports() {
             )}
             {activeTab === 'payment_methods'    && (
               <PaymentMethodsTab orders={filteredForAnalytics} lang={lang} />
+            )}
+            {activeTab === 'order_types'        && (
+              <OrderTypesTab orders={filteredForAnalytics} lang={lang} />
             )}
             {activeTab === 'waiter_performance' && (
               <WaiterPerformanceTab orders={filteredForAnalytics} lang={lang} />

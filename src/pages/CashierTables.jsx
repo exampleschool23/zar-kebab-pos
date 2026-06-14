@@ -18,6 +18,7 @@ import {
 } from '../lib/analytics'
 import { isCashierVisibleBill, isTakeAwayBill } from '../lib/cashierBills'
 import UnifiedSidebar from '../components/UnifiedSidebar'
+import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ const L = {
     activeNotReady:  'Faol, hisobga tayyor emas',
     activeTableBills: 'Faol stol hisoblari',
     takeAwayBills:   'Olib ketish hisoblari',
+    deliveryBills:   'Yetkazib berish hisoblari',
     needsBillBadge:  'Hisob kerak',
     newestFirst:     'Yangi avval',
     oldestFirst:     'Eski avval',
@@ -95,6 +97,7 @@ const L = {
     viewAllTables:   "Barcha stollarni ko'rish",
     noPayData:       "To'lov ma'lumotlari yo'q",
     takeAway:         'Olib ketish',
+    delivery:         'Yetkazib berish',
     showPaid:         "To'langanlarni ko'rsatish",
     hidePaid:         "To'langanlarni yashirish",
     noTable:          'Stolsiz',
@@ -123,6 +126,7 @@ const L = {
     activeNotReady:  'Активные, счёт не готов',
     activeTableBills: 'Активные счета столов',
     takeAwayBills:   'Заказ с собой',
+    deliveryBills:   'Доставка',
     needsBillBadge:  'Нужен счёт',
     newestFirst:     'Сначала новые',
     oldestFirst:     'Сначала старые',
@@ -139,6 +143,7 @@ const L = {
     viewAllTables:   'Все столы',
     noPayData:       'Нет данных об оплате',
     takeAway:         'Заказ с собой',
+    delivery:         'Доставка',
     showPaid:         'Показать оплаченные',
     hidePaid:         'Скрыть оплаченные',
     noTable:          'Без стола',
@@ -167,6 +172,7 @@ const L = {
     activeNotReady:  'Active, not bill-ready',
     activeTableBills: 'Active table bills',
     takeAwayBills:   'Take-away bills',
+    deliveryBills:   'Delivery bills',
     needsBillBadge:  'Needs Bill',
     newestFirst:     'Newest First',
     oldestFirst:     'Oldest First',
@@ -183,6 +189,7 @@ const L = {
     viewAllTables:   'View All Tables',
     noPayData:       'No payments today yet',
     takeAway:         'Take Away',
+    delivery:         'Delivery',
     showPaid:         'Show paid today',
     hidePaid:         'Hide paid today',
     noTable:          'No table',
@@ -227,6 +234,13 @@ function KpiCard({ label, value, sub, accent, icon: Icon, iconBg, iconColor }) {
 
 function TableStatusBadge({ status, lang }) {
   const l = L[lang] || L.en
+  if (status === 'delivery') {
+    return (
+      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
+        {l.delivery}
+      </span>
+    )
+  }
   if (status === 'take_away') {
     return (
       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-[#2563EB] border border-blue-100">
@@ -251,6 +265,8 @@ function TableStatusBadge({ status, lang }) {
 function BillCard({ order, table, menuItemMap, lang, onOpen }) {
   const l = L[lang] || L.en
   const isTakeAway = isTakeAwayBill(order)
+  const isDelivery = isDeliveryOrderType(inferOrderType(order))
+  const orderType = inferOrderType(order)
 
   const items = useMemo(() => {
     return getGroupedOrderItems(order.items || [])
@@ -278,15 +294,15 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
             </div>
             <div className="min-w-0">
               <h3 className="font-black text-[#1F2937] text-[16px] leading-tight">
-                {isTakeAway ? `${l.takeAway} · ${order.order_number || order.id}` : order.table_name}
+                {isOffPremiseOrderType(orderType) ? `${orderTypeLabel(orderType, lang)} · ${order.order_number || order.id}` : order.table_name}
               </h3>
-              {isTakeAway && <p className="text-[11px] font-bold text-[#ff5a00]">{l.noTable}</p>}
+              {isOffPremiseOrderType(orderType) && <p className="text-[11px] font-bold text-[#ff5a00]">{l.noTable}</p>}
               {order.waiter_name && (
                 <p className="text-[11px] text-[#9CA3AF]">{l.waiter}: {order.waiter_name}</p>
               )}
             </div>
           </div>
-          <TableStatusBadge status={isTakeAway ? 'take_away' : table?.status || order.status} lang={lang} />
+          <TableStatusBadge status={isDelivery ? 'delivery' : isTakeAway ? 'take_away' : table?.status || order.status} lang={lang} />
         </div>
 
         <div className="flex items-center gap-4 mt-3 text-[11px] text-[#9CA3AF]">
@@ -444,12 +460,12 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle }) {
             <p className="px-5 py-4 text-[13px] text-[#6B7280]">{l.noPayData}</p>
           ) : (
             latest.map(order => {
-              const isTakeAway = isTakeAwayBill(order)
+              const orderType = inferOrderType(order)
               return (
                 <div key={order.id} className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[#F3F4F6] last:border-b-0">
                   <div className="min-w-0">
                     <p className="font-bold text-[#1F2937] text-[13px] truncate">
-                      {isTakeAway ? `${l.takeAway} · ${order.order_number || order.id}` : order.table_name}
+                      {isOffPremiseOrderType(orderType) ? `${orderTypeLabel(orderType, lang)} · ${order.order_number || order.id}` : order.table_name}
                     </p>
                     <p className="text-[11px] text-[#9CA3AF]">
                       {paidTimeLabel(order.paid_at || getOrderDate(order))}
@@ -492,7 +508,7 @@ export default function CashierTables() {
     const raw = state.orders.filter(isCashierVisibleBill)
     const grouped = {}
     raw.forEach(order => {
-      const key = order.order_type === 'take_away' || !order.table_id
+      const key = isOffPremiseOrderType(inferOrderType(order)) || !order.table_id
         ? `order:${order.id}`
         : `table:${order.table_id}`
       if (!grouped[key]) {
@@ -561,6 +577,7 @@ export default function CashierTables() {
     { value: 'needs_bill', label: l.needsBillBadge },
     { value: 'active',     label: l.activeNotReady },
     { value: 'take_away',  label: l.takeAway       },
+    { value: 'delivery',   label: l.delivery       },
   ]
 
   const sortOptions = SORT_OPTIONS(l).map(o => ({ value: o.key, label: o.label }))
@@ -589,9 +606,11 @@ export default function CashierTables() {
     if (filterStatus !== 'all') {
       result = result.filter(o => {
         const isTakeAway = isTakeAwayBill(o)
-        if (filterStatus === 'needs_bill') return !isTakeAway && o.status === 'needs_bill'
-        if (filterStatus === 'active') return !isTakeAway && o.status !== 'needs_bill'
+        const isDelivery = isDeliveryOrderType(inferOrderType(o))
+        if (filterStatus === 'needs_bill') return !isTakeAway && !isDelivery && o.status === 'needs_bill'
+        if (filterStatus === 'active') return !isTakeAway && !isDelivery && o.status !== 'needs_bill'
         if (filterStatus === 'take_away') return isTakeAway
+        if (filterStatus === 'delivery') return isDelivery
         return false
       })
     }
@@ -613,14 +632,16 @@ export default function CashierTables() {
   )
 
   const billSections = useMemo(() => {
-    const needsBill = filteredBills.filter(o => !isTakeAwayBill(o) && o.status === 'needs_bill')
-    const active = filteredBills.filter(o => !isTakeAwayBill(o) && o.status !== 'needs_bill')
+    const needsBill = filteredBills.filter(o => !isOffPremiseOrderType(inferOrderType(o)) && o.status === 'needs_bill')
+    const active = filteredBills.filter(o => !isOffPremiseOrderType(inferOrderType(o)) && o.status !== 'needs_bill')
     const takeAway = filteredBills.filter(isTakeAwayBill)
+    const delivery = filteredBills.filter(o => isDeliveryOrderType(inferOrderType(o)))
 
     return [
       { key: 'needs_bill', title: l.needsBill, tone: 'red', icon: CreditCard, bills: needsBill },
       { key: 'active', title: l.activeTableBills, tone: 'amber', icon: Receipt, bills: active },
       { key: 'take_away', title: l.takeAwayBills, tone: 'blue', icon: Receipt, bills: takeAway },
+      { key: 'delivery', title: l.deliveryBills, tone: 'purple', icon: Receipt, bills: delivery },
     ].filter(section => section.bills.length > 0)
   }, [filteredBills, l])
 
@@ -800,7 +821,7 @@ export default function CashierTables() {
                     table={tableMap[order.table_id]}
                     menuItemMap={menuItemMap}
                     lang={lang}
-                    onOpen={bill => navigate(isTakeAwayBill(bill)
+                    onOpen={bill => navigate(isOffPremiseOrderType(inferOrderType(bill))
                       ? `/cashier/bill/order/${bill.id}`
                       : `/cashier/bill/${bill.table_id}`
                     )}

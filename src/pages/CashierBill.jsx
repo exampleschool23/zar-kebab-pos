@@ -31,6 +31,7 @@ import StatusBadge from '../components/StatusBadge'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
+import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -112,8 +113,8 @@ export default function CashierBill() {
     const billableItems = allItems.filter(item => !isCancelledOrderItem(item))
     const mergedItems = getGroupedOrderItems(billableItems)
     const firstOrder = orders[0]
-    const orderType = firstOrder?.order_type || (!firstOrder?.table_id && String(firstOrder?.table_name || '').toLowerCase().includes('take') ? 'take_away' : 'dine_in')
-    const serviceRatePct = orderType === 'take_away'
+    const orderType = inferOrderType(firstOrder)
+    const serviceRatePct = isOffPremiseOrderType(orderType)
       ? 0
       : orders.find(o => o.service_rate_pct != null)?.service_rate_pct ?? configuredServiceRatePct
     const summary = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, billableItems, configuredServiceRatePct)
@@ -129,9 +130,10 @@ export default function CashierBill() {
   }, [state.orders, tableId, orderId, configuredServiceRatePct, menuItemMap])
 
   const table = state.tables.find(t => t.id === tableId)
-  const isTakeAway = order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
-  const orderLabel = isTakeAway
-    ? `${lang === 'uz' ? 'Olib ketish' : lang === 'ru' ? 'Заказ с собой' : 'Take Away'} · ${order?.order_number || order?.id || ''}`
+  const orderType = inferOrderType(order)
+  const isOffPremise = isOffPremiseOrderType(orderType)
+  const orderLabel = isOffPremise
+    ? `${orderTypeLabel(orderType, lang)} · ${order?.order_number || order?.id || ''}`
     : table?.name
 
   const quickItems = useMemo(() =>
@@ -596,7 +598,7 @@ export default function CashierBill() {
                         <h1 className="font-black text-[#1F2937] text-2xl leading-tight">{orderLabel}</h1>
                         <StatusBadge status={order.payment_status === 'paid' ? 'paid' : order.status} />
                       </div>
-                      {isTakeAway && <p className="text-[11px] font-bold text-[#ff5a00] mt-0.5">{lbl.noTable}</p>}
+                      {isOffPremise && <p className="text-[11px] font-bold text-[#ff5a00] mt-0.5">{lbl.noTable}</p>}
                       <div className="flex items-center gap-3 mt-1 text-[11px] text-[#6B7280]">
                         {order.waiter_name && (
                           <span className="flex items-center gap-1">

@@ -11,6 +11,7 @@ import {
   getOrderPaymentSummary,
 } from '../lib/analytics'
 import { isCashierQuickItem } from '../lib/menuItems'
+import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -131,15 +132,9 @@ function combineReceiptOrders(orders) {
   }
 }
 
-function receiptTakeAwayLabel(lang) {
-  if (lang === 'uz') return 'Olib ketish'
-  if (lang === 'ru') return 'Заказ с собой'
-  return 'Take Away'
-}
-
 function receiptTableLabel(order, table, lang, fallback) {
-  const isTakeAway = order?.order_type === 'take_away' || (!order?.table_id && String(order?.table_name || '').toLowerCase().includes('take'))
-  return isTakeAway ? receiptTakeAwayLabel(lang) : (table?.name || order?.table_name || fallback)
+  const orderType = inferOrderType(order)
+  return isOffPremiseOrderType(orderType) ? orderTypeLabel(orderType, lang) : (table?.name || order?.table_name || fallback)
 }
 
 function payMethodLabel(method, lang) {

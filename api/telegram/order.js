@@ -1,14 +1,9 @@
 import { randomUUID } from 'crypto'
 import { getOrderPaymentFields } from '../../src/lib/analytics.js'
+import { normalizeOrderType, orderTypeLabel } from '../../src/lib/orderTypes.js'
 import { getBearerToken, json, methodNotAllowed, readJson } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { sendTelegramMessage, verifyTelegramSession } from './_lib/telegram.js'
-
-function normalizeOrderType(value) {
-  const raw = String(value || '').toLowerCase()
-  if (raw === 'dine_in') return 'dine_in'
-  return 'take_away'
-}
 
 function makeOrderNumber(orderId) {
   const suffix = String(orderId).replace(/\D/g, '').slice(-4).padStart(4, '0')
@@ -107,11 +102,7 @@ export default async function handler(req, res) {
       rows,
       serviceRatePct
     )
-    const tableName = body.orderType === 'delivery'
-      ? 'Telegram Delivery'
-      : body.orderType === 'dine_in'
-        ? 'Telegram Dine In'
-        : 'Telegram Takeaway'
+    const tableName = `Telegram ${orderTypeLabel(orderType, 'en')}`
 
     const orderInsert = {
       id: orderId,

@@ -2,6 +2,13 @@ import {
   getOrderPaymentFields,
   normalizeServiceRatePct,
 } from '../lib/analytics.js'
+import {
+  isOffPremiseOrderType,
+  normalizeOrderType,
+  orderTypePrefix,
+} from '../lib/orderTypes.js'
+
+export { normalizeOrderType }
 
 export const DEFAULT_SETTINGS = {
   restaurantName: 'Zar Kebab',
@@ -30,11 +37,6 @@ export function loadInitialLang() {
   }
 }
 
-export function normalizeOrderType(value) {
-  const raw = String(value || '').toLowerCase()
-  return raw.includes('take') || raw.includes('away') ? 'take_away' : 'dine_in'
-}
-
 export function serviceRatePctFromSettings(settings) {
   return normalizeServiceRatePct(settings?.serviceRate)
 }
@@ -49,21 +51,25 @@ export function makeLocalId() {
 }
 
 export function recalcOrderTotals(order, settings) {
-  const isTakeAway = normalizeOrderType(order?.order_type || order?.orderType) === 'take_away'
-  const serviceRatePct = isTakeAway ? 0 : Number.isFinite(Number(order?.service_rate_pct))
+  const orderType = normalizeOrderType(order?.order_type || order?.orderType)
+  const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : Number.isFinite(Number(order?.service_rate_pct))
     ? Number(order.service_rate_pct)
     : serviceRatePctFromSettings(settings)
   const paymentFields = getOrderPaymentFields(
-    { ...order, order_type: isTakeAway ? 'take_away' : normalizeOrderType(order?.order_type || order?.orderType), service_rate_pct: serviceRatePct },
+    { ...order, order_type: orderType, service_rate_pct: serviceRatePct },
     order?.items || [],
     serviceRatePct
   )
   return { ...order, ...paymentFields }
 }
 
-export function makeTakeAwayOrderNumber(orderId) {
+export function makeOrderNumber(orderId, orderType = 'take_away') {
   const suffix = String(orderId || Date.now()).replace(/\D/g, '').slice(-4).padStart(4, '0')
-  return `TA-${suffix}`
+  return `${orderTypePrefix(orderType)}-${suffix}`
+}
+
+export function makeTakeAwayOrderNumber(orderId) {
+  return makeOrderNumber(orderId, 'take_away')
 }
 
 export function getQuickSortOrder(item) {
