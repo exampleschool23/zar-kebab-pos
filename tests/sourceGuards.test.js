@@ -734,6 +734,7 @@ test('CashierBill keeps counter items in main content above loyalty and out of p
 test('loyalty cashback wallet migration and admin route are wired', () => {
   const migration = readSource('supabase/022_loyalty_cashback_wallet.sql')
   const adminCreateMigration = readSource('supabase/041_admin_create_loyalty_cards.sql')
+  const deleteTransactionMigration = readSource('supabase/042_delete_loyalty_transaction.sql')
   const app = readSource('src/App.jsx')
   const admin = readSource('src/pages/AdminLoyalty.jsx')
   const loyalty = readSource('src/lib/loyalty.js')
@@ -749,6 +750,10 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   assert.match(migration, /owner_create_loyalty_cards/)
   assert.match(adminCreateMigration, /owner_admin_create_loyalty_cards/)
   assert.match(adminCreateMigration, /array\['owner','admin'\]/)
+  assert.match(deleteTransactionMigration, /delete_loyalty_transaction/)
+  assert.match(deleteTransactionMigration, /current_staff_has_role\(array\['owner'\]\)/)
+  assert.match(deleteTransactionMigration, /delete from public\.loyalty_transactions/)
+  assert.match(deleteTransactionMigration, /total_redeemed/)
   assert.match(migration, /owner_cashier_update_loyalty_cards/)
   assert.match(migration, /owner_cashier_insert_loyalty_transactions/)
   assert.doesNotMatch(migration, /staff_all_loyalty_cards on public\.loyalty_cards\s+for all/)
@@ -761,6 +766,8 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   assert.match(admin, /canCreateLoyaltyCard/)
   assert.match(admin, /canAdjustLoyaltyBalance/)
   assert.match(admin, /canDeactivateLoyaltyCard/)
+  assert.match(admin, /canDeleteLoyaltyTransaction/)
+  assert.match(admin, /delete_loyalty_transaction/)
   assert.match(admin, /isMissingLoyaltySchemaColumn/)
   assert.match(admin, /setSupportsCashbackType\(false\)/)
   assert.match(admin, /formatUzPhoneNumberInput/)
@@ -771,6 +778,7 @@ test('loyalty cashback wallet migration and admin route are wired', () => {
   assert.match(db, /legacyTransactions/)
   assert.match(loyalty, /bronze: \{ label: 'Bronze', percent: 3 \}/)
   assert.match(loyalty, /black: \{ label: 'Black', percent: 15 \}/)
+  assert.match(loyalty, /deleteLoyaltyTransactionRecord/)
 })
 
 test('AdminLoyalty selected card uses compact profile and detailed transaction layout', () => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Search, BadgeDollarSign, Plus, Ban, RefreshCw, ChevronRight, ArrowLeft } from 'lucide-react'
+import { Search, BadgeDollarSign, Plus, Ban, RefreshCw, ChevronRight, ArrowLeft, Trash2, X } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
@@ -10,6 +10,7 @@ import {
   canAdjustLoyaltyBalance,
   canCreateLoyaltyCard,
   canDeactivateLoyaltyCard,
+  canDeleteLoyaltyTransaction,
   canEditLoyaltyCard,
   createLoyaltyCardRecord,
   editLoyaltyCardRecord,
@@ -33,6 +34,7 @@ export default function AdminLoyalty() {
   const canEdit = canEditLoyaltyCard(role)
   const canAdjust = canAdjustLoyaltyBalance(role)
   const canDeactivate = canDeactivateLoyaltyCard(role)
+  const canDeleteTransactions = canDeleteLoyaltyTransaction(role)
   const [query, setQuery] = useState('')
   const [cards, setCards] = useState([])
   const [selected, setSelected] = useState(null)
@@ -41,6 +43,8 @@ export default function AdminLoyalty() {
   const [profileForm, setProfileForm] = useState({ customer_name: '', phone_number: '' })
   const [adjustment, setAdjustment] = useState({ amount: '', reason: '' })
   const [message, setMessage] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState('')
+  const [deletingTransactionId, setDeletingTransactionId] = useState('')
   const [supportsCashbackType, setSupportsCashbackType] = useState(true)
   const [loadingCards, setLoadingCards] = useState(false)
   const [cardPage, setCardPage] = useState(0)
@@ -100,6 +104,12 @@ export default function AdminLoyalty() {
       adjustmentRequired: 'Tuzatish summasi va sababini kiriting.',
       balanceNegative: 'Sodiqlik balansi manfiy bo‘la olmaydi.',
       ownerOnly: 'Bu amal faqat owner uchun ruxsat etilgan.',
+      deleteTransaction: 'O‘chirish',
+      confirmDelete: 'O‘chirishni tasdiqlash',
+      cancel: 'Bekor qilish',
+      deletingTransaction: 'O‘chirilmoqda...',
+      ownerDeleteOnly: 'Faqat owner test tranzaksiyalarini o‘chirishi mumkin.',
+      deleteTransactionFailed: 'Tranzaksiyani o‘chirib bo‘lmadi. 042 migratsiyasini ishga tushiring.',
       cashbackTypeUnavailable: 'Cashback turi ustuni hali bazada qo‘llanmagan. 022 migratsiyasini ishga tushiring.',
       cardFormRequired: '8 xonali karta raqamini kiriting. Telefon ixtiyoriy, lekin kiritilsa +998 XX XXX XX XX formatida bo‘lishi kerak.',
       transactionTypes: {
@@ -162,6 +172,12 @@ export default function AdminLoyalty() {
       adjustmentRequired: 'Введите сумму корректировки и причину.',
       balanceNegative: 'Баланс лояльности не может быть отрицательным.',
       ownerOnly: 'Это действие доступно только владельцу.',
+      deleteTransaction: 'Удалить',
+      confirmDelete: 'Подтвердить удаление',
+      cancel: 'Отмена',
+      deletingTransaction: 'Удаление...',
+      ownerDeleteOnly: 'Только владелец может удалять тестовые транзакции.',
+      deleteTransactionFailed: 'Не удалось удалить транзакцию. Запустите миграцию 042.',
       cashbackTypeUnavailable: 'Колонка типа кешбэка ещё не применена в базе. Запустите миграцию 022.',
       cardFormRequired: 'Введите 8-значный номер карты. Телефон необязателен, но если указан, должен быть в формате +998 XX XXX XX XX.',
       transactionTypes: {
@@ -224,6 +240,12 @@ export default function AdminLoyalty() {
       adjustmentRequired: 'Enter an adjustment amount and reason.',
       balanceNegative: 'Loyalty balance cannot go negative.',
       ownerOnly: 'Only the owner can perform this action.',
+      deleteTransaction: 'Delete',
+      confirmDelete: 'Confirm delete',
+      cancel: 'Cancel',
+      deletingTransaction: 'Deleting...',
+      ownerDeleteOnly: 'Only owner can delete test transactions.',
+      deleteTransactionFailed: 'Could not delete transaction. Run migration 042.',
       cashbackTypeUnavailable: 'Cashback type is not available in the database yet. Run migration 022.',
       cardFormRequired: 'Enter an 8-digit card number. Phone is optional, but must match +998 XX XXX XX XX when provided.',
       transactionTypes: {
@@ -331,6 +353,7 @@ export default function AdminLoyalty() {
 
   async function loadTransactions(card) {
     setSelected(card)
+    setConfirmDeleteId('')
     setProfileForm({
       customer_name: card.customer_name || '',
       phone_number: card.phone_number || '',
@@ -492,6 +515,33 @@ export default function AdminLoyalty() {
     setAdjustment({ amount: '', reason: '' })
     setCards(prev => prev.map(row => row.id === data.id ? data : row))
     loadTransactions(data)
+  }
+
+  async function deleteTransaction(tx) {
+    if (!selected || !tx?.id) return
+    if (!canDeleteTransactions) {
+      setMessage(l.ownerOnly)
+      return
+    }
+    if (confirmDeleteId !== tx.id) {
+      setConfirmDeleteId(tx.id)
+      return
+    }
+    setMessage('')
+    setDeletingTransactionId(tx.id)
+    const { data, error } = await supabase.rpc('delete_loyalty_transaction', {
+      p_transaction_id: tx.id,
+    })
+    setDeletingTransactionId('')
+    if (error) {
+      setMessage(error.message || l.deleteTransactionFailed)
+      return
+    }
+    const nextCard = data?.card || selected
+    setCards(prev => prev.map(row => row.id === nextCard.id ? nextCard : row))
+    setSelected(nextCard)
+    setConfirmDeleteId('')
+    loadTransactions(nextCard)
   }
 
   useEffect(() => {
@@ -658,7 +708,7 @@ export default function AdminLoyalty() {
                 <div className="rounded-2xl border border-[#E5E7EB] bg-[#FBFCFE] p-5">
                   <div className="mb-4">
                     <h3 className="text-base font-black text-[#1F2937]">{l.transactionHistory}</h3>
-                    <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{l.latestTransactions}</p>
+                    <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{canDeleteTransactions ? l.latestTransactions : l.ownerDeleteOnly}</p>
                   </div>
                   <div className="space-y-3">
                     {transactions.map(tx => (
@@ -679,6 +729,34 @@ export default function AdminLoyalty() {
                         </div>
                         {tx.balance_before != null && tx.balance_after != null && (
                           <p className="mt-2 text-xs font-bold text-[#1F2937]">{l.balanceFlow}: {formatCurrency(tx.balance_before)} -&gt; {formatCurrency(tx.balance_after)}</p>
+                        )}
+                        {canDeleteTransactions && (
+                          <div className="mt-3 flex flex-wrap justify-end gap-2">
+                            {confirmDeleteId === tx.id && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId('')}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280]"
+                              >
+                                <X size={13} /> {l.cancel}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => deleteTransaction(tx)}
+                              disabled={deletingTransactionId === tx.id}
+                              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black ${
+                                confirmDeleteId === tx.id
+                                  ? 'bg-red-600 text-white'
+                                  : 'border border-red-200 bg-red-50 text-red-600'
+                              } disabled:opacity-60`}
+                            >
+                              <Trash2 size={13} />
+                              {deletingTransactionId === tx.id
+                                ? l.deletingTransaction
+                                : confirmDeleteId === tx.id ? l.confirmDelete : l.deleteTransaction}
+                            </button>
+                          </div>
                         )}
                       </div>
                     ))}

@@ -59,6 +59,10 @@ export function canAdjustLoyaltyBalance(role) {
   return normalizeRole(role) === 'owner'
 }
 
+export function canDeleteLoyaltyTransaction(role) {
+  return normalizeRole(role) === 'owner'
+}
+
 export function requireLoyaltyPermission(role, action) {
   const allowed = action === 'view'
     ? canViewLoyaltyCards(role)
@@ -70,7 +74,9 @@ export function requireLoyaltyPermission(role, action) {
           ? canDeactivateLoyaltyCard(role)
           : action === 'adjust'
             ? canAdjustLoyaltyBalance(role)
-            : false
+            : action === 'delete_transaction'
+              ? canDeleteLoyaltyTransaction(role)
+              : false
   if (!allowed) fail('forbidden', 'Forbidden loyalty card action', { action, role: normalizeRole(role), status: 403 })
   return true
 }
@@ -362,6 +368,59 @@ export function completeOrderCashback({ card, order, items = [], loyaltyUsedAmou
 
 export function getLoyaltyTransactionHistory(transactions = []) {
   return [...transactions].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+}
+
+export function getLoyaltyTransactionDelta(transaction) {
+  const before = Number(transaction?.balance_before)
+  const after = Number(transaction?.balance_after)
+  if (Number.isFinite(before) && Number.isFinite(after)) return after - before
+  const amount = Number(transaction?.amount) || 0
+  return transaction?.type === 'redeemed' ? -Math.abs(amount) : amount
+}
+
+export function deleteLoyaltyTransactionRecord({
+  role = 'owner',
+  card,
+  transactions = [],
+  transactionId,
+  now = new Date().toISOString(),
+} = {}) {
+  requireLoyaltyPermission(role, 'delete_transaction')
+  if (!card?.id) fail('card_not_found', 'Loyalty card not found', { status: 404 })
+  const transaction = transactions.find(row => row.id === transactionId)
+  if (!transaction) fail('transaction_not_found', 'Loyalty transaction not found', { status: 404 })
+
+  const allAsc = [...transactions].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+  const remainingAsc = allAsc.filter(row => row.id !== transactionId)
+
+  let balance = allAsc.length > 0
+    ? normalizeMoneyAmount(allAsc[0].balance_before || 0)
+    : 0
+  let totalEarned = balance
+  let totalRedeemed = 0
+  const updatedTransactions = remainingAsc.map(row => {
+    const delta = getLoyaltyTransactionDelta(row)
+    if (!Number.isFinite(delta) || !Number.isInteger(delta)) fail('invalid_amount', 'Transaction amount must be an integer')
+    const before = balance
+    const after = before + delta
+    if (after < 0) fail('negative_balance', 'Loyalty balance cannot go negative')
+    balance = after
+    if (delta > 0) totalEarned += delta
+    if (delta < 0) totalRedeemed += Math.abs(delta)
+    return { ...row, balance_before: before, balance_after: after }
+  })
+
+  return {
+    card: {
+      ...card,
+      balance,
+      total_earned: totalEarned,
+      total_redeemed: totalRedeemed,
+      updated_at: now,
+    },
+    deletedTransaction: transaction,
+    transactions: getLoyaltyTransactionHistory(updatedTransactions),
+  }
 }
 
 export function getLoyaltyCardDisplay(card, lang = 'en') {

@@ -8,11 +8,13 @@ import {
   canAdjustLoyaltyBalance,
   canCreateLoyaltyCard,
   canDeactivateLoyaltyCard,
+  canDeleteLoyaltyTransaction,
   canEditLoyaltyCard,
   canViewLoyaltyCards,
   completeOrderCashback,
   createLoyaltyCardRecord,
   deactivateLoyaltyCardRecord,
+  deleteLoyaltyTransactionRecord,
   editLoyaltyCardRecord,
   formatUzPhoneNumberInput,
   getCashbackTypePercent,
@@ -315,6 +317,7 @@ test('loyalty permissions allow admin creation while keeping financial mutations
   assert.equal(canEditLoyaltyCard('owner'), true)
   assert.equal(canAdjustLoyaltyBalance('owner'), true)
   assert.equal(canDeactivateLoyaltyCard('owner'), true)
+  assert.equal(canDeleteLoyaltyTransaction('owner'), true)
 
   for (const role of ['cashier', 'waiter', 'stakeholder', 'guest']) {
     assert.equal(canCreateLoyaltyCard(role), false)
@@ -324,6 +327,7 @@ test('loyalty permissions allow admin creation while keeping financial mutations
     assert.equal(canEditLoyaltyCard(role), false)
     assert.equal(canAdjustLoyaltyBalance(role), false)
     assert.equal(canDeactivateLoyaltyCard(role), false)
+    assert.equal(canDeleteLoyaltyTransaction(role), false)
   }
 
   assertLoyaltyError(() => deactivateLoyaltyCardRecord({ role: 'admin', card: card() }), 'forbidden')
@@ -545,6 +549,46 @@ test('transaction history is newest first and preserves amount signs, balances, 
   assert.equal(history[0].balance_after, 2000)
   assert.equal(history[2].cashback_percent_used, 3)
   assert.equal(history[2].card_type_at_transaction, 'bronze')
+})
+
+test('owner can delete a loyalty transaction and recompute remaining wallet balances', () => {
+  const transactions = [
+    { id: 'tx-1', type: 'cashback_earned', amount: 1000, balance_before: 0, balance_after: 1000, created_at: '2026-05-19T10:00:00.000Z' },
+    { id: 'tx-2', type: 'manual_adjustment', amount: 500, balance_before: 1000, balance_after: 1500, created_at: '2026-05-19T12:00:00.000Z' },
+    { id: 'tx-3', type: 'redeemed', amount: -300, balance_before: 1500, balance_after: 1200, created_at: '2026-05-20T10:00:00.000Z' },
+  ]
+
+  const result = deleteLoyaltyTransactionRecord({
+    role: 'owner',
+    card: card({ balance: 1200, total_earned: 1500, total_redeemed: 300 }),
+    transactions,
+    transactionId: 'tx-2',
+    now: '2026-05-21T10:00:00.000Z',
+  })
+
+  assert.equal(result.deletedTransaction.id, 'tx-2')
+  assert.equal(result.card.balance, 700)
+  assert.equal(result.card.total_earned, 1000)
+  assert.equal(result.card.total_redeemed, 300)
+  assert.equal(result.card.updated_at, '2026-05-21T10:00:00.000Z')
+  assert.deepEqual(result.transactions.map(tx => tx.id), ['tx-3', 'tx-1'])
+  assert.deepEqual(
+    result.transactions.find(tx => tx.id === 'tx-3'),
+    { ...transactions[2], balance_before: 1000, balance_after: 700 }
+  )
+
+  assertLoyaltyError(() => deleteLoyaltyTransactionRecord({
+    role: 'admin',
+    card: card(),
+    transactions,
+    transactionId: 'tx-1',
+  }), 'forbidden')
+  assertLoyaltyError(() => deleteLoyaltyTransactionRecord({
+    role: 'owner',
+    card: card(),
+    transactions,
+    transactionId: 'missing',
+  }), 'transaction_not_found')
 })
 
 test('customer public loyalty page is read-only and protected by public token', () => {
