@@ -34,6 +34,18 @@ function timeLabel(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+function dateTimeLabel(iso) {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const datePart = date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+  return `${datePart} ${timeLabel(iso)}`
+}
+
 function countLabel(count, lang) {
   if (lang === 'uz') return `${count} hisob`
   if (lang === 'ru') return `${count} ${count === 1 ? 'счёт' : count < 5 ? 'счёта' : 'счетов'}`
@@ -281,7 +293,7 @@ function BillCard({ order, table, menuItemMap, lang, onOpen }) {
           <span className="flex items-center gap-1">
             <Clock size={11} />
             {l.opened} {elapsedSince(order.created_at)}
-            {order.created_at && <span className="text-[#D1D5DB]">({timeLabel(order.created_at)})</span>}
+            {order.created_at && <span className="text-[#D1D5DB]">({dateTimeLabel(order.created_at)})</span>}
           </span>
           <span>{items.length} {l.items}</span>
         </div>

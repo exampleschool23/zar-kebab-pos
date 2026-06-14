@@ -526,6 +526,17 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(db, /case 'MARK_TABLE_NEEDS_BILL':[\s\S]*\.neq\('payment_status', 'paid'\)[\s\S]*\.is\('payment_status', null\)[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'needs_bill' \}/)
 })
 
+test('CashierTables shows full opened date and time on bill cards', () => {
+  const source = readSource('src/pages/CashierTables.jsx')
+  const dateTimeLabel = functionBody(source, 'dateTimeLabel')
+
+  assert.match(dateTimeLabel, /toLocaleDateString\('ru-RU'/)
+  assert.match(dateTimeLabel, /year: 'numeric'/)
+  assert.match(dateTimeLabel, /timeLabel\(iso\)/)
+  assert.match(source, /\{dateTimeLabel\(order\.created_at\)\}/)
+  assert.doesNotMatch(source, /\{timeLabel\(order\.created_at\)\}/)
+})
+
 test('WaiterTables hides disabled tables and links admins to management', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
 
@@ -604,6 +615,8 @@ test('WaiterOrder prints cook checks by submitted order round', () => {
   assert.match(db, /kitchen_round_id: i\.kitchen_round_id/)
   assert.match(migration, /add column if not exists kitchen_round_id/)
   assert.match(migration, /add column if not exists submitted_at/)
+  assert.match(migration, /disable trigger guard_paid_order_items/)
+  assert.match(migration, /enable trigger guard_paid_order_items/)
   assert.match(migration, /create or replace function public\.submit_order_to_kitchen/)
   assert.match(health, /kitchen_round_id, submitted_at/)
   assert.match(source, /order_number: item\.order_number \|\| o\.order_number/)

@@ -6,9 +6,34 @@ alter table public.order_items
 alter table public.order_items
   add column if not exists submitted_at timestamptz;
 
-update public.order_items
-  set submitted_at = created_at
-  where submitted_at is null;
+do $$
+declare
+  has_guard_trigger boolean;
+begin
+  select exists (
+    select 1
+    from pg_trigger
+    where tgrelid = 'public.order_items'::regclass
+      and tgname = 'guard_paid_order_items'
+  ) into has_guard_trigger;
+
+  if has_guard_trigger then
+    execute 'alter table public.order_items disable trigger guard_paid_order_items';
+  end if;
+
+  update public.order_items
+    set submitted_at = created_at
+    where submitted_at is null;
+
+  if has_guard_trigger then
+    execute 'alter table public.order_items enable trigger guard_paid_order_items';
+  end if;
+exception when others then
+  if has_guard_trigger then
+    execute 'alter table public.order_items enable trigger guard_paid_order_items';
+  end if;
+  raise;
+end $$;
 
 create index if not exists idx_order_items_kitchen_round
   on public.order_items(order_id, kitchen_round_id, submitted_at);
