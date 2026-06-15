@@ -77,8 +77,8 @@ export default function Expenses() {
   const { profile } = useAuth()
   const lang = state.lang || 'ru'
   const role = (profile?.role || state.user?.role || 'guest').toLowerCase()
-  const canAdd = ['owner', 'admin', 'cashier'].includes(role)
-  const canDelete = ['owner', 'admin'].includes(role)
+  const canAdd = role === 'owner'
+  const canDelete = role === 'owner'
 
   const [dateFrom, setDateFrom] = useState(todayExpenseDate())
   const [dateTo, setDateTo] = useState(todayExpenseDate())

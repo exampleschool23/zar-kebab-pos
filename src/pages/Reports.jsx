@@ -1047,6 +1047,7 @@ export default function Reports() {
   const lang         = state.lang
   const serviceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const canDeleteOrder = (profile?.role || state.user?.role) === 'owner'
+  const canViewExpenses = (profile?.role || state.user?.role) === 'owner'
 
   const [activeTab,     setActiveTab]     = useState('order_history')
   const [dateFrom, setDateFrom] = useState(todayStr())
@@ -1109,6 +1110,11 @@ export default function Reports() {
   useEffect(() => {
     let cancelled = false
     async function loadExpenses() {
+      if (!canViewExpenses) {
+        setExpenses([])
+        setExpensesError('')
+        return
+      }
       const { data, error } = await supabase
         .from('expenses')
         .select('id, expense_date, category, payment_method, amount')
@@ -1129,7 +1135,7 @@ export default function Reports() {
     }
     loadExpenses()
     return () => { cancelled = true }
-  }, [dateFrom, dateTo])
+  }, [dateFrom, dateTo, canViewExpenses])
 
   function exportCloseout() {
     downloadCsv(`zar-kebab-closeout-${closeout.date}.csv`, closeoutToCsv(closeout))
@@ -1274,8 +1280,12 @@ export default function Reports() {
               <KpiCard icon={ShoppingBag} iconCls="bg-orange-50 text-[#ff5a00]"  label={l.numOrders} value={kpiOrders} />
               <KpiCard icon={BarChart2}   iconCls="bg-blue-50 text-blue-600"     label={l.avgOrder}  value={formatCurrency(kpiAvg)} />
               <KpiCard icon={Package}     iconCls="bg-purple-50 text-purple-600" label={l.itemsSold} value={kpiItemsSold} />
-              <KpiCard icon={CreditCard}   iconCls="bg-red-50 text-red-600"       label={l.expenses} value={formatCurrency(expenseSummary.total)} sub={expensesError || ''} />
-              <KpiCard icon={DollarSign}   iconCls={netIncome >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} label={l.netIncome} value={formatCurrency(netIncome)} />
+              {canViewExpenses && (
+                <>
+                  <KpiCard icon={CreditCard} iconCls="bg-red-50 text-red-600" label={l.expenses} value={formatCurrency(expenseSummary.total)} sub={expensesError || ''} />
+                  <KpiCard icon={DollarSign} iconCls={netIncome >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} label={l.netIncome} value={formatCurrency(netIncome)} />
+                </>
+              )}
             </div>
 
             <div className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">

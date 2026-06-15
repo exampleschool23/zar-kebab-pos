@@ -1,4 +1,4 @@
--- Cafe expenses tracking for accountant cash/card/terminal spend.
+-- Owner-only cafe expenses tracking for cash/card/terminal spend.
 
 create table if not exists public.expenses (
   id             uuid primary key default gen_random_uuid(),
@@ -44,30 +44,34 @@ drop policy if exists "staff_read_expenses" on public.expenses;
 drop policy if exists "accounting_staff_insert_expenses" on public.expenses;
 drop policy if exists "owner_admin_update_expenses" on public.expenses;
 drop policy if exists "owner_admin_delete_expenses" on public.expenses;
+drop policy if exists "owner_read_expenses" on public.expenses;
+drop policy if exists "owner_insert_expenses" on public.expenses;
+drop policy if exists "owner_update_expenses" on public.expenses;
+drop policy if exists "owner_delete_expenses" on public.expenses;
 
-create policy "staff_read_expenses"
+create policy "owner_read_expenses"
   on public.expenses for select
   to authenticated
-  using (public.current_staff_has_role(array['owner','admin','cashier','stakeholder']));
+  using (public.current_staff_has_role(array['owner']));
 
-create policy "accounting_staff_insert_expenses"
+create policy "owner_insert_expenses"
   on public.expenses for insert
   to authenticated
   with check (
-    public.current_staff_has_role(array['owner','admin','cashier'])
+    public.current_staff_has_role(array['owner'])
     and created_by = auth.uid()
   );
 
-create policy "owner_admin_update_expenses"
+create policy "owner_update_expenses"
   on public.expenses for update
   to authenticated
-  using (public.current_staff_has_role(array['owner','admin']))
-  with check (public.current_staff_has_role(array['owner','admin']));
+  using (public.current_staff_has_role(array['owner']))
+  with check (public.current_staff_has_role(array['owner']));
 
-create policy "owner_admin_delete_expenses"
+create policy "owner_delete_expenses"
   on public.expenses for delete
   to authenticated
-  using (public.current_staff_has_role(array['owner','admin']));
+  using (public.current_staff_has_role(array['owner']));
 
 do $$
 begin
@@ -83,4 +87,3 @@ begin
     alter publication supabase_realtime add table public.expenses;
   end if;
 end $$;
-
