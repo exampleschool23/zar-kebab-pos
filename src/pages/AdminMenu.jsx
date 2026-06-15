@@ -594,6 +594,7 @@ const blankItem = {
   description_uz: '', description_ru: '', description_en: '',
   external_id: '', price: '', old_price: '', grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', available: true, sort_order: '',
   show_in_cashier_quick_items: false,
+  cashier_only: false,
   send_to_kitchen: false,
   quick_item_sort_order: '',
 }
@@ -699,6 +700,7 @@ export default function AdminMenu() {
       external_id: generateMenuExternalId(),
       sort_order: maxOrder + 1,
       show_in_cashier_quick_items: true,
+      cashier_only: true,
       send_to_kitchen: false,
       quick_item_sort_order: maxQuickOrder + 1,
     })
@@ -713,6 +715,7 @@ export default function AdminMenu() {
       stock_count: i.stock_count ?? i.stockCount ?? 0,
       sort_order: i.sort_order ?? 0,
       show_in_cashier_quick_items: isCashierQuickItem(i),
+      cashier_only: !!(i.cashier_only || i.cashierOnly),
       send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
       quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
     })
@@ -741,6 +744,7 @@ export default function AdminMenu() {
         sort_order: Number(form.sort_order) || 0,
         quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
         show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
+        cashier_only: !!form.cashier_only,
         send_to_kitchen: !!form.send_to_kitchen,
       },
     })
@@ -1409,11 +1413,23 @@ export default function AdminMenu() {
                 id="cashierQuick"
                 type="checkbox"
                 checked={!!form.show_in_cashier_quick_items}
-                onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked }))}
+                onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked, cashier_only: e.target.checked ? true : f.cashier_only }))}
                 className="accent-[#ff5a00] w-4 h-4"
               />
               <label htmlFor="cashierQuick" className="text-sm text-gray-700 font-medium">
                 {lang === 'uz' ? 'Kassir tezkor mahsulotlarida ko‘rsatish' : lang === 'ru' ? 'Показывать в быстрых товарах кассира' : 'Show in cashier quick items'}
+              </label>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="cashierOnly"
+                type="checkbox"
+                checked={!!form.cashier_only}
+                onChange={e => setForm(f => ({ ...f, cashier_only: e.target.checked }))}
+                className="accent-[#ff5a00] w-4 h-4"
+              />
+              <label htmlFor="cashierOnly" className="text-sm text-gray-700 font-medium">
+                {lang === 'uz' ? 'Faqat kassirda ko‘rsatish' : lang === 'ru' ? 'Показывать только кассиру' : 'Show only to cashier'}
               </label>
             </div>
             <div className="flex items-center gap-2 pt-1">

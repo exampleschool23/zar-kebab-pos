@@ -18,6 +18,7 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { isCustomerMenuItem } from '../lib/menuItems'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
 function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName, viewerRole }) {
@@ -517,7 +518,7 @@ export default function WaiterOrder() {
   const categoryItemCounts = useMemo(() => {
     const counts = { all: 0 }
     state.menuItems.forEach(item => {
-      if (!item.available) return
+      if (!isCustomerMenuItem(item)) return
       counts.all = (counts.all || 0) + 1
       counts[item.category_id] = (counts[item.category_id] || 0) + 1
     })
@@ -534,7 +535,7 @@ export default function WaiterOrder() {
   const filteredItems = useMemo(() => {
     return state.menuItems
       .filter(item => {
-        if (!item.available) return false
+        if (!isCustomerMenuItem(item)) return false
         const matchSearch = !q || [item.name_uz, item.name_ru, item.name_en].some(n => n?.toLowerCase().includes(q))
         return matchSearch
       })

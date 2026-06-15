@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
 import { getMenuPricing } from '../lib/menuPricing'
+import { isCustomerMenuItem } from '../lib/menuItems'
 import { useApp } from '../store/AppContext'
 import { findMenuItemByLinkKey, getMenuItemPublicPath } from '../lib/menuLinks'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -20,7 +21,7 @@ async function loadPublicMenuData() {
   if (!rpcRes.error && rpcRes.data) {
     return {
       categories: rpcRes.data.categories || [],
-      items: rpcRes.data.items || [],
+      items: (rpcRes.data.items || []).filter(isCustomerMenuItem),
       source: 'rpc',
     }
   }
@@ -37,7 +38,7 @@ async function loadPublicMenuData() {
 
   return {
     categories: catRes.data || [],
-    items: itemRes.data || [],
+    items: (itemRes.data || []).filter(isCustomerMenuItem),
     source: 'direct',
     rpcError: rpcRes.error,
   }

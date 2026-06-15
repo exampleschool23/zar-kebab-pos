@@ -7,6 +7,9 @@ alter table public.menu_items
   add column if not exists show_in_cashier_quick_items boolean not null default false;
 
 alter table public.menu_items
+  add column if not exists cashier_only boolean not null default false;
+
+alter table public.menu_items
   add column if not exists send_to_kitchen boolean not null default false;
 
 alter table public.menu_items

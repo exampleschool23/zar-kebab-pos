@@ -16,6 +16,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { isCustomerMenuItem } from '../lib/menuItems'
 import { formatCurrency } from '../lib/formatCurrency'
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
@@ -33,7 +34,7 @@ async function loadTelegramMenuData() {
   if (!rpcRes.error && rpcRes.data) {
     return {
       categories: rpcRes.data.categories || [],
-      items: rpcRes.data.items || [],
+      items: (rpcRes.data.items || []).filter(isCustomerMenuItem),
     }
   }
 
@@ -44,7 +45,7 @@ async function loadTelegramMenuData() {
   if (catRes.error || itemRes.error) throw catRes.error || itemRes.error
   return {
     categories: catRes.data || [],
-    items: itemRes.data || [],
+    items: (itemRes.data || []).filter(isCustomerMenuItem),
   }
 }
 

@@ -64,6 +64,7 @@ create table if not exists public.menu_items (
   stock_count      integer     not null default 0,
   image_url        text        default '',
   available        boolean     not null default true,
+  cashier_only     boolean     not null default false,
   sort_order       integer     not null default 0,
   created_at       timestamptz not null default now()
 );

@@ -7,6 +7,14 @@ export function isCashierQuickItem(item) {
   )
 }
 
+export function isCashierOnlyItem(item) {
+  return !!(item?.cashier_only || item?.cashierOnly)
+}
+
+export function isCustomerMenuItem(item) {
+  return !!item?.available && !isCashierOnlyItem(item)
+}
+
 export function getQuickItemSortOrder(item) {
   const value = Number(item?.quick_item_sort_order ?? item?.quickItemSortOrder ?? item?.sort_order ?? 9999)
   return Number.isFinite(value) ? value : 9999

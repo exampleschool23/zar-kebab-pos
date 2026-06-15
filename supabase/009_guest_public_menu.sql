@@ -42,7 +42,7 @@ create policy "Public: read menu categories"
 drop policy if exists "Public: read available menu items" on public.menu_items;
 create policy "Public: read available menu items"
   on public.menu_items for select
-  using (available = true);
+  using (available = true and coalesce(cashier_only, false) = false);
 
 create or replace function public.get_public_menu_data()
 returns jsonb
@@ -66,6 +66,7 @@ as $$
           select jsonb_agg(to_jsonb(i) order by i.sort_order, i.created_at)
           from public.menu_items i
           where i.available = true
+            and coalesce(i.cashier_only, false) = false
         ),
         '[]'::jsonb
       )
