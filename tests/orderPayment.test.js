@@ -80,6 +80,23 @@ test('order subtotal is calculated from item rows, not stale stored subtotal', (
   assert.equal(summary.subtotal, 399000)
 })
 
+test('order history totals keep the captured order item price after menu price changes', () => {
+  const historicalItems = [
+    { id: 'old-chicken', menu_item_id: 'chicken-wings', name: 'Chicken wings', quantity: 2, price: 22000 },
+  ]
+  const currentMenuItem = { id: 'chicken-wings', name_en: 'Chicken wings', price: 35000 }
+
+  const summary = getOrderPaymentSummary(
+    { id: 'paid-before-price-change', payment_status: 'paid', service_rate_pct: 0 },
+    historicalItems,
+    0
+  )
+
+  assert.equal(currentMenuItem.price, 35000)
+  assert.equal(summary.subtotal, 44000)
+  assert.equal(summary.total, 44000)
+})
+
 test('service fee uses saved/configured service_rate_pct', () => {
   const summary = getOrderPaymentSummary(
     { service_rate_pct: 17 },
