@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Receipt, CreditCard, Menu as MenuIcon, Clock, Users, Search,
   ChevronDown, Table2, Banknote, Monitor, QrCode,
-  UtensilsCrossed, ArrowUpDown, X, HelpCircle, Trash2, RotateCcw, Plus,
+  UtensilsCrossed, ArrowUpDown, X, HelpCircle, Trash2, RotateCcw,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,8 +20,6 @@ import {
 import { isCashierVisibleBill, isTakeAwayBill } from '../lib/cashierBills'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { getItemName } from '../lib/i18n'
-import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -110,8 +108,6 @@ const L = {
     waitingKitchenSub: 'Buyurtma kassirda ochiq',
     recallTable:     'Stolga qaytarish',
     deleteFailed:    "Buyurtmani o'chirib bo'lmadi",
-    quickItems:      'Tezkor kassir mahsulotlari',
-    addQuickFailed:  "Tezkor mahsulotni qo'shib bo'lmadi",
     payments:        n => `${n} ta to'lov`,
     ofTodayRev:      'bugungi daromaddan',
   },
@@ -162,8 +158,6 @@ const L = {
     waitingKitchenSub: 'Заказ уже открыт у кассира',
     recallTable:     'Вернуть на стол',
     deleteFailed:    'Не удалось удалить заказ',
-    quickItems:      'Быстрые товары кассира',
-    addQuickFailed:  'Не удалось добавить быстрый товар',
     payments:        n => `${n} платёж${n === 1 ? '' : n < 5 ? 'а' : 'ей'}`,
     ofTodayRev:      'от дневной выручки',
   },
@@ -214,8 +208,6 @@ const L = {
     waitingKitchenSub: 'Order is already open for cashier',
     recallTable:     'Move back to table',
     deleteFailed:    'Could not delete order',
-    quickItems:      'Cashier quick items',
-    addQuickFailed:  'Could not add quick item',
     payments:        n => `${n} payment${n === 1 ? '' : 's'}`,
     ofTodayRev:      "of today's revenue",
   },
@@ -288,11 +280,7 @@ function BillCard({
   table,
   menuItemMap,
   lang,
-  quickItems = [],
   onOpen,
-  onAddQuickItem,
-  quickAddBusyKey = '',
-  quickAddError = '',
   onRecall,
   canDelete,
   onDelete,
@@ -391,35 +379,6 @@ function BillCard({
           )}
         </div>
 
-        {readyForCashier && quickItems.length > 0 && (
-          <div className="mt-4 rounded-xl border border-orange-100 bg-orange-50/40 p-3">
-            <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#ff5a00]">{l.quickItems}</p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {quickItems.map(item => {
-                const busyKey = `${order.id}:${item.id}`
-                const busy = quickAddBusyKey === busyKey
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onAddQuickItem?.(order, item)}
-                    className="flex min-h-10 items-center justify-between gap-2 rounded-lg border border-orange-100 bg-white px-2.5 py-2 text-left text-[12px] font-black text-[#1F2937] shadow-sm transition-all hover:border-[#ff5a00] disabled:opacity-60"
-                  >
-                    <span className="line-clamp-1">{getItemName(item, lang)}</span>
-                    <span className="flex items-center gap-1 text-[#ff5a00]">
-                      {formatCurrency(item.price)}
-                      <Plus size={13} />
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            {quickAddError && (
-              <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-[11px] font-bold text-red-600">{quickAddError}</p>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Open bill button */}
@@ -598,21 +557,11 @@ export default function CashierTables() {
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
   const [deletingOrderId, setDeletingOrderId] = useState('')
   const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
-  const [quickAddBusyKey, setQuickAddBusyKey] = useState('')
-  const [quickAddErrorByOrderId, setQuickAddErrorByOrderId] = useState({})
   const isOwner = profile?.role === 'owner' || state.user?.role === 'owner'
 
   // ── Menu item lookup map ────────────────────────────────────────────────────
   const menuItemMap = useMemo(() =>
     Object.fromEntries(state.menuItems.map(m => [m.id, m])),
-    [state.menuItems]
-  )
-
-  const quickItems = useMemo(() =>
-    state.menuItems
-      .filter(isCashierQuickItem)
-      .sort((a, b) => getQuickItemSortOrder(a) - getQuickItemSortOrder(b))
-      .slice(0, 6),
     [state.menuItems]
   )
 
@@ -792,32 +741,6 @@ export default function CashierTables() {
     }
   }
 
-  async function handleAddQuickItem(order, item) {
-    if (!order?.id || !item?.id) return
-    const orderType = inferOrderType(order)
-    const busyKey = `${order.id}:${item.id}`
-    setQuickAddBusyKey(busyKey)
-    setQuickAddErrorByOrderId(current => ({ ...current, [order.id]: '' }))
-    try {
-      const result = await dispatch({
-        type: 'ADD_QUICK_ITEM_TO_ORDER',
-        payload: {
-          tableId: isOffPremiseOrderType(orderType) ? null : order.table_id,
-          orderId: isOffPremiseOrderType(orderType) ? order.id : null,
-          item,
-        },
-      })
-      if (result?.error) throw result.error
-    } catch (err) {
-      setQuickAddErrorByOrderId(current => ({
-        ...current,
-        [order.id]: err?.message || l.addQuickFailed,
-      }))
-    } finally {
-      setQuickAddBusyKey('')
-    }
-  }
-
   return (
     <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
 
@@ -992,14 +915,10 @@ export default function CashierTables() {
                     table={tableMap[order.table_id]}
                     menuItemMap={menuItemMap}
                     lang={lang}
-                    quickItems={quickItems}
                     onOpen={bill => navigate(isOffPremiseOrderType(inferOrderType(bill))
                       ? `/cashier/bill/order/${bill.id}`
                       : `/cashier/bill/${bill.table_id}`
                     )}
-                    onAddQuickItem={handleAddQuickItem}
-                    quickAddBusyKey={quickAddBusyKey}
-                    quickAddError={quickAddErrorByOrderId[order.id]}
                     canDelete={isOwner}
                     onRecall={handleRecallTable}
                     onDelete={handleDeleteOrder}
