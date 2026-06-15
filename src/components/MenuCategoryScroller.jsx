@@ -93,6 +93,21 @@ function CategoryChip({ category, active, title, count, onClick }) {
   )
 }
 
+function isScrollableElement(element) {
+  if (!element || element === document.body || element === document.documentElement) return false
+  const style = window.getComputedStyle(element)
+  return /(auto|scroll)/.test(style.overflowY) && element.scrollHeight > element.clientHeight
+}
+
+function findScrollContainer(element) {
+  let current = element?.parentElement
+  while (current) {
+    if (isScrollableElement(current)) return current
+    current = current.parentElement
+  }
+  return null
+}
+
 export default function MenuCategoryScroller({
   categories,
   activeCategoryId,
@@ -126,11 +141,11 @@ export default function MenuCategoryScroller({
   }
 
   function getScrollRoot() {
-    return scrollContainerRef?.current || window
+    return scrollContainerRef?.current || findScrollContainer(sentinelRef.current) || window
   }
 
   function getScrollElement() {
-    return scrollContainerRef?.current || document.documentElement
+    return scrollContainerRef?.current || findScrollContainer(sentinelRef.current) || document.documentElement
   }
 
   function scrollToCategory(categoryId) {

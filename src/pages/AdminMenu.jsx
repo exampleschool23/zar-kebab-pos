@@ -651,7 +651,10 @@ export default function AdminMenu() {
 
   const filteredItems = useMemo(() => {
     return sortedItems.filter(item => {
-      const matchAvail  = filterAvail === 'all' || (filterAvail === 'available' ? item.available : !item.available)
+      const matchAvail  = filterAvail === 'all'
+        || (filterAvail === 'available' && item.available && !item.cashier_only)
+        || (filterAvail === 'hidden' && !item.available)
+        || (filterAvail === 'cashier_only' && !!item.cashier_only)
       const q           = search.trim().toLowerCase()
       const externalId  = String(item.external_id || item.externalId || '').toLowerCase()
       const matchSearch = !q || getItemName(item, lang).toLowerCase().includes(q) || externalId.includes(q)
@@ -918,6 +921,9 @@ export default function AdminMenu() {
                   <option value="hidden">
                     {lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden'}
                   </option>
+                  <option value="cashier_only">
+                    {lang === 'uz' ? 'Faqat kassirda' : lang === 'ru' ? 'Только у кассира' : 'Only cashier'}
+                  </option>
                 </select>
                 <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                   <button
@@ -988,7 +994,7 @@ export default function AdminMenu() {
                   )}
                 </div>
               ) : (() => {
-                // Show grouped sections when "All" is selected with no active filters
+                // Category chips scroll to these grouped sections.
                 const showGrouped = true
 
                 // Build category sections for grouped view
@@ -1430,18 +1436,6 @@ export default function AdminMenu() {
               />
               <label htmlFor="cashierOnly" className="text-sm text-gray-700 font-medium">
                 {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
-              </label>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="sendToKitchen"
-                type="checkbox"
-                checked={!!form.send_to_kitchen}
-                onChange={e => setForm(f => ({ ...f, send_to_kitchen: e.target.checked }))}
-                className="accent-[#ff5a00] w-4 h-4"
-              />
-              <label htmlFor="sendToKitchen" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Qo‘shilganda tayyorlashga yuborish' : lang === 'ru' ? 'Отправлять на подготовку при добавлении' : 'Needs preparation when added'}
               </label>
             </div>
             <div className="flex gap-2 pt-2">

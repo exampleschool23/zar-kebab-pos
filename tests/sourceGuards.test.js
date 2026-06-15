@@ -333,8 +333,13 @@ test('cashier-only menu items are hidden from customer menus but available to ca
   assert.match(adminMenu, /Скрыть из публичного меню/)
   assert.match(adminMenu, /show_in_cashier_quick_items: true/)
   assert.match(adminMenu, /cashier_only: false/)
+  assert.match(adminMenu, /filterAvail === 'cashier_only'/)
+  assert.match(adminMenu, /value="cashier_only"/)
+  assert.match(adminMenu, /Только у кассира/)
   assert.doesNotMatch(adminMenu, /Show only to cashier/)
   assert.doesNotMatch(adminMenu, /Показывать только кассиру/)
+  assert.doesNotMatch(adminMenu, /Needs preparation when added/)
+  assert.doesNotMatch(adminMenu, /Отправлять на подготовку при добавлении/)
   assert.match(publicMenu, /filter\(isCustomerMenuItem\)/)
   assert.match(waiterOrder, /isCustomerMenuItem\(item\)/)
   assert.match(telegram, /filter\(isCustomerMenuItem\)/)
@@ -391,6 +396,15 @@ test('MenuCategoryScroller collapsed chips do not overlap expanded category card
   assert.match(source, /scrollOffset \+ 8/)
   assert.doesNotMatch(source, /\+ 82/)
   assert.match(source, /aria-pressed=\{active\}/)
+})
+
+test('MenuCategoryScroller scrolls inside the nearest app content scroller', () => {
+  const source = readSource('src/components/MenuCategoryScroller.jsx')
+
+  assert.match(source, /function findScrollContainer/)
+  assert.match(source, /overflowY/)
+  assert.match(source, /scrollContainerRef\?\.current \|\| findScrollContainer\(sentinelRef\.current\) \|\| window/)
+  assert.match(source, /scrollContainerRef\?\.current \|\| findScrollContainer\(sentinelRef\.current\) \|\| document\.documentElement/)
 })
 
 test('PublicMenu enables tappable fixed collapsed categories', () => {
