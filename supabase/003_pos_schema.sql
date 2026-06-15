@@ -61,6 +61,7 @@ create table if not exists public.menu_items (
   grams            integer     not null default 0,
   millilitres      integer     not null default 0,
   kcal             integer     not null default 0,
+  stock_count      integer     not null default 0,
   image_url        text        default '',
   available        boolean     not null default true,
   sort_order       integer     not null default 0,

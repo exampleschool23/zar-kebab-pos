@@ -412,6 +412,11 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
               {kcalLabel(item, lang)}
             </span>
           )}
+          {Number(item.stock_count ?? item.stockCount ?? 0) > 0 && (
+            <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700 ring-1 ring-amber-200">
+              {lang === 'uz' ? 'Tokcha' : lang === 'ru' ? 'Полка' : 'Shelf'}: {Number(item.stock_count ?? item.stockCount ?? 0)}
+            </span>
+          )}
         </div>
         <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit mb-3 ${
           item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
@@ -587,7 +592,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  external_id: '', price: '', old_price: '', grams: '', millilitres: '', kcal: '', image_url: '', available: true, sort_order: '',
+  external_id: '', price: '', old_price: '', grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', available: true, sort_order: '',
   show_in_cashier_quick_items: false,
   send_to_kitchen: false,
   quick_item_sort_order: '',
@@ -705,6 +710,7 @@ export default function AdminMenu() {
       ...blankItem,
       ...i,
       millilitres: i.millilitres ?? i.milliliters ?? (Number(i.litres ?? i.liters) > 0 ? Math.round(Number(i.litres ?? i.liters) * 1000) : ''),
+      stock_count: i.stock_count ?? i.stockCount ?? 0,
       sort_order: i.sort_order ?? 0,
       show_in_cashier_quick_items: isCashierQuickItem(i),
       send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
@@ -731,6 +737,7 @@ export default function AdminMenu() {
         grams: Math.max(0, Math.round(Number(form.grams) || 0)),
         millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
         kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
+        stock_count: Math.max(0, Math.round(Number(form.stock_count) || 0)),
         sort_order: Number(form.sort_order) || 0,
         quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
         show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
@@ -1363,6 +1370,13 @@ export default function AdminMenu() {
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
             <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
             <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />
+            <Field
+              label={lang === 'uz' ? 'Tokchadagi soni' : lang === 'ru' ? 'Количество на полке' : 'Shelf count'}
+              type="number"
+              value={form.stock_count}
+              onChange={setF('stock_count')}
+              placeholder="24"
+            />
             <ImageUploadField
               label={t(lang, 'imageUrl')}
               value={form.image_url}
