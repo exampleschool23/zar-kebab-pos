@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
 import { getMenuPricing } from '../lib/menuPricing'
-import { isCustomerMenuItem } from '../lib/menuItems'
+import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
 import { useApp } from '../store/AppContext'
 import { findMenuItemByLinkKey, getMenuItemPublicPath } from '../lib/menuLinks'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -19,9 +19,11 @@ async function loadPublicMenuData() {
   const rpcRes = await supabase.rpc('get_public_menu_data')
 
   if (!rpcRes.error && rpcRes.data) {
+    const categories = (rpcRes.data.categories || []).filter(isCustomerMenuCategory)
+    const categoryIds = new Set(categories.map(category => category.id))
     return {
-      categories: rpcRes.data.categories || [],
-      items: (rpcRes.data.items || []).filter(isCustomerMenuItem),
+      categories,
+      items: (rpcRes.data.items || []).filter(item => isCustomerMenuItem(item) && (!item.category_id || categoryIds.has(item.category_id))),
       source: 'rpc',
     }
   }
@@ -36,9 +38,11 @@ async function loadPublicMenuData() {
     throw catRes.error || itemRes.error
   }
 
+  const categories = (catRes.data || []).filter(isCustomerMenuCategory)
+  const categoryIds = new Set(categories.map(category => category.id))
   return {
-    categories: catRes.data || [],
-    items: (itemRes.data || []).filter(isCustomerMenuItem),
+    categories,
+    items: (itemRes.data || []).filter(item => isCustomerMenuItem(item) && (!item.category_id || categoryIds.has(item.category_id))),
     source: 'direct',
     rpcError: rpcRes.error,
   }

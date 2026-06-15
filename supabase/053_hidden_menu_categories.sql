@@ -1,12 +1,17 @@
--- Cashier-only menu items
--- These stay available to staff/cashier quick items but are hidden from public,
--- Telegram, and waiter customer-facing menus.
+-- Hidden menu categories
+-- Keeps categories/items available to admin/reporting while hiding whole groups
+-- from public, Telegram, and waiter customer-facing menus.
 
-alter table public.menu_items
-  add column if not exists cashier_only boolean not null default false;
+alter table public.menu_categories
+  add column if not exists hidden boolean not null default false;
 
-create index if not exists idx_menu_items_public_visible
-  on public.menu_items(available, cashier_only, sort_order);
+create index if not exists idx_menu_categories_public_visible
+  on public.menu_categories(hidden, sort_order);
+
+drop policy if exists "Public: read menu categories" on public.menu_categories;
+create policy "Public: read menu categories"
+  on public.menu_categories for select
+  using (coalesce(hidden, false) = false);
 
 drop policy if exists "Public: read available menu items" on public.menu_items;
 create policy "Public: read available menu items"

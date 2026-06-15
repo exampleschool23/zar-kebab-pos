@@ -16,7 +16,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { isCustomerMenuItem } from '../lib/menuItems'
+import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
 import { formatCurrency } from '../lib/formatCurrency'
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
@@ -32,9 +32,11 @@ import {
 async function loadTelegramMenuData() {
   const rpcRes = await supabase.rpc('get_public_menu_data')
   if (!rpcRes.error && rpcRes.data) {
+    const categories = (rpcRes.data.categories || []).filter(isCustomerMenuCategory)
+    const categoryIds = new Set(categories.map(category => category.id))
     return {
-      categories: rpcRes.data.categories || [],
-      items: (rpcRes.data.items || []).filter(isCustomerMenuItem),
+      categories,
+      items: (rpcRes.data.items || []).filter(item => isCustomerMenuItem(item) && (!item.category_id || categoryIds.has(item.category_id))),
     }
   }
 
@@ -43,9 +45,11 @@ async function loadTelegramMenuData() {
     supabase.from('menu_items').select('*').eq('available', true).order('sort_order'),
   ])
   if (catRes.error || itemRes.error) throw catRes.error || itemRes.error
+  const categories = (catRes.data || []).filter(isCustomerMenuCategory)
+  const categoryIds = new Set(categories.map(category => category.id))
   return {
-    categories: catRes.data || [],
-    items: (itemRes.data || []).filter(isCustomerMenuItem),
+    categories,
+    items: (itemRes.data || []).filter(item => isCustomerMenuItem(item) && (!item.category_id || categoryIds.has(item.category_id))),
   }
 }
 

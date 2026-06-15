@@ -11,6 +11,14 @@ export function isCashierOnlyItem(item) {
   return !!(item?.cashier_only || item?.cashierOnly)
 }
 
+export function isHiddenMenuCategory(category) {
+  return !!(category?.hidden || category?.is_hidden || category?.isHidden)
+}
+
+export function isCustomerMenuCategory(category) {
+  return !isHiddenMenuCategory(category)
+}
+
 export function isCustomerMenuItem(item) {
   return !!item?.available && !isCashierOnlyItem(item)
 }

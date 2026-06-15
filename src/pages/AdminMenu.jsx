@@ -554,8 +554,12 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, sortIndex }) {
 
       {/* col 4 – status */}
       <div>
-        <span className="text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full bg-green-50 text-green-600 whitespace-nowrap">
-          {lang === 'uz' ? 'Faol' : lang === 'ru' ? 'Активно' : 'Active'}
+        <span className={`text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full whitespace-nowrap ${
+          cat.hidden ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'
+        }`}>
+          {cat.hidden
+            ? (lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden')
+            : (lang === 'uz' ? 'Faol' : lang === 'ru' ? 'Активно' : 'Active')}
         </span>
       </div>
 
@@ -599,7 +603,7 @@ const blankItem = {
   quick_item_sort_order: '',
 }
 
-const blankCat = { id: '', name_uz: '', name_ru: '', name_en: '', image_url: '', sort_order: '' }
+const blankCat = { id: '', name_uz: '', name_ru: '', name_en: '', image_url: '', sort_order: '', hidden: false }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -773,7 +777,7 @@ export default function AdminMenu() {
   }
   function openEditCat(c) {
     uploadedCatImageUrlsRef.current.clear()
-    setCatForm({ ...c, sort_order: c.sort_order ?? 0 })
+    setCatForm({ ...blankCat, ...c, sort_order: c.sort_order ?? 0, hidden: !!c.hidden })
     setCatModal('edit')
   }
   async function closeCatModal() {
@@ -787,7 +791,7 @@ export default function AdminMenu() {
       : ''
     const result = await dispatch({
       type: catModal === 'new' ? 'ADD_CATEGORY' : 'UPDATE_CATEGORY',
-      payload: { ...catForm, sort_order: Number(catForm.sort_order) || 0 },
+      payload: { ...catForm, sort_order: Number(catForm.sort_order) || 0, hidden: !!catForm.hidden },
     })
     if (!result?.error) {
       await cleanupTrackedUploads(uploadedCatImageUrlsRef, [catForm.image_url])
@@ -1470,6 +1474,18 @@ export default function AdminMenu() {
               entityId={catForm.id}
             />
             <Field label={t(lang, 'sortOrder')} type="number" value={catForm.sort_order} onChange={setCF('sort_order')} placeholder="1" />
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="categoryHidden"
+                type="checkbox"
+                checked={!!catForm.hidden}
+                onChange={e => setCatForm(f => ({ ...f, hidden: e.target.checked }))}
+                className="accent-[#ff5a00] w-4 h-4"
+              />
+              <label htmlFor="categoryHidden" className="text-sm text-gray-700 font-medium">
+                {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
+              </label>
+            </div>
             <div className="flex gap-2 pt-2">
               <button onClick={closeCatModal} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                 {t(lang, 'cancel')}

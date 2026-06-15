@@ -19,6 +19,7 @@ create table if not exists public.menu_categories (
   name_ru    text        default '',
   name_en    text        default '',
   image_url  text        default '',
+  hidden     boolean     not null default false,
   sort_order integer     not null default 0,
   created_at timestamptz not null default now()
 );

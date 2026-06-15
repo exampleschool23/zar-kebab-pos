@@ -18,7 +18,7 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { isCustomerMenuItem } from '../lib/menuItems'
+import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
 function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName, viewerRole }) {
@@ -511,19 +511,27 @@ export default function WaiterOrder() {
 
   // Categories
   const sortedCategories = useMemo(() =>
-    [...state.categories].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
+    [...state.categories]
+      .filter(isCustomerMenuCategory)
+      .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
     [state.categories]
+  )
+
+  const visibleCategoryIds = useMemo(
+    () => new Set(sortedCategories.map(category => category.id)),
+    [sortedCategories]
   )
 
   const categoryItemCounts = useMemo(() => {
     const counts = { all: 0 }
     state.menuItems.forEach(item => {
       if (!isCustomerMenuItem(item)) return
+      if (item.category_id && !visibleCategoryIds.has(item.category_id)) return
       counts.all = (counts.all || 0) + 1
       counts[item.category_id] = (counts[item.category_id] || 0) + 1
     })
     return counts
-  }, [state.menuItems])
+  }, [state.menuItems, visibleCategoryIds])
 
   const allCategoryCards = useMemo(() => [
     { id: 'all' },
@@ -536,11 +544,12 @@ export default function WaiterOrder() {
     return state.menuItems
       .filter(item => {
         if (!isCustomerMenuItem(item)) return false
+        if (item.category_id && !visibleCategoryIds.has(item.category_id)) return false
         const matchSearch = !q || [item.name_uz, item.name_ru, item.name_en].some(n => n?.toLowerCase().includes(q))
         return matchSearch
       })
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
-  }, [state.menuItems, q])
+  }, [state.menuItems, visibleCategoryIds, q])
 
   // Grouped sections when "All" is selected without a search query
   const sections = useMemo(() => {
