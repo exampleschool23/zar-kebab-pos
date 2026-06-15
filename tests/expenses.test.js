@@ -7,6 +7,7 @@ import {
   expensePaymentMethodLabel,
   getNetIncome,
   normalizeExpenseAmount,
+  summarizeExpenseCashflow,
   summarizeExpenses,
 } from '../src/lib/expenses.js'
 
@@ -34,6 +35,32 @@ test('net income subtracts expenses from cafe revenue', () => {
   ]), 1_350_000)
 })
 
+test('expense cashflow shows what is left in cash card and terminal', () => {
+  const cashflow = summarizeExpenseCashflow([
+    { payment_status: 'paid', payment_method: 'cash', total: 1_000_000 },
+    {
+      payment_status: 'paid',
+      payment_method: 'mixed',
+      total: 600_000,
+      payments: [
+        { method: 'card', amount: 250_000 },
+        { method: 'terminal', amount: 350_000 },
+      ],
+    },
+  ], [
+    { payment_method: 'cash', amount: 300_000 },
+    { payment_method: 'card', amount: 100_000 },
+    { payment_method: 'terminal', amount: 400_000 },
+  ])
+
+  assert.equal(cashflow.byMethod.cash.income, 1_000_000)
+  assert.equal(cashflow.byMethod.cash.expenses, 300_000)
+  assert.equal(cashflow.byMethod.cash.left, 700_000)
+  assert.equal(cashflow.byMethod.card.left, 150_000)
+  assert.equal(cashflow.byMethod.terminal.left, -50_000)
+  assert.deepEqual(cashflow.rows.map(row => row.method), ['cash', 'card', 'terminal'])
+})
+
 test('expense helpers normalize values and labels for accountant entry', () => {
   assert.equal(normalizeExpenseAmount('12000.7'), 12001)
   assert.equal(normalizeExpenseAmount('-5000'), 0)
@@ -42,4 +69,3 @@ test('expense helpers normalize values and labels for accountant entry', () => {
   assert.equal(expenseMatchesRange({ expense_date: '2026-06-15' }, '2026-06-01', '2026-06-30'), true)
   assert.equal(expenseMatchesRange({ expense_date: '2026-07-01' }, '2026-06-01', '2026-06-30'), false)
 })
-

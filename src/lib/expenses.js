@@ -1,4 +1,4 @@
-import { toLocalDateStr } from './analytics.js'
+import { getOrderPayments, toLocalDateStr } from './analytics.js'
 
 export const EXPENSE_PAYMENT_METHODS = ['cash', 'card', 'terminal']
 
@@ -107,7 +107,32 @@ export function summarizeExpenses(expenses = []) {
   return summary
 }
 
+export function summarizeExpenseCashflow(paidOrders = [], expenses = []) {
+  const byMethod = EXPENSE_PAYMENT_METHODS.reduce((acc, method) => {
+    acc[method] = { income: 0, expenses: 0, left: 0 }
+    return acc
+  }, {})
+
+  for (const order of paidOrders || []) {
+    for (const payment of getOrderPayments(order)) {
+      const method = payment.method || payment.payment_method
+      if (!byMethod[method]) continue
+      byMethod[method].income += normalizeExpenseAmount(payment.amount)
+    }
+  }
+
+  const expenseSummary = summarizeExpenses(expenses)
+  for (const method of EXPENSE_PAYMENT_METHODS) {
+    byMethod[method].expenses = expenseSummary.byMethod[method] || 0
+    byMethod[method].left = byMethod[method].income - byMethod[method].expenses
+  }
+
+  return {
+    byMethod,
+    rows: EXPENSE_PAYMENT_METHODS.map(method => ({ method, ...byMethod[method] })),
+  }
+}
+
 export function getNetIncome(revenue = 0, expenses = []) {
   return Math.round(Number(revenue) || 0) - summarizeExpenses(expenses).total
 }
-

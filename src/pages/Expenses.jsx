@@ -26,6 +26,7 @@ import {
   expensePaymentMethodLabel,
   getNetIncome,
   normalizeExpenseAmount,
+  summarizeExpenseCashflow,
   summarizeExpenses,
   todayExpenseDate,
 } from '../lib/expenses'
@@ -125,6 +126,11 @@ export default function Expenses() {
       to: 'Gacha',
       byCategory: 'Kategoriya bo‘yicha',
       byMethod: 'To‘lov turi bo‘yicha',
+      methodBalances: 'To‘lov turi qoldig‘i',
+      moneyFlow: 'Pul qayerga ketmoqda',
+      incomeIn: 'Kirdi',
+      spentOut: 'Chiqdi',
+      remaining: 'Qoldi',
       history: 'Xarajatlar tarixi',
       empty: 'Bu davrda xarajat yozilmagan',
       required: 'Sana, kategoriya, to‘lov turi va summa kerak.',
@@ -162,6 +168,11 @@ export default function Expenses() {
       to: 'По',
       byCategory: 'По категориям',
       byMethod: 'По способам оплаты',
+      methodBalances: 'Остаток по способам оплаты',
+      moneyFlow: 'Куда уходят деньги',
+      incomeIn: 'Приход',
+      spentOut: 'Расход',
+      remaining: 'Остаток',
       history: 'История расходов',
       empty: 'За этот период расходов нет',
       required: 'Нужны дата, категория, способ оплаты и сумма.',
@@ -199,6 +210,11 @@ export default function Expenses() {
       to: 'To',
       byCategory: 'By category',
       byMethod: 'By payment method',
+      methodBalances: 'Left by payment method',
+      moneyFlow: 'Where money is going',
+      incomeIn: 'In',
+      spentOut: 'Out',
+      remaining: 'Left',
       history: 'Expense history',
       empty: 'No expenses in this period',
       required: 'Date, category, payment method, and amount are required.',
@@ -258,6 +274,7 @@ export default function Expenses() {
   }, [expenses, query, lang])
 
   const summary = useMemo(() => summarizeExpenses(filteredExpenses), [filteredExpenses])
+  const cashflow = useMemo(() => summarizeExpenseCashflow(paidOrders, filteredExpenses), [paidOrders, filteredExpenses])
   const netIncome = getNetIncome(revenue, filteredExpenses)
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])
@@ -369,6 +386,38 @@ export default function Expenses() {
             <Kpi icon={CalendarDays} label={l.entries} value={summary.count} tone="purple" />
           </div>
 
+          <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-black text-[#1F2937]">{l.methodBalances}</h2>
+              <span className="text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.remaining}</span>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {cashflow.rows.map(row => {
+                const Icon = methodIcon(row.method)
+                return (
+                  <div key={row.method} className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-2 text-sm font-black text-[#1F2937]">
+                        <Icon size={16} className="text-[#ff5a00]" />{expensePaymentMethodLabel(row.method, lang)}
+                      </span>
+                      <span className={`text-lg font-black ${row.left >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(row.left)}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                      <div className="rounded-lg bg-green-50 px-2 py-2 text-green-700">
+                        <span className="block text-[10px] uppercase text-green-500">{l.incomeIn}</span>
+                        {formatCurrency(row.income)}
+                      </div>
+                      <div className="rounded-lg bg-orange-50 px-2 py-2 text-[#ff5a00]">
+                        <span className="block text-[10px] uppercase text-orange-400">{l.spentOut}</span>
+                        {formatCurrency(row.expenses)}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
           {error && (
             <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
               {error}
@@ -441,54 +490,92 @@ export default function Expenses() {
               <Breakdown title={l.byMethod} rows={methodRows} total={summary.total} lang={lang} type="method" />
             </div>
 
-            <section className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
-              <div className="border-b border-[#F3F4F6] px-4 py-4">
-                <h2 className="text-base font-black text-[#1F2937]">{l.history}</h2>
-              </div>
-              {loading ? (
-                <OperationalLoading title={l.loadFailed.replace('Не удалось ', '').replace('Could not ', '')} description="" />
-              ) : filteredExpenses.length === 0 ? (
-                <div className="px-4 py-14 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div>
-              ) : (
-                <div className="max-h-[720px] overflow-y-auto">
-                  {filteredExpenses.map(expense => {
-                    const Icon = methodIcon(expense.payment_method)
-                    return (
-                      <div key={expense.id} className="flex flex-col gap-3 border-b border-[#F3F4F6] px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <div className="mb-1 flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-black text-[#1F2937]">{expenseCategoryLabel(expense.category, lang)}</span>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-black text-[#6B7280]">
-                              <Icon size={11} />{expensePaymentMethodLabel(expense.payment_method, lang)}
-                            </span>
-                          </div>
-                          <p className="text-xs font-bold text-[#9CA3AF]">{expense.expense_date} · {expense.created_by_name || '—'}</p>
-                          {(expense.vendor || expense.description) && (
-                            <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">
-                              {[expense.vendor, expense.description].filter(Boolean).join(' · ')}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
-                          <p className="text-lg font-black text-[#ff5a00]">{formatCurrency(expense.amount)}</p>
-                          {canDelete && (
-                            <button onClick={() => deleteExpense(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
-                              confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
-                            }`}>
-                              <Trash2 size={14} />{confirmDeleteId === expense.id ? l.confirmDelete : l.delete}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
+            <div className="min-w-0 space-y-5">
+              <ExpenseCategoryChart title={l.moneyFlow} rows={categoryRows} total={summary.total} lang={lang} />
+
+              <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
+                <div className="border-b border-[#F3F4F6] px-4 py-4">
+                  <h2 className="text-base font-black text-[#1F2937]">{l.history}</h2>
                 </div>
-              )}
-            </section>
+                {loading ? (
+                  <OperationalLoading title={l.loadFailed.replace('Не удалось ', '').replace('Could not ', '')} description="" />
+                ) : filteredExpenses.length === 0 ? (
+                  <div className="px-4 py-14 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div>
+                ) : (
+                  <div className="max-h-[720px] overflow-y-auto">
+                    {filteredExpenses.map(expense => {
+                      const Icon = methodIcon(expense.payment_method)
+                      return (
+                        <div key={expense.id} className="flex flex-col gap-3 border-b border-[#F3F4F6] px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="mb-1 flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-black text-[#1F2937]">{expenseCategoryLabel(expense.category, lang)}</span>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-black text-[#6B7280]">
+                                <Icon size={11} />{expensePaymentMethodLabel(expense.payment_method, lang)}
+                              </span>
+                            </div>
+                            <p className="text-xs font-bold text-[#9CA3AF]">{expense.expense_date} · {expense.created_by_name || '—'}</p>
+                            {(expense.vendor || expense.description) && (
+                              <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">
+                                {[expense.vendor, expense.description].filter(Boolean).join(' · ')}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
+                            <p className="text-lg font-black text-[#ff5a00]">{formatCurrency(expense.amount)}</p>
+                            {canDelete && (
+                              <button onClick={() => deleteExpense(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
+                                confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
+                              }`}>
+                                <Trash2 size={14} />{confirmDeleteId === expense.id ? l.confirmDelete : l.delete}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
           </div>
         </div>
       </div>
     </AppShell>
+  )
+}
+
+function ExpenseCategoryChart({ title, rows, total, lang }) {
+  const palette = ['#ff5a00', '#16a34a', '#2563eb', '#9333ea', '#dc2626', '#0f766e']
+  const visibleRows = rows.slice(0, 6)
+
+  return (
+    <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+      <h2 className="mb-4 text-base font-black text-[#1F2937]">{title}</h2>
+      {visibleRows.length === 0 ? (
+        <p className="py-6 text-sm font-bold text-[#9CA3AF]">—</p>
+      ) : (
+        <div className="space-y-3">
+          {visibleRows.map(([key, amount], index) => {
+            const width = total > 0 ? Math.max(6, Math.round((amount / total) * 100)) : 0
+            return (
+              <div key={key} className="grid gap-2 sm:grid-cols-[180px_1fr_120px] sm:items-center">
+                <span className="truncate text-sm font-black text-[#374151]">{expenseCategoryLabel(key, lang)}</span>
+                <div className="h-8 overflow-hidden rounded-xl bg-gray-100">
+                  <div
+                    className="flex h-full items-center justify-end rounded-xl pr-2 text-[11px] font-black text-white"
+                    style={{ width: `${width}%`, backgroundColor: palette[index % palette.length] }}
+                  >
+                    {width >= 18 ? `${width}%` : ''}
+                  </div>
+                </div>
+                <span className="text-sm font-black text-[#1F2937] sm:text-right">{formatCurrency(amount)}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 
