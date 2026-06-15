@@ -181,11 +181,11 @@ begin
   update public.restaurant_tables rt
   set
     status = 'available',
-    reserved_for_name = null,
-    reserved_for_phone = null,
+    reserved_for_name = '',
+    reserved_for_phone = '',
     reserved_at = null,
     reserved_until = null,
-    reservation_notes = null,
+    reservation_notes = '',
     updated_at = now()
   where rt.id = any(v_table_ids)
     and rt.status in ('occupied', 'needs_bill', 'reserved')

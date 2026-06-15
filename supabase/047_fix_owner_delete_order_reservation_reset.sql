@@ -1,5 +1,5 @@
--- Ensure owner order deletion removes all order-linked loyalty side effects too.
--- Apply after 043_owner_delete_orders.sql.
+-- Fix owner order deletion for reservation columns that are NOT NULL.
+-- Apply after 046_owner_delete_orders_loyalty_cleanup.sql.
 
 create or replace function public.delete_order_owner(p_order_id text)
 returns jsonb

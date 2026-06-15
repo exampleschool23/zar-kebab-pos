@@ -90,11 +90,11 @@ begin
     if v_reset_table then
       update public.restaurant_tables
       set status = 'available',
-          reserved_for_name = null,
-          reserved_for_phone = null,
+          reserved_for_name = '',
+          reserved_for_phone = '',
           reserved_at = null,
           reserved_until = null,
-          reservation_notes = null,
+          reservation_notes = '',
           updated_at = now()
       where id = v_order.table_id
         and status in ('occupied', 'needs_bill', 'reserved');
