@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Receipt, CreditCard, Menu as MenuIcon, Clock, Users, Search,
   ChevronDown, Table2, Banknote, Monitor, QrCode,
-  UtensilsCrossed, ArrowUpDown, X, HelpCircle, Trash2,
+  UtensilsCrossed, ArrowUpDown, X, HelpCircle, Trash2, RotateCcw,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -106,6 +106,8 @@ const L = {
     noTable:          'Stolsiz',
     waitingKitchen:  'Tayyorlanmoqda',
     waitingKitchenSub: 'Buyurtma kassirda ochiq',
+    recallTable:     'Stolga qaytarish',
+    deleteFailed:    "Buyurtmani o'chirib bo'lmadi",
     payments:        n => `${n} ta to'lov`,
     ofTodayRev:      'bugungi daromaddan',
   },
@@ -154,6 +156,8 @@ const L = {
     noTable:          'Без стола',
     waitingKitchen:  'Готовится',
     waitingKitchenSub: 'Заказ уже открыт у кассира',
+    recallTable:     'Вернуть на стол',
+    deleteFailed:    'Не удалось удалить заказ',
     payments:        n => `${n} платёж${n === 1 ? '' : n < 5 ? 'а' : 'ей'}`,
     ofTodayRev:      'от дневной выручки',
   },
@@ -202,6 +206,8 @@ const L = {
     noTable:          'No table',
     waitingKitchen:  'Preparing',
     waitingKitchenSub: 'Order is already open for cashier',
+    recallTable:     'Move back to table',
+    deleteFailed:    'Could not delete order',
     payments:        n => `${n} payment${n === 1 ? '' : 's'}`,
     ofTodayRev:      "of today's revenue",
   },
@@ -269,7 +275,7 @@ function TableStatusBadge({ status, lang }) {
   )
 }
 
-function BillCard({ order, table, menuItemMap, lang, onOpen, canDelete, onDelete, confirmDelete, isDeleting }) {
+function BillCard({ order, table, menuItemMap, lang, onOpen, onRecall, canDelete, onDelete, confirmDelete, isDeleting, deleteError }) {
   const l = L[lang] || L.en
   const isTakeAway = isTakeAwayBill(order)
   const isDelivery = isDeliveryOrderType(inferOrderType(order))
@@ -373,6 +379,15 @@ function BillCard({ order, table, menuItemMap, lang, onOpen, canDelete, onDelete
               <Receipt size={16} />
               {l.openBill}
             </button>
+            {order.status === 'needs_bill' && !isOffPremiseOrderType(orderType) && onRecall && (
+              <button
+                onClick={() => onRecall(order)}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 text-gray-600 py-2.5 text-[13px] font-bold hover:bg-gray-100 active:scale-[0.98] transition-all"
+              >
+                <RotateCcw size={14} />
+                {l.recallTable}
+              </button>
+            )}
             {canDelete && (
               <button
                 type="button"
@@ -387,6 +402,11 @@ function BillCard({ order, table, menuItemMap, lang, onOpen, canDelete, onDelete
                 <Trash2 size={15} />
                 {confirmDelete ? l.confirmDelete : l.deleteOrder}
               </button>
+            )}
+            {deleteError && (
+              <p className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[12px] font-bold leading-snug text-red-600">
+                {l.deleteFailed}: {deleteError}
+              </p>
             )}
           </div>
         ) : (
@@ -523,6 +543,7 @@ export default function CashierTables() {
   const [showPaidToday, setShowPaidToday] = useState(false)
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
   const [deletingOrderId, setDeletingOrderId] = useState('')
+  const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
   const isOwner = profile?.role === 'owner' || state.user?.role === 'owner'
 
   // ── Menu item lookup map ────────────────────────────────────────────────────
@@ -675,8 +696,14 @@ export default function CashierTables() {
 
   const visibleBillCount = billSections.reduce((sum, section) => sum + section.bills.length, 0)
 
+  function handleRecallTable(order) {
+    if (!order?.table_id) return
+    dispatch({ type: 'RECALL_TABLE_FROM_CASHIER', payload: order.table_id })
+  }
+
   async function handleDeleteOrder(order) {
     if (!isOwner || !order?.id || deletingOrderId) return
+    setDeleteErrorByOrderId(errors => ({ ...errors, [order.id]: '' }))
     if (confirmDeleteOrderId !== order.id) {
       setConfirmDeleteOrderId(order.id)
       return
@@ -688,7 +715,14 @@ export default function CashierTables() {
         type: 'DELETE_ORDER',
         payload: { orderId: order.id },
       })
-      if (!result?.error) setConfirmDeleteOrderId('')
+      if (result?.error) {
+        setDeleteErrorByOrderId(errors => ({
+          ...errors,
+          [order.id]: result.error.message || String(result.error),
+        }))
+        return
+      }
+      setConfirmDeleteOrderId('')
     } finally {
       setDeletingOrderId('')
     }
@@ -873,9 +907,11 @@ export default function CashierTables() {
                       : `/cashier/bill/${bill.table_id}`
                     )}
                     canDelete={isOwner}
+                    onRecall={handleRecallTable}
                     onDelete={handleDeleteOrder}
                     confirmDelete={confirmDeleteOrderId === order.id}
                     isDeleting={deletingOrderId === order.id}
+                    deleteError={deleteErrorByOrderId[order.id]}
                   />
                 ))}
               </BillsSection>

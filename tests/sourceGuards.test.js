@@ -523,10 +523,12 @@ test('CashierTables groups bills by cashier urgency', () => {
   const source = readSource('src/pages/CashierTables.jsx')
   const cashierBills = readSource('src/lib/cashierBills.js')
   const db = readSource('src/lib/db.js')
+  const appContext = readSource('src/store/AppContext.jsx')
 
   assert.match(source, /from '\.\.\/lib\/cashierBills'/)
   assert.doesNotMatch(source, /function isCashierVisibleBill/)
   assert.match(cashierBills, /function isCashierVisibleBill/)
+  assert.match(cashierBills, /!isOffPremiseBill\(order\) && order\.status !== 'needs_bill'/)
   assert.match(cashierBills, /if \(billableItems\.length === 0\) return false/)
   assert.match(cashierBills, /getOrderPaymentSummary\(order, billableItems, order\.service_rate_pct\)\.total > 0/)
   assert.doesNotMatch(source, /function isCashierReadyTakeAway/)
@@ -538,11 +540,17 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(source, /isDeliveryOrderType/)
   assert.match(source, /function PaidTodaySummary/)
   assert.match(source, /showPaidToday/)
+  assert.match(source, /recallTable/)
+  assert.match(source, /RECALL_TABLE_FROM_CASHIER/)
+  assert.match(source, /deleteErrorByOrderId/)
+  assert.match(source, /deleteFailed/)
   assert.doesNotMatch(source, /filteredBills\.map\(order =>/)
   assert.match(db, /function assertUpdatedRows/)
   assert.match(db, /case 'CONFIRM_ORDER_DELIVERED':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*assertUpdatedRows\(deliveredOrders[\s\S]*if \(itemsError\) throw itemsError[\s\S]*assertUpdatedRows\(servedItems/)
   // Bug fix (Jun 2026): uses neq('payment_status','paid') + null fallback so legacy orders are never skipped
   assert.match(db, /case 'MARK_TABLE_NEEDS_BILL':[\s\S]*\.neq\('payment_status', 'paid'\)[\s\S]*\.is\('payment_status', null\)[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'needs_bill' \}/)
+  assert.match(db, /case 'RECALL_TABLE_FROM_CASHIER':[\s\S]*\.update\(\{ status: 'delivered' \}\)[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'occupied' \}/)
+  assert.match(appContext, /'RECALL_TABLE_FROM_CASHIER'/)
 })
 
 test('CashierTables shows full opened date and time on bill cards', () => {

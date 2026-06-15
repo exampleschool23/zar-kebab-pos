@@ -22,6 +22,7 @@ export function getCashierBillableItems(order) {
 
 export function isCashierVisibleBill(order) {
   if (!order || order.payment_status === 'paid' || order.status === 'cancelled') return false
+  if (!isOffPremiseBill(order) && order.status !== 'needs_bill') return false
   const billableItems = getCashierBillableItems(order)
   if (billableItems.length === 0) return false
   return getOrderPaymentSummary(order, billableItems, order.service_rate_pct).total > 0

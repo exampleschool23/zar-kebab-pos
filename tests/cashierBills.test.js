@@ -58,6 +58,18 @@ test('cashier shows valid unpaid take-away orders immediately', () => {
   assert.equal(isCashierVisibleBill(order({ items: [item({ price: 18000 })] })), true)
 })
 
+test('cashier shows dine-in table orders only after bill is requested', () => {
+  const dineIn = {
+    order_type: 'dine_in',
+    table_id: 't1',
+    table_name: 'Table 1',
+    items: [item({ status: 'served', price: 18000 })],
+  }
+
+  assert.equal(isCashierVisibleBill(order({ ...dineIn, status: 'delivered' })), false)
+  assert.equal(isCashierVisibleBill(order({ ...dineIn, status: 'needs_bill' })), true)
+})
+
 test('cashier hides paid or cancelled orders even with billable items', () => {
   assert.equal(isCashierVisibleBill(order({ payment_status: 'paid', items: [item()] })), false)
   assert.equal(isCashierVisibleBill(order({ status: 'cancelled', items: [item()] })), false)

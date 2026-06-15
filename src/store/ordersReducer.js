@@ -146,6 +146,19 @@ export function ordersReducer(state, action) {
         ),
       }
 
+    case 'RECALL_TABLE_FROM_CASHIER': {
+      const tableId = action.payload
+      return {
+        ...state,
+        tables: state.tables.map(t => t.id === tableId ? { ...t, status: 'occupied' } : t),
+        orders: state.orders.map(o =>
+          o.table_id === tableId && o.status === 'needs_bill' && o.payment_status !== 'paid'
+            ? { ...o, status: 'delivered' }
+            : o
+        ),
+      }
+    }
+
     case 'ADD_QUICK_ITEM_TO_ORDER': {
       const { tableId, orderId, item } = action.payload
       const activeOrder = state.orders.find(o =>

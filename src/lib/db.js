@@ -888,6 +888,34 @@ export async function writeToSupabase(action, state) {
       break
     }
 
+    case 'RECALL_TABLE_FROM_CASHIER': {
+      const tableId = action.payload
+      const { data: recalledOrders, error: ordersError } = await supabase
+        .from('orders')
+        .update({ status: 'delivered' })
+        .eq('table_id', tableId)
+        .eq('status', 'needs_bill')
+        .neq('payment_status', 'paid')
+        .select('id')
+      if (ordersError) throw ordersError
+
+      const { data: legacyOrders, error: legacyError } = await supabase
+        .from('orders')
+        .update({ status: 'delivered' })
+        .eq('table_id', tableId)
+        .eq('status', 'needs_bill')
+        .is('payment_status', null)
+        .select('id')
+      if (legacyError) throw legacyError
+
+      if (!recalledOrders?.length && !legacyOrders?.length) {
+        throw new Error('Order was not moved back to table. Refresh and try again.')
+      }
+
+      await updateRestaurantTableStatus(tableId, { status: 'occupied' }, { status: 'occupied' })
+      break
+    }
+
     case 'ADD_QUICK_ITEM_TO_ORDER': {
       const { tableId, orderId, item } = action.payload
       if ((!tableId && !orderId) || !item) return

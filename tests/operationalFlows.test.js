@@ -153,6 +153,37 @@ test('requested-bill quantity edits can reduce or remove served items before pay
   assert.equal(removedLast.tables[0].status, 'available')
 })
 
+test('cashier can move requested bill back to occupied table for waiter additions', () => {
+  const base = {
+    ...state(),
+    tables: [{ id: 't1', name: 'Table 1', status: 'needs_bill', is_active: true }],
+    orders: [
+      {
+        id: 'o1',
+        table_id: 't1',
+        status: 'needs_bill',
+        payment_status: 'unpaid',
+        order_type: 'dine_in',
+        items: [{ id: 'i1', menu_item_id: 'm1', name: 'Shashlik', price: 100000, quantity: 1, status: 'served' }],
+      },
+      {
+        id: 'o2',
+        table_id: 't1',
+        status: 'paid',
+        payment_status: 'paid',
+        order_type: 'dine_in',
+        items: [],
+      },
+    ],
+  }
+
+  const recalled = ordersReducer(base, { type: 'RECALL_TABLE_FROM_CASHIER', payload: 't1' })
+
+  assert.equal(recalled.tables[0].status, 'occupied')
+  assert.equal(recalled.orders.find(order => order.id === 'o1').status, 'delivered')
+  assert.equal(recalled.orders.find(order => order.id === 'o2').status, 'paid')
+})
+
 test('owner order deletion removes the order and resets table only when no active orders remain', () => {
   const base = {
     ...state(),
