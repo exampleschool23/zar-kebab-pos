@@ -700,7 +700,7 @@ export default function AdminMenu() {
       external_id: generateMenuExternalId(),
       sort_order: maxOrder + 1,
       show_in_cashier_quick_items: true,
-      cashier_only: true,
+      cashier_only: false,
       send_to_kitchen: false,
       quick_item_sort_order: maxQuickOrder + 1,
     })
@@ -1413,7 +1413,7 @@ export default function AdminMenu() {
                 id="cashierQuick"
                 type="checkbox"
                 checked={!!form.show_in_cashier_quick_items}
-                onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked, cashier_only: e.target.checked ? true : f.cashier_only }))}
+                onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked }))}
                 className="accent-[#ff5a00] w-4 h-4"
               />
               <label htmlFor="cashierQuick" className="text-sm text-gray-700 font-medium">
@@ -1429,7 +1429,7 @@ export default function AdminMenu() {
                 className="accent-[#ff5a00] w-4 h-4"
               />
               <label htmlFor="cashierOnly" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Faqat kassirda ko‘rsatish' : lang === 'ru' ? 'Показывать только кассиру' : 'Show only to cashier'}
+                {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
               </label>
             </div>
             <div className="flex items-center gap-2 pt-1">
