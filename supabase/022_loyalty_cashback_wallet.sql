@@ -18,7 +18,7 @@ create table if not exists public.loyalty_cards (
 
 create table if not exists public.loyalty_transactions (
   id              uuid primary key default gen_random_uuid(),
-  loyalty_card_id uuid not null references public.loyalty_cards(id) on delete cascade,
+  loyalty_card_id uuid references public.loyalty_cards(id) on delete set null,
   order_id        text references public.orders(id) on delete set null,
   type            text not null check (type in (
                     'cashback_earned',
@@ -34,6 +34,9 @@ create table if not exists public.loyalty_transactions (
   created_by      uuid references public.profiles(id) on delete set null,
   cashback_percent_used numeric check (cashback_percent_used is null or (cashback_percent_used >= 0 and cashback_percent_used <= 100)),
   card_type_at_transaction text check (card_type_at_transaction is null or card_type_at_transaction in ('bronze', 'silver', 'gold', 'premium', 'black')),
+  card_number_at_transaction text,
+  customer_name_at_transaction text not null default '',
+  phone_number_at_transaction text not null default '',
   created_at      timestamptz not null default now()
 );
 
@@ -42,7 +45,10 @@ alter table public.loyalty_cards
 
 alter table public.loyalty_transactions
   add column if not exists cashback_percent_used numeric,
-  add column if not exists card_type_at_transaction text;
+  add column if not exists card_type_at_transaction text,
+  add column if not exists card_number_at_transaction text,
+  add column if not exists customer_name_at_transaction text not null default '',
+  add column if not exists phone_number_at_transaction text not null default '';
 
 do $$ begin
   alter table public.loyalty_transactions drop constraint if exists loyalty_transactions_amount_check;

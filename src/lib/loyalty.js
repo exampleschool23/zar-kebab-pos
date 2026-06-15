@@ -51,7 +51,7 @@ export function canEditLoyaltyCard(role) {
   return normalizeRole(role) === 'owner'
 }
 
-export function canDeactivateLoyaltyCard(role) {
+export function canRemoveLoyaltyCard(role) {
   return normalizeRole(role) === 'owner'
 }
 
@@ -70,8 +70,8 @@ export function requireLoyaltyPermission(role, action) {
       ? canCreateLoyaltyCard(role)
       : action === 'edit'
         ? canEditLoyaltyCard(role)
-        : action === 'deactivate'
-          ? canDeactivateLoyaltyCard(role)
+        : action === 'remove_card'
+          ? canRemoveLoyaltyCard(role)
           : action === 'adjust'
             ? canAdjustLoyaltyBalance(role)
             : action === 'delete_transaction'
@@ -208,9 +208,15 @@ export function editLoyaltyCardRecord({ role = 'owner', card, patch = {}, now = 
   return next
 }
 
-export function deactivateLoyaltyCardRecord({ role = 'owner', card, now = new Date().toISOString() } = {}) {
-  requireLoyaltyPermission(role, 'deactivate')
-  return { ...card, is_active: false, updated_at: now }
+export function removeLoyaltyCardRecord({ role = 'owner', card } = {}) {
+  requireLoyaltyPermission(role, 'remove_card')
+  if (!card?.id) fail('card_not_found', 'Loyalty card not found', { status: 404 })
+  return {
+    removedCardId: card.id,
+    card_number: card.card_number,
+    customer_name: card.customer_name || '',
+    phone_number: card.phone_number || '',
+  }
 }
 
 export function makeLoyaltyTransaction({
@@ -454,7 +460,7 @@ export function getPublicLoyaltyCardView({ card, transactions = [], orders = [],
     })),
     canEdit: false,
     canAdjust: false,
-    canDeactivate: false,
+    canRemoveCard: false,
   }
 }
 

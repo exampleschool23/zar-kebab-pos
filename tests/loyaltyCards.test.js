@@ -7,13 +7,12 @@ import {
   adjustLoyaltyBalance,
   canAdjustLoyaltyBalance,
   canCreateLoyaltyCard,
-  canDeactivateLoyaltyCard,
   canDeleteLoyaltyTransaction,
   canEditLoyaltyCard,
+  canRemoveLoyaltyCard,
   canViewLoyaltyCards,
   completeOrderCashback,
   createLoyaltyCardRecord,
-  deactivateLoyaltyCardRecord,
   deleteLoyaltyTransactionRecord,
   editLoyaltyCardRecord,
   formatUzPhoneNumberInput,
@@ -29,6 +28,7 @@ import {
   normalizeCardNumber,
   normalizeCashbackType,
   redeemLoyaltyBalance,
+  removeLoyaltyCardRecord,
   validateLoyaltyPayment,
 } from '../src/lib/loyalty.js'
 import {
@@ -94,6 +94,7 @@ test('loyalty card registration is owner/admin and preserves exact 8-digit card 
   const created = createLoyaltyCardRecord({
     role: 'owner',
     cardNumber: '00123456',
+    customerName: ' Sabina ',
     phoneNumber: ' +998901112233 ',
     publicToken: 'token-00123456',
     existingCardNumbers: [],
@@ -102,7 +103,7 @@ test('loyalty card registration is owner/admin and preserves exact 8-digit card 
 
   assert.equal(created.card_number, '00123456')
   assert.equal(typeof created.card_number, 'string')
-  assert.equal(created.customer_name, '')
+  assert.equal(created.customer_name, 'Sabina')
   assert.equal(created.phone_number, '+998 90 111 22 33')
   assert.equal(created.cashback_type, DEFAULT_CASHBACK_TYPE)
   assert.equal(created.public_token, 'token-00123456')
@@ -316,7 +317,7 @@ test('loyalty permissions allow admin creation while keeping financial mutations
   assert.equal(canCreateLoyaltyCard('admin'), true)
   assert.equal(canEditLoyaltyCard('owner'), true)
   assert.equal(canAdjustLoyaltyBalance('owner'), true)
-  assert.equal(canDeactivateLoyaltyCard('owner'), true)
+  assert.equal(canRemoveLoyaltyCard('owner'), true)
   assert.equal(canDeleteLoyaltyTransaction('owner'), true)
 
   for (const role of ['cashier', 'waiter', 'stakeholder', 'guest']) {
@@ -326,12 +327,13 @@ test('loyalty permissions allow admin creation while keeping financial mutations
   for (const role of ['admin', 'cashier', 'waiter', 'stakeholder', 'guest']) {
     assert.equal(canEditLoyaltyCard(role), false)
     assert.equal(canAdjustLoyaltyBalance(role), false)
-    assert.equal(canDeactivateLoyaltyCard(role), false)
+    assert.equal(canRemoveLoyaltyCard(role), false)
     assert.equal(canDeleteLoyaltyTransaction(role), false)
   }
 
-  assertLoyaltyError(() => deactivateLoyaltyCardRecord({ role: 'admin', card: card() }), 'forbidden')
-  assert.equal(deactivateLoyaltyCardRecord({ role: 'owner', card: card() }).is_active, false)
+  assertLoyaltyError(() => removeLoyaltyCardRecord({ role: 'admin', card: card() }), 'forbidden')
+  assert.equal(removeLoyaltyCardRecord({ role: 'owner', card: card() }).removedCardId, 'lc-1')
+  assert.equal(removeLoyaltyCardRecord({ role: 'owner', card: card() }).card_number, '00123456')
 })
 
 test('cashier loyalty payment validates search, card state, order state, bill cap and balance cap', () => {
@@ -605,7 +607,7 @@ test('customer public loyalty page is read-only and protected by public token', 
   assert.equal(view.transactions.length, 1)
   assert.equal(view.canEdit, false)
   assert.equal(view.canAdjust, false)
-  assert.equal(view.canDeactivate, false)
+  assert.equal(view.canRemoveCard, false)
   assertLoyaltyError(() => getPublicLoyaltyCardView({ card: card(), publicToken: 'guessed-card-number' }), 'not_found')
 })
 

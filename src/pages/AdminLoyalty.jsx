@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Search, BadgeDollarSign, Plus, Ban, RefreshCw, ChevronRight, ArrowLeft, Trash2, X } from 'lucide-react'
+import { Search, BadgeDollarSign, Plus, RefreshCw, ChevronRight, ArrowLeft, Trash2, X } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
@@ -9,9 +9,9 @@ import {
   adjustLoyaltyBalance,
   canAdjustLoyaltyBalance,
   canCreateLoyaltyCard,
-  canDeactivateLoyaltyCard,
   canDeleteLoyaltyTransaction,
   canEditLoyaltyCard,
+  canRemoveLoyaltyCard,
   createLoyaltyCardRecord,
   editLoyaltyCardRecord,
   formatUzPhoneNumberInput,
@@ -23,7 +23,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 const CARD_PAGE_SIZE = 20
 const CARD_SELECT_COLUMNS = 'id, card_number, public_token, customer_name, phone_number, cashback_type, balance, total_earned, total_redeemed, is_active, created_at, updated_at'
-const TRANSACTION_SELECT_COLUMNS = 'id, loyalty_card_id, order_id, type, amount, balance_before, balance_after, reason, created_by, cashback_percent_used, card_type_at_transaction, created_at'
+const TRANSACTION_SELECT_COLUMNS = 'id, loyalty_card_id, order_id, type, amount, balance_before, balance_after, reason, created_by, cashback_percent_used, card_type_at_transaction, card_number_at_transaction, customer_name_at_transaction, phone_number_at_transaction, created_at'
 
 export default function AdminLoyalty() {
   const { state } = useApp()
@@ -33,13 +33,13 @@ export default function AdminLoyalty() {
   const canCreate = canCreateLoyaltyCard(role)
   const canEdit = canEditLoyaltyCard(role)
   const canAdjust = canAdjustLoyaltyBalance(role)
-  const canDeactivate = canDeactivateLoyaltyCard(role)
+  const canRemoveCard = canRemoveLoyaltyCard(role)
   const canDeleteTransactions = canDeleteLoyaltyTransaction(role)
   const [query, setQuery] = useState('')
   const [cards, setCards] = useState([])
   const [selected, setSelected] = useState(null)
   const [transactions, setTransactions] = useState([])
-  const [form, setForm] = useState({ card_number: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
+  const [form, setForm] = useState({ card_number: '', customer_name: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
   const [profileForm, setProfileForm] = useState({ customer_name: '', phone_number: '' })
   const [adjustment, setAdjustment] = useState({ amount: '', reason: '' })
   const [message, setMessage] = useState('')
@@ -76,7 +76,10 @@ export default function AdminLoyalty() {
       active: 'Faol',
       inactive: 'Faol emas',
       cashbackBalance: 'Cashback balansi',
-      deactivate: 'Faolsizlantirish',
+      removeCard: 'Kartani o‘chirish',
+      confirmRemoveCard: 'O‘chirishni tasdiqlash',
+      removeCardHelp: 'Karta o‘chiriladi, lekin eski tranzaksiyalar va hisobotlar saqlanadi. Bu karta raqamini boshqa mijozga qayta berish mumkin.',
+      removeCardFailed: 'Kartani o‘chirib bo‘lmadi. 051 migratsiyasini ishga tushiring.',
       totalEarned: 'Jami cashback',
       totalUsed: 'Jami ishlatilgan sodiqlik balansi',
       status: 'Status',
@@ -144,7 +147,10 @@ export default function AdminLoyalty() {
       active: 'Активна',
       inactive: 'Неактивна',
       cashbackBalance: 'Баланс кешбэка',
-      deactivate: 'Деактивировать',
+      removeCard: 'Удалить карту',
+      confirmRemoveCard: 'Подтвердить удаление',
+      removeCardHelp: 'Карта будет удалена, но старые транзакции и отчёты сохранятся. Этот номер карты можно будет выдать другому клиенту.',
+      removeCardFailed: 'Не удалось удалить карту. Запустите миграцию 051.',
       totalEarned: 'Всего кешбэка начислено',
       totalUsed: 'Всего использовано с баланса',
       status: 'Статус',
@@ -212,7 +218,10 @@ export default function AdminLoyalty() {
       active: 'Active',
       inactive: 'Inactive',
       cashbackBalance: 'Cashback balance',
-      deactivate: 'Deactivate',
+      removeCard: 'Remove card',
+      confirmRemoveCard: 'Confirm remove',
+      removeCardHelp: 'The card will be removed, but old transactions and reports stay preserved. This card number can be issued to another customer.',
+      removeCardFailed: 'Could not remove card. Run migration 051.',
       totalEarned: 'Total cashback earned',
       totalUsed: 'Total loyalty used',
       status: 'Status',
@@ -384,7 +393,7 @@ export default function AdminLoyalty() {
       cardRecord = createLoyaltyCardRecord({
         role,
         cardNumber: form.card_number,
-        customerName: '',
+        customerName: form.customer_name,
         phoneNumber: form.phone_number,
         cashbackType: form.cashback_type,
         existingCardNumbers: cards.map(card => card.card_number),
@@ -413,28 +422,32 @@ export default function AdminLoyalty() {
       setMessage(error.message)
       return
     }
-    setForm({ card_number: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
+    setForm({ card_number: '', customer_name: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
     setCards(prev => [data, ...prev])
     loadTransactions(data)
   }
 
-  async function deactivateCard(card) {
-    if (!canDeactivate) {
+  async function removeCard(card) {
+    if (!canRemoveCard) {
       setMessage(l.ownerOnly)
       return
     }
-    const { data, error } = await supabase
-      .from('loyalty_cards')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', card.id)
-      .select(CARD_SELECT_COLUMNS)
-      .single()
-    if (error) {
-      setMessage(error.message)
+    if (confirmDeleteId !== `card:${card.id}`) {
+      setConfirmDeleteId(`card:${card.id}`)
       return
     }
-    setCards(prev => prev.map(row => row.id === data.id ? data : row))
-    setSelected(data)
+    const { error } = await supabase.rpc('remove_loyalty_card', {
+      p_card_id: card.id,
+    })
+    if (error) {
+      setMessage(error.message || l.removeCardFailed)
+      return
+    }
+    setCards(prev => prev.filter(row => row.id !== card.id))
+    setSelected(null)
+    setTransactions([])
+    setConfirmDeleteId('')
+    setMessage('')
   }
 
   async function updateCustomerProfile() {
@@ -571,6 +584,7 @@ export default function AdminLoyalty() {
             <h2 className="mb-3 text-sm font-black text-[#1F2937]">{l.createTitle}</h2>
             <div className="space-y-2">
               <input value={form.card_number} onChange={e => setForm({ ...form, card_number: String(e.target.value || '').replace(/\D/g, '').slice(0, 8) })} placeholder={l.cardNumber} inputMode="numeric" maxLength={8} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
+              <input value={form.customer_name} onChange={e => setForm({ ...form, customer_name: e.target.value })} placeholder={l.customerName} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
               <input value={form.phone_number} onChange={e => setForm({ ...form, phone_number: formatUzPhoneNumberInput(e.target.value) })} placeholder="+998 91 132 32 32" className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold" />
               <select value={form.cashback_type} onChange={e => setForm({ ...form, cashback_type: e.target.value })} disabled={!canCreate} className="w-full rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50 disabled:text-[#9CA3AF]">
                 {Object.entries(CASHBACK_TYPES).map(([key, config]) => (
@@ -692,10 +706,11 @@ export default function AdminLoyalty() {
                         <h3 className="flex items-center gap-2 text-sm font-black text-[#1F2937]"><BadgeDollarSign size={16} /> {l.ownerActions}</h3>
                         <p className="mt-1 text-xs font-bold text-[#6B7280]">{l.manualAdjustment}</p>
                       </div>
-                      <button onClick={() => deactivateCard(selected)} disabled={selected.is_active === false || !canDeactivate} className="flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40">
-                        <Ban size={14} /> {l.deactivate}
+                      <button onClick={() => removeCard(selected)} disabled={!canRemoveCard} className="flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40">
+                        <Trash2 size={14} /> {confirmDeleteId === `card:${selected.id}` ? l.confirmRemoveCard : l.removeCard}
                       </button>
                     </div>
+                    {canRemoveCard && <p className="mb-3 text-xs font-semibold text-red-500">{l.removeCardHelp}</p>}
                     <p className="mb-3 text-xs font-semibold text-[#9CA3AF]">{canAdjust ? l.adjustmentHelper : l.ownerAdjustOnly}</p>
                     <div className="grid gap-2">
                       <input type="number" value={adjustment.amount} disabled={!canAdjust} onChange={e => setAdjustment({ ...adjustment, amount: e.target.value })} placeholder={l.amountPlaceholder} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50" />
