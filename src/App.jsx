@@ -26,6 +26,7 @@ const AdminMenu = lazy(() => import('./pages/AdminMenu'))
 const AdminTables = lazy(() => import('./pages/AdminTables'))
 const AdminUsers = lazy(() => import('./pages/AdminUsers'))
 const AdminLoyalty = lazy(() => import('./pages/AdminLoyalty'))
+const Expenses = lazy(() => import('./pages/Expenses'))
 const Reports = lazy(() => import('./pages/Reports'))
 const AdminAudit = lazy(() => import('./pages/AdminAudit'))
 const AdminSettings = lazy(() => import('./pages/AdminSettings'))
@@ -265,6 +266,9 @@ function AppRoutes() {
         } />
         <Route path="/admin/loyalty" element={
           <LazyProtectedRoute roles={PAGE_ACCESS.loyalty}><AdminLoyalty /></LazyProtectedRoute>
+        } />
+        <Route path="/admin/expenses" element={
+          <LazyProtectedRoute roles={PAGE_ACCESS.expenses}><Expenses /></LazyProtectedRoute>
         } />
         <Route path="/admin/discount-cards" element={<Navigate to="/admin/loyalty" replace />} />
         <Route path="/admin/reports" element={

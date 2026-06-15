@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { getNetIncome, summarizeExpenses } from '../lib/expenses'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -1055,6 +1056,8 @@ export default function Reports() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [deletingOrderId, setDeletingOrderId] = useState('')
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
+  const [expenses, setExpenses] = useState([])
+  const [expensesError, setExpensesError] = useState('')
 
   // ── Lookups ────────────────────────────────────────────────────────────────
 
@@ -1100,6 +1103,33 @@ export default function Reports() {
     (s, o) => s + getOrderItems(o).reduce((a, i) => a + (Number(i.quantity) || 1), 0), 0
   )
   const closeout = useMemo(() => getDailyCloseout(state.orders, dateTo), [state.orders, dateTo])
+  const expenseSummary = useMemo(() => summarizeExpenses(expenses), [expenses])
+  const netIncome = getNetIncome(kpiRevenue, expenses)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadExpenses() {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, expense_date, category, payment_method, amount')
+        .gte('expense_date', dateFrom)
+        .lte('expense_date', dateTo)
+      if (cancelled) return
+      const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+      if (error && message.includes('expenses') && (message.includes('does not exist') || message.includes('schema cache') || message.includes('42p01'))) {
+        setExpenses([])
+        setExpensesError('')
+      } else if (error) {
+        setExpenses([])
+        setExpensesError(error.message || 'Could not load expenses')
+      } else {
+        setExpenses(data || [])
+        setExpensesError('')
+      }
+    }
+    loadExpenses()
+    return () => { cancelled = true }
+  }, [dateFrom, dateTo])
 
   function exportCloseout() {
     downloadCsv(`zar-kebab-closeout-${closeout.date}.csv`, closeoutToCsv(closeout))
@@ -1126,9 +1156,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Jami daromad', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', loyaltyUsed: 'Sodiqlik ishlatildi', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Общая выручка',  numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', loyaltyUsed: 'Использовано лояльности', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Total Revenue',  numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold',allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', loyaltyUsed: 'Loyalty used', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Jami daromad', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', loyaltyUsed: 'Sodiqlik ishlatildi', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Общая выручка',  numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано', expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', loyaltyUsed: 'Использовано лояльности', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Total Revenue',  numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold', expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', loyaltyUsed: 'Loyalty used', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled' },
   }
   const l = L[lang] || L.en
 
@@ -1239,11 +1269,13 @@ export default function Reports() {
             </div>
 
             {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
               <KpiCard icon={DollarSign}  iconCls="bg-green-50 text-green-600"   label={l.totalRev}  value={formatCurrency(kpiRevenue)} sub={`${kpiOrders} ${lang === 'uz' ? "ta to'langan" : lang === 'ru' ? 'оплаченных' : 'paid orders'}`} />
               <KpiCard icon={ShoppingBag} iconCls="bg-orange-50 text-[#ff5a00]"  label={l.numOrders} value={kpiOrders} />
               <KpiCard icon={BarChart2}   iconCls="bg-blue-50 text-blue-600"     label={l.avgOrder}  value={formatCurrency(kpiAvg)} />
               <KpiCard icon={Package}     iconCls="bg-purple-50 text-purple-600" label={l.itemsSold} value={kpiItemsSold} />
+              <KpiCard icon={CreditCard}   iconCls="bg-red-50 text-red-600"       label={l.expenses} value={formatCurrency(expenseSummary.total)} sub={expensesError || ''} />
+              <KpiCard icon={DollarSign}   iconCls={netIncome >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} label={l.netIncome} value={formatCurrency(netIncome)} />
             </div>
 
             <div className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">

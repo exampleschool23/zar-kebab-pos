@@ -132,6 +132,7 @@ const checks = await Promise.all([
   checkTable('order_payments', 'id, order_id, method, amount'),
   checkTable('loyalty_cards', 'id, card_number, public_token, customer_name, phone_number, cashback_type, balance, total_earned, total_redeemed, is_active, created_at, updated_at'),
   checkTable('loyalty_transactions', 'id, loyalty_card_id, order_id, type, amount, balance_before, balance_after, reason, created_by, cashback_percent_used, card_type_at_transaction, created_at'),
+  checkTable('expenses', 'id, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at', false),
   checkRpc(
     'get_public_menu_data()',
     () => supabase.rpc('get_public_menu_data'),
