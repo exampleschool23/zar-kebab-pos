@@ -73,8 +73,170 @@ export function expensePaymentMethodLabel(method, lang = 'en') {
 }
 
 export function normalizeExpenseAmount(value) {
-  const amount = Math.round(Number(value) || 0)
+  const normalizedValue = typeof value === 'string'
+    ? value.replace(/\s+/g, '').replace(/,/g, '')
+    : value
+  const amount = Math.round(Number(normalizedValue) || 0)
   return Number.isFinite(amount) ? Math.max(0, amount) : 0
+}
+
+export const SALARY_PAY_SCHEDULES = ['daily', 'twice_weekly', 'monthly']
+export const SALARY_RATE_UNITS = ['daily', 'monthly']
+
+export function normalizePaySchedule(value) {
+  return SALARY_PAY_SCHEDULES.includes(value) ? value : 'monthly'
+}
+
+export function normalizeSalaryRateUnit(value) {
+  return SALARY_RATE_UNITS.includes(value) ? value : 'daily'
+}
+
+export function getSalaryCategoryForRole(role) {
+  const normalized = String(role || '').toLowerCase()
+  if (normalized === 'waiter') return 'salary_waiter'
+  if (['owner', 'admin', 'cashier'].includes(normalized)) return 'salary_manager'
+  return 'salary_other'
+}
+
+export function getCurrentSalaryRate(salaryProfile, asOfDate = todayExpenseDate()) {
+  const rates = [...(salaryProfile?.rates || [])]
+    .filter(rate => rate?.effective_from && rate.effective_from <= asOfDate)
+    .sort((a, b) => b.effective_from.localeCompare(a.effective_from) || String(b.created_at || '').localeCompare(String(a.created_at || '')))
+  return rates[0] || null
+}
+
+export function convertSalaryAmountToDaily(amount, rateUnit) {
+  const normalized = normalizeExpenseAmount(amount)
+  if (normalized <= 0) return 0
+  return normalizeSalaryRateUnit(rateUnit) === 'monthly'
+    ? Math.round(normalized / 30)
+    : normalized
+}
+
+export function getDailySalaryAmount(salaryProfile, asOfDate = todayExpenseDate()) {
+  const rate = getCurrentSalaryRate(salaryProfile, asOfDate)
+  return convertSalaryAmountToDaily(rate?.amount ?? rate?.daily_amount, rate?.rate_unit)
+}
+
+export function getSalaryActiveUntil(salaryProfile, dateTo = todayExpenseDate()) {
+  const endDate = String(salaryProfile?.ended_at || '').slice(0, 10)
+  if (!endDate) return dateTo
+  return endDate < dateTo ? endDate : dateTo
+}
+
+export function buildSalaryExpenseRows(salaryProfiles = [], dateFrom, dateTo) {
+  if (!dateFrom || !dateTo) return []
+  const rows = []
+  for (const salaryProfile of salaryProfiles || []) {
+    if (!salaryProfile) continue
+    const joinedAt = String(salaryProfile.joined_at || dateFrom).slice(0, 10)
+    const activeUntil = getSalaryActiveUntil(salaryProfile, dateTo)
+    const start = joinedAt > dateFrom ? joinedAt : dateFrom
+    if (start > activeUntil) continue
+    for (let date = start; date <= activeUntil; date = addLocalDateDays(date, 1)) {
+      const dailyAmount = getDailySalaryAmount(salaryProfile, date)
+      if (dailyAmount <= 0) continue
+      const name = salaryProfile.employee_name || salaryProfile.profile?.full_name || salaryProfile.profile?.email || ''
+      rows.push({
+        id: `salary-${salaryProfile.id}-${date}`,
+        expense_date: date,
+        category: getSalaryCategoryForRole(salaryProfile.profile?.role),
+        payment_method: salaryProfile.payment_method || 'cash',
+        amount: dailyAmount,
+        vendor: name,
+        description: 'Automatic daily salary',
+        created_by_name: name,
+        is_salary_auto: true,
+        salary_profile_id: salaryProfile.id,
+        employee_id: salaryProfile.profile_id,
+      })
+    }
+  }
+  return rows
+}
+
+export function buildSalaryPaymentExpenseRows(salaryProfiles = [], dateFrom, dateTo) {
+  if (!dateFrom || !dateTo) return []
+  const rows = []
+  for (const salaryProfile of salaryProfiles || []) {
+    if (!salaryProfile) continue
+    const name = salaryProfile.employee_name || salaryProfile.profile?.full_name || salaryProfile.profile?.email || ''
+    for (const payment of salaryProfile.payments || []) {
+      const expenseDate = String(payment?.paid_date || '').slice(0, 10)
+      if (!expenseDate || expenseDate < dateFrom || expenseDate > dateTo) continue
+      const amount = normalizeExpenseAmount(payment?.amount)
+      if (amount <= 0) continue
+      rows.push({
+        id: `salary-payment-${payment.id}`,
+        expense_date: expenseDate,
+        category: getSalaryCategoryForRole(salaryProfile.profile?.role),
+        payment_method: payment.payment_method || salaryProfile.payment_method || 'cash',
+        amount,
+        vendor: name,
+        description: payment.note || 'Salary payment',
+        created_by_name: payment.created_by_name || name,
+        is_salary_payment: true,
+        salary_profile_id: salaryProfile.id,
+        employee_id: salaryProfile.profile_id,
+      })
+    }
+  }
+  return rows
+}
+
+export function buildSalaryBonusExpenseRows(salaryProfiles = [], dateFrom, dateTo) {
+  if (!dateFrom || !dateTo) return []
+  const rows = []
+  for (const salaryProfile of salaryProfiles || []) {
+    if (!salaryProfile) continue
+    const name = salaryProfile.employee_name || salaryProfile.profile?.full_name || salaryProfile.profile?.email || ''
+    for (const bonus of salaryProfile.bonuses || []) {
+      const expenseDate = String(bonus?.bonus_date || '').slice(0, 10)
+      if (!expenseDate || expenseDate < dateFrom || expenseDate > dateTo) continue
+      const amount = normalizeExpenseAmount(bonus?.amount)
+      if (amount <= 0) continue
+      rows.push({
+        id: `salary-bonus-${bonus.id}`,
+        expense_date: expenseDate,
+        category: getSalaryCategoryForRole(salaryProfile.profile?.role),
+        payment_method: bonus.payment_method || salaryProfile.payment_method || 'cash',
+        amount,
+        vendor: name,
+        description: bonus.note || 'Employee bonus',
+        created_by_name: bonus.created_by_name || name,
+        is_salary_bonus: true,
+        salary_profile_id: salaryProfile.id,
+        employee_id: salaryProfile.profile_id,
+      })
+    }
+  }
+  return rows
+}
+
+export function getSalaryPaidAmount(salaryProfile, dateTo = todayExpenseDate()) {
+  return (salaryProfile?.payments || []).reduce((sum, payment) => {
+    if (payment?.paid_date && payment.paid_date > dateTo) return sum
+    return sum + normalizeExpenseAmount(payment?.amount)
+  }, 0)
+}
+
+export function getSalaryDue(salaryProfile, dateTo = todayExpenseDate()) {
+  const joinedAt = String(salaryProfile?.joined_at || dateTo).slice(0, 10)
+  const activeUntil = getSalaryActiveUntil(salaryProfile, dateTo)
+  const accrued = summarizeExpenses(buildSalaryExpenseRows([salaryProfile], joinedAt, activeUntil)).total
+  return Math.max(0, accrued - getSalaryPaidAmount(salaryProfile, dateTo))
+}
+
+export function getTotalSalaryDue(salaryProfiles = [], dateTo = todayExpenseDate()) {
+  return (salaryProfiles || []).reduce((sum, salaryProfile) => (
+    sum + getSalaryDue(salaryProfile, dateTo)
+  ), 0)
+}
+
+function addLocalDateDays(isoDate, days) {
+  const date = new Date(`${isoDate}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  return toLocalDateStr(date.toISOString())
 }
 
 export function expenseMatchesRange(expense, dateFrom, dateTo) {

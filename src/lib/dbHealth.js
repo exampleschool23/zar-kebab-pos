@@ -13,6 +13,10 @@ const TABLE_CHECKS = [
   { name: 'menu_items', columns: ['id', 'external_id', 'name_uz', 'name_ru', 'name_en', 'price', 'old_price', 'grams', 'millilitres', 'kcal', 'stock_count', 'cashier_only', 'sort_order'] },
   { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'hidden', 'sort_order'] },
   { name: 'profiles', columns: ['id', 'role', 'full_name'] },
+  { name: 'employee_salary_profiles', columns: ['id', 'profile_id', 'employee_name', 'joined_at', 'ended_at', 'pay_schedule', 'payment_method', 'is_active'] },
+  { name: 'employee_salary_rates', columns: ['id', 'salary_profile_id', 'effective_from', 'amount', 'rate_unit'] },
+  { name: 'employee_salary_payments', columns: ['id', 'salary_profile_id', 'paid_date', 'period_from', 'period_to', 'amount', 'payment_method'] },
+  { name: 'employee_salary_bonuses', columns: ['id', 'salary_profile_id', 'bonus_date', 'amount', 'payment_method'] },
   { name: 'order_payment_audit', columns: ['id', 'order_id', 'action', 'changed_at'] },
   { name: 'profile_audit', columns: ['id', 'profile_id', 'action', 'changed_at'] },
 ]
@@ -28,6 +32,10 @@ const MIGRATION_HINTS = {
   profile_audit: 'Run supabase/028_profile_role_audit.sql',
   menu_items: 'Run supabase/033_menu_item_grams.sql, supabase/034_menu_item_millilitres.sql, supabase/036_menu_item_old_price.sql, supabase/037_menu_item_external_id.sql, supabase/038_generate_immutable_menu_item_external_ids.sql, supabase/050_menu_item_stock_count.sql, and supabase/052_cashier_only_menu_items.sql',
   menu_categories: 'Run supabase/053_hidden_menu_categories.sql',
+  employee_salary_profiles: 'Run supabase/054_employee_salary_profiles.sql and supabase/056_employee_salary_profile_end_date.sql',
+  employee_salary_rates: 'Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, and supabase/058_employee_salary_daily_amount_compat.sql',
+  employee_salary_payments: 'Run supabase/054_employee_salary_profiles.sql',
+  employee_salary_bonuses: 'Run supabase/057_employee_salary_bonuses.sql',
   submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
 }

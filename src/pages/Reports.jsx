@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { getNetIncome, summarizeExpenses } from '../lib/expenses'
+import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -44,6 +44,17 @@ function addDays(isoDate, n) {
   const d = new Date(isoDate + 'T00:00:00')
   d.setDate(d.getDate() + n)
   return toLocalDateStr(d.toISOString())
+}
+
+function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], profiles = []) {
+  const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
+  return rows.map(row => ({
+    ...row,
+    profile: profileMap[row.profile_id] || null,
+    rates: rates.filter(rate => rate.salary_profile_id === row.id),
+    payments: payments.filter(payment => payment.salary_profile_id === row.id),
+    bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
+  }))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1058,6 +1069,7 @@ export default function Reports() {
   const [deletingOrderId, setDeletingOrderId] = useState('')
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
   const [expenses, setExpenses] = useState([])
+  const [salaryProfiles, setSalaryProfiles] = useState([])
   const [expensesError, setExpensesError] = useState('')
 
   // ── Lookups ────────────────────────────────────────────────────────────────
@@ -1104,8 +1116,15 @@ export default function Reports() {
     (s, o) => s + getOrderItems(o).reduce((a, i) => a + (Number(i.quantity) || 1), 0), 0
   )
   const closeout = useMemo(() => getDailyCloseout(state.orders, dateTo), [state.orders, dateTo])
-  const expenseSummary = useMemo(() => summarizeExpenses(expenses), [expenses])
-  const netIncome = getNetIncome(kpiRevenue, expenses)
+  const salaryExpenses = useMemo(() => (
+    buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
+  ), [salaryProfiles, dateFrom, dateTo])
+  const salaryBonusExpenses = useMemo(() => (
+    buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
+  ), [salaryProfiles, dateFrom, dateTo])
+  const allExpenses = useMemo(() => [...salaryExpenses, ...salaryBonusExpenses, ...expenses], [salaryExpenses, salaryBonusExpenses, expenses])
+  const expenseSummary = useMemo(() => summarizeExpenses(allExpenses), [allExpenses])
+  const netIncome = getNetIncome(kpiRevenue, allExpenses)
 
   useEffect(() => {
     let cancelled = false
@@ -1115,12 +1134,20 @@ export default function Reports() {
         setExpensesError('')
         return
       }
-      const { data, error } = await supabase
-        .from('expenses')
-        .select('id, expense_date, category, payment_method, amount')
-        .gte('expense_date', dateFrom)
-        .lte('expense_date', dateTo)
+      const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, teamResult] = await Promise.all([
+        supabase
+          .from('expenses')
+          .select('id, expense_date, category, payment_method, amount')
+          .gte('expense_date', dateFrom)
+          .lte('expense_date', dateTo),
+        supabase.from('employee_salary_profiles').select('*'),
+        supabase.from('employee_salary_rates').select('*'),
+        supabase.from('employee_salary_payments').select('*'),
+        supabase.from('employee_salary_bonuses').select('*'),
+        supabase.from('profiles').select('id, full_name, email, role, status'),
+      ])
       if (cancelled) return
+      const { data, error } = expenseResult
       const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
       if (error && message.includes('expenses') && (message.includes('does not exist') || message.includes('schema cache') || message.includes('42p01'))) {
         setExpenses([])
@@ -1131,6 +1158,17 @@ export default function Reports() {
       } else {
         setExpenses(data || [])
         setExpensesError('')
+      }
+      if (salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error) {
+        setSalaryProfiles([])
+      } else {
+        setSalaryProfiles(composeSalaryProfiles(
+          salaryProfileResult.data || [],
+          salaryRateResult.data || [],
+          salaryPaymentResult.data || [],
+          salaryBonusResult.data || [],
+          teamResult.data || [],
+        ))
       }
     }
     loadExpenses()

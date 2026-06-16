@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Banknote,
   CalendarDays,
@@ -8,6 +9,7 @@ import {
   ReceiptText,
   RefreshCw,
   Search,
+  Users,
   Terminal,
   Trash2,
   WalletCards,
@@ -22,9 +24,12 @@ import { formatCurrency } from '../lib/formatCurrency'
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_PAYMENT_METHODS,
+  buildSalaryBonusExpenseRows,
+  buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
   expensePaymentMethodLabel,
   getNetIncome,
+  getTotalSalaryDue,
   normalizeExpenseAmount,
   summarizeExpenseCashflow,
   summarizeExpenses,
@@ -56,6 +61,29 @@ function isMissingExpensesMigration(error) {
   )
 }
 
+function isMissingSalaryMigration(error) {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return text.includes('employee_salary') && (
+    text.includes('does not exist') ||
+    text.includes('could not find the') ||
+    text.includes('column') ||
+    text.includes('schema cache') ||
+    text.includes('42p01') ||
+    text.includes('42703')
+  )
+}
+
+function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], profiles = []) {
+  const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
+  return rows.map(row => ({
+    ...row,
+    profile: profileMap[row.profile_id] || null,
+    rates: rates.filter(rate => rate.salary_profile_id === row.id),
+    payments: payments.filter(payment => payment.salary_profile_id === row.id),
+    bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
+  }))
+}
+
 function exportExpensesCsv(expenses, lang) {
   const header = ['date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by']
   const rows = expenses.map(expense => [
@@ -76,6 +104,7 @@ function exportExpensesCsv(expenses, lang) {
 export default function Expenses() {
   const { state } = useApp()
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const lang = state.lang || 'ru'
   const role = (profile?.role || state.user?.role || 'guest').toLowerCase()
   const canAdd = role === 'owner'
@@ -85,6 +114,7 @@ export default function Expenses() {
   const [dateTo, setDateTo] = useState(todayExpenseDate())
   const [query, setQuery] = useState('')
   const [expenses, setExpenses] = useState([])
+  const [salaryProfiles, setSalaryProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -118,6 +148,8 @@ export default function Expenses() {
       saving: 'Saqlanmoqda...',
       refresh: 'Yangilash',
       export: 'Eksport',
+      salaries: 'Maoshlar',
+      salaryDue: 'Maosh qarzi',
       search: 'Kategoriya, izoh yoki xodim qidirish...',
       today: 'Bugun',
       week: '7 kun',
@@ -137,6 +169,8 @@ export default function Expenses() {
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
       loadFailed: 'Xarajatlarni yuklab bo‘lmadi.',
       migrationMissing: 'Xarajatlar jadvali hali bazada yaratilmagan. Supabase SQL editorida supabase/048_expenses.sql migratsiyasini ishga tushiring.',
+      salaryMigrationMissing: 'Maosh jadvallari yangilanmagan. Supabase SQL editorida supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql va supabase/056_employee_salary_profile_end_date.sql migratsiyalarini ishga tushiring.',
+      automaticSalary: 'Maosh to‘lovi',
       delete: 'O‘chirish',
       confirmDelete: 'Tasdiqlash',
       deleteFailed: 'Xarajatni o‘chirib bo‘lmadi.',
@@ -160,6 +194,8 @@ export default function Expenses() {
       saving: 'Сохраняется...',
       refresh: 'Обновить',
       export: 'Экспорт',
+      salaries: 'Зарплаты',
+      salaryDue: 'Долг по зарплате',
       search: 'Поиск по категории, описанию или сотруднику...',
       today: 'Сегодня',
       week: '7 дней',
@@ -179,6 +215,8 @@ export default function Expenses() {
       saveFailed: 'Не удалось сохранить расход.',
       loadFailed: 'Не удалось загрузить расходы.',
       migrationMissing: 'Таблица расходов ещё не создана в базе. Запустите supabase/048_expenses.sql в Supabase SQL Editor.',
+      salaryMigrationMissing: 'Таблицы зарплат не обновлены. Запустите supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql и supabase/056_employee_salary_profile_end_date.sql в Supabase SQL Editor.',
+      automaticSalary: 'Выплата зарплаты',
       delete: 'Удалить',
       confirmDelete: 'Подтвердить',
       deleteFailed: 'Не удалось удалить расход.',
@@ -202,6 +240,8 @@ export default function Expenses() {
       saving: 'Saving...',
       refresh: 'Refresh',
       export: 'Export',
+      salaries: 'Salaries',
+      salaryDue: 'Salary due',
       search: 'Search category, description, or employee...',
       today: 'Today',
       week: '7 days',
@@ -221,6 +261,8 @@ export default function Expenses() {
       saveFailed: 'Could not save expense.',
       loadFailed: 'Could not load expenses.',
       migrationMissing: 'Expenses table is not created yet. Run supabase/048_expenses.sql in Supabase SQL Editor.',
+      salaryMigrationMissing: 'Salary tables are not up to date. Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, and supabase/056_employee_salary_profile_end_date.sql in Supabase SQL Editor.',
+      automaticSalary: 'Salary payment',
       delete: 'Delete',
       confirmDelete: 'Confirm',
       deleteFailed: 'Could not delete expense.',
@@ -232,19 +274,39 @@ export default function Expenses() {
   async function loadExpenses() {
     setLoading(true)
     setError('')
-    const { data, error: loadError } = await supabase
-      .from('expenses')
-      .select(SELECT_COLUMNS)
-      .gte('expense_date', dateFrom)
-      .lte('expense_date', dateTo)
-      .order('expense_date', { ascending: false })
-      .order('created_at', { ascending: false })
+    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, teamResult] = await Promise.all([
+      supabase
+        .from('expenses')
+        .select(SELECT_COLUMNS)
+        .gte('expense_date', dateFrom)
+        .lte('expense_date', dateTo)
+        .order('expense_date', { ascending: false })
+        .order('created_at', { ascending: false }),
+      supabase.from('employee_salary_profiles').select('*'),
+      supabase.from('employee_salary_rates').select('*'),
+      supabase.from('employee_salary_payments').select('*'),
+      supabase.from('employee_salary_bonuses').select('*'),
+      supabase.from('profiles').select('id, full_name, email, role, status'),
+    ])
 
-    if (loadError) {
-      setError(isMissingExpensesMigration(loadError) ? l.migrationMissing : loadError.message || l.loadFailed)
+    if (expenseResult.error) {
+      setError(isMissingExpensesMigration(expenseResult.error) ? l.migrationMissing : expenseResult.error.message || l.loadFailed)
       setExpenses([])
     } else {
-      setExpenses(data || [])
+      setExpenses(expenseResult.data || [])
+    }
+    const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error
+    if (salaryError) {
+      setSalaryProfiles([])
+      if (!expenseResult.error && isMissingSalaryMigration(salaryError)) setError(l.salaryMigrationMissing)
+    } else {
+      setSalaryProfiles(composeSalaryProfiles(
+        salaryProfileResult.data || [],
+        salaryRateResult.data || [],
+        salaryPaymentResult.data || [],
+        salaryBonusResult.data || [],
+        teamResult.data || [],
+      ))
     }
     setLoading(false)
   }
@@ -258,10 +320,22 @@ export default function Expenses() {
   ), [state.orders, dateFrom, dateTo])
 
   const revenue = paidOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+  const salaryExpenses = useMemo(() => (
+    buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
+      .map(row => ({ ...row, description: l.automaticSalary }))
+      .sort((a, b) => b.expense_date.localeCompare(a.expense_date) || String(a.vendor || '').localeCompare(String(b.vendor || '')))
+  ), [salaryProfiles, dateFrom, dateTo, l.automaticSalary])
+  const salaryBonusExpenses = useMemo(() => (
+    buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
+      .sort((a, b) => b.expense_date.localeCompare(a.expense_date) || String(a.vendor || '').localeCompare(String(b.vendor || '')))
+  ), [salaryProfiles, dateFrom, dateTo])
+
+  const allExpenses = useMemo(() => [...salaryExpenses, ...salaryBonusExpenses, ...expenses], [salaryExpenses, salaryBonusExpenses, expenses])
+
   const filteredExpenses = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    if (!needle) return expenses
-    return expenses.filter(expense => {
+    if (!needle) return allExpenses
+    return allExpenses.filter(expense => {
       const haystack = [
         expenseCategoryLabel(expense.category, lang),
         expensePaymentMethodLabel(expense.payment_method, lang),
@@ -271,11 +345,13 @@ export default function Expenses() {
       ].join(' ').toLowerCase()
       return haystack.includes(needle)
     })
-  }, [expenses, query, lang])
+  }, [allExpenses, query, lang])
 
   const summary = useMemo(() => summarizeExpenses(filteredExpenses), [filteredExpenses])
   const cashflow = useMemo(() => summarizeExpenseCashflow(paidOrders, filteredExpenses), [paidOrders, filteredExpenses])
   const netIncome = getNetIncome(revenue, filteredExpenses)
+  const salaryDueDate = dateTo < todayExpenseDate() ? dateTo : todayExpenseDate()
+  const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])
   const methodRows = Object.entries(summary.byMethod)
@@ -359,6 +435,9 @@ export default function Expenses() {
               <button onClick={loadExpenses} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
                 <RefreshCw size={14} />{l.refresh}
               </button>
+              <button onClick={() => navigate('/admin/expenses/salaries')} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-[#ff5a00] shadow-sm">
+                <Users size={14} />{l.salaries}
+              </button>
               <button onClick={() => exportExpensesCsv(filteredExpenses, lang)} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
                 <Download size={14} />{l.export}
               </button>
@@ -379,10 +458,11 @@ export default function Expenses() {
             </div>
           </div>
 
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Kpi icon={WalletCards} label={l.income} value={formatCurrency(revenue)} tone="green" />
             <Kpi icon={ReceiptText} label={l.expenses} value={formatCurrency(summary.total)} sub={`${summary.count} ${l.entries.toLowerCase()}`} tone="orange" />
             <Kpi icon={Banknote} label={l.left} value={formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
+            <Kpi icon={Users} label={l.salaryDue} value={formatCurrency(totalSalaryDue)} tone={totalSalaryDue > 0 ? 'orange' : 'green'} />
             <Kpi icon={CalendarDays} label={l.entries} value={summary.count} tone="purple" />
           </div>
 
@@ -523,7 +603,7 @@ export default function Expenses() {
                           </div>
                           <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
                             <p className="text-lg font-black text-[#ff5a00]">{formatCurrency(expense.amount)}</p>
-                            {canDelete && (
+                            {canDelete && !expense.is_salary_auto && (
                               <button onClick={() => deleteExpense(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
                                 confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
                               }`}>
