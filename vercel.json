@@ -1,4 +1,28 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "zar-kebab.vercel.app"
+        }
+      ],
+      "destination": "https://www.zarkebab.uz/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "zar-kebab-pos.vercel.app"
+        }
+      ],
+      "destination": "https://www.zarkebab.uz/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
