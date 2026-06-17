@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppProvider, useApp } from './store/AppContext'
-import { defaultPath as roleDefaultPath, isPublicOnlyRole, PAGE_ACCESS } from './lib/permissions'
+import { defaultPath as roleDefaultPath, PAGE_ACCESS } from './lib/permissions'
 import { t } from './lib/i18n'
 
 import Login          from './pages/Login'
@@ -117,24 +117,6 @@ function ProtectedRoute({ children, roles }) {
   return children
 }
 
-function PublicMenuRoute({ children }) {
-  const { session, profile, loading } = useAuth()
-
-  if (loading) return <Spinner />
-  if (!session) return children
-  if (!profile) return <Spinner />
-
-  const role = (profile?.role || 'guest').toLowerCase()
-  if (profile?.status === 'disabled' || profile?.status === 'pending') {
-    return <RoleRedirect />
-  }
-  if (!isPublicOnlyRole(role)) {
-    return <Navigate to={defaultPath(role)} replace />
-  }
-
-  return children
-}
-
 function SignedOutRoute({ children }) {
   const { session, profile, loading } = useAuth()
   const [searchParams] = useSearchParams()
@@ -213,7 +195,7 @@ function AppRoutes() {
       <Routes>
         {/* Public */}
         <Route path="/"              element={<RoleRedirect />} />
-        <Route path="/menu"          element={<PublicMenuRoute><PublicMenu /></PublicMenuRoute>} />
+        <Route path="/menu"          element={<PublicMenu />} />
         <Route path="/menu/item/:itemId" element={<PublicMenu />} />
         <Route path="/catering"      element={<CateringPage />} />
         <Route path="/telegram"      element={<TelegramMiniApp />} />
@@ -268,12 +250,14 @@ function AppRoutes() {
         <Route path="/admin/loyalty" element={
           <LazyProtectedRoute roles={PAGE_ACCESS.loyalty}><AdminLoyalty /></LazyProtectedRoute>
         } />
-        <Route path="/admin/expenses" element={
+        <Route path="/admin/accounting" element={
           <LazyProtectedRoute roles={PAGE_ACCESS.expenses}><Expenses /></LazyProtectedRoute>
         } />
-        <Route path="/admin/expenses/salaries" element={
+        <Route path="/admin/accounting/salaries" element={
           <LazyProtectedRoute roles={PAGE_ACCESS.expenses}><Salaries /></LazyProtectedRoute>
         } />
+        <Route path="/admin/expenses" element={<Navigate to="/admin/accounting" replace />} />
+        <Route path="/admin/expenses/salaries" element={<Navigate to="/admin/accounting/salaries" replace />} />
         <Route path="/admin/discount-cards" element={<Navigate to="/admin/loyalty" replace />} />
         <Route path="/admin/reports" element={
           <LazyProtectedRoute roles={PAGE_ACCESS.reports}><Reports /></LazyProtectedRoute>

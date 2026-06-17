@@ -51,7 +51,7 @@ const NAV = [
     key: 'expenses',
     icon: WalletCards,
     labels: { uz: 'Buxgalteriya', ru: 'Бухгалтерия', en: 'Accounting' },
-    path: '/admin/expenses',
+    path: '/admin/accounting',
     roles: PAGE_ACCESS.expenses,
   },
   {
@@ -99,6 +99,7 @@ function activeKey(pathname) {
   if (pathname.startsWith('/waiter/tables'))  return 'tables'
   if (pathname.startsWith('/cashier'))        return 'cashier'
   if (pathname.startsWith('/admin/loyalty'))  return 'loyalty'
+  if (pathname.startsWith('/admin/accounting')) return 'expenses'
   if (pathname.startsWith('/admin/expenses')) return 'expenses'
   if (pathname.startsWith('/admin/menu'))     return 'menu'
   if (pathname.startsWith('/admin/tables'))   return 'settings'
