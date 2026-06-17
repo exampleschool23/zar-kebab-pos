@@ -387,7 +387,10 @@ export default function Expenses() {
       .sort((a, b) => b.expense_date.localeCompare(a.expense_date) || String(a.vendor || '').localeCompare(String(b.vendor || '')))
   ), [salaryProfiles, dateFrom, dateTo])
 
-  const allExpenses = useMemo(() => [...salaryExpenses, ...salaryBonusExpenses, ...expenses], [salaryExpenses, salaryBonusExpenses, expenses])
+  const allExpenses = useMemo(() => (
+    [...salaryExpenses, ...salaryBonusExpenses, ...expenses]
+      .sort((a, b) => b.expense_date.localeCompare(a.expense_date))
+  ), [salaryExpenses, salaryBonusExpenses, expenses])
 
   const filteredExpenses = allExpenses
 
