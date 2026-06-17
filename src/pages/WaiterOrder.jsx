@@ -452,6 +452,7 @@ export default function WaiterOrder() {
   const [orderType,     setOrderType]    = useState(isTakeAwayFlow ? 'take_away' : 'dine_in')
   const [detailItem,    setDetailItem]   = useState(null)
   const productScrollRef = useRef(null)
+  const savedMenuScrollRef = useRef(0)
   const shouldOpenOrderPanel = searchParams.get('panel') === 'order'
   const routeOrderType = isTakeAwayFlow
     ? normalizeOrderType(searchParams.get('orderType') || searchParams.get('type') || 'take_away')
@@ -597,6 +598,7 @@ export default function WaiterOrder() {
 
   function openDetail(item) {
     if (isSendingOrder) return
+    savedMenuScrollRef.current = productScrollRef.current?.scrollTop ?? 0
     setDetailItem(item)
   }
 
@@ -615,6 +617,16 @@ export default function WaiterOrder() {
     dispatch({ type: 'LOGOUT' })
     signOut?.()
   }
+
+  React.useEffect(() => {
+    if (!detailItem && savedMenuScrollRef.current > 0) {
+      requestAnimationFrame(() => {
+        if (productScrollRef.current) {
+          productScrollRef.current.scrollTop = savedMenuScrollRef.current
+        }
+      })
+    }
+  }, [detailItem])
 
   React.useEffect(() => {
     dispatch({ type: 'SET_TABLE', payload: isTakeAwayFlow ? null : tableId })

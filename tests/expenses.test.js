@@ -398,6 +398,51 @@ test('salary payment and bonus expenses are filtered by their recorded dates', (
   ])
 })
 
+test('salary transaction payment methods flow into accounting summaries', () => {
+  const salaryProfile = {
+    id: 'salary-accounting-methods-1',
+    profile_id: 'salary-accounting-methods-user-1',
+    employee_name: 'Method Cashier',
+    joined_at: '2026-06-01',
+    payment_method: 'cash',
+    profile: { role: 'cashier' },
+    rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
+    payments: [
+      { id: 'payment-card', paid_date: '2026-06-12', amount: 1_200_000, payment_method: 'card', note: 'Paid by card' },
+      { id: 'payment-fallback', paid_date: '2026-06-13', amount: 800_000, note: 'Uses profile method' },
+    ],
+    bonuses: [
+      { id: 'bonus-terminal', bonus_date: '2026-06-14', amount: 500_000, payment_method: 'terminal', note: 'Terminal bonus' },
+    ],
+  }
+
+  const accountingRows = [
+    ...buildSalaryPaymentExpenseRows([salaryProfile], '2026-06-01', '2026-06-30'),
+    ...buildSalaryBonusExpenseRows([salaryProfile], '2026-06-01', '2026-06-30'),
+  ]
+  const summary = summarizeExpenses(accountingRows)
+  const cashflow = summarizeExpenseCashflow([
+    { payment_status: 'paid', payment_method: 'cash', total: 2_000_000 },
+    { payment_status: 'paid', payment_method: 'card', total: 2_000_000 },
+    { payment_status: 'paid', payment_method: 'terminal', total: 2_000_000 },
+  ], accountingRows)
+
+  assert.deepEqual(accountingRows.map(row => [row.id, row.payment_method, row.amount]), [
+    ['salary-payment-payment-card', 'card', 1_200_000],
+    ['salary-payment-payment-fallback', 'cash', 800_000],
+    ['salary-bonus-bonus-terminal', 'terminal', 500_000],
+  ])
+  assert.equal(summary.byMethod.card, 1_200_000)
+  assert.equal(summary.byMethod.cash, 800_000)
+  assert.equal(summary.byMethod.terminal, 500_000)
+  assert.equal(cashflow.byMethod.card.expenses, 1_200_000)
+  assert.equal(cashflow.byMethod.card.left, 800_000)
+  assert.equal(cashflow.byMethod.cash.expenses, 800_000)
+  assert.equal(cashflow.byMethod.cash.left, 1_200_000)
+  assert.equal(cashflow.byMethod.terminal.expenses, 500_000)
+  assert.equal(cashflow.byMethod.terminal.left, 1_500_000)
+})
+
 test('salary bonuses do not reduce salary due or mutate payment history balances', () => {
   const waiterProfile = {
     id: 'salary-bonus-due-1',
@@ -445,4 +490,52 @@ test('salary expenses participate in expense cashflow by recorded payment method
   assert.equal(cashflow.byMethod.cash.left, 1_750_000)
   assert.equal(cashflow.byMethod.terminal.expenses, 1_000_000)
   assert.equal(cashflow.byMethod.terminal.left, 500_000)
+})
+
+test('salary payment rows never carry period_from or period_to — those columns are dropped', () => {
+  const profile = {
+    id: 'salary-no-period-1',
+    profile_id: 'waiter-no-period-1',
+    employee_name: 'No Period Waiter',
+    joined_at: '2026-06-01',
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
+    payments: [
+      { id: 'p1', paid_date: '2026-06-16', amount: 1_000_000, payment_method: 'cash' },
+    ],
+    bonuses: [],
+  }
+
+  const rows = buildSalaryPaymentExpenseRows([profile], '2026-06-01', '2026-06-30')
+
+  assert.equal(rows.length, 1)
+  assert.equal('period_from' in rows[0], false, 'period_from must not appear on payment expense rows')
+  assert.equal('period_to' in rows[0], false, 'period_to must not appear on payment expense rows')
+  assert.equal(rows[0].amount, 1_000_000)
+  assert.equal(rows[0].expense_date, '2026-06-16')
+})
+
+test('salary payment note is shown instead of period range when present', () => {
+  const profile = {
+    id: 'salary-payment-note-1',
+    profile_id: 'waiter-note-1',
+    employee_name: 'Note Waiter',
+    joined_at: '2026-06-01',
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
+    payments: [
+      { id: 'p-note', paid_date: '2026-06-16', amount: 900_000, payment_method: 'cash', note: 'June payout' },
+      { id: 'p-no-note', paid_date: '2026-06-20', amount: 600_000, payment_method: 'cash', note: '' },
+    ],
+    bonuses: [],
+  }
+
+  const rows = buildSalaryPaymentExpenseRows([profile], '2026-06-01', '2026-06-30')
+
+  assert.equal(rows.length, 2)
+  // payment note flows into description so the accounting tab can display it
+  assert.equal(rows.find(r => r.id === 'salary-payment-p-note')?.description, 'June payout')
+  assert.equal(rows.find(r => r.id === 'salary-payment-p-no-note')?.description, 'Salary payment')
 })

@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Power, RefreshCw, Save, Trash2, WalletCards } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, History, Loader2, Plus, Power, RefreshCw, Save, Trash2, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { formatCurrency } from '../lib/formatCurrency'
+import { formatCurrency, formatDate } from '../lib/formatCurrency'
 import {
   EXPENSE_PAYMENT_METHODS,
   SALARY_RATE_UNITS,
@@ -123,6 +123,7 @@ export default function Salaries() {
       totalDue: 'Jami qarzdorlik',
       accruedToday: 'Bugungi xarajat',
       history: 'Maosh tarixi',
+      historyBtn: 'Tarix',
       payments: 'To‘lovlar',
       paymentHistory: 'To‘lovlar / bonuslar',
       paymentLabel: 'To‘lov',
@@ -167,6 +168,7 @@ export default function Salaries() {
       totalDue: 'Общий долг',
       accruedToday: 'Расход за день',
       history: 'История зарплаты',
+      historyBtn: 'История',
       payments: 'Выплаты',
       paymentHistory: 'Выплаты / бонусы',
       paymentLabel: 'Выплата',
@@ -211,6 +213,7 @@ export default function Salaries() {
       totalDue: 'Total due',
       accruedToday: 'Daily expense',
       history: 'Salary history',
+      historyBtn: 'History',
       payments: 'Payments',
       paymentHistory: 'Payments / bonuses',
       paymentLabel: 'Payment',
@@ -234,6 +237,7 @@ export default function Salaries() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [confirmActionKey, setConfirmActionKey] = useState('')
+  const [historyOpenId, setHistoryOpenId] = useState(null)
   const [page, setPage] = useState(1)
   const [form, setForm] = useState({
     employee_name: '',
@@ -417,8 +421,6 @@ export default function Salaries() {
       : await supabase.from('employee_salary_payments').insert({
           salary_profile_id: salaryProfile.id,
           paid_date: paidDate,
-          period_from: salaryProfile.joined_at,
-          period_to: paidDate,
           amount,
           payment_method: transactionForm.payment_method || salaryProfile.payment_method || 'cash',
           note: transactionForm.note || '',
@@ -547,7 +549,7 @@ export default function Salaries() {
         <div className="mx-auto max-w-[1200px] px-4 py-5 sm:px-5 sm:py-6">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <button onClick={() => navigate('/admin/expenses')} className="mb-3 inline-flex items-center gap-2 text-xs font-black text-[#6B7280] hover:text-[#ff5a00]">
+              <button onClick={() => navigate('/admin/accounting')} className="mb-3 inline-flex items-center gap-2 text-xs font-black text-[#6B7280] hover:text-[#ff5a00]">
                 <ArrowLeft size={14} />{l.back}
               </button>
               <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
@@ -589,11 +591,6 @@ export default function Salaries() {
                       <Field label={l.salaryUnit}>
                         <select value={form.salary_unit} onChange={event => setForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage}>
                           {SALARY_RATE_UNITS.map(item => <option key={item} value={item}>{salaryRateUnitLabel(item, lang)}</option>)}
-                        </select>
-                      </Field>
-                      <Field label={l.method}>
-                        <select value={form.payment_method} onChange={event => setForm(current => ({ ...current, payment_method: event.target.value }))} className={FIELD} disabled={!canManage}>
-                          {EXPENSE_PAYMENT_METHODS.map(item => <option key={item} value={item}>{expensePaymentMethodLabel(item, lang)}</option>)}
                         </select>
                       </Field>
                       <button disabled={!canManage || saving === 'create'} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white disabled:bg-gray-200">
@@ -733,6 +730,16 @@ export default function Salaries() {
                       disabled={!canManage}
                     />
                   </Field>
+                  <Field label={l.method}>
+                    <select
+                      value={transactionForm.payment_method}
+                      onChange={event => setTransactionForm(current => ({ ...current, payment_method: event.target.value }))}
+                      className={FIELD}
+                      disabled={!canManage}
+                    >
+                      {EXPENSE_PAYMENT_METHODS.map(method => <option key={method} value={method}>{expensePaymentMethodLabel(method, lang)}</option>)}
+                    </select>
+                  </Field>
                   <button
                     type="button"
                     onClick={addTransaction}
@@ -764,7 +771,7 @@ export default function Salaries() {
                     entryType: 'payment',
                     date: payment.paid_date,
                     amount: payment.amount,
-                    detail: `${payment.period_from} - ${payment.period_to}`,
+                    detail: payment.note || '',
                     row: payment,
                   })),
                   ...item.bonuses.map(bonus => ({
@@ -778,8 +785,8 @@ export default function Salaries() {
                 ].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
                 return (
                   <section key={item.id} className={`rounded-2xl border p-4 shadow-sm ${isInactive ? 'border-[#E5E7EB] bg-[#F3F4F6]' : 'border-[#E5E7EB] bg-white'}`}>
-                    <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_180px_220px] lg:items-start">
-                      <div>
+                    <div className="flex flex-wrap items-start gap-3">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h2 className={`text-lg font-black ${isInactive ? 'text-[#6B7280]' : 'text-[#1F2937]'}`}>{item.employee_name || item.profile?.full_name || item.profile?.email}</h2>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-black ${item.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-[#6B7280]'}`}>
@@ -787,105 +794,44 @@ export default function Salaries() {
                           </span>
                         </div>
                         <p className={`mt-1 flex flex-wrap items-center gap-2 text-xs font-bold ${isInactive ? 'text-[#9CA3AF]' : 'text-[#6B7280]'}`}>
-                          <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{item.joined_at}</span>
-                          <span>{expensePaymentMethodLabel(item.payment_method, lang)}</span>
-                          {!item.is_active && item.ended_at && <span>{l.to}: {item.ended_at}</span>}
+                          <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{formatDate(item.joined_at)}</span>
+                          {!item.is_active && item.ended_at && <span>{formatDate(item.ended_at)}</span>}
                         </p>
                       </div>
-                      <Metric label={l.accruedToday} value={formatCurrency(dailyAmount)} />
-                      <Metric label={l.due} value={formatCurrency(due)} hot />
-                    </div>
-
-                    <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
                       <div className="flex flex-wrap items-center gap-2">
+                        <Metric label={l.accruedToday} value={formatCurrency(dailyAmount)} />
+                        <Metric label={l.due} value={formatCurrency(due)} hot />
                         <button
                           type="button"
-                          onClick={() => removeSalaryProfile(item)}
-                          disabled={!canManage || saving === `profile-remove-${item.id}`}
-                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 text-xs font-black text-red-600"
+                          onClick={() => setHistoryOpenId(item.id)}
+                          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280]"
                         >
-                          {saving === `profile-remove-${item.id}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                          {confirmActionKey === `profile-remove-${item.id}` ? l.confirmDelete : l.remove}
+                          <History size={14} />{l.historyBtn}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleSalaryProfileActive(item)}
-                          disabled={!canManage || saving === `profile-toggle-${item.id}`}
-                          className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black ${
-                            item.is_active ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] bg-white text-[#1F2937]'
-                          }`}
-                        >
-                          {saving === `profile-toggle-${item.id}` ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
-                          {confirmActionKey === `profile-toggle-${item.id}` ? l.confirmDelete : item.is_active ? l.deactivate : l.reactivate}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mb-4 grid gap-3 md:grid-cols-2">
-                      <Field label={l.method}>
-                        <select value={item.payment_method} onChange={event => updateSalaryProfile(item, { payment_method: event.target.value })} className={FIELD} disabled={!canManage || isInactive || saving === item.id}>
-                          {EXPENSE_PAYMENT_METHODS.map(method => <option key={method} value={method}>{expensePaymentMethodLabel(method, lang)}</option>)}
-                        </select>
-                      </Field>
-                      <Field label={l.joined}>
-                        <input type="date" value={item.joined_at} onChange={event => updateSalaryProfile(item, { joined_at: event.target.value })} className={FIELD} disabled={!canManage || isInactive || saving === item.id} />
-                      </Field>
-                    </div>
-
-                    <div className="grid gap-4">
-                      <div className="space-y-4">
-                        <div className={`rounded-xl border p-3 ${isInactive ? 'border-[#E5E7EB] bg-[#F9FAFB]' : 'border-[#EEF0F3] bg-[#FBFCFD]'}`}>
-                          <h3 className={`mb-3 text-sm font-black ${isInactive ? 'text-[#9CA3AF]' : 'text-[#1F2937]'}`}>{l.history}</h3>
-                          <div className="mt-3 space-y-1">
-                            {item.rates.slice(0, 4).map(rate => (
-                              <div key={rate.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-bold ${isInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-white text-[#6B7280]'}`}>
-                                <span>{rate.effective_from}</span>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span>{formatCurrency(rate.amount ?? rate.daily_amount)} · {salaryRateUnitLabel(rate.rate_unit || 'daily', lang)} · {formatCurrency(convertSalaryAmountToDaily(rate.amount ?? rate.daily_amount, rate.rate_unit))}/day</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteRate(rate)}
-                                    disabled={!canManage || isInactive || saving === `rate-delete-${rate.id}`}
-                                    className={`inline-flex h-8 items-center justify-center rounded-lg border px-2 text-[11px] font-black ${
-                                      confirmActionKey === `rate-delete-${rate.id}` ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
-                                    }`}
-                                  >
-                                    {saving === `rate-delete-${rate.id}` ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} className="mr-1" />{confirmActionKey === `rate-delete-${rate.id}` ? l.confirmDelete : l.delete}</>}
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className={`rounded-xl border p-3 ${isInactive ? 'border-[#E5E7EB] bg-[#F9FAFB]' : 'border-[#EEF0F3] bg-[#FBFCFD]'}`}>
-                          <h3 className={`mb-3 text-sm font-black ${isInactive ? 'text-[#9CA3AF]' : 'text-[#1F2937]'}`}>{l.paymentHistory}</h3>
-                          <div className="mt-3 space-y-1">
-                            {transactionHistory.slice(0, 6).map(entry => (
-                              <div key={`${entry.entryType}-${entry.id}`} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-bold ${isInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-white text-[#6B7280]'}`}>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span>{entry.date}</span>
-                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${entry.entryType === 'bonus' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-[#ff5a00]'}`}>
-                                    {entry.entryType === 'bonus' ? l.bonusLabel : l.paymentLabel}
-                                  </span>
-                                  {entry.detail && <span>{entry.detail}</span>}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span>{formatCurrency(entry.amount)}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => (entry.entryType === 'bonus' ? deleteBonus(entry.row) : deletePayment(entry.row))}
-                                    disabled={!canManage || isInactive || saving === `${entry.entryType}-delete-${entry.id}`}
-                                    className={`inline-flex h-8 items-center justify-center rounded-lg border px-2 text-[11px] font-black ${
-                                      confirmActionKey === `${entry.entryType}-delete-${entry.id}` ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
-                                    }`}
-                                  >
-                                    {saving === `${entry.entryType}-delete-${entry.id}` ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} className="mr-1" />{confirmActionKey === `${entry.entryType}-delete-${entry.id}` ? l.confirmDelete : l.delete}</>}
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                        {canManage && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => removeSalaryProfile(item)}
+                              disabled={saving === `profile-remove-${item.id}`}
+                              className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 text-xs font-black text-red-600"
+                            >
+                              {saving === `profile-remove-${item.id}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              {confirmActionKey === `profile-remove-${item.id}` ? l.confirmDelete : l.remove}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleSalaryProfileActive(item)}
+                              disabled={saving === `profile-toggle-${item.id}`}
+                              className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black ${
+                                item.is_active ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] bg-white text-[#1F2937]'
+                              }`}
+                            >
+                              {saving === `profile-toggle-${item.id}` ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
+                              {confirmActionKey === `profile-toggle-${item.id}` ? l.confirmDelete : item.is_active ? l.deactivate : l.reactivate}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </section>
@@ -919,6 +865,90 @@ export default function Salaries() {
           )}
         </div>
       </div>
+
+      {/* History drawer */}
+      {(() => {
+        const drawerItem = historyOpenId ? salaryProfiles.find(p => p.id === historyOpenId) : null
+        if (!drawerItem) return null
+        const drawerInactive = drawerItem.is_active === false
+        const drawerTransactionHistory = [
+          ...drawerItem.payments.map(payment => ({
+            id: payment.id,
+            entryType: 'payment',
+            date: payment.paid_date,
+            amount: payment.amount,
+            detail: `${formatDate(payment.period_from)} – ${formatDate(payment.period_to)}`,
+            row: payment,
+          })),
+          ...drawerItem.bonuses.map(bonus => ({
+            id: bonus.id,
+            entryType: 'bonus',
+            date: bonus.bonus_date,
+            amount: bonus.amount,
+            detail: bonus.note || expensePaymentMethodLabel(bonus.payment_method, lang),
+            row: bonus,
+          })),
+        ].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+        return (
+          <>
+            {/* backdrop */}
+            <div
+              className="fixed inset-0 z-40 bg-black/30"
+              onClick={() => setHistoryOpenId(null)}
+            />
+            {/* drawer panel */}
+            <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl">
+              <div className="flex flex-shrink-0 items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
+                <div>
+                  <h2 className="text-base font-black text-[#1F2937]">{drawerItem.employee_name || drawerItem.profile?.full_name}</h2>
+                  <p className="mt-0.5 text-xs font-bold text-[#6B7280]">{l.history}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpenId(null)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] hover:text-[#1F2937]"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                <div>
+                  <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#6B7280]">{l.paymentHistory}</p>
+                  <div className="space-y-1">
+                    {drawerTransactionHistory.map(entry => (
+                      <div key={`${entry.entryType}-${entry.id}`} className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-xs font-bold ${drawerInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-[#F9FAFB] text-[#6B7280]'}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{formatDate(entry.date)}</span>
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${entry.entryType === 'bonus' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-[#ff5a00]'}`}>
+                            {entry.entryType === 'bonus' ? l.bonusLabel : l.paymentLabel}
+                          </span>
+                          {entry.detail && <span className="text-[#9CA3AF]">{entry.detail}</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-[#1F2937]">{formatCurrency(entry.amount)}</span>
+                          {canManage && (
+                            <button
+                              type="button"
+                              onClick={() => (entry.entryType === 'bonus' ? deleteBonus(entry.row) : deletePayment(entry.row))}
+                              disabled={drawerInactive || saving === `${entry.entryType}-delete-${entry.id}`}
+                              className={`inline-flex h-7 items-center justify-center rounded-lg border px-2 text-[11px] font-black ${confirmActionKey === `${entry.entryType}-delete-${entry.id}` ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'}`}
+                            >
+                              {saving === `${entry.entryType}-delete-${entry.id}` ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} className="mr-1" />{confirmActionKey === `${entry.entryType}-delete-${entry.id}` ? l.confirmDelete : l.delete}</>}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {drawerTransactionHistory.length === 0 && (
+                      <p className="py-4 text-center text-xs font-bold text-[#9CA3AF]">—</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </AppShell>
   )
 }

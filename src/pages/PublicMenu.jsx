@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Search, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -62,6 +62,8 @@ export default function PublicMenu() {
   const [error, setError] = useState('')
   const [detailItem, setDetailItem] = useState(null)
   const [missingItemLink, setMissingItemLink] = useState(false)
+  const showDetailOverlay = Boolean(detailItem)
+  const savedScrollRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -158,32 +160,19 @@ export default function PublicMenu() {
   }, [categories])
 
   function openDetail(item) {
+    savedScrollRef.current = window.scrollY
     setDetailItem(item)
     navigate(getMenuItemPublicPath(item))
   }
 
   function closeDetail() {
+    const scrollY = savedScrollRef.current
     setDetailItem(null)
     setMissingItemLink(false)
     navigate('/menu')
-  }
-
-  if (detailItem) {
-    return (
-      <div className="h-screen bg-[#FAF6EE]">
-        <MenuProductDetailPage
-          item={detailItem}
-          category={categoryMap[detailItem.category_id]}
-          currentQty={0}
-          currentNotes=""
-          lang={lang}
-          onBack={closeDetail}
-          onCancel={closeDetail}
-          onAddToCart={() => {}}
-          readOnly
-        />
-      </div>
-    )
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY, behavior: 'instant' })
+    })
   }
 
   return (
@@ -363,6 +352,21 @@ export default function PublicMenu() {
           )
         )}
       </main>
+      {showDetailOverlay && (
+        <div className="fixed inset-0 z-[80] bg-[#FAF6EE]">
+          <MenuProductDetailPage
+            item={detailItem}
+            category={categoryMap[detailItem.category_id]}
+            currentQty={0}
+            currentNotes=""
+            lang={lang}
+            onBack={closeDetail}
+            onCancel={closeDetail}
+            onAddToCart={() => {}}
+            readOnly
+          />
+        </div>
+      )}
     </div>
   )
 }

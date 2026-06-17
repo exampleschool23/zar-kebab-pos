@@ -19,7 +19,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
-import { formatCurrency } from '../lib/formatCurrency'
+import { formatCurrency, formatDate } from '../lib/formatCurrency'
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_ENTRY_TYPES,
@@ -503,7 +503,7 @@ export default function Expenses() {
             <button onClick={loadExpenses} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
               <RefreshCw size={14} />{l.refresh}
             </button>
-            <button onClick={() => navigate('/admin/expenses/salaries')} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-[#ff5a00] shadow-sm">
+            <button onClick={() => navigate('/admin/accounting/salaries')} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-[#ff5a00] shadow-sm">
               <Users size={14} />{l.salaries}
             </button>
             <button onClick={() => exportExpensesCsv(filteredExpenses, lang)} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
@@ -513,10 +513,10 @@ export default function Expenses() {
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Kpi icon={WalletCards} label={l.income} value={formatCurrency(totalIncome)} tone="green" />
+            <Kpi icon={HandCoins} label={l.investorSupport} value={formatCurrency(investorSupportTotal)} tone="purple" />
             <Kpi icon={ReceiptText} label={l.expenses} value={formatCurrency(summary.total)} sub={`${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" />
             <Kpi icon={Banknote} label={l.left} value={formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
             <Kpi icon={Users} label={l.salaryDue} value={formatCurrency(totalSalaryDue)} tone={totalSalaryDue > 0 ? 'orange' : 'green'} />
-            <Kpi icon={HandCoins} label={l.investorSupport} value={formatCurrency(investorSupportTotal)} tone="purple" />
           </div>
 
           <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
@@ -727,7 +727,7 @@ function ExpenseHistorySection({
                       <Icon size={11} />{expensePaymentMethodLabel(expense.payment_method, lang)}
                     </span>
                   </div>
-                  <p className="text-xs font-bold text-[#9CA3AF]">{expense.expense_date} · {expense.created_by_name || '—'}</p>
+                  <p className="text-xs font-bold text-[#9CA3AF]">{formatDate(expense.expense_date)} · {expense.created_by_name || '—'}</p>
                   {(expense.vendor || expense.description) && (
                     <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">
                       {[expense.vendor, expense.description].filter(Boolean).join(' · ')}
