@@ -460,7 +460,10 @@ export default function WaiterOrder() {
   const table = isTakeAwayFlow ? null : state.tables.find(t => t.id === tableId)
   const orderTitle = isTakeAwayFlow
     ? orderTypeLabel(orderType, lang)
-    : table?.name
+    : table?.name || table?.label || `${t(lang, 'table')} ${table?.number || tableId}`
+  const orderContextLabel = isTakeAwayFlow
+    ? (lang === 'uz' ? 'Buyurtma turi' : lang === 'ru' ? 'Тип заказа' : 'Order type')
+    : t(lang, 'table')
 
   // Merge all active orders for this table
   const activeOrder = useMemo(() => {
@@ -710,7 +713,7 @@ export default function WaiterOrder() {
         {/* Public-menu style search */}
         <div className="flex-shrink-0 px-4 pt-4 pb-0">
           <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
           {/* Mobile hamburger */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -729,7 +732,12 @@ export default function WaiterOrder() {
             <ArrowLeft size={17} />
           </button>
 
-          <div className="relative flex-1">
+          <div className="min-w-[92px] max-w-[180px] flex-shrink-0 sm:max-w-[240px]">
+            <p className="truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
+            <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
+          </div>
+
+          <div className="relative order-last min-w-full flex-1 sm:order-none sm:min-w-[180px]">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] pointer-events-none" />
             <input
               type="text"

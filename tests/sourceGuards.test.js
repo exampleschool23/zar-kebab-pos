@@ -718,6 +718,16 @@ test('WaiterOrder opens the cart drawer from manage-order links', () => {
   assert.match(source, /setCartOpen\(true\)/)
 })
 
+test('WaiterOrder shows the current table or order type in the header', () => {
+  const source = readSource('src/pages/WaiterOrder.jsx')
+
+  assert.match(source, /const orderTitle = isTakeAwayFlow/)
+  assert.match(source, /table\?\.name \|\| table\?\.label/)
+  assert.match(source, /\{orderContextLabel\}/)
+  assert.match(source, /\{orderTitle\}/)
+  assert.match(source, /order-last min-w-full flex-1 sm:order-none/)
+})
+
 test('WaiterOrder lets active and requested-bill order items be quantity-adjusted', () => {
   const source = readSource('src/pages/WaiterOrder.jsx')
   const panel = functionBody(source, 'OrderActionPanel')
