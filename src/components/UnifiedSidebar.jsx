@@ -50,7 +50,7 @@ const NAV = [
   {
     key: 'expenses',
     icon: WalletCards,
-    labels: { uz: 'Xarajatlar', ru: 'Расходы', en: 'Expenses' },
+    labels: { uz: 'Buxgalteriya', ru: 'Бухгалтерия', en: 'Accounting' },
     path: '/admin/expenses',
     roles: PAGE_ACCESS.expenses,
   },

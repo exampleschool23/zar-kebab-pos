@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Banknote,
-  CalendarDays,
   CreditCard,
   Download,
+  HandCoins,
   Plus,
   ReceiptText,
   RefreshCw,
@@ -54,6 +54,40 @@ function methodIcon(method) {
   if (method === 'card') return CreditCard
   if (method === 'terminal') return Terminal
   return Banknote
+}
+
+function expenseTone(expense) {
+  const category = String(expense?.category || '')
+  if (normalizeExpenseEntryType(expense?.entry_type) === 'income') {
+    return {
+      row: 'border-l-4 border-l-green-500',
+      title: 'text-green-700',
+      badge: 'bg-green-50 text-green-700',
+      amount: 'text-green-600',
+    }
+  }
+  if (category.startsWith('salary_') || expense?.is_salary_payment || expense?.is_salary_bonus) {
+    return {
+      row: 'border-l-4 border-l-blue-500',
+      title: 'text-blue-700',
+      badge: 'bg-blue-50 text-blue-700',
+      amount: 'text-blue-600',
+    }
+  }
+  if (category === 'products_bazaar') {
+    return {
+      row: 'border-l-4 border-l-teal-500',
+      title: 'text-teal-700',
+      badge: 'bg-teal-50 text-teal-700',
+      amount: 'text-teal-600',
+    }
+  }
+  return {
+    row: 'border-l-4 border-l-orange-500',
+    title: 'text-[#1F2937]',
+    badge: 'bg-gray-100 text-[#6B7280]',
+    amount: 'text-[#ff5a00]',
+  }
 }
 
 function isMissingExpensesMigration(error) {
@@ -137,12 +171,12 @@ export default function Expenses() {
 
   const L = {
     uz: {
-      title: 'Xarajatlar',
-      sub: 'Pul qayerga ketayotganini yozib boring',
+      title: 'Buxgalteriya',
+      sub: 'Daromad, xarajat, investor yordami va maoshlarni kuzatish',
       income: 'Daromad',
+      investorSupport: 'Investor yordami',
       expenses: 'Xarajatlar',
       left: 'Qolgan pul',
-      entries: 'Yozuvlar',
       add: 'Xarajat qo‘shish',
       addIncome: 'Boshqa daromad qo‘shish',
       date: 'Sana',
@@ -167,16 +201,17 @@ export default function Expenses() {
       month: 'Oy',
       from: 'Dan',
       to: 'Gacha',
-      byCategory: 'Kategoriya bo‘yicha',
-      byMethod: 'To‘lov turi bo‘yicha',
       methodBalances: 'To‘lov turi qoldig‘i',
       moneyFlow: 'Pul qayerga ketmoqda',
       incomeSources: 'Qo‘shimcha daromad manbalari',
       incomeIn: 'Kirdi',
       spentOut: 'Chiqdi',
       remaining: 'Qoldi',
+      investorHistory: 'Investor yordami',
       history: 'Xarajatlar tarixi',
       empty: 'Bu davrda xarajat yozilmagan',
+      emptyInvestor: 'Bu davrda investor yordami yo‘q',
+      salaryBonus: 'Maosh bonusi',
       required: 'Sana, kategoriya, to‘lov turi va summa kerak.',
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
       loadFailed: 'Xarajatlarni yuklab bo‘lmadi.',
@@ -189,12 +224,12 @@ export default function Expenses() {
       readOnly: 'Bu rol faqat ko‘ra oladi.',
     },
     ru: {
-      title: 'Расходы',
-      sub: 'Учёт денег, которые уходят из кафе',
+      title: 'Бухгалтерия',
+      sub: 'Учёт доходов, расходов, поддержки инвестора и зарплат',
       income: 'Доход',
+      investorSupport: 'Поддержка инвестора',
       expenses: 'Расходы',
       left: 'Остаток',
-      entries: 'Записей',
       add: 'Добавить расход',
       addIncome: 'Добавить внешний доход',
       date: 'Дата',
@@ -219,16 +254,17 @@ export default function Expenses() {
       month: 'Месяц',
       from: 'С',
       to: 'По',
-      byCategory: 'По категориям',
-      byMethod: 'По способам оплаты',
       methodBalances: 'Остаток по способам оплаты',
       moneyFlow: 'Куда уходят деньги',
       incomeSources: 'Источники внешнего дохода',
       incomeIn: 'Приход',
       spentOut: 'Расход',
       remaining: 'Остаток',
+      investorHistory: 'Поддержка инвестора',
       history: 'История расходов',
       empty: 'За этот период расходов нет',
+      emptyInvestor: 'За этот период поддержки инвестора нет',
+      salaryBonus: 'Бонус к зарплате',
       required: 'Нужны дата, категория, способ оплаты и сумма.',
       saveFailed: 'Не удалось сохранить расход.',
       loadFailed: 'Не удалось загрузить расходы.',
@@ -241,12 +277,12 @@ export default function Expenses() {
       readOnly: 'Эта роль может только просматривать.',
     },
     en: {
-      title: 'Expenses',
-      sub: 'Track where cafe money is going out',
+      title: 'Accounting',
+      sub: 'Track income, expenses, investor support, and salaries',
       income: 'Income',
+      investorSupport: 'Investor support',
       expenses: 'Expenses',
       left: 'Left',
-      entries: 'Entries',
       add: 'Add expense',
       addIncome: 'Add other income',
       date: 'Date',
@@ -271,16 +307,17 @@ export default function Expenses() {
       month: 'Month',
       from: 'From',
       to: 'To',
-      byCategory: 'By category',
-      byMethod: 'By payment method',
       methodBalances: 'Left by payment method',
       moneyFlow: 'Where money is going',
       incomeSources: 'Other income sources',
       incomeIn: 'In',
       spentOut: 'Out',
       remaining: 'Left',
+      investorHistory: 'Investor support',
       history: 'Expense history',
       empty: 'No expenses in this period',
+      emptyInvestor: 'No investor support in this period',
+      salaryBonus: 'Salary bonus',
       required: 'Date, category, payment method, and amount are required.',
       saveFailed: 'Could not save expense.',
       loadFailed: 'Could not load expenses.',
@@ -372,19 +409,21 @@ export default function Expenses() {
     })
   }, [allExpenses, query, lang])
 
+  const filteredInvestorSupport = useMemo(() => (
+    filteredExpenses.filter(expense => normalizeExpenseEntryType(expense.entry_type) === 'income')
+  ), [filteredExpenses])
+  const filteredExpenseRows = useMemo(() => (
+    filteredExpenses.filter(expense => normalizeExpenseEntryType(expense.entry_type) !== 'income')
+  ), [filteredExpenses])
   const incomeSummary = useMemo(() => summarizeIncomeEntries(filteredExpenses), [filteredExpenses])
   const summary = useMemo(() => summarizeExpenses(filteredExpenses), [filteredExpenses])
   const cashflow = useMemo(() => summarizeExpenseCashflow(paidOrders, filteredExpenses), [paidOrders, filteredExpenses])
   const netIncome = getNetIncome(revenue, filteredExpenses)
   const totalIncome = revenue + incomeSummary.total
-  const totalEntryCount = filteredExpenses.length
+  const investorSupportTotal = incomeSummary.byCategory.investor_support || 0
   const salaryDueDate = dateTo < todayExpenseDate() ? dateTo : todayExpenseDate()
   const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
   const categoryRows = Object.entries(summary.byCategory)
-    .sort((a, b) => b[1] - a[1])
-  const incomeCategoryRows = Object.entries(incomeSummary.byCategory)
-    .sort((a, b) => b[1] - a[1])
-  const methodRows = Object.entries(summary.byMethod)
     .sort((a, b) => b[1] - a[1])
 
   async function saveExpense(event) {
@@ -498,10 +537,10 @@ export default function Expenses() {
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Kpi icon={WalletCards} label={l.income} value={formatCurrency(totalIncome)} tone="green" />
-            <Kpi icon={ReceiptText} label={l.expenses} value={formatCurrency(summary.total)} sub={`${summary.count} ${l.entries.toLowerCase()}`} tone="orange" />
+            <Kpi icon={ReceiptText} label={l.expenses} value={formatCurrency(summary.total)} sub={`${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" />
             <Kpi icon={Banknote} label={l.left} value={formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
             <Kpi icon={Users} label={l.salaryDue} value={formatCurrency(totalSalaryDue)} tone={totalSalaryDue > 0 ? 'orange' : 'green'} />
-            <Kpi icon={CalendarDays} label={l.entries} value={totalEntryCount} tone="purple" />
+            <Kpi icon={HandCoins} label={l.investorSupport} value={formatCurrency(investorSupportTotal)} tone="purple" />
           </div>
 
           <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
@@ -627,64 +666,114 @@ export default function Expenses() {
                 )}
               </section>
 
-              <Breakdown title={l.byCategory} rows={categoryRows} total={summary.total} lang={lang} type="category" />
-              <Breakdown title={l.byMethod} rows={methodRows} total={summary.total} lang={lang} type="method" />
+              <ExpenseHistorySection
+                title={l.investorHistory}
+                rows={filteredInvestorSupport}
+                loading={loading}
+                emptyText={l.emptyInvestor}
+                loadingTitle={l.loadFailed.replace('Не удалось ', '').replace('Could not ', '')}
+                lang={lang}
+                canDelete={canDelete}
+                confirmDeleteId={confirmDeleteId}
+                confirmDeleteLabel={l.confirmDelete}
+                deleteLabel={l.delete}
+                onDelete={deleteExpense}
+                salaryPaymentLabel={l.automaticSalary}
+                salaryBonusLabel={l.salaryBonus}
+              />
             </div>
 
             <div className="min-w-0 space-y-5">
               <ExpenseCategoryChart title={l.moneyFlow} rows={categoryRows} total={summary.total} lang={lang} />
-              <Breakdown title={l.incomeSources} rows={incomeCategoryRows} total={incomeSummary.total} lang={lang} type="category" />
-
-              <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
-                <div className="border-b border-[#F3F4F6] px-4 py-4">
-                  <h2 className="text-base font-black text-[#1F2937]">{l.history}</h2>
-                </div>
-                {loading ? (
-                  <OperationalLoading title={l.loadFailed.replace('Не удалось ', '').replace('Could not ', '')} description="" />
-                ) : filteredExpenses.length === 0 ? (
-                  <div className="px-4 py-14 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div>
-                ) : (
-                  <div className="max-h-[720px] overflow-y-auto">
-                    {filteredExpenses.map(expense => {
-                      const Icon = methodIcon(expense.payment_method)
-                      const isIncome = normalizeExpenseEntryType(expense.entry_type) === 'income'
-                      return (
-                        <div key={expense.id} className="flex flex-col gap-3 border-b border-[#F3F4F6] px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="min-w-0">
-                            <div className="mb-1 flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-black text-[#1F2937]">{expenseCategoryLabel(expense.category, lang)}</span>
-                              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-black text-[#6B7280]">
-                                <Icon size={11} />{expensePaymentMethodLabel(expense.payment_method, lang)}
-                              </span>
-                            </div>
-                            <p className="text-xs font-bold text-[#9CA3AF]">{expense.expense_date} · {expense.created_by_name || '—'}</p>
-                            {(expense.vendor || expense.description) && (
-                              <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">
-                                {[expense.vendor, expense.description].filter(Boolean).join(' · ')}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
-                            <p className={`text-lg font-black ${isIncome ? 'text-green-600' : 'text-[#ff5a00]'}`}>{formatCurrency(expense.amount)}</p>
-                            {canDelete && !expense.is_salary_auto && (
-                              <button onClick={() => deleteExpense(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
-                                confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
-                              }`}>
-                                <Trash2 size={14} />{confirmDeleteId === expense.id ? l.confirmDelete : l.delete}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </section>
+              <ExpenseHistorySection
+                title={l.history}
+                rows={filteredExpenseRows}
+                loading={loading}
+                emptyText={l.empty}
+                loadingTitle={l.loadFailed.replace('Не удалось ', '').replace('Could not ', '')}
+                lang={lang}
+                canDelete={canDelete}
+                confirmDeleteId={confirmDeleteId}
+                confirmDeleteLabel={l.confirmDelete}
+                deleteLabel={l.delete}
+                onDelete={deleteExpense}
+                salaryPaymentLabel={l.automaticSalary}
+                salaryBonusLabel={l.salaryBonus}
+              />
             </div>
           </div>
         </div>
       </div>
     </AppShell>
+  )
+}
+
+function ExpenseHistorySection({
+  title,
+  rows,
+  loading,
+  emptyText,
+  loadingTitle,
+  lang,
+  canDelete,
+  confirmDeleteId,
+  confirmDeleteLabel,
+  deleteLabel,
+  onDelete,
+  salaryPaymentLabel,
+  salaryBonusLabel,
+}) {
+  return (
+    <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
+      <div className="border-b border-[#F3F4F6] px-4 py-4">
+        <h2 className="text-base font-black text-[#1F2937]">{title}</h2>
+      </div>
+      {loading ? (
+        <OperationalLoading title={loadingTitle} description="" />
+      ) : rows.length === 0 ? (
+        <div className="px-4 py-12 text-center text-sm font-bold text-[#9CA3AF]">{emptyText}</div>
+      ) : (
+        <div className="max-h-[520px] overflow-y-auto">
+          {rows.map(expense => {
+            const Icon = methodIcon(expense.payment_method)
+            const tone = expenseTone(expense)
+            const title = expense.is_salary_payment
+              ? salaryPaymentLabel
+              : expense.is_salary_bonus
+                ? salaryBonusLabel
+                : expenseCategoryLabel(expense.category, lang)
+            return (
+              <div key={expense.id} className={`flex flex-col gap-3 border-b border-[#F3F4F6] px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between ${tone.row}`}>
+                <div className="min-w-0">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className={`text-sm font-black ${tone.title}`}>{title}</span>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-black ${tone.badge}`}>
+                      <Icon size={11} />{expensePaymentMethodLabel(expense.payment_method, lang)}
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-[#9CA3AF]">{expense.expense_date} · {expense.created_by_name || '—'}</p>
+                  {(expense.vendor || expense.description) && (
+                    <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">
+                      {[expense.vendor, expense.description].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
+                  <p className={`text-lg font-black ${tone.amount}`}>{formatCurrency(expense.amount)}</p>
+                  {canDelete && !expense.is_salary_auto && (
+                    <button onClick={() => onDelete(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
+                      confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
+                    }`}>
+                      <Trash2 size={14} />{confirmDeleteId === expense.id ? confirmDeleteLabel : deleteLabel}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 

@@ -95,7 +95,7 @@ export default function Salaries() {
     uz: {
       title: 'Maoshlar',
       sub: 'Ishga kirgan sana, maosh va to‘lanishi kerak summa',
-      back: 'Xarajatlarga qaytish',
+      back: 'Buxgalteriyaga qaytish',
       add: 'Xodim maoshi qo‘shish',
       employee: 'Xodim',
       employeeName: 'Xodim ismi',
@@ -139,7 +139,7 @@ export default function Salaries() {
     ru: {
       title: 'Зарплаты',
       sub: 'Дата выхода, зарплата и сумма к выплате',
-      back: 'Назад к расходам',
+      back: 'Назад к бухгалтерии',
       add: 'Добавить зарплату сотрудника',
       employee: 'Сотрудник',
       employeeName: 'Имя сотрудника',
@@ -183,7 +183,7 @@ export default function Salaries() {
     en: {
       title: 'Salaries',
       sub: 'Joining date, salary, and amount due',
-      back: 'Back to expenses',
+      back: 'Back to accounting',
       add: 'Add employee salary',
       employee: 'Employee',
       employeeName: 'Employee name',
