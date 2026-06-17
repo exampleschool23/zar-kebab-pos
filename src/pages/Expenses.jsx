@@ -8,7 +8,6 @@ import {
   Plus,
   ReceiptText,
   RefreshCw,
-  Search,
   Users,
   Terminal,
   Trash2,
@@ -151,7 +150,6 @@ export default function Expenses() {
 
   const [dateFrom, setDateFrom] = useState(todayExpenseDate())
   const [dateTo, setDateTo] = useState(todayExpenseDate())
-  const [query, setQuery] = useState('')
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -195,7 +193,6 @@ export default function Expenses() {
       export: 'Eksport',
       salaries: 'Maoshlar',
       salaryDue: 'Maosh qarzi',
-      search: 'Kategoriya, izoh yoki xodim qidirish...',
       today: 'Bugun',
       week: '7 kun',
       month: 'Oy',
@@ -248,7 +245,6 @@ export default function Expenses() {
       export: 'Экспорт',
       salaries: 'Зарплаты',
       salaryDue: 'Долг по зарплате',
-      search: 'Поиск по категории, описанию или сотруднику...',
       today: 'Сегодня',
       week: '7 дней',
       month: 'Месяц',
@@ -301,7 +297,6 @@ export default function Expenses() {
       export: 'Export',
       salaries: 'Salaries',
       salaryDue: 'Salary due',
-      search: 'Search category, description, or employee...',
       today: 'Today',
       week: '7 days',
       month: 'Month',
@@ -394,20 +389,7 @@ export default function Expenses() {
 
   const allExpenses = useMemo(() => [...salaryExpenses, ...salaryBonusExpenses, ...expenses], [salaryExpenses, salaryBonusExpenses, expenses])
 
-  const filteredExpenses = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    if (!needle) return allExpenses
-    return allExpenses.filter(expense => {
-      const haystack = [
-        expenseCategoryLabel(expense.category, lang),
-        expensePaymentMethodLabel(expense.payment_method, lang),
-        expense.vendor,
-        expense.description,
-        expense.created_by_name,
-      ].join(' ').toLowerCase()
-      return haystack.includes(needle)
-    })
-  }, [allExpenses, query, lang])
+  const filteredExpenses = allExpenses
 
   const filteredInvestorSupport = useMemo(() => (
     filteredExpenses.filter(expense => normalizeExpenseEntryType(expense.entry_type) === 'income')
@@ -490,35 +472,6 @@ export default function Expenses() {
               <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
               <p className="mt-1 text-sm font-medium text-[#6B7280]">{l.sub}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {[
-                { key: 'today', label: l.today },
-                { key: 'week', label: l.week },
-                { key: 'month', label: l.month },
-              ].map(option => (
-                <button
-                  key={option.key}
-                  onClick={() => {
-                    const today = todayExpenseDate()
-                    if (option.key === 'today') { setDateFrom(today); setDateTo(today) }
-                    if (option.key === 'week') { setDateFrom(addDays(today, -6)); setDateTo(today) }
-                    if (option.key === 'month') { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
-                  }}
-                  className="rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm hover:border-orange-200 hover:text-[#ff5a00]"
-                >
-                  {option.label}
-                </button>
-              ))}
-              <button onClick={loadExpenses} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
-                <RefreshCw size={14} />{l.refresh}
-              </button>
-              <button onClick={() => navigate('/admin/expenses/salaries')} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-[#ff5a00] shadow-sm">
-                <Users size={14} />{l.salaries}
-              </button>
-              <button onClick={() => exportExpensesCsv(filteredExpenses, lang)} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
-                <Download size={14} />{l.export}
-              </button>
-            </div>
           </div>
 
           <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -529,10 +482,33 @@ export default function Expenses() {
               <span className="text-[11px] font-bold text-[#9CA3AF]">{l.to}</span>
               <input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} className="bg-transparent text-sm outline-none" />
             </div>
-            <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 shadow-sm">
-              <Search size={16} className="text-[#9CA3AF]" />
-              <input value={query} onChange={event => setQuery(event.target.value)} placeholder={l.search} className="w-full bg-transparent text-sm outline-none" />
-            </div>
+            {[
+              { key: 'today', label: l.today },
+              { key: 'week', label: l.week },
+              { key: 'month', label: l.month },
+            ].map(option => (
+              <button
+                key={option.key}
+                onClick={() => {
+                  const today = todayExpenseDate()
+                  if (option.key === 'today') { setDateFrom(today); setDateTo(today) }
+                  if (option.key === 'week') { setDateFrom(addDays(today, -6)); setDateTo(today) }
+                  if (option.key === 'month') { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
+                }}
+                className="rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm hover:border-orange-200 hover:text-[#ff5a00]"
+              >
+                {option.label}
+              </button>
+            ))}
+            <button onClick={loadExpenses} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
+              <RefreshCw size={14} />{l.refresh}
+            </button>
+            <button onClick={() => navigate('/admin/expenses/salaries')} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-[#ff5a00] shadow-sm">
+              <Users size={14} />{l.salaries}
+            </button>
+            <button onClick={() => exportExpensesCsv(filteredExpenses, lang)} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
+              <Download size={14} />{l.export}
+            </button>
           </div>
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
