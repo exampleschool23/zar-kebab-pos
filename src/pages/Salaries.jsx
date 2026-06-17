@@ -8,10 +8,8 @@ import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import {
   EXPENSE_PAYMENT_METHODS,
-  SALARY_PAY_SCHEDULES,
   SALARY_RATE_UNITS,
   buildSalaryBonusExpenseRows,
-  buildSalaryExpenseRows,
   convertSalaryAmountToDaily,
   expensePaymentMethodLabel,
   getDailySalaryAmount,
@@ -52,15 +50,6 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
       .filter(bonus => bonus.salary_profile_id === row.id)
       .sort((a, b) => b.bonus_date.localeCompare(a.bonus_date)),
   }))
-}
-
-function payScheduleLabel(key, lang) {
-  const labels = {
-    daily: { uz: 'Kunlik', ru: 'Ежедневно', en: 'Daily' },
-    twice_weekly: { uz: 'Haftasiga 2 marta', ru: '2 раза в неделю', en: 'Twice weekly' },
-    monthly: { uz: 'Oylik', ru: 'Ежемесячно', en: 'Monthly' },
-  }
-  return labels[key]?.[lang] || labels[key]?.en || key
 }
 
 function salaryRateUnitLabel(key, lang) {
@@ -105,25 +94,25 @@ export default function Salaries() {
   const L = {
     uz: {
       title: 'Maoshlar',
-      sub: 'Xodim maoshi, to‘lov jadvali va qarzdorlik',
+      sub: 'Ishga kirgan sana, maosh va to‘lanishi kerak summa',
       back: 'Xarajatlarga qaytish',
       add: 'Xodim maoshi qo‘shish',
       employee: 'Xodim',
-      staffAccount: 'Tizim akkaunti',
-      optional: 'Ixtiyoriy',
       employeeName: 'Xodim ismi',
       joined: 'Ishga kirgan sana',
       salaryAmount: 'Maosh summasi',
       salaryUnit: 'Maosh turi',
-      schedule: 'To‘lov jadvali',
       method: 'To‘lov turi',
-      effectiveFrom: 'Qachondan',
       save: 'Saqlash',
       delete: 'O‘chirish',
       remove: 'Butunlay o‘chirish',
       confirmDelete: 'Tasdiqlash',
       changeSalary: 'Maoshni o‘zgartirish',
+      selectEmployee: 'Xodimni tanlang',
       recordPayment: 'To‘lovni yozish',
+      paymentBonus: 'To‘lov / bonus yozish',
+      paymentEntry: 'To‘lov',
+      bonusEntry: 'Bonus',
       bonus: 'Bonus',
       addBonus: 'Bonus qo‘shish',
       paidDate: 'To‘lov sanasi',
@@ -134,6 +123,9 @@ export default function Salaries() {
       accruedToday: 'Bugungi xarajat',
       history: 'Maosh tarixi',
       payments: 'To‘lovlar',
+      paymentHistory: 'To‘lovlar / bonuslar',
+      paymentLabel: 'To‘lov',
+      bonusLabel: 'Bonus',
       active: 'Faol',
       inactive: 'Nofaol',
       deactivate: 'Faolsizlantirish',
@@ -145,25 +137,25 @@ export default function Salaries() {
     },
     ru: {
       title: 'Зарплаты',
-      sub: 'Дата выхода, дневная зарплата, график выплат и долг',
+      sub: 'Дата выхода, зарплата и сумма к выплате',
       back: 'Назад к расходам',
       add: 'Добавить зарплату сотрудника',
       employee: 'Сотрудник',
-      staffAccount: 'Аккаунт в системе',
-      optional: 'Необязательно',
       employeeName: 'Имя сотрудника',
       joined: 'Дата выхода',
       salaryAmount: 'Сумма зарплаты',
       salaryUnit: 'Тип зарплаты',
-      schedule: 'График выплат',
       method: 'Способ оплаты',
-      effectiveFrom: 'Действует с',
       save: 'Сохранить',
       delete: 'Удалить',
       remove: 'Удалить полностью',
       confirmDelete: 'Подтвердить',
       changeSalary: 'Изменить зарплату',
+      selectEmployee: 'Выберите сотрудника',
       recordPayment: 'Записать выплату',
+      paymentBonus: 'Записать выплату / бонус',
+      paymentEntry: 'Выплата',
+      bonusEntry: 'Бонус',
       bonus: 'Бонус',
       addBonus: 'Добавить бонус',
       paidDate: 'Дата выплаты',
@@ -174,6 +166,9 @@ export default function Salaries() {
       accruedToday: 'Расход за день',
       history: 'История зарплаты',
       payments: 'Выплаты',
+      paymentHistory: 'Выплаты / бонусы',
+      paymentLabel: 'Выплата',
+      bonusLabel: 'Бонус',
       active: 'Активен',
       inactive: 'Неактивен',
       deactivate: 'Деактивировать',
@@ -185,25 +180,25 @@ export default function Salaries() {
     },
     en: {
       title: 'Salaries',
-      sub: 'Joining date, daily salary, payment schedule, and amount due',
+      sub: 'Joining date, salary, and amount due',
       back: 'Back to expenses',
       add: 'Add employee salary',
       employee: 'Employee',
-      staffAccount: 'System account',
-      optional: 'Optional',
       employeeName: 'Employee name',
       joined: 'Joining date',
       salaryAmount: 'Salary amount',
       salaryUnit: 'Salary type',
-      schedule: 'Payment schedule',
       method: 'Payment method',
-      effectiveFrom: 'Effective from',
       save: 'Save',
       delete: 'Delete',
       remove: 'Remove completely',
       confirmDelete: 'Confirm',
       changeSalary: 'Change salary',
+      selectEmployee: 'Select employee',
       recordPayment: 'Record payment',
+      paymentBonus: 'Record payment / bonus',
+      paymentEntry: 'Payment',
+      bonusEntry: 'Bonus',
       bonus: 'Bonus',
       addBonus: 'Add bonus',
       paidDate: 'Paid date',
@@ -214,6 +209,9 @@ export default function Salaries() {
       accruedToday: 'Daily expense',
       history: 'Salary history',
       payments: 'Payments',
+      paymentHistory: 'Payments / bonuses',
+      paymentLabel: 'Payment',
+      bonusLabel: 'Bonus',
       active: 'Active',
       inactive: 'Inactive',
       deactivate: 'Deactivate',
@@ -235,20 +233,23 @@ export default function Salaries() {
   const [confirmActionKey, setConfirmActionKey] = useState('')
   const [page, setPage] = useState(1)
   const [form, setForm] = useState({
-    profile_id: '',
     employee_name: '',
     joined_at: today,
     salary_amount: '',
     salary_unit: 'daily',
-    pay_schedule: 'monthly',
     payment_method: 'cash',
-    effective_from: today,
   })
-  const [rateForms, setRateForms] = useState({})
-  const [paymentForms, setPaymentForms] = useState({})
-  const [bonusForm, setBonusForm] = useState({
+  const [changeForm, setChangeForm] = useState({
     salary_profile_id: '',
-    bonus_date: today,
+    effective_from: today,
+    salary_amount: '',
+    salary_unit: 'daily',
+    note: '',
+  })
+  const [transactionForm, setTransactionForm] = useState({
+    salary_profile_id: '',
+    entry_type: 'payment',
+    paid_date: today,
     amount: '',
     payment_method: 'cash',
     note: '',
@@ -279,8 +280,6 @@ export default function Salaries() {
 
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const usedProfileIds = useMemo(() => new Set(salaryProfiles.map(item => item.profile_id).filter(Boolean)), [salaryProfiles])
-  const availableEmployees = team.filter(member => !usedProfileIds.has(member.id) && member.status !== 'disabled')
   const sortedSalaryProfiles = useMemo(() => (
     [...salaryProfiles].sort((a, b) => {
       if (Boolean(a.is_active) !== Boolean(b.is_active)) return a.is_active ? -1 : 1
@@ -307,18 +306,17 @@ export default function Salaries() {
     if (!canManage) return
     setError('')
     setMessage('')
-    const employee = team.find(item => item.id === form.profile_id)
-    const employeeName = (form.employee_name || employee?.full_name || employee?.email || '').trim()
+    const employeeName = String(form.employee_name || '').trim()
     const amount = normalizeExpenseAmount(form.salary_amount)
-    if (!employeeName || !form.joined_at || !form.effective_from || amount <= 0) return
+    if (!employeeName || !form.joined_at || amount <= 0) return
     setSaving('create')
     const { data: salaryProfile, error: profileError } = await supabase
       .from('employee_salary_profiles')
       .insert({
-        profile_id: employee?.id || null,
+        profile_id: null,
         employee_name: employeeName,
         joined_at: form.joined_at,
-        pay_schedule: form.pay_schedule,
+        pay_schedule: 'monthly',
         payment_method: form.payment_method,
         created_by: profile?.id || null,
       })
@@ -333,7 +331,7 @@ export default function Salaries() {
       .from('employee_salary_rates')
       .insert(buildSalaryRatePayload({
         salaryProfileId: salaryProfile.id,
-        effectiveFrom: form.effective_from,
+        effectiveFrom: form.joined_at,
         amount,
         salaryUnit: form.salary_unit,
         createdBy: profile?.id || null,
@@ -345,7 +343,7 @@ export default function Salaries() {
       return
     }
     setMessage(l.save)
-    setForm(current => ({ ...current, profile_id: '', employee_name: '', salary_amount: '' }))
+    setForm(current => ({ ...current, employee_name: '', salary_amount: '' }))
     await loadData()
   }
 
@@ -364,18 +362,19 @@ export default function Salaries() {
     await loadData()
   }
 
-  async function addRate(salaryProfile) {
-    const rateForm = rateForms[salaryProfile.id] || {}
-    const amount = normalizeExpenseAmount(rateForm.salary_amount)
-    const effectiveFrom = rateForm.effective_from || today
+  async function addRate() {
+    const selectedProfile = salaryProfiles.find(item => item.id === changeForm.salary_profile_id)
+    if (!selectedProfile) return
+    const amount = normalizeExpenseAmount(changeForm.salary_amount)
+    const effectiveFrom = changeForm.effective_from || today
     if (!canManage || amount <= 0) return
-    setSaving(`rate-${salaryProfile.id}`)
+    setSaving('rate-create')
     const { error: rateError } = await supabase.from('employee_salary_rates').insert(buildSalaryRatePayload({
-      salaryProfileId: salaryProfile.id,
+      salaryProfileId: selectedProfile.id,
       effectiveFrom,
       amount,
-      salaryUnit: rateForm.salary_unit || 'daily',
-      note: rateForm.note || '',
+      salaryUnit: changeForm.salary_unit || 'daily',
+      note: changeForm.note || '',
       createdBy: profile?.id || null,
     }))
     setSaving('')
@@ -383,60 +382,55 @@ export default function Salaries() {
       setError(rateError.message)
       return
     }
-    setRateForms(current => ({ ...current, [salaryProfile.id]: { effective_from: today, salary_amount: '', salary_unit: 'daily', note: '' } }))
-    await loadData()
-  }
-
-  async function addPayment(salaryProfile) {
-    const paymentForm = paymentForms[salaryProfile.id] || {}
-    const paidDate = paymentForm.paid_date || today
-    const due = getSalaryDue(salaryProfile, paidDate)
-    const amount = normalizeExpenseAmount(paymentForm.amount || due)
-    if (!canManage || amount <= 0) return
-    setSaving(`payment-${salaryProfile.id}`)
-    const { error: paymentError } = await supabase.from('employee_salary_payments').insert({
-      salary_profile_id: salaryProfile.id,
-      paid_date: paidDate,
-      period_from: salaryProfile.joined_at,
-      period_to: paidDate,
-      amount,
-      payment_method: paymentForm.payment_method || salaryProfile.payment_method || 'cash',
-      note: paymentForm.note || '',
-      created_by: profile?.id || null,
-      created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
-    })
-    setSaving('')
-    if (paymentError) {
-      setError(paymentError.message)
-      return
-    }
-    setPaymentForms(current => ({ ...current, [salaryProfile.id]: { paid_date: today, amount: '', payment_method: salaryProfile.payment_method || 'cash', note: '' } }))
-    await loadData()
-  }
-
-  async function addBonus() {
-    const salaryProfile = salaryProfiles.find(item => item.id === bonusForm.salary_profile_id)
-    const amount = normalizeExpenseAmount(bonusForm.amount)
-    if (!canManage || amount <= 0) return
-    if (!salaryProfile) return
-    setSaving('bonus-create')
-    const { error: bonusError } = await supabase.from('employee_salary_bonuses').insert({
-      salary_profile_id: salaryProfile.id,
-      bonus_date: bonusForm.bonus_date || today,
-      amount,
-      payment_method: bonusForm.payment_method || salaryProfile.payment_method || 'cash',
-      note: bonusForm.note || '',
-      created_by: profile?.id || null,
-      created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
-    })
-    setSaving('')
-    if (bonusError) {
-      setError(bonusError.message)
-      return
-    }
-    setBonusForm({
+    setChangeForm({
       salary_profile_id: '',
-      bonus_date: today,
+      effective_from: today,
+      salary_amount: '',
+      salary_unit: 'daily',
+      note: '',
+    })
+    await loadData()
+  }
+
+  async function addTransaction() {
+    const salaryProfile = salaryProfiles.find(item => item.id === transactionForm.salary_profile_id)
+    if (!salaryProfile) return
+    const paidDate = transactionForm.paid_date || today
+    const due = getSalaryDue(salaryProfile, paidDate)
+    const amount = normalizeExpenseAmount(transactionForm.amount || due)
+    if (!canManage || amount <= 0) return
+    const isBonus = transactionForm.entry_type === 'bonus'
+    setSaving(isBonus ? 'bonus-create' : 'payment-create')
+    const { error: writeError } = isBonus
+      ? await supabase.from('employee_salary_bonuses').insert({
+          salary_profile_id: salaryProfile.id,
+          bonus_date: paidDate,
+          amount,
+          payment_method: transactionForm.payment_method || salaryProfile.payment_method || 'cash',
+          note: transactionForm.note || '',
+          created_by: profile?.id || null,
+          created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
+        })
+      : await supabase.from('employee_salary_payments').insert({
+          salary_profile_id: salaryProfile.id,
+          paid_date: paidDate,
+          period_from: salaryProfile.joined_at,
+          period_to: paidDate,
+          amount,
+          payment_method: transactionForm.payment_method || salaryProfile.payment_method || 'cash',
+          note: transactionForm.note || '',
+          created_by: profile?.id || null,
+          created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
+        })
+    setSaving('')
+    if (writeError) {
+      setError(writeError.message)
+      return
+    }
+    setTransactionForm({
+      salary_profile_id: '',
+      entry_type: 'payment',
+      paid_date: today,
       amount: '',
       payment_method: 'cash',
       note: '',
@@ -471,6 +465,24 @@ export default function Salaries() {
     }
     setSaving(key)
     const { error: deleteError } = await supabase.from('employee_salary_payments').delete().eq('id', payment.id)
+    setSaving('')
+    setConfirmActionKey('')
+    if (deleteError) {
+      setError(deleteError.message)
+      return
+    }
+    await loadData()
+  }
+
+  async function deleteBonus(bonus) {
+    if (!canManage || !bonus?.id) return
+    const key = `bonus-delete-${bonus.id}`
+    if (confirmActionKey !== key) {
+      setConfirmActionKey(key)
+      return
+    }
+    setSaving(key)
+    const { error: deleteError } = await supabase.from('employee_salary_bonuses').delete().eq('id', bonus.id)
     setSaving('')
     setConfirmActionKey('')
     if (deleteError) {
@@ -554,110 +566,181 @@ export default function Salaries() {
           {message && !error && <div className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">{message}</div>}
 
           <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-            <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.add}</h2>
-            <form onSubmit={createSalaryProfile} className="grid gap-3 lg:grid-cols-[1.3fr_1.2fr_repeat(6,1fr)_120px] lg:items-end">
-              <Field label={l.employeeName}>
-                <input
-                  type="text"
-                  value={form.employee_name}
-                  onChange={event => setForm(current => ({ ...current, employee_name: event.target.value }))}
-                  className={FIELD}
-                  disabled={!canManage}
-                />
-              </Field>
-              <Field label={`${l.staffAccount} (${l.optional})`}>
-                <select
-                  value={form.profile_id}
-                  onChange={event => {
-                    const selectedEmployee = team.find(member => member.id === event.target.value)
-                    setForm(current => ({
-                      ...current,
-                      profile_id: event.target.value,
-                      employee_name: current.employee_name || selectedEmployee?.full_name || selectedEmployee?.email || '',
-                    }))
-                  }}
-                  className={FIELD}
-                  disabled={!canManage}
-                >
-                  <option value="">—</option>
-                  {availableEmployees.map(member => <option key={member.id} value={member.id}>{member.full_name || member.email}</option>)}
-                </select>
-              </Field>
-              <Field label={l.joined}><input type="date" value={form.joined_at} onChange={event => setForm(current => ({ ...current, joined_at: event.target.value }))} className={FIELD} disabled={!canManage} /></Field>
-              <Field label={l.salaryAmount}><input type="text" inputMode="numeric" value={formatAmountInput(form.salary_amount)} onChange={event => setForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))} className={FIELD} disabled={!canManage} /></Field>
-              <Field label={l.salaryUnit}>
-                <select value={form.salary_unit} onChange={event => setForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage}>
-                  {SALARY_RATE_UNITS.map(item => <option key={item} value={item}>{salaryRateUnitLabel(item, lang)}</option>)}
-                </select>
-              </Field>
-              <Field label={l.schedule}>
-                <select value={form.pay_schedule} onChange={event => setForm(current => ({ ...current, pay_schedule: event.target.value }))} className={FIELD} disabled={!canManage}>
-                  {SALARY_PAY_SCHEDULES.map(item => <option key={item} value={item}>{payScheduleLabel(item, lang)}</option>)}
-                </select>
-              </Field>
-              <Field label={l.method}>
-                <select value={form.payment_method} onChange={event => setForm(current => ({ ...current, payment_method: event.target.value }))} className={FIELD} disabled={!canManage}>
-                  {EXPENSE_PAYMENT_METHODS.map(item => <option key={item} value={item}>{expensePaymentMethodLabel(item, lang)}</option>)}
-                </select>
-              </Field>
-              <Field label={l.effectiveFrom}><input type="date" value={form.effective_from} onChange={event => setForm(current => ({ ...current, effective_from: event.target.value }))} className={FIELD} disabled={!canManage} /></Field>
-              <button disabled={!canManage || saving === 'create'} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white disabled:bg-gray-200">
-                {saving === 'create' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}{l.save}
-              </button>
-            </form>
-          </section>
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,0.9fr)]">
+              <div className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-4">
+                <div className="grid gap-5">
+                  <div>
+                    <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.add}</h2>
+                    <form onSubmit={createSalaryProfile} className="grid gap-3 lg:grid-cols-[minmax(190px,1.3fr)_150px_minmax(140px,1fr)_130px_140px_110px] lg:items-end">
+                      <Field label={l.employeeName}>
+                        <input
+                          type="text"
+                          value={form.employee_name}
+                          onChange={event => setForm(current => ({ ...current, employee_name: event.target.value }))}
+                          className={FIELD}
+                          disabled={!canManage}
+                        />
+                      </Field>
+                      <Field label={l.joined}><input type="date" value={form.joined_at} onChange={event => setForm(current => ({ ...current, joined_at: event.target.value }))} className={FIELD} disabled={!canManage} /></Field>
+                      <Field label={l.salaryAmount}><input type="text" inputMode="numeric" value={formatAmountInput(form.salary_amount)} onChange={event => setForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))} className={FIELD} disabled={!canManage} /></Field>
+                      <Field label={l.salaryUnit}>
+                        <select value={form.salary_unit} onChange={event => setForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage}>
+                          {SALARY_RATE_UNITS.map(item => <option key={item} value={item}>{salaryRateUnitLabel(item, lang)}</option>)}
+                        </select>
+                      </Field>
+                      <Field label={l.method}>
+                        <select value={form.payment_method} onChange={event => setForm(current => ({ ...current, payment_method: event.target.value }))} className={FIELD} disabled={!canManage}>
+                          {EXPENSE_PAYMENT_METHODS.map(item => <option key={item} value={item}>{expensePaymentMethodLabel(item, lang)}</option>)}
+                        </select>
+                      </Field>
+                      <button disabled={!canManage || saving === 'create'} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white disabled:bg-gray-200">
+                        {saving === 'create' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}{l.save}
+                      </button>
+                    </form>
+                  </div>
 
-          <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-            <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.bonus}</h2>
-            <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_140px] lg:items-end">
-              <Field label={l.employee}>
-                <select
-                  value={bonusForm.salary_profile_id}
-                  onChange={event => {
-                    const selectedProfile = salaryProfiles.find(item => item.id === event.target.value)
-                    setBonusForm(current => ({
-                      ...current,
-                      salary_profile_id: event.target.value,
-                      payment_method: selectedProfile?.payment_method || 'cash',
-                    }))
-                  }}
-                  className={FIELD}
-                  disabled={!canManage}
-                >
-                  <option value="">—</option>
-                  {activeSalaryProfiles.map(item => (
-                    <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={l.bonusDate}>
-                <input
-                  type="date"
-                  value={bonusForm.bonus_date}
-                  onChange={event => setBonusForm(current => ({ ...current, bonus_date: event.target.value }))}
-                  className={FIELD}
-                  disabled={!canManage}
-                />
-              </Field>
-              <Field label={l.amount}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={formatAmountInput(bonusForm.amount)}
-                  onChange={event => setBonusForm(current => ({ ...current, amount: parseAmountInput(event.target.value) }))}
-                  className={FIELD}
-                  disabled={!canManage}
-                />
-              </Field>
-              <button
-                type="button"
-                onClick={addBonus}
-                disabled={!canManage || !bonusForm.salary_profile_id || saving === 'bonus-create'}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-4 text-sm font-black text-white disabled:bg-gray-200"
-              >
-                {saving === 'bonus-create' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={15} />}
-                {l.addBonus}
-              </button>
+                  <div className="border-t border-[#E5E7EB] pt-5">
+                    <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.changeSalary}</h2>
+                    <div className="grid gap-3 lg:grid-cols-[minmax(190px,1.4fr)_150px_minmax(140px,1fr)_130px_110px] lg:items-end">
+                      <Field label={l.selectEmployee}>
+                        <select
+                          value={changeForm.salary_profile_id}
+                          onChange={event => {
+                            const selectedProfile = salaryProfiles.find(item => item.id === event.target.value)
+                            setChangeForm(current => ({
+                              ...current,
+                              salary_profile_id: event.target.value,
+                              effective_from: selectedProfile?.joined_at || current.effective_from,
+                              salary_unit: selectedProfile?.rates?.[0]?.rate_unit || current.salary_unit,
+                            }))
+                          }}
+                          className={FIELD}
+                          disabled={!canManage}
+                        >
+                          <option value="">—</option>
+                          {activeSalaryProfiles.map(item => (
+                            <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label={l.joined}>
+                        <input
+                          type="date"
+                          value={changeForm.effective_from}
+                          onChange={event => setChangeForm(current => ({ ...current, effective_from: event.target.value }))}
+                          className={FIELD}
+                          disabled={!canManage}
+                        />
+                      </Field>
+                      <Field label={l.salaryAmount}>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={formatAmountInput(changeForm.salary_amount)}
+                          onChange={event => setChangeForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))}
+                          className={FIELD}
+                          disabled={!canManage}
+                        />
+                      </Field>
+                      <Field label={l.salaryUnit}>
+                        <select value={changeForm.salary_unit} onChange={event => setChangeForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage}>
+                          {SALARY_RATE_UNITS.map(item => <option key={item} value={item}>{salaryRateUnitLabel(item, lang)}</option>)}
+                        </select>
+                      </Field>
+                      <button type="button" onClick={() => addRate()} disabled={!canManage || !changeForm.salary_profile_id || saving === 'rate-create'} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-4 text-sm font-black text-white disabled:bg-gray-200">
+                        {saving === 'rate-create' ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}{l.save}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-4">
+                <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.paymentBonus}</h2>
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  {['payment', 'bonus'].map(entryType => {
+                    const active = transactionForm.entry_type === entryType
+                    return (
+                      <button
+                        key={entryType}
+                        type="button"
+                        onClick={() => setTransactionForm(current => ({ ...current, entry_type: entryType }))}
+                        className={`flex h-11 items-center justify-center rounded-xl border text-sm font-black ${
+                          active ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'
+                        }`}
+                      >
+                        {entryType === 'bonus' ? l.bonusEntry : l.paymentEntry}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="grid gap-3">
+                  <Field label={l.employee}>
+                    <select
+                      value={transactionForm.salary_profile_id}
+                      onChange={event => {
+                        const selectedProfile = salaryProfiles.find(item => item.id === event.target.value)
+                        const nextPaidDate = transactionForm.paid_date || today
+                        const due = selectedProfile && transactionForm.entry_type === 'payment'
+                          ? getSalaryDue(selectedProfile, nextPaidDate)
+                          : ''
+                        setTransactionForm(current => ({
+                          ...current,
+                          salary_profile_id: event.target.value,
+                          amount: due ? String(due) : current.amount,
+                          payment_method: selectedProfile?.payment_method || 'cash',
+                        }))
+                      }}
+                      className={FIELD}
+                      disabled={!canManage}
+                    >
+                      <option value="">—</option>
+                      {activeSalaryProfiles.map(item => (
+                        <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label={transactionForm.entry_type === 'bonus' ? l.bonusDate : l.paidDate}>
+                    <input
+                      type="date"
+                      value={transactionForm.paid_date}
+                      onChange={event => {
+                        const nextPaidDate = event.target.value
+                        const selectedProfile = salaryProfiles.find(item => item.id === transactionForm.salary_profile_id)
+                        const due = selectedProfile && transactionForm.entry_type === 'payment'
+                          ? getSalaryDue(selectedProfile, nextPaidDate)
+                          : ''
+                        setTransactionForm(current => ({
+                          ...current,
+                          paid_date: nextPaidDate,
+                          amount: due ? String(due) : current.amount,
+                        }))
+                      }}
+                      className={FIELD}
+                      disabled={!canManage}
+                    />
+                  </Field>
+                  <Field label={l.amount}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formatAmountInput(transactionForm.amount)}
+                      onChange={event => setTransactionForm(current => ({ ...current, amount: parseAmountInput(event.target.value) }))}
+                      className={FIELD}
+                      disabled={!canManage}
+                    />
+                  </Field>
+                  <button
+                    type="button"
+                    onClick={addTransaction}
+                    disabled={!canManage || !transactionForm.salary_profile_id || (saving !== '' && (saving === 'payment-create' || saving === 'bonus-create'))}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white disabled:bg-gray-200"
+                  >
+                    {(saving === 'payment-create' || saving === 'bonus-create') ? <Loader2 size={16} className="animate-spin" /> : transactionForm.entry_type === 'bonus' ? <Plus size={15} /> : <WalletCards size={15} />}
+                    {transactionForm.entry_type === 'bonus' ? l.addBonus : l.recordPayment}
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -672,8 +755,24 @@ export default function Salaries() {
                 const asOfDate = getSalaryActiveUntil(item, today)
                 const due = getSalaryDue(item, today)
                 const dailyAmount = getDailySalaryAmount(item, asOfDate)
-                const rateForm = rateForms[item.id] || { effective_from: today, salary_amount: '', salary_unit: 'daily', note: '' }
-                const paymentForm = paymentForms[item.id] || { paid_date: today, amount: due || '', payment_method: item.payment_method || 'cash', note: '' }
+                const transactionHistory = [
+                  ...item.payments.map(payment => ({
+                    id: payment.id,
+                    entryType: 'payment',
+                    date: payment.paid_date,
+                    amount: payment.amount,
+                    detail: `${payment.period_from} - ${payment.period_to}`,
+                    row: payment,
+                  })),
+                  ...item.bonuses.map(bonus => ({
+                    id: bonus.id,
+                    entryType: 'bonus',
+                    date: bonus.bonus_date,
+                    amount: bonus.amount,
+                    detail: bonus.note || expensePaymentMethodLabel(bonus.payment_method, lang),
+                    row: bonus,
+                  })),
+                ].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
                 return (
                   <section key={item.id} className={`rounded-2xl border p-4 shadow-sm ${isInactive ? 'border-[#E5E7EB] bg-[#F3F4F6]' : 'border-[#E5E7EB] bg-white'}`}>
                     <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_180px_220px] lg:items-start">
@@ -686,7 +785,6 @@ export default function Salaries() {
                         </div>
                         <p className={`mt-1 flex flex-wrap items-center gap-2 text-xs font-bold ${isInactive ? 'text-[#9CA3AF]' : 'text-[#6B7280]'}`}>
                           <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{item.joined_at}</span>
-                          <span>{payScheduleLabel(item.pay_schedule, lang)}</span>
                           <span>{expensePaymentMethodLabel(item.payment_method, lang)}</span>
                           {!item.is_active && item.ended_at && <span>{l.to}: {item.ended_at}</span>}
                         </p>
@@ -720,12 +818,7 @@ export default function Salaries() {
                       </div>
                     </div>
 
-                    <div className="mb-4 grid gap-3 md:grid-cols-3">
-                      <Field label={l.schedule}>
-                        <select value={item.pay_schedule} onChange={event => updateSalaryProfile(item, { pay_schedule: event.target.value })} className={FIELD} disabled={!canManage || isInactive || saving === item.id}>
-                          {SALARY_PAY_SCHEDULES.map(schedule => <option key={schedule} value={schedule}>{payScheduleLabel(schedule, lang)}</option>)}
-                        </select>
-                      </Field>
+                    <div className="mb-4 grid gap-3 md:grid-cols-2">
                       <Field label={l.method}>
                         <select value={item.payment_method} onChange={event => updateSalaryProfile(item, { payment_method: event.target.value })} className={FIELD} disabled={!canManage || isInactive || saving === item.id}>
                           {EXPENSE_PAYMENT_METHODS.map(method => <option key={method} value={method}>{expensePaymentMethodLabel(method, lang)}</option>)}
@@ -736,20 +829,10 @@ export default function Salaries() {
                       </Field>
                     </div>
 
-                    <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+                    <div className="grid gap-4">
                       <div className="space-y-4">
                         <div className={`rounded-xl border p-3 ${isInactive ? 'border-[#E5E7EB] bg-[#F9FAFB]' : 'border-[#EEF0F3] bg-[#FBFCFD]'}`}>
-                          <h3 className={`mb-3 text-sm font-black ${isInactive ? 'text-[#9CA3AF]' : 'text-[#1F2937]'}`}>{l.changeSalary}</h3>
-                          <div className="grid gap-2 md:grid-cols-[1fr_1fr] xl:grid-cols-[1fr_1fr_150px_auto]">
-                            <input type="date" value={rateForm.effective_from || today} onChange={event => setRateForms(current => ({ ...current, [item.id]: { ...rateForm, effective_from: event.target.value } }))} className={FIELD} disabled={!canManage || isInactive} />
-                            <input type="text" inputMode="numeric" value={formatAmountInput(rateForm.salary_amount || '')} onChange={event => setRateForms(current => ({ ...current, [item.id]: { ...rateForm, salary_amount: parseAmountInput(event.target.value) } }))} placeholder={l.salaryAmount} className={FIELD} disabled={!canManage || isInactive} />
-                            <select value={rateForm.salary_unit || 'daily'} onChange={event => setRateForms(current => ({ ...current, [item.id]: { ...rateForm, salary_unit: event.target.value } }))} className={FIELD} disabled={!canManage || isInactive}>
-                              {SALARY_RATE_UNITS.map(unit => <option key={unit} value={unit}>{salaryRateUnitLabel(unit, lang)}</option>)}
-                            </select>
-                            <button type="button" onClick={() => addRate(item)} disabled={!canManage || isInactive || saving === `rate-${item.id}`} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-4 text-sm font-black text-white disabled:bg-gray-200">
-                              <Save size={15} />{l.save}
-                            </button>
-                          </div>
+                          <h3 className={`mb-3 text-sm font-black ${isInactive ? 'text-[#9CA3AF]' : 'text-[#1F2937]'}`}>{l.history}</h3>
                           <div className="mt-3 space-y-1">
                             {item.rates.slice(0, 4).map(rate => (
                               <div key={rate.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-bold ${isInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-white text-[#6B7280]'}`}>
@@ -771,41 +854,34 @@ export default function Salaries() {
                             ))}
                           </div>
                         </div>
-
-                      </div>
-
-                      <div className={`rounded-xl border p-3 ${isInactive ? 'border-[#E5E7EB] bg-[#F9FAFB]' : 'border-[#EEF0F3] bg-[#FBFCFD]'}`}>
-                        <h3 className={`mb-3 text-sm font-black ${isInactive ? 'text-[#9CA3AF]' : 'text-[#1F2937]'}`}>{l.recordPayment}</h3>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <Field label={l.paidDate}>
-                            <input type="date" value={paymentForm.paid_date || today} onChange={event => setPaymentForms(current => ({ ...current, [item.id]: { ...paymentForm, paid_date: event.target.value } }))} className={FIELD} disabled={!canManage || isInactive} />
-                          </Field>
-                          <Field label={l.amount}>
-                            <input type="text" inputMode="numeric" value={formatAmountInput(paymentForm.amount || '')} onChange={event => setPaymentForms(current => ({ ...current, [item.id]: { ...paymentForm, amount: parseAmountInput(event.target.value) } }))} placeholder={l.amount} className={FIELD} disabled={!canManage || isInactive} />
-                          </Field>
-                        </div>
-                        <button type="button" onClick={() => addPayment(item)} disabled={!canManage || isInactive || saving === `payment-${item.id}`} className="mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white disabled:bg-gray-200">
-                          <WalletCards size={15} />{l.recordPayment}
-                        </button>
-                        <div className="mt-3 space-y-1">
-                          {item.payments.slice(0, 4).map(payment => (
-                            <div key={payment.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-bold ${isInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-white text-[#6B7280]'}`}>
-                              <span>{payment.paid_date} · {payment.period_from} - {payment.period_to}</span>
-                              <div className="flex items-center gap-2">
-                                <span>{formatCurrency(payment.amount)}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => deletePayment(payment)}
-                                  disabled={!canManage || isInactive || saving === `payment-delete-${payment.id}`}
-                                  className={`inline-flex h-8 items-center justify-center rounded-lg border px-2 text-[11px] font-black ${
-                                    confirmActionKey === `payment-delete-${payment.id}` ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
-                                  }`}
-                                >
-                                  {saving === `payment-delete-${payment.id}` ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} className="mr-1" />{confirmActionKey === `payment-delete-${payment.id}` ? l.confirmDelete : l.delete}</>}
-                                </button>
+                        <div className={`rounded-xl border p-3 ${isInactive ? 'border-[#E5E7EB] bg-[#F9FAFB]' : 'border-[#EEF0F3] bg-[#FBFCFD]'}`}>
+                          <h3 className={`mb-3 text-sm font-black ${isInactive ? 'text-[#9CA3AF]' : 'text-[#1F2937]'}`}>{l.paymentHistory}</h3>
+                          <div className="mt-3 space-y-1">
+                            {transactionHistory.slice(0, 6).map(entry => (
+                              <div key={`${entry.entryType}-${entry.id}`} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-bold ${isInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-white text-[#6B7280]'}`}>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span>{entry.date}</span>
+                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${entry.entryType === 'bonus' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-[#ff5a00]'}`}>
+                                    {entry.entryType === 'bonus' ? l.bonusLabel : l.paymentLabel}
+                                  </span>
+                                  {entry.detail && <span>{entry.detail}</span>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span>{formatCurrency(entry.amount)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => (entry.entryType === 'bonus' ? deleteBonus(entry.row) : deletePayment(entry.row))}
+                                    disabled={!canManage || isInactive || saving === `${entry.entryType}-delete-${entry.id}`}
+                                    className={`inline-flex h-8 items-center justify-center rounded-lg border px-2 text-[11px] font-black ${
+                                      confirmActionKey === `${entry.entryType}-delete-${entry.id}` ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
+                                    }`}
+                                  >
+                                    {saving === `${entry.entryType}-delete-${entry.id}` ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} className="mr-1" />{confirmActionKey === `${entry.entryType}-delete-${entry.id}` ? l.confirmDelete : l.delete}</>}
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
