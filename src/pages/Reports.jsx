@@ -1137,7 +1137,7 @@ export default function Reports() {
       const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, teamResult] = await Promise.all([
         supabase
           .from('expenses')
-          .select('id, expense_date, category, payment_method, amount')
+          .select('id, entry_type, expense_date, category, payment_method, amount')
           .gte('expense_date', dateFrom)
           .lte('expense_date', dateTo),
         supabase.from('employee_salary_profiles').select('*'),

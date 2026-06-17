@@ -2,6 +2,8 @@
 
 create table if not exists public.expenses (
   id             uuid primary key default gen_random_uuid(),
+  entry_type     text not null default 'expense'
+                 check (entry_type in ('expense', 'income')),
   expense_date   date not null default current_date,
   category       text not null default 'other'
                  check (category in (
@@ -16,7 +18,9 @@ create table if not exists public.expenses (
                    'delivery',
                    'marketing',
                    'repair',
-                   'other'
+                   'other',
+                   'investor_support',
+                   'other_income'
                  )),
   payment_method text not null default 'cash'
                  check (payment_method in ('cash', 'card', 'terminal')),

@@ -109,6 +109,9 @@ export default function Salaries() {
       back: 'Xarajatlarga qaytish',
       add: 'Xodim maoshi qo‘shish',
       employee: 'Xodim',
+      staffAccount: 'Tizim akkaunti',
+      optional: 'Ixtiyoriy',
+      employeeName: 'Xodim ismi',
       joined: 'Ishga kirgan sana',
       salaryAmount: 'Maosh summasi',
       salaryUnit: 'Maosh turi',
@@ -137,7 +140,7 @@ export default function Salaries() {
       reactivate: 'Qayta yoqish',
       page: 'Sahifa',
       empty: 'Maosh sozlamalari yo‘q',
-      migration: 'Maosh jadvallari yangilanmagan. supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql va supabase/056_employee_salary_profile_end_date.sql migratsiyalarini ishga tushiring.',
+      migration: 'Maosh jadvallari yangilanmagan. supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql va supabase/060_employee_salary_manual_names.sql migratsiyalarini ishga tushiring.',
       readOnly: 'Bu sahifa faqat egasi uchun.',
     },
     ru: {
@@ -146,6 +149,9 @@ export default function Salaries() {
       back: 'Назад к расходам',
       add: 'Добавить зарплату сотрудника',
       employee: 'Сотрудник',
+      staffAccount: 'Аккаунт в системе',
+      optional: 'Необязательно',
+      employeeName: 'Имя сотрудника',
       joined: 'Дата выхода',
       salaryAmount: 'Сумма зарплаты',
       salaryUnit: 'Тип зарплаты',
@@ -174,7 +180,7 @@ export default function Salaries() {
       reactivate: 'Включить снова',
       page: 'Страница',
       empty: 'Настроек зарплаты пока нет',
-      migration: 'Таблицы зарплат не обновлены. Запустите supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql и supabase/056_employee_salary_profile_end_date.sql.',
+      migration: 'Таблицы зарплат не обновлены. Запустите supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql и supabase/060_employee_salary_manual_names.sql.',
       readOnly: 'Эта страница доступна только владельцу.',
     },
     en: {
@@ -183,6 +189,9 @@ export default function Salaries() {
       back: 'Back to expenses',
       add: 'Add employee salary',
       employee: 'Employee',
+      staffAccount: 'System account',
+      optional: 'Optional',
+      employeeName: 'Employee name',
       joined: 'Joining date',
       salaryAmount: 'Salary amount',
       salaryUnit: 'Salary type',
@@ -211,7 +220,7 @@ export default function Salaries() {
       reactivate: 'Reactivate',
       page: 'Page',
       empty: 'No salary settings yet',
-      migration: 'Salary tables are not up to date. Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, and supabase/056_employee_salary_profile_end_date.sql.',
+      migration: 'Salary tables are not up to date. Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql, and supabase/060_employee_salary_manual_names.sql.',
       readOnly: 'Only the owner can manage this page.',
     },
   }
@@ -227,6 +236,7 @@ export default function Salaries() {
   const [page, setPage] = useState(1)
   const [form, setForm] = useState({
     profile_id: '',
+    employee_name: '',
     joined_at: today,
     salary_amount: '',
     salary_unit: 'daily',
@@ -269,7 +279,7 @@ export default function Salaries() {
 
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const usedProfileIds = useMemo(() => new Set(salaryProfiles.map(item => item.profile_id)), [salaryProfiles])
+  const usedProfileIds = useMemo(() => new Set(salaryProfiles.map(item => item.profile_id).filter(Boolean)), [salaryProfiles])
   const availableEmployees = team.filter(member => !usedProfileIds.has(member.id) && member.status !== 'disabled')
   const sortedSalaryProfiles = useMemo(() => (
     [...salaryProfiles].sort((a, b) => {
@@ -298,14 +308,15 @@ export default function Salaries() {
     setError('')
     setMessage('')
     const employee = team.find(item => item.id === form.profile_id)
+    const employeeName = (form.employee_name || employee?.full_name || employee?.email || '').trim()
     const amount = normalizeExpenseAmount(form.salary_amount)
-    if (!employee || !form.joined_at || !form.effective_from || amount <= 0) return
+    if (!employeeName || !form.joined_at || !form.effective_from || amount <= 0) return
     setSaving('create')
     const { data: salaryProfile, error: profileError } = await supabase
       .from('employee_salary_profiles')
       .insert({
-        profile_id: employee.id,
-        employee_name: employee.full_name || employee.email || '',
+        profile_id: employee?.id || null,
+        employee_name: employeeName,
         joined_at: form.joined_at,
         pay_schedule: form.pay_schedule,
         payment_method: form.payment_method,
@@ -334,7 +345,7 @@ export default function Salaries() {
       return
     }
     setMessage(l.save)
-    setForm(current => ({ ...current, profile_id: '', salary_amount: '' }))
+    setForm(current => ({ ...current, profile_id: '', employee_name: '', salary_amount: '' }))
     await loadData()
   }
 
@@ -544,9 +555,30 @@ export default function Salaries() {
 
           <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
             <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.add}</h2>
-            <form onSubmit={createSalaryProfile} className="grid gap-3 lg:grid-cols-[1.5fr_repeat(6,1fr)_120px] lg:items-end">
-              <Field label={l.employee}>
-                <select value={form.profile_id} onChange={event => setForm(current => ({ ...current, profile_id: event.target.value }))} className={FIELD} disabled={!canManage}>
+            <form onSubmit={createSalaryProfile} className="grid gap-3 lg:grid-cols-[1.3fr_1.2fr_repeat(6,1fr)_120px] lg:items-end">
+              <Field label={l.employeeName}>
+                <input
+                  type="text"
+                  value={form.employee_name}
+                  onChange={event => setForm(current => ({ ...current, employee_name: event.target.value }))}
+                  className={FIELD}
+                  disabled={!canManage}
+                />
+              </Field>
+              <Field label={`${l.staffAccount} (${l.optional})`}>
+                <select
+                  value={form.profile_id}
+                  onChange={event => {
+                    const selectedEmployee = team.find(member => member.id === event.target.value)
+                    setForm(current => ({
+                      ...current,
+                      profile_id: event.target.value,
+                      employee_name: current.employee_name || selectedEmployee?.full_name || selectedEmployee?.email || '',
+                    }))
+                  }}
+                  className={FIELD}
+                  disabled={!canManage}
+                >
                   <option value="">—</option>
                   {availableEmployees.map(member => <option key={member.id} value={member.id}>{member.full_name || member.email}</option>)}
                 </select>

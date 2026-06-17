@@ -23,7 +23,9 @@ import { getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib
 import { formatCurrency } from '../lib/formatCurrency'
 import {
   EXPENSE_CATEGORIES,
+  EXPENSE_ENTRY_TYPES,
   EXPENSE_PAYMENT_METHODS,
+  INCOME_CATEGORIES,
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
@@ -31,13 +33,15 @@ import {
   getNetIncome,
   getTotalSalaryDue,
   normalizeExpenseAmount,
+  normalizeExpenseEntryType,
   summarizeExpenseCashflow,
   summarizeExpenses,
+  summarizeIncomeEntries,
   todayExpenseDate,
 } from '../lib/expenses'
 import { downloadCsv } from '../lib/closeout'
 
-const SELECT_COLUMNS = 'id, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
+const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 const FIELD_INPUT_CLASS = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00]'
 
 function addDays(isoDate, n) {
@@ -85,8 +89,9 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
 }
 
 function exportExpensesCsv(expenses, lang) {
-  const header = ['date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by']
+  const header = ['entry_type', 'date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by']
   const rows = expenses.map(expense => [
+    normalizeExpenseEntryType(expense.entry_type),
     expense.expense_date,
     expenseCategoryLabel(expense.category, lang),
     expensePaymentMethodLabel(expense.payment_method, lang),
@@ -121,6 +126,7 @@ export default function Expenses() {
   const [message, setMessage] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState('')
   const [form, setForm] = useState({
+    entry_type: 'expense',
     expense_date: todayExpenseDate(),
     category: 'products_bazaar',
     payment_method: 'cash',
@@ -138,11 +144,16 @@ export default function Expenses() {
       left: 'Qolgan pul',
       entries: 'Yozuvlar',
       add: 'Xarajat qo‘shish',
+      addIncome: 'Boshqa daromad qo‘shish',
       date: 'Sana',
+      entryType: 'Yozuv turi',
+      expenseType: 'Xarajat',
+      incomeType: 'Daromad',
       category: 'Kategoriya',
       method: 'To‘lov turi',
       amount: 'Summa',
       vendor: 'Yetkazuvchi yoki xodim',
+      source: 'Investor yoki manba',
       description: 'Izoh',
       save: 'Saqlash',
       saving: 'Saqlanmoqda...',
@@ -160,6 +171,7 @@ export default function Expenses() {
       byMethod: 'To‘lov turi bo‘yicha',
       methodBalances: 'To‘lov turi qoldig‘i',
       moneyFlow: 'Pul qayerga ketmoqda',
+      incomeSources: 'Qo‘shimcha daromad manbalari',
       incomeIn: 'Kirdi',
       spentOut: 'Chiqdi',
       remaining: 'Qoldi',
@@ -168,7 +180,7 @@ export default function Expenses() {
       required: 'Sana, kategoriya, to‘lov turi va summa kerak.',
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
       loadFailed: 'Xarajatlarni yuklab bo‘lmadi.',
-      migrationMissing: 'Xarajatlar jadvali hali bazada yaratilmagan. Supabase SQL editorida supabase/048_expenses.sql migratsiyasini ishga tushiring.',
+      migrationMissing: 'Xarajatlar jadvali hali bazada tayyor emas. Supabase SQL editorida supabase/048_expenses.sql va supabase/059_expense_income_entries.sql migratsiyalarini ishga tushiring.',
       salaryMigrationMissing: 'Maosh jadvallari yangilanmagan. Supabase SQL editorida supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql va supabase/056_employee_salary_profile_end_date.sql migratsiyalarini ishga tushiring.',
       automaticSalary: 'Maosh to‘lovi',
       delete: 'O‘chirish',
@@ -184,11 +196,16 @@ export default function Expenses() {
       left: 'Остаток',
       entries: 'Записей',
       add: 'Добавить расход',
+      addIncome: 'Добавить внешний доход',
       date: 'Дата',
+      entryType: 'Тип записи',
+      expenseType: 'Расход',
+      incomeType: 'Доход',
       category: 'Категория',
       method: 'Способ оплаты',
       amount: 'Сумма',
       vendor: 'Поставщик или сотрудник',
+      source: 'Инвестор или источник',
       description: 'Описание',
       save: 'Сохранить',
       saving: 'Сохраняется...',
@@ -206,6 +223,7 @@ export default function Expenses() {
       byMethod: 'По способам оплаты',
       methodBalances: 'Остаток по способам оплаты',
       moneyFlow: 'Куда уходят деньги',
+      incomeSources: 'Источники внешнего дохода',
       incomeIn: 'Приход',
       spentOut: 'Расход',
       remaining: 'Остаток',
@@ -214,7 +232,7 @@ export default function Expenses() {
       required: 'Нужны дата, категория, способ оплаты и сумма.',
       saveFailed: 'Не удалось сохранить расход.',
       loadFailed: 'Не удалось загрузить расходы.',
-      migrationMissing: 'Таблица расходов ещё не создана в базе. Запустите supabase/048_expenses.sql в Supabase SQL Editor.',
+      migrationMissing: 'Таблица расходов ещё не готова в базе. Запустите supabase/048_expenses.sql и supabase/059_expense_income_entries.sql в Supabase SQL Editor.',
       salaryMigrationMissing: 'Таблицы зарплат не обновлены. Запустите supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql и supabase/056_employee_salary_profile_end_date.sql в Supabase SQL Editor.',
       automaticSalary: 'Выплата зарплаты',
       delete: 'Удалить',
@@ -230,11 +248,16 @@ export default function Expenses() {
       left: 'Left',
       entries: 'Entries',
       add: 'Add expense',
+      addIncome: 'Add other income',
       date: 'Date',
+      entryType: 'Entry type',
+      expenseType: 'Expense',
+      incomeType: 'Income',
       category: 'Category',
       method: 'Payment method',
       amount: 'Amount',
       vendor: 'Vendor or employee',
+      source: 'Investor or source',
       description: 'Description',
       save: 'Save',
       saving: 'Saving...',
@@ -252,6 +275,7 @@ export default function Expenses() {
       byMethod: 'By payment method',
       methodBalances: 'Left by payment method',
       moneyFlow: 'Where money is going',
+      incomeSources: 'Other income sources',
       incomeIn: 'In',
       spentOut: 'Out',
       remaining: 'Left',
@@ -260,7 +284,7 @@ export default function Expenses() {
       required: 'Date, category, payment method, and amount are required.',
       saveFailed: 'Could not save expense.',
       loadFailed: 'Could not load expenses.',
-      migrationMissing: 'Expenses table is not created yet. Run supabase/048_expenses.sql in Supabase SQL Editor.',
+      migrationMissing: 'Expenses table is not ready yet. Run supabase/048_expenses.sql and supabase/059_expense_income_entries.sql in Supabase SQL Editor.',
       salaryMigrationMissing: 'Salary tables are not up to date. Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, and supabase/056_employee_salary_profile_end_date.sql in Supabase SQL Editor.',
       automaticSalary: 'Salary payment',
       delete: 'Delete',
@@ -270,6 +294,7 @@ export default function Expenses() {
     },
   }
   const l = L[lang] || L.en
+  const categoryOptions = form.entry_type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
 
   async function loadExpenses() {
     setLoading(true)
@@ -347,12 +372,17 @@ export default function Expenses() {
     })
   }, [allExpenses, query, lang])
 
+  const incomeSummary = useMemo(() => summarizeIncomeEntries(filteredExpenses), [filteredExpenses])
   const summary = useMemo(() => summarizeExpenses(filteredExpenses), [filteredExpenses])
   const cashflow = useMemo(() => summarizeExpenseCashflow(paidOrders, filteredExpenses), [paidOrders, filteredExpenses])
   const netIncome = getNetIncome(revenue, filteredExpenses)
+  const totalIncome = revenue + incomeSummary.total
+  const totalEntryCount = filteredExpenses.length
   const salaryDueDate = dateTo < todayExpenseDate() ? dateTo : todayExpenseDate()
   const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
   const categoryRows = Object.entries(summary.byCategory)
+    .sort((a, b) => b[1] - a[1])
+  const incomeCategoryRows = Object.entries(incomeSummary.byCategory)
     .sort((a, b) => b[1] - a[1])
   const methodRows = Object.entries(summary.byMethod)
     .sort((a, b) => b[1] - a[1])
@@ -366,8 +396,10 @@ export default function Expenses() {
       setError(l.required)
       return
     }
+    const entryType = normalizeExpenseEntryType(form.entry_type)
     setSaving(true)
     const payload = {
+      entry_type: entryType,
       expense_date: form.expense_date,
       category: form.category,
       payment_method: form.payment_method,
@@ -383,7 +415,13 @@ export default function Expenses() {
       setError(isMissingExpensesMigration(saveError) ? l.migrationMissing : saveError.message || l.saveFailed)
       return
     }
-    setForm(current => ({ ...current, amount: '', vendor: '', description: '' }))
+    setForm(current => ({
+      ...current,
+      category: entryType === 'income' ? 'investor_support' : current.category,
+      amount: '',
+      vendor: '',
+      description: '',
+    }))
     setMessage(l.save)
     await loadExpenses()
   }
@@ -459,11 +497,11 @@ export default function Expenses() {
           </div>
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <Kpi icon={WalletCards} label={l.income} value={formatCurrency(revenue)} tone="green" />
+            <Kpi icon={WalletCards} label={l.income} value={formatCurrency(totalIncome)} tone="green" />
             <Kpi icon={ReceiptText} label={l.expenses} value={formatCurrency(summary.total)} sub={`${summary.count} ${l.entries.toLowerCase()}`} tone="orange" />
             <Kpi icon={Banknote} label={l.left} value={formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
             <Kpi icon={Users} label={l.salaryDue} value={formatCurrency(totalSalaryDue)} tone={totalSalaryDue > 0 ? 'orange' : 'green'} />
-            <Kpi icon={CalendarDays} label={l.entries} value={summary.count} tone="purple" />
+            <Kpi icon={CalendarDays} label={l.entries} value={totalEntryCount} tone="purple" />
           </div>
 
           <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
@@ -513,19 +551,42 @@ export default function Expenses() {
             <div className="space-y-5">
               <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-base font-black text-[#1F2937]">{l.add}</h2>
+                  <h2 className="text-base font-black text-[#1F2937]">{form.entry_type === 'income' ? l.addIncome : l.add}</h2>
                   <Plus size={18} className="text-[#ff5a00]" />
                 </div>
                 {!canAdd ? (
                   <p className="rounded-xl bg-gray-50 px-3 py-3 text-sm font-bold text-[#6B7280]">{l.readOnly}</p>
                 ) : (
                   <form onSubmit={saveExpense} className="space-y-3">
+                    <Field label={l.entryType}>
+                      <div className="grid grid-cols-2 gap-2">
+                        {EXPENSE_ENTRY_TYPES.map(entryType => {
+                          const active = form.entry_type === entryType
+                          return (
+                            <button
+                              key={entryType}
+                              type="button"
+                              onClick={() => setForm(current => ({
+                                ...current,
+                                entry_type: entryType,
+                                category: entryType === 'income' ? 'investor_support' : 'products_bazaar',
+                              }))}
+                              className={`flex h-11 items-center justify-center rounded-xl border text-xs font-black transition-colors ${
+                                active ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'
+                              }`}
+                            >
+                              {entryType === 'income' ? l.incomeType : l.expenseType}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </Field>
                     <Field label={l.date}>
                       <input type="date" value={form.expense_date} onChange={event => setForm(current => ({ ...current, expense_date: event.target.value }))} className={FIELD_INPUT_CLASS} />
                     </Field>
                     <Field label={l.category}>
                       <select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} className={FIELD_INPUT_CLASS}>
-                        {EXPENSE_CATEGORIES.map(category => (
+                        {categoryOptions.map(category => (
                           <option key={category.key} value={category.key}>{expenseCategoryLabel(category.key, lang)}</option>
                         ))}
                       </select>
@@ -553,7 +614,7 @@ export default function Expenses() {
                     <Field label={l.amount}>
                       <input type="number" min="0" step="1000" value={form.amount} onChange={event => setForm(current => ({ ...current, amount: event.target.value }))} className={`${FIELD_INPUT_CLASS} text-lg font-black`} placeholder="0" />
                     </Field>
-                    <Field label={l.vendor}>
+                    <Field label={form.entry_type === 'income' ? l.source : l.vendor}>
                       <input value={form.vendor} onChange={event => setForm(current => ({ ...current, vendor: event.target.value }))} className={FIELD_INPUT_CLASS} />
                     </Field>
                     <Field label={l.description}>
@@ -572,6 +633,7 @@ export default function Expenses() {
 
             <div className="min-w-0 space-y-5">
               <ExpenseCategoryChart title={l.moneyFlow} rows={categoryRows} total={summary.total} lang={lang} />
+              <Breakdown title={l.incomeSources} rows={incomeCategoryRows} total={incomeSummary.total} lang={lang} type="category" />
 
               <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
                 <div className="border-b border-[#F3F4F6] px-4 py-4">
@@ -585,6 +647,7 @@ export default function Expenses() {
                   <div className="max-h-[720px] overflow-y-auto">
                     {filteredExpenses.map(expense => {
                       const Icon = methodIcon(expense.payment_method)
+                      const isIncome = normalizeExpenseEntryType(expense.entry_type) === 'income'
                       return (
                         <div key={expense.id} className="flex flex-col gap-3 border-b border-[#F3F4F6] px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
@@ -602,7 +665,7 @@ export default function Expenses() {
                             )}
                           </div>
                           <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
-                            <p className="text-lg font-black text-[#ff5a00]">{formatCurrency(expense.amount)}</p>
+                            <p className={`text-lg font-black ${isIncome ? 'text-green-600' : 'text-[#ff5a00]'}`}>{formatCurrency(expense.amount)}</p>
                             {canDelete && !expense.is_salary_auto && (
                               <button onClick={() => deleteExpense(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
                                 confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'

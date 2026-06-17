@@ -1,6 +1,7 @@
 import { getOrderPayments, toLocalDateStr } from './analytics.js'
 
 export const EXPENSE_PAYMENT_METHODS = ['cash', 'card', 'terminal']
+export const EXPENSE_ENTRY_TYPES = ['expense', 'income']
 
 export const EXPENSE_CATEGORIES = [
   {
@@ -53,13 +54,29 @@ export const EXPENSE_CATEGORIES = [
   },
 ]
 
+export const INCOME_CATEGORIES = [
+  {
+    key: 'investor_support',
+    labels: { uz: 'Investor yordami', ru: 'Поддержка инвестора', en: 'Investor support' },
+  },
+  {
+    key: 'other_income',
+    labels: { uz: 'Boshqa daromad', ru: 'Другой доход', en: 'Other income' },
+  },
+]
+
 export function todayExpenseDate() {
   return toLocalDateStr(new Date().toISOString())
 }
 
 export function expenseCategoryLabel(category, lang = 'en') {
-  const cfg = EXPENSE_CATEGORIES.find(item => item.key === category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1]
+  const cfg = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES]
+    .find(item => item.key === category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1]
   return cfg.labels[lang] || cfg.labels.en
+}
+
+export function normalizeExpenseEntryType(value) {
+  return EXPENSE_ENTRY_TYPES.includes(value) ? value : 'expense'
 }
 
 export function expensePaymentMethodLabel(method, lang = 'en') {
@@ -247,6 +264,29 @@ export function expenseMatchesRange(expense, dateFrom, dateTo) {
   return true
 }
 
+export function summarizeIncomeEntries(entries = []) {
+  const summary = {
+    total: 0,
+    count: 0,
+    byCategory: {},
+    byMethod: {},
+  }
+
+  for (const entry of entries) {
+    if (normalizeExpenseEntryType(entry?.entry_type) !== 'income') continue
+    const amount = normalizeExpenseAmount(entry?.amount)
+    if (amount <= 0) continue
+    summary.total += amount
+    summary.count += 1
+    const category = entry?.category || 'other_income'
+    const method = entry?.payment_method || entry?.paymentMethod || 'cash'
+    summary.byCategory[category] = (summary.byCategory[category] || 0) + amount
+    summary.byMethod[method] = (summary.byMethod[method] || 0) + amount
+  }
+
+  return summary
+}
+
 export function summarizeExpenses(expenses = []) {
   const summary = {
     total: 0,
@@ -256,6 +296,7 @@ export function summarizeExpenses(expenses = []) {
   }
 
   for (const expense of expenses) {
+    if (normalizeExpenseEntryType(expense?.entry_type) !== 'expense') continue
     const amount = normalizeExpenseAmount(expense?.amount)
     if (amount <= 0) continue
     summary.total += amount
@@ -283,6 +324,11 @@ export function summarizeExpenseCashflow(paidOrders = [], expenses = []) {
     }
   }
 
+  const incomeSummary = summarizeIncomeEntries(expenses)
+  for (const method of EXPENSE_PAYMENT_METHODS) {
+    byMethod[method].income += incomeSummary.byMethod[method] || 0
+  }
+
   const expenseSummary = summarizeExpenses(expenses)
   for (const method of EXPENSE_PAYMENT_METHODS) {
     byMethod[method].expenses = expenseSummary.byMethod[method] || 0
@@ -296,5 +342,5 @@ export function summarizeExpenseCashflow(paidOrders = [], expenses = []) {
 }
 
 export function getNetIncome(revenue = 0, expenses = []) {
-  return Math.round(Number(revenue) || 0) - summarizeExpenses(expenses).total
+  return Math.round(Number(revenue) || 0) + summarizeIncomeEntries(expenses).total - summarizeExpenses(expenses).total
 }

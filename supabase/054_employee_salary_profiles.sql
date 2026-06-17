@@ -4,7 +4,7 @@
 
 create table if not exists public.employee_salary_profiles (
   id             uuid primary key default gen_random_uuid(),
-  profile_id     uuid not null references public.profiles(id) on delete cascade,
+  profile_id     uuid references public.profiles(id) on delete set null,
   employee_name  text not null default '',
   joined_at      date not null default current_date,
   pay_schedule   text not null default 'monthly'
@@ -14,8 +14,7 @@ create table if not exists public.employee_salary_profiles (
   is_active      boolean not null default true,
   created_by     uuid references public.profiles(id) on delete set null,
   created_at     timestamptz not null default now(),
-  updated_at     timestamptz not null default now(),
-  unique(profile_id)
+  updated_at     timestamptz not null default now()
 );
 
 create table if not exists public.employee_salary_rates (
@@ -48,6 +47,10 @@ create table if not exists public.employee_salary_payments (
 
 create index if not exists idx_employee_salary_profiles_profile_id
   on public.employee_salary_profiles(profile_id);
+
+create unique index if not exists idx_employee_salary_profiles_profile_id_unique
+  on public.employee_salary_profiles(profile_id)
+  where profile_id is not null;
 
 create index if not exists idx_employee_salary_profiles_joined_at
   on public.employee_salary_profiles(joined_at);

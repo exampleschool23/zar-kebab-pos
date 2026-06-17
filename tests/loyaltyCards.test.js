@@ -173,16 +173,19 @@ test('loyalty card display keeps card number, phone number, balance, type and fa
 })
 
 test('cashback types use fixed rates and reject invalid types', () => {
-  assert.deepEqual(Object.keys(CASHBACK_TYPES), ['bronze', 'silver', 'gold', 'premium', 'black'])
+  assert.deepEqual(Object.keys(CASHBACK_TYPES), ['bronze', 'silver', 'gold', 'premium', 'black', 'special'])
   assert.equal(getCashbackTypePercent('bronze'), 3)
   assert.equal(getCashbackTypePercent('silver'), 5)
   assert.equal(getCashbackTypePercent('gold'), 7)
   assert.equal(getCashbackTypePercent('premium'), 10)
   assert.equal(getCashbackTypePercent('black'), 15)
+  assert.equal(getCashbackTypePercent('special'), 40)
   assert.equal(normalizeCashbackType('Gold'), 'gold')
   assert.equal(getLoyaltyCardCashbackType({ cashbackType: 'Premium' }), 'premium')
   assert.equal(getLoyaltyCardCashbackPercent({ cashbackType: 'Premium' }), 10)
   assert.equal(getLoyaltyCardCashbackPercent({ cashback_type: 'black' }), 15)
+  assert.equal(getLoyaltyCardCashbackType({ cashbackType: 'Special' }), 'special')
+  assert.equal(getLoyaltyCardCashbackPercent({ cashback_type: 'special' }), 40)
   assertLoyaltyError(() => normalizeCashbackType('diamond'), 'invalid_cashback_type')
 })
 
@@ -198,6 +201,7 @@ test('cashback preview uses selected loyalty card type against subtotal plus ser
     gold: 19085,
     premium: 27265,
     black: 40897,
+    special: 109060,
   }
 
   for (const [cashbackType, expected] of Object.entries(expectedByType)) {
@@ -453,6 +457,7 @@ test('cashback calculation uses subtotal plus service minus loyalty, floors inte
     ['gold', 15049],
     ['premium', 21499],
     ['black', 32249],
+    ['special', 85999],
   ]
 
   for (const [type, expected] of rates) {
