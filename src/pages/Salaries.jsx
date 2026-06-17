@@ -100,6 +100,7 @@ export default function Salaries() {
       employee: 'Xodim',
       employeeName: 'Xodim ismi',
       joined: 'Ishga kirgan sana',
+      effectiveDate: 'Qachondan',
       salaryAmount: 'Maosh summasi',
       salaryUnit: 'Maosh turi',
       method: 'To‘lov turi',
@@ -143,6 +144,7 @@ export default function Salaries() {
       employee: 'Сотрудник',
       employeeName: 'Имя сотрудника',
       joined: 'Дата выхода',
+      effectiveDate: 'Действует с',
       salaryAmount: 'Сумма зарплаты',
       salaryUnit: 'Тип зарплаты',
       method: 'Способ оплаты',
@@ -186,6 +188,7 @@ export default function Salaries() {
       employee: 'Employee',
       employeeName: 'Employee name',
       joined: 'Joining date',
+      effectiveDate: 'Effective date',
       salaryAmount: 'Salary amount',
       salaryUnit: 'Salary type',
       method: 'Payment method',
@@ -566,12 +569,12 @@ export default function Salaries() {
           {message && !error && <div className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">{message}</div>}
 
           <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(360px,0.9fr)]">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_382px]">
               <div className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-4">
                 <div className="grid gap-5">
                   <div>
                     <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.add}</h2>
-                    <form onSubmit={createSalaryProfile} className="grid gap-3 lg:grid-cols-[minmax(190px,1.3fr)_150px_minmax(140px,1fr)_130px_140px_110px] lg:items-end">
+                    <form onSubmit={createSalaryProfile} className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 lg:items-end">
                       <Field label={l.employeeName}>
                         <input
                           type="text"
@@ -581,7 +584,7 @@ export default function Salaries() {
                           disabled={!canManage}
                         />
                       </Field>
-                      <Field label={l.joined}><input type="date" value={form.joined_at} onChange={event => setForm(current => ({ ...current, joined_at: event.target.value }))} className={FIELD} disabled={!canManage} /></Field>
+                      <Field label={l.effectiveDate}><input type="date" value={form.joined_at} onChange={event => setForm(current => ({ ...current, joined_at: event.target.value }))} className={FIELD} disabled={!canManage} /></Field>
                       <Field label={l.salaryAmount}><input type="text" inputMode="numeric" value={formatAmountInput(form.salary_amount)} onChange={event => setForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))} className={FIELD} disabled={!canManage} /></Field>
                       <Field label={l.salaryUnit}>
                         <select value={form.salary_unit} onChange={event => setForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage}>
@@ -601,7 +604,7 @@ export default function Salaries() {
 
                   <div className="border-t border-[#E5E7EB] pt-5">
                     <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.changeSalary}</h2>
-                    <div className="grid gap-3 lg:grid-cols-[minmax(190px,1.4fr)_150px_minmax(140px,1fr)_130px_110px] lg:items-end">
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 lg:items-end">
                       <Field label={l.selectEmployee}>
                         <select
                           value={changeForm.salary_profile_id}
@@ -623,7 +626,7 @@ export default function Salaries() {
                           ))}
                         </select>
                       </Field>
-                      <Field label={l.joined}>
+                      <Field label={l.effectiveDate}>
                         <input
                           type="date"
                           value={changeForm.effective_from}
@@ -922,7 +925,7 @@ export default function Salaries() {
 
 function Field({ label, children }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-[#6B7280]">{label}</span>
       {children}
     </label>
