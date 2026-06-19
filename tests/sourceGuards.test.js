@@ -630,7 +630,7 @@ test('WaiterTables keeps filter chips in requested status order', () => {
 test('WaiterTables uses responsive section grids instead of one flat table grid', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
 
-  assert.match(source, /grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4/)
+  assert.match(source, /grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-5/)
   assert.match(source, /sections\.map\(\(\{ status, items \}\)/)
 })
 

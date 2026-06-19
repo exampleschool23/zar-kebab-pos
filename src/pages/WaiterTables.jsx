@@ -6,7 +6,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import AppShell from '../components/AppShell'
 import {
   UtensilsCrossed, Clock, CheckCircle2,
-  Receipt, Coffee, RefreshCw, Layers, Plus,
+  Receipt, Coffee, Plus,
   Search, CreditCard, Settings, CalendarClock, Phone,
 } from 'lucide-react'
 import { getOrderTotal } from '../lib/analytics'
@@ -20,7 +20,6 @@ const L = {
   en: {
     tables: 'Tables',
     welcome: 'Welcome back',
-    refresh: 'Refresh',
     all: 'All',
     available: 'Available',
     waitingKitchen: 'Waiting',
@@ -40,24 +39,14 @@ const L = {
     requestBill: 'Request Bill',
     tableSingular: 'table',
     tablePlural: 'tables',
-    searchPlaceholder: 'Search table...',
     confirmServed: 'Confirm served',
     viewKitchen: 'View orders',
     viewTable: 'View table',
     takePayment: 'Take payment',
-    statusGuide: 'Table Status Guide',
-    guideAvailable: 'Table is free — tap to take a new order',
-    guideWaiting: 'Order sent and waiting',
-    guidePreparing: 'Items are being prepared',
-    guideReady: 'All items ready — confirm delivery',
-    guideOccupied: 'Order delivered and eating',
-    guideReserved: 'Reserved for an upcoming guest',
-    guideNeedsBill: 'Guest requested the bill',
     takeAwayOrder: 'Take Away Order',
     deliveryOrder: 'Delivery Order',
     manageTables: 'Manage tables',
     todaysReservations: 'Today’s Reservations',
-    noReservationsToday: 'No reservations today',
     seat: 'Seat',
     cancelReservation: 'Cancel',
     call: 'Call',
@@ -65,7 +54,6 @@ const L = {
   ru: {
     tables: 'Столы',
     welcome: 'Добро пожаловать',
-    refresh: 'Обновить',
     all: 'Все',
     available: 'Свободен',
     waitingKitchen: 'Ожидание',
@@ -85,24 +73,14 @@ const L = {
     requestBill: 'Запросить счёт',
     tableSingular: 'стол',
     tablePlural: 'столов',
-    searchPlaceholder: 'Поиск стола...',
     confirmServed: 'Подтвердить подачу',
     viewKitchen: 'Заказы',
     viewTable: 'Открыть стол',
     takePayment: 'Оплата',
-    statusGuide: 'Статусы столов',
-    guideAvailable: 'Стол свободен — нажмите для нового заказа',
-    guideWaiting: 'Заказ отправлен и ожидает',
-    guidePreparing: 'Позиции готовятся',
-    guideReady: 'Всё готово — подтвердите доставку',
-    guideOccupied: 'Заказ доставлен, гость ест',
-    guideReserved: 'Забронировано для гостя',
-    guideNeedsBill: 'Гость попросил счёт',
     takeAwayOrder: 'Заказ с собой',
     deliveryOrder: 'Доставка',
     manageTables: 'Управление столами',
     todaysReservations: 'Брони сегодня',
-    noReservationsToday: 'Сегодня броней нет',
     seat: 'Посадить',
     cancelReservation: 'Отменить',
     call: 'Позвонить',
@@ -110,7 +88,6 @@ const L = {
   uz: {
     tables: 'Stollar',
     welcome: 'Xush kelibsiz',
-    refresh: 'Yangilash',
     all: 'Hammasi',
     available: 'Bo\'sh',
     waitingKitchen: 'Kutilmoqda',
@@ -130,24 +107,14 @@ const L = {
     requestBill: 'Hisob so\'rash',
     tableSingular: 'stol',
     tablePlural: 'stol',
-    searchPlaceholder: 'Stol qidirish...',
     confirmServed: 'Yetkazildi',
     viewKitchen: 'Buyurtmalar',
     viewTable: 'Stolni ko‘rish',
     takePayment: 'To‘lov olish',
-    statusGuide: 'Stol holatlari',
-    guideAvailable: 'Stol bo\'sh — yangi buyurtma boshlash uchun bosing',
-    guideWaiting: 'Buyurtma yuborildi va kutilmoqda',
-    guidePreparing: 'Mahsulotlar tayyorlanmoqda',
-    guideReady: 'Hammasi tayyor — yetkazib berishni tasdiqlang',
-    guideOccupied: 'Buyurtma yetkazildi, mehmon ovqatlanmoqda',
-    guideReserved: 'Keladigan mehmon uchun bron qilingan',
-    guideNeedsBill: 'Mehmon hisob so\'radi',
     takeAwayOrder: 'Olib ketish buyurtmasi',
     deliveryOrder: 'Yetkazib berish',
     manageTables: 'Stollarni boshqarish',
     todaysReservations: 'Bugungi bronlar',
-    noReservationsToday: 'Bugun bron yo‘q',
     seat: 'Joylashtirish',
     cancelReservation: 'Bekor qilish',
     call: 'Qo‘ng‘iroq',
@@ -379,12 +346,12 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onClick()}
-      className={`group relative flex min-h-[172px] w-full cursor-pointer flex-col rounded-2xl border border-[#E5E7EB] border-l-4 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${cfg.border} ${cfg.hoverBorder}`}
+      className={`group relative flex min-h-[116px] w-full cursor-pointer flex-col rounded-xl border border-[#E5E7EB] border-l-4 bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${cfg.border} ${cfg.hoverBorder}`}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <p className="font-black text-gray-900 text-lg leading-none">{table.name}</p>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-base font-black leading-none text-gray-900">{table.name}</p>
           {elapsed && status !== 'available' && (
             <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-gray-400">
               <Clock size={11} />
@@ -392,7 +359,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
             </p>
           )}
         </div>
-        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${cfg.badge}`}>
+        <span className={`flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${cfg.badge}`}>
           <StatusIcon size={10} />
           {statusLabel(lang, status)}
         </span>
@@ -400,7 +367,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
 
       {/* State-specific content */}
       {status === 'available' && (
-        <p className="text-xs text-gray-400 mt-auto">{tr(lang, 'tapToStart')}</p>
+        <p className="mt-auto text-[11px] text-gray-400">{tr(lang, 'tapToStart')}</p>
       )}
 
       {status === 'reserved' && reservation && (
@@ -511,63 +478,9 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
   )
 }
 
-const STATUS_GUIDE_ITEMS = [
-  { status: 'available',       guideKey: 'guideAvailable' },
-  { status: 'waiting_kitchen', guideKey: 'guideWaiting'   },
-  { status: 'preparing',       guideKey: 'guidePreparing'  },
-  { status: 'ready',           guideKey: 'guideReady'      },
-  { status: 'occupied',        guideKey: 'guideOccupied'   },
-  { status: 'reserved',        guideKey: 'guideReserved'   },
-  { status: 'needs_bill',      guideKey: 'guideNeedsBill'  },
-]
-
-function StatusGuide({ lang }) {
-  return (
-    <div className="mt-8 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-      <div className="flex items-center gap-2 mb-3">
-        <Layers size={15} className="text-gray-400" />
-        <p className="text-sm font-bold text-gray-700">{tr(lang, 'statusGuide')}</p>
-      </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {STATUS_GUIDE_ITEMS.map(({ status, guideKey }) => {
-          const cfg = STATUS_CFG[status]
-          const Icon = cfg.icon
-          const label =
-            status === 'available'       ? tr(lang, 'available')        :
-            status === 'waiting_kitchen' ? tr(lang, 'waitingKitchen')   :
-            status === 'preparing'       ? tr(lang, 'preparing')         :
-            status === 'ready'           ? tr(lang, 'readyFromKitchen')  :
-            status === 'reserved'        ? tr(lang, 'reserved')          :
-            status === 'occupied'        ? tr(lang, 'occupied')          :
-                                           tr(lang, 'needsBill')
-          return (
-            <div key={status} className="flex items-center gap-2.5">
-              <span className={`flex items-center justify-center w-6 h-6 rounded-lg ${cfg.badge} flex-shrink-0`}>
-                <Icon size={12} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-gray-800">{label}</p>
-                <p className="truncate text-[11px] text-gray-400">{tr(lang, guideKey)}</p>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function ReservationStrip({ reservations, lang, onSeat, onCancel, onCall }) {
   if (reservations.length === 0) {
-    return (
-      <div className="mb-5 rounded-2xl border border-dashed border-purple-100 bg-white px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-black text-[#1F2937]">
-          <CalendarClock size={16} className="text-purple-500" />
-          {tr(lang, 'todaysReservations')}
-        </div>
-        <p className="mt-1 text-xs font-semibold text-gray-400">{tr(lang, 'noReservationsToday')}</p>
-      </div>
-    )
+    return null
   }
 
   return (
@@ -629,7 +542,6 @@ export default function WaiterTables() {
   const navigate = useNavigate()
   const lang = state.lang || 'en'
   const [activeFilter, setActiveFilter] = useState('all')
-  const [search, setSearch] = useState('')
 
   const waiterName = profile?.full_name || state.user?.name || 'Waiter'
   const canManageTables = ['owner', 'admin'].includes((profile?.role || state.user?.role || '').toLowerCase())
@@ -657,13 +569,11 @@ export default function WaiterTables() {
   }, [tableInfos])
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return tableInfos.filter(({ table, status }) => {
+    return tableInfos.filter(({ status }) => {
       const matchStatus = activeFilter === 'all' || status === activeFilter
-      const matchSearch = !q || table.name.toLowerCase().includes(q)
-      return matchStatus && matchSearch
+      return matchStatus
     })
-  }, [tableInfos, activeFilter, search])
+  }, [tableInfos, activeFilter])
 
   const sections = useMemo(() =>
     SECTION_ORDER
@@ -759,22 +669,6 @@ export default function WaiterTables() {
               <p className="text-sm text-gray-400 mt-0.5">{tr(lang, 'welcome')}, {waiterName}</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-              <div className="relative min-w-0 sm:w-[280px]">
-                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-                <input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder={tr(lang, 'searchPlaceholder')}
-                  className="h-10 w-full rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] pl-9 pr-3 text-sm text-[#1F2937] outline-none transition-all focus:border-[#ff5a00] focus:bg-white focus:ring-2 focus:ring-[#ff5a00]/15"
-                />
-              </div>
-              <button
-                onClick={() => window.location.reload()}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 shadow-sm transition-colors hover:bg-gray-50"
-              >
-                <RefreshCw size={14} className="shrink-0" />
-                <span className="truncate whitespace-nowrap">{tr(lang, 'refresh')}</span>
-              </button>
               <button
                 onClick={handleTakeAway}
                 className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-sm shadow-orange-200 transition-colors hover:bg-[#cc4800]"
@@ -855,7 +749,7 @@ export default function WaiterTables() {
                       <p className="text-xs font-semibold text-[#8A94A6]">{tableCountLabel(lang, items.length)}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-5">
                     {items.map(({ table, status: itemStatus, counts }) => (
                       <TableCard
                         key={table.id}
@@ -882,9 +776,6 @@ export default function WaiterTables() {
               </div>
             )}
           </div>
-
-          {/* Status guide */}
-          <StatusGuide lang={lang} />
         </div>
       </div>
     </AppShell>
