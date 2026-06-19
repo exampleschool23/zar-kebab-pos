@@ -758,7 +758,7 @@ export default function WaiterTables() {
               <h2 className="text-2xl font-black text-gray-900">{tr(lang, 'tables')}</h2>
               <p className="text-sm text-gray-400 mt-0.5">{tr(lang, 'welcome')}, {waiterName}</p>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
               <div className="relative min-w-0 sm:w-[280px]">
                 <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
                 <input
@@ -770,32 +770,32 @@ export default function WaiterTables() {
               </div>
               <button
                 onClick={() => window.location.reload()}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-sm"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-600 shadow-sm transition-colors hover:bg-gray-50"
               >
-                <RefreshCw size={14} />
-                {tr(lang, 'refresh')}
+                <RefreshCw size={14} className="shrink-0" />
+                <span className="truncate whitespace-nowrap">{tr(lang, 'refresh')}</span>
               </button>
               <button
                 onClick={handleTakeAway}
-                className="flex items-center gap-2 px-4 py-2 bg-[#ff5a00] text-white rounded-xl text-sm font-black hover:bg-[#cc4800] transition-colors shadow-sm shadow-orange-200"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-sm shadow-orange-200 transition-colors hover:bg-[#cc4800]"
               >
-                <Plus size={15} />
-                {tr(lang, 'takeAwayOrder')}
+                <Plus size={15} className="shrink-0" />
+                <span className="truncate whitespace-nowrap">{tr(lang, 'takeAwayOrder')}</span>
               </button>
               <button
                 onClick={handleDelivery}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-black hover:bg-purple-700 transition-colors shadow-sm shadow-purple-100"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 text-sm font-black text-white shadow-sm shadow-purple-100 transition-colors hover:bg-purple-700"
               >
-                <Plus size={15} />
-                {tr(lang, 'deliveryOrder')}
+                <Plus size={15} className="shrink-0" />
+                <span className="truncate whitespace-nowrap">{tr(lang, 'deliveryOrder')}</span>
               </button>
               {canManageTables && (
                 <button
                   onClick={() => navigate('/admin/tables')}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-xl text-sm font-black hover:bg-black transition-colors shadow-sm"
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-black"
                 >
-                  <Settings size={15} />
-                  {tr(lang, 'manageTables')}
+                  <Settings size={15} className="shrink-0" />
+                  <span className="truncate whitespace-nowrap">{tr(lang, 'manageTables')}</span>
                 </button>
               )}
             </div>

@@ -17,6 +17,7 @@ const TABLE_CHECKS = [
   { name: 'employee_salary_rates', columns: ['id', 'salary_profile_id', 'effective_from', 'amount', 'rate_unit'] },
   { name: 'employee_salary_payments', columns: ['id', 'salary_profile_id', 'paid_date', 'period_from', 'period_to', 'amount', 'payment_method'] },
   { name: 'employee_salary_bonuses', columns: ['id', 'salary_profile_id', 'bonus_date', 'amount', 'payment_method'] },
+  { name: 'employee_salary_absences', columns: ['id', 'salary_profile_id', 'absence_date'] },
   { name: 'order_payment_audit', columns: ['id', 'order_id', 'action', 'changed_at'] },
   { name: 'profile_audit', columns: ['id', 'profile_id', 'action', 'changed_at'] },
 ]
@@ -36,6 +37,7 @@ const MIGRATION_HINTS = {
   employee_salary_rates: 'Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, and supabase/058_employee_salary_daily_amount_compat.sql',
   employee_salary_payments: 'Run supabase/054_employee_salary_profiles.sql',
   employee_salary_bonuses: 'Run supabase/057_employee_salary_bonuses.sql',
+  employee_salary_absences: 'Run supabase/063_employee_salary_absences.sql',
   submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
 }

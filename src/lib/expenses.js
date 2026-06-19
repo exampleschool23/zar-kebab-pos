@@ -141,6 +141,13 @@ export function getSalaryActiveUntil(salaryProfile, dateTo = todayExpenseDate())
   return endDate < dateTo ? endDate : dateTo
 }
 
+export function getSalaryAbsenceDates(salaryProfile) {
+  return new Set((salaryProfile?.absences || [])
+    .map(absence => String(absence?.absence_date || absence?.date || '').slice(0, 10))
+    .filter(Boolean)
+  )
+}
+
 export function buildSalaryExpenseRows(salaryProfiles = [], dateFrom, dateTo) {
   if (!dateFrom || !dateTo) return []
   const rows = []
@@ -150,7 +157,9 @@ export function buildSalaryExpenseRows(salaryProfiles = [], dateFrom, dateTo) {
     const activeUntil = getSalaryActiveUntil(salaryProfile, dateTo)
     const start = joinedAt > dateFrom ? joinedAt : dateFrom
     if (start > activeUntil) continue
+    const absenceDates = getSalaryAbsenceDates(salaryProfile)
     for (let date = start; date <= activeUntil; date = addLocalDateDays(date, 1)) {
+      if (absenceDates.has(date)) continue
       const dailyAmount = getDailySalaryAmount(salaryProfile, date)
       if (dailyAmount <= 0) continue
       const name = salaryProfile.employee_name || salaryProfile.profile?.full_name || salaryProfile.profile?.email || ''

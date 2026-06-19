@@ -170,6 +170,29 @@ test('deactivated salary profiles stop accruing after ended_at while keeping due
   assert.equal(getTotalSalaryDue([formerWaiter], '2026-06-16'), 2_100_000)
 })
 
+test('salary absences skip daily accrual and reduce salary due for those dates', () => {
+  const waiterProfile = {
+    id: 'salary-absence-1',
+    profile_id: 'waiter-absence-1',
+    employee_name: 'Absent Waiter',
+    joined_at: '2026-06-01',
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-06-01', amount: 200_000, rate_unit: 'daily' }],
+    payments: [],
+    absences: [
+      { id: 'absence-1', absence_date: '2026-06-02' },
+      { id: 'absence-2', absence_date: '2026-06-04' },
+    ],
+  }
+
+  const rows = buildSalaryExpenseRows([waiterProfile], '2026-06-01', '2026-06-05')
+
+  assert.deepEqual(rows.map(row => row.expense_date), ['2026-06-01', '2026-06-03', '2026-06-05'])
+  assert.equal(summarizeExpenses(rows).total, 600_000)
+  assert.equal(getSalaryDue(waiterProfile, '2026-06-05'), 600_000)
+})
+
 test('salary bonuses create separate expense rows without changing salary due', () => {
   const waiterProfile = {
     id: 'salary-bonus-1',

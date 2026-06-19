@@ -47,7 +47,7 @@ function addDays(isoDate, n) {
   return toLocalDateStr(d.toISOString())
 }
 
-function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], profiles = []) {
+function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], absences = [], profiles = []) {
   const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
   return rows.map(row => ({
     ...row,
@@ -55,6 +55,7 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
     rates: rates.filter(rate => rate.salary_profile_id === row.id),
     payments: payments.filter(payment => payment.salary_profile_id === row.id),
     bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
+    absences: absences.filter(absence => absence.salary_profile_id === row.id),
   }))
 }
 
@@ -1132,7 +1133,7 @@ export default function Reports() {
         setExpensesError('')
         return
       }
-      const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, teamResult] = await Promise.all([
+      const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult] = await Promise.all([
         supabase
           .from('expenses')
           .select('id, entry_type, expense_date, category, payment_method, amount')
@@ -1142,6 +1143,7 @@ export default function Reports() {
         supabase.from('employee_salary_rates').select('*'),
         supabase.from('employee_salary_payments').select('*'),
         supabase.from('employee_salary_bonuses').select('*'),
+        supabase.from('employee_salary_absences').select('*'),
         supabase.from('profiles').select('id, full_name, email, role, status'),
       ])
       if (cancelled) return
@@ -1157,7 +1159,7 @@ export default function Reports() {
         setExpenses(data || [])
         setExpensesError('')
       }
-      if (salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error) {
+      if (salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error) {
         setSalaryProfiles([])
       } else {
         setSalaryProfiles(composeSalaryProfiles(
@@ -1165,6 +1167,7 @@ export default function Reports() {
           salaryRateResult.data || [],
           salaryPaymentResult.data || [],
           salaryBonusResult.data || [],
+          salaryAbsenceResult.data || [],
           teamResult.data || [],
         ))
       }

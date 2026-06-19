@@ -110,7 +110,7 @@ function isMissingSalaryMigration(error) {
   )
 }
 
-function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], profiles = []) {
+function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], absences = [], profiles = []) {
   const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
   return rows.map(row => ({
     ...row,
@@ -118,6 +118,7 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
     rates: rates.filter(rate => rate.salary_profile_id === row.id),
     payments: payments.filter(payment => payment.salary_profile_id === row.id),
     bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
+    absences: absences.filter(absence => absence.salary_profile_id === row.id),
   }))
 }
 
@@ -213,7 +214,7 @@ export default function Expenses() {
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
       loadFailed: 'Xarajatlarni yuklab bo‘lmadi.',
       migrationMissing: 'Xarajatlar jadvali hali bazada tayyor emas. Supabase SQL editorida supabase/048_expenses.sql va supabase/059_expense_income_entries.sql migratsiyalarini ishga tushiring.',
-      salaryMigrationMissing: 'Maosh jadvallari yangilanmagan. Supabase SQL editorida supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql va supabase/056_employee_salary_profile_end_date.sql migratsiyalarini ishga tushiring.',
+      salaryMigrationMissing: 'Maosh jadvallari yangilanmagan. Supabase SQL editorida supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql va supabase/063_employee_salary_absences.sql migratsiyalarini ishga tushiring.',
       automaticSalary: 'Maosh to‘lovi',
       delete: 'O‘chirish',
       confirmDelete: 'Tasdiqlash',
@@ -265,7 +266,7 @@ export default function Expenses() {
       saveFailed: 'Не удалось сохранить расход.',
       loadFailed: 'Не удалось загрузить расходы.',
       migrationMissing: 'Таблица расходов ещё не готова в базе. Запустите supabase/048_expenses.sql и supabase/059_expense_income_entries.sql в Supabase SQL Editor.',
-      salaryMigrationMissing: 'Таблицы зарплат не обновлены. Запустите supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql и supabase/056_employee_salary_profile_end_date.sql в Supabase SQL Editor.',
+      salaryMigrationMissing: 'Таблицы зарплат не обновлены. Запустите supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql и supabase/063_employee_salary_absences.sql в Supabase SQL Editor.',
       automaticSalary: 'Выплата зарплаты',
       delete: 'Удалить',
       confirmDelete: 'Подтвердить',
@@ -317,7 +318,7 @@ export default function Expenses() {
       saveFailed: 'Could not save expense.',
       loadFailed: 'Could not load expenses.',
       migrationMissing: 'Expenses table is not ready yet. Run supabase/048_expenses.sql and supabase/059_expense_income_entries.sql in Supabase SQL Editor.',
-      salaryMigrationMissing: 'Salary tables are not up to date. Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, and supabase/056_employee_salary_profile_end_date.sql in Supabase SQL Editor.',
+      salaryMigrationMissing: 'Salary tables are not up to date. Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql, and supabase/063_employee_salary_absences.sql in Supabase SQL Editor.',
       automaticSalary: 'Salary payment',
       delete: 'Delete',
       confirmDelete: 'Confirm',
@@ -331,7 +332,7 @@ export default function Expenses() {
   async function loadExpenses() {
     setLoading(true)
     setError('')
-    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, teamResult] = await Promise.all([
+    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult] = await Promise.all([
       supabase
         .from('expenses')
         .select(SELECT_COLUMNS)
@@ -343,6 +344,7 @@ export default function Expenses() {
       supabase.from('employee_salary_rates').select('*'),
       supabase.from('employee_salary_payments').select('*'),
       supabase.from('employee_salary_bonuses').select('*'),
+      supabase.from('employee_salary_absences').select('*'),
       supabase.from('profiles').select('id, full_name, email, role, status'),
     ])
 
@@ -352,7 +354,7 @@ export default function Expenses() {
     } else {
       setExpenses(expenseResult.data || [])
     }
-    const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error
+    const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
     if (salaryError) {
       setSalaryProfiles([])
       if (!expenseResult.error && isMissingSalaryMigration(salaryError)) setError(l.salaryMigrationMissing)
@@ -362,6 +364,7 @@ export default function Expenses() {
         salaryRateResult.data || [],
         salaryPaymentResult.data || [],
         salaryBonusResult.data || [],
+        salaryAbsenceResult.data || [],
         teamResult.data || [],
       ))
     }
