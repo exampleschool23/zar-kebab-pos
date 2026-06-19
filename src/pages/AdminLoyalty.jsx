@@ -20,6 +20,7 @@ import {
 } from '../lib/loyalty'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
+import { formatDateTime } from '../lib/dateFormat'
 
 const CARD_PAGE_SIZE = 20
 const CARD_SELECT_COLUMNS = 'id, card_number, public_token, customer_name, phone_number, cashback_type, balance, total_earned, total_redeemed, is_active, created_at, updated_at'
@@ -312,12 +313,7 @@ export default function AdminLoyalty() {
   }
 
   function formatTransactionDate(value) {
-    if (!value) return ''
-    try {
-      return new Date(value).toLocaleString()
-    } catch {
-      return ''
-    }
+    return formatDateTime(value)
   }
 
   function transactionCardType(tx) {

@@ -32,6 +32,7 @@ import {
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
+import { formatDateTime } from '../lib/dateFormat'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -98,10 +99,7 @@ function todayStr() {
 }
 
 function fmtDate(iso) {
-  if (!iso) return '—'
-  const d   = new Date(iso)
-  const pad = n => String(n).padStart(2, '0')
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}  ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return formatDateTime(iso, '—')
 }
 
 function orderTableLabel(order, lang) {

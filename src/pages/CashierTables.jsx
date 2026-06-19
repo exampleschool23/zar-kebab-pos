@@ -22,6 +22,7 @@ import UnifiedSidebar from '../components/UnifiedSidebar'
 import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { getItemName } from '../lib/i18n'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
+import { formatDateTime, formatTime } from '../lib/dateFormat'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -34,20 +35,11 @@ function elapsedSince(iso) {
 }
 
 function timeLabel(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return formatTime(iso)
 }
 
 function dateTimeLabel(iso) {
-  if (!iso) return ''
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  const datePart = date.toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-  return `${datePart} ${timeLabel(iso)}`
+  return formatDateTime(iso)
 }
 
 function countLabel(count, lang) {
@@ -57,8 +49,11 @@ function countLabel(count, lang) {
 }
 
 function paidTimeLabel(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return formatTime(iso)
+}
+
+function getCashierItemName(item, menuItem, lang) {
+  return menuItem ? getItemName(menuItem, lang) : item.name
 }
 
 // ── Localisation ──────────────────────────────────────────────────────────────
@@ -362,13 +357,14 @@ function BillCard({
         <div className="space-y-2.5">
           {preview.map((item, i) => {
             const mi = menuItemMap[item.menu_item_id]
+            const displayName = getCashierItemName(item, mi, lang)
             const lineTotal = (item.price || 0) * (item.quantity || 1)
             return (
               <div key={i} className="flex items-center gap-3">
                 {mi?.image_url ? (
                   <img
                     src={mi.image_url}
-                    alt={item.name}
+                    alt={displayName}
                     className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
                   />
                 ) : (
@@ -376,7 +372,7 @@ function BillCard({
                     <UtensilsCrossed size={12} className="text-gray-300" />
                   </div>
                 )}
-                <p className="flex-1 text-[13px] text-[#1F2937] font-medium truncate">{item.name}</p>
+                <p className="flex-1 text-[13px] text-[#1F2937] font-medium truncate">{displayName}</p>
                 <span className="text-[12px] text-[#9CA3AF] flex-shrink-0 w-8 text-center">×{item.quantity}</span>
                 <span className="text-[13px] font-semibold text-[#1F2937] flex-shrink-0 w-24 text-right">
                   {formatCurrency(lineTotal)}

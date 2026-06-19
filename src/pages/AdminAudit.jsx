@@ -5,19 +5,10 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { formatCurrency } from '../lib/formatCurrency'
 import { ORDER_TYPE_LABELS } from '../lib/orderTypes'
+import { formatDateTime } from '../lib/dateFormat'
 
 function fmtDate(value, lang = 'ru') {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return '—'
-  const locale = lang === 'uz' ? 'uz-UZ' : lang === 'en' ? 'en-US' : 'ru-RU'
-  return d.toLocaleString(locale, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(value, '—')
 }
 
 function actionLabel(action, lang) {

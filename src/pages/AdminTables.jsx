@@ -8,6 +8,7 @@ import { useApp } from '../store/AppContext'
 import AppShell from '../components/AppShell'
 import { canDeleteTable, canDisableTable } from '../lib/tableManagement'
 import { clearReservationPatch, compactTimelineLabels, getTodaysReservations } from '../lib/tableActivity'
+import { formatDateTime, formatTime } from '../lib/dateFormat'
 
 const DEFAULT_ZONES = ['Main Hall', 'VIP', 'Outdoor', 'Second Floor']
 
@@ -411,7 +412,7 @@ function ReservationStrip({ reservations, labels, onSeat, onCancel, onCall }) {
                   <p className="truncate text-xs font-bold text-purple-700">{reservation.name || '-'}</p>
                 </div>
                 <span className="rounded-full bg-white px-2 py-1 text-xs font-black text-purple-700">
-                  {new Date(reservation.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {formatTime(reservation.startsAt)}
                 </span>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-1.5">
@@ -933,7 +934,7 @@ export default function AdminTables() {
                   <div>
                     <StatusPill table={table} labels={l} />
                     {table.status === 'reserved' && table.reserved_at && (
-                      <p className="mt-1 text-xs font-semibold text-gray-400">{new Date(table.reserved_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</p>
+                      <p className="mt-1 text-xs font-semibold text-gray-400">{formatDateTime(table.reserved_at)}</p>
                     )}
                   </div>
                   <div className="hidden items-center gap-1.5 text-sm font-semibold text-gray-600 md:flex">

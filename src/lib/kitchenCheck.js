@@ -1,3 +1,5 @@
+import { formatTime } from './dateFormat.js'
+
 const CANCELLED_STATUS = 'cancelled'
 const DEFAULT_TITLE = 'ЧЕК ДЛЯ КУХНИ'
 const SEPARATOR = '━━━━━━━━━━━━━━━━━━━━'
@@ -32,13 +34,7 @@ function itemCreatedAt(item) {
 }
 
 function formatKitchenTime(value) {
-  const date = value ? new Date(value) : new Date()
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return formatTime(value || new Date())
 }
 
 function formatKitchenOrderNumber(group) {

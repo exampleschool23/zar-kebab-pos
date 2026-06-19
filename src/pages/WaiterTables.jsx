@@ -12,6 +12,7 @@ import {
 import { getOrderTotal } from '../lib/analytics'
 import { getReservationSummary, getWaiterTableStatus } from '../lib/tableManagement'
 import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
+import { formatDateTime, formatTime } from '../lib/dateFormat'
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
@@ -280,16 +281,28 @@ function deriveStatusForTable(table, orders) {
 function getPreparationCounts(tableId, orders) {
   const active = getVisibleActiveOrdersForTable(tableId, orders)
   const items = active.flatMap(o => o.items || []).filter(i => i.status !== 'cancelled')
+  const pendingItemTimes = active.flatMap(o => (o.items || [])
+    .filter(i => i.status !== 'cancelled' && i.status !== 'served')
+    .map(i => i.submitted_at || i.submittedAt || i.created_at || i.createdAt || o.created_at)
+    .filter(Boolean)
+  )
+  const billableItemTimes = active.flatMap(o => (o.items || [])
+    .filter(i => i.status !== 'cancelled')
+    .map(i => i.submitted_at || i.submittedAt || i.created_at || i.createdAt || o.created_at)
+    .filter(Boolean)
+  )
+  const orderTimes = active.map(o => o.created_at).filter(Boolean)
+  const earliestTime = times => times.reduce((earliest, time) =>
+    !earliest || new Date(time) < new Date(earliest) ? time : earliest,
+    null
+  )
   return {
     newCount: items.filter(i => (i.status || 'new') === 'new').length,
     preparingCount: items.filter(i => i.status === 'preparing').length,
     readyCount: items.filter(i => i.status === 'ready').length,
     itemCount: items.reduce((s, i) => s + (Number(i.quantity) || 1), 0),
     total: active.reduce((s, o) => s + getOrderTotal(o), 0),
-    createdAt: active.reduce((earliest, o) =>
-      new Date(o.created_at) < new Date(earliest) ? o.created_at : earliest,
-      active[0]?.created_at
-    ),
+    createdAt: earliestTime(pendingItemTimes) || earliestTime(billableItemTimes) || earliestTime(orderTimes),
   }
 }
 
@@ -396,7 +409,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
           {reservation.startsAt && (
             <p className="flex items-center gap-1 text-xs font-semibold text-gray-500">
               <Clock size={12} />
-              {new Date(reservation.startsAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+              {formatDateTime(reservation.startsAt)}
             </p>
           )}
           {reservation.phone && (
@@ -579,7 +592,7 @@ function ReservationStrip({ reservations, lang, onSeat, onCancel, onCall }) {
                 <p className="truncate text-xs font-bold text-purple-700">{reservation.name || '-'}</p>
               </div>
               <span className="rounded-full bg-white px-2 py-1 text-xs font-black text-purple-700">
-                {new Date(reservation.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {formatTime(reservation.startsAt)}
               </span>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-1.5">

@@ -189,6 +189,6 @@ test('latest selected period wins when a slow analytics response resolves out of
 test('dashboard readable date format uses a clear date time separator', () => {
   assert.equal(
     formatReadableDateTime('2026-05-19T23:29:00'),
-    'May 19, 2026 · 11:29 PM'
+    '19.05.2026 23:29'
   )
 })

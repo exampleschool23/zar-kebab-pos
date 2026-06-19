@@ -12,6 +12,7 @@ import {
 } from '../lib/analytics'
 import { isCashierQuickItem } from '../lib/menuItems'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { formatDateTime } from '../lib/dateFormat'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -29,7 +30,6 @@ const L = {
     servicePct:  n => `Xizmat haqi ${n}%`,
     loyaltyUsed: 'Sodiqlik ishlatildi',
     cashbackEarned: 'Cashback hisoblandi',
-    payment:     "To'lov",
     total:       "To'lovga jami",
     thanks1:     'Tashrifingiz uchun rahmat!',
     thanks2:     'Sizni yana kutib qolamiz!',
@@ -48,7 +48,6 @@ const L = {
     servicePct:  n => `Обслуживание ${n}%`,
     loyaltyUsed: 'Использовано с карты',
     cashbackEarned: 'Начислен кешбэк',
-    payment:     'Оплата',
     total:       'Итого к оплате',
     thanks1:     'Спасибо, что выбрали ZarKebab!',
     thanks2:     'Будем рады видеть вас снова!',
@@ -67,7 +66,6 @@ const L = {
     servicePct:  n => `Service ${n}%`,
     loyaltyUsed: 'Loyalty used',
     cashbackEarned: 'Cashback earned',
-    payment:     'Payment',
     total:       'Total to pay',
     thanks1:     'Thank you for choosing ZarKebab!',
     thanks2:     'We hope to see you again!',
@@ -135,19 +133,6 @@ function combineReceiptOrders(orders) {
 function receiptTableLabel(order, table, lang, fallback) {
   const orderType = inferOrderType(order)
   return isOffPremiseOrderType(orderType) ? orderTypeLabel(orderType, lang) : (table?.name || order?.table_name || fallback)
-}
-
-function payMethodLabel(method, lang) {
-  const labels = {
-    cash: { uz: 'Naqd', ru: 'Наличные', en: 'Cash' },
-    card: { uz: 'Karta', ru: 'Карта', en: 'Card' },
-    terminal: { uz: 'Terminal', ru: 'Терминал', en: 'Terminal' },
-    qr: { uz: 'QR Code', ru: 'QR-код', en: 'QR Code' },
-    loyalty_card: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' },
-    mixed: { uz: 'Aralash', ru: 'Смешанная', en: 'Mixed' },
-    unknown: { uz: "Noma'lum", ru: 'Неизвестно', en: 'Unknown' },
-  }
-  return (labels[method] || labels.unknown)[lang] || (labels[method] || labels.unknown).en
 }
 
 // ── Shared font styles ────────────────────────────────────────────────────────
@@ -247,7 +232,7 @@ function handlePrintReceipt(delay = 300) {
 
 // ── ReceiptPaper ──────────────────────────────────────────────────────────────
 
-function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, payments, labels, lang, restaurantName, receiptFooter }) {
+function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, lang, restaurantName, receiptFooter }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=https://instagram.com/zarkebab&size=220x220&margin=6&color=111111&bgcolor=ffffff`
 
   return (
@@ -371,13 +356,6 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
           {cashbackEarned > 0 && (
             <TotalRow label={labels.cashbackEarned} value={`+ ${fmtUZS(cashbackEarned)}`} color="#d97706" />
           )}
-          {payments?.length > 0 && payments.map((row, index) => (
-            <TotalRow
-              key={`${row.method}-${row.amount}-${index}`}
-              label={`${labels.payment} · ${payMethodLabel(row.method, lang)}`}
-              value={fmtUZS(row.amount)}
-            />
-          ))}
         </tbody>
       </table>
 
@@ -583,7 +561,7 @@ export function TableReceipt() {
     return {
       tableName:  receiptTableLabel(orders[0], table, lang, tableId),
       waiterName: orders[0]?.waiter_name || '—',
-      createdAt:  orders[0]?.created_at,
+      receiptAt:  orders[0]?.paid_at || orders[0]?.created_at,
       items,
       subtotal: summary.subtotal,
       serviceFee: summary.serviceFee,
@@ -606,7 +584,7 @@ export function TableReceipt() {
     >
       <ReceiptPaper
         {...data}
-        dateStr={formatDate(data.createdAt)}
+        dateStr={formatDateTime(data.receiptAt)}
         labels={labels}
         lang={lang}
         restaurantName={settings.restaurantName}
@@ -664,7 +642,7 @@ export default function Receipt() {
     return {
       tableName:  receiptTableLabel(order, table, lang, '—'),
       waiterName: order.waiter_name || '—',
-      createdAt:  order.created_at,
+      receiptAt:  order.paid_at || order.created_at,
       items,
       subtotal: summary.subtotal,
       serviceFee: summary.serviceFee,
@@ -687,7 +665,7 @@ export default function Receipt() {
     >
       <ReceiptPaper
         {...data}
-        dateStr={formatDate(data.createdAt)}
+        dateStr={formatDateTime(data.receiptAt)}
         labels={labels}
         lang={lang}
         restaurantName={settings.restaurantName}
@@ -771,10 +749,4 @@ function NotFound({ onBack }) {
       </div>
     </div>
   )
-}
-
-function formatDate(isoString) {
-  const d   = isoString ? new Date(isoString) : new Date()
-  const pad = n => String(n).padStart(2, '0')
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }

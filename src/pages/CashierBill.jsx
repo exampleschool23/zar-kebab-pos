@@ -66,6 +66,10 @@ function getDesc(menuItem, lang) {
   return menuItem[`description_${lang}`] || menuItem.description_en || menuItem.description_uz || ''
 }
 
+function getCashierItemName(item, menuItem, lang) {
+  return menuItem ? getItemName(menuItem, lang) : item.name
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 export default function CashierBill() {
   const { tableId, orderId }  = useParams()
@@ -642,6 +646,7 @@ export default function CashierBill() {
                 <div className="divide-y divide-[#F9FAFB]">
                   {order.items.map((item, i) => {
                     const mi   = menuItemMap[item.menu_item_id]
+                    const displayName = getCashierItemName(item, mi, lang)
                     const desc = getDesc(mi, lang)
                     const grams = gramsLabel(mi, lang)
                     const millilitres = millilitresLabel(mi, lang)
@@ -658,7 +663,7 @@ export default function CashierBill() {
                             {mi?.image_url ? (
                               <img
                                 src={mi.image_url}
-                                alt={item.name}
+                                alt={displayName}
                                 className="w-full h-full object-cover"
                                 loading="lazy"
                               />
@@ -669,7 +674,7 @@ export default function CashierBill() {
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold text-sm text-[#1F2937] line-clamp-1">{item.name}</p>
+                            <p className="font-bold text-sm text-[#1F2937] line-clamp-1">{displayName}</p>
                             {desc && (
                               <p className="text-[11px] text-[#6B7280] line-clamp-1 mt-0.5">{desc}</p>
                             )}

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Search, UtensilsCrossed } from 'lucide-react'
+import { Instagram, Phone, Search, Send, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
@@ -14,6 +14,21 @@ import {
   ProductCard as MenuProductCard,
   ProductDetailPage as MenuProductDetailPage,
 } from '../components/MenuProductCards'
+
+const PUBLIC_CONTACTS = {
+  telegram: {
+    label: 'Telegram',
+    href: 'https://t.me/zarkebab',
+  },
+  phone: {
+    label: '+998 90 509-55-45',
+    href: 'tel:+998905095545',
+  },
+  instagram: {
+    label: '@zarkebab',
+    href: 'https://www.instagram.com/zarkebab',
+  },
+}
 
 async function loadPublicMenuData() {
   const rpcRes = await supabase.rpc('get_public_menu_data')
@@ -191,6 +206,33 @@ export default function PublicMenu() {
             <p className="hidden text-xs font-semibold text-[#8A94A6] sm:block">
               {lang === 'uz' ? 'Buyurtma berish uchun ofitsiantga murojaat qiling.' : lang === 'ru' ? 'Для заказа обратитесь к официанту.' : 'Please ask your waiter to order.'}
             </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <a
+              href={PUBLIC_CONTACTS.telegram.href}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={PUBLIC_CONTACTS.telegram.label}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-700 transition-colors hover:bg-sky-100"
+            >
+              <Send size={16} />
+            </a>
+            <a
+              href={PUBLIC_CONTACTS.phone.href}
+              aria-label={PUBLIC_CONTACTS.phone.label}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
+            >
+              <Phone size={16} />
+            </a>
+            <a
+              href={PUBLIC_CONTACTS.instagram.href}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={PUBLIC_CONTACTS.instagram.label}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100"
+            >
+              <Instagram size={16} />
+            </a>
           </div>
           <LanguageSwitcher />
         </div>

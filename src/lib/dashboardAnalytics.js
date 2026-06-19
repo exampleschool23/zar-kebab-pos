@@ -10,6 +10,8 @@ function localDateStr(value) {
   return toLocalDateStr(value instanceof Date ? value.toISOString() : value)
 }
 
+import { formatDateTime } from './dateFormat.js'
+
 function todayStr(now = new Date()) {
   return localDateStr(now)
 }
@@ -153,19 +155,5 @@ export function getDashboardStaffPerformance(orders, staffProfiles = []) {
 }
 
 export function formatReadableDateTime(date, locale = 'en-US') {
-  const value = typeof date === 'string' ? new Date(date) : date
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return ''
-
-  const dateText = new Intl.DateTimeFormat(locale, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(value)
-  const timeText = new Intl.DateTimeFormat(locale, {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(value)
-
-  return `${dateText} · ${timeText}`
+  return formatDateTime(date)
 }

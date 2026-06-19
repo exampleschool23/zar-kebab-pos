@@ -9,6 +9,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getAllProfiles } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
+import { formatDateOnly } from '../lib/dateFormat'
 import {
   getOrderDate,
   getOrderItems,
@@ -232,10 +233,9 @@ function orderTableLabel(order, lang, fallback) {
 }
 
 function shortLabel(ds, mode) {
-  const d = new Date(ds + 'T12:00:00')
   if (mode === 'today')  return `${ds.slice(11, 16)}` // hour label passed in directly
-  if (mode === 'year')   return d.toLocaleDateString('en', { month: 'short' })
-  return d.toLocaleDateString('en', { weekday: 'short', day: 'numeric' })
+  if (mode === 'year')   return ds.slice(5, 7)
+  return formatDateOnly(ds)
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -542,7 +542,7 @@ export default function AdminDashboard() {
       })
       const todayDs = todayStr()
       const bars = days.map(ds => ({
-        label:   new Date(ds + 'T12:00:00').toLocaleDateString('en', { weekday: 'short', day: 'numeric' }),
+        label:   formatDateOnly(ds),
         revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
         isToday: ds === todayDs,
       }))

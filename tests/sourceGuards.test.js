@@ -317,6 +317,21 @@ test('PublicMenu is read-only for QR customers', () => {
   assert.match(productCards, /!\s*readOnly && \(/)
 })
 
+test('PublicMenu exposes public contact actions', () => {
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+
+  assert.match(publicMenu, /const PUBLIC_CONTACTS = \{/)
+  assert.match(publicMenu, /https:\/\/t\.me\/zarkebab/)
+  assert.match(publicMenu, /tel:\+998905095545/)
+  assert.match(publicMenu, /https:\/\/www\.instagram\.com\/zarkebab/)
+  assert.match(publicMenu, /aria-label=\{PUBLIC_CONTACTS\.telegram\.label\}/)
+  assert.match(publicMenu, /<Send size=\{16\}/)
+  assert.match(publicMenu, /<Phone size=\{16\}/)
+  assert.match(publicMenu, /<Instagram size=\{16\}/)
+  assert.match(publicMenu, /<LanguageSwitcher \/>/)
+  assert.doesNotMatch(publicMenu, /PUBLIC_CONTACTS\.phone\.label\}<\/span>/)
+})
+
 test('cashier-only menu items are hidden from customer menus but available to cashier quick items', () => {
   const adminMenu = readSource('src/pages/AdminMenu.jsx')
   const publicMenu = readSource('src/pages/PublicMenu.jsx')
@@ -513,6 +528,14 @@ test('source does not use blocking alert dialogs', () => {
   assert.deepEqual(offenders, [])
 })
 
+test('source uses shared date formatting instead of browser locale defaults', () => {
+  const offenders = sourceFiles()
+    .filter(file => /toLocale(?:Date|Time|String)|Intl\.DateTimeFormat/.test(readFileSync(file, 'utf8')))
+    .map(file => file.slice(root.length))
+
+  assert.deepEqual(offenders, [])
+})
+
 test('CartPanel exposes in-flight send state from its parent', () => {
   const source = readSource('src/components/CartPanel.jsx')
   const body = functionBody(source, 'CartPanel')
@@ -573,6 +596,16 @@ test('WaiterTables ready-card total uses shared payment math instead of stale st
   assert.match(source, /import \{ getOrderTotal \} from '\.\.\/lib\/analytics'/)
   assert.match(getPreparationCounts, /total: active\.reduce\(\(s, o\) => s \+ getOrderTotal\(o\), 0\)/)
   assert.doesNotMatch(getPreparationCounts, /Number\(o\.total\)/)
+})
+
+test('WaiterTables elapsed label uses pending item submit time before stale order time', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+  const getPreparationCounts = functionBody(source, 'getPreparationCounts')
+
+  assert.match(getPreparationCounts, /const pendingItemTimes = active\.flatMap/)
+  assert.match(getPreparationCounts, /i\.submitted_at \|\| i\.submittedAt \|\| i\.created_at \|\| i\.createdAt \|\| o\.created_at/)
+  assert.match(getPreparationCounts, /createdAt: earliestTime\(pendingItemTimes\) \|\| earliestTime\(billableItemTimes\) \|\| earliestTime\(orderTimes\)/)
+  assert.doesNotMatch(getPreparationCounts, /createdAt: active\.reduce\(\(earliest, o\)/)
 })
 
 test('WaiterTables hides zero-value active orders from table cards', () => {
@@ -639,11 +672,25 @@ test('CashierTables shows full opened date and time on bill cards', () => {
   const source = readSource('src/pages/CashierTables.jsx')
   const dateTimeLabel = functionBody(source, 'dateTimeLabel')
 
-  assert.match(dateTimeLabel, /toLocaleDateString\('ru-RU'/)
-  assert.match(dateTimeLabel, /year: 'numeric'/)
-  assert.match(dateTimeLabel, /timeLabel\(iso\)/)
+  assert.match(source, /import \{ formatDateTime, formatTime \} from '\.\.\/lib\/dateFormat'/)
+  assert.match(dateTimeLabel, /return formatDateTime\(iso\)/)
   assert.match(source, /\{dateTimeLabel\(order\.created_at\)\}/)
   assert.doesNotMatch(source, /\{timeLabel\(order\.created_at\)\}/)
+})
+
+test('cashier bill item names render in selected language when menu data is available', () => {
+  const cashierBill = readSource('src/pages/CashierBill.jsx')
+  const cashierTables = readSource('src/pages/CashierTables.jsx')
+
+  assert.match(cashierBill, /function getCashierItemName\(item, menuItem, lang\)/)
+  assert.match(cashierBill, /menuItem \? getItemName\(menuItem, lang\) : item\.name/)
+  assert.match(cashierBill, /const displayName = getCashierItemName\(item, mi, lang\)/)
+  assert.match(cashierBill, /alt=\{displayName\}/)
+  assert.match(cashierBill, /\{displayName\}<\/p>/)
+  assert.match(cashierTables, /function getCashierItemName\(item, menuItem, lang\)/)
+  assert.match(cashierTables, /const displayName = getCashierItemName\(item, mi, lang\)/)
+  assert.match(cashierTables, /alt=\{displayName\}/)
+  assert.match(cashierTables, /\{displayName\}<\/p>/)
 })
 
 test('delivery order type is wired through POS surfaces and reports', () => {
@@ -1094,6 +1141,23 @@ test('AdminSettings does not expose receipt footer editing', () => {
   assert.doesNotMatch(settings, /payload: \{ restaurantName, serviceRate, receiptFooter, autoPrint \}/)
 })
 
+test('Receipt hides payment method rows and uses paid timestamp when available', () => {
+  const receipt = readSource('src/pages/Receipt.jsx')
+  const receiptPaper = functionBody(receipt, 'ReceiptPaper')
+  const tableReceiptRoute = functionBody(receipt, 'TableReceipt')
+
+  assert.doesNotMatch(receipt, /payment:\s*['"]/)
+  assert.doesNotMatch(receipt, /function payMethodLabel/)
+  assert.doesNotMatch(receiptPaper, /labels\.payment/)
+  assert.doesNotMatch(receiptPaper, /payments\?\.length/)
+  assert.doesNotMatch(receiptPaper, /Payment ·/)
+  assert.match(receipt, /receiptAt:\s+order\.paid_at \|\| order\.created_at/)
+  assert.match(tableReceiptRoute, /receiptAt:\s+orders\[0\]\?\.paid_at \|\| orders\[0\]\?\.created_at/)
+  assert.match(receipt, /import \{ formatDateTime \} from '\.\.\/lib\/dateFormat'/)
+  assert.match(receipt, /dateStr=\{formatDateTime\(data\.receiptAt\)\}/)
+  assert.doesNotMatch(receipt, /function formatDate\(/)
+})
+
 test('cashier payment waits for database success and supports legacy loyalty transaction constraints', () => {
   const cashier = readSource('src/pages/CashierBill.jsx')
   const appContext = readSource('src/store/AppContext.jsx')
@@ -1218,7 +1282,7 @@ test('expenses page is owner-only, persisted, and included in owner reports net 
   assert.match(salaries, /payment_method:\s*transactionForm\.payment_method \|\| salaryProfile\.payment_method \|\| 'cash'/)
   assert.match(expenses, /const salaryExpenses = useMemo\(\(\) => \(\s*buildSalaryPaymentExpenseRows\(salaryProfiles, dateFrom, dateTo\)/)
   assert.match(expenses, /const salaryBonusExpenses = useMemo\(\(\) => \(\s*buildSalaryBonusExpenseRows\(salaryProfiles, dateFrom, dateTo\)/)
-  assert.match(expenses, /const allExpenses = useMemo\(\(\) => \[\.\.\.salaryExpenses, \.\.\.salaryBonusExpenses, \.\.\.expenses\]/)
+  assert.match(expenses, /const allExpenses = useMemo\(\(\) => \(\s*\[\.\.\.salaryExpenses, \.\.\.salaryBonusExpenses, \.\.\.expenses\]\s*\.sort\(/)
   assert.doesNotMatch(expenses, /buildSalaryExpenseRows\(salaryProfiles, dateFrom, dateTo\)/)
   assert.match(expenses, /\.from\('employee_salary_profiles'\)/)
   assert.match(salaries, /\.from\('employee_salary_profiles'\)/)
