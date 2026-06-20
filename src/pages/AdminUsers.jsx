@@ -101,7 +101,7 @@ export default function AdminUsers() {
   const lang   = state.lang
   const l      = L[lang] || L.en
   const myRole = myProfile?.role || 'waiter'
-  const canEditAccess = canManageFeatureAccess(myRole)
+  const canEditAccess = canManageFeatureAccess(myProfile)
 
   const [users, setUsers]               = useState([])
   const [loading, setLoading]           = useState(true)
@@ -156,7 +156,7 @@ export default function AdminUsers() {
   }
 
   async function handleDelete(user) {
-    if (!canDeleteTeamMember(myRole, user.role, user.id === myProfile?.id)) return
+    if (!canDeleteTeamMember(myProfile, user, user.id === myProfile?.id)) return
     setDeleting(user.id)
     setNotice(null)
     const { error } = await deleteProfile(user.id)
@@ -264,7 +264,7 @@ export default function AdminUsers() {
                 const isMe       = user.id === myProfile?.id
                 const isSaving   = saving === user.id
                 const canEdit    = !isMe && canEditAccess
-                const canDelete  = canDeleteTeamMember(myRole, user.role, isMe)
+                const canDelete  = canDeleteTeamMember(myProfile, user, isMe)
                 const isDeleting = deleting === user.id
                 const isConfirmingDelete = confirmDeleteId === user.id
                 const isAccessExpanded = expandedAccessId === user.id

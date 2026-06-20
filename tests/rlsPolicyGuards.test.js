@@ -9,6 +9,8 @@ const adminCannotEditAdminsSql = fs.readFileSync(new URL('../supabase/026_admin_
 const featureAccessSql = fs.readFileSync(new URL('../supabase/064_profile_feature_access.sql', import.meta.url), 'utf8')
 const deletePaidOrdersFeatureSql = fs.readFileSync(new URL('../supabase/066_delete_paid_orders_feature_access.sql', import.meta.url), 'utf8')
 const moveBackToTableFeatureSql = fs.readFileSync(new URL('../supabase/067_move_back_to_table_feature_access.sql', import.meta.url), 'utf8')
+const primaryOwnerFeatureAccessSql = fs.readFileSync(new URL('../supabase/068_primary_owner_feature_access_manager.sql', import.meta.url), 'utf8')
+const manageNonPrimaryOwnersSql = fs.readFileSync(new URL('../supabase/069_manage_non_primary_owner_profiles.sql', import.meta.url), 'utf8')
 
 test('role-aware write migration removes broad menu and zone writes', () => {
   assert.match(sql, /drop policy if exists "staff_all_categories"/)
@@ -59,6 +61,22 @@ test('profile feature access migration protects owner-managed feature overrides'
   assert.match(featureAccessSql, /when p\.feature_access is not null then feature_key = any\(p\.feature_access\)/)
   assert.match(featureAccessSql, /prevent_non_owner_feature_access_update/)
   assert.match(featureAccessSql, /Only owners can change feature access/)
+})
+
+test('feature access changes are limited to the primary owner account', () => {
+  assert.match(primaryOwnerFeatureAccessSql, /is_feature_access_manager\(\)/)
+  assert.match(primaryOwnerFeatureAccessSql, /lower\(p\.email\) = 'dangerhoggish@gmail\.com'/)
+  assert.match(primaryOwnerFeatureAccessSql, /not public\.is_feature_access_manager\(\)/)
+  assert.match(primaryOwnerFeatureAccessSql, /Only the primary owner can change feature access/)
+})
+
+test('primary owner can restrict and delete non-primary owner profiles', () => {
+  assert.match(manageNonPrimaryOwnersSql, /public\.is_feature_access_manager\(\)/)
+  assert.match(manageNonPrimaryOwnersSql, /role <> 'stakeholder'/)
+  assert.match(manageNonPrimaryOwnersSql, /lower\(coalesce\(email, ''\)\) <> 'dangerhoggish@gmail\.com'/)
+  assert.match(manageNonPrimaryOwnersSql, /when p\.role = 'owner' and lower\(p\.email\) = 'dangerhoggish@gmail\.com' then true/)
+  assert.match(manageNonPrimaryOwnersSql, /when p\.feature_access is not null then feature_key = any\(p\.feature_access\)/)
+  assert.match(manageNonPrimaryOwnersSql, /when p\.role = 'owner' then true/)
 })
 
 test('accounting read policies honor explicit expenses feature access', () => {

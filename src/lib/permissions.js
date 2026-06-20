@@ -81,9 +81,19 @@ export const FEATURE_DEFINITIONS = [
 ]
 
 export const FEATURE_KEYS = FEATURE_DEFINITIONS.map(feature => feature.key)
+export const FEATURE_ACCESS_MANAGER_EMAILS = ['dangerhoggish@gmail.com']
 
 export function normalizeRole(role) {
   return (role || 'guest').toLowerCase()
+}
+
+export function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase()
+}
+
+export function isFeatureAccessManager(profileOrRole) {
+  if (typeof profileOrRole === 'string' || !profileOrRole) return false
+  return normalizeRole(profileOrRole.role) === 'owner' && FEATURE_ACCESS_MANAGER_EMAILS.includes(normalizeEmail(profileOrRole.email))
 }
 
 export function normalizeFeatureAccess(featureAccess) {
@@ -98,7 +108,7 @@ export function defaultFeaturesForRole(role) {
 
 export function featureAccessForProfile(profileOrRole) {
   if (typeof profileOrRole === 'string' || !profileOrRole) return defaultFeaturesForRole(profileOrRole)
-  if (normalizeRole(profileOrRole.role) === 'owner') return FEATURE_KEYS
+  if (isFeatureAccessManager(profileOrRole)) return FEATURE_KEYS
   const explicitAccess = normalizeFeatureAccess(profileOrRole.feature_access)
   return explicitAccess || defaultFeaturesForRole(profileOrRole.role)
 }
@@ -108,8 +118,8 @@ export function canViewPage(profileOrRole, page) {
   return featureAccessForProfile(profileOrRole).includes(page)
 }
 
-export function canManageFeatureAccess(role) {
-  return normalizeRole(role) === 'owner'
+export function canManageFeatureAccess(profileOrRole) {
+  return isFeatureAccessManager(profileOrRole)
 }
 
 export function canDeletePaidOrders(profileOrRole) {
@@ -148,11 +158,15 @@ export function canEditTeamMember(viewerRole, targetRole) {
  * must not cascade into order/report records.
  */
 export function canDeleteTeamMember(viewerRole, targetRole, isSelf = false) {
-  const viewer = (viewerRole || '').toLowerCase()
-  const target = (targetRole || '').toLowerCase()
+  const viewer = normalizeRole(viewerRole?.role || viewerRole)
+  const target = normalizeRole(targetRole?.role || targetRole)
   if (isSelf) return false
   if (viewer !== 'owner') return false
-  return !['owner', 'stakeholder'].includes(target)
+  if (target === 'stakeholder') return false
+  if (target === 'owner') {
+    return isFeatureAccessManager(viewerRole) && !isFeatureAccessManager(targetRole)
+  }
+  return true
 }
 
 /** Roles the viewer is allowed to assign. Owner can assign any role; admin cannot assign owner. */
