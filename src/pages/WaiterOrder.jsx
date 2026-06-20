@@ -104,6 +104,20 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     ? items.filter(item => String(item.status || '').toLowerCase() !== 'cancelled')
     : []
   const kitchenCheckGroups = getKitchenCheckGroups(order)
+  const preparationEditableGroups = kitchenCheckGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => !['served', 'cancelled'].includes(String(item.status || '').toLowerCase())),
+    }))
+    .filter(group => group.items.length > 0)
+  const requestedBillEditableGroups = canEditRequestedBill
+    ? kitchenCheckGroups
+      .map(group => ({
+        ...group,
+        items: group.items.filter(item => String(item.status || '').toLowerCase() !== 'cancelled'),
+      }))
+      .filter(group => group.items.length > 0)
+    : []
 
   function handlePrintKitchenCheck(group) {
     const printWindow = window.open('', '_blank', 'width=420,height=640')
@@ -221,9 +235,26 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
           )}
         </div>
         {preparationEditableItems.length > 0 && (
-          <div className="mt-3 space-y-2 border-t border-orange-100 pt-3">
-            {kitchenCheckGroups.length > 0 && (
-              <div className="mb-2 grid grid-cols-1 gap-2">
+          <div className="mt-3 space-y-3 border-t border-orange-100 pt-3">
+            {preparationEditableGroups.map((group, index) => (
+              <div key={group.roundId} className="space-y-2 rounded-2xl border border-orange-100 bg-white/35 p-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintKitchenCheck(group)}
+                  className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-orange-200 bg-white px-3 text-[12px] font-black text-[#ff5a00] transition-colors hover:bg-orange-50"
+                >
+                  <Printer size={14} />
+                  {l.printCheck} · {l.roundLabel(index + 1)}
+                </button>
+                <div className="space-y-2">
+                  {group.items.map(item => (
+                    <OrderItemQtyRow key={item.id || `${group.roundId}-${item.menu_item_id}`} item={item} />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {preparationEditableGroups.length === 0 && kitchenCheckGroups.length > 0 && (
+              <div className="grid grid-cols-1 gap-2">
                 {kitchenCheckGroups.map((group, index) => (
                   <button
                     key={group.roundId}
@@ -237,9 +268,6 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
                 ))}
               </div>
             )}
-            {preparationEditableItems.map(item => (
-              <OrderItemQtyRow key={item.id || item.menu_item_id} item={item} />
-            ))}
           </div>
         )}
       </div>
@@ -308,9 +336,16 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
           </div>
         </div>
         {requestedBillEditableItems.length > 0 && (
-          <div className="mt-3 space-y-2 border-t border-red-100 pt-3">
-            {requestedBillEditableItems.map(item => (
-              <OrderItemQtyRow key={item.id || item.menu_item_id} item={item} />
+          <div className="mt-3 space-y-3 border-t border-red-100 pt-3">
+            {requestedBillEditableGroups.map((group, index) => (
+              <div key={group.roundId} className="space-y-2 rounded-2xl border border-red-100 bg-white/45 p-2">
+                <p className="px-1 text-[11px] font-black uppercase tracking-wide text-red-500">
+                  {l.roundLabel(index + 1)}
+                </p>
+                {group.items.map(item => (
+                  <OrderItemQtyRow key={item.id || `${group.roundId}-${item.menu_item_id}`} item={item} />
+                ))}
+              </div>
             ))}
           </div>
         )}
@@ -454,6 +489,7 @@ export default function WaiterOrder() {
   const productScrollRef = useRef(null)
   const savedMenuScrollRef = useRef(0)
   const shouldOpenOrderPanel = searchParams.get('panel') === 'order'
+  const isManageOrderPanel = shouldOpenOrderPanel
   const routeOrderType = isTakeAwayFlow
     ? normalizeOrderType(searchParams.get('orderType') || searchParams.get('type') || 'take_away')
     : 'dine_in'
@@ -507,6 +543,7 @@ export default function WaiterOrder() {
   }, [state.cart])
 
   const cartCount = state.cart.reduce((s, i) => s + i.quantity, 0)
+  const isManageOrderOnly = isManageOrderPanel && cartCount === 0
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const cartSummary = useMemo(() => {
     const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : configuredServiceRatePct
@@ -897,7 +934,18 @@ export default function WaiterOrder() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-slate-900/30" onClick={() => { if (!isSendingOrder) setCartOpen(false) }} />
           <div className="relative flex h-full w-full max-w-full flex-col overflow-hidden bg-white shadow-[-12px_0_32px_rgba(15,23,42,0.16)] sm:max-w-[420px] lg:max-w-[460px]">
-            <div className="max-h-[48dvh] flex-shrink-0 overflow-y-auto overscroll-contain">
+            {isManageOrderOnly && (
+              <button
+                type="button"
+                onClick={() => { if (!isSendingOrder) setCartOpen(false) }}
+                disabled={isSendingOrder}
+                className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-xl bg-white/90 text-[#9CA3AF] shadow-sm ring-1 ring-gray-100 transition-colors hover:bg-gray-100 hover:text-[#6B7280] disabled:cursor-wait disabled:opacity-50"
+                title={lang === 'uz' ? 'Yopish' : lang === 'ru' ? 'Закрыть' : 'Close'}
+              >
+                <X size={16} />
+              </button>
+            )}
+            <div className={`${isManageOrderOnly ? 'flex-1 pt-14' : 'max-h-[48dvh] flex-shrink-0'} overflow-y-auto overscroll-contain`}>
               <OrderActionPanel
                 order={activeOrder}
                 tableId={tableId}
@@ -909,6 +957,7 @@ export default function WaiterOrder() {
                 viewerRole={role}
               />
             </div>
+            {!isManageOrderOnly && (
             <div className="flex-1 min-h-0 overflow-hidden">
               <CartPanel
                 tableName={orderTitle}
@@ -920,6 +969,7 @@ export default function WaiterOrder() {
                 onClose={() => { if (!isSendingOrder) setCartOpen(false) }}
               />
             </div>
+            )}
           </div>
         </div>
       )}

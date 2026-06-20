@@ -223,6 +223,20 @@ test('AppContext exposes a stable dbDispatch callback', () => {
   assert.match(source, /import React, \{[^}]*useCallback[^}]*\} from 'react'/)
 })
 
+test('waiter cart edits stay local until send to kitchen', () => {
+  const source = readSource('src/store/AppContext.jsx')
+  const body = functionBody(source, 'dbDispatch')
+
+  assert.match(source, /const LOCAL_ONLY_ACTIONS = new Set\(\[/)
+  assert.match(source, /'ADD_TO_CART'/)
+  assert.match(source, /'REMOVE_FROM_CART'/)
+  assert.match(source, /'UPDATE_CART_QTY'/)
+  assert.match(source, /'UPDATE_CART_NOTES'/)
+  assert.match(source, /'CLEAR_CART'/)
+  assert.match(body, /if \(LOCAL_ONLY_ACTIONS\.has\(enriched\.type\)\) \{[\s\S]*dispatch\(enriched\)[\s\S]*return \{ error: null \}/)
+  assert.match(source, /'SEND_TO_KITCHEN'/)
+})
+
 test('new signed-up users always start as guest', () => {
   const auth = readSource('src/contexts/AuthContext.jsx')
   const migration = readSource('supabase/024_profiles_force_guest_signup.sql')
@@ -775,7 +789,11 @@ test('WaiterOrder opens the cart drawer from manage-order links', () => {
 
   assert.match(source, /useSearchParams/)
   assert.match(source, /searchParams\.get\('panel'\) === 'order'/)
+  assert.match(source, /const isManageOrderPanel = shouldOpenOrderPanel/)
+  assert.match(source, /const isManageOrderOnly = isManageOrderPanel && cartCount === 0/)
   assert.match(source, /setCartOpen\(true\)/)
+  assert.match(source, /!\{?isManageOrderOnly[\s\S]*<CartPanel/)
+  assert.match(source, /isManageOrderOnly \? 'flex-1 pt-14' : 'max-h-\[48dvh\] flex-shrink-0'/)
 })
 
 test('WaiterOrder shows the current table or order type in the header', () => {
@@ -800,7 +818,11 @@ test('WaiterOrder lets active and requested-bill order items be quantity-adjuste
   assert.match(panel, /function handleUpdateItemQty\(item, qty\)/)
   assert.match(panel, /type: 'UPDATE_BILL_ITEM_QTY'/)
   assert.match(panel, /requestedBillEditableItems/)
-  assert.match(panel, /<OrderItemQtyRow key=\{item\.id \|\| item\.menu_item_id\} item=\{item\} \/>/)
+  assert.match(panel, /const preparationEditableGroups = kitchenCheckGroups/)
+  assert.match(panel, /const requestedBillEditableGroups = canEditRequestedBill/)
+  assert.match(panel, /preparationEditableGroups\.map\(\(group, index\)/)
+  assert.match(panel, /requestedBillEditableGroups\.map\(\(group, index\)/)
+  assert.match(panel, /<OrderItemQtyRow key=\{item\.id \|\| `\$\{group\.roundId\}-\$\{item\.menu_item_id\}`\} item=\{item\} \/>/)
   assert.match(source, /max-h-\[48dvh\][^"]*overflow-y-auto/)
 })
 

@@ -22,6 +22,14 @@ const WRITE_BEFORE_LOCAL_ACTIONS = new Set([
   'DELETE_ORDER',
 ])
 
+const LOCAL_ONLY_ACTIONS = new Set([
+  'ADD_TO_CART',
+  'REMOVE_FROM_CART',
+  'UPDATE_CART_QTY',
+  'UPDATE_CART_NOTES',
+  'CLEAR_CART',
+])
+
 const initialState = {
   lang:           loadInitialLang(),
   settings:       { ...DEFAULT_SETTINGS, ...loadSettings() },
@@ -110,6 +118,11 @@ export function AppProvider({ children }) {
         ...action,
         _itemId: makeLocalId('oi'),
       }
+    }
+
+    if (LOCAL_ONLY_ACTIONS.has(enriched.type)) {
+      dispatch(enriched)
+      return { error: null }
     }
 
     if (WRITE_BEFORE_LOCAL_ACTIONS.has(enriched.type)) {
