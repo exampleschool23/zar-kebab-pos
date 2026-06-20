@@ -32,7 +32,7 @@ import {
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
-import { formatDateTime } from '../lib/dateFormat'
+import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -99,8 +99,24 @@ function todayStr() {
   return toLocalDateStr(new Date().toISOString())
 }
 
-function fmtDate(iso) {
-  return formatDateTime(iso, '—')
+function fmtDate(iso, lang) {
+  return formatLongDateTime(iso, lang, '—')
+}
+
+function DateInput({ value, lang, onChange }) {
+  return (
+    <div className="relative h-6 w-[138px]">
+      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center whitespace-nowrap text-sm text-[#1F2937]">
+        {formatLongDate(value, lang, value)}
+      </span>
+      <input
+        type="date"
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className="h-6 w-full cursor-pointer bg-transparent text-sm text-transparent caret-transparent outline-none"
+      />
+    </div>
+  )
 }
 
 function orderTableLabel(order, lang) {
@@ -756,8 +772,8 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
             { label: lang === 'uz' ? 'Stol'      : lang === 'ru' ? 'Стол'      : 'Table',    value: orderTableLabel(order, lang) },
             { label: lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант'  : 'Waiter',   value: order.waiter_name || '—' },
             { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PayBadge method={order.payment_method} lang={lang} /> },
-            { label: lang === 'uz' ? 'Yaratildi' : lang === 'ru' ? 'Создан'    : 'Created',  value: fmtDate(order.created_at) },
-            { label: lang === 'uz' ? "To'landi"  : lang === 'ru' ? 'Оплачен'   : 'Paid At',  value: fmtDate(order.paid_at) },
+            { label: lang === 'uz' ? 'Yaratildi' : lang === 'ru' ? 'Создан'    : 'Created',  value: fmtDate(order.created_at, lang) },
+            { label: lang === 'uz' ? "To'landi"  : lang === 'ru' ? 'Оплачен'   : 'Paid At',  value: fmtDate(order.paid_at, lang) },
             { label: lang === 'uz' ? 'Holat'     : lang === 'ru' ? 'Статус'    : 'Status',   value: <StatusBadge status={order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')} lang={lang} /> },
           ].map(({ label, value }) => (
             <div key={label} className="bg-gray-50 rounded-xl p-3">
@@ -980,7 +996,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                     </span>
                     <span className="text-sm font-medium text-[#1F2937] truncate">{orderTableLabel(order, lang)}</span>
                     <span className="text-sm text-[#6B7280] truncate">{(order.waiter_name || '—').split(' ')[0]}</span>
-                    <span className="text-[12px] text-[#6B7280]">{fmtDate(getOrderDate(order))}</span>
+                    <span className="text-[12px] text-[#6B7280]">{fmtDate(getOrderDate(order), lang)}</span>
                     <span><StatusBadge status={status} lang={lang} /></span>
                     <span><PayBadge method={order.payment_method} lang={lang} /></span>
                     <span className="text-center text-sm text-[#6B7280]">{loyaltyUsed > 0 ? formatCurrency(loyaltyUsed) : '—'}</span>
@@ -1008,7 +1024,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                         <StatusBadge status={status} lang={lang} />
                       </div>
                       <p className="text-sm font-medium text-[#1F2937]">{orderTableLabel(order, lang)} · {(order.waiter_name || '').split(' ')[0]}</p>
-                      <p className="text-[11px] text-[#9CA3AF] mt-0.5">{fmtDate(getOrderDate(order))}</p>
+                      <p className="text-[11px] text-[#9CA3AF] mt-0.5">{fmtDate(getOrderDate(order), lang)}</p>
                       <div className="mt-1.5"><PayBadge method={order.payment_method} lang={lang} /></div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
@@ -1285,16 +1301,10 @@ export default function Reports() {
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex items-center gap-1.5 bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 shadow-sm">
                     <span className="text-[11px] text-[#9CA3AF] font-semibold">{l.from}</span>
-                    <input type="date" value={dateFrom}
-                      onChange={e => setDateFrom(e.target.value)}
-                      className="text-sm focus:outline-none cursor-pointer bg-transparent"
-                    />
+                    <DateInput value={dateFrom} lang={lang} onChange={setDateFrom} />
                     <span className="text-[11px] text-[#9CA3AF] font-semibold mx-1">—</span>
                     <span className="text-[11px] text-[#9CA3AF] font-semibold">{l.to}</span>
-                    <input type="date" value={dateTo}
-                      onChange={e => setDateTo(e.target.value)}
-                      className="text-sm focus:outline-none cursor-pointer bg-transparent"
-                    />
+                    <DateInput value={dateTo} lang={lang} onChange={setDateTo} />
                   </div>
                   <select value={tableFilter} onChange={e => setTableFilter(e.target.value)}
                     className="bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm text-[#6B7280] focus:outline-none shadow-sm cursor-pointer">

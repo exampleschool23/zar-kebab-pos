@@ -9,7 +9,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getAllProfiles } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
-import { formatDateOnly } from '../lib/dateFormat'
+import { formatDateOnly, formatLongDate, normalizeDateLang } from '../lib/dateFormat'
 import {
   getOrderDate,
   getOrderItems,
@@ -427,7 +427,7 @@ export default function AdminDashboard() {
   const { state }   = useApp()
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const lang = state.lang
+  const lang = normalizeDateLang(state.lang || 'ru')
   const l    = L[lang] || L.en
 
   const displayName = profile?.full_name || state.user?.name || 'Admin'
@@ -542,7 +542,7 @@ export default function AdminDashboard() {
       })
       const todayDs = todayStr()
       const bars = days.map(ds => ({
-        label:   formatDateOnly(ds),
+        label:   formatLongDate(ds, lang, ds, { includeYear: false }),
         revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
         isToday: ds === todayDs,
       }))
@@ -600,7 +600,7 @@ export default function AdminDashboard() {
       currentPeriodTotal:  bars.reduce((s, b) => s + b.revenue, 0),
       previousPeriodTotal: 0, // prior year data not loaded
     }
-  }, [paidOrders, period])
+  }, [paidOrders, period, lang])
 
   const periodGrowth = useMemo(() => {
     if (previousPeriodTotal === 0) return null

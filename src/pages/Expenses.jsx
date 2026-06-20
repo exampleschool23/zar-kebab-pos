@@ -19,7 +19,8 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
-import { formatCurrency, formatDate } from '../lib/formatCurrency'
+import { formatCurrency } from '../lib/formatCurrency'
+import { formatLongDate } from '../lib/dateFormat'
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_ENTRY_TYPES,
@@ -42,6 +43,8 @@ import { downloadCsv } from '../lib/closeout'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 const FIELD_INPUT_CLASS = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00]'
+const DATE_INPUT_CLASS = `${FIELD_INPUT_CLASS} text-transparent caret-transparent`
+const RANGE_DATE_INPUT_CLASS = 'h-6 w-[138px] bg-transparent text-sm text-transparent caret-transparent outline-none'
 
 function addDays(isoDate, n) {
   const d = new Date(isoDate + 'T00:00:00')
@@ -87,6 +90,22 @@ function expenseTone(expense) {
     badge: 'bg-gray-100 text-[#6B7280]',
     amount: 'text-[#ff5a00]',
   }
+}
+
+function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS }) {
+  return (
+    <div className="relative">
+      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center whitespace-nowrap text-sm font-semibold text-[#1F2937]">
+        {formatLongDate(value, lang, value)}
+      </span>
+      <input
+        type="date"
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className={className}
+      />
+    </div>
+  )
 }
 
 function isMissingExpensesMigration(error) {
@@ -483,10 +502,10 @@ export default function Expenses() {
           <div className="mb-5 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 shadow-sm">
               <span className="text-[11px] font-bold text-[#9CA3AF]">{l.from}</span>
-              <input type="date" value={dateFrom} onChange={event => setDateFrom(event.target.value)} className="bg-transparent text-sm outline-none" />
+              <DateInput value={dateFrom} lang={lang} onChange={setDateFrom} className={RANGE_DATE_INPUT_CLASS} />
               <span className="text-[#9CA3AF]">—</span>
               <span className="text-[11px] font-bold text-[#9CA3AF]">{l.to}</span>
-              <input type="date" value={dateTo} onChange={event => setDateTo(event.target.value)} className="bg-transparent text-sm outline-none" />
+              <DateInput value={dateTo} lang={lang} onChange={setDateTo} className={RANGE_DATE_INPUT_CLASS} />
             </div>
             {[
               { key: 'today', label: l.today },
@@ -603,7 +622,11 @@ export default function Expenses() {
                       </div>
                     </Field>
                     <Field label={l.date}>
-                      <input type="date" value={form.expense_date} onChange={event => setForm(current => ({ ...current, expense_date: event.target.value }))} className={FIELD_INPUT_CLASS} />
+                      <DateInput
+                        value={form.expense_date}
+                        lang={lang}
+                        onChange={value => setForm(current => ({ ...current, expense_date: value }))}
+                      />
                     </Field>
                     <Field label={l.category}>
                       <select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} className={FIELD_INPUT_CLASS}>
@@ -733,7 +756,7 @@ function ExpenseHistorySection({
                       <Icon size={11} />{expensePaymentMethodLabel(expense.payment_method, lang)}
                     </span>
                   </div>
-                  <p className="text-xs font-bold text-[#9CA3AF]">{formatDate(expense.expense_date)} · {expense.created_by_name || '—'}</p>
+                  <p className="text-xs font-bold text-[#9CA3AF]">{formatLongDate(expense.expense_date, lang, expense.expense_date)} · {expense.created_by_name || '—'}</p>
                   {(expense.vendor || expense.description) && (
                     <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">
                       {[expense.vendor, expense.description].filter(Boolean).join(' · ')}

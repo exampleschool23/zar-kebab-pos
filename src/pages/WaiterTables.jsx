@@ -50,6 +50,9 @@ const L = {
     seat: 'Seat',
     cancelReservation: 'Cancel',
     call: 'Call',
+    lessThanMinuteAgo: '< 1 min ago',
+    minutesAgo: n => `${n} min ago`,
+    hoursMinutesAgo: (h, m) => `${h}h ${m}m ago`,
   },
   ru: {
     tables: 'Столы',
@@ -84,6 +87,9 @@ const L = {
     seat: 'Посадить',
     cancelReservation: 'Отменить',
     call: 'Позвонить',
+    lessThanMinuteAgo: '< 1 мин назад',
+    minutesAgo: n => `${n} мин назад`,
+    hoursMinutesAgo: (h, m) => `${h}ч ${m}м назад`,
   },
   uz: {
     tables: 'Stollar',
@@ -118,6 +124,9 @@ const L = {
     seat: 'Joylashtirish',
     cancelReservation: 'Bekor qilish',
     call: 'Qo‘ng‘iroq',
+    lessThanMinuteAgo: '< 1 daqiqa oldin',
+    minutesAgo: n => `${n} daqiqa oldin`,
+    hoursMinutesAgo: (h, m) => `${h} soat ${m} daqiqa oldin`,
   },
 }
 
@@ -273,12 +282,12 @@ function getPreparationCounts(tableId, orders) {
   }
 }
 
-function elapsedSince(isoString) {
+function elapsedSince(isoString, lang) {
   if (!isoString) return null
   const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 60000)
-  if (diff < 1) return '< 1 min'
-  if (diff < 60) return `${diff} min`
-  return `${Math.floor(diff / 60)}h ${diff % 60}m`
+  if (diff < 1) return tr(lang, 'lessThanMinuteAgo')
+  if (diff < 60) return tr(lang, 'minutesAgo', diff)
+  return tr(lang, 'hoursMinutesAgo', Math.floor(diff / 60), diff % 60)
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -334,7 +343,7 @@ function actionForStatus(lang, status) {
 function TableCard({ table, status, counts, lang, onClick, onAction, onManage }) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.available
   const StatusIcon = cfg.icon
-  const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt) : null
+  const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt, lang) : null
   const action = actionForStatus(lang, status)
   const ActionIcon = action?.Icon
   const reservation = getReservationSummary(table)
@@ -355,7 +364,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
           {elapsed && status !== 'available' && (
             <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-gray-400">
               <Clock size={11} />
-              {elapsed} ago
+              {elapsed}
             </p>
           )}
         </div>
