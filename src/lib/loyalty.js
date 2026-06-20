@@ -12,6 +12,7 @@ export const CASHBACK_TYPES = Object.freeze({
   gold: { label: 'Gold', percent: 7 },
   premium: { label: 'Premium', percent: 10 },
   black: { label: 'Black', percent: 15 },
+  platinum: { label: 'Platinum', percent: 30 },
   special: { label: 'Special card', percent: 40 },
 })
 

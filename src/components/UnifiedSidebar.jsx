@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
-import { PAGE_ACCESS } from '../lib/permissions'
+import { canViewPage } from '../lib/permissions'
 import { t } from '../lib/i18n'
 
 // ── Nav definition — roles come from PAGE_ACCESS to stay in sync ───────────────
@@ -17,70 +17,60 @@ const NAV = [
     icon: LayoutDashboard,
     labels: { uz: 'Boshqaruv', ru: 'Панель', en: 'Dashboard' },
     path: '/admin',
-    roles: PAGE_ACCESS.dashboard,
   },
   {
     key: 'tables',
     icon: Table2,
     labels: { uz: 'Stollar', ru: 'Столы', en: 'Tables' },
     path: '/waiter/tables',
-    roles: PAGE_ACCESS.tables,
   },
   {
     key: 'menu',
     icon: BookOpen,
     labels: { uz: 'Menyu', ru: 'Меню', en: 'Menu' },
     path: '/admin/menu',
-    roles: PAGE_ACCESS.menu,
   },
   {
     key: 'cashier',
     icon: Receipt,
     labels: { uz: 'Kassir', ru: 'Кассир', en: 'Cashier' },
     path: '/cashier/tables',
-    roles: PAGE_ACCESS.cashier,
   },
   {
     key: 'loyalty',
     icon: BadgeDollarSign,
     labels: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' },
     path: '/admin/loyalty',
-    roles: PAGE_ACCESS.loyalty,
   },
   {
     key: 'expenses',
     icon: WalletCards,
     labels: { uz: 'Buxgalteriya', ru: 'Бухгалтерия', en: 'Accounting' },
     path: '/admin/accounting',
-    roles: PAGE_ACCESS.expenses,
   },
   {
     key: 'team',
     icon: Users,
     labels: { uz: 'Jamoa', ru: 'Команда', en: 'Team' },
     path: '/admin/users',
-    roles: PAGE_ACCESS.team,
   },
   {
     key: 'reports',
     icon: BarChart2,
     labels: { uz: 'Hisobotlar', ru: 'Отчёты', en: 'Reports' },
     path: '/admin/reports',
-    roles: PAGE_ACCESS.reports,
   },
   {
     key: 'audit',
     icon: ShieldCheck,
     labels: { uz: 'Audit', ru: 'Аудит', en: 'Audit' },
     path: '/admin/audit',
-    roles: PAGE_ACCESS.audit,
   },
   {
     key: 'settings',
     icon: Settings,
     labels: { uz: 'Sozlamalar', ru: 'Настройки', en: 'Settings' },
     path: '/admin/settings',
-    roles: PAGE_ACCESS.settings,
   },
 ]
 
@@ -125,7 +115,7 @@ export default function UnifiedSidebar({ onClose }) {
   const displayName = profile?.full_name || state.user?.name || profile?.email || ''
   const initial     = (displayName || '?')[0].toUpperCase()
 
-  const visibleNav = NAV.filter(item => item.roles.includes(role))
+  const visibleNav = NAV.filter(item => canViewPage(profile || { role }, item.key))
 
   function handleNav(item) {
     navigate(item.path)

@@ -23,6 +23,7 @@ import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLa
 import { getItemName } from '../lib/i18n'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import { formatDateTime, formatTime } from '../lib/dateFormat'
+import { canDeletePaidOrders, canMoveBackToTable } from '../lib/permissions'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -596,7 +597,8 @@ export default function CashierTables() {
   const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
   const [quickAddBusyKey, setQuickAddBusyKey] = useState('')
   const [quickAddErrorByOrderId, setQuickAddErrorByOrderId] = useState({})
-  const isOwner = profile?.role === 'owner' || state.user?.role === 'owner'
+  const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
+  const canRecallTable = canMoveBackToTable(profile || { role: state.user?.role })
 
   // ── Menu item lookup map ────────────────────────────────────────────────────
   const menuItemMap = useMemo(() =>
@@ -762,7 +764,7 @@ export default function CashierTables() {
   }
 
   async function handleDeleteOrder(order) {
-    if (!isOwner || !order?.id || deletingOrderId) return
+    if (!canDeleteOrder || !order?.id || deletingOrderId) return
     setDeleteErrorByOrderId(errors => ({ ...errors, [order.id]: '' }))
     if (confirmDeleteOrderId !== order.id) {
       setConfirmDeleteOrderId(order.id)
@@ -996,8 +998,8 @@ export default function CashierTables() {
                     onAddQuickItem={handleAddQuickItem}
                     quickAddBusyKey={quickAddBusyKey}
                     quickAddError={quickAddErrorByOrderId[order.id]}
-                    canDelete={isOwner}
-                    onRecall={handleRecallTable}
+                    canDelete={canDeleteOrder}
+                    onRecall={canRecallTable ? handleRecallTable : null}
                     onDelete={handleDeleteOrder}
                     confirmDelete={confirmDeleteOrderId === order.id}
                     isDeleting={deletingOrderId === order.id}

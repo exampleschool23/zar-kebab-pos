@@ -32,6 +32,7 @@ import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { canDeletePaidOrders } from '../lib/permissions'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -78,7 +79,7 @@ export default function CashierBill() {
   const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
-  const isOwner = (profile?.role || state.user?.role) === 'owner'
+  const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
 
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
 
@@ -359,7 +360,7 @@ export default function CashierBill() {
   }
 
   async function handleDeleteOrder() {
-    if (!isOwner || !order?.id || isDeletingOrder) return
+    if (!canDeleteOrder || !order?.id || isDeletingOrder) return
     if (!confirmDeleteOrder) {
       setConfirmDeleteOrder(true)
       return
@@ -1204,7 +1205,7 @@ export default function CashierBill() {
                   {lbl.printReceipt}
                 </button>
 
-                {isOwner && (
+                {canDeleteOrder && (
                   <div className="grid gap-2">
                     <button
                       onClick={handleDeleteOrder}

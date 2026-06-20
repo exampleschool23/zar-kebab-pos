@@ -33,6 +33,7 @@ import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
+import { canDeletePaidOrders } from '../lib/permissions'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -1072,7 +1073,7 @@ export default function Reports() {
   const navigate     = useNavigate()
   const lang         = state.lang
   const serviceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
-  const canDeleteOrder = (profile?.role || state.user?.role) === 'owner'
+  const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
   const canViewExpenses = (profile?.role || state.user?.role) === 'owner'
 
   const [activeTab,     setActiveTab]     = useState('order_history')

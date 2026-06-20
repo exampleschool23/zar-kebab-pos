@@ -6,6 +6,9 @@ const sql = fs.readFileSync(new URL('../supabase/021_role_based_write_policies.s
 const removeKitchenRoleSql = fs.readFileSync(new URL('../supabase/035_remove_kitchen_profile_role.sql', import.meta.url), 'utf8')
 const deleteProfilesSql = fs.readFileSync(new URL('../supabase/025_owner_delete_profiles.sql', import.meta.url), 'utf8')
 const adminCannotEditAdminsSql = fs.readFileSync(new URL('../supabase/026_admin_cannot_edit_admins.sql', import.meta.url), 'utf8')
+const featureAccessSql = fs.readFileSync(new URL('../supabase/064_profile_feature_access.sql', import.meta.url), 'utf8')
+const deletePaidOrdersFeatureSql = fs.readFileSync(new URL('../supabase/066_delete_paid_orders_feature_access.sql', import.meta.url), 'utf8')
+const moveBackToTableFeatureSql = fs.readFileSync(new URL('../supabase/067_move_back_to_table_feature_access.sql', import.meta.url), 'utf8')
 
 test('role-aware write migration removes broad menu and zone writes', () => {
   assert.match(sql, /drop policy if exists "staff_all_categories"/)
@@ -48,4 +51,37 @@ test('admin profile update policy cannot edit or assign admin role', () => {
   assert.match(adminCannotEditAdminsSql, /on public\.profiles for update/)
   assert.match(adminCannotEditAdminsSql, /id <> auth\.uid\(\)/)
   assert.match(adminCannotEditAdminsSql, /role not in \('owner', 'admin', 'stakeholder'\)/)
+})
+
+test('profile feature access migration protects owner-managed feature overrides', () => {
+  assert.match(featureAccessSql, /add column if not exists feature_access text\[\]/)
+  assert.match(featureAccessSql, /current_staff_can_access\(feature_key text\)/)
+  assert.match(featureAccessSql, /when p\.feature_access is not null then feature_key = any\(p\.feature_access\)/)
+  assert.match(featureAccessSql, /prevent_non_owner_feature_access_update/)
+  assert.match(featureAccessSql, /Only owners can change feature access/)
+})
+
+test('accounting read policies honor explicit expenses feature access', () => {
+  assert.match(featureAccessSql, /feature_access_read_expenses/)
+  assert.match(featureAccessSql, /using \(public\.current_staff_can_access\('expenses'\)\)/)
+  assert.match(featureAccessSql, /feature_access_read_employee_salary_profiles/)
+  assert.match(featureAccessSql, /feature_access_read_employee_salary_rates/)
+  assert.match(featureAccessSql, /feature_access_read_employee_salary_payments/)
+})
+
+test('paid order deletion can be granted as explicit feature access', () => {
+  assert.match(deletePaidOrdersFeatureSql, /'delete_paid_orders'/)
+  assert.match(deletePaidOrdersFeatureSql, /profiles_feature_access_valid/)
+  assert.match(deletePaidOrdersFeatureSql, /current_staff_can_access\(feature_key text\)/)
+  assert.match(deletePaidOrdersFeatureSql, /when feature_key = 'delete_paid_orders' then false/)
+  assert.match(deletePaidOrdersFeatureSql, /delete_order_owner\(p_order_id text\)/)
+  assert.match(deletePaidOrdersFeatureSql, /current_staff_can_access\('delete_paid_orders'\)/)
+})
+
+test('move back to table can be granted as explicit feature access', () => {
+  assert.match(moveBackToTableFeatureSql, /'move_back_to_table'/)
+  assert.match(moveBackToTableFeatureSql, /profiles_feature_access_valid/)
+  assert.match(moveBackToTableFeatureSql, /current_staff_can_access\(feature_key text\)/)
+  assert.match(moveBackToTableFeatureSql, /when feature_key = 'move_back_to_table' then false/)
+  assert.match(moveBackToTableFeatureSql, /when feature_key = 'delete_paid_orders' then false/)
 })

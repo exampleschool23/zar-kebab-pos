@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppProvider, useApp } from './store/AppContext'
-import { defaultPath as roleDefaultPath, PAGE_ACCESS } from './lib/permissions'
+import { canViewPage, defaultPath as roleDefaultPath } from './lib/permissions'
 import { t } from './lib/i18n'
 
 import Login          from './pages/Login'
@@ -97,7 +97,7 @@ function DisabledAccount({ signOut }) {
 }
 
 // Route guard: requires authentication + optional role check
-function ProtectedRoute({ children, roles }) {
+function ProtectedRoute({ children, page }) {
   const { session, profile, loading } = useAuth()
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}${location.hash}`
@@ -106,13 +106,11 @@ function ProtectedRoute({ children, roles }) {
   if (!session) return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />
   if (!profile) return <Spinner />
 
-  const role = (profile?.role || 'guest').toLowerCase()
-
   if (profile?.status === 'disabled') return null // handled by RoleRedirect
   if (profile?.status === 'pending')  return <Navigate to="/pending-approval" replace />
 
-  if (roles && !roles.includes(role)) {
-    return <Navigate to={defaultPath(role)} replace />
+  if (page && !canViewPage(profile, page)) {
+    return <Navigate to={defaultPath(profile)} replace />
   }
 
   return children
@@ -126,12 +124,12 @@ function SignedOutRoute({ children }) {
   if (loading) return <Spinner />
   if (!session) return children
   if (!profile) return <Spinner />
-  return <Navigate to={returnTo || defaultPath(profile?.role || 'guest')} replace />
+  return <Navigate to={returnTo || defaultPath(profile || 'guest')} replace />
 }
 
-function LazyProtectedRoute({ roles, children }) {
+function LazyProtectedRoute({ page, children }) {
   return (
-    <ProtectedRoute roles={roles}>
+    <ProtectedRoute page={page}>
       <Suspense fallback={<Spinner />}>
         {children}
       </Suspense>
@@ -151,10 +149,9 @@ function RoleRedirect() {
     if (loading) return
     if (!session) { navigate('/menu', { replace: true }); return }
     if (!profile) return
-    const role = (profile?.role || 'guest').toLowerCase()
     if (profile?.status === 'disabled') return
     if (profile?.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
-    navigate(defaultPath(role), { replace: true })
+    navigate(defaultPath(profile), { replace: true })
   }, [session, profile, loading, navigate])
 
   // If session exists but profile never loads, show a retry option
@@ -207,71 +204,71 @@ function AppRoutes() {
 
         {/* Waiter — tables & order flow only; no cashier */}
         <Route path="/waiter/tables" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterTables /></LazyProtectedRoute>
+          <LazyProtectedRoute page="tables"><WaiterTables /></LazyProtectedRoute>
         } />
         <Route path="/waiter/order/:tableId" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></LazyProtectedRoute>
+          <LazyProtectedRoute page="tables"><WaiterOrder /></LazyProtectedRoute>
         } />
         <Route path="/waiter/take-away" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.tables}><WaiterOrder /></LazyProtectedRoute>
+          <LazyProtectedRoute page="tables"><WaiterOrder /></LazyProtectedRoute>
         } />
 
         <Route path="/kitchen" element={<Navigate to="/admin" replace />} />
 
         {/* Cashier — cashier + admin/owner; waiters are redirected */}
         <Route path="/cashier/tables" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><CashierTables /></LazyProtectedRoute>
+          <LazyProtectedRoute page="cashier"><CashierTables /></LazyProtectedRoute>
         } />
         <Route path="/cashier/bill/:tableId" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></LazyProtectedRoute>
+          <LazyProtectedRoute page="cashier"><CashierBill /></LazyProtectedRoute>
         } />
         <Route path="/cashier/bill/order/:orderId" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><CashierBill /></LazyProtectedRoute>
+          <LazyProtectedRoute page="cashier"><CashierBill /></LazyProtectedRoute>
         } />
         <Route path="/receipt/:orderId" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><Receipt /></LazyProtectedRoute>
+          <LazyProtectedRoute page="cashier"><Receipt /></LazyProtectedRoute>
         } />
         <Route path="/receipt/table/:tableId" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.cashier}><TableReceipt /></LazyProtectedRoute>
+          <LazyProtectedRoute page="cashier"><TableReceipt /></LazyProtectedRoute>
         } />
 
         {/* Dashboard — admin, owner, cashier, stakeholder */}
         <Route path="/admin" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.dashboard}><AdminDashboard /></LazyProtectedRoute>
+          <LazyProtectedRoute page="dashboard"><AdminDashboard /></LazyProtectedRoute>
         } />
         <Route path="/admin/menu" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.menu}><AdminMenu /></LazyProtectedRoute>
+          <LazyProtectedRoute page="menu"><AdminMenu /></LazyProtectedRoute>
         } />
         <Route path="/admin/tables" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.menu}><AdminTables /></LazyProtectedRoute>
+          <LazyProtectedRoute page="settings"><AdminTables /></LazyProtectedRoute>
         } />
         <Route path="/admin/users" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.team}><AdminUsers /></LazyProtectedRoute>
+          <LazyProtectedRoute page="team"><AdminUsers /></LazyProtectedRoute>
         } />
         <Route path="/admin/loyalty" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.loyalty}><AdminLoyalty /></LazyProtectedRoute>
+          <LazyProtectedRoute page="loyalty"><AdminLoyalty /></LazyProtectedRoute>
         } />
         <Route path="/admin/accounting" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.expenses}><Expenses /></LazyProtectedRoute>
+          <LazyProtectedRoute page="expenses"><Expenses /></LazyProtectedRoute>
         } />
         <Route path="/admin/accounting/salaries" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.expenses}><Salaries /></LazyProtectedRoute>
+          <LazyProtectedRoute page="expenses"><Salaries /></LazyProtectedRoute>
         } />
         <Route path="/admin/accounting/employees" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.expenses}><Employees /></LazyProtectedRoute>
+          <LazyProtectedRoute page="expenses"><Employees /></LazyProtectedRoute>
         } />
         <Route path="/admin/expenses" element={<Navigate to="/admin/accounting" replace />} />
         <Route path="/admin/expenses/salaries" element={<Navigate to="/admin/accounting/salaries" replace />} />
         <Route path="/admin/expenses/employees" element={<Navigate to="/admin/accounting/employees" replace />} />
         <Route path="/admin/discount-cards" element={<Navigate to="/admin/loyalty" replace />} />
         <Route path="/admin/reports" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.reports}><Reports /></LazyProtectedRoute>
+          <LazyProtectedRoute page="reports"><Reports /></LazyProtectedRoute>
         } />
         <Route path="/admin/audit" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.audit}><AdminAudit /></LazyProtectedRoute>
+          <LazyProtectedRoute page="audit"><AdminAudit /></LazyProtectedRoute>
         } />
         <Route path="/admin/settings" element={
-          <LazyProtectedRoute roles={PAGE_ACCESS.settings}><AdminSettings /></LazyProtectedRoute>
+          <LazyProtectedRoute page="settings"><AdminSettings /></LazyProtectedRoute>
         } />
 
         {/* Catch-all: redirect based on role */}
