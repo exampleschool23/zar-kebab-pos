@@ -195,6 +195,8 @@ function AppRoutes() {
         <Route path="/"              element={<RoleRedirect />} />
         <Route path="/menu"          element={<PublicMenu />} />
         <Route path="/menu/item/:itemId" element={<PublicMenu />} />
+        <Route path="/premium-menu"          element={<PublicMenu premium />} />
+        <Route path="/premium-menu/item/:itemId" element={<PublicMenu premium />} />
         <Route path="/catering"      element={<CateringPage />} />
         <Route path="/telegram"      element={<TelegramMiniApp />} />
         <Route path="/login"         element={<SignedOutRoute><Login /></SignedOutRoute>} />

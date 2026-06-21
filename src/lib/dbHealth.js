@@ -3,8 +3,8 @@ import { supabase } from './supabase.js'
 const TABLE_CHECKS = [
   { name: 'restaurant_tables', columns: ['id', 'name', 'status', 'capacity', 'sort_order', 'is_active', 'reserved_at'] },
   { name: 'table_zones', columns: ['id', 'name', 'sort_order', 'is_active'] },
-  { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned'] },
-  { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity'] },
+  { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned', 'price_mode'] },
+  { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity', 'base_price', 'unit_price', 'price_mode'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
   { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name'] },
   { name: 'loyalty_cards', columns: ['id', 'card_number', 'cashback_type', 'balance', 'total_earned', 'total_redeemed', 'is_active'] },

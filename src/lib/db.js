@@ -9,6 +9,14 @@ import {
   normalizeSplitPayments,
   validateLoyaltyRedeemAmount,
 } from './analytics.js'
+import {
+  DEFAULT_PRICE_MODE,
+  calculateUnitPrice,
+  getOrderItemBasePrice,
+  getOrderItemUnitPrice,
+  normalizePriceMode,
+  withPriceModeFields,
+} from './priceModes.js'
 import { getLoyaltyCardCashbackPercent, getLoyaltyCardCashbackType } from './loyalty.js'
 import { notifyTelegramOrderStatus } from './telegramNotifications.js'
 import {
@@ -38,7 +46,10 @@ function isMissingOptionalOrderTypeColumn(error) {
       message.includes('item_type') ||
       message.includes('is_counter_item') ||
       message.includes('kitchen_round_id') ||
-      message.includes('submitted_at')
+      message.includes('submitted_at') ||
+      message.includes('price_mode') ||
+      message.includes('base_price') ||
+      message.includes('unit_price')
     )
   )
 }
@@ -397,6 +408,7 @@ async function rollbackLoyaltyWalletSettlement(rollback) {
 
 async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, items, paymentFields, state, action }) {
   const isOffPremise = isOffPremiseOrderType(orderType)
+  const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
   const payload = {
     order: {
       id: orderId,
@@ -407,13 +419,17 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, ite
       payment_status: 'unpaid',
       order_type: orderType,
       order_number: isOffPremise ? (action._orderNumber || makeOrderNumber(orderId, orderType)) : null,
+      price_mode: priceMode,
       ...paymentFields,
     },
     items: items.map(i => ({
       id: i.id,
       menu_item_id: i.menu_item_id,
       name: i.name,
-      price: Number(i.price) || 0,
+      price: getOrderItemUnitPrice(i),
+      base_price: getOrderItemBasePrice(i),
+      unit_price: getOrderItemUnitPrice(i),
+      price_mode: normalizePriceMode(i.price_mode || priceMode),
       quantity: Number(i.quantity) || 1,
       notes: i.notes || '',
       status: 'new',
@@ -640,21 +656,29 @@ export async function writeToSupabase(action, state) {
       const orderId  = action._orderId
       const tableId  = state.currentTableId
       const orderType = normalizeOrderType(action.payload?.orderType)
+      const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
       const isOffPremise = isOffPremiseOrderType(orderType)
       const table    = isOffPremise ? null : state.tables.find(t => t.id === tableId)
       if ((!isOffPremise && !table) || state.cart.length === 0) return
 
       const submittedAt = action._submittedAt || new Date().toISOString()
       const kitchenRoundId = action._kitchenRoundId || `${orderId}-${submittedAt}`
-      const items = action._items || state.cart.map(i => ({
+      const items = (action._items || state.cart.map(i => ({
         ...i,
         status: 'new',
         order_type: orderType,
         kitchen_round_id: kitchenRoundId,
         submitted_at: submittedAt,
         created_at: submittedAt,
+      }))).map(i => ({
+        ...withPriceModeFields(i, i.price_mode || priceMode),
+        status: i.status || 'new',
+        order_type: i.order_type || orderType,
+        kitchen_round_id: i.kitchen_round_id || kitchenRoundId,
+        submitted_at: i.submitted_at || submittedAt,
+        created_at: i.created_at || submittedAt,
       }))
-      const addedSubtotal = items.reduce((s, i) => s + i.price * i.quantity, 0)
+      const addedSubtotal = items.reduce((s, i) => s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1), 0)
       const { data: existingOrder } = await supabase
         .from('orders')
         .select('id, subtotal, service_rate_pct')
@@ -686,10 +710,17 @@ export async function writeToSupabase(action, state) {
       if (!isMissingKitchenSubmitRpc(rpcResult.error)) throw rpcResult.error
 
       if (existingOrder) {
-        const { data: updatedOrder, error: orderUpdateError } = await supabase.from('orders').update({
+        let { data: updatedOrder, error: orderUpdateError } = await supabase.from('orders').update({
           status: 'sent_to_kitchen',
+          price_mode: priceMode,
           ...paymentFields,
         }).eq('id', orderId).select('*').maybeSingle()
+        if (orderUpdateError && isMissingOptionalOrderTypeColumn(orderUpdateError)) {
+          ;({ data: updatedOrder, error: orderUpdateError } = await supabase.from('orders').update({
+            status: 'sent_to_kitchen',
+            ...paymentFields,
+          }).eq('id', orderId).select('*').maybeSingle())
+        }
         if (orderUpdateError) throw orderUpdateError
       } else {
         const orderInsert = {
@@ -699,6 +730,7 @@ export async function writeToSupabase(action, state) {
           waiter_name:    state.user?.name || 'Waiter',
           status:         'sent_to_kitchen',
           payment_status: 'unpaid',
+          price_mode:     priceMode,
           ...paymentFields,
         }
         if (isOffPremise) {
@@ -709,7 +741,10 @@ export async function writeToSupabase(action, state) {
         if (orderInsertError && isOffPremise && isMissingOptionalOrderTypeColumn(orderInsertError)) {
           // Backward-compatible fallback while the take-away migration is being applied.
           // table_id=null + service_fee=0 still lets the order reach kitchen/cashier.
-          const { order_type, order_number, ...fallbackOrderInsert } = orderInsert
+          const { order_type, order_number, price_mode, ...fallbackOrderInsert } = orderInsert
+          ;({ data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle())
+        } else if (orderInsertError && isMissingOptionalOrderTypeColumn(orderInsertError)) {
+          const { price_mode, ...fallbackOrderInsert } = orderInsert
           ;({ data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle())
         }
         if (orderInsertError) throw orderInsertError
@@ -720,7 +755,10 @@ export async function writeToSupabase(action, state) {
         order_id:     orderId,
         menu_item_id: i.menu_item_id,
         name:         i.name,
-        price:        i.price,
+        price:        getOrderItemUnitPrice(i),
+        base_price:   getOrderItemBasePrice(i),
+        unit_price:   getOrderItemUnitPrice(i),
+        price_mode:   normalizePriceMode(i.price_mode || priceMode),
         quantity:     i.quantity,
         notes:        i.notes || '',
         status:       'new',
@@ -733,7 +771,7 @@ export async function writeToSupabase(action, state) {
         .insert(rows)
         .select('*')
       if (itemInsertError && isMissingOptionalOrderTypeColumn(itemInsertError)) {
-        const fallbackRows = rows.map(({ order_type, kitchen_round_id, submitted_at, ...row }) => row)
+        const fallbackRows = rows.map(({ order_type, kitchen_round_id, submitted_at, base_price, unit_price, price_mode, ...row }) => row)
         ;({ data: insertedItems, error: itemInsertError } = await supabase
           .from('order_items')
           .insert(fallbackRows)
@@ -972,7 +1010,10 @@ export async function writeToSupabase(action, state) {
           order_id: order.id,
           menu_item_id: item.id,
           name: item.name,
-          price: Number(item.price) || 0,
+          price: Number(item.unit_price ?? item.unitPrice ?? item.price) || 0,
+          base_price: Number(item.base_price ?? item.basePrice ?? item.price) || 0,
+          unit_price: Number(item.unit_price ?? item.unitPrice ?? item.price) || 0,
+          price_mode: normalizePriceMode(item.price_mode || item.priceMode || order.price_mode),
           quantity: 1,
           notes: '',
           status: item.sendToKitchen || item.send_to_kitchen ? 'new' : 'served',
@@ -982,7 +1023,7 @@ export async function writeToSupabase(action, state) {
         }
         let { error } = await supabase.from('order_items').insert(row)
         if (error && isMissingOptionalOrderTypeColumn(error)) {
-          const { order_type, item_type, is_counter_item, ...fallbackRow } = row
+          const { order_type, item_type, is_counter_item, base_price, unit_price, price_mode, ...fallbackRow } = row
           ;({ error } = await supabase.from('order_items').insert(fallbackRow))
         }
         if (error) throw error
@@ -1024,6 +1065,69 @@ export async function writeToSupabase(action, state) {
         if (!activeOrders?.length) {
           await updateRestaurantTableStatus(order.table_id, { status: 'available' }, { status: 'available' })
         }
+      }
+      break
+    }
+
+    case 'UPDATE_ORDER_PRICE_MODE': {
+      const { tableId, orderId } = action.payload || {}
+      const priceMode = normalizePriceMode(action.payload?.priceMode)
+      if (!tableId && !orderId) return
+
+      let query = supabase
+        .from('orders')
+        .select('*, items:order_items(*)')
+        .neq('payment_status', 'paid')
+      query = orderId ? query.eq('id', orderId) : query.eq('table_id', tableId)
+      const { data: orders, error: ordersError } = await query
+      if (ordersError) throw ordersError
+
+      for (const order of orders || []) {
+        const nextItems = (order.items || []).map(item => {
+          const basePrice = getOrderItemBasePrice(item)
+          const unitPrice = calculateUnitPrice(basePrice, priceMode)
+          return {
+            ...item,
+            base_price: basePrice,
+            unit_price: unitPrice,
+            price: unitPrice,
+            price_mode: priceMode,
+          }
+        })
+
+        for (const item of nextItems) {
+          const updateRow = {
+            price: item.unit_price,
+            base_price: item.base_price,
+            unit_price: item.unit_price,
+            price_mode: priceMode,
+          }
+          let { error } = await supabase.from('order_items').update(updateRow).eq('id', item.id)
+          if (error && isMissingOptionalOrderTypeColumn(error)) {
+            ;({ error } = await supabase.from('order_items').update({ price: item.unit_price }).eq('id', item.id))
+          }
+          if (error) throw error
+        }
+
+        const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
+          ? Number(order.service_rate_pct)
+          : serviceRatePctFromSettings(state.settings)
+        const paymentFields = getOrderPaymentFields(
+          { ...order, order_type: order.order_type, service_rate_pct: serviceRatePct, price_mode: priceMode },
+          nextItems,
+          serviceRatePct
+        )
+        let { error: orderUpdateError } = await supabase
+          .from('orders')
+          .update({ price_mode: priceMode, ...paymentFields })
+          .eq('id', order.id)
+        if (orderUpdateError && isMissingOptionalOrderTypeColumn(orderUpdateError)) {
+          ;({ error: orderUpdateError } = await supabase
+            .from('orders')
+            .update(paymentFields)
+            .eq('id', order.id))
+        }
+        if (orderUpdateError) throw orderUpdateError
       }
       break
     }

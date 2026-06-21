@@ -1,3 +1,5 @@
+import { withPriceModeFields } from '../lib/priceModes.js'
+
 export function cartReducer(state, action) {
   switch (action.type) {
     case 'ADD_TO_CART': {
@@ -32,6 +34,13 @@ export function cartReducer(state, action) {
       return {
         ...state,
         cart: state.cart.map(i => i.menu_item_id === menu_item_id ? { ...i, notes } : i),
+      }
+    }
+
+    case 'UPDATE_CART_PRICE_MODE': {
+      return {
+        ...state,
+        cart: state.cart.map(item => withPriceModeFields(item, action.payload?.priceMode || action.payload)),
       }
     }
 

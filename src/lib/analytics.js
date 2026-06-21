@@ -1,4 +1,5 @@
 import { inferOrderType, isOffPremiseOrderType } from './orderTypes.js'
+import { getOrderItemBasePrice, getOrderItemUnitPrice, normalizePriceMode } from './priceModes.js'
 
 export function isPaidOrder(o) {
   if (!o) return false
@@ -195,11 +196,11 @@ export function getOrderPaymentSummary(order, items = getOrderItems(order), fall
   const billableItems = sourceItems.filter(item => !isCancelledOrderItem(item))
   const hasItems = sourceItems.length > 0
   const menuItemsSubtotal = billableItems.reduce(
-    (s, i) => isCounterOrderItem(i) ? s : s + (Number(i.price) || 0) * (Number(i.quantity) || 1),
+    (s, i) => isCounterOrderItem(i) ? s : s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1),
     0
   )
   const counterItemsSubtotal = billableItems.reduce(
-    (s, i) => isCounterOrderItem(i) ? s + (Number(i.price) || 0) * (Number(i.quantity) || 1) : s,
+    (s, i) => isCounterOrderItem(i) ? s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1) : s,
     0
   )
   const itemsSubtotal = menuItemsSubtotal + counterItemsSubtotal
@@ -470,6 +471,12 @@ export function getOrderItemOptionsKey(item) {
     'itemType',
     'is_counter_item',
     'isCounterItem',
+    'price_mode',
+    'priceMode',
+    'base_price',
+    'basePrice',
+    'unit_price',
+    'unitPrice',
   ]
 
   const selected = {}
@@ -506,6 +513,10 @@ export function getGroupedOrderItems(items, resolveName) {
     grouped.set(key, {
       ...item,
       name: resolveName ? resolveName(item) : item.name,
+      price: getOrderItemUnitPrice(item),
+      unit_price: getOrderItemUnitPrice(item),
+      base_price: getOrderItemBasePrice(item),
+      price_mode: normalizePriceMode(item.price_mode ?? item.priceMode),
       source_item_ids: item.source_item_ids || (item.id ? [item.id] : []),
     })
   })

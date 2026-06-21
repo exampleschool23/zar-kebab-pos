@@ -5,9 +5,19 @@ import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
 import { getMenuPricing } from '../lib/menuPricing'
+import {
+  MENU_CURRENCIES,
+  DEFAULT_MENU_CURRENCY,
+  formatMenuCurrency,
+  getDefaultMenuCurrency,
+  loadMenuCurrencyRates,
+  normalizeMenuCurrency,
+  saveMenuCurrency,
+} from '../lib/menuCurrency'
 import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
 import { useApp } from '../store/AppContext'
 import { findMenuItemByLinkKey, getMenuItemPublicPath } from '../lib/menuLinks'
+import { getMenuItemForPriceMode } from '../lib/priceModes'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import {
@@ -63,7 +73,7 @@ async function loadPublicMenuData() {
   }
 }
 
-export default function PublicMenu() {
+export default function PublicMenu({ premium = false }) {
   const { itemId } = useParams()
   const navigate = useNavigate()
   const { state } = useApp()
@@ -77,6 +87,10 @@ export default function PublicMenu() {
   const [error, setError] = useState('')
   const [detailItem, setDetailItem] = useState(null)
   const [missingItemLink, setMissingItemLink] = useState(false)
+  const [menuCurrency, setMenuCurrency] = useState(() => getDefaultMenuCurrency())
+  const [currencyRates, setCurrencyRates] = useState({ UZS: 1 })
+  const [currencyLoading, setCurrencyLoading] = useState(false)
+  const menuBasePath = premium ? '/premium-menu' : '/menu'
   const showDetailOverlay = Boolean(detailItem)
   const savedScrollRef = useRef(0)
 
@@ -120,26 +134,45 @@ export default function PublicMenu() {
       setMissingItemLink(false)
       return
     }
-    const linkedItem = findMenuItemByLinkKey(items, itemId)
+    const linkedItems = premium ? items.map(item => getMenuItemForPriceMode(item, 'tourist')) : items
+    const linkedItem = findMenuItemByLinkKey(linkedItems, itemId)
     setDetailItem(linkedItem)
     setMissingItemLink(!linkedItem)
-  }, [itemId, items, loading])
+  }, [itemId, items, loading, premium])
+
+  useEffect(() => {
+    if (menuCurrency === DEFAULT_MENU_CURRENCY) return
+    let cancelled = false
+    setCurrencyLoading(true)
+    loadMenuCurrencyRates()
+      .then(rates => {
+        if (!cancelled) setCurrencyRates(rates)
+      })
+      .finally(() => {
+        if (!cancelled) setCurrencyLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [menuCurrency])
 
   const q = search.trim().toLowerCase()
   const categoryCards = useMemo(() => [{ id: 'all' }, ...categories], [categories])
+  const displayItems = useMemo(
+    () => premium ? items.map(item => getMenuItemForPriceMode(item, 'tourist')) : items,
+    [items, premium]
+  )
   const itemCounts = useMemo(() => {
-    const counts = { all: items.length }
-    items.forEach(item => { counts[item.category_id] = (counts[item.category_id] || 0) + 1 })
+    const counts = { all: displayItems.length }
+    displayItems.forEach(item => { counts[item.category_id] = (counts[item.category_id] || 0) + 1 })
     return counts
-  }, [items])
+  }, [displayItems])
 
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    return displayItems.filter(item => {
       const names = [item.name_uz, item.name_ru, item.name_en, item.description_uz, item.description_ru, item.description_en]
       const matchesSearch = !q || names.some(value => value?.toLowerCase().includes(q))
       return matchesSearch
     })
-  }, [items, q])
+  }, [displayItems, q])
 
   const groupedSections = useMemo(() => {
     const sections = categories
@@ -165,8 +198,22 @@ export default function PublicMenu() {
     filteredItems.filter(item => getMenuPricing(item).discounted),
     [filteredItems]
   )
+  const priceFormatter = useMemo(
+    () => amount => formatMenuCurrency(amount, menuCurrency, currencyRates),
+    [menuCurrency, currencyRates]
+  )
 
   const dealsTitle = lang === 'uz' ? 'Chegirmalar' : lang === 'ru' ? 'Акции' : 'Deals'
+  const menuTitle = premium
+    ? (lang === 'uz' ? 'Premium menyu' : lang === 'ru' ? 'Премиум меню' : 'Premium Menu')
+    : (lang === 'uz' ? 'Menyu' : lang === 'ru' ? 'Меню' : 'Menu')
+  const menuSubtitle = premium
+    ? (lang === 'uz'
+        ? 'Turistlar uchun 20% yuqori narxlar.'
+        : lang === 'ru'
+          ? 'Цены для туристов на 20% выше.'
+          : 'Tourist prices are 20% higher.')
+    : (lang === 'uz' ? 'Buyurtma berish uchun ofitsiantga murojaat qiling.' : lang === 'ru' ? 'Для заказа обратитесь к официанту.' : 'Please ask your waiter to order.')
 
   const categoryMap = useMemo(() => {
     const map = {}
@@ -177,17 +224,21 @@ export default function PublicMenu() {
   function openDetail(item) {
     savedScrollRef.current = window.scrollY
     setDetailItem(item)
-    navigate(getMenuItemPublicPath(item))
+    navigate(getMenuItemPublicPath(item, menuBasePath))
   }
 
   function closeDetail() {
     const scrollY = savedScrollRef.current
     setDetailItem(null)
     setMissingItemLink(false)
-    navigate('/menu')
+    navigate(menuBasePath)
     requestAnimationFrame(() => {
       window.scrollTo({ top: scrollY, behavior: 'instant' })
     })
+  }
+
+  function changeMenuCurrency(currency) {
+    setMenuCurrency(saveMenuCurrency(normalizeMenuCurrency(currency)))
   }
 
   return (
@@ -201,13 +252,29 @@ export default function PublicMenu() {
               className="h-12 w-auto max-w-[150px] object-contain"
             />
             <p className="text-xs font-bold uppercase tracking-wider text-[#ff5a00]">
-              {lang === 'uz' ? 'Menyu' : lang === 'ru' ? 'Меню' : 'Menu'}
+              {menuTitle}
             </p>
             <p className="hidden text-xs font-semibold text-[#8A94A6] sm:block">
-              {lang === 'uz' ? 'Buyurtma berish uchun ofitsiantga murojaat qiling.' : lang === 'ru' ? 'Для заказа обратитесь к официанту.' : 'Please ask your waiter to order.'}
+              {menuSubtitle}
             </p>
           </div>
           <div className="flex items-center gap-1.5">
+            <div className="hidden items-center gap-1 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-1 sm:flex">
+              {MENU_CURRENCIES.map(currency => (
+                <button
+                  key={currency}
+                  type="button"
+                  onClick={() => changeMenuCurrency(currency)}
+                  className={`h-7 rounded-lg px-2.5 text-[11px] font-black transition-colors ${
+                    menuCurrency === currency
+                      ? 'bg-white text-[#ff5a00] shadow-sm'
+                      : 'text-[#6B7280] hover:text-[#1F2937]'
+                  }`}
+                >
+                  {currency}
+                </button>
+              ))}
+            </div>
             <a
               href={PUBLIC_CONTACTS.telegram.href}
               target="_blank"
@@ -240,7 +307,8 @@ export default function PublicMenu() {
 
       <main className="mx-auto max-w-[1180px] px-4 py-5">
         <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
-          <div className="relative">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
             <input
               value={search}
@@ -248,6 +316,30 @@ export default function PublicMenu() {
               placeholder={lang === 'uz' ? 'Menyudan qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
               className="w-full rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] py-3 pl-11 pr-4 text-sm outline-none transition-all focus:border-[#ff5a00] focus:bg-white focus:ring-2 focus:ring-[#ff5a00]/15"
             />
+          </div>
+          <div className="flex items-center gap-1 rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] p-1 sm:hidden">
+            {MENU_CURRENCIES.map(currency => (
+              <button
+                key={currency}
+                type="button"
+                onClick={() => changeMenuCurrency(currency)}
+                className={`h-9 flex-1 rounded-xl px-2 text-[12px] font-black transition-colors ${
+                  menuCurrency === currency
+                    ? 'bg-white text-[#ff5a00] shadow-sm'
+                    : 'text-[#6B7280]'
+                }`}
+              >
+                {currency}
+              </button>
+            ))}
+          </div>
+          {menuCurrency !== 'UZS' && (
+            <p className="text-[11px] font-semibold text-[#9CA3AF] sm:w-[180px] sm:text-right">
+              {currencyLoading
+                ? (lang === 'uz' ? 'Kurs yuklanmoqda...' : lang === 'ru' ? 'Загружаем курс...' : 'Loading rates...')
+                : (lang === 'uz' ? 'Jonli kurs' : lang === 'ru' ? 'Текущий курс' : 'Live rates')}
+            </p>
+          )}
           </div>
         </div>
 
@@ -301,7 +393,7 @@ export default function PublicMenu() {
               {lang === 'uz' ? 'U o‘chirilgan yoki hozir mavjud emas.' : lang === 'ru' ? 'Возможно, она удалена или сейчас недоступна.' : 'It may have been removed or is not currently available.'}
             </p>
             <button
-              onClick={() => navigate('/menu')}
+              onClick={() => navigate(menuBasePath)}
               className="mt-4 rounded-xl bg-[#ff5a00] px-4 py-2 text-sm font-black text-white shadow-sm"
             >
               {lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Вернуться в меню' : 'Back to menu'}
@@ -342,6 +434,8 @@ export default function PublicMenu() {
                         eager={index < 4}
                         onOpenDetail={openDetail}
                         readOnly
+                        formatPrice={priceFormatter}
+                        linkBasePath={menuBasePath}
                       />
                     ))}
                   </div>
@@ -371,6 +465,8 @@ export default function PublicMenu() {
                         eager={groupedSections[0]?.cat.id === section.cat.id && index < 6}
                         onOpenDetail={openDetail}
                         readOnly
+                        formatPrice={priceFormatter}
+                        linkBasePath={menuBasePath}
                       />
                     ))}
                   </div>
@@ -388,6 +484,8 @@ export default function PublicMenu() {
                   eager={index < 8}
                   onOpenDetail={openDetail}
                   readOnly
+                  formatPrice={priceFormatter}
+                  linkBasePath={menuBasePath}
                 />
               ))}
             </div>
@@ -406,6 +504,8 @@ export default function PublicMenu() {
             onCancel={closeDetail}
             onAddToCart={() => {}}
             readOnly
+            formatPrice={priceFormatter}
+            linkBasePath={menuBasePath}
           />
         </div>
       )}

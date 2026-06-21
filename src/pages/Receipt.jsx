@@ -10,6 +10,7 @@ import {
   getOrderPaymentBreakdown,
   getOrderPaymentSummary,
 } from '../lib/analytics'
+import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { isCashierQuickItem } from '../lib/menuItems'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatDateTime } from '../lib/dateFormat'
@@ -21,6 +22,7 @@ const L = {
     slogan:      "Olov. Ta'm. An'ana.",
     receiptTitle:'CHEK',
     table:       'Stol',
+    menuType:    'Menyu turi',
     waiter:      'Ofitsiant',
     date:        'Sana',
     itemCol:     'Taom',
@@ -39,6 +41,7 @@ const L = {
     slogan:      'Огонь. Вкус. Традиции.',
     receiptTitle:'ЧЕК',
     table:       'Стол',
+    menuType:    'Тип меню',
     waiter:      'Официант',
     date:        'Дата',
     itemCol:     'Блюдо',
@@ -57,6 +60,7 @@ const L = {
     slogan:      'Fire. Flavor. Tradition.',
     receiptTitle:'RECEIPT',
     table:       'Table',
+    menuType:    'Menu type',
     waiter:      'Waiter',
     date:        'Date',
     itemCol:     'Item',
@@ -126,6 +130,7 @@ function combineReceiptOrders(orders) {
     service_rate_pct: orders.find(o => o.service_rate_pct != null)?.service_rate_pct ??
       orders.find(o => o.service_percent != null)?.service_percent ??
       orders[0]?.service_rate_pct,
+    price_mode: normalizePriceMode(orders[0]?.price_mode),
     payments: orders.flatMap(o => getOrderPaymentBreakdown(o)),
   }
 }
@@ -232,7 +237,7 @@ function handlePrintReceipt(delay = 300) {
 
 // ── ReceiptPaper ──────────────────────────────────────────────────────────────
 
-function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, lang, restaurantName, receiptFooter }) {
+function ReceiptPaper({ tableName, waiterName, dateStr, priceMode, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, lang, restaurantName, receiptFooter }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=https://instagram.com/zarkebab&size=220x220&margin=6&color=111111&bgcolor=ffffff`
 
   return (
@@ -297,6 +302,7 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '14px' }}>
         <tbody>
           <MetaRow label={labels.table}  value={tableName}  />
+          <MetaRow label={labels.menuType} value={getPriceModeLabel(priceMode, lang)} />
           <MetaRow label={labels.waiter} value={waiterName} />
           <MetaRow label={labels.date}   value={dateStr}    />
         </tbody>
@@ -337,7 +343,7 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
             <span style={{ paddingRight: '8px', lineHeight: 1.4, color: '#222' }}>{item.name}</span>
             <span style={{ textAlign: 'center', fontWeight: 500, color: '#444' }}>{item.quantity}</span>
             <span style={{ textAlign: 'right', fontWeight: 600, color: '#111' }}>
-              {fmtNum(item.price * item.quantity)}
+              {fmtNum(getOrderItemUnitPrice(item) * (Number(item.quantity) || 1))}
             </span>
           </div>
         ))}
@@ -560,6 +566,7 @@ export function TableReceipt() {
 
     return {
       tableName:  receiptTableLabel(orders[0], table, lang, tableId),
+      priceMode: normalizePriceMode(orders[0]?.price_mode),
       waiterName: orders[0]?.waiter_name || '—',
       receiptAt:  orders[0]?.paid_at || orders[0]?.created_at,
       items,
@@ -641,6 +648,7 @@ export default function Receipt() {
 
     return {
       tableName:  receiptTableLabel(order, table, lang, '—'),
+      priceMode: normalizePriceMode(order.price_mode),
       waiterName: order.waiter_name || '—',
       receiptAt:  order.paid_at || order.created_at,
       items,

@@ -9,6 +9,14 @@ import {
   removeSentCartItems,
 } from '../lib/analytics.js'
 import {
+  DEFAULT_PRICE_MODE,
+  calculateUnitPrice,
+  getOrderItemBasePrice,
+  getOrderItemUnitPrice,
+  normalizePriceMode,
+  withPriceModeFields,
+} from '../lib/priceModes.js'
+import {
   makeOrderNumber,
   makeLocalId,
   normalizeOrderType,
@@ -29,9 +37,10 @@ export function ordersReducer(state, action) {
       const table = isOffPremise ? null : state.tables.find(t => t.id === state.currentTableId)
       if ((!isOffPremise && !table) || state.cart.length === 0) return state
       const orderId = action._orderId || ('o' + Date.now())
+      const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
       const submittedAt = action._submittedAt || new Date().toISOString()
       const kitchenRoundId = action._kitchenRoundId || `${orderId}-${submittedAt}`
-      const cartItems = action._items || state.cart.map(i => ({
+      const cartItems = (action._items || state.cart.map(i => ({
         ...i,
         id: makeLocalId(),
         status: 'new',
@@ -39,8 +48,15 @@ export function ordersReducer(state, action) {
         kitchen_round_id: kitchenRoundId,
         submitted_at: submittedAt,
         created_at: submittedAt,
+      }))).map(i => ({
+        ...withPriceModeFields(i, i.price_mode || priceMode),
+        status: i.status || 'new',
+        order_type: i.order_type || orderType,
+        kitchen_round_id: i.kitchen_round_id || kitchenRoundId,
+        submitted_at: i.submitted_at || submittedAt,
+        created_at: i.created_at || submittedAt,
       }))
-      const addedSubtotal = cartItems.reduce((s, i) => s + i.price * i.quantity, 0)
+      const addedSubtotal = cartItems.reduce((s, i) => s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1), 0)
       const activeOrder = state.orders.find(o =>
         o.id === orderId ||
         (!isOffPremise && o.table_id === state.currentTableId && o.payment_status !== 'paid')
@@ -59,6 +75,7 @@ export function ordersReducer(state, action) {
             ? {
                 ...o,
                 status: 'sent_to_kitchen',
+                price_mode: priceMode,
                 items: [...(o.items || []), ...cartItems],
                 ...paymentFields,
               }
@@ -68,6 +85,7 @@ export function ordersReducer(state, action) {
             id: orderId,
             order_number: isOffPremise ? (action._orderNumber || makeOrderNumber(orderId, orderType)) : undefined,
             order_type: orderType,
+            price_mode: priceMode,
             table_id: isOffPremise ? null : state.currentTableId,
             table_name: isOffPremise ? orderTypeLabel(orderType, 'en') : table.name,
             waiter_name: state.user?.name || 'Waiter',
@@ -188,6 +206,9 @@ export function ordersReducer(state, action) {
               menu_item_id: item.id,
               name: item.name,
               price: Number(item.price) || 0,
+              base_price: Number(item.base_price ?? item.basePrice ?? item.price) || 0,
+              unit_price: Number(item.unit_price ?? item.unitPrice ?? item.price) || 0,
+              price_mode: normalizePriceMode(item.price_mode || item.priceMode || activeOrder.price_mode),
               quantity: 1,
               notes: '',
               status: item.sendToKitchen || item.send_to_kitchen ? 'new' : 'served',
@@ -203,6 +224,30 @@ export function ordersReducer(state, action) {
           ? recalcOrderTotals({ ...o, items: nextItems }, state.settings)
           : o
         ),
+      }
+    }
+
+    case 'UPDATE_ORDER_PRICE_MODE': {
+      const { tableId, orderId } = action.payload || {}
+      const priceMode = normalizePriceMode(action.payload?.priceMode)
+      return {
+        ...state,
+        orders: state.orders.map(order => {
+          const matches = orderId ? order.id === orderId : order.table_id === tableId
+          if (!matches || order.payment_status === 'paid') return order
+          const nextItems = (order.items || []).map(item => {
+            const basePrice = getOrderItemBasePrice(item)
+            const unitPrice = calculateUnitPrice(basePrice, priceMode)
+            return {
+              ...item,
+              base_price: basePrice,
+              unit_price: unitPrice,
+              price: unitPrice,
+              price_mode: priceMode,
+            }
+          })
+          return recalcOrderTotals({ ...order, price_mode: priceMode, items: nextItems }, state.settings)
+        }),
       }
     }
 

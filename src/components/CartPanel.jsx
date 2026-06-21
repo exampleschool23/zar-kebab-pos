@@ -6,6 +6,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { ORDER_TYPE_LABELS, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { DEFAULT_PRICE_MODE, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 
 const ORDER_TYPES = [
   { key: 'dine_in', ...ORDER_TYPE_LABELS.dine_in },
@@ -122,6 +123,7 @@ export default function CartPanel({
   orderType,
   onOrderTypeChange,
   onClose,
+  priceMode = DEFAULT_PRICE_MODE,
   allowOrderTypeChange = true,
   isSending = false,
   onSendingChange,
@@ -129,6 +131,7 @@ export default function CartPanel({
   const { state, dispatch } = useApp()
   const lang    = state.lang
   const cart    = state.cart
+  const normalizedPriceMode = normalizePriceMode(priceMode)
   const [message, setMessage] = useState(null)
 
   const menuItemMap = useMemo(() => {
@@ -154,7 +157,7 @@ export default function CartPanel({
     try {
       const result = await dispatch({
         type: 'SEND_TO_KITCHEN',
-        payload: { orderType },
+        payload: { orderType, priceMode: normalizedPriceMode },
         _kitchenRoundId: kitchenRoundId,
         _submittedAt: submittedAt,
       })
@@ -207,6 +210,9 @@ export default function CartPanel({
                     {orderTypeLabel(orderType, lang)}
                   </span>
                 )}
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#ff5a00] border border-orange-100 flex-shrink-0">
+                  {getPriceModeLabel(normalizedPriceMode, lang)}
+                </span>
               </div>
               <p className="text-[12px] text-[#9CA3AF] mt-0.5">
                 {itemCount > 0

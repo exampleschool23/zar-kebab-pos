@@ -19,6 +19,7 @@ import { useAppDataStatus } from '../store/appHooks'
 import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
+import { DEFAULT_PRICE_MODE, getMenuItemForPriceMode, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
 function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName, viewerRole }) {
@@ -485,6 +486,8 @@ export default function WaiterOrder() {
   const [isSendingOrder,setSendingOrder] = useState(false)
   const isTakeAwayFlow = !tableId
   const [orderType,     setOrderType]    = useState(isTakeAwayFlow ? 'take_away' : 'dine_in')
+  const [priceMode,     setPriceMode]    = useState(DEFAULT_PRICE_MODE)
+  const [pendingPriceMode, setPendingPriceMode] = useState(null)
   const [detailItem,    setDetailItem]   = useState(null)
   const productScrollRef = useRef(null)
   const savedMenuScrollRef = useRef(0)
@@ -523,6 +526,11 @@ export default function WaiterOrder() {
     }
     return merged
   }, [state.orders, tableId, isTakeAwayFlow])
+
+  useEffect(() => {
+    if (isSendingOrder || pendingPriceMode) return
+    setPriceMode(normalizePriceMode(activeOrder?.price_mode || DEFAULT_PRICE_MODE))
+  }, [activeOrder?.id, activeOrder?.price_mode, isSendingOrder, pendingPriceMode])
 
   useEffect(() => {
     if (!shouldOpenOrderPanel || detailItem) return
@@ -592,12 +600,17 @@ export default function WaiterOrder() {
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
   }, [state.menuItems, visibleCategoryIds, q])
 
+  const pricedFilteredItems = useMemo(
+    () => filteredItems.map(item => getMenuItemForPriceMode(item, priceMode)),
+    [filteredItems, priceMode]
+  )
+
   // Grouped sections when "All" is selected without a search query
   const sections = useMemo(() => {
     return sortedCategories
-      .map(cat => ({ cat, items: filteredItems.filter(i => i.category_id === cat.id) }))
+      .map(cat => ({ cat, items: pricedFilteredItems.filter(i => i.category_id === cat.id) }))
       .filter(s => s.items.length > 0)
-  }, [sortedCategories, filteredItems])
+  }, [sortedCategories, pricedFilteredItems])
 
   // Category lookup map (for product detail page)
   const categoryMap = useMemo(() => {
@@ -616,12 +629,12 @@ export default function WaiterOrder() {
 
   function handleAdd(item) {
     if (isSendingOrder) return
-    dispatch({ type: 'ADD_TO_CART', payload: { menu_item_id: item.id, name: getItemName(item, lang), price: item.price } })
+    dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
   }
 
   function handleIncrement(item) {
     if (isSendingOrder) return
-    dispatch({ type: 'ADD_TO_CART', payload: { menu_item_id: item.id, name: getItemName(item, lang), price: item.price } })
+    dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
   }
 
   function handleDecrement(item) {
@@ -643,11 +656,45 @@ export default function WaiterOrder() {
     if (isSendingOrder) return
     const alreadyInCart = (cartQtyMap[item.id] || 0) > 0
     if (!alreadyInCart) {
-      dispatch({ type: 'ADD_TO_CART', payload: { menu_item_id: item.id, name: getItemName(item, lang), price: item.price } })
+      dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
     }
     dispatch({ type: 'UPDATE_CART_QTY', payload: { menu_item_id: item.id, qty } })
     dispatch({ type: 'UPDATE_CART_NOTES', payload: { menu_item_id: item.id, notes: notes || '' } })
     setDetailItem(null)
+  }
+
+  function makeCartPayload(item) {
+    const pricedItem = getMenuItemForPriceMode(item, priceMode)
+    return {
+      menu_item_id: pricedItem.id,
+      name: getItemName(pricedItem, lang),
+      price: pricedItem.unit_price,
+      base_price: pricedItem.base_price,
+      unit_price: pricedItem.unit_price,
+      price_mode: pricedItem.price_mode,
+    }
+  }
+
+  function requestPriceModeChange(nextMode) {
+    const normalized = normalizePriceMode(nextMode)
+    if (normalized === priceMode || isSendingOrder) return
+    const hasPricedItems = cartCount > 0 || ((activeOrder?.items || []).length > 0 && activeOrder?.payment_status !== 'paid')
+    if (hasPricedItems) {
+      setPendingPriceMode(normalized)
+      return
+    }
+    setPriceMode(normalized)
+  }
+
+  function confirmPriceModeChange() {
+    if (!pendingPriceMode) return
+    const nextMode = pendingPriceMode
+    setPriceMode(nextMode)
+    dispatch({ type: 'UPDATE_CART_PRICE_MODE', payload: { priceMode: nextMode } })
+    if (activeOrder?.id || tableId) {
+      dispatch({ type: 'UPDATE_ORDER_PRICE_MODE', payload: { tableId, priceMode: nextMode } })
+    }
+    setPendingPriceMode(null)
   }
 
   function handleSignOut() {
@@ -786,6 +833,24 @@ export default function WaiterOrder() {
             <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
           </div>
 
+          <div className="flex flex-shrink-0 rounded-xl bg-[#F3F4F6] p-1">
+            {['regular', 'tourist'].map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => requestPriceModeChange(mode)}
+                disabled={isSendingOrder}
+                className={`h-8 rounded-lg px-3 text-[12px] font-black transition-all disabled:cursor-wait disabled:opacity-60 ${
+                  priceMode === mode
+                    ? 'bg-white text-[#ff5a00] shadow-sm'
+                    : 'text-[#6B7280] hover:text-[#1F2937]'
+                }`}
+              >
+                {getPriceModeLabel(mode, lang)}
+              </button>
+            ))}
+          </div>
+
           <div className="relative order-last min-w-full flex-1 sm:order-none sm:min-w-[180px]">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] pointer-events-none" />
             <input
@@ -868,7 +933,7 @@ export default function WaiterOrder() {
             className="pt-4 mb-4"
             collapsedClassName="-mx-4 px-4"
           />
-          {filteredItems.length === 0 ? (
+          {pricedFilteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-[#9CA3AF]">
               <Search size={36} className="mb-3 opacity-20" />
               <p className="text-sm font-semibold">
@@ -901,7 +966,7 @@ export default function WaiterOrder() {
           ) : (
             // Flat grid for specific category or search results
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {filteredItems.map((item, index) => (
+              {pricedFilteredItems.map((item, index) => (
                 <ProductCard
                   key={item.id}
                   item={item}
@@ -963,6 +1028,7 @@ export default function WaiterOrder() {
                 tableName={orderTitle}
                 orderType={orderType}
                 onOrderTypeChange={setOrderType}
+                priceMode={priceMode}
                 allowOrderTypeChange
                 isSending={isSendingOrder}
                 onSendingChange={setSendingOrder}
@@ -970,6 +1036,42 @@ export default function WaiterOrder() {
               />
             </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {pendingPriceMode && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-[380px] rounded-2xl border border-orange-100 bg-white p-5 shadow-2xl">
+            <p className="text-sm font-black uppercase tracking-wide text-[#ff5a00]">
+              {lang === 'uz' ? 'Menyu turini o‘zgartirish' : lang === 'ru' ? 'Изменить тип меню' : 'Change menu type'}
+            </p>
+            <h2 className="mt-2 text-xl font-black text-[#1F2937]">
+              {getPriceModeLabel(priceMode, lang)} → {getPriceModeLabel(pendingPriceMode, lang)}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#6B7280]">
+              {lang === 'uz'
+                ? 'Savatdagi va shu stolning to‘lanmagan mahsulotlari yangi narx bo‘yicha qayta hisoblanadi.'
+                : lang === 'ru'
+                  ? 'Позиции в корзине и неоплаченные позиции этого стола будут пересчитаны по новому типу меню.'
+                  : 'Cart items and unpaid items on this table will be recalculated with the new menu type.'}
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingPriceMode(null)}
+                className="h-11 flex-1 rounded-xl border border-[#E5E7EB] bg-white text-sm font-black text-[#6B7280] hover:bg-gray-50"
+              >
+                {lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={confirmPriceModeChange}
+                className="h-11 flex-1 rounded-xl bg-[#ff5a00] text-sm font-black text-white hover:bg-[#e64d00]"
+              >
+                {lang === 'uz' ? 'Qayta hisoblash' : lang === 'ru' ? 'Пересчитать' : 'Recalculate'}
+              </button>
+            </div>
           </div>
         </div>
       )}

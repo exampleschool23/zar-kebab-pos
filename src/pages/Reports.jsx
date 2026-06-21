@@ -19,6 +19,7 @@ import {
   normalizeServiceRatePct,
   toLocalDateStr,
 } from '../lib/analytics'
+import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -234,7 +235,7 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
           }
         }
         map[key].quantity += Number(item.quantity) || 1
-        map[key].revenue  += (Number(item.price) || 0) * (Number(item.quantity) || 1)
+        map[key].revenue  += getOrderItemUnitPrice(item) * (Number(item.quantity) || 1)
       })
     })
     return Object.values(map).sort((a, b) =>
@@ -334,7 +335,7 @@ function ByCategoryTab({ orders, categories, menuItemMap, lang }) {
         const key = cat?.id || '__uncategorized__'
         const lbl = cat ? getCategoryName(cat, lang) : 'Uncategorized'
         if (!map[key]) map[key] = { label: lbl, image: cat?.image_url || null, revenue: 0, qty: 0 }
-        const rev = (Number(item.price) || 0) * (Number(item.quantity) || 1)
+        const rev = getOrderItemUnitPrice(item) * (Number(item.quantity) || 1)
         map[key].revenue += rev
         map[key].qty     += Number(item.quantity) || 1
         totalRev         += rev
@@ -829,11 +830,11 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
                     )}
                     {item.notes && <p className="text-[11px] text-[#9CA3AF]">{item.notes}</p>}
                     <p className="text-[11px] text-[#6B7280] mt-0.5">
-                      {lang === 'uz' ? 'Dona' : lang === 'ru' ? 'Кол' : 'Qty'} {item.quantity} × {formatCurrency(item.price || 0)}
+                      {lang === 'uz' ? 'Dona' : lang === 'ru' ? 'Кол' : 'Qty'} {item.quantity} × {formatCurrency(getOrderItemUnitPrice(item))}
                     </p>
                   </div>
                   <p className="font-bold text-sm text-[#1F2937] flex-shrink-0">
-                    {formatCurrency((Number(item.price) || 0) * (Number(item.quantity) || 1))}
+                    {formatCurrency(getOrderItemUnitPrice(item) * (Number(item.quantity) || 1))}
                   </p>
                 </div>
               )
@@ -1131,6 +1132,18 @@ export default function Reports() {
   const kpiItemsSold = filteredForAnalytics.reduce(
     (s, o) => s + getOrderItems(o).reduce((a, i) => a + (Number(i.quantity) || 1), 0), 0
   )
+  const priceModeBreakdown = useMemo(() => {
+    const rows = {
+      regular: { mode: 'regular', orders: 0, revenue: 0 },
+      tourist: { mode: 'tourist', orders: 0, revenue: 0 },
+    }
+    filteredForAnalytics.forEach(order => {
+      const mode = normalizePriceMode(order.price_mode)
+      rows[mode].orders += 1
+      rows[mode].revenue += getOrderTotal(order)
+    })
+    return Object.values(rows)
+  }, [filteredForAnalytics])
   const closeout = useMemo(() => getDailyCloseout(state.orders, dateTo), [state.orders, dateTo])
   const salaryExpenses = useMemo(() => (
     buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
@@ -1336,6 +1349,28 @@ export default function Reports() {
                   <KpiCard icon={DollarSign} iconCls={netIncome >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} label={l.netIncome} value={formatCurrency(netIncome)} />
                 </>
               )}
+            </div>
+
+            <div className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+              <div className="mb-3">
+                <p className="text-sm font-black text-[#1F2937]">
+                  {lang === 'uz' ? 'Menyu turi bo‘yicha savdo' : lang === 'ru' ? 'Продажи по типу меню' : 'Sales by menu type'}
+                </p>
+                <p className="text-xs font-semibold text-[#9CA3AF]">
+                  {lang === 'uz' ? 'Oddiy va turist narxlari bo‘yicha tushum' : lang === 'ru' ? 'Выручка по обычным и туристическим ценам' : 'Revenue split between regular and tourist pricing'}
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {priceModeBreakdown.map(row => (
+                  <div key={row.mode} className="rounded-xl border border-orange-100 bg-orange-50/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-black text-[#1F2937]">{getPriceModeLabel(row.mode, lang)}</span>
+                      <span className="text-xs font-bold text-[#9CA3AF]">{row.orders} {lang === 'uz' ? 'buyurtma' : lang === 'ru' ? 'заказов' : 'orders'}</span>
+                    </div>
+                    <p className="mt-2 text-xl font-black text-[#ff5a00]">{formatCurrency(row.revenue)}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">

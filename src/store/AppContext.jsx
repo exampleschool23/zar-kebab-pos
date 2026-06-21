@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, loadInitialLang, loadSettings, makeLocalId, makeOrder
 import { settingsReducer } from './settingsReducer'
 import { tablesReducer } from './tablesReducer'
 import { isOffPremiseOrderType } from '../lib/orderTypes'
+import { DEFAULT_PRICE_MODE, normalizePriceMode, withPriceModeFields } from '../lib/priceModes'
 
 const AppContext = createContext(null)
 
@@ -26,6 +27,7 @@ const LOCAL_ONLY_ACTIONS = new Set([
   'REMOVE_FROM_CART',
   'UPDATE_CART_QTY',
   'UPDATE_CART_NOTES',
+  'UPDATE_CART_PRICE_MODE',
   'CLEAR_CART',
 ])
 
@@ -89,9 +91,14 @@ export function AppProvider({ children }) {
       const orderType = normalizeOrderType(action.payload?.orderType)
       const isOffPremise = isOffPremiseOrderType(orderType)
       const submittedAt = action._submittedAt || new Date().toISOString()
+      const activeOrder = stateRef.current.orders.find(o =>
+        o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
+      )
+      const priceMode = normalizePriceMode(action.payload?.priceMode || activeOrder?.price_mode || DEFAULT_PRICE_MODE)
       const kitchenRoundId = action._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
       enriched = {
         ...action,
+        _priceMode: priceMode,
         _submittedAt: submittedAt,
         _kitchenRoundId: kitchenRoundId,
         _orderId: isOffPremise
@@ -103,7 +110,7 @@ export function AppProvider({ children }) {
           ? makeOrderNumber(Date.now(), orderType)
           : undefined,
         _items: stateRef.current.cart.map(i => ({
-          ...i,
+          ...withPriceModeFields(i, i.price_mode || priceMode),
           id: makeLocalId('oi'),
           status: 'new',
           order_type: orderType,

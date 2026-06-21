@@ -336,6 +336,7 @@ test('PublicMenu is read-only for QR customers', () => {
   const productCards = readSource('src/components/MenuProductCards.jsx')
 
   assert.match(app, /path="\/menu"\s+element=\{<PublicMenu \/>\}/)
+  assert.match(app, /path="\/premium-menu"\s+element=\{<PublicMenu premium \/>\}/)
   assert.doesNotMatch(app, /PublicMenuRoute/)
   assert.doesNotMatch(publicMenu, /useAuth/)
   assert.doesNotMatch(publicMenu, /LogIn/)
@@ -448,19 +449,34 @@ test('PublicMenu supports direct product links and copyable item URLs', () => {
   const menuLinks = readSource('src/lib/menuLinks.js')
 
   assert.match(app, /path="\/menu\/item\/:itemId"/)
+  assert.match(app, /path="\/premium-menu\/item\/:itemId"/)
   assert.match(publicMenu, /useParams/)
-  assert.match(publicMenu, /findMenuItemByLinkKey\(items, itemId\)/)
-  assert.match(publicMenu, /navigate\(getMenuItemPublicPath\(item\)\)/)
+  assert.match(publicMenu, /findMenuItemByLinkKey\(linkedItems, itemId\)/)
+  assert.match(publicMenu, /navigate\(getMenuItemPublicPath\(item, menuBasePath\)\)/)
+  assert.match(publicMenu, /premium \? '\/premium-menu' : '\/menu'/)
   assert.match(publicMenu, /const showDetailOverlay = Boolean\(detailItem\)/)
   assert.match(publicMenu, /showDetailOverlay && \(/)
   assert.match(publicMenu, /fixed inset-0 z-\[80\]/)
   assert.doesNotMatch(publicMenu, /if \(detailItem\) \{/)
-  assert.match(productCards, /getMenuItemPublicUrl\(item\)/)
+  assert.match(productCards, /linkBasePath = '\/menu'/)
+  assert.match(productCards, /getMenuItemPublicUrl\(item, globalThis\.location\?\.origin, linkBasePath\)/)
   assert.match(productCards, /copyTextToClipboard/)
   assert.match(productCards, /<Copy size=\{15\}/)
   assert.match(productCards, /<Copy size=\{14\}/)
   assert.match(menuLinks, /external_id \|\| item\?\.externalId \|\| item\?\.id/)
-  assert.match(menuLinks, /\/menu\/item\/\$\{encodeURIComponent\(key\)\}/)
+  assert.match(menuLinks, /basePath = '\/menu'/)
+  assert.match(menuLinks, /\$\{normalizedBase\}\/item\/\$\{encodeURIComponent\(key\)\}/)
+})
+
+test('Premium public menu uses tourist pricing without duplicating menu items', () => {
+  const app = readSource('src/App.jsx')
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+
+  assert.match(app, /path="\/premium-menu"/)
+  assert.match(publicMenu, /export default function PublicMenu\(\{ premium = false \}\)/)
+  assert.match(publicMenu, /getMenuItemForPriceMode\(item, 'tourist'\)/)
+  assert.match(publicMenu, /Premium Menu/)
+  assert.match(publicMenu, /Tourist prices are 20% higher/)
 })
 
 test('MenuCategoryScroller collapsed chips do not overlap expanded category cards', () => {

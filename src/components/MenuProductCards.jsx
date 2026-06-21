@@ -116,7 +116,7 @@ export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
   )
 }
 
-export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false }) {
+export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu' }) {
   const inCart = !readOnly && qty > 0
   const [copied, setCopied] = useState(false)
   const kcal = kcalLabel(item, lang)
@@ -130,7 +130,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
 
   async function copyProductLink(event) {
     event.stopPropagation()
-    await copyTextToClipboard(getMenuItemPublicUrl(item))
+    await copyTextToClipboard(getMenuItemPublicUrl(item, globalThis.location?.origin, linkBasePath))
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1400)
   }
@@ -184,10 +184,10 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         <div className="mb-2.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
             {pricing.discounted && (
-              <p className="text-[12px] font-bold text-[#9CA3AF] line-through">{formatCurrency(pricing.oldPrice)}</p>
+              <p className="text-[12px] font-bold text-[#9CA3AF] line-through">{formatPrice(pricing.oldPrice)}</p>
             )}
             <p className={`${pricing.discounted ? 'text-[17px] text-red-600' : 'text-[16px] text-[#ff5a00]'} font-black`}>
-              {formatCurrency(pricing.price)}
+              {formatPrice(pricing.price)}
             </p>
           </div>
           {(grams || millilitres || kcal) && (
@@ -245,7 +245,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   )
 }
 
-export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false }) {
+export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false, formatPrice = formatCurrency, linkBasePath = '/menu' }) {
   const [qty, setQty] = useState(Math.max(1, currentQty))
   const [notes, setNotes] = useState(currentNotes || '')
   const [copied, setCopied] = useState(false)
@@ -280,7 +280,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   }
 
   async function copyProductLink() {
-    await copyTextToClipboard(getMenuItemPublicUrl(item))
+    await copyTextToClipboard(getMenuItemPublicUrl(item, globalThis.location?.origin, linkBasePath))
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1400)
   }
@@ -316,11 +316,11 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
           )}
           {pricing.discounted && (
             <p className="whitespace-nowrap text-sm font-bold text-[#9CA3AF] line-through tabular-nums">
-              {formatCurrency(pricing.oldPrice)}
+              {formatPrice(pricing.oldPrice)}
             </p>
           )}
           <p className={`whitespace-nowrap text-xl sm:text-2xl font-black tabular-nums ${pricing.discounted ? 'text-red-600' : 'text-[#FF4D00]'}`}>
-            {formatCurrency(pricing.price)}
+            {formatPrice(pricing.price)}
           </p>
           {(grams || millilitres || kcal) && (
             <div className="flex flex-wrap justify-end gap-1">
@@ -365,10 +365,10 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                 <h2 className="text-2xl font-black uppercase tracking-tight text-[#111827] sm:text-3xl">{name}</h2>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {pricing.discounted && (
-                    <p className="text-sm font-bold text-[#9CA3AF] line-through">{formatCurrency(pricing.oldPrice)}</p>
+                    <p className="text-sm font-bold text-[#9CA3AF] line-through">{formatPrice(pricing.oldPrice)}</p>
                   )}
                   <p className={`${pricing.discounted ? 'text-xl text-red-600' : 'text-lg text-[#FF4D00]'} font-black`}>
-                    {formatCurrency(pricing.price)}
+                    {formatPrice(pricing.price)}
                   </p>
                   {grams && (
                     <span className="rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00] ring-1 ring-[#FFD8BF]">
@@ -454,7 +454,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
             onClick={() => onAddToCart(item, qty, notes)}
             className="h-14 flex-[2] rounded-2xl bg-[#0F3B2E] text-sm sm:text-base font-black text-white hover:bg-[#0A2A20] active:scale-[0.99] transition-all shadow-[0_8px_18px_rgba(15,59,46,0.22)]"
           >
-            {labels.add} - {formatCurrency(total)}
+            {labels.add} - {formatPrice(total)}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import {
   getOrderTotal,
   toLocalDateStr,
 } from './analytics.js'
+import { getOrderItemUnitPrice } from './priceModes.js'
 
 function localDateStr(value) {
   return toLocalDateStr(value instanceof Date ? value.toISOString() : value)
@@ -53,7 +54,7 @@ export function getDashboardSalesByCategory(orders, menuItemMap, categoryMap, la
       const name = cat
         ? (cat[`name_${lang}`] || cat.name_en || cat.name_uz || 'Other')
         : 'Other'
-      const revenue = (Number(item.price) || 0) * (Number(item.quantity) || 1)
+      const revenue = getOrderItemUnitPrice(item) * (Number(item.quantity) || 1)
       if (!map[name]) map[name] = { name, revenue: 0, qty: 0 }
       map[name].revenue += revenue
       map[name].qty += Number(item.quantity) || 1
@@ -82,7 +83,7 @@ export function getDashboardBestSelling(orders, menuItemMap) {
         }
       }
       map[key].qty += Number(item.quantity) || 1
-      map[key].revenue += (Number(item.price) || 0) * (Number(item.quantity) || 1)
+      map[key].revenue += getOrderItemUnitPrice(item) * (Number(item.quantity) || 1)
     })
   })
 

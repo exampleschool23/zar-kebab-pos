@@ -17,6 +17,7 @@ import {
   isPaidOrder,
   toLocalDateStr,
 } from '../lib/analytics'
+import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { isCashierVisibleBill, isTakeAwayBill } from '../lib/cashierBills'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
@@ -300,6 +301,7 @@ function BillCard({
   const isTakeAway = isTakeAwayBill(order)
   const isDelivery = isDeliveryOrderType(inferOrderType(order))
   const orderType = inferOrderType(order)
+  const priceMode = normalizePriceMode(order.price_mode)
 
   const items = useMemo(() => {
     return getGroupedOrderItems(order.items || [])
@@ -333,6 +335,9 @@ function BillCard({
               {order.waiter_name && (
                 <p className="text-[11px] text-[#9CA3AF]">{l.waiter}: {order.waiter_name}</p>
               )}
+              <p className="mt-1 text-[11px] font-black text-[#ff5a00]">
+                {lang === 'uz' ? 'Menyu turi' : lang === 'ru' ? 'Тип меню' : 'Menu type'}: {getPriceModeLabel(priceMode, lang)}
+              </p>
             </div>
           </div>
           <TableStatusBadge status={isDelivery ? 'delivery' : isTakeAway ? 'take_away' : table?.status || order.status} lang={lang} />
@@ -359,7 +364,7 @@ function BillCard({
           {preview.map((item, i) => {
             const mi = menuItemMap[item.menu_item_id]
             const displayName = getCashierItemName(item, mi, lang)
-            const lineTotal = (item.price || 0) * (item.quantity || 1)
+            const lineTotal = getOrderItemUnitPrice(item) * (Number(item.quantity) || 1)
             return (
               <div key={i} className="flex items-center gap-3">
                 {mi?.image_url ? (

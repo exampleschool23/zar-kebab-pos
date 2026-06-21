@@ -33,6 +33,7 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
+import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -126,6 +127,7 @@ export default function CashierBill() {
     return {
       ...orders[0],
       order_type: orderType,
+      price_mode: normalizePriceMode(firstOrder.price_mode),
       items:       mergedItems,
       subtotal:    summary.subtotal,
       service_fee: summary.serviceFee,
@@ -136,6 +138,7 @@ export default function CashierBill() {
 
   const table = state.tables.find(t => t.id === tableId)
   const orderType = inferOrderType(order)
+  const orderPriceMode = normalizePriceMode(order?.price_mode)
   const isOffPremise = isOffPremiseOrderType(orderType)
   const orderLabel = isOffPremise
     ? `${orderTypeLabel(orderType, lang)} · ${order?.order_number || order?.id || ''}`
@@ -602,6 +605,9 @@ export default function CashierBill() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h1 className="font-black text-[#1F2937] text-2xl leading-tight">{orderLabel}</h1>
                         <StatusBadge status={order.payment_status === 'paid' ? 'paid' : order.status} />
+                        <span className="rounded-full border border-orange-100 bg-orange-50 px-2.5 py-1 text-[11px] font-black text-[#ff5a00]">
+                          {lang === 'uz' ? 'Menyu turi' : lang === 'ru' ? 'Тип меню' : 'Menu type'}: {getPriceModeLabel(orderPriceMode, lang)}
+                        </span>
                       </div>
                       {isOffPremise && <p className="text-[11px] font-bold text-[#ff5a00] mt-0.5">{lbl.noTable}</p>}
                       <div className="flex items-center gap-3 mt-1 text-[11px] text-[#6B7280]">
@@ -653,6 +659,8 @@ export default function CashierBill() {
                     const millilitres = millilitresLabel(mi, lang)
                     const kcal = kcalLabel(mi, lang)
                     const isCounter = isCashierQuickItem(mi)
+                    const unitPrice = getOrderItemUnitPrice(item)
+                    const lineTotal = unitPrice * (Number(item.quantity) || 1)
                     return (
                       <div
                         key={i}
@@ -708,8 +716,8 @@ export default function CashierBill() {
                               <span className="inline-flex items-center justify-center bg-[#fff1e8] text-[#ff5a00] font-black text-[11px] rounded-lg px-2 py-0.5">
                                 ×{item.quantity}
                               </span>
-                              <span className="text-xs text-[#6B7280]">{formatCurrency(item.price)}</span>
-                              <span className="text-sm font-black text-[#1F2937]">{formatCurrency(item.price * item.quantity)}</span>
+                              <span className="text-xs text-[#6B7280]">{formatCurrency(unitPrice)}</span>
+                              <span className="text-sm font-black text-[#1F2937]">{formatCurrency(lineTotal)}</span>
                             </div>
                             {isCounter && (
                               <div className="mt-2 flex w-fit items-center gap-1 rounded-xl border border-[#FFE0CC] bg-[#fff7f2] p-1 sm:hidden">
@@ -769,13 +777,13 @@ export default function CashierBill() {
 
                         {/* Unit price */}
                         <div className="hidden sm:block col-span-2 text-right text-sm text-[#6B7280] font-medium">
-                          {formatCurrency(item.price)}
+                          {formatCurrency(unitPrice)}
                         </div>
 
                         {/* Line total */}
                         <div className="hidden sm:block col-span-2 text-right font-black text-sm text-[#1F2937]">
                           <div className="flex items-center justify-end gap-2">
-                            <span>{formatCurrency(item.price * item.quantity)}</span>
+                            <span>{formatCurrency(lineTotal)}</span>
                             {isCounter && (
                               <button
                                 type="button"
