@@ -77,7 +77,7 @@ export default function PublicMenu({ premium = false }) {
   const { itemId } = useParams()
   const navigate = useNavigate()
   const { state } = useApp()
-  const lang = state.lang || 'ru'
+  const appLang = state.lang || 'ru'
 
   const [categories, setCategories] = useState([])
   const [items, setItems] = useState([])
@@ -87,10 +87,11 @@ export default function PublicMenu({ premium = false }) {
   const [error, setError] = useState('')
   const [detailItem, setDetailItem] = useState(null)
   const [missingItemLink, setMissingItemLink] = useState(false)
-  const [menuCurrency, setMenuCurrency] = useState(() => getDefaultMenuCurrency())
+  const [premiumLang, setPremiumLang] = useState('en')
+  const [menuCurrency, setMenuCurrency] = useState(() => premium ? 'USD' : getDefaultMenuCurrency())
   const [currencyRates, setCurrencyRates] = useState({ UZS: 1 })
-  const [currencyLoading, setCurrencyLoading] = useState(false)
   const menuBasePath = premium ? '/premium-menu' : '/menu'
+  const lang = premium ? premiumLang : appLang
   const showDetailOverlay = Boolean(detailItem)
   const savedScrollRef = useRef(0)
 
@@ -143,13 +144,9 @@ export default function PublicMenu({ premium = false }) {
   useEffect(() => {
     if (menuCurrency === DEFAULT_MENU_CURRENCY) return
     let cancelled = false
-    setCurrencyLoading(true)
     loadMenuCurrencyRates()
       .then(rates => {
         if (!cancelled) setCurrencyRates(rates)
-      })
-      .finally(() => {
-        if (!cancelled) setCurrencyLoading(false)
       })
     return () => { cancelled = true }
   }, [menuCurrency])
@@ -207,13 +204,7 @@ export default function PublicMenu({ premium = false }) {
   const menuTitle = premium
     ? (lang === 'uz' ? 'Premium menyu' : lang === 'ru' ? 'Премиум меню' : 'Premium Menu')
     : (lang === 'uz' ? 'Menyu' : lang === 'ru' ? 'Меню' : 'Menu')
-  const menuSubtitle = premium
-    ? (lang === 'uz'
-        ? 'Turistlar uchun 20% yuqori narxlar.'
-        : lang === 'ru'
-          ? 'Цены для туристов на 20% выше.'
-          : 'Tourist prices are 20% higher.')
-    : (lang === 'uz' ? 'Buyurtma berish uchun ofitsiantga murojaat qiling.' : lang === 'ru' ? 'Для заказа обратитесь к официанту.' : 'Please ask your waiter to order.')
+  const menuSubtitle = premium ? '' : (lang === 'uz' ? 'Buyurtma berish uchun ofitsiantga murojaat qiling.' : lang === 'ru' ? 'Для заказа обратитесь к официанту.' : 'Please ask your waiter to order.')
 
   const categoryMap = useMemo(() => {
     const map = {}
@@ -238,7 +229,8 @@ export default function PublicMenu({ premium = false }) {
   }
 
   function changeMenuCurrency(currency) {
-    setMenuCurrency(saveMenuCurrency(normalizeMenuCurrency(currency)))
+    const normalized = normalizeMenuCurrency(currency)
+    setMenuCurrency(premium ? normalized : saveMenuCurrency(normalized))
   }
 
   return (
@@ -254,9 +246,11 @@ export default function PublicMenu({ premium = false }) {
             <p className="text-xs font-bold uppercase tracking-wider text-[#ff5a00]">
               {menuTitle}
             </p>
-            <p className="hidden text-xs font-semibold text-[#8A94A6] sm:block">
-              {menuSubtitle}
-            </p>
+            {menuSubtitle && (
+              <p className="hidden text-xs font-semibold text-[#8A94A6] sm:block">
+                {menuSubtitle}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <div className="hidden items-center gap-1 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-1 sm:flex">
@@ -301,7 +295,11 @@ export default function PublicMenu({ premium = false }) {
               <Instagram size={16} />
             </a>
           </div>
-          <LanguageSwitcher />
+          {premium ? (
+            <LanguageSwitcher value={lang} onChange={setPremiumLang} />
+          ) : (
+            <LanguageSwitcher />
+          )}
         </div>
       </header>
 
@@ -333,13 +331,6 @@ export default function PublicMenu({ premium = false }) {
               </button>
             ))}
           </div>
-          {menuCurrency !== 'UZS' && (
-            <p className="text-[11px] font-semibold text-[#9CA3AF] sm:w-[180px] sm:text-right">
-              {currencyLoading
-                ? (lang === 'uz' ? 'Kurs yuklanmoqda...' : lang === 'ru' ? 'Загружаем курс...' : 'Loading rates...')
-                : (lang === 'uz' ? 'Jonli kurs' : lang === 'ru' ? 'Текущий курс' : 'Live rates')}
-            </p>
-          )}
           </div>
         </div>
 

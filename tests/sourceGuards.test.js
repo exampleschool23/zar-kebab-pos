@@ -474,9 +474,17 @@ test('Premium public menu uses tourist pricing without duplicating menu items', 
 
   assert.match(app, /path="\/premium-menu"/)
   assert.match(publicMenu, /export default function PublicMenu\(\{ premium = false \}\)/)
+  assert.match(publicMenu, /const \[premiumLang, setPremiumLang\] = useState\('en'\)/)
+  assert.match(publicMenu, /useState\(\(\) => premium \? 'USD' : getDefaultMenuCurrency\(\)\)/)
+  assert.match(publicMenu, /const lang = premium \? premiumLang : appLang/)
+  assert.match(publicMenu, /<LanguageSwitcher value=\{lang\} onChange=\{setPremiumLang\} \/>/)
   assert.match(publicMenu, /getMenuItemForPriceMode\(item, 'tourist'\)/)
   assert.match(publicMenu, /Premium Menu/)
-  assert.match(publicMenu, /Tourist prices are 20% higher/)
+  assert.doesNotMatch(publicMenu, new RegExp('20% ' + 'higher'))
+  assert.doesNotMatch(publicMenu, /Turistlar uchun 20% yuqori narxlar/)
+  assert.doesNotMatch(publicMenu, /Цены для туристов на 20% выше/)
+  assert.doesNotMatch(publicMenu, new RegExp('Live ' + 'rates'))
+  assert.doesNotMatch(publicMenu, new RegExp('Saved ' + 'rates'))
 })
 
 test('MenuCategoryScroller collapsed chips do not overlap expanded category cards', () => {
