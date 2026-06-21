@@ -237,6 +237,18 @@ test('waiter cart edits stay local until send to kitchen', () => {
   assert.match(source, /'SEND_TO_KITCHEN'/)
 })
 
+test('waiter bill item quantity edits update optimistically', () => {
+  const source = readSource('src/store/AppContext.jsx')
+  const writeBeforeBlock = source.slice(
+    source.indexOf('const WRITE_BEFORE_LOCAL_ACTIONS'),
+    source.indexOf('const LOCAL_ONLY_ACTIONS')
+  )
+  const body = functionBody(source, 'dbDispatch')
+
+  assert.doesNotMatch(writeBeforeBlock, /'UPDATE_BILL_ITEM_QTY'/)
+  assert.match(body, /dispatch\(enriched\)[\s\S]*return writeWithIdleRecovery\(enriched, stateRef\.current\)/)
+})
+
 test('new signed-up users always start as guest', () => {
   const auth = readSource('src/contexts/AuthContext.jsx')
   const migration = readSource('supabase/024_profiles_force_guest_signup.sql')
