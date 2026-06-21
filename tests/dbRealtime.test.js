@@ -121,6 +121,39 @@ test('remote table updates show conflict feedback and refresh tables', async () 
   unsubscribe()
 })
 
+test('menu item realtime changes refresh menu prices in active sessions', async () => {
+  const dbClient = makeRealtimeClient()
+  const actions = []
+  const unsubscribe = subscribeToRealtime(action => actions.push(action), {
+    dbClient,
+    debounceMs: 0,
+    settingsLoader: async () => null,
+    menuCatalogLoader: async () => ({
+      categories: [{ id: 'shashlik', name_en: 'Shashlik' }],
+      menuItems: [{ id: 'beef', name_en: 'Beef Shashlik', price: 35000 }],
+    }),
+  })
+
+  assert.equal(typeof dbClient.handlers.get('menu_items'), 'function')
+
+  dbClient.handlers.get('menu_items')({ eventType: 'UPDATE' })
+  await new Promise(resolve => setTimeout(resolve, 5))
+
+  assert.deepEqual(actions, [
+    {
+      type: 'SET_CONNECTION_NOTICE',
+      payload: {
+        tone: 'info',
+        message: 'Changed by another device. Refreshed the latest data.',
+      },
+    },
+    { type: 'SET_CATEGORIES', payload: [{ id: 'shashlik', name_en: 'Shashlik' }] },
+    { type: 'SET_MENU_ITEMS', payload: [{ id: 'beef', name_en: 'Beef Shashlik', price: 35000 }] },
+  ])
+
+  unsubscribe()
+})
+
 test('realtime channel errors surface a connection notice', () => {
   const dbClient = makeRealtimeClient()
   const actions = []

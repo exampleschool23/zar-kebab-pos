@@ -491,6 +491,20 @@ async function loadTableZones(dbClient = supabase) {
   return data || []
 }
 
+export async function loadMenuCatalog(dbClient = supabase) {
+  const [categoriesRes, menuItemsRes] = await Promise.all([
+    dbClient.from('menu_categories').select('*').order('sort_order'),
+    dbClient.from('menu_items').select('*').order('sort_order'),
+  ])
+  if (categoriesRes.error) throw categoriesRes.error
+  if (menuItemsRes.error) throw menuItemsRes.error
+
+  return {
+    categories: categoriesRes.data || [],
+    menuItems: menuItemsRes.data || [],
+  }
+}
+
 async function fetchOrdersByPaymentStatus(paymentStatus, includeRecentPaidFilter = false) {
   const buildQuery = (select) => {
     let query = supabase.from('orders').select(select)
@@ -521,11 +535,10 @@ export async function loadOrders() {
 }
 
 export async function loadPOSData() {
-  const [tables, tableZones, categoriesRes, menuItemsRes, unpaidRes, paidRes, settings] = await Promise.all([
+  const [tables, tableZones, menuCatalog, unpaidRes, paidRes, settings] = await Promise.all([
     loadRestaurantTables(),
     loadTableZones(),
-    supabase.from('menu_categories').select('*').order('sort_order'),
-    supabase.from('menu_items').select('*').order('sort_order'),
+    loadMenuCatalog(),
     // All unpaid/active orders (no date limit)
     fetchOrdersByPaymentStatus('unpaid'),
     // Paid orders from the last 7 days (for revenue & best-sellers)
@@ -536,8 +549,8 @@ export async function loadPOSData() {
   return {
     tables,
     tableZones,
-    categories: categoriesRes.data || [],
-    menuItems:  menuItemsRes.data  || [],
+    categories: menuCatalog.categories,
+    menuItems:  menuCatalog.menuItems,
     orders:     [...(unpaidRes.data || []), ...(paidRes.data || [])],
     settings,
   }
@@ -548,6 +561,7 @@ export async function loadPOSData() {
 export function subscribeToRealtime(dispatch, options = {}) {
   const dbClient = options.dbClient || supabase
   const settingsLoader = options.settingsLoader || (() => loadBusinessSettings(dbClient))
+  const menuCatalogLoader = options.menuCatalogLoader || (() => loadMenuCatalog(dbClient))
   const debounceMs = options.debounceMs ?? 250
   const onConnectionIssue = options.onConnectionIssue || (() => {})
 
@@ -555,6 +569,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
   let ordersReloadInFlight = false
   let ordersReloadQueued = false
   let settingsReloadTimer = null
+  let menuReloadTimer = null
 
   function notifyRemoteChange(payload) {
     if (!payload || payload.eventType !== 'UPDATE') return
@@ -616,11 +631,27 @@ export function subscribeToRealtime(dispatch, options = {}) {
     }, debounceMs)
   }
 
+  function scheduleReloadMenu(payload) {
+    notifyRemoteChange(payload)
+    if (menuReloadTimer) clearTimeout(menuReloadTimer)
+    menuReloadTimer = setTimeout(() => {
+      menuReloadTimer = null
+      menuCatalogLoader()
+        .then(({ categories, menuItems }) => {
+          dispatch({ type: 'SET_CATEGORIES', payload: categories })
+          dispatch({ type: 'SET_MENU_ITEMS', payload: menuItems })
+        })
+        .catch(err => console.error('[db] realtime menu reload failed:', err))
+    }, debounceMs)
+  }
+
   const channel = dbClient
     .channel(`pos-realtime-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_payments' }, scheduleReloadOrders)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, scheduleReloadMenu)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, scheduleReloadMenu)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, reloadTables)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'table_zones' }, reloadTableZones)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'business_settings' }, scheduleReloadSettings)
@@ -643,6 +674,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
   return () => {
     if (ordersReloadTimer) clearTimeout(ordersReloadTimer)
     if (settingsReloadTimer) clearTimeout(settingsReloadTimer)
+    if (menuReloadTimer) clearTimeout(menuReloadTimer)
     dbClient.removeChannel(channel)
   }
 }

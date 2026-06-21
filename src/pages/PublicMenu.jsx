@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Instagram, Phone, Search, Send, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -94,39 +94,56 @@ export default function PublicMenu({ premium = false }) {
   const lang = premium ? premiumLang : appLang
   const showDetailOverlay = Boolean(detailItem)
   const savedScrollRef = useRef(0)
+  const menuLoadSeqRef = useRef(0)
+
+  const refreshPublicMenu = useCallback(async ({ showLoading = false } = {}) => {
+    const seq = menuLoadSeqRef.current + 1
+    menuLoadSeqRef.current = seq
+    if (showLoading) setLoading(true)
+    setError('')
+    try {
+      const data = await loadPublicMenuData()
+      if (menuLoadSeqRef.current !== seq) return
+      if (data.source === 'direct' && data.categories.length === 0 && data.items.length === 0 && data.rpcError) {
+        throw new Error('Public menu SQL has not been applied yet. Run supabase/009_guest_public_menu.sql.')
+      }
+      setCategories(data.categories)
+      setItems(data.items)
+    } catch (err) {
+      if (menuLoadSeqRef.current !== seq) return
+      console.error('[guest-menu] failed to load public menu', err)
+      setError(
+        lang === 'uz'
+          ? 'Menyuni yuklab bo‘lmadi.'
+          : lang === 'ru'
+            ? 'Не удалось загрузить меню.'
+            : 'Could not load the menu.'
+      )
+    } finally {
+      if (menuLoadSeqRef.current === seq) setLoading(false)
+    }
+  }, [lang])
 
   useEffect(() => {
-    let cancelled = false
+    refreshPublicMenu({ showLoading: true })
+  }, [refreshPublicMenu])
 
-    async function loadMenu() {
-      setLoading(true)
-      setError('')
-      try {
-        const data = await loadPublicMenuData()
-        if (cancelled) return
-        if (data.source === 'direct' && data.categories.length === 0 && data.items.length === 0 && data.rpcError) {
-          throw new Error('Public menu SQL has not been applied yet. Run supabase/009_guest_public_menu.sql.')
-        }
-        setCategories(data.categories)
-        setItems(data.items)
-      } catch (err) {
-        if (cancelled) return
-        console.error('[guest-menu] failed to load public menu', err)
-        setError(
-          lang === 'uz'
-            ? 'Menyuni yuklab bo‘lmadi.'
-            : lang === 'ru'
-              ? 'Не удалось загрузить меню.'
-              : 'Could not load the menu.'
-        )
-      } finally {
-        if (!cancelled) setLoading(false)
+  useEffect(() => {
+    function refreshWhenActive() {
+      if (document.visibilityState === 'visible') {
+        refreshPublicMenu({ showLoading: false })
       }
     }
 
-    loadMenu()
-    return () => { cancelled = true }
-  }, [lang])
+    document.addEventListener('visibilitychange', refreshWhenActive)
+    window.addEventListener('focus', refreshWhenActive)
+    window.addEventListener('online', refreshWhenActive)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenActive)
+      window.removeEventListener('focus', refreshWhenActive)
+      window.removeEventListener('online', refreshWhenActive)
+    }
+  }, [refreshPublicMenu])
 
   useEffect(() => {
     if (loading) return

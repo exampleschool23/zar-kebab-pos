@@ -305,6 +305,21 @@ test('realtime subscription uses unique channel names', () => {
   assert.doesNotMatch(source, /\.channel\('pos-realtime'\)/)
 })
 
+test('menu price changes refresh active staff and public menu sessions', () => {
+  const db = readSource('src/lib/db.js')
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+
+  assert.match(db, /export async function loadMenuCatalog/)
+  assert.match(db, /table: 'menu_items' \}, scheduleReloadMenu/)
+  assert.match(db, /table: 'menu_categories' \}, scheduleReloadMenu/)
+  assert.match(db, /dispatch\(\{ type: 'SET_MENU_ITEMS', payload: menuItems \}\)/)
+  assert.match(publicMenu, /useCallback/)
+  assert.match(publicMenu, /refreshPublicMenu\(\{ showLoading: false \}\)/)
+  assert.match(publicMenu, /document\.addEventListener\('visibilitychange', refreshWhenActive\)/)
+  assert.match(publicMenu, /window\.addEventListener\('focus', refreshWhenActive\)/)
+  assert.match(publicMenu, /window\.addEventListener\('online', refreshWhenActive\)/)
+})
+
 test('AppContext recovers Supabase after browser idle or resume', () => {
   const appContext = readSource('src/store/AppContext.jsx')
   const db = readSource('src/lib/db.js')
