@@ -391,6 +391,8 @@ test('public and waiter menu cards stay dense enough for tablet browsing', () =>
 
   assert.match(productCards, /showCompactPublicCard \? 'aspect-\[4\/3\]/)
   assert.match(productCards, /dense \? 'aspect-\[2\/1\]/)
+  assert.match(productCards, /group flex h-full flex-col/)
+  assert.match(productCards, /showCompactPublicCard \? 'mt-auto mb-0 items-end pt-2'/)
   assert.match(productCards, /pricing\.discounted \? 'text-red-600' : 'text-\[#ff5a00\]'/)
   assert.match(publicMenu, /grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4/)
   assert.match(waiterOrder, /density="compact"/)
@@ -568,7 +570,9 @@ test('PublicMenu enables tappable fixed collapsed categories', () => {
   assert.match(source, /collapsedClassName="z-50/)
   assert.match(source, /scrollOffset=\{64\}/)
   assert.match(source, /px-4 pb-5 pt-2 sm:px-6/)
-  assert.match(source, /className="mb-7 mt-0 rounded-\[28px\]/)
+  assert.match(source, /flex min-w-0 flex-1 flex-wrap items-center/)
+  assert.match(source, /className="mb-6 mt-0 rounded-\[24px\]/)
+  assert.doesNotMatch(source, /variant="overlay"/)
   assert.match(source, /categories\.filter\(category => \(itemCounts\[category\.id\] \|\| 0\) > 0\)/)
   assert.doesNotMatch(source, /px-4 py-5 sm:px-6/)
   assert.doesNotMatch(source, /className="mb-7 mt-3 rounded-\[28px\]/)
@@ -912,7 +916,7 @@ test('AnimatedSearch provides reusable smooth expandable search controls', () =>
   assert.match(source, /scale-x-100/)
   assert.match(source, /scale-x-\[0\.08\]/)
   assert.match(source, /requestAnimationFrame\(\(\) => inputRef\.current\?\.focus\(\)\)/)
-  assert.match(publicMenu, /variant="overlay"/)
+  assert.doesNotMatch(publicMenu, /variant="overlay"/)
   assert.match(waiterOrder, /<AnimatedSearch/)
 })
 

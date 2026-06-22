@@ -56,7 +56,7 @@ function LargeCategoryCard({ category, active, title, onClick }) {
         )}
       </div>
 
-      <div className="flex min-h-[42px] items-center justify-center px-1.5 py-1.5 sm:min-h-[48px] sm:px-2 md:min-h-[52px] lg:min-h-[54px] xl:min-h-[58px] xl:px-2.5 xl:py-2.5">
+      <div className="flex min-h-[38px] items-center justify-center px-1.5 py-1.5 sm:min-h-[48px] sm:px-2 md:min-h-[52px] lg:min-h-[54px] xl:min-h-[58px] xl:px-2.5 xl:py-2.5">
         <p className={`line-clamp-2 text-[11px] font-extrabold leading-tight sm:text-[12px] md:text-[13px] xl:text-sm ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
           {title}
         </p>
@@ -233,7 +233,7 @@ export default function MenuCategoryScroller({
   return (
     <>
       <div ref={sentinelRef} className={className}>
-        <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:gap-3" style={{ scrollbarWidth: 'none' }}>
           {cards.map(category => {
             const title = titleFor(category)
             return (

@@ -161,7 +161,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onOpenDetail(item)}
-      className={`group flex flex-col overflow-hidden bg-white transition-all cursor-pointer select-none ${
+      className={`group flex h-full flex-col overflow-hidden bg-white transition-all cursor-pointer select-none ${
         inCart
           ? 'rounded-[18px] border-2 border-[#ff5a00]/40 shadow-md shadow-orange-100/60'
           : showCompactPublicCard
@@ -206,7 +206,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         {!showCompactPublicCard && getItemDesc(item, lang) && (
           <FadingMenuDescription text={getItemDesc(item, lang)} className={`${dense ? 'text-[11px] mb-1' : 'text-[12px] mb-1.5'} text-[#9CA3AF]`} />
         )}
-        <div className={`${showCompactPublicCard ? 'mt-2 mb-0 items-end' : dense ? 'mb-2 items-start' : 'mb-2.5 items-start'} flex justify-between gap-2`}>
+        <div className={`${showCompactPublicCard ? 'mt-auto mb-0 items-end pt-2' : dense ? 'mt-auto mb-2 items-start pt-1' : 'mt-auto mb-2.5 items-start pt-1'} flex justify-between gap-2`}>
           <div className="min-w-0">
             {pricing.discounted && (
               <p className={`${showCompactPublicCard ? 'text-[13px]' : 'text-[12px]'} font-bold text-[#9CA3AF] line-through`}>{formatPrice(pricing.oldPrice)}</p>

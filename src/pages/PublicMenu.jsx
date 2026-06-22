@@ -324,7 +324,7 @@ export default function PublicMenu({ premium = false }) {
     <div className="min-h-screen bg-white text-[#1F2937]" style={{ paddingTop: headerOffset }}>
       <header ref={headerRef} className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
         <div className="relative mx-auto flex max-w-[1280px] flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3 pr-0 lg:pr-36">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 pr-0 lg:pr-36">
             <div className="flex flex-shrink-0 items-center gap-3">
               <img
                 src={getBrandLogo(lang)}
@@ -342,7 +342,6 @@ export default function PublicMenu({ premium = false }) {
               searchLabel={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
               clearLabel={lang === 'uz' ? 'Qidiruvni tozalash' : lang === 'ru' ? 'Очистить поиск' : 'Clear search'}
               closeLabel={lang === 'uz' ? 'Qidiruvni yopish' : lang === 'ru' ? 'Закрыть поиск' : 'Close search'}
-              variant="overlay"
             />
           </div>
 
@@ -378,7 +377,7 @@ export default function PublicMenu({ premium = false }) {
           sectionPrefix="public-menu-category"
           topOffset={headerOffset}
           scrollOffset={64}
-          className="mb-7 mt-0 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm"
+          className="mb-6 mt-0 rounded-[24px] border border-[#E5E7EB] bg-white p-3 shadow-sm sm:mb-7 sm:rounded-[28px] sm:p-4"
           collapsedPosition="fixed"
           collapsedSurfaceClass="bg-white/95"
           collapsedClassName="z-50 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1280px] sm:-translate-x-1/2"
