@@ -12,6 +12,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
 import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
+import AnimatedSearch from '../components/AnimatedSearch'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import { ProductCard, ProductDetailPage } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
@@ -449,7 +450,7 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
           {items.length}
         </span>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
         {items.map((item, index) => (
           <ProductCard
             key={item.id}
@@ -457,6 +458,7 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
             qty={cartQtyMap[item.id] || 0}
             lang={lang}
             eager={index < eagerCount}
+            density="compact"
             onAdd={onAdd}
             onIncrement={onIncrement}
             onDecrement={onDecrement}
@@ -851,25 +853,18 @@ export default function WaiterOrder() {
             ))}
           </div>
 
-          <div className="relative order-last min-w-full flex-1 sm:order-none sm:min-w-[180px]">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] pointer-events-none" />
-            <input
-              type="text"
-              placeholder={lang === 'uz' ? 'Menyu qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-9 py-2.5 bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl text-[14px] text-[#1F2937] placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] focus:bg-white transition-all"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#6B7280]">
-                <X size={14} />
-              </button>
-            )}
-          </div>
+          <AnimatedSearch
+            value={search}
+            onChange={setSearch}
+            placeholder={lang === 'uz' ? 'Menyu qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
+            searchLabel={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
+            clearLabel={lang === 'uz' ? 'Qidiruvni tozalash' : lang === 'ru' ? 'Очистить поиск' : 'Clear search'}
+            closeLabel={lang === 'uz' ? 'Qidiruvni yopish' : lang === 'ru' ? 'Закрыть поиск' : 'Close search'}
+          />
 
           <button
             onClick={() => setCartOpen(true)}
-            className={`relative flex-shrink-0 rounded-xl border font-black transition-all active:scale-[0.98] ${
+            className={`relative ml-auto flex-shrink-0 rounded-xl border font-black transition-all active:scale-[0.98] ${
               cartCount > 0
                 ? 'bg-[#ff5a00] border-[#ff5a00] text-white shadow-md shadow-orange-100 hover:bg-[#e64d00]'
                 : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-orange-200 hover:bg-orange-50'
@@ -965,7 +960,7 @@ export default function WaiterOrder() {
             </div>
           ) : (
             // Flat grid for specific category or search results
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
               {pricedFilteredItems.map((item, index) => (
                 <ProductCard
                   key={item.id}
@@ -973,6 +968,7 @@ export default function WaiterOrder() {
                   qty={cartQtyMap[item.id] || 0}
                   lang={lang}
                   eager={index < 8}
+                  density="compact"
                   onAdd={handleAdd}
                   onIncrement={handleIncrement}
                   onDecrement={handleDecrement}

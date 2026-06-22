@@ -378,6 +378,18 @@ test('PublicMenu exposes public contact actions', () => {
   assert.doesNotMatch(publicMenu, /PUBLIC_CONTACTS\.phone\.label\}<\/span>/)
 })
 
+test('public and waiter menu cards stay dense enough for tablet browsing', () => {
+  const productCards = readSource('src/components/MenuProductCards.jsx')
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
+
+  assert.match(productCards, /showCompactPublicCard \? 'aspect-\[4\/3\]/)
+  assert.match(productCards, /dense \? 'aspect-\[2\/1\]/)
+  assert.match(publicMenu, /grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4/)
+  assert.match(waiterOrder, /density="compact"/)
+  assert.doesNotMatch(productCards, /showCompactPublicCard \? 'aspect-square/)
+})
+
 test('cashier-only menu items are hidden from customer menus but available to cashier quick items', () => {
   const adminMenu = readSource('src/pages/AdminMenu.jsx')
   const publicMenu = readSource('src/pages/PublicMenu.jsx')
@@ -506,13 +518,23 @@ test('MenuCategoryScroller collapsed chips do not overlap expanded category card
   const source = readSource('src/components/MenuCategoryScroller.jsx')
 
   assert.doesNotMatch(source, /-mt-\[61px\]/)
-  assert.match(source, /const COLLAPSED_BAR_HEIGHT = 72/)
-  assert.match(source, /const FIXED_COLLAPSED_GAP = 12/)
+  assert.match(source, /const COLLAPSED_BAR_HEIGHT = 56/)
+  assert.match(source, /flex h-11 w-auto/)
+  assert.match(source, /py-1\.5/)
+  assert.match(source, /const COLLAPSE_SHOW_OFFSET = 61/)
+  assert.match(source, /const COLLAPSE_HIDE_OFFSET = 28/)
   assert.match(source, /maxHeight: collapsedPosition === 'fixed' \|\| collapsed \? COLLAPSED_BAR_HEIGHT : 0/)
-  assert.match(source, /height: collapsed \? COLLAPSED_BAR_HEIGHT \+ FIXED_COLLAPSED_GAP : 0/)
+  assert.doesNotMatch(source, /height: collapsed \? COLLAPSED_BAR_HEIGHT/)
+  assert.match(source, /setCollapsed\(isCollapsed =>/)
   assert.match(source, /scrollOffset \+ 8/)
   assert.doesNotMatch(source, /\+ 82/)
   assert.match(source, /aria-pressed=\{active\}/)
+  assert.match(source, /rounded-\[18px\]/)
+  assert.match(source, /rounded-t-\[16px\]/)
+  assert.match(source, /rounded-b-\[16px\]/)
+  assert.match(source, /if \(scrollToCategory\(category\.id\)\) \{/)
+  assert.match(source, /return true/)
+  assert.match(source, /if \(!section\) return false/)
 })
 
 test('MenuCategoryScroller scrolls inside the nearest app content scroller', () => {
@@ -527,9 +549,18 @@ test('MenuCategoryScroller scrolls inside the nearest app content scroller', () 
 test('PublicMenu enables tappable fixed collapsed categories', () => {
   const source = readSource('src/pages/PublicMenu.jsx')
 
+  assert.match(source, /const headerRef = useRef\(null\)/)
+  assert.match(source, /getBoundingClientRect\(\)\.height/)
+  assert.match(source, /new ResizeObserver\(updateHeaderOffset\)/)
+  assert.match(source, /<header ref=\{headerRef\}/)
   assert.match(source, /collapsedPosition="fixed"/)
   assert.match(source, /collapsedClassName="z-50/)
   assert.match(source, /scrollOffset=\{116\}/)
+  assert.match(source, /px-4 pb-5 pt-2 sm:px-6/)
+  assert.match(source, /className="mb-7 mt-0 rounded-\[28px\]/)
+  assert.match(source, /categories\.filter\(category => \(itemCounts\[category\.id\] \|\| 0\) > 0\)/)
+  assert.doesNotMatch(source, /px-4 py-5 sm:px-6/)
+  assert.doesNotMatch(source, /className="mb-7 mt-3 rounded-\[28px\]/)
 })
 
 test('menu item discounts use old_price for display and public deals', () => {
@@ -854,7 +885,33 @@ test('WaiterOrder shows the current table or order type in the header', () => {
   assert.match(source, /table\?\.name \|\| table\?\.label/)
   assert.match(source, /\{orderContextLabel\}/)
   assert.match(source, /\{orderTitle\}/)
-  assert.match(source, /order-last min-w-full flex-1 sm:order-none/)
+  assert.match(source, /import AnimatedSearch/)
+  assert.match(source, /<AnimatedSearch/)
+  assert.match(source, /onChange=\{setSearch\}/)
+})
+
+test('AnimatedSearch provides reusable smooth expandable search controls', () => {
+  const source = readSource('src/components/AnimatedSearch.jsx')
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
+
+  assert.match(source, /variant = 'inline'/)
+  assert.match(source, /variant === 'overlay'/)
+  assert.match(source, /transition-all duration-200 ease-out/)
+  assert.match(source, /scale-x-100/)
+  assert.match(source, /scale-x-\[0\.08\]/)
+  assert.match(source, /requestAnimationFrame\(\(\) => inputRef\.current\?\.focus\(\)\)/)
+  assert.match(publicMenu, /variant="overlay"/)
+  assert.match(waiterOrder, /<AnimatedSearch/)
+})
+
+test('WaiterOrder keeps tablet product grids at three columns', () => {
+  const source = readSource('src/pages/WaiterOrder.jsx')
+  const productSection = functionBody(source, 'ProductSection')
+
+  assert.match(productSection, /grid grid-cols-2 min-\[700px\]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
+  assert.match(source, /grid grid-cols-2 min-\[700px\]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
+  assert.doesNotMatch(source, /grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
 })
 
 test('WaiterOrder lets active and requested-bill order items be quantity-adjusted', () => {
@@ -1628,7 +1685,7 @@ test('menu items support and display nutrition values', () => {
   assert.match(adminMenu, /Math\.max\(0, Math\.round\(Number\(form\.stock_count\) \|\| 0\)\)/)
   assert.match(adminMenu, /stock_count: i\.stock_count \?\? i\.stockCount \?\? 0/)
   assert.match(adminMenu, /Shelf count/)
-  assert.match(categoryScroller, /text-sm font-black tabular-nums/)
+  assert.match(categoryScroller, /text-\[12px\] font-black tabular-nums/)
   for (const source of [adminMenu, productCards, cartPanel, kitchen, cashierBill, reports, telegramMiniApp]) {
     assert.match(source, /kcalLabel/)
     assert.match(source, /gramsLabel/)

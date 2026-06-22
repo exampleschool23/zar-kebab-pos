@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Instagram, Phone, Search, Send, UtensilsCrossed } from 'lucide-react'
+import { Instagram, Phone, Send, UtensilsCrossed } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
@@ -19,6 +19,7 @@ import { useApp } from '../store/AppContext'
 import { findMenuItemByLinkKey, getMenuItemPublicPath } from '../lib/menuLinks'
 import { getMenuItemForPriceMode } from '../lib/priceModes'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import AnimatedSearch from '../components/AnimatedSearch'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import {
   ProductCard as MenuProductCard,
@@ -38,6 +39,57 @@ const PUBLIC_CONTACTS = {
     label: '@zarkebab',
     href: 'https://www.instagram.com/zarkebab',
   },
+}
+
+function HeaderSelect({ value, onChange, options, ariaLabel, className = '' }) {
+  return (
+    <label className={`relative inline-flex h-9 items-center rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-xs font-black text-[#1F2937] shadow-sm transition-colors hover:bg-white ${className}`}>
+      <select
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        aria-label={ariaLabel}
+        className="h-full appearance-none rounded-xl bg-transparent px-3 py-0 text-xs font-black uppercase outline-none"
+      >
+        {options.map(option => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function PublicContactButtons({ className = '' }) {
+  return (
+    <div className={`flex items-center justify-center gap-1.5 ${className}`}>
+      <a
+        href={PUBLIC_CONTACTS.telegram.href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={PUBLIC_CONTACTS.telegram.label}
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-700 transition-colors hover:bg-sky-100"
+      >
+        <Send size={16} />
+      </a>
+      <a
+        href={PUBLIC_CONTACTS.phone.href}
+        aria-label={PUBLIC_CONTACTS.phone.label}
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
+      >
+        <Phone size={16} />
+      </a>
+      <a
+        href={PUBLIC_CONTACTS.instagram.href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={PUBLIC_CONTACTS.instagram.label}
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100"
+      >
+        <Instagram size={16} />
+      </a>
+    </div>
+  )
 }
 
 async function loadPublicMenuData() {
@@ -87,12 +139,14 @@ export default function PublicMenu({ premium = false }) {
   const [error, setError] = useState('')
   const [detailItem, setDetailItem] = useState(null)
   const [missingItemLink, setMissingItemLink] = useState(false)
+  const [headerOffset, setHeaderOffset] = useState(() => globalThis.window?.innerWidth < 640 ? 122 : 73)
   const [premiumLang, setPremiumLang] = useState('en')
   const [menuCurrency, setMenuCurrency] = useState(() => premium ? 'USD' : getDefaultMenuCurrency())
   const [currencyRates, setCurrencyRates] = useState({ UZS: 1 })
   const menuBasePath = premium ? '/premium-menu' : '/menu'
   const lang = premium ? premiumLang : appLang
   const showDetailOverlay = Boolean(detailItem)
+  const headerRef = useRef(null)
   const savedScrollRef = useRef(0)
   const menuLoadSeqRef = useRef(0)
 
@@ -112,21 +166,36 @@ export default function PublicMenu({ premium = false }) {
     } catch (err) {
       if (menuLoadSeqRef.current !== seq) return
       console.error('[guest-menu] failed to load public menu', err)
-      setError(
-        lang === 'uz'
-          ? 'Menyuni yuklab bo‘lmadi.'
-          : lang === 'ru'
-            ? 'Не удалось загрузить меню.'
-            : 'Could not load the menu.'
-      )
+      setError('load_failed')
     } finally {
       if (menuLoadSeqRef.current === seq) setLoading(false)
     }
-  }, [lang])
+  }, [])
 
   useEffect(() => {
     refreshPublicMenu({ showLoading: true })
   }, [refreshPublicMenu])
+
+  useEffect(() => {
+    function updateHeaderOffset() {
+      const header = headerRef.current
+      const measuredHeight = header ? Math.ceil(header.getBoundingClientRect().height) : 0
+      setHeaderOffset(measuredHeight || (window.innerWidth < 640 ? 122 : 73))
+    }
+
+    updateHeaderOffset()
+    const observer = typeof ResizeObserver !== 'undefined' && headerRef.current
+      ? new ResizeObserver(updateHeaderOffset)
+      : null
+    observer?.observe(headerRef.current)
+    const frame = requestAnimationFrame(updateHeaderOffset)
+    window.addEventListener('resize', updateHeaderOffset)
+    return () => {
+      cancelAnimationFrame(frame)
+      observer?.disconnect()
+      window.removeEventListener('resize', updateHeaderOffset)
+    }
+  }, [])
 
   useEffect(() => {
     function refreshWhenActive() {
@@ -169,7 +238,6 @@ export default function PublicMenu({ premium = false }) {
   }, [menuCurrency])
 
   const q = search.trim().toLowerCase()
-  const categoryCards = useMemo(() => [{ id: 'all' }, ...categories], [categories])
   const displayItems = useMemo(
     () => premium ? items.map(item => getMenuItemForPriceMode(item, 'tourist')) : items,
     [items, premium]
@@ -179,6 +247,10 @@ export default function PublicMenu({ premium = false }) {
     displayItems.forEach(item => { counts[item.category_id] = (counts[item.category_id] || 0) + 1 })
     return counts
   }, [displayItems])
+  const categoryCards = useMemo(
+    () => [{ id: 'all' }, ...categories.filter(category => (itemCounts[category.id] || 0) > 0)],
+    [categories, itemCounts]
+  )
 
   const filteredItems = useMemo(() => {
     return displayItems.filter(item => {
@@ -221,8 +293,6 @@ export default function PublicMenu({ premium = false }) {
   const menuTitle = premium
     ? (lang === 'uz' ? 'Premium menyu' : lang === 'ru' ? 'Премиум меню' : 'Premium Menu')
     : (lang === 'uz' ? 'Menyu' : lang === 'ru' ? 'Меню' : 'Menu')
-  const menuSubtitle = premium ? '' : (lang === 'uz' ? 'Buyurtma berish uchun ofitsiantga murojaat qiling.' : lang === 'ru' ? 'Для заказа обратитесь к официанту.' : 'Please ask your waiter to order.')
-
   const categoryMap = useMemo(() => {
     const map = {}
     categories.forEach(cat => { map[cat.id] = cat })
@@ -251,66 +321,43 @@ export default function PublicMenu({ premium = false }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF6EE] pt-[73px] text-[#1F2937]">
-      <header className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1180px] items-center gap-4 px-4 py-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <img
-              src={getBrandLogo(lang)}
-              alt="Zar Kebab"
-              className="h-12 w-auto max-w-[150px] object-contain"
-            />
-            <p className="text-xs font-bold uppercase tracking-wider text-[#ff5a00]">
-              {menuTitle}
-            </p>
-            {menuSubtitle && (
-              <p className="hidden text-xs font-semibold text-[#8A94A6] sm:block">
-                {menuSubtitle}
+    <div className="min-h-screen bg-white text-[#1F2937]" style={{ paddingTop: headerOffset }}>
+      <header ref={headerRef} className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
+        <div className="relative mx-auto flex max-w-[1280px] flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3 pr-0 lg:pr-36">
+            <div className="flex flex-shrink-0 items-center gap-3">
+              <img
+                src={getBrandLogo(lang)}
+                alt="Zar Kebab"
+                className="h-12 w-auto max-w-[150px] object-contain"
+              />
+              <p className="text-xs font-bold uppercase tracking-wider text-[#ff5a00]">
+                ZarKebab
               </p>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="hidden items-center gap-1 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-1 sm:flex">
-              {MENU_CURRENCIES.map(currency => (
-                <button
-                  key={currency}
-                  type="button"
-                  onClick={() => changeMenuCurrency(currency)}
-                  className={`h-7 rounded-lg px-2.5 text-[11px] font-black transition-colors ${
-                    menuCurrency === currency
-                      ? 'bg-white text-[#ff5a00] shadow-sm'
-                      : 'text-[#6B7280] hover:text-[#1F2937]'
-                  }`}
-                >
-                  {currency}
-                </button>
-              ))}
             </div>
-            <a
-              href={PUBLIC_CONTACTS.telegram.href}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={PUBLIC_CONTACTS.telegram.label}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-700 transition-colors hover:bg-sky-100"
-            >
-              <Send size={16} />
-            </a>
-            <a
-              href={PUBLIC_CONTACTS.phone.href}
-              aria-label={PUBLIC_CONTACTS.phone.label}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
-            >
-              <Phone size={16} />
-            </a>
-            <a
-              href={PUBLIC_CONTACTS.instagram.href}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={PUBLIC_CONTACTS.instagram.label}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100"
-            >
-              <Instagram size={16} />
-            </a>
+            <AnimatedSearch
+              value={search}
+              onChange={setSearch}
+              placeholder={lang === 'uz' ? 'Menyudan qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
+              searchLabel={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
+              clearLabel={lang === 'uz' ? 'Qidiruvni tozalash' : lang === 'ru' ? 'Очистить поиск' : 'Clear search'}
+              closeLabel={lang === 'uz' ? 'Qidiruvni yopish' : lang === 'ru' ? 'Закрыть поиск' : 'Close search'}
+              variant="overlay"
+            />
+          </div>
+
+          <PublicContactButtons className="order-last w-full sm:absolute sm:left-1/2 sm:top-1/2 sm:order-none sm:w-auto sm:-translate-x-1/2 sm:-translate-y-1/2" />
+
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            <HeaderSelect
+              value={menuCurrency}
+              onChange={changeMenuCurrency}
+              options={MENU_CURRENCIES.map(currency => ({
+                value: currency,
+                label: currency === 'UZS' ? '🇺🇿 UZS' : currency === 'USD' ? '🇺🇸 USD' : '🇪🇺 EUR',
+              }))}
+              ariaLabel={lang === 'uz' ? 'Valyuta' : lang === 'ru' ? 'Валюта' : 'Currency'}
+            />
           </div>
           {premium ? (
             <LanguageSwitcher value={lang} onChange={setPremiumLang} />
@@ -320,37 +367,7 @@ export default function PublicMenu({ premium = false }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1180px] px-4 py-5">
-        <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={lang === 'uz' ? 'Menyudan qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
-              className="w-full rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] py-3 pl-11 pr-4 text-sm outline-none transition-all focus:border-[#ff5a00] focus:bg-white focus:ring-2 focus:ring-[#ff5a00]/15"
-            />
-          </div>
-          <div className="flex items-center gap-1 rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] p-1 sm:hidden">
-            {MENU_CURRENCIES.map(currency => (
-              <button
-                key={currency}
-                type="button"
-                onClick={() => changeMenuCurrency(currency)}
-                className={`h-9 flex-1 rounded-xl px-2 text-[12px] font-black transition-colors ${
-                  menuCurrency === currency
-                    ? 'bg-white text-[#ff5a00] shadow-sm'
-                    : 'text-[#6B7280]'
-                }`}
-              >
-                {currency}
-              </button>
-            ))}
-          </div>
-          </div>
-        </div>
-
+      <main className="mx-auto max-w-[1280px] px-4 pb-5 pt-2 sm:px-6">
         <MenuCategoryScroller
           categories={categoryCards}
           activeCategoryId={activeCategory}
@@ -359,29 +376,35 @@ export default function PublicMenu({ premium = false }) {
           lang={lang}
           itemCounts={itemCounts}
           sectionPrefix="public-menu-category"
-          topOffset={73}
+          topOffset={headerOffset}
           scrollOffset={116}
-          className="mb-5 mt-3 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm"
+          className="mb-7 mt-0 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm"
           collapsedPosition="fixed"
-          collapsedClassName="z-50 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1180px] sm:-translate-x-1/2"
+          collapsedSurfaceClass="bg-white/95"
+          collapsedClassName="z-50 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1280px] sm:-translate-x-1/2"
         />
 
         {loading ? (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, idx) => (
-              <div key={idx} className="overflow-hidden rounded-[24px] border border-[#E5E7EB] bg-white shadow-sm">
+              <div key={idx} className="overflow-hidden rounded-[18px] border border-[#E5E7EB] bg-white shadow-sm">
                 <div className="aspect-[4/3] animate-pulse bg-orange-50" />
-                <div className="space-y-3 p-4">
+                <div className="space-y-2.5 p-3">
                   <div className="h-4 w-2/3 animate-pulse rounded bg-gray-100" />
-                  <div className="h-3 w-full animate-pulse rounded bg-gray-100" />
-                  <div className="h-3 w-1/2 animate-pulse rounded bg-gray-100" />
+                  <div className="h-5 w-1/2 animate-pulse rounded bg-gray-100" />
                 </div>
               </div>
             ))}
           </div>
         ) : error ? (
           <div className="rounded-[28px] border border-red-100 bg-red-50 p-10 text-center">
-            <p className="font-semibold text-red-700">{error}</p>
+            <p className="font-semibold text-red-700">
+              {lang === 'uz'
+                ? 'Menyuni yuklab bo‘lmadi.'
+                : lang === 'ru'
+                  ? 'Не удалось загрузить меню.'
+                  : 'Could not load the menu.'}
+            </p>
             <button
               onClick={() => window.location.reload()}
               className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-black text-red-700 shadow-sm"
@@ -421,7 +444,7 @@ export default function PublicMenu({ premium = false }) {
           </div>
         ) : (
           groupedSections ? (
-            <div className="space-y-8">
+            <div className="space-y-7">
               {dealItems.length > 0 && (
                 <section id="public-menu-deals" className="scroll-mt-32">
                   <div className="mb-3 flex items-center gap-2.5">
@@ -501,7 +524,7 @@ export default function PublicMenu({ premium = false }) {
         )}
       </main>
       {showDetailOverlay && (
-        <div className="fixed inset-0 z-[80] bg-[#FAF6EE]">
+        <div className="fixed inset-0 z-[80] bg-white">
           <MenuProductDetailPage
             item={detailItem}
             category={categoryMap[detailItem.category_id]}

@@ -1,6 +1,12 @@
 import React from 'react'
 import { useApp } from '../store/AppContext'
 
+const LANGUAGE_LABELS = {
+  uz: '🇺🇿 UZ',
+  ru: '🇷🇺 RU',
+  en: '🇬🇧 EN',
+}
+
 export default function LanguageSwitcher({ value, onChange }) {
   const { state, dispatch } = useApp()
   const activeLang = value || state.lang
@@ -14,20 +20,22 @@ export default function LanguageSwitcher({ value, onChange }) {
   }
 
   return (
-    <div className="flex gap-1">
+    <label className="relative inline-flex h-9 items-center rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-xs font-black text-[#1F2937] shadow-sm transition-colors hover:bg-white">
+      <select
+        value={activeLang}
+        onChange={event => changeLanguage(event.target.value)}
+        aria-label={activeLang === 'uz' ? 'Til' : activeLang === 'ru' ? 'Язык' : 'Language'}
+        className="h-full appearance-none rounded-xl bg-transparent px-3 py-0 text-xs font-black uppercase outline-none"
+      >
       {['uz', 'ru', 'en'].map(l => (
-        <button
+        <option
           key={l}
-          onClick={() => changeLanguage(l)}
-          className={`px-2 py-1 rounded-lg text-xs font-bold uppercase transition-colors ${
-            activeLang === l
-              ? 'bg-brand text-white'
-              : 'bg-white text-gray-500 border border-gray-200 hover:bg-orange-50'
-          }`}
+          value={l}
         >
-          {l}
-        </button>
+          {LANGUAGE_LABELS[l]}
+        </option>
       ))}
-    </div>
+      </select>
+    </label>
   )
 }

@@ -116,13 +116,15 @@ export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
   )
 }
 
-export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu' }) {
+export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu', density = 'comfortable' }) {
   const inCart = !readOnly && qty > 0
   const [copied, setCopied] = useState(false)
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const showCompactPublicCard = readOnly
+  const dense = !readOnly && density === 'compact'
   const labels = {
     copy: lang === 'uz' ? 'Havolani nusxalash' : lang === 'ru' ? 'Скопировать ссылку' : 'Copy link',
     copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
@@ -141,17 +143,19 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onOpenDetail(item)}
-      className={`bg-white rounded-[18px] border-2 flex flex-col overflow-hidden transition-all cursor-pointer select-none ${
+      className={`group flex flex-col overflow-hidden bg-white transition-all cursor-pointer select-none ${
         inCart
-          ? 'border-[#ff5a00]/40 shadow-md shadow-orange-100/60'
-          : 'border-[#E5E7EB] shadow-sm hover:shadow-md hover:border-gray-200'
+          ? 'rounded-[18px] border-2 border-[#ff5a00]/40 shadow-md shadow-orange-100/60'
+          : showCompactPublicCard
+            ? 'rounded-[18px] border border-[#E6EAF0] shadow-sm hover:-translate-y-0.5 hover:border-[#D8DEE8] hover:shadow-md'
+            : 'rounded-[18px] border-2 border-[#E5E7EB] shadow-sm hover:shadow-md hover:border-gray-200'
       }`}
     >
-      <div className="relative aspect-[4/3] w-full flex-shrink-0 overflow-hidden bg-orange-50">
+      <div className={`relative w-full flex-shrink-0 overflow-hidden bg-orange-50 ${showCompactPublicCard ? 'aspect-[4/3] rounded-b-[14px]' : dense ? 'aspect-[2/1]' : 'aspect-[4/3]'}`}>
         <SafeMenuImage
           src={item.image_url}
           alt={getItemName(item, lang)}
-          className="h-full w-full object-cover object-center"
+          className="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.02]"
           fallbackIconSize={34}
           loading={eager ? 'eager' : 'lazy'}
           fetchPriority={eager ? 'high' : undefined}
@@ -167,43 +171,46 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             onClick={copyProductLink}
             title={copied ? labels.copied : labels.copy}
             aria-label={copied ? labels.copied : labels.copy}
-            className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-xl border border-white/80 bg-white/95 text-[#1F2937] shadow-sm backdrop-blur transition-colors hover:bg-[#fff4ed] hover:text-[#ff5a00]"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/95 text-[#5B6472] shadow-sm backdrop-blur transition-colors hover:bg-[#fff4ed] hover:text-[#ff5a00]"
           >
             {copied ? <Check size={16} /> : <Copy size={15} />}
           </button>
         )}
       </div>
 
-      <div className="p-3 flex flex-col flex-1">
-        <h3 className="font-bold text-[15px] text-[#1F2937] line-clamp-2 leading-snug mb-1 flex-1">
+      <div className={`${showCompactPublicCard ? 'p-3 pt-2.5' : dense ? 'p-2.5' : 'p-3'} flex flex-col flex-1`}>
+        <h3 className={`${showCompactPublicCard ? 'text-[15px]' : dense ? 'text-[14px] mb-0.5 flex-1' : 'text-[15px] mb-1 flex-1'} font-bold text-[#1F2937] line-clamp-2 leading-snug`}>
           {getItemName(item, lang)}
         </h3>
-        {getItemDesc(item, lang) && (
-          <p className="text-[12px] text-[#9CA3AF] line-clamp-1 mb-1.5">{plainMenuText(getItemDesc(item, lang))}</p>
+        {showCompactPublicCard && getItemDesc(item, lang) && (
+          <p className="mt-0.5 min-h-[16px] text-[12px] leading-snug text-[#8A94A6] line-clamp-1">{plainMenuText(getItemDesc(item, lang))}</p>
         )}
-        <div className="mb-2.5 flex items-start justify-between gap-2">
+        {!showCompactPublicCard && getItemDesc(item, lang) && (
+          <p className={`${dense ? 'text-[11px] mb-1' : 'text-[12px] mb-1.5'} text-[#9CA3AF] line-clamp-1`}>{plainMenuText(getItemDesc(item, lang))}</p>
+        )}
+        <div className={`${showCompactPublicCard ? 'mt-2 mb-0 items-end' : dense ? 'mb-2 items-start' : 'mb-2.5 items-start'} flex justify-between gap-2`}>
           <div className="min-w-0">
             {pricing.discounted && (
-              <p className="text-[12px] font-bold text-[#9CA3AF] line-through">{formatPrice(pricing.oldPrice)}</p>
+              <p className={`${showCompactPublicCard ? 'text-[13px]' : 'text-[12px]'} font-bold text-[#9CA3AF] line-through`}>{formatPrice(pricing.oldPrice)}</p>
             )}
-            <p className={`${pricing.discounted ? 'text-[17px] text-red-600' : 'text-[16px] text-[#ff5a00]'} font-black`}>
+            <p className={`${pricing.discounted ? 'text-red-600' : showCompactPublicCard ? 'text-[#0F1F33]' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[18px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
               {formatPrice(pricing.price)}
             </p>
           </div>
-          {(grams || millilitres || kcal) && (
+          {!showCompactPublicCard && (grams || millilitres || kcal) && (
             <div className="flex flex-wrap justify-end gap-1">
               {grams && (
-                <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                <span className={`rounded-full bg-[#F8FAFC] ${dense ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]'} font-black text-[#64748B] ring-1 ring-[#E5E7EB]`}>
                   {grams}
                 </span>
               )}
               {millilitres && (
-                <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                <span className={`rounded-full bg-[#F8FAFC] ${dense ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]'} font-black text-[#64748B] ring-1 ring-[#E5E7EB]`}>
                   {millilitres}
                 </span>
               )}
               {kcal && (
-                <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
+                <span className={`rounded-full bg-[#F8FAFC] ${dense ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-[11px]'} font-black text-[#64748B] ring-1 ring-[#E5E7EB]`}>
                   {kcal}
                 </span>
               )}
@@ -234,7 +241,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           <button
             onClick={e => { e.stopPropagation(); onAdd(item) }}
             className="w-full rounded-xl bg-[#fff1e8] text-[#ff5a00] border border-[#ff5a00]/20 text-[13px] font-bold hover:bg-[#ff5a00] hover:text-white active:scale-95 transition-all flex items-center justify-center gap-1.5"
-            style={{ height: '40px' }}
+            style={{ height: dense ? '34px' : '40px' }}
           >
             <Plus size={14} />
             {lang === 'uz' ? "Qo'shish" : lang === 'ru' ? 'Добавить' : 'Add'}
@@ -286,7 +293,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#FAF6EE]">
+    <div className={`flex h-full flex-col ${readOnly ? 'bg-white' : 'bg-[#FAF6EE]'}`}>
       <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-[#E5E7EB] bg-white px-5 py-3 shadow-sm">
         <button
           onClick={onBack}

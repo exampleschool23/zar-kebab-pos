@@ -7,8 +7,9 @@ export function menuCategorySectionId(prefix, categoryId) {
   return `${prefix}-${String(categoryId).replace(/[^a-zA-Z0-9_-]/g, '-')}`
 }
 
-const COLLAPSED_BAR_HEIGHT = 72
-const FIXED_COLLAPSED_GAP = 12
+const COLLAPSED_BAR_HEIGHT = 56
+const COLLAPSE_SHOW_OFFSET = 61
+const COLLAPSE_HIDE_OFFSET = 28
 
 function CategoryImage({ src, alt, active }) {
   return (
@@ -33,17 +34,21 @@ function LargeCategoryCard({ category, active, title, onClick }) {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`min-w-[124px] w-[124px] flex-shrink-0 overflow-hidden rounded-[20px] border-2 text-center transition-all active:scale-[0.98] ${
+      className={`min-w-[82px] w-[82px] flex-shrink-0 overflow-hidden rounded-[18px] border-2 text-center transition-all active:scale-[0.98] sm:min-w-[96px] sm:w-[96px] md:min-w-[108px] md:w-[108px] lg:min-w-[116px] lg:w-[116px] xl:min-w-[124px] xl:w-[124px] xl:rounded-[22px] ${
         active
           ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-[0_8px_18px_rgba(255,90,31,0.16)]'
           : 'border-[#E5E7EB] bg-white shadow-sm hover:border-orange-200 hover:shadow-md'
       }`}
     >
-      <div className={`aspect-square w-full overflow-hidden ${active ? 'bg-[#FFE8D8]' : 'bg-[#F3F4F6]'}`}>
+      <div className={`aspect-square w-full overflow-hidden rounded-t-[16px] xl:rounded-t-[20px] ${
+        isAll
+          ? active ? 'bg-[#fff4ed]' : 'bg-[#F8FAFC]'
+          : active ? 'bg-[#FFE8D8]' : 'bg-[#F3F4F6]'
+      }`}>
         {isAll ? (
           <div className="flex h-full w-full items-center justify-center">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${active ? 'bg-[#ff5a1f]/15' : 'bg-white shadow-sm'}`}>
-              <LayoutGrid size={24} className={active ? 'text-[#ff4d00]' : 'text-[#ff8a3d]'} />
+            <div className={`flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10 lg:h-11 lg:w-11 xl:h-12 xl:w-12 xl:rounded-2xl ${active ? 'bg-[#ff5a1f]/12 text-[#ff4d00]' : 'bg-white shadow-sm'}`}>
+              <LayoutGrid size={20} className={active ? 'text-[#ff4d00]' : 'text-[#ff8a3d]'} />
             </div>
           </div>
         ) : (
@@ -51,8 +56,8 @@ function LargeCategoryCard({ category, active, title, onClick }) {
         )}
       </div>
 
-      <div className="flex min-h-[58px] items-center justify-center px-2.5 py-2.5">
-        <p className={`line-clamp-2 text-sm font-extrabold leading-tight ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
+      <div className="flex min-h-[42px] items-center justify-center rounded-b-[16px] px-1.5 py-1.5 sm:min-h-[48px] sm:px-2 md:min-h-[52px] lg:min-h-[54px] xl:min-h-[58px] xl:rounded-b-[20px] xl:px-2.5 xl:py-2.5">
+        <p className={`line-clamp-2 text-[11px] font-extrabold leading-tight sm:text-[12px] md:text-[13px] xl:text-sm ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
           {title}
         </p>
       </div>
@@ -68,13 +73,13 @@ function CategoryChip({ category, active, title, count, onClick }) {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex h-14 w-auto min-w-[104px] max-w-none flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border px-3 py-2 text-sm font-black transition-all ${
+      className={`flex h-11 w-auto min-w-[96px] max-w-none flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border px-3 py-1 text-sm font-black transition-all ${
         active
           ? 'border-[#ff5a1f] bg-[#fff4ed] text-[#ff4d00] shadow-sm'
           : 'border-[#E5E7EB] bg-white text-[#1F2937] hover:border-orange-200 hover:bg-orange-50/40'
       }`}
     >
-      <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl ${active ? 'bg-[#FFE8D8]' : 'bg-[#F3F4F6]'}`}>
+      <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg ${active ? 'bg-[#FFE8D8]' : 'bg-[#F3F4F6]'}`}>
         {isAll ? (
           <LayoutGrid size={15} className={active ? 'text-[#ff4d00]' : 'text-[#ff8a3d]'} />
         ) : category.image_url ? (
@@ -85,7 +90,7 @@ function CategoryChip({ category, active, title, count, onClick }) {
       </span>
       <span className="max-w-none flex-shrink-0 whitespace-nowrap text-[12px] leading-tight">{title}</span>
       {Number.isFinite(count) && (
-        <span className={`flex h-6 min-w-6 flex-shrink-0 items-center justify-center rounded-lg px-2 text-sm font-black tabular-nums leading-none ${active ? 'bg-white/90 text-[#ff4d00]' : 'bg-[#E8F1FF] text-[#2563EB]'}`}>
+        <span className={`flex h-6 min-w-6 flex-shrink-0 items-center justify-center rounded-lg px-1.5 text-[12px] font-black tabular-nums leading-none ${active ? 'bg-white/90 text-[#ff4d00]' : 'bg-[#E8F1FF] text-[#2563EB]'}`}>
           {count}
         </span>
       )}
@@ -120,6 +125,7 @@ export default function MenuCategoryScroller({
   topOffset = 0,
   className = '',
   collapsedClassName = '',
+  collapsedSurfaceClass = 'bg-[#FAF6EE]/95',
   collapsedPosition = 'sticky',
   scrollOffset = 84,
 }) {
@@ -157,11 +163,11 @@ export default function MenuCategoryScroller({
       } else {
         scroller.scrollTo({ top: 0, behavior: 'smooth' })
       }
-      return
+      return true
     }
 
     const section = document.getElementById(menuCategorySectionId(sectionPrefix, categoryId))
-    if (!section) return
+    if (!section) return false
 
     if (root === window) {
       const target = section.getBoundingClientRect().top + window.scrollY - topOffset - scrollOffset
@@ -171,11 +177,13 @@ export default function MenuCategoryScroller({
       const target = section.getBoundingClientRect().top - rootRect.top + scroller.scrollTop - scrollOffset
       scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
     }
+    return true
   }
 
   function handleClick(category) {
-    onCategoryClick?.(category.id)
-    scrollToCategory(category.id)
+    if (scrollToCategory(category.id)) {
+      onCategoryClick?.(category.id)
+    }
   }
 
   useEffect(() => {
@@ -187,7 +195,11 @@ export default function MenuCategoryScroller({
       if (sentinel) {
         const rect = sentinel.getBoundingClientRect()
         const rootTop = root === window ? topOffset : scroller.getBoundingClientRect().top
-        setCollapsed(rect.bottom <= rootTop + 61)
+        setCollapsed(isCollapsed => (
+          isCollapsed
+            ? rect.bottom <= rootTop + COLLAPSE_HIDE_OFFSET
+            : rect.bottom <= rootTop + COLLAPSE_SHOW_OFFSET
+        ))
       }
 
       if (!onActiveCategoryChange || !sectionPrefix) return
@@ -238,7 +250,7 @@ export default function MenuCategoryScroller({
       </div>
 
       <div
-        className={`${collapsedPosition === 'fixed' ? 'fixed left-0 right-0' : 'sticky -mx-1 overflow-hidden'} z-30 border-b border-[#E5E7EB] bg-[#FAF6EE]/95 px-1 py-2 backdrop-blur transition-all duration-200 ${
+        className={`${collapsedPosition === 'fixed' ? 'fixed left-0 right-0' : 'sticky -mx-1 overflow-hidden'} z-30 border-b border-[#E5E7EB] ${collapsedSurfaceClass} px-1 py-1.5 backdrop-blur transition-all duration-200 ${
           collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
         } ${collapsedClassName}`}
         style={{
@@ -262,14 +274,6 @@ export default function MenuCategoryScroller({
           })}
         </div>
       </div>
-
-      {collapsedPosition === 'fixed' && (
-        <div
-          aria-hidden="true"
-          className="transition-[height] duration-200"
-          style={{ height: collapsed ? COLLAPSED_BAR_HEIGHT + FIXED_COLLAPSED_GAP : 0 }}
-        />
-      )}
     </>
   )
 }
