@@ -36,13 +36,13 @@ function LargeCategoryCard({ category, active, title, onClick }) {
       aria-pressed={active}
       className={`min-w-[82px] w-[82px] flex-shrink-0 overflow-hidden rounded-[18px] border-2 text-center transition-all active:scale-[0.98] sm:min-w-[96px] sm:w-[96px] md:min-w-[108px] md:w-[108px] lg:min-w-[116px] lg:w-[116px] xl:min-w-[124px] xl:w-[124px] xl:rounded-[22px] ${
         active
-          ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-[0_8px_18px_rgba(255,90,31,0.16)]'
+          ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-none ring-1 ring-inset ring-[#ff5a1f]/10'
           : 'border-[#E5E7EB] bg-white shadow-sm hover:border-orange-200 hover:shadow-md'
       }`}
     >
-      <div className={`aspect-square w-full overflow-hidden rounded-t-[16px] xl:rounded-t-[20px] ${
+      <div className={`aspect-square w-full overflow-hidden ${
         isAll
-          ? active ? 'bg-[#fff4ed]' : 'bg-[#F8FAFC]'
+          ? active ? 'bg-transparent' : 'bg-[#F8FAFC]'
           : active ? 'bg-[#FFE8D8]' : 'bg-[#F3F4F6]'
       }`}>
         {isAll ? (
@@ -56,7 +56,7 @@ function LargeCategoryCard({ category, active, title, onClick }) {
         )}
       </div>
 
-      <div className="flex min-h-[42px] items-center justify-center rounded-b-[16px] px-1.5 py-1.5 sm:min-h-[48px] sm:px-2 md:min-h-[52px] lg:min-h-[54px] xl:min-h-[58px] xl:rounded-b-[20px] xl:px-2.5 xl:py-2.5">
+      <div className="flex min-h-[42px] items-center justify-center px-1.5 py-1.5 sm:min-h-[48px] sm:px-2 md:min-h-[52px] lg:min-h-[54px] xl:min-h-[58px] xl:px-2.5 xl:py-2.5">
         <p className={`line-clamp-2 text-[11px] font-extrabold leading-tight sm:text-[12px] md:text-[13px] xl:text-sm ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
           {title}
         </p>

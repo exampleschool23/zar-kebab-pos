@@ -32,6 +32,24 @@ function plainMenuText(text) {
   return String(text || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\s+/g, ' ').trim()
 }
 
+function FadingMenuDescription({ text, className = '' }) {
+  const value = plainMenuText(text)
+  if (!value) return null
+
+  return (
+    <p
+      title={value}
+      className={`overflow-hidden whitespace-nowrap ${className}`}
+      style={{
+        WebkitMaskImage: 'linear-gradient(90deg, #000 0%, #000 calc(100% - 34px), transparent 100%)',
+        maskImage: 'linear-gradient(90deg, #000 0%, #000 calc(100% - 34px), transparent 100%)',
+      }}
+    >
+      {value}
+    </p>
+  )
+}
+
 function FormattedMenuText({ text, fallback }) {
   const value = String(text || fallback || '')
   return value.split('\n').map((line, lineIndex) => {
@@ -183,17 +201,17 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           {getItemName(item, lang)}
         </h3>
         {showCompactPublicCard && getItemDesc(item, lang) && (
-          <p className="mt-0.5 min-h-[16px] text-[12px] leading-snug text-[#8A94A6] line-clamp-1">{plainMenuText(getItemDesc(item, lang))}</p>
+          <FadingMenuDescription text={getItemDesc(item, lang)} className="mt-0.5 min-h-[16px] text-[12px] leading-snug text-[#8A94A6]" />
         )}
         {!showCompactPublicCard && getItemDesc(item, lang) && (
-          <p className={`${dense ? 'text-[11px] mb-1' : 'text-[12px] mb-1.5'} text-[#9CA3AF] line-clamp-1`}>{plainMenuText(getItemDesc(item, lang))}</p>
+          <FadingMenuDescription text={getItemDesc(item, lang)} className={`${dense ? 'text-[11px] mb-1' : 'text-[12px] mb-1.5'} text-[#9CA3AF]`} />
         )}
         <div className={`${showCompactPublicCard ? 'mt-2 mb-0 items-end' : dense ? 'mb-2 items-start' : 'mb-2.5 items-start'} flex justify-between gap-2`}>
           <div className="min-w-0">
             {pricing.discounted && (
               <p className={`${showCompactPublicCard ? 'text-[13px]' : 'text-[12px]'} font-bold text-[#9CA3AF] line-through`}>{formatPrice(pricing.oldPrice)}</p>
             )}
-            <p className={`${pricing.discounted ? 'text-red-600' : showCompactPublicCard ? 'text-[#0F1F33]' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[18px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
+            <p className={`${pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[18px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
               {formatPrice(pricing.price)}
             </p>
           </div>

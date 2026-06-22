@@ -164,10 +164,16 @@ test('menu product descriptions render new lines and bold safely', () => {
   const source = readSource('src/components/MenuProductCards.jsx')
 
   assert.match(source, /function FormattedMenuText/)
+  assert.match(source, /function FadingMenuDescription/)
+  assert.match(source, /WebkitMaskImage/)
+  assert.match(source, /maskImage/)
+  assert.match(source, /overflow-hidden whitespace-nowrap/)
   assert.match(source, /split\('\\n'\)/)
   assert.match(source, /<strong/)
   assert.match(source, /whitespace-pre-wrap/)
   assert.match(source, /function plainMenuText/)
+  assert.doesNotMatch(source, /text-\[#8A94A6\] line-clamp-1/)
+  assert.doesNotMatch(source, /text-\[#9CA3AF\] line-clamp-1/)
 })
 
 test('AdminMenu sortable item card does not reference upload error state', () => {
@@ -385,9 +391,11 @@ test('public and waiter menu cards stay dense enough for tablet browsing', () =>
 
   assert.match(productCards, /showCompactPublicCard \? 'aspect-\[4\/3\]/)
   assert.match(productCards, /dense \? 'aspect-\[2\/1\]/)
+  assert.match(productCards, /pricing\.discounted \? 'text-red-600' : 'text-\[#ff5a00\]'/)
   assert.match(publicMenu, /grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4/)
   assert.match(waiterOrder, /density="compact"/)
   assert.doesNotMatch(productCards, /showCompactPublicCard \? 'aspect-square/)
+  assert.doesNotMatch(productCards, /showCompactPublicCard \? 'text-\[#0F1F33\]'/)
 })
 
 test('cashier-only menu items are hidden from customer menus but available to cashier quick items', () => {
@@ -530,8 +538,11 @@ test('MenuCategoryScroller collapsed chips do not overlap expanded category card
   assert.doesNotMatch(source, /\+ 82/)
   assert.match(source, /aria-pressed=\{active\}/)
   assert.match(source, /rounded-\[18px\]/)
-  assert.match(source, /rounded-t-\[16px\]/)
-  assert.match(source, /rounded-b-\[16px\]/)
+  assert.match(source, /shadow-none ring-1 ring-inset ring-\[#ff5a1f\]\/10/)
+  assert.doesNotMatch(source, /shadow-\[0_8px_18px_rgba\(255,90,31,0\.16\)\]/)
+  assert.match(source, /active \? 'bg-transparent' : 'bg-\[#F8FAFC\]'/)
+  assert.doesNotMatch(source, /rounded-t-\[16px\]/)
+  assert.doesNotMatch(source, /rounded-b-\[16px\]/)
   assert.match(source, /if \(scrollToCategory\(category\.id\)\) \{/)
   assert.match(source, /return true/)
   assert.match(source, /if \(!section\) return false/)
@@ -555,7 +566,7 @@ test('PublicMenu enables tappable fixed collapsed categories', () => {
   assert.match(source, /<header ref=\{headerRef\}/)
   assert.match(source, /collapsedPosition="fixed"/)
   assert.match(source, /collapsedClassName="z-50/)
-  assert.match(source, /scrollOffset=\{116\}/)
+  assert.match(source, /scrollOffset=\{64\}/)
   assert.match(source, /px-4 pb-5 pt-2 sm:px-6/)
   assert.match(source, /className="mb-7 mt-0 rounded-\[28px\]/)
   assert.match(source, /categories\.filter\(category => \(itemCounts\[category\.id\] \|\| 0\) > 0\)/)
