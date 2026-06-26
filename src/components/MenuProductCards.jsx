@@ -169,7 +169,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             : 'rounded-[18px] border-2 border-[#E5E7EB] shadow-sm hover:shadow-md hover:border-gray-200'
       }`}
     >
-      <div className={`relative w-full flex-shrink-0 overflow-hidden bg-orange-50 ${showCompactPublicCard ? 'aspect-[4/3] rounded-b-[14px]' : dense ? 'aspect-[2/1]' : 'aspect-[4/3]'}`}>
+      <div className={`relative aspect-square w-full flex-shrink-0 overflow-hidden bg-orange-50 ${showCompactPublicCard ? 'rounded-b-[14px]' : ''}`}>
         <SafeMenuImage
           src={item.image_url}
           alt={getItemName(item, lang)}
@@ -372,7 +372,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
       <div className={`flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 ${readOnly ? 'pb-6' : 'pb-28'}`}>
         <div className="mx-auto w-full max-w-[1120px]">
           <section className="grid gap-5 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm md:grid-cols-[minmax(320px,0.9fr)_minmax(360px,1.1fr)] md:p-5 lg:gap-6">
-            <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[22px] bg-orange-50 md:max-h-[360px]">
+            <div className="relative aspect-square w-full overflow-hidden rounded-[22px] bg-orange-50 md:max-h-[520px]">
               <SafeMenuImage
                 src={item.image_url}
                 alt={name}

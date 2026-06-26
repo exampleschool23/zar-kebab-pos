@@ -9,9 +9,8 @@ const IMAGE_TABLES = [
   { table: 'menu_categories', folder: 'categories', label: 'category' },
 ]
 
-const DEFAULT_TARGET_BYTES = 50 * 1024
-const DEFAULT_MAX_DIMENSION = 520
-const MIN_DIMENSION = 160
+const DEFAULT_TARGET_BYTES = 100 * 1024
+const MENU_IMAGE_TARGET_SIZE = 600
 const QUALITIES = [76, 70, 64, 58, 52, 46, 40, 34, 28, 22]
 
 function loadEnvFile(path) {
@@ -40,7 +39,7 @@ const apply = args.has('--apply')
 const includeExternal = args.has('--include-external')
 const force = args.has('--force')
 const targetBytes = parseBytesArg('--target-kb', DEFAULT_TARGET_BYTES)
-const maxDimension = parseNumberArg('--max-dimension', DEFAULT_MAX_DIMENSION)
+const targetDimension = MENU_IMAGE_TARGET_SIZE
 const reportDir = resolve(process.cwd(), 'migration-reports')
 const reportFile = resolve(reportDir, `menu-images-optimized-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`)
 
@@ -80,11 +79,6 @@ function argValue(name) {
 function parseBytesArg(name, fallback) {
   const value = Number(argValue(name))
   return Number.isFinite(value) && value > 0 ? Math.round(value * 1024) : fallback
-}
-
-function parseNumberArg(name, fallback) {
-  const value = Number(argValue(name))
-  return Number.isFinite(value) && value > 0 ? Math.round(value) : fallback
 }
 
 function writeReport(entry) {
@@ -176,31 +170,25 @@ async function assertApplyCanUpdateRows() {
 
 async function encodeWebpUnderTarget(inputBuffer) {
   let best = null
-  const metadata = await sharp(inputBuffer, { animated: false }).metadata()
-  const sourceMax = Math.max(metadata.width || maxDimension, metadata.height || maxDimension)
-  const firstDimension = Math.min(maxDimension, sourceMax)
+  for (const quality of QUALITIES) {
+    const buffer = await sharp(inputBuffer, { animated: false })
+      .rotate()
+      .resize({
+        width: targetDimension,
+        height: targetDimension,
+        fit: 'cover',
+        position: 'center',
+      })
+      .webp({
+        quality,
+        effort: 6,
+        smartSubsample: true,
+      })
+      .toBuffer()
 
-  for (let dimension = firstDimension; dimension >= MIN_DIMENSION; dimension = Math.floor(dimension * 0.86)) {
-    for (const quality of QUALITIES) {
-      const buffer = await sharp(inputBuffer, { animated: false })
-        .rotate()
-        .resize({
-          width: dimension,
-          height: dimension,
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .webp({
-          quality,
-          effort: 6,
-          smartSubsample: true,
-        })
-        .toBuffer()
-
-      const candidate = { buffer, bytes: buffer.length, width: dimension, quality }
-      if (!best || candidate.bytes < best.bytes) best = candidate
-      if (candidate.bytes <= targetBytes) return { ...candidate, metTarget: true }
-    }
+    const candidate = { buffer, bytes: buffer.length, width: targetDimension, height: targetDimension, quality }
+    if (!best || candidate.bytes < best.bytes) best = candidate
+    if (candidate.bytes <= targetBytes) return { ...candidate, metTarget: true }
   }
 
   return { ...best, metTarget: best?.bytes <= targetBytes }
@@ -229,6 +217,7 @@ async function optimizeRow(row, tableInfo) {
     targetBytes,
     metTarget: optimized.metTarget,
     width: optimized.width,
+    height: optimized.height,
     quality: optimized.quality,
     originalContentType: image.contentType,
     originalWasRealWebp: isRealWebp(image.buffer),
@@ -273,7 +262,7 @@ async function main() {
   }
 
   console.log(apply ? 'Optimizing menu/category images...' : 'Dry run: scanning menu/category images for optimization...')
-  console.log(`Target: ${formatBytes(targetBytes)}. Max dimension: ${maxDimension}px.`)
+  console.log(`Target: ${formatBytes(targetBytes)}. Dimensions: ${targetDimension}x${targetDimension}px.`)
   console.log(includeExternal ? 'External HTTP image URLs will also be optimized.' : 'External HTTP image URLs will be left unchanged.')
   if (!apply) console.log('No database rows or R2 objects will be changed. Rerun with --apply to update images.')
 

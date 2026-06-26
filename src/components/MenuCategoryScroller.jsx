@@ -16,7 +16,7 @@ function CategoryImage({ src, alt, active }) {
     <ImageLoadShimmer
       src={src}
       alt={alt}
-      className="h-full w-full scale-[1.04] object-cover object-top"
+      className="h-full w-full object-cover object-center"
       fallback={
         <div className="flex h-full w-full items-center justify-center bg-orange-50">
           <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />

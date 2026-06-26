@@ -30,8 +30,10 @@ import { supabase } from '../lib/supabase'
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
 const MAX_UPLOAD_IMAGE_SIZE = 5 * 1024 * 1024
-const MAX_MENU_IMAGE_DIMENSION = 520
+const MENU_IMAGE_TARGET_SIZE = 600
+const MAX_MENU_IMAGE_BYTES = 100 * 1024
 const MENU_IMAGE_WEBP_QUALITY = 0.62
+const MENU_IMAGE_WEBP_QUALITIES = [0.74, MENU_IMAGE_WEBP_QUALITY, 0.52, 0.44, 0.36, 0.3]
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {
@@ -60,22 +62,35 @@ async function compressMenuImage(file) {
   if (file.size > MAX_UPLOAD_IMAGE_SIZE) throw new Error('Image must be 5 MB or smaller')
 
   const image = await loadImage(file)
-  const scale = Math.min(1, MAX_MENU_IMAGE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight))
-  const width = Math.max(1, Math.round(image.naturalWidth * scale))
-  const height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const sourceSize = Math.max(1, Math.min(image.naturalWidth, image.naturalHeight))
+  const sourceX = Math.max(0, Math.round((image.naturalWidth - sourceSize) / 2))
+  const sourceY = Math.max(0, Math.round((image.naturalHeight - sourceSize) / 2))
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  canvas.width = MENU_IMAGE_TARGET_SIZE
+  canvas.height = MENU_IMAGE_TARGET_SIZE
   const context = canvas.getContext('2d')
-  context.drawImage(image, 0, 0, width, height)
-  const blob = await canvasToBlob(canvas, 'image/webp', MENU_IMAGE_WEBP_QUALITY)
-  if (blob.type !== 'image/webp') {
-    return file
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    MENU_IMAGE_TARGET_SIZE,
+    MENU_IMAGE_TARGET_SIZE
+  )
+  for (const quality of MENU_IMAGE_WEBP_QUALITIES) {
+    const blob = await canvasToBlob(canvas, 'image/webp', quality)
+    if (blob.type !== 'image/webp') {
+      throw new Error('Your browser could not create a WebP menu image')
+    }
+    if (blob.size <= MAX_MENU_IMAGE_BYTES) {
+      return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
+    }
   }
-  if (file.type === 'image/webp' && file.size <= blob.size) {
-    return new File([file], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
-  }
-  return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
+
+  throw new Error('Image could not be compressed below 100 KB. Try a less detailed image or crop it closer before uploading.')
 }
 
 async function getAuthToken() {
@@ -111,6 +126,11 @@ function formatMenuImageUploadError(lang, message) {
     if (lang === 'ru') return 'Для меню можно загружать только WebP изображения.'
     if (lang === 'uz') return 'Menyu uchun faqat WebP rasmlarni yuklash mumkin.'
     return 'Only WebP images can be uploaded for menu items.'
+  }
+  if (/600x600|100 KB|compressed below 100 KB/i.test(text)) {
+    if (lang === 'ru') return 'Изображения меню должны быть 600x600 px и меньше 100 KB.'
+    if (lang === 'uz') return 'Menyu rasmlari 600x600 px va 100 KB dan kichik bo‘lishi kerak.'
+    return 'Menu images must be 600x600 px and smaller than 100 KB.'
   }
   return text
 }
@@ -276,7 +296,7 @@ function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
       </div>
       {value && (
-        <img src={value} alt={t(lang, 'imagePreview')} className="mt-2 h-20 w-20 object-cover rounded-xl border border-gray-200" />
+        <img src={value} alt={t(lang, 'imagePreview')} className="mt-2 h-20 w-20 rounded-xl border border-gray-200 object-cover object-center" />
       )}
       {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
@@ -368,8 +388,8 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
         <SafeMenuImage
           src={item.image_url}
           alt={getItemName(item, lang)}
-          className="aspect-[4/3] w-full object-cover object-center"
-          fallbackClassName="aspect-[4/3] w-full"
+          className="aspect-square w-full object-cover object-center"
+          fallbackClassName="aspect-square w-full"
         />
         {/* Drag handle overlay */}
         <button
@@ -469,7 +489,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, categories }) {
     >
       <DragHandle listeners={listeners} attributes={attributes} />
       {item.image_url ? (
-        <img src={item.image_url} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+        <img src={item.image_url} alt="" className="h-12 w-12 flex-shrink-0 rounded-xl object-cover object-center" />
       ) : (
         <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
           <UtensilsCrossed size={18} className="text-orange-200" />
@@ -535,7 +555,7 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, sortIndex }) {
 
       {/* col 2 – image */}
       {cat.image_url ? (
-        <img src={cat.image_url} alt="" className="w-12 h-12 rounded-xl object-cover" />
+        <img src={cat.image_url} alt="" className="h-12 w-12 rounded-xl object-cover object-center" />
       ) : (
         <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center">
           <Tag size={18} className="text-orange-300" />
@@ -1020,8 +1040,8 @@ export default function AdminMenu() {
                   <div className="bg-white rounded-2xl border-2 border-[#ff5a00]/40 shadow-2xl opacity-95 w-44 rotate-2">
                     <SafeMenuImage
                       src={activeItem.image_url}
-                      className="aspect-[4/3] w-full rounded-t-2xl object-cover object-center"
-                      fallbackClassName="aspect-[4/3] w-full rounded-t-2xl"
+                      className="aspect-square w-full rounded-t-2xl object-cover object-center"
+                      fallbackClassName="aspect-square w-full rounded-t-2xl"
                       iconSize={24}
                     />
                     <div className="p-2.5">
@@ -1064,7 +1084,7 @@ export default function AdminMenu() {
                               {/* Section header */}
                               <div className="flex items-center gap-2.5 mb-3">
                                 {cat.image_url && (
-                                  <img src={cat.image_url} alt="" className="w-7 h-7 rounded-lg object-cover flex-shrink-0" />
+                                  <img src={cat.image_url} alt="" className="h-7 w-7 flex-shrink-0 rounded-lg object-cover object-center" />
                                 )}
                                 <h3 className="text-xl font-black uppercase tracking-tight text-[#1F2937]">
                                   {getCategoryName(cat, lang)}
@@ -1239,7 +1259,7 @@ export default function AdminMenu() {
                       {activeCat && (
                         <div className="bg-white border-2 border-[#ff5a00]/40 rounded-2xl shadow-2xl flex items-center gap-4 px-5 py-4 opacity-95">
                           {activeCat.image_url ? (
-                            <img src={activeCat.image_url} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                            <img src={activeCat.image_url} alt="" className="h-12 w-12 flex-shrink-0 rounded-xl object-cover object-center" />
                           ) : (
                             <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
                               <Tag size={18} className="text-orange-300" />
@@ -1331,8 +1351,8 @@ export default function AdminMenu() {
                         <div className="bg-white rounded-2xl border-2 border-[#ff5a00]/40 shadow-2xl opacity-95 w-44 rotate-2">
                           <SafeMenuImage
                             src={activeItem.image_url}
-                            className="aspect-[4/3] w-full rounded-t-2xl object-cover object-center"
-                            fallbackClassName="aspect-[4/3] w-full rounded-t-2xl"
+                            className="aspect-square w-full rounded-t-2xl object-cover object-center"
+                            fallbackClassName="aspect-square w-full rounded-t-2xl"
                             iconSize={24}
                           />
                           <div className="p-2.5">

@@ -197,7 +197,7 @@ function SafeImage({ src, alt }) {
     <ImageLoadShimmer
       src={src}
       alt={alt}
-      className="h-full w-full object-cover"
+      className="h-full w-full object-cover object-center"
       fallback={
         <div className="flex h-full w-full items-center justify-center bg-[#F4EFE7]">
           <UtensilsCrossed size={30} className="text-[#D39D70]" />
@@ -250,7 +250,7 @@ function ProductCard({ item, lang, quantity, onAdd, onIncrement, onDecrement }) 
   const pricing = getMenuPricing(item)
   return (
     <article className="overflow-hidden rounded-[8px] border border-[#E8DED2] bg-white shadow-sm">
-      <div className="aspect-[4/3]">
+      <div className="aspect-square">
         <SafeImage src={item.image_url} alt={name} />
       </div>
       <div className="flex min-h-[152px] flex-col p-3">

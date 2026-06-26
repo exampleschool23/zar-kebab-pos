@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     await requireAdminRole(req)
     const { fields, file } = await readMultipart(req)
     const type = String(fields.type || '')
-    assertImageFile(file)
+    await assertImageFile(file)
     const key = makeObjectKey({
       type,
       entityId: fields.entityId,

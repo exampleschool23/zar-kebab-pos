@@ -50,18 +50,29 @@ test('AdminMenu keeps upload error rendering inside ImageUploadField', () => {
   assert.match(body, /\{error && <p[^}]+>\{error\}<\/p>\}/)
 })
 
-test('AdminMenu compresses uploaded menu images to card-sized assets', () => {
+test('AdminMenu compresses uploaded menu images to centered 600px square assets', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const compressor = functionBody(source, 'compressMenuImage')
 
-  assert.match(source, /const MAX_MENU_IMAGE_DIMENSION = 520/)
+  assert.match(source, /const MENU_IMAGE_TARGET_SIZE = 600/)
+  assert.match(source, /const MAX_MENU_IMAGE_BYTES = 100 \* 1024/)
   assert.match(source, /const MENU_IMAGE_WEBP_QUALITY = 0\.62/)
-  assert.match(compressor, /MAX_MENU_IMAGE_DIMENSION \/ Math\.max\(image\.naturalWidth, image\.naturalHeight\)/)
-  assert.match(compressor, /canvasToBlob\(canvas, 'image\/webp', MENU_IMAGE_WEBP_QUALITY\)/)
+  assert.match(source, /const MENU_IMAGE_WEBP_QUALITIES = \[0\.74, MENU_IMAGE_WEBP_QUALITY, 0\.52, 0\.44, 0\.36, 0\.3\]/)
+  assert.match(compressor, /Math\.min\(image\.naturalWidth, image\.naturalHeight\)/)
+  assert.match(compressor, /canvas\.width = MENU_IMAGE_TARGET_SIZE/)
+  assert.match(compressor, /canvas\.height = MENU_IMAGE_TARGET_SIZE/)
+  assert.match(compressor, /sourceX/)
+  assert.match(compressor, /sourceY/)
+  assert.match(compressor, /sourceSize/)
+  assert.match(compressor, /MENU_IMAGE_TARGET_SIZE,\s*MENU_IMAGE_TARGET_SIZE/)
+  assert.match(compressor, /for \(const quality of MENU_IMAGE_WEBP_QUALITIES\)/)
+  assert.match(compressor, /canvasToBlob\(canvas, 'image\/webp', quality\)/)
   assert.match(compressor, /blob\.type !== 'image\/webp'/)
-  assert.match(compressor, /return file/)
-  assert.match(compressor, /file\.type === 'image\/webp' && file\.size <= blob\.size/)
-  assert.match(compressor, /new File\(\[file\]/)
+  assert.match(compressor, /blob\.size <= MAX_MENU_IMAGE_BYTES/)
+  assert.match(compressor, /compressed below 100 KB/)
+  assert.doesNotMatch(compressor, /return file/)
+  assert.doesNotMatch(compressor, /file\.type === 'image\/webp' && file\.size <= blob\.size/)
+  assert.match(compressor, /new File\(\[blob\]/)
 })
 
 test('R2 menu image uploads use long-lived immutable browser caching', () => {
@@ -70,22 +81,29 @@ test('R2 menu image uploads use long-lived immutable browser caching', () => {
   assert.match(r2, /CacheControl: 'public, max-age=31536000, immutable'/)
 })
 
-test('R2 menu image uploads accept images and keep matching file extensions', () => {
+test('R2 menu image uploads only accept enforced 600px WebP assets', () => {
   const r2 = readSource('api/menu-image/_lib/r2.js')
   const upload = readSource('api/menu-image/upload.js')
 
+  assert.match(r2, /import sharp from 'sharp'/)
+  assert.match(r2, /const MENU_IMAGE_TARGET_SIZE = 600/)
+  assert.match(r2, /const MAX_MENU_IMAGE_BYTES = 100 \* 1024/)
   assert.match(r2, /startsWith\('image\/'\)/)
-  assert.match(r2, /'image\/png': 'png'/)
-  assert.match(r2, /'image\/jpeg': 'jpg'/)
   assert.match(r2, /'image\/webp': 'webp'/)
+  assert.match(r2, /contentType !== 'image\/webp'/)
+  assert.match(r2, /file\.buffer\.length > MAX_MENU_IMAGE_BYTES/)
+  assert.match(r2, /sharp\(file\.buffer, \{ animated: false \}\)\.metadata\(\)/)
+  assert.match(r2, /metadata\.width !== MENU_IMAGE_TARGET_SIZE \|\| metadata\.height !== MENU_IMAGE_TARGET_SIZE/)
   assert.match(r2, /extensionForContentType\(contentType\)/)
+  assert.match(upload, /await assertImageFile\(file\)/)
   assert.match(upload, /contentType: file\.contentType/)
 })
 
 test('R2 menu image uploads still reject mislabeled WebP bytes', () => {
   const r2 = readSource('api/menu-image/_lib/r2.js')
 
-  assert.match(r2, /String\(file\.contentType \|\| ''\)\.toLowerCase\(\) === 'image\/webp'/)
+  assert.match(r2, /const contentType = String\(file\.contentType \|\| ''\)\.toLowerCase\(\)/)
+  assert.match(r2, /contentType !== 'image\/webp'/)
   assert.match(r2, /function isWebpBuffer/)
   assert.match(r2, /This file is named WebP but contains different image data/)
 })
@@ -116,15 +134,22 @@ test('AdminMenu cleans up replaced or cancelled uploaded menu images', () => {
   assert.match(adminMenu, /onUploadComplete=\{upload => handleTrackedUpload\(uploadedCatImageUrlsRef, upload\)\}/)
 })
 
-test('menu image optimization script targets real WebP files under 50 KB', () => {
+test('menu image optimization script targets real 600px WebP files under 100 KB', () => {
   const pkg = JSON.parse(readSource('package.json'))
   const script = readSource('scripts/optimize-menu-images.js')
 
   assert.equal(pkg.scripts['optimize:menu-images'], 'node scripts/optimize-menu-images.js')
   assert.match(script, /import sharp from 'sharp'/)
-  assert.match(script, /const DEFAULT_TARGET_BYTES = 50 \* 1024/)
+  assert.match(script, /const DEFAULT_TARGET_BYTES = 100 \* 1024/)
+  assert.match(script, /const MENU_IMAGE_TARGET_SIZE = 600/)
+  assert.match(script, /const targetDimension = MENU_IMAGE_TARGET_SIZE/)
+  assert.match(script, /fit: 'cover'/)
+  assert.match(script, /position: 'center'/)
+  assert.match(script, /width: targetDimension/)
+  assert.match(script, /height: targetDimension/)
   assert.match(script, /\.webp\(\{\s*quality,/)
   assert.match(script, /isRealWebp\(image\.buffer\) && image\.buffer\.length <= targetBytes/)
+  assert.match(script, /Dimensions: \$\{targetDimension\}x\$\{targetDimension\}px/)
   assert.match(script, /Rerun with --apply to update images/)
 })
 
@@ -415,8 +440,7 @@ test('public and waiter menu cards stay dense enough for tablet browsing', () =>
   const publicMenu = readSource('src/pages/PublicMenu.jsx')
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
 
-  assert.match(productCards, /showCompactPublicCard \? 'aspect-\[4\/3\]/)
-  assert.match(productCards, /dense \? 'aspect-\[2\/1\]/)
+  assert.match(productCards, /relative aspect-square w-full flex-shrink-0 overflow-hidden bg-orange-50/)
   assert.match(productCards, /group flex h-full flex-col/)
   assert.match(productCards, /showCompactPublicCard \? 'mt-auto mb-0 items-end pt-2'/)
   assert.match(productCards, /pricing\.discounted \? 'text-red-600' : 'text-\[#ff5a00\]'/)
@@ -425,7 +449,7 @@ test('public and waiter menu cards stay dense enough for tablet browsing', () =>
   assert.match(productCards, /showCompactPublicCard \? 'text-\[16px\] sm:text-\[19px\]'/)
   assert.match(publicMenu, /grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4/)
   assert.match(waiterOrder, /density="compact"/)
-  assert.doesNotMatch(productCards, /showCompactPublicCard \? 'aspect-square/)
+  assert.doesNotMatch(productCards, /aspect-\[4\/3\]|aspect-\[2\/1\]/)
   assert.doesNotMatch(productCards, /showCompactPublicCard \? 'text-\[#0F1F33\]'/)
 })
 
@@ -570,8 +594,8 @@ test('MenuCategoryScroller collapsed chips do not overlap expanded category card
   assert.match(source, /aria-pressed=\{active\}/)
   assert.match(source, /min-w-\[92px\] w-\[92px\]/)
   assert.match(source, /text-\[10\.5px\]/)
-  assert.match(source, /scale-\[1\.04\] object-cover object-top/)
-  assert.doesNotMatch(source, /object-cover object-center/)
+  assert.match(source, /object-cover object-center/)
+  assert.doesNotMatch(source, /scale-\[1\.04\] object-cover object-top/)
   assert.match(source, /rounded-\[18px\]/)
   assert.match(source, /shadow-none ring-1 ring-inset ring-\[#ff5a1f\]\/10/)
   assert.doesNotMatch(source, /shadow-\[0_8px_18px_rgba\(255,90,31,0\.16\)\]/)

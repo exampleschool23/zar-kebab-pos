@@ -506,7 +506,7 @@ export default function PublicMenu({ premium = false }) {
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div key={idx} className="overflow-hidden rounded-[18px] border border-[#E5E7EB] bg-white shadow-sm">
-                <div className="aspect-[4/3] animate-pulse bg-orange-50" />
+                <div className="aspect-square animate-pulse bg-orange-50" />
                 <div className="space-y-2.5 p-3">
                   <div className="h-4 w-2/3 animate-pulse rounded bg-gray-100" />
                   <div className="h-5 w-1/2 animate-pulse rounded bg-gray-100" />
