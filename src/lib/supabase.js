@@ -12,9 +12,25 @@ if (missingConfig && isBrowser) {
 
 export const isSupabaseConfigured = !missingConfig
 
+function withNoCacheHeaders(headers) {
+  const next = new Headers(headers || {})
+  next.set('Cache-Control', 'no-cache')
+  next.set('Pragma', 'no-cache')
+  return next
+}
+
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
+  supabaseAnonKey || 'placeholder-key',
+  {
+    global: {
+      fetch: (input, init = {}) => fetch(input, {
+        ...init,
+        cache: 'no-store',
+        headers: withNoCacheHeaders(init.headers),
+      }),
+    },
+  }
 )
 
 export async function getProfile(userId) {

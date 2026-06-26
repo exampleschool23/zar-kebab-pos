@@ -622,20 +622,24 @@ export default function Receipt() {
     const order = state.orders.find(o => o.id === orderId)
     if (!order) return null
 
-    // For paid orders: find all rounds from the same session (same table + paid_at minute).
-    // For unpaid orders: find all active rounds for the table.
-    const allOrders = order.payment_status === 'paid' && order.paid_at
-      ? state.orders.filter(
-          o => o.table_id === order.table_id &&
-               o.payment_status === 'paid' &&
-               o.paid_at?.slice(0, 16) === order.paid_at.slice(0, 16)
-        )
-      : (() => {
-          const siblings = state.orders.filter(
-            o => o.table_id === order.table_id && o.payment_status !== 'paid'
+    const isOffPremise = isOffPremiseOrderType(inferOrderType(order))
+
+    // Off-premise bills do not share a table, so the order route must stay
+    // one receipt per order. Dine-in table receipts can still merge rounds.
+    const allOrders = isOffPremise
+      ? [order]
+      : order.payment_status === 'paid' && order.paid_at
+        ? state.orders.filter(
+            o => o.table_id === order.table_id &&
+                 o.payment_status === 'paid' &&
+                 o.paid_at?.slice(0, 16) === order.paid_at.slice(0, 16)
           )
-          return siblings.length > 0 ? siblings : [order]
-        })()
+        : (() => {
+            const siblings = state.orders.filter(
+              o => o.table_id === order.table_id && o.payment_status !== 'paid'
+            )
+            return siblings.length > 0 ? siblings : [order]
+          })()
 
     const allItems = normalizeReceiptItems(allOrders.flatMap(o => o.items || []), menuItemMap)
     const items = getReceiptItems(allItems, menuItemMap, lang)

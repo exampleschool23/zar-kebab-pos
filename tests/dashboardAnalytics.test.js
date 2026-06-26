@@ -9,6 +9,7 @@ import {
   getDashboardSalesByCategory,
   getDashboardStaffPerformance,
 } from '../src/lib/dashboardAnalytics.js'
+import { toRestaurantDateStr } from '../src/lib/analytics.js'
 
 const menuItemMap = {
   kebab: { id: 'kebab', category_id: 'kebab', image_url: 'kebab.jpg' },
@@ -110,6 +111,29 @@ test('dashboard selected period filters revenue payments categories and best sel
   assert.deepEqual(data.categories.map(row => row.name), ['Kebab', 'Drinks'])
   assert.deepEqual(data.best.map(row => row.menuItemId), ['kebab', 'cola'])
   assert.deepEqual(data.staff.map(row => row.name), ['Jasurbek'])
+})
+
+test('dashboard today period uses restaurant timezone instead of device timezone', () => {
+  const edgeOrders = [
+    order({
+      id: 'restaurant-today',
+      paidAt: '2026-05-19T19:30:00.000Z',
+      items: [item('kebab', 'Kebab', 1, 25000)],
+      total: 25000,
+    }),
+    order({
+      id: 'restaurant-yesterday',
+      paidAt: '2026-05-18T18:30:00.000Z',
+      items: [item('cola', 'Cola', 1, 12000)],
+      total: 12000,
+    }),
+  ]
+
+  assert.equal(toRestaurantDateStr('2026-05-19T19:30:00.000Z'), '2026-05-20')
+  assert.deepEqual(
+    getDashboardPeriodOrders(edgeOrders, 'today', new Date('2026-05-19T20:00:00.000Z')).map(row => row.id),
+    ['restaurant-today']
+  )
 })
 
 test('dashboard period change from today to 7 days removes stale today-only category and dish data', () => {

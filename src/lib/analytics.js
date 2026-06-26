@@ -1,6 +1,42 @@
 import { inferOrderType, isOffPremiseOrderType } from './orderTypes.js'
 import { getOrderItemBasePrice, getOrderItemUnitPrice, normalizePriceMode } from './priceModes.js'
 
+export const RESTAURANT_TIME_ZONE = 'Asia/Tashkent'
+export const RESTAURANT_UTC_OFFSET_MINUTES = 5 * 60
+
+function toRestaurantDate(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (isNaN(date.getTime())) return null
+  return new Date(date.getTime() + RESTAURANT_UTC_OFFSET_MINUTES * 60 * 1000)
+}
+
+export function toRestaurantDateStr(value) {
+  const date = toRestaurantDate(value)
+  if (!date) return ''
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, '0'),
+    String(date.getUTCDate()).padStart(2, '0'),
+  ].join('-')
+}
+
+export function restaurantTodayStr(now = new Date()) {
+  return toRestaurantDateStr(now)
+}
+
+export function getRestaurantHour(value = new Date()) {
+  const date = toRestaurantDate(value)
+  return date ? date.getUTCHours() : 0
+}
+
+export function addRestaurantDays(dateStr, days) {
+  if (!dateStr) return ''
+  const [year, month, day] = String(dateStr).split('-').map(Number)
+  if (!year || !month || !day) return ''
+  const date = new Date(Date.UTC(year, month - 1, day + Number(days || 0), 12, 0, 0))
+  return toRestaurantDateStr(date)
+}
+
 export function isPaidOrder(o) {
   if (!o) return false
   if (o.status === 'cancelled' || o.payment_status === 'cancelled') return false
@@ -525,14 +561,7 @@ export function getGroupedOrderItems(items, resolveName) {
 }
 
 export function toLocalDateStr(iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
-  ].join('-')
+  return toRestaurantDateStr(iso)
 }
 
 export function matchesRange(o, from, to) {

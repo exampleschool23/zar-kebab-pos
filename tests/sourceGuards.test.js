@@ -266,6 +266,18 @@ test('new signed-up users always start as guest', () => {
   assert.doesNotMatch(migration, /raw_user_meta_data->>'role'/)
 })
 
+test('Supabase browser reads bypass HTTP cache for live POS data', () => {
+  const supabase = readSource('src/lib/supabase.js')
+
+  assert.match(supabase, /function withNoCacheHeaders\(headers\)/)
+  assert.match(supabase, /new Headers\(headers \|\| \{\}\)/)
+  assert.match(supabase, /global:\s*\{\s*fetch:/)
+  assert.match(supabase, /cache: 'no-store'/)
+  assert.match(supabase, /next\.set\('Cache-Control', 'no-cache'\)/)
+  assert.match(supabase, /next\.set\('Pragma', 'no-cache'\)/)
+  assert.doesNotMatch(supabase, /\.\.\.\(init\.headers \|\| \{\}\)/)
+})
+
 test('AdminUsers can delete profiles without touching historical order names', () => {
   const adminUsers = readSource('src/pages/AdminUsers.jsx')
   const supabase = readSource('src/lib/supabase.js')
@@ -1367,6 +1379,9 @@ test('Receipt hides payment method rows and uses paid timestamp when available',
   assert.doesNotMatch(receiptPaper, /labels\.payment/)
   assert.doesNotMatch(receiptPaper, /payments\?\.length/)
   assert.doesNotMatch(receiptPaper, /Payment ·/)
+  assert.match(receipt, /const isOffPremise = isOffPremiseOrderType\(inferOrderType\(order\)\)/)
+  assert.match(receipt, /const allOrders = isOffPremise\s*\?\s*\[order\]/)
+  assert.match(receipt, /o\.table_id === order\.table_id && o\.payment_status !== 'paid'/)
   assert.match(receipt, /receiptAt:\s+order\.paid_at \|\| order\.created_at/)
   assert.match(tableReceiptRoute, /receiptAt:\s+orders\[0\]\?\.paid_at \|\| orders\[0\]\?\.created_at/)
   assert.match(receipt, /import \{ formatDateTime \} from '\.\.\/lib\/dateFormat'/)

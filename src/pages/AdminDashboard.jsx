@@ -11,13 +11,16 @@ import { getAllProfiles } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatDateOnly, formatLongDate, normalizeDateLang } from '../lib/dateFormat'
 import {
+  addRestaurantDays,
+  getRestaurantHour,
   getOrderDate,
   getOrderItems,
   getOrderTotal,
   groupOrdersBySession,
   isActiveNeedsBillOrder,
   isPaidOrder,
-  toLocalDateStr,
+  restaurantTodayStr,
+  toRestaurantDateStr,
 } from '../lib/analytics'
 import {
   formatReadableDateTime,
@@ -209,11 +212,11 @@ const L = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function localDateStr(d) {
-  return toLocalDateStr(d instanceof Date ? d.toISOString() : d)
+  return toRestaurantDateStr(d)
 }
 
-function todayStr()     { return localDateStr(new Date()) }
-function yesterdayStr() { const d = new Date(); d.setDate(d.getDate() - 1); return localDateStr(d) }
+function todayStr()     { return restaurantTodayStr() }
+function yesterdayStr() { return addRestaurantDays(todayStr(), -1) }
 
 function isOrderInPeriod(order, period) {
   return isOrderInDashboardPeriod(order, period)
@@ -518,11 +521,11 @@ export default function AdminDashboard() {
       const yesterday = yesterdayStr()
       const todayPaid = paidOrders.filter(o => localDateStr(getOrderDate(o)) === today)
       const yestPaid  = paidOrders.filter(o => localDateStr(getOrderDate(o)) === yesterday)
-      const currentHour = now.getHours()
+      const currentHour = getRestaurantHour(now)
       const bars = Array.from({ length: currentHour + 1 }, (_, h) => ({
         label:   `${h}:00`,
         revenue: todayPaid
-          .filter(o => new Date(getOrderDate(o)).getHours() === h)
+          .filter(o => getRestaurantHour(getOrderDate(o)) === h)
           .reduce((s, o) => s + getOrderTotal(o), 0),
         isToday: h === currentHour,
       }))
@@ -534,13 +537,9 @@ export default function AdminDashboard() {
     }
 
     if (period === '7days') {
-      const days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(); d.setDate(d.getDate() - (6 - i)); return localDateStr(d)
-      })
-      const prev = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(); d.setDate(d.getDate() - (13 - i)); return localDateStr(d)
-      })
       const todayDs = todayStr()
+      const days = Array.from({ length: 7 }, (_, i) => addRestaurantDays(todayDs, -(6 - i)))
+      const prev = Array.from({ length: 7 }, (_, i) => addRestaurantDays(todayDs, -(13 - i)))
       const bars = days.map(ds => ({
         label:   formatLongDate(ds, lang, ds, { includeYear: false }),
         revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
@@ -556,10 +555,10 @@ export default function AdminDashboard() {
     }
 
     if (period === 'month') {
-      const year  = now.getFullYear()
-      const month = now.getMonth()
-      const daysInMonth = new Date(year, month + 1, 0).getDate()
       const todayDs = todayStr()
+      const [year, monthNumber] = todayDs.split('-').map(Number)
+      const month = monthNumber - 1
+      const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
       const bars = Array.from({ length: daysInMonth }, (_, i) => {
         const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
         return {
@@ -571,7 +570,7 @@ export default function AdminDashboard() {
       // Previous month
       const prevMonth     = month === 0 ? 11 : month - 1
       const prevYear      = month === 0 ? year - 1 : year
-      const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate()
+      const daysInPrevMonth = new Date(Date.UTC(prevYear, prevMonth + 1, 0)).getUTCDate()
       const prevTotal = Array.from({ length: daysInPrevMonth }, (_, i) => {
         const ds = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
         return paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0)
@@ -584,15 +583,15 @@ export default function AdminDashboard() {
     }
 
     // year
-    const year = now.getFullYear()
     const todayDs = todayStr()
+    const year = Number(todayDs.slice(0, 4))
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     const bars = Array.from({ length: 12 }, (_, m) => {
       const prefix = `${year}-${String(m + 1).padStart(2, '0')}-`
       return {
         label:   monthNames[m],
         revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)).startsWith(prefix)).reduce((s, o) => s + getOrderTotal(o), 0),
-        isToday: localDateStr(new Date()).startsWith(prefix),
+        isToday: todayDs.startsWith(prefix),
       }
     })
     return {

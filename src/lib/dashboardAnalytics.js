@@ -1,8 +1,10 @@
 import {
+  addRestaurantDays,
   getOrderDate,
   getOrderItems,
   getOrderPaymentBreakdown,
   getOrderTotal,
+  restaurantTodayStr,
   toLocalDateStr,
 } from './analytics.js'
 import { getOrderItemUnitPrice } from './priceModes.js'
@@ -14,7 +16,7 @@ function localDateStr(value) {
 import { formatDateTime } from './dateFormat.js'
 
 function todayStr(now = new Date()) {
-  return localDateStr(now)
+  return restaurantTodayStr(now)
 }
 
 export function isOrderInDashboardPeriod(order, period, now = new Date()) {
@@ -24,18 +26,19 @@ export function isOrderInDashboardPeriod(order, period, now = new Date()) {
   if (period === 'today') return ds === todayStr(now)
 
   if (period === '7days') {
-    const start = new Date(now)
-    start.setDate(start.getDate() - 6)
-    return ds >= localDateStr(start) && ds <= todayStr(now)
+    const today = todayStr(now)
+    const start = addRestaurantDays(today, -6)
+    return ds >= start && ds <= today
   }
 
   if (period === 'month') {
-    const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-`
+    const today = todayStr(now)
+    const prefix = today.slice(0, 8)
     return ds.startsWith(prefix)
   }
 
   if (period === 'year') {
-    return ds.startsWith(`${now.getFullYear()}-`)
+    return ds.startsWith(`${todayStr(now).slice(0, 4)}-`)
   }
 
   return true
