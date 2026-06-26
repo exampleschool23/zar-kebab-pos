@@ -197,11 +197,11 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
       </div>
 
       <div className={`${showCompactPublicCard ? 'p-3 pt-2.5' : dense ? 'p-2.5' : 'p-3'} flex flex-col flex-1`}>
-        <h3 className={`${showCompactPublicCard ? 'text-[15px]' : dense ? 'text-[14px] mb-0.5 flex-1' : 'text-[15px] mb-1 flex-1'} font-bold text-[#1F2937] line-clamp-2 leading-snug`}>
+        <h3 className={`${showCompactPublicCard ? 'text-[13px] sm:text-[15px]' : dense ? 'text-[14px] mb-0.5 flex-1' : 'text-[15px] mb-1 flex-1'} font-bold text-[#1F2937] line-clamp-2 leading-snug`}>
           {getItemName(item, lang)}
         </h3>
         {showCompactPublicCard && getItemDesc(item, lang) && (
-          <FadingMenuDescription text={getItemDesc(item, lang)} className="mt-0.5 min-h-[16px] text-[12px] leading-snug text-[#8A94A6]" />
+          <FadingMenuDescription text={getItemDesc(item, lang)} className="mt-0.5 min-h-[15px] text-[11px] leading-snug text-[#8A94A6] sm:min-h-[16px] sm:text-[12px]" />
         )}
         {!showCompactPublicCard && getItemDesc(item, lang) && (
           <FadingMenuDescription text={getItemDesc(item, lang)} className={`${dense ? 'text-[11px] mb-1' : 'text-[12px] mb-1.5'} text-[#9CA3AF]`} />
@@ -211,7 +211,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             {pricing.discounted && (
               <p className={`${showCompactPublicCard ? 'text-[13px]' : 'text-[12px]'} font-bold text-[#9CA3AF] line-through`}>{formatPrice(pricing.oldPrice)}</p>
             )}
-            <p className={`${pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[18px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
+            <p className={`${pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[16px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
               {formatPrice(pricing.price)}
             </p>
           </div>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Instagram, Phone, Send, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Instagram, Phone, Search, Send, UtensilsCrossed, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
@@ -19,7 +19,6 @@ import { useApp } from '../store/AppContext'
 import { findMenuItemByLinkKey, getMenuItemPublicPath } from '../lib/menuLinks'
 import { getMenuItemForPriceMode } from '../lib/priceModes'
 import LanguageSwitcher from '../components/LanguageSwitcher'
-import AnimatedSearch from '../components/AnimatedSearch'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
 import {
   ProductCard as MenuProductCard,
@@ -48,7 +47,7 @@ function HeaderSelect({ value, onChange, options, ariaLabel, className = '' }) {
         value={value}
         onChange={event => onChange(event.target.value)}
         aria-label={ariaLabel}
-        className="h-full appearance-none rounded-xl bg-transparent px-3 py-0 text-xs font-black uppercase outline-none"
+        className="h-full appearance-none rounded-xl bg-transparent py-0 pl-3 pr-7 text-xs font-black uppercase outline-none"
       >
         {options.map(option => (
           <option key={option.value} value={option.value}>
@@ -56,6 +55,7 @@ function HeaderSelect({ value, onChange, options, ariaLabel, className = '' }) {
           </option>
         ))}
       </select>
+      <ChevronDown size={13} strokeWidth={3} className="pointer-events-none absolute right-2.5 text-[#64748B]" />
     </label>
   )
 }
@@ -88,6 +88,122 @@ function PublicContactButtons({ className = '' }) {
       >
         <Instagram size={16} />
       </a>
+    </div>
+  )
+}
+
+function MenuSectionHeader({ title, tone = 'default' }) {
+  const titleClass = tone === 'deal' ? 'text-red-600' : 'text-[#1F2937]'
+
+  return (
+    <div className="mb-4 flex items-center gap-4 sm:mb-5 sm:gap-5">
+      <div className="h-px min-w-0 flex-1 bg-[#C9C9C9]" />
+      <h2 className={`max-w-[70%] flex-shrink-0 text-center text-[24px] font-black leading-none tracking-tight sm:text-[30px] ${titleClass}`}>
+        {title}
+      </h2>
+      <div className="h-px min-w-0 flex-1 bg-[#C9C9C9]" />
+    </div>
+  )
+}
+
+function MobileSearchPage({
+  open,
+  value,
+  onChange,
+  onClose,
+  items,
+  lang,
+  onOpenDetail,
+  formatPrice,
+  linkBasePath,
+}) {
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const frame = requestAnimationFrame(() => inputRef.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [open])
+
+  if (!open) return null
+
+  const labels = {
+    title: lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search',
+    placeholder: lang === 'uz' ? 'Menyudan qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...',
+    clear: lang === 'uz' ? 'Tozalash' : lang === 'ru' ? 'Очистить' : 'Clear',
+    close: lang === 'uz' ? 'Yopish' : lang === 'ru' ? 'Закрыть' : 'Close',
+    emptyTitle: lang === 'uz' ? 'Hech narsa topilmadi' : lang === 'ru' ? 'Ничего не найдено' : 'No results found',
+    emptyText: lang === 'uz' ? 'Boshqa nom yoki taomni qidirib ko‘ring.' : lang === 'ru' ? 'Попробуйте другое название или блюдо.' : 'Try another dish name or keyword.',
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex flex-col bg-white text-[#1F2937]">
+      <div className="sticky top-0 z-10 border-b border-[#E5E7EB] bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="mb-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={labels.close}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-[#64748B] transition-colors hover:border-orange-200 hover:text-[#ff5a00]"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="text-lg font-black text-[#1F2937]">{labels.title}</h1>
+        </div>
+
+        <div className="relative flex h-12 items-center rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/20">
+          <Search size={18} className="pointer-events-none absolute left-4 text-[#9CA3AF]" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={event => onChange(event.target.value)}
+            placeholder={labels.placeholder}
+            className="h-full w-full bg-transparent pl-12 pr-12 text-base text-[#1F2937] placeholder-[#9CA3AF] outline-none"
+          />
+          {value && (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              aria-label={labels.clear}
+              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-[#9CA3AF] transition-colors hover:bg-white hover:text-[#ff5a00]"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-5">
+        {items.length === 0 ? (
+          <div className="flex min-h-[45vh] flex-col items-center justify-center text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
+              <UtensilsCrossed size={28} className="text-orange-300" />
+            </div>
+            <p className="font-black text-[#1F2937]">{labels.emptyTitle}</p>
+            <p className="mt-1 max-w-[260px] text-sm text-[#8A94A6]">{labels.emptyText}</p>
+          </div>
+        ) : (
+          <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-4 pb-6 md:grid-cols-3 xl:grid-cols-4">
+            {items.map((item, index) => (
+              <MenuProductCard
+                key={item.id}
+                item={item}
+                qty={0}
+                lang={lang}
+                eager={index < 4}
+                onOpenDetail={itemToOpen => {
+                  onClose()
+                  onOpenDetail(itemToOpen)
+                }}
+                readOnly
+                formatPrice={formatPrice}
+                linkBasePath={linkBasePath}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -139,6 +255,7 @@ export default function PublicMenu({ premium = false }) {
   const [error, setError] = useState('')
   const [detailItem, setDetailItem] = useState(null)
   const [missingItemLink, setMissingItemLink] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [headerOffset, setHeaderOffset] = useState(() => globalThis.window?.innerWidth < 640 ? 122 : 73)
   const [premiumLang, setPremiumLang] = useState('en')
   const [menuCurrency, setMenuCurrency] = useState(() => premium ? 'USD' : getDefaultMenuCurrency())
@@ -237,7 +354,7 @@ export default function PublicMenu({ premium = false }) {
     return () => { cancelled = true }
   }, [menuCurrency])
 
-  const q = search.trim().toLowerCase()
+  const searchQuery = search.trim().toLowerCase()
   const displayItems = useMemo(
     () => premium ? items.map(item => getMenuItemForPriceMode(item, 'tourist')) : items,
     [items, premium]
@@ -252,24 +369,24 @@ export default function PublicMenu({ premium = false }) {
     [categories, itemCounts]
   )
 
-  const filteredItems = useMemo(() => {
+  const searchResults = useMemo(() => {
     return displayItems.filter(item => {
       const names = [item.name_uz, item.name_ru, item.name_en, item.description_uz, item.description_ru, item.description_en]
-      const matchesSearch = !q || names.some(value => value?.toLowerCase().includes(q))
+      const matchesSearch = !searchQuery || names.some(value => value?.toLowerCase().includes(searchQuery))
       return matchesSearch
     })
-  }, [displayItems, q])
+  }, [displayItems, searchQuery])
 
   const groupedSections = useMemo(() => {
     const sections = categories
       .map(cat => ({
         cat,
-        items: filteredItems.filter(item => item.category_id === cat.id),
+        items: displayItems.filter(item => item.category_id === cat.id),
       }))
       .filter(section => section.items.length > 0)
 
     const categoryIds = new Set(categories.map(cat => cat.id))
-    const uncategorized = filteredItems.filter(item => !categoryIds.has(item.category_id))
+    const uncategorized = displayItems.filter(item => !categoryIds.has(item.category_id))
     if (uncategorized.length > 0) {
       sections.push({
         cat: { id: 'uncategorized', name_uz: 'Boshqa', name_ru: 'Другое', name_en: 'Other' },
@@ -278,11 +395,11 @@ export default function PublicMenu({ premium = false }) {
     }
 
     return sections
-  }, [categories, filteredItems])
+  }, [categories, displayItems])
 
   const dealItems = useMemo(() =>
-    filteredItems.filter(item => getMenuPricing(item).discounted),
-    [filteredItems]
+    displayItems.filter(item => getMenuPricing(item).discounted),
+    [displayItems]
   )
   const priceFormatter = useMemo(
     () => amount => formatMenuCurrency(amount, menuCurrency, currencyRates),
@@ -323,31 +440,33 @@ export default function PublicMenu({ premium = false }) {
   return (
     <div className="min-h-screen bg-white text-[#1F2937]" style={{ paddingTop: headerOffset }}>
       <header ref={headerRef} className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
-        <div className="relative mx-auto flex max-w-[1280px] flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 pr-0 lg:pr-36">
-            <div className="flex flex-shrink-0 items-center gap-3">
+        <div className="relative mx-auto grid max-w-[1280px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-2 px-4 py-2 sm:flex sm:flex-nowrap sm:gap-4 sm:py-3">
+          <div className="flex min-w-0 items-center gap-2 sm:flex-1 sm:gap-3 sm:pr-0 lg:pr-36">
+            <div className="flex min-w-0 flex-shrink items-center gap-2 sm:gap-3">
               <img
                 src={getBrandLogo(lang)}
                 alt="Zar Kebab"
-                className="h-12 w-auto max-w-[150px] object-contain"
+                className="h-10 w-auto max-w-[110px] flex-shrink-0 object-contain sm:h-12 sm:max-w-[150px]"
               />
-              <p className="text-xs font-bold uppercase tracking-wider text-[#ff5a00]">
+              <p className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wider text-[#ff5a00] sm:text-xs">
                 ZarKebab
               </p>
             </div>
-            <AnimatedSearch
-              value={search}
-              onChange={setSearch}
-              placeholder={lang === 'uz' ? 'Menyudan qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
-              searchLabel={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
-              clearLabel={lang === 'uz' ? 'Qidiruvni tozalash' : lang === 'ru' ? 'Очистить поиск' : 'Clear search'}
-              closeLabel={lang === 'uz' ? 'Qidiruvni yopish' : lang === 'ru' ? 'Закрыть поиск' : 'Close search'}
-            />
+          </div>
+          <div className="col-start-1 row-start-2 flex items-center sm:contents">
+            <button
+              type="button"
+              onClick={() => setMobileSearchOpen(true)}
+              aria-label={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-colors hover:border-orange-200 hover:bg-white hover:text-[#ff5a00] sm:h-10 sm:w-10"
+            >
+              <Search size={17} />
+            </button>
           </div>
 
-          <PublicContactButtons className="order-last w-full sm:absolute sm:left-1/2 sm:top-1/2 sm:order-none sm:w-auto sm:-translate-x-1/2 sm:-translate-y-1/2" />
+          <PublicContactButtons className="col-span-3 col-start-1 row-start-2 justify-self-center sm:absolute sm:left-1/2 sm:top-1/2 sm:w-auto sm:-translate-x-1/2 sm:-translate-y-1/2" />
 
-          <div className="flex flex-shrink-0 items-center gap-1.5">
+          <div className="col-start-2 row-start-1 flex flex-shrink-0 items-center gap-1.5">
             <HeaderSelect
               value={menuCurrency}
               onChange={changeMenuCurrency}
@@ -359,9 +478,9 @@ export default function PublicMenu({ premium = false }) {
             />
           </div>
           {premium ? (
-            <LanguageSwitcher value={lang} onChange={setPremiumLang} />
+            <LanguageSwitcher value={lang} onChange={setPremiumLang} className="col-start-3 row-start-1" />
           ) : (
-            <LanguageSwitcher />
+            <LanguageSwitcher className="col-start-3 row-start-1" />
           )}
         </div>
       </header>
@@ -429,7 +548,7 @@ export default function PublicMenu({ premium = false }) {
               {lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Вернуться в меню' : 'Back to menu'}
             </button>
           </div>
-        ) : filteredItems.length === 0 ? (
+        ) : displayItems.length === 0 ? (
           <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-10 text-center shadow-sm">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
               <UtensilsCrossed size={28} className="text-orange-300" />
@@ -446,14 +565,7 @@ export default function PublicMenu({ premium = false }) {
             <div className="space-y-7">
               {dealItems.length > 0 && (
                 <section id="public-menu-deals" className="scroll-mt-32">
-                  <div className="mb-3 flex items-center gap-2.5">
-                    <h2 className="text-xl font-black uppercase tracking-tight text-red-600">
-                      {dealsTitle}
-                    </h2>
-                    <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-bold text-red-600">
-                      {dealItems.length} {lang === 'uz' ? 'ta' : lang === 'ru' ? 'шт' : 'items'}
-                    </span>
-                  </div>
+                  <MenuSectionHeader title={dealsTitle} tone="deal" />
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                     {dealItems.map((item, index) => (
                       <MenuProductCard
@@ -477,14 +589,7 @@ export default function PublicMenu({ premium = false }) {
                   id={menuCategorySectionId('public-menu-category', section.cat.id)}
                   className="scroll-mt-32"
                 >
-                  <div className="mb-3 flex items-center gap-2.5">
-                    <h2 className="text-xl font-black uppercase tracking-tight text-[#1F2937]">
-                      {getCategoryName(section.cat, lang)}
-                    </h2>
-                    <span className="rounded-full bg-[#F3F4F6] px-2.5 py-0.5 text-xs font-bold text-[#6B7280]">
-                      {section.items.length} {lang === 'uz' ? 'ta' : lang === 'ru' ? 'шт' : 'items'}
-                    </span>
-                  </div>
+                  <MenuSectionHeader title={getCategoryName(section.cat, lang)} />
                   <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                     {section.items.map((item, index) => (
                       <MenuProductCard
@@ -505,7 +610,7 @@ export default function PublicMenu({ premium = false }) {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-              {filteredItems.map((item, index) => (
+              {displayItems.map((item, index) => (
                 <MenuProductCard
                   key={item.id}
                   item={item}
@@ -539,6 +644,17 @@ export default function PublicMenu({ premium = false }) {
           />
         </div>
       )}
+      <MobileSearchPage
+        open={mobileSearchOpen}
+        value={search}
+        onChange={setSearch}
+        onClose={() => setMobileSearchOpen(false)}
+        items={searchResults}
+        lang={lang}
+        onOpenDetail={openDetail}
+        formatPrice={priceFormatter}
+        linkBasePath={menuBasePath}
+      />
     </div>
   )
 }

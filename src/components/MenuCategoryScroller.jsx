@@ -16,7 +16,7 @@ function CategoryImage({ src, alt, active }) {
     <ImageLoadShimmer
       src={src}
       alt={alt}
-      className="h-full w-full object-cover object-center"
+      className="h-full w-full scale-[1.04] object-cover object-top"
       fallback={
         <div className="flex h-full w-full items-center justify-center bg-orange-50">
           <UtensilsCrossed size={28} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
@@ -34,7 +34,7 @@ function LargeCategoryCard({ category, active, title, onClick }) {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`min-w-[82px] w-[82px] flex-shrink-0 overflow-hidden rounded-[18px] border-2 text-center transition-all active:scale-[0.98] sm:min-w-[96px] sm:w-[96px] md:min-w-[108px] md:w-[108px] lg:min-w-[116px] lg:w-[116px] xl:min-w-[124px] xl:w-[124px] xl:rounded-[22px] ${
+      className={`min-w-[92px] w-[92px] flex-shrink-0 overflow-hidden rounded-[18px] border-2 text-center transition-all active:scale-[0.98] sm:min-w-[96px] sm:w-[96px] md:min-w-[108px] md:w-[108px] lg:min-w-[116px] lg:w-[116px] xl:min-w-[124px] xl:w-[124px] xl:rounded-[22px] ${
         active
           ? 'border-[#ff5a1f] bg-[#fff4ed] shadow-none ring-1 ring-inset ring-[#ff5a1f]/10'
           : 'border-[#E5E7EB] bg-white shadow-sm hover:border-orange-200 hover:shadow-md'
@@ -57,7 +57,7 @@ function LargeCategoryCard({ category, active, title, onClick }) {
       </div>
 
       <div className="flex min-h-[38px] items-center justify-center px-1.5 py-1.5 sm:min-h-[48px] sm:px-2 md:min-h-[52px] lg:min-h-[54px] xl:min-h-[58px] xl:px-2.5 xl:py-2.5">
-        <p className={`line-clamp-2 text-[11px] font-extrabold leading-tight sm:text-[12px] md:text-[13px] xl:text-sm ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
+        <p className={`line-clamp-2 text-[10.5px] font-extrabold leading-tight sm:text-[12px] md:text-[13px] xl:text-sm ${active ? 'text-[#ff4d00]' : 'text-[#1F2937]'}`}>
           {title}
         </p>
       </div>

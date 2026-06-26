@@ -444,11 +444,12 @@ function BottomTableChips({ currentTableId, onNewOrder }) {
 function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDecrement, onOpenDetail, eagerCount = 0 }) {
   return (
     <div>
-      <div className="flex items-center gap-2.5 mb-4">
-        <h2 className="font-black text-[18px] text-[#1F2937]">{getCategoryName(cat, lang)}</h2>
-        <span className="bg-[#F3F4F6] text-[#6B7280] text-[12px] font-bold px-2.5 py-0.5 rounded-full">
-          {items.length}
-        </span>
+      <div className="mb-4 flex items-center gap-4 sm:mb-5 sm:gap-5">
+        <div className="h-px min-w-0 flex-1 bg-[#C9C9C9]" />
+        <h2 className="max-w-[70%] flex-shrink-0 text-center text-[24px] font-black leading-none tracking-tight text-[#1F2937] sm:text-[30px]">
+          {getCategoryName(cat, lang)}
+        </h2>
+        <div className="h-px min-w-0 flex-1 bg-[#C9C9C9]" />
       </div>
       <div className="grid grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
         {items.map((item, index) => (
@@ -864,7 +865,7 @@ export default function WaiterOrder() {
 
           <button
             onClick={() => setCartOpen(true)}
-            className={`relative ml-auto flex-shrink-0 rounded-xl border font-black transition-all active:scale-[0.98] ${
+            className={`relative ml-auto min-w-0 max-w-[min(260px,38vw)] flex-shrink rounded-xl border font-black transition-all active:scale-[0.98] ${
               cartCount > 0
                 ? 'bg-[#ff5a00] border-[#ff5a00] text-white shadow-md shadow-orange-100 hover:bg-[#e64d00]'
                 : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-orange-200 hover:bg-orange-50'
@@ -873,9 +874,9 @@ export default function WaiterOrder() {
               ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
               : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
           >
-            <span className="flex h-10 items-center gap-2 px-3 sm:px-4">
-              <ShoppingCart size={17} />
-              <span className="hidden sm:inline whitespace-nowrap text-[13px]">
+            <span className="flex h-10 min-w-0 items-center gap-2 px-3 sm:px-4">
+              <ShoppingCart size={17} className="flex-shrink-0" />
+              <span className="hidden min-w-0 truncate whitespace-nowrap text-[13px] sm:inline">
                 {cartCount > 0
                   ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
                   : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
