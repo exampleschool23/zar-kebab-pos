@@ -17,6 +17,7 @@ export default function AuthCallback() {
   }
 
   useEffect(() => {
+    let cancelled = false
     const url = new URL(window.location.href)
     const hashParams   = new URLSearchParams(url.hash.replace(/^#/, ''))
     const oauthError   = url.searchParams.get('error')
@@ -38,35 +39,57 @@ export default function AuthCallback() {
       return
     }
 
-    // Give up after 15 seconds and redirect to login
+    function finish(path) {
+      if (cancelled) return
+      clearTimeout(giveUp)
+      navigate(path, { replace: true })
+    }
+
+    function fail(error) {
+      if (cancelled) return
+      const msg = error?.message || String(error || 'Sign in could not be completed')
+      log(`Auth callback error: ${msg}`)
+      clearTimeout(giveUp)
+      setErrorMsg(msg)
+      setTimeout(() => navigate('/login', { replace: true }), 5000)
+    }
+
+    function withTimeout(promise, label, ms = 10000) {
+      let timeoutId
+      const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`${label} timed out`)), ms)
+      })
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId))
+    }
+
     const giveUp = setTimeout(() => {
       log('Timeout — redirecting to login')
-      navigate('/login', { replace: true })
+      fail(new Error('OAuth callback timed out'))
     }, 15000)
 
     async function completeCodeSignIn() {
       if (!code) return false
       log('Exchanging OAuth code')
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+      const { data, error } = await withTimeout(
+        supabase.auth.exchangeCodeForSession(code),
+        'OAuth code exchange'
+      )
       if (error) {
         log(`Code exchange error: ${error.message}`)
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          'Session lookup',
+          5000
+        )
         if (session) {
-          clearTimeout(giveUp)
-          subscription.unsubscribe()
-          navigate(returnTo || '/', { replace: true })
+          finish(returnTo || '/')
           return true
         }
-        setErrorMsg(error.message)
-        clearTimeout(giveUp)
-        setTimeout(() => navigate('/login', { replace: true }), 5000)
-        return true
+        throw error
       }
       if (data?.session) {
         log('Code exchange complete')
-        clearTimeout(giveUp)
-        subscription.unsubscribe()
-        navigate(returnTo || '/', { replace: true })
+        finish(returnTo || '/')
         return true
       }
       return false
@@ -75,60 +98,50 @@ export default function AuthCallback() {
     async function completeHashSignIn() {
       if (!accessToken || !refreshToken) return false
       log('Setting OAuth hash session')
-      const { data, error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      })
+      const { data, error } = await withTimeout(
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        }),
+        'OAuth hash session'
+      )
       if (error) {
         log(`Hash session error: ${error.message}`)
-        setErrorMsg(error.message)
-        clearTimeout(giveUp)
-        setTimeout(() => navigate('/login', { replace: true }), 5000)
-        return true
+        throw error
       }
       if (data?.session) {
         log('Hash session complete')
-        clearTimeout(giveUp)
-        subscription.unsubscribe()
-        navigate(returnTo || '/', { replace: true })
+        finish(returnTo || '/')
         return true
       }
       return false
     }
 
-    // Keep listening for password recovery and already-established sessions.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      log(`onAuthStateChange: ${event}, session: ${!!session}`)
-      if (session) {
-        clearTimeout(giveUp)
-        subscription.unsubscribe()
-        if (event === 'PASSWORD_RECOVERY') {
-          navigate('/reset-password', { replace: true })
-          return
-        }
-        navigate(returnTo || '/', { replace: true })
-      }
-    })
-
-    // Also check immediately in case session is already set
-    completeCodeSignIn().then(exchanged => {
-      if (exchanged) return true
-      return completeHashSignIn()
-    }).then(exchanged => {
-      if (exchanged) return true
-      return supabase.auth.getSession().then(({ data: { session }, error }) => {
+    async function completeSignIn() {
+      try {
+        if (await completeCodeSignIn()) return
+        if (await completeHashSignIn()) return
+        const { data: { session }, error } = await withTimeout(
+          supabase.auth.getSession(),
+          'Session lookup',
+          5000
+        )
         log(`getSession: session=${!!session}, error=${error?.message || 'none'}`)
         if (session) {
-          clearTimeout(giveUp)
-          subscription.unsubscribe()
-          navigate(returnTo || '/', { replace: true })
+          finish(returnTo || '/')
+          return
         }
-      })
-    })
+        throw error || new Error('No session was returned by Supabase')
+      } catch (error) {
+        fail(error)
+      }
+    }
+
+    completeSignIn()
 
     return () => {
+      cancelled = true
       clearTimeout(giveUp)
-      subscription.unsubscribe()
     }
   }, [navigate])
 

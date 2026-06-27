@@ -248,7 +248,7 @@ function InternalAppRoutes({ adminHost = false }) {
         <Route path="/premium-menu/item/:itemId" element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu premium />} />
         <Route path="/catering"      element={adminHost ? <Navigate to="/admin" replace /> : <CateringPage />} />
         <Route path="/telegram"      element={adminHost ? <Navigate to="/admin" replace /> : <TelegramMiniApp />} />
-        <Route path="/login"         element={<SignedOutRoute><Login staffOnly={adminHost} /></SignedOutRoute>} />
+        <Route path="/login"         element={<SignedOutRoute><Login /></SignedOutRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pending-approval" element={<PendingApproval />} />

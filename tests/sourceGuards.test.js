@@ -223,12 +223,11 @@ test('protected deep links preserve their target through login', () => {
   assert.match(callback, /const hashParams\s+= new URLSearchParams\(url\.hash\.replace\(\W\^#\W, ''\)\)/)
   assert.match(callback, /function completeHashSignIn\(\)/)
   assert.match(callback, /supabase\.auth\.setSession\(\{[\s\S]*access_token: accessToken,[\s\S]*refresh_token: refreshToken/)
-  assert.match(callback, /navigate\(returnTo \|\| '\/', \{ replace: true \}\)/)
+  assert.match(callback, /finish\(returnTo \|\| '\/'\)/)
 })
 
 test('App splits customer and admin hostnames', () => {
   const app = readSource('src/App.jsx')
-  const login = readSource('src/pages/Login.jsx')
   const publicRoutes = functionBody(app, 'PublicCustomerRoutes')
   const internalRoutes = functionBody(app, 'InternalAppRoutes')
   const appRoutes = functionBody(app, 'AppRoutes')
@@ -250,19 +249,13 @@ test('App splits customer and admin hostnames', () => {
   assert.match(internalRoutes, /const signedOutPath = adminHost \? '\/admin' : '\/menu'/)
   assert.match(internalRoutes, /<Route path="\/"[\s\S]*adminHost \? <Navigate to="\/admin" replace \/> : <RoleRedirect signedOutPath=\{signedOutPath\} \/>/)
   assert.match(internalRoutes, /<Route path="\/menu"[\s\S]*adminHost \? <Navigate to="\/admin" replace \/> : <PublicMenu \/>/)
-  assert.match(internalRoutes, /<Route path="\/login"[\s\S]*<Login staffOnly=\{adminHost\} \/>/)
+  assert.match(internalRoutes, /<Route path="\/login"[\s\S]*<Login \/>/)
   assert.match(internalRoutes, /<Route path="\/admin" element=/)
   assert.match(internalRoutes, /<Route path="\/cashier\/tables" element=/)
   assert.match(internalRoutes, /<Route path="\/waiter\/tables" element=/)
   assert.match(appRoutes, /const publicOnlyHost = isPublicCustomerHost\(hostname\) && !isAdminHost\(hostname\)/)
   assert.match(appRoutes, /const adminHost = isAdminHost\(hostname\)/)
   assert.match(appRoutes, /\{publicOnlyHost \? <PublicCustomerRoutes \/> : <InternalAppRoutes adminHost=\{adminHost\} \/>\}/)
-  assert.match(login, /export default function Login\(\{ googleOnly = false, staffOnly = false \}\)/)
-  assert.match(login, /googleOnly = false,\s*\n\s*staffOnly = false,\s*\n\s*\}/)
-  assert.match(login, /googleOnly,\s*\n\s*staffOnly,\s*\n\s*\}/)
-  assert.match(login, /if \(staffOnly && mode === 'signup'\) setMode\('signin'\)/)
-  assert.match(login, /!\s*googleOnly && <form onSubmit=\{handleSubmit\}/)
-  assert.match(login, /!\s*staffOnly && !\s*googleOnly && <button[\s\S]*navigate\('\/menu'\)/)
 })
 
 test('AppContext exposes a stable dbDispatch callback', () => {
@@ -331,14 +324,15 @@ test('Supabase browser reads bypass HTTP cache for live POS data', () => {
   assert.doesNotMatch(supabase, /\.\.\.\(init\.headers \|\| \{\}\)/)
 })
 
-test('Supabase OAuth uses PKCE callbacks and keeps implicit hash fallback supported', () => {
+test('Supabase OAuth uses app-owned PKCE exchange and keeps implicit hash fallback supported', () => {
   const supabase = readSource('src/lib/supabase.js')
   const callback = readSource('src/pages/AuthCallback.jsx')
 
   assert.match(supabase, /auth:\s*\{[\s\S]*flowType: 'pkce'/)
-  assert.match(supabase, /detectSessionInUrl: true/)
+  assert.match(supabase, /detectSessionInUrl: false/)
   assert.match(supabase, /persistSession: true/)
   assert.match(supabase, /autoRefreshToken: true/)
+  assert.match(callback, /supabase\.auth\.exchangeCodeForSession\(code\)/)
   assert.match(callback, /hashParams\.get\('access_token'\)/)
   assert.match(callback, /hashParams\.get\('refresh_token'\)/)
 })
