@@ -18,12 +18,17 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const url = new URL(window.location.href)
+    const hashParams   = new URLSearchParams(url.hash.replace(/^#/, ''))
     const oauthError   = url.searchParams.get('error')
+      || hashParams.get('error')
     const oauthErrDesc = url.searchParams.get('error_description')
+      || hashParams.get('error_description')
     const code         = url.searchParams.get('code')
+    const accessToken  = hashParams.get('access_token')
+    const refreshToken = hashParams.get('refresh_token')
     const returnTo     = sanitizeReturnTo(url.searchParams.get('returnTo'))
 
-    log(`URL params — code: ${!!code}, error: ${oauthError || 'none'}`)
+    log(`URL params — code: ${!!code}, token: ${!!accessToken}, error: ${oauthError || 'none'}`)
 
     if (oauthError) {
       const msg = oauthErrDesc || oauthError
@@ -67,6 +72,30 @@ export default function AuthCallback() {
       return false
     }
 
+    async function completeHashSignIn() {
+      if (!accessToken || !refreshToken) return false
+      log('Setting OAuth hash session')
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+      if (error) {
+        log(`Hash session error: ${error.message}`)
+        setErrorMsg(error.message)
+        clearTimeout(giveUp)
+        setTimeout(() => navigate('/login', { replace: true }), 5000)
+        return true
+      }
+      if (data?.session) {
+        log('Hash session complete')
+        clearTimeout(giveUp)
+        subscription.unsubscribe()
+        navigate(returnTo || '/', { replace: true })
+        return true
+      }
+      return false
+    }
+
     // Keep listening for password recovery and already-established sessions.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       log(`onAuthStateChange: ${event}, session: ${!!session}`)
@@ -83,7 +112,10 @@ export default function AuthCallback() {
 
     // Also check immediately in case session is already set
     completeCodeSignIn().then(exchanged => {
-      if (exchanged) return
+      if (exchanged) return true
+      return completeHashSignIn()
+    }).then(exchanged => {
+      if (exchanged) return true
       return supabase.auth.getSession().then(({ data: { session }, error }) => {
         log(`getSession: session=${!!session}, error=${error?.message || 'none'}`)
         if (session) {

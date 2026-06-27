@@ -220,6 +220,9 @@ test('protected deep links preserve their target through login', () => {
   assert.match(auth, /redirectUrl\.searchParams\.set\('returnTo', returnTo\)/)
   assert.match(callback, /supabase\.auth\.exchangeCodeForSession\(code\)/)
   assert.match(callback, /function completeCodeSignIn\(\)/)
+  assert.match(callback, /const hashParams\s+= new URLSearchParams\(url\.hash\.replace\(\W\^#\W, ''\)\)/)
+  assert.match(callback, /function completeHashSignIn\(\)/)
+  assert.match(callback, /supabase\.auth\.setSession\(\{[\s\S]*access_token: accessToken,[\s\S]*refresh_token: refreshToken/)
   assert.match(callback, /navigate\(returnTo \|\| '\/', \{ replace: true \}\)/)
 })
 
@@ -326,6 +329,18 @@ test('Supabase browser reads bypass HTTP cache for live POS data', () => {
   assert.match(supabase, /next\.set\('Cache-Control', 'no-cache'\)/)
   assert.match(supabase, /next\.set\('Pragma', 'no-cache'\)/)
   assert.doesNotMatch(supabase, /\.\.\.\(init\.headers \|\| \{\}\)/)
+})
+
+test('Supabase OAuth uses PKCE callbacks and keeps implicit hash fallback supported', () => {
+  const supabase = readSource('src/lib/supabase.js')
+  const callback = readSource('src/pages/AuthCallback.jsx')
+
+  assert.match(supabase, /auth:\s*\{[\s\S]*flowType: 'pkce'/)
+  assert.match(supabase, /detectSessionInUrl: true/)
+  assert.match(supabase, /persistSession: true/)
+  assert.match(supabase, /autoRefreshToken: true/)
+  assert.match(callback, /hashParams\.get\('access_token'\)/)
+  assert.match(callback, /hashParams\.get\('refresh_token'\)/)
 })
 
 test('AdminUsers can delete profiles without touching historical order names', () => {
