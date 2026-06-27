@@ -95,6 +95,7 @@ function LoginCard({
   navigate,
   showLogo = true,
   className = '',
+  googleOnly = false,
 }) {
   return (
     <div className={`rounded-[34px] border border-[#D4AF37]/70 bg-[#07130F]/86 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-7 lg:p-7 ${className}`}>
@@ -146,7 +147,7 @@ function LoginCard({
         </button>
       )}
 
-      {!isForgot && (
+      {!isForgot && !googleOnly && (
         <div className="mb-4 flex items-center gap-5">
           <div className="h-px flex-1 bg-[#D4AF37]/15" />
           <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
@@ -154,7 +155,7 @@ function LoginCard({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-3.5">
+      {!googleOnly && <form onSubmit={handleSubmit} className="space-y-3.5">
         {isSignup && (
           <div>
             <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
@@ -285,9 +286,9 @@ function LoginCard({
               : t(lang, 'signIn')}
           {!loading && !isForgot && <ArrowRight size={22} className="transition-transform group-hover:translate-x-1" />}
         </button>
-      </form>
+      </form>}
 
-      <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
+      {!googleOnly && <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
         {!isForgot && !isSignup && (
           <>
             {t(lang, 'authNoAccountPremium')}{' '}
@@ -321,26 +322,26 @@ function LoginCard({
             {t(lang, 'backToSignIn')}
           </button>
         )}
-      </div>
+      </div>}
 
-      <div className="my-4 flex items-center gap-5">
+      {!googleOnly && <div className="my-4 flex items-center gap-5">
         <div className="h-px flex-1 bg-[#D4AF37]/15" />
         <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
         <div className="h-px flex-1 bg-[#D4AF37]/15" />
-      </div>
+      </div>}
 
-      <button
+      {!googleOnly && <button
         onClick={() => navigate('/menu')}
         className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/65 text-base font-black uppercase tracking-[0.16em] text-[#D4AF37] transition-all hover:border-[#D4AF37] hover:bg-[#D4AF37]/10"
       >
         <UserRound size={22} />
         {t(lang, 'premiumLoginGuest')}
-      </button>
+      </button>}
     </div>
   )
 }
 
-export default function Login() {
+export default function Login({ googleOnly = false }) {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuth()
   const { state } = useApp()
   const navigate = useNavigate()
@@ -365,6 +366,10 @@ export default function Login() {
   })
 
   function clearMessages() { setError(''); setInfo('') }
+
+  useEffect(() => {
+    if (googleOnly && mode !== 'signin') setMode('signin')
+  }, [googleOnly, mode])
 
   useEffect(() => {
     if (resetCooldownSeconds() <= 0) return
@@ -485,6 +490,7 @@ export default function Login() {
     handleSubmit,
     handleGoogle,
     navigate,
+    googleOnly,
   }
 
   return (
@@ -633,7 +639,7 @@ export default function Login() {
                 </button>
               )}
 
-              {!isForgot && (
+              {!isForgot && !googleOnly && (
                 <div className="mb-4 flex items-center gap-5">
                   <div className="h-px flex-1 bg-[#D4AF37]/15" />
                   <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
@@ -641,7 +647,7 @@ export default function Login() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-3.5">
+              {!googleOnly && <form onSubmit={handleSubmit} className="space-y-3.5">
                 {isSignup && (
                   <div>
                     <label className="mb-2 block text-sm font-bold text-[#F5EBD4]">
@@ -772,9 +778,9 @@ export default function Login() {
                       : t(lang, 'signIn')}
                   {!loading && !isForgot && <ArrowRight size={22} className="transition-transform group-hover:translate-x-1" />}
                 </button>
-              </form>
+              </form>}
 
-              <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
+              {!googleOnly && <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
                 {!isForgot && !isSignup && (
                   <>
                     {t(lang, 'authNoAccountPremium')}{' '}
@@ -808,21 +814,21 @@ export default function Login() {
                     {t(lang, 'backToSignIn')}
                   </button>
                 )}
-              </div>
+              </div>}
 
-              <div className="my-4 flex items-center gap-5">
+              {!googleOnly && <div className="my-4 flex items-center gap-5">
                 <div className="h-px flex-1 bg-[#D4AF37]/15" />
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
                 <div className="h-px flex-1 bg-[#D4AF37]/15" />
-              </div>
+              </div>}
 
-              <button
+              {!googleOnly && <button
                 onClick={() => navigate('/menu')}
                 className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/65 text-base font-black uppercase tracking-[0.16em] text-[#D4AF37] transition-all hover:border-[#D4AF37] hover:bg-[#D4AF37]/10"
               >
                 <UserRound size={22} />
                 {t(lang, 'premiumLoginGuest')}
-              </button>
+              </button>}
             </div>
 
             <p className="mt-4 flex items-center justify-center gap-2 text-center text-sm text-[#F5EBD4]/72">

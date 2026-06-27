@@ -39,8 +39,35 @@ export default function AuthCallback() {
       navigate('/login', { replace: true })
     }, 15000)
 
-    // Supabase automatically exchanges the code via detectSessionInUrl.
-    // We just listen for the resulting SIGNED_IN event.
+    async function completeCodeSignIn() {
+      if (!code) return false
+      log('Exchanging OAuth code')
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+      if (error) {
+        log(`Code exchange error: ${error.message}`)
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          clearTimeout(giveUp)
+          subscription.unsubscribe()
+          navigate(returnTo || '/', { replace: true })
+          return true
+        }
+        setErrorMsg(error.message)
+        clearTimeout(giveUp)
+        setTimeout(() => navigate('/login', { replace: true }), 5000)
+        return true
+      }
+      if (data?.session) {
+        log('Code exchange complete')
+        clearTimeout(giveUp)
+        subscription.unsubscribe()
+        navigate(returnTo || '/', { replace: true })
+        return true
+      }
+      return false
+    }
+
+    // Keep listening for password recovery and already-established sessions.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       log(`onAuthStateChange: ${event}, session: ${!!session}`)
       if (session) {
@@ -55,13 +82,16 @@ export default function AuthCallback() {
     })
 
     // Also check immediately in case session is already set
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      log(`getSession: session=${!!session}, error=${error?.message || 'none'}`)
-      if (session) {
-        clearTimeout(giveUp)
-        subscription.unsubscribe()
-        navigate(returnTo || '/', { replace: true })
-      }
+    completeCodeSignIn().then(exchanged => {
+      if (exchanged) return
+      return supabase.auth.getSession().then(({ data: { session }, error }) => {
+        log(`getSession: session=${!!session}, error=${error?.message || 'none'}`)
+        if (session) {
+          clearTimeout(giveUp)
+          subscription.unsubscribe()
+          navigate(returnTo || '/', { replace: true })
+        }
+      })
     })
 
     return () => {

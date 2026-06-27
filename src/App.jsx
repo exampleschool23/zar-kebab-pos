@@ -158,7 +158,7 @@ function LazyProtectedRoute({ page, children }) {
 }
 
 // Decides where to send user after login
-function RoleRedirect() {
+function RoleRedirect({ signedOutPath = '/menu' }) {
   const { session, profile, loading, signOut } = useAuth()
   const navigate = useNavigate()
   const [profileTimeout, setProfileTimeout] = React.useState(false)
@@ -167,7 +167,7 @@ function RoleRedirect() {
 
   useEffect(() => {
     if (loading) return
-    if (!session) { navigate('/menu', { replace: true }); return }
+    if (!session) { navigate(signedOutPath, { replace: true }); return }
     if (!profile) return
     if (profile?.status === 'disabled') return
     if (profile?.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
@@ -182,7 +182,7 @@ function RoleRedirect() {
   }, [session, profile, loading])
 
   if (loading) return <Spinner />
-  if (!session) return <Navigate to="/menu" replace />
+  if (!session) return <Navigate to={signedOutPath} replace />
   if (profile?.status === 'disabled') return <DisabledAccount signOut={signOut} />
 
   if (profileTimeout) {
@@ -230,18 +230,20 @@ function PublicCustomerRoutes() {
   )
 }
 
-function InternalAppRoutes() {
+function InternalAppRoutes({ adminHost = false }) {
+  const signedOutPath = adminHost ? '/admin' : '/menu'
+
   return (
     <Routes>
         {/* Public */}
-        <Route path="/"              element={<RoleRedirect />} />
-        <Route path="/menu"          element={<PublicMenu />} />
-        <Route path="/menu/item/:itemId" element={<PublicMenu />} />
-        <Route path="/premium-menu"          element={<PublicMenu premium />} />
-        <Route path="/premium-menu/item/:itemId" element={<PublicMenu premium />} />
-        <Route path="/catering"      element={<CateringPage />} />
-        <Route path="/telegram"      element={<TelegramMiniApp />} />
-        <Route path="/login"         element={<SignedOutRoute><Login /></SignedOutRoute>} />
+        <Route path="/"              element={adminHost ? <Navigate to="/admin" replace /> : <RoleRedirect signedOutPath={signedOutPath} />} />
+        <Route path="/menu"          element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu />} />
+        <Route path="/menu/item/:itemId" element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu />} />
+        <Route path="/premium-menu"          element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu premium />} />
+        <Route path="/premium-menu/item/:itemId" element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu premium />} />
+        <Route path="/catering"      element={adminHost ? <Navigate to="/admin" replace /> : <CateringPage />} />
+        <Route path="/telegram"      element={adminHost ? <Navigate to="/admin" replace /> : <TelegramMiniApp />} />
+        <Route path="/login"         element={<SignedOutRoute><Login googleOnly={adminHost} /></SignedOutRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
@@ -319,7 +321,7 @@ function InternalAppRoutes() {
         } />
 
         {/* Catch-all: redirect based on role */}
-        <Route path="*" element={<RoleRedirect />} />
+        <Route path="*" element={<RoleRedirect signedOutPath={signedOutPath} />} />
       </Routes>
   )
 }
@@ -327,11 +329,12 @@ function InternalAppRoutes() {
 function AppRoutes() {
   const hostname = currentHostname()
   const publicOnlyHost = isPublicCustomerHost(hostname) && !isAdminHost(hostname)
+  const adminHost = isAdminHost(hostname)
 
   return (
     <>
       <ProfileSync />
-      {publicOnlyHost ? <PublicCustomerRoutes /> : <InternalAppRoutes />}
+      {publicOnlyHost ? <PublicCustomerRoutes /> : <InternalAppRoutes adminHost={adminHost} />}
     </>
   )
 }
