@@ -14,16 +14,16 @@ import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import AnimatedSearch from '../components/AnimatedSearch'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
-import { ProductCard, ProductDetailPage, getManualOrderNotes, getOrderItemOptionLines, menuItemRequiresOptions } from '../components/MenuProductCards'
+import { ProductCard, ProductDetailPage, getOrderItemOptionLines, menuItemRequiresOptions } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
-import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
+import { getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
 import { DEFAULT_PRICE_MODE, getMenuItemForPriceMode, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
-function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, restaurantName, viewerRole }) {
+function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, viewerRole, onPrintKitchenCheck }) {
   const [busy, setBusy] = useState(false)
   const [updatingItemId, setUpdatingItemId] = useState(null)
 
@@ -120,32 +120,6 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       }))
       .filter(group => group.items.length > 0)
     : []
-
-  function handlePrintKitchenCheck(group) {
-    const printWindow = window.open('', '_blank', 'width=420,height=640')
-    if (!printWindow) return
-    const russianGroup = {
-      ...group,
-      items: group.items.map(item => ({
-        ...item,
-        name: menuItemMap?.[item.menu_item_id]
-          ? getItemName(menuItemMap[item.menu_item_id], 'ru')
-          : item.name,
-        notes: [
-          ...getOrderItemOptionLines(item, menuItemMap?.[item.menu_item_id], 'ru'),
-          getManualOrderNotes(item, menuItemMap?.[item.menu_item_id], 'ru'),
-        ].filter(Boolean).join('\n'),
-      })),
-    }
-    printWindow.document.open()
-    printWindow.document.write(buildKitchenCheckHtml({ group: russianGroup, lang: 'ru', restaurantName }))
-    printWindow.document.close()
-    printWindow.focus()
-    window.setTimeout(() => {
-      printWindow.print()
-      printWindow.close()
-    }, 300)
-  }
 
   async function handleUpdateItemQty(item, qty) {
     const itemKey = item.id || item.menu_item_id
@@ -251,7 +225,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
               <div key={group.roundId} className="space-y-2 rounded-2xl border border-orange-100 bg-white/35 p-2">
                 <button
                   type="button"
-                  onClick={() => handlePrintKitchenCheck(group)}
+                  onClick={() => onPrintKitchenCheck(group)}
                   className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-orange-200 bg-white px-3 text-[12px] font-black text-[#ff5a00] transition-colors hover:bg-orange-50"
                 >
                   <Printer size={14} />
@@ -270,7 +244,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
                   <button
                     key={group.roundId}
                     type="button"
-                    onClick={() => handlePrintKitchenCheck(group)}
+                    onClick={() => onPrintKitchenCheck(group)}
                     className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-white px-3 text-[12px] font-black text-[#ff5a00] transition-colors hover:bg-orange-50"
                   >
                     <Printer size={14} />
@@ -675,6 +649,17 @@ export default function WaiterOrder() {
     setDetailItem(item)
   }
 
+  function handlePrintKitchenCheck(group) {
+    const sourceOrderId = group?.orderId || activeOrder?.id
+    if (!sourceOrderId) return
+    const params = new URLSearchParams({
+      print: '1',
+      round: String(group?.roundId || ''),
+      back: isTakeAwayFlow ? '/waiter/take-away?panel=order' : `/waiter/order/${tableId}?panel=order`,
+    })
+    navigate(`/kitchen-check/${encodeURIComponent(sourceOrderId)}?${params.toString()}`)
+  }
+
   function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionPriceDelta = 0) {
     if (isSendingOrder) return
     const payload = makeCartPayload(item, { selectedOptions, selectedOptionPriceDelta })
@@ -1069,8 +1054,8 @@ export default function WaiterOrder() {
                 dispatch={dispatch}
                 cartCount={cartCount}
                 menuItemMap={menuItemMap}
-                restaurantName={state.settings?.restaurantName}
                 viewerRole={role}
+                onPrintKitchenCheck={handlePrintKitchenCheck}
               />
             </div>
             {!isManageOrderOnly && (

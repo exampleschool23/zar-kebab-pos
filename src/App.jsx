@@ -17,6 +17,7 @@ import CateringPage from './pages/CateringPage'
 
 const WaiterTables = lazy(() => import('./pages/WaiterTables'))
 const WaiterOrder = lazy(() => import('./pages/WaiterOrder'))
+const KitchenCheckReceipt = lazy(() => import('./pages/KitchenCheckReceipt'))
 const CashierTables = lazy(() => import('./pages/CashierTables'))
 const CashierBill = lazy(() => import('./pages/CashierBill'))
 const Receipt = lazy(() => import('./pages/Receipt'))
@@ -213,6 +214,9 @@ function AppRoutes() {
         } />
         <Route path="/waiter/take-away" element={
           <LazyProtectedRoute page="tables"><WaiterOrder /></LazyProtectedRoute>
+        } />
+        <Route path="/kitchen-check/:orderId" element={
+          <LazyProtectedRoute page="tables"><KitchenCheckReceipt /></LazyProtectedRoute>
         } />
 
         <Route path="/kitchen" element={<Navigate to="/admin" replace />} />

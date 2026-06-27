@@ -37,7 +37,7 @@ function formatKitchenTime(value) {
   return formatTime(value || new Date())
 }
 
-function formatKitchenOrderNumber(group) {
+export function formatKitchenOrderNumber(group) {
   const raw = group?.orderNumber || group?.orderId || ''
   if (!raw) return ''
   const text = String(raw)
@@ -46,13 +46,13 @@ function formatKitchenOrderNumber(group) {
   return `#${numericSuffix || text}`
 }
 
-function formatKitchenTableName(value) {
+export function formatKitchenTableName(value) {
   const text = String(value || '-').trim()
   const tableNumber = text.match(/^(table|стол)\s+(.+)$/i)?.[2]
   return tableNumber ? `СТОЛ ${tableNumber}` : text.toLocaleUpperCase('ru-RU')
 }
 
-function kitchenItemName(item) {
+export function kitchenItemName(item) {
   return String(item?.name || '').trim().toLocaleUpperCase('ru-RU')
 }
 
