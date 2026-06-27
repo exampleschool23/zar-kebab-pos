@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       key,
       file: {
         ...file,
-        contentType: file.contentType || 'image/webp',
+        contentType: file.contentType,
       },
     })
     return json(res, 200, result)

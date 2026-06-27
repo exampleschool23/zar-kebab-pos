@@ -1,9 +1,5 @@
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
-import sharp from 'sharp'
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024
-const MENU_IMAGE_TARGET_SIZE = 600
-const MAX_MENU_IMAGE_BYTES = 100 * 1024
 const VALID_TYPES = new Set(['product', 'category'])
 const IMAGE_EXTENSIONS = {
   'image/avif': 'avif',
@@ -48,21 +44,6 @@ export async function assertImageFile(file) {
   if (!file?.buffer?.length) throw new Error('Image file is required')
   const contentType = String(file.contentType || '').toLowerCase()
   if (!contentType.startsWith('image/')) throw new Error('Only image uploads are allowed')
-  if (file.buffer.length > MAX_FILE_SIZE) throw new Error('Image must be 5 MB or smaller')
-  if (contentType !== 'image/webp') throw new Error('Only WebP menu images are allowed')
-  if (file.buffer.length > MAX_MENU_IMAGE_BYTES) throw new Error('Menu images must be smaller than 100 KB')
-  if (!isWebpBuffer(file.buffer)) {
-    throw new Error('This file is named WebP but contains different image data')
-  }
-  const metadata = await sharp(file.buffer, { animated: false }).metadata()
-  if (metadata.width !== MENU_IMAGE_TARGET_SIZE || metadata.height !== MENU_IMAGE_TARGET_SIZE) {
-    throw new Error('Menu images must be exactly 600x600 px')
-  }
-}
-
-function isWebpBuffer(buffer) {
-  const header = buffer.subarray(0, 12)
-  return header.toString('ascii', 0, 4) === 'RIFF' && header.toString('ascii', 8, 12) === 'WEBP'
 }
 
 function extensionForContentType(contentType) {

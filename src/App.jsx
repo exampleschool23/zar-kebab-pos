@@ -15,6 +15,9 @@ import TelegramMiniApp from './pages/TelegramMiniApp'
 import PendingApproval from './pages/PendingApproval'
 import CateringPage from './pages/CateringPage'
 
+const ADMIN_HOSTNAME = 'admin.zarkebab.uz'
+const PUBLIC_HOSTNAMES = new Set(['zarkebab.uz', 'www.zarkebab.uz'])
+
 const WaiterTables = lazy(() => import('./pages/WaiterTables'))
 const WaiterOrder = lazy(() => import('./pages/WaiterOrder'))
 const KitchenCheckReceipt = lazy(() => import('./pages/KitchenCheckReceipt'))
@@ -43,6 +46,22 @@ function sanitizeReturnTo(value) {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
   if (raw.startsWith('/login') || raw.startsWith('/auth/callback')) return ''
   return raw
+}
+
+function currentHostname() {
+  return String(globalThis.location?.hostname || '').toLowerCase()
+}
+
+function isPublicCustomerHost(hostname = currentHostname()) {
+  return PUBLIC_HOSTNAMES.has(String(hostname || '').toLowerCase())
+}
+
+function isAdminHost(hostname = currentHostname()) {
+  return String(hostname || '').toLowerCase() === ADMIN_HOSTNAME
+}
+
+function adminUrlForLocation(location = globalThis.location) {
+  return `https://${ADMIN_HOSTNAME}${location?.pathname || '/'}${location?.search || ''}${location?.hash || ''}`
 }
 
 // Syncs the Supabase profile into AppContext so POS pages keep working
@@ -187,11 +206,33 @@ function RoleRedirect() {
   return <Spinner />
 }
 
-function AppRoutes() {
+function PublicHostAdminRedirect() {
+  useEffect(() => {
+    globalThis.location?.replace?.(adminUrlForLocation(globalThis.location))
+  }, [])
+  return <Spinner />
+}
+
+function PublicCustomerRoutes() {
   return (
-    <>
-      <ProfileSync />
-      <Routes>
+    <Routes>
+      <Route path="/" element={<Navigate to="/menu" replace />} />
+      <Route path="/menu" element={<PublicMenu />} />
+      <Route path="/menu/item/:itemId" element={<PublicMenu />} />
+      <Route path="/premium-menu" element={<PublicMenu premium />} />
+      <Route path="/premium-menu/item/:itemId" element={<PublicMenu premium />} />
+      <Route path="/catering" element={<CateringPage />} />
+      <Route path="/telegram" element={<TelegramMiniApp />} />
+      <Route path="/admin" element={<PublicHostAdminRedirect />} />
+      <Route path="/admin/*" element={<PublicHostAdminRedirect />} />
+      <Route path="*" element={<Navigate to="/menu" replace />} />
+    </Routes>
+  )
+}
+
+function InternalAppRoutes() {
+  return (
+    <Routes>
         {/* Public */}
         <Route path="/"              element={<RoleRedirect />} />
         <Route path="/menu"          element={<PublicMenu />} />
@@ -280,6 +321,17 @@ function AppRoutes() {
         {/* Catch-all: redirect based on role */}
         <Route path="*" element={<RoleRedirect />} />
       </Routes>
+  )
+}
+
+function AppRoutes() {
+  const hostname = currentHostname()
+  const publicOnlyHost = isPublicCustomerHost(hostname) && !isAdminHost(hostname)
+
+  return (
+    <>
+      <ProfileSync />
+      {publicOnlyHost ? <PublicCustomerRoutes /> : <InternalAppRoutes />}
     </>
   )
 }

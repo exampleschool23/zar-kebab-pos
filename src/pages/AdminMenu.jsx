@@ -29,86 +29,9 @@ import { supabase } from '../lib/supabase'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
-const MAX_UPLOAD_IMAGE_SIZE = 5 * 1024 * 1024
-const MENU_IMAGE_TARGET_SIZE = 600
-const MAX_MENU_IMAGE_BYTES = 100 * 1024
-const MENU_IMAGE_WEBP_QUALITY = 0.62
-const MENU_IMAGE_WEBP_QUALITIES = [0.74, MENU_IMAGE_WEBP_QUALITY, 0.52, 0.44, 0.36, 0.3]
-
-function loadImage(file) {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-    const objectUrl = URL.createObjectURL(file)
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl)
-      resolve(image)
-    }
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      reject(new Error('Could not read image'))
-    }
-    image.src = objectUrl
-  })
-}
-
-function canvasToBlob(canvas, type, quality) {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not compress image')), type, quality)
-  })
-}
-
-async function isWebpFile(file) {
-  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer())
-  const text = String.fromCharCode(...header)
-  return text.slice(0, 4) === 'RIFF' && text.slice(8, 12) === 'WEBP'
-}
-
-async function isAlreadyValidMenuWebp(file, image) {
-  return file.type === 'image/webp' &&
-    file.size <= MAX_MENU_IMAGE_BYTES &&
-    image.naturalWidth === MENU_IMAGE_TARGET_SIZE &&
-    image.naturalHeight === MENU_IMAGE_TARGET_SIZE &&
-    await isWebpFile(file)
-}
-
-async function compressMenuImage(file) {
+function validateMenuImage(file) {
   if (!file.type.startsWith('image/')) throw new Error('Only image uploads are allowed')
-  if (file.size > MAX_UPLOAD_IMAGE_SIZE) throw new Error('Image must be 5 MB or smaller')
-
-  const image = await loadImage(file)
-  if (await isAlreadyValidMenuWebp(file, image)) {
-    return new File([file], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
-  }
-
-  const sourceSize = Math.max(1, Math.min(image.naturalWidth, image.naturalHeight))
-  const sourceX = Math.max(0, Math.round((image.naturalWidth - sourceSize) / 2))
-  const sourceY = Math.max(0, Math.round((image.naturalHeight - sourceSize) / 2))
-  const canvas = document.createElement('canvas')
-  canvas.width = MENU_IMAGE_TARGET_SIZE
-  canvas.height = MENU_IMAGE_TARGET_SIZE
-  const context = canvas.getContext('2d')
-  context.drawImage(
-    image,
-    sourceX,
-    sourceY,
-    sourceSize,
-    sourceSize,
-    0,
-    0,
-    MENU_IMAGE_TARGET_SIZE,
-    MENU_IMAGE_TARGET_SIZE
-  )
-  for (const quality of MENU_IMAGE_WEBP_QUALITIES) {
-    const blob = await canvasToBlob(canvas, 'image/webp', quality)
-    if (blob.type !== 'image/webp') {
-      throw new Error('Your browser could not create a WebP menu image')
-    }
-    if (blob.size <= MAX_MENU_IMAGE_BYTES) {
-      return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
-    }
-  }
-
-  throw new Error('Image could not be compressed below 100 KB. Try a less detailed image or crop it closer before uploading.')
+  return file
 }
 
 async function getAuthToken() {
@@ -135,21 +58,6 @@ async function uploadMenuImageToR2({ file, type, entityId }) {
 
 function formatMenuImageUploadError(lang, message) {
   const text = String(message || '')
-  if (/Uploaded WebP file is invalid|named WebP but contains different image data/i.test(text)) {
-    if (lang === 'ru') return 'Файл называется WebP, но внутри не WebP. Загрузите исходный WebP или заново конвертируйте изображение в настоящий WebP.'
-    if (lang === 'uz') return 'Fayl WebP deb nomlangan, lekin ichida WebP emas. Asl WebP faylni yuklang yoki rasmni qaytadan haqiqiy WebP formatiga o‘tkazing.'
-    return 'This file is named WebP, but its contents are not WebP. Upload the original WebP or convert the image again to real WebP.'
-  }
-  if (/Only WebP menu images are allowed/i.test(text)) {
-    if (lang === 'ru') return 'Для меню можно загружать только WebP изображения.'
-    if (lang === 'uz') return 'Menyu uchun faqat WebP rasmlarni yuklash mumkin.'
-    return 'Only WebP images can be uploaded for menu items.'
-  }
-  if (/600x600|100 KB|compressed below 100 KB/i.test(text)) {
-    if (lang === 'ru') return 'Изображения меню должны быть 600x600 px и меньше 100 KB.'
-    if (lang === 'uz') return 'Menyu rasmlari 600x600 px va 100 KB dan kichik bo‘lishi kerak.'
-    return 'Menu images must be 600x600 px and smaller than 100 KB.'
-  }
   return text
 }
 
@@ -279,8 +187,7 @@ function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type
     setError('')
     try {
       const previousUrl = value
-      const compressed = await compressMenuImage(file)
-      const data = await uploadMenuImageToR2({ file: compressed, type, entityId })
+      const data = await uploadMenuImageToR2({ file: validateMenuImage(file), type, entityId })
       onChange({ target: { value: data.url } })
       await onUploadComplete?.({ newUrl: data.url, previousUrl })
     } catch (err) {

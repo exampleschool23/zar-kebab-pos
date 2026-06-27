@@ -50,34 +50,19 @@ test('AdminMenu keeps upload error rendering inside ImageUploadField', () => {
   assert.match(body, /\{error && <p[^}]+>\{error\}<\/p>\}/)
 })
 
-test('AdminMenu compresses uploaded menu images to centered 600px square assets', () => {
+test('AdminMenu uploads selected menu image files without resizing or byte-limit constraints', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
-  const compressor = functionBody(source, 'compressMenuImage')
+  const validator = functionBody(source, 'validateMenuImage')
+  const uploadField = functionBody(source, 'ImageUploadField')
 
-  assert.match(source, /const MENU_IMAGE_TARGET_SIZE = 600/)
-  assert.match(source, /const MAX_MENU_IMAGE_BYTES = 100 \* 1024/)
-  assert.match(source, /async function isWebpFile\(file\)/)
-  assert.match(source, /text\.slice\(0, 4\) === 'RIFF' && text\.slice\(8, 12\) === 'WEBP'/)
-  assert.match(source, /async function isAlreadyValidMenuWebp\(file, image\)/)
-  assert.match(source, /image\.naturalWidth === MENU_IMAGE_TARGET_SIZE/)
-  assert.match(source, /image\.naturalHeight === MENU_IMAGE_TARGET_SIZE/)
-  assert.match(source, /const MENU_IMAGE_WEBP_QUALITY = 0\.62/)
-  assert.match(source, /const MENU_IMAGE_WEBP_QUALITIES = \[0\.74, MENU_IMAGE_WEBP_QUALITY, 0\.52, 0\.44, 0\.36, 0\.3\]/)
-  assert.match(compressor, /if \(await isAlreadyValidMenuWebp\(file, image\)\)/)
-  assert.match(compressor, /Math\.min\(image\.naturalWidth, image\.naturalHeight\)/)
-  assert.match(compressor, /canvas\.width = MENU_IMAGE_TARGET_SIZE/)
-  assert.match(compressor, /canvas\.height = MENU_IMAGE_TARGET_SIZE/)
-  assert.match(compressor, /sourceX/)
-  assert.match(compressor, /sourceY/)
-  assert.match(compressor, /sourceSize/)
-  assert.match(compressor, /MENU_IMAGE_TARGET_SIZE,\s*MENU_IMAGE_TARGET_SIZE/)
-  assert.match(compressor, /for \(const quality of MENU_IMAGE_WEBP_QUALITIES\)/)
-  assert.match(compressor, /canvasToBlob\(canvas, 'image\/webp', quality\)/)
-  assert.match(compressor, /blob\.type !== 'image\/webp'/)
-  assert.match(compressor, /blob\.size <= MAX_MENU_IMAGE_BYTES/)
-  assert.match(compressor, /compressed below 100 KB/)
-  assert.doesNotMatch(compressor, /file\.type === 'image\/webp' && file\.size <= blob\.size/)
-  assert.match(compressor, /new File\(\[blob\]/)
+  assert.match(validator, /file\.type\.startsWith\('image\/'\)/)
+  assert.match(validator, /return file/)
+  assert.match(uploadField, /uploadMenuImageToR2\(\{ file: validateMenuImage\(file\), type, entityId \}\)/)
+  assert.doesNotMatch(source, /compressMenuImage/)
+  assert.doesNotMatch(source, /MENU_IMAGE_TARGET_SIZE/)
+  assert.doesNotMatch(source, /MAX_MENU_IMAGE_BYTES/)
+  assert.doesNotMatch(source, /canvasToBlob/)
+  assert.doesNotMatch(source, /isAlreadyValidMenuWebp/)
 })
 
 test('R2 menu image uploads use long-lived immutable browser caching', () => {
@@ -86,40 +71,20 @@ test('R2 menu image uploads use long-lived immutable browser caching', () => {
   assert.match(r2, /CacheControl: 'public, max-age=31536000, immutable'/)
 })
 
-test('R2 menu image uploads only accept enforced 600px WebP assets', () => {
+test('R2 menu image uploads accept image files without WebP, dimension, or byte-limit constraints', () => {
   const r2 = readSource('api/menu-image/_lib/r2.js')
   const upload = readSource('api/menu-image/upload.js')
 
-  assert.match(r2, /import sharp from 'sharp'/)
-  assert.match(r2, /const MENU_IMAGE_TARGET_SIZE = 600/)
-  assert.match(r2, /const MAX_MENU_IMAGE_BYTES = 100 \* 1024/)
   assert.match(r2, /startsWith\('image\/'\)/)
-  assert.match(r2, /'image\/webp': 'webp'/)
-  assert.match(r2, /contentType !== 'image\/webp'/)
-  assert.match(r2, /file\.buffer\.length > MAX_MENU_IMAGE_BYTES/)
-  assert.match(r2, /sharp\(file\.buffer, \{ animated: false \}\)\.metadata\(\)/)
-  assert.match(r2, /metadata\.width !== MENU_IMAGE_TARGET_SIZE \|\| metadata\.height !== MENU_IMAGE_TARGET_SIZE/)
   assert.match(r2, /extensionForContentType\(contentType\)/)
   assert.match(upload, /await assertImageFile\(file\)/)
   assert.match(upload, /contentType: file\.contentType/)
-})
-
-test('R2 menu image uploads still reject mislabeled WebP bytes', () => {
-  const r2 = readSource('api/menu-image/_lib/r2.js')
-
-  assert.match(r2, /const contentType = String\(file\.contentType \|\| ''\)\.toLowerCase\(\)/)
-  assert.match(r2, /contentType !== 'image\/webp'/)
-  assert.match(r2, /function isWebpBuffer/)
-  assert.match(r2, /This file is named WebP but contains different image data/)
-})
-
-test('AdminMenu explains fake WebP upload failures in staff-friendly text', () => {
-  const source = readSource('src/pages/AdminMenu.jsx')
-
-  assert.match(source, /function formatMenuImageUploadError/)
-  assert.match(source, /Файл называется WebP, но внутри не WebP/)
-  assert.match(source, /This file is named WebP, but its contents are not WebP/)
-  assert.match(source, /formatMenuImageUploadError\(lang, err\.message\)/)
+  assert.doesNotMatch(r2, /import sharp from 'sharp'/)
+  assert.doesNotMatch(r2, /MENU_IMAGE_TARGET_SIZE/)
+  assert.doesNotMatch(r2, /MAX_MENU_IMAGE_BYTES/)
+  assert.doesNotMatch(r2, /contentType !== 'image\/webp'/)
+  assert.doesNotMatch(r2, /file\.buffer\.length >/)
+  assert.doesNotMatch(r2, /metadata\(\)/)
 })
 
 test('AdminMenu cleans up replaced or cancelled uploaded menu images', () => {
@@ -250,6 +215,31 @@ test('protected deep links preserve their target through login', () => {
   assert.match(login, /signInWithGoogle\(returnTo\)/)
   assert.match(auth, /redirectUrl\.searchParams\.set\('returnTo', returnTo\)/)
   assert.match(callback, /navigate\(returnTo \|\| '\/', \{ replace: true \}\)/)
+})
+
+test('App splits customer and admin hostnames', () => {
+  const app = readSource('src/App.jsx')
+  const publicRoutes = functionBody(app, 'PublicCustomerRoutes')
+  const internalRoutes = functionBody(app, 'InternalAppRoutes')
+  const appRoutes = functionBody(app, 'AppRoutes')
+  const redirect = functionBody(app, 'PublicHostAdminRedirect')
+
+  assert.match(app, /const ADMIN_HOSTNAME = 'admin\.zarkebab\.uz'/)
+  assert.match(app, /const PUBLIC_HOSTNAMES = new Set\(\['zarkebab\.uz', 'www\.zarkebab\.uz'\]\)/)
+  assert.match(app, /function currentHostname\(\)/)
+  assert.match(app, /function isPublicCustomerHost\(hostname = currentHostname\(\)\)/)
+  assert.match(app, /function isAdminHost\(hostname = currentHostname\(\)\)/)
+  assert.match(app, /function adminUrlForLocation\(location = globalThis\.location\)/)
+  assert.match(redirect, /globalThis\.location\?\.replace\?\.\(adminUrlForLocation\(globalThis\.location\)\)/)
+  assert.match(publicRoutes, /<Route path="\/admin" element=\{<PublicHostAdminRedirect \/>\} \/>/)
+  assert.match(publicRoutes, /<Route path="\/admin\/\*" element=\{<PublicHostAdminRedirect \/>\} \/>/)
+  assert.match(publicRoutes, /<Route path="\*" element=\{<Navigate to="\/menu" replace \/>\} \/>/)
+  assert.doesNotMatch(publicRoutes, /LazyProtectedRoute|\/cashier|\/waiter|\/receipt|\/login/)
+  assert.match(internalRoutes, /<Route path="\/admin" element=/)
+  assert.match(internalRoutes, /<Route path="\/cashier\/tables" element=/)
+  assert.match(internalRoutes, /<Route path="\/waiter\/tables" element=/)
+  assert.match(appRoutes, /const publicOnlyHost = isPublicCustomerHost\(hostname\) && !isAdminHost\(hostname\)/)
+  assert.match(appRoutes, /\{publicOnlyHost \? <PublicCustomerRoutes \/> : <InternalAppRoutes \/>\}/)
 })
 
 test('AppContext exposes a stable dbDispatch callback', () => {
