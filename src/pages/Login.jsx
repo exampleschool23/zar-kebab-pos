@@ -96,6 +96,7 @@ function LoginCard({
   showLogo = true,
   className = '',
   googleOnly = false,
+  staffOnly = false,
 }) {
   return (
     <div className={`rounded-[34px] border border-[#D4AF37]/70 bg-[#07130F]/86 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-7 lg:p-7 ${className}`}>
@@ -288,8 +289,8 @@ function LoginCard({
         </button>
       </form>}
 
-      {!googleOnly && <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
-        {!isForgot && !isSignup && (
+      {!googleOnly && (!staffOnly || isSignup || isForgot) && <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
+        {!staffOnly && !isForgot && !isSignup && (
           <>
             {t(lang, 'authNoAccountPremium')}{' '}
             <button
@@ -324,13 +325,13 @@ function LoginCard({
         )}
       </div>}
 
-      {!googleOnly && <div className="my-4 flex items-center gap-5">
+      {!staffOnly && !googleOnly && <div className="my-4 flex items-center gap-5">
         <div className="h-px flex-1 bg-[#D4AF37]/15" />
         <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
         <div className="h-px flex-1 bg-[#D4AF37]/15" />
       </div>}
 
-      {!googleOnly && <button
+      {!staffOnly && !googleOnly && <button
         onClick={() => navigate('/menu')}
         className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/65 text-base font-black uppercase tracking-[0.16em] text-[#D4AF37] transition-all hover:border-[#D4AF37] hover:bg-[#D4AF37]/10"
       >
@@ -341,7 +342,7 @@ function LoginCard({
   )
 }
 
-export default function Login({ googleOnly = false }) {
+export default function Login({ googleOnly = false, staffOnly = false }) {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuth()
   const { state } = useApp()
   const navigate = useNavigate()
@@ -370,6 +371,10 @@ export default function Login({ googleOnly = false }) {
   useEffect(() => {
     if (googleOnly && mode !== 'signin') setMode('signin')
   }, [googleOnly, mode])
+
+  useEffect(() => {
+    if (staffOnly && mode === 'signup') setMode('signin')
+  }, [staffOnly, mode])
 
   useEffect(() => {
     if (resetCooldownSeconds() <= 0) return
@@ -491,6 +496,7 @@ export default function Login({ googleOnly = false }) {
     handleGoogle,
     navigate,
     googleOnly,
+    staffOnly,
   }
 
   return (
@@ -780,8 +786,8 @@ export default function Login({ googleOnly = false }) {
                 </button>
               </form>}
 
-              {!googleOnly && <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
-                {!isForgot && !isSignup && (
+              {!googleOnly && (!staffOnly || isSignup || isForgot) && <div className="my-4 text-center text-sm text-[#F5EBD4]/70">
+                {!staffOnly && !isForgot && !isSignup && (
                   <>
                     {t(lang, 'authNoAccountPremium')}{' '}
                     <button
@@ -816,13 +822,13 @@ export default function Login({ googleOnly = false }) {
                 )}
               </div>}
 
-              {!googleOnly && <div className="my-4 flex items-center gap-5">
+              {!staffOnly && !googleOnly && <div className="my-4 flex items-center gap-5">
                 <div className="h-px flex-1 bg-[#D4AF37]/15" />
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#F5EBD4]/60">{t(lang, 'premiumLoginOr')}</span>
                 <div className="h-px flex-1 bg-[#D4AF37]/15" />
               </div>}
 
-              {!googleOnly && <button
+              {!staffOnly && !googleOnly && <button
                 onClick={() => navigate('/menu')}
                 className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-[#D4AF37]/65 text-base font-black uppercase tracking-[0.16em] text-[#D4AF37] transition-all hover:border-[#D4AF37] hover:bg-[#D4AF37]/10"
               >

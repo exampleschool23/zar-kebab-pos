@@ -3,6 +3,16 @@ import { supabase, getProfile } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+function fallbackProfileFromUser(user, status = 'pending') {
+  return {
+    id: user.id,
+    email: user.email,
+    full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+    role: 'guest',
+    status,
+  }
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -11,23 +21,11 @@ export function AuthProvider({ children }) {
   async function loadProfile(user) {
     try {
       const data = await getProfile(user.id)
-      const next = data || {
-        id: user.id,
-        email: user.email,
-        full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-        role: 'guest',
-        status: 'active',
-      }
+      const next = data || fallbackProfileFromUser(user)
       setProfile(next)
       return next
     } catch {
-      const fallback = {
-        id: user.id,
-        email: user.email,
-        full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-        role: 'guest',
-        status: 'active',
-      }
+      const fallback = fallbackProfileFromUser(user)
       setProfile(fallback)
       return fallback
     }

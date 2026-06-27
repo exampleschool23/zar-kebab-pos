@@ -196,9 +196,13 @@ test('App waits for profile before role-based route redirects', () => {
   const source = readSource('src/App.jsx')
   const protectedRoute = functionBody(source, 'ProtectedRoute')
   const roleRedirect = functionBody(source, 'RoleRedirect')
+  const signedOutRoute = functionBody(source, 'SignedOutRoute')
 
   assert.match(protectedRoute, /if \(!profile\) return <Spinner \/>/)
+  assert.match(protectedRoute, /defaultPathForHost\(profile\)/)
+  assert.match(signedOutRoute, /defaultPathForHost\(profile \|\| 'guest'\)/)
   assert.match(roleRedirect, /if \(!profile\) return/)
+  assert.match(roleRedirect, /defaultPathForHost\(profile\)/)
 })
 
 test('protected deep links preserve their target through login', () => {
@@ -232,6 +236,8 @@ test('App splits customer and admin hostnames', () => {
   assert.match(app, /function currentHostname\(\)/)
   assert.match(app, /function isPublicCustomerHost\(hostname = currentHostname\(\)\)/)
   assert.match(app, /function isAdminHost\(hostname = currentHostname\(\)\)/)
+  assert.match(app, /function defaultPathForHost\(profile, adminHost = isAdminHost\(\)\)/)
+  assert.match(app, /return adminHost && path === '\/menu' \? '\/pending-approval' : path/)
   assert.match(app, /function adminUrlForLocation\(location = globalThis\.location\)/)
   assert.match(redirect, /globalThis\.location\?\.replace\?\.\(adminUrlForLocation\(globalThis\.location\)\)/)
   assert.match(publicRoutes, /<Route path="\/admin" element=\{<PublicHostAdminRedirect \/>\} \/>/)
@@ -241,17 +247,19 @@ test('App splits customer and admin hostnames', () => {
   assert.match(internalRoutes, /const signedOutPath = adminHost \? '\/admin' : '\/menu'/)
   assert.match(internalRoutes, /<Route path="\/"[\s\S]*adminHost \? <Navigate to="\/admin" replace \/> : <RoleRedirect signedOutPath=\{signedOutPath\} \/>/)
   assert.match(internalRoutes, /<Route path="\/menu"[\s\S]*adminHost \? <Navigate to="\/admin" replace \/> : <PublicMenu \/>/)
-  assert.match(internalRoutes, /<Route path="\/login"[\s\S]*<Login googleOnly=\{adminHost\} \/>/)
+  assert.match(internalRoutes, /<Route path="\/login"[\s\S]*<Login staffOnly=\{adminHost\} \/>/)
   assert.match(internalRoutes, /<Route path="\/admin" element=/)
   assert.match(internalRoutes, /<Route path="\/cashier\/tables" element=/)
   assert.match(internalRoutes, /<Route path="\/waiter\/tables" element=/)
   assert.match(appRoutes, /const publicOnlyHost = isPublicCustomerHost\(hostname\) && !isAdminHost\(hostname\)/)
   assert.match(appRoutes, /const adminHost = isAdminHost\(hostname\)/)
   assert.match(appRoutes, /\{publicOnlyHost \? <PublicCustomerRoutes \/> : <InternalAppRoutes adminHost=\{adminHost\} \/>\}/)
-  assert.match(login, /export default function Login\(\{ googleOnly = false \}\)/)
-  assert.match(login, /googleOnly,\s*\n\s*\}/)
+  assert.match(login, /export default function Login\(\{ googleOnly = false, staffOnly = false \}\)/)
+  assert.match(login, /googleOnly = false,\s*\n\s*staffOnly = false,\s*\n\s*\}/)
+  assert.match(login, /googleOnly,\s*\n\s*staffOnly,\s*\n\s*\}/)
+  assert.match(login, /if \(staffOnly && mode === 'signup'\) setMode\('signin'\)/)
   assert.match(login, /!\s*googleOnly && <form onSubmit=\{handleSubmit\}/)
-  assert.match(login, /!\s*googleOnly && <button[\s\S]*navigate\('\/menu'\)/)
+  assert.match(login, /!\s*staffOnly && !\s*googleOnly && <button[\s\S]*navigate\('\/menu'\)/)
 })
 
 test('AppContext exposes a stable dbDispatch callback', () => {
@@ -296,6 +304,16 @@ test('new signed-up users always start as guest', () => {
   assert.match(migration, /public\.handle_new_user/)
   assert.match(migration, /'guest',\s*\n\s*'active'/)
   assert.doesNotMatch(migration, /raw_user_meta_data->>'role'/)
+})
+
+test('missing auth profile falls back to pending approval, not active guest', () => {
+  const auth = readSource('src/contexts/AuthContext.jsx')
+  const fallback = functionBody(auth, 'fallbackProfileFromUser')
+
+  assert.match(auth, /const next = data \|\| fallbackProfileFromUser\(user\)/)
+  assert.match(auth, /function fallbackProfileFromUser\(user, status = 'pending'\)/)
+  assert.match(fallback, /role: 'guest'/)
+  assert.doesNotMatch(fallback, /status: 'active'/)
 })
 
 test('Supabase browser reads bypass HTTP cache for live POS data', () => {

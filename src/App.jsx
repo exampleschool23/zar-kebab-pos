@@ -41,6 +41,11 @@ function defaultPath(role) {
   return roleDefaultPath(role)
 }
 
+function defaultPathForHost(profile, adminHost = isAdminHost()) {
+  const path = defaultPath(profile)
+  return adminHost && path === '/menu' ? '/pending-approval' : path
+}
+
 function sanitizeReturnTo(value) {
   const raw = String(value || '').trim()
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
@@ -130,7 +135,7 @@ function ProtectedRoute({ children, page }) {
   if (profile?.status === 'pending')  return <Navigate to="/pending-approval" replace />
 
   if (page && !canViewPage(profile, page)) {
-    return <Navigate to={defaultPath(profile)} replace />
+    return <Navigate to={defaultPathForHost(profile)} replace />
   }
 
   return children
@@ -144,7 +149,7 @@ function SignedOutRoute({ children }) {
   if (loading) return <Spinner />
   if (!session) return children
   if (!profile) return <Spinner />
-  return <Navigate to={returnTo || defaultPath(profile || 'guest')} replace />
+  return <Navigate to={returnTo || defaultPathForHost(profile || 'guest')} replace />
 }
 
 function LazyProtectedRoute({ page, children }) {
@@ -171,7 +176,7 @@ function RoleRedirect({ signedOutPath = '/menu' }) {
     if (!profile) return
     if (profile?.status === 'disabled') return
     if (profile?.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
-    navigate(defaultPath(profile), { replace: true })
+    navigate(defaultPathForHost(profile), { replace: true })
   }, [session, profile, loading, navigate])
 
   // If session exists but profile never loads, show a retry option
@@ -243,7 +248,7 @@ function InternalAppRoutes({ adminHost = false }) {
         <Route path="/premium-menu/item/:itemId" element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu premium />} />
         <Route path="/catering"      element={adminHost ? <Navigate to="/admin" replace /> : <CateringPage />} />
         <Route path="/telegram"      element={adminHost ? <Navigate to="/admin" replace /> : <TelegramMiniApp />} />
-        <Route path="/login"         element={<SignedOutRoute><Login googleOnly={adminHost} /></SignedOutRoute>} />
+        <Route path="/login"         element={<SignedOutRoute><Login staffOnly={adminHost} /></SignedOutRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
