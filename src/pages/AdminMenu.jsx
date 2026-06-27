@@ -57,11 +57,29 @@ function canvasToBlob(canvas, type, quality) {
   })
 }
 
+async function isWebpFile(file) {
+  const header = new Uint8Array(await file.slice(0, 12).arrayBuffer())
+  const text = String.fromCharCode(...header)
+  return text.slice(0, 4) === 'RIFF' && text.slice(8, 12) === 'WEBP'
+}
+
+async function isAlreadyValidMenuWebp(file, image) {
+  return file.type === 'image/webp' &&
+    file.size <= MAX_MENU_IMAGE_BYTES &&
+    image.naturalWidth === MENU_IMAGE_TARGET_SIZE &&
+    image.naturalHeight === MENU_IMAGE_TARGET_SIZE &&
+    await isWebpFile(file)
+}
+
 async function compressMenuImage(file) {
   if (!file.type.startsWith('image/')) throw new Error('Only image uploads are allowed')
   if (file.size > MAX_UPLOAD_IMAGE_SIZE) throw new Error('Image must be 5 MB or smaller')
 
   const image = await loadImage(file)
+  if (await isAlreadyValidMenuWebp(file, image)) {
+    return new File([file], `${file.name.replace(/\.[^.]+$/, '') || 'menu-image'}.webp`, { type: 'image/webp' })
+  }
+
   const sourceSize = Math.max(1, Math.min(image.naturalWidth, image.naturalHeight))
   const sourceX = Math.max(0, Math.round((image.naturalWidth - sourceSize) / 2))
   const sourceY = Math.max(0, Math.round((image.naturalHeight - sourceSize) / 2))
