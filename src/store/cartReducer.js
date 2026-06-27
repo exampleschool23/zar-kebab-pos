@@ -1,14 +1,23 @@
 import { withPriceModeFields } from '../lib/priceModes.js'
 
+function getCartItemKey(item) {
+  return item?.cart_item_key || item?.cartItemKey || item?.menu_item_id
+}
+
+function actionCartItemKey(payload) {
+  return payload?.cart_item_key || payload?.cartItemKey || payload?.menu_item_id || payload
+}
+
 export function cartReducer(state, action) {
   switch (action.type) {
     case 'ADD_TO_CART': {
-      const existing = state.cart.find(i => i.menu_item_id === action.payload.menu_item_id)
+      const payloadKey = getCartItemKey(action.payload)
+      const existing = state.cart.find(i => getCartItemKey(i) === payloadKey)
       if (existing) {
         return {
           ...state,
           cart: state.cart.map(i =>
-            i.menu_item_id === action.payload.menu_item_id
+            getCartItemKey(i) === payloadKey
               ? { ...i, quantity: i.quantity + 1 }
               : i
           ),
@@ -18,22 +27,33 @@ export function cartReducer(state, action) {
     }
 
     case 'REMOVE_FROM_CART':
-      return { ...state, cart: state.cart.filter(i => i.menu_item_id !== action.payload) }
+      return { ...state, cart: state.cart.filter(i => getCartItemKey(i) !== actionCartItemKey(action.payload)) }
 
     case 'UPDATE_CART_QTY': {
-      const { menu_item_id, qty } = action.payload
-      if (qty <= 0) return { ...state, cart: state.cart.filter(i => i.menu_item_id !== menu_item_id) }
+      const { qty } = action.payload
+      const key = actionCartItemKey(action.payload)
+      if (qty <= 0) return { ...state, cart: state.cart.filter(i => getCartItemKey(i) !== key) }
       return {
         ...state,
-        cart: state.cart.map(i => i.menu_item_id === menu_item_id ? { ...i, quantity: qty } : i),
+        cart: state.cart.map(i => getCartItemKey(i) === key ? { ...i, quantity: qty } : i),
       }
     }
 
     case 'UPDATE_CART_NOTES': {
-      const { menu_item_id, notes } = action.payload
+      const { notes } = action.payload
+      const key = actionCartItemKey(action.payload)
       return {
         ...state,
-        cart: state.cart.map(i => i.menu_item_id === menu_item_id ? { ...i, notes } : i),
+        cart: state.cart.map(i => getCartItemKey(i) === key ? { ...i, notes } : i),
+      }
+    }
+
+    case 'UPDATE_CART_ITEM_FIELDS': {
+      const { fields = {} } = action.payload
+      const key = actionCartItemKey(action.payload)
+      return {
+        ...state,
+        cart: state.cart.map(i => getCartItemKey(i) === key ? { ...i, ...fields } : i),
       }
     }
 

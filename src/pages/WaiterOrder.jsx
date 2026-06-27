@@ -14,7 +14,7 @@ import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import AnimatedSearch from '../components/AnimatedSearch'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
-import { ProductCard, ProductDetailPage } from '../components/MenuProductCards'
+import { ProductCard, ProductDetailPage, getManualOrderNotes, getOrderItemOptionLines, menuItemRequiresOptions } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { buildKitchenCheckHtml, getKitchenCheckGroups } from '../lib/kitchenCheck'
@@ -131,6 +131,10 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
         name: menuItemMap?.[item.menu_item_id]
           ? getItemName(menuItemMap[item.menu_item_id], 'ru')
           : item.name,
+        notes: [
+          ...getOrderItemOptionLines(item, menuItemMap?.[item.menu_item_id], 'ru'),
+          getManualOrderNotes(item, menuItemMap?.[item.menu_item_id], 'ru'),
+        ].filter(Boolean).join('\n'),
       })),
     }
     printWindow.document.open()
@@ -169,13 +173,18 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   function OrderItemQtyRow({ item }) {
     const itemKey = item.id || item.menu_item_id
     const menuItem = menuItemMap?.[item.menu_item_id]
+    const displayName = menuItem ? getItemName(menuItem, lang) : item.name
+    const optionLines = getOrderItemOptionLines(item, menuItem, lang)
     const missing = !menuItem || menuItem.available === false
     const updating = updatingItemId === itemKey
     const quantity = Number(item.quantity) || 1
     return (
       <div className="flex items-center gap-2 rounded-xl bg-white/75 px-3 py-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12px] font-black text-[#1F2937]">{item.name}</p>
+          <p className="truncate text-[12px] font-black text-[#1F2937]">{displayName}</p>
+          {optionLines.map((line, index) => (
+            <p key={`${itemKey}-option-${index}`} className="truncate text-[11px] font-black text-[#111827]">{line}</p>
+          ))}
           <p className="text-[10px] font-bold text-[#9CA3AF]">
             ×{quantity}
             {missing ? ` · ${l.missingItem}` : ''}
@@ -543,13 +552,16 @@ export default function WaiterOrder() {
   // Cart lookups
   const cartQtyMap = useMemo(() => {
     const map = {}
-    state.cart.forEach(i => { map[i.menu_item_id] = i.quantity })
+    state.cart.forEach(i => { map[i.menu_item_id] = (map[i.menu_item_id] || 0) + (Number(i.quantity) || 0) })
     return map
   }, [state.cart])
 
   const cartNotesMap = useMemo(() => {
     const map = {}
-    state.cart.forEach(i => { if (i.notes) map[i.menu_item_id] = i.notes })
+    state.cart.forEach(i => {
+      if (!i.notes || Object.keys(i.selected_options || i.selectedOptions || {}).length > 0) return
+      map[i.menu_item_id] = i.notes
+    })
     return map
   }, [state.cart])
 
@@ -632,11 +644,19 @@ export default function WaiterOrder() {
 
   function handleAdd(item) {
     if (isSendingOrder) return
+    if (menuItemRequiresOptions(item)) {
+      openDetail(item)
+      return
+    }
     dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
   }
 
   function handleIncrement(item) {
     if (isSendingOrder) return
+    if (menuItemRequiresOptions(item)) {
+      openDetail(item)
+      return
+    }
     dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
   }
 
@@ -655,26 +675,60 @@ export default function WaiterOrder() {
     setDetailItem(item)
   }
 
-  function handleProductDetailAdd(item, qty, notes) {
+  function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionPriceDelta = 0) {
     if (isSendingOrder) return
-    const alreadyInCart = (cartQtyMap[item.id] || 0) > 0
+    const payload = makeCartPayload(item, { selectedOptions, selectedOptionPriceDelta })
+    const cartItemKey = payload.cart_item_key || payload.menu_item_id
+    const alreadyInCart = state.cart.some(row => (row.cart_item_key || row.menu_item_id) === cartItemKey)
     if (!alreadyInCart) {
-      dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
+      dispatch({ type: 'ADD_TO_CART', payload })
+    } else {
+      dispatch({
+        type: 'UPDATE_CART_ITEM_FIELDS',
+        payload: {
+          cart_item_key: cartItemKey,
+          fields: {
+            price: payload.price,
+            base_price: payload.base_price,
+            unit_price: payload.unit_price,
+            selected_options: payload.selected_options,
+          },
+        },
+      })
     }
-    dispatch({ type: 'UPDATE_CART_QTY', payload: { menu_item_id: item.id, qty } })
-    dispatch({ type: 'UPDATE_CART_NOTES', payload: { menu_item_id: item.id, notes: notes || '' } })
+    dispatch({ type: 'UPDATE_CART_QTY', payload: { cart_item_key: cartItemKey, qty } })
+    dispatch({ type: 'UPDATE_CART_NOTES', payload: { cart_item_key: cartItemKey, notes: notes || '' } })
     setDetailItem(null)
   }
 
-  function makeCartPayload(item) {
+  function selectedOptionsCartKey(selectedOptions = {}) {
+    const entries = Object.keys(selectedOptions || {})
+      .sort()
+      .map(key => `${key}:${selectedOptions[key]}`)
+      .join('|')
+    return entries ? entries : 'plain'
+  }
+
+  function makeCartPayload(item, extra = {}) {
     const pricedItem = getMenuItemForPriceMode(item, priceMode)
+    const optionPriceDelta = Number(extra.selectedOptionPriceDelta) || 0
+    const unitPrice = pricedItem.unit_price + optionPriceDelta
+    const basePrice = pricedItem.base_price + optionPriceDelta
+    const selectedOptions = extra.selectedOptions || {}
+    const optionKey = selectedOptionsCartKey(selectedOptions)
+    const hasSelectedOptions = optionKey !== 'plain'
     return {
+      ...(hasSelectedOptions ? {
+        id: `${pricedItem.id}::${optionKey}`,
+        cart_item_key: `${pricedItem.id}::${optionKey}`,
+      } : {}),
       menu_item_id: pricedItem.id,
       name: getItemName(pricedItem, lang),
-      price: pricedItem.unit_price,
-      base_price: pricedItem.base_price,
-      unit_price: pricedItem.unit_price,
+      price: unitPrice,
+      base_price: basePrice,
+      unit_price: unitPrice,
       price_mode: pricedItem.price_mode,
+      selected_options: hasSelectedOptions ? selectedOptions : {},
     }
   }
 

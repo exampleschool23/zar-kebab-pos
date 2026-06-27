@@ -68,6 +68,89 @@ function FormattedMenuText({ text, fallback }) {
   })
 }
 
+function localizedOptionText(value, lang, fallback = '') {
+  if (!value || typeof value !== 'object') return fallback
+  return value[`label_${lang}`] || value[`title_${lang}`] || value.label || value.title || value.name || fallback
+}
+
+export function getMenuItemOptionGroups(item, lang = 'en') {
+  let raw = item?.option_groups ?? item?.optionGroups ?? []
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw)
+    } catch {
+      raw = []
+    }
+  }
+  if (!Array.isArray(raw)) return []
+  return raw.map((group, groupIndex) => {
+    const options = Array.isArray(group?.options) ? group.options : []
+    return {
+      id: String(group?.id || `group_${groupIndex + 1}`),
+      title: localizedOptionText(group, lang, lang === 'uz' ? 'Variantlar' : lang === 'ru' ? 'Варианты' : 'Variants'),
+      required: group?.required !== false,
+      options: options.map((option, optionIndex) => ({
+        id: String(option?.id || `option_${optionIndex + 1}`),
+        label: localizedOptionText(option, lang, String(option?.label || option?.name || '')),
+        price_delta: Math.max(0, Math.round(Number(option?.price_delta ?? option?.priceDelta ?? 0) || 0)),
+      })).filter(option => option.label),
+    }
+  }).filter(group => group.options.length > 0)
+}
+
+export function menuItemRequiresOptions(item) {
+  return getMenuItemOptionGroups(item).some(group => group.required && group.options.length > 0)
+}
+
+export function getOrderItemOptionLines(item, menuItem, lang = 'en') {
+  const selectedOptions = item?.selected_options || item?.selectedOptions || {}
+  const groups = getMenuItemOptionGroups(menuItem || item, lang)
+  const lines = selectedOptions && typeof selectedOptions === 'object'
+    ? groups.map(group => {
+        const selectedId = selectedOptions[group.id]
+        const option = group.options.find(row => row.id === selectedId)
+        return option?.label || ''
+      }).filter(Boolean)
+    : []
+
+  if (lines.length > 0) return lines
+
+  const notes = String(item?.notes || '')
+  const noteMatches = [...notes.matchAll(/(?:Variants|Варианты|Variantlar)\s*:\s*([^:\n]+?)(?=(?:Variants|Варианты|Variantlar)\s*:|$|\n)/g)]
+    .map(match => match[1].trim())
+    .filter(Boolean)
+  if (noteMatches.length > 0) return noteMatches
+
+  const parentName = menuItem ? getItemName(menuItem, lang) : ''
+  const rowName = String(item?.name || '').trim()
+  if (parentName && rowName && rowName !== parentName) return [rowName]
+
+  return []
+}
+
+export function getManualOrderNotes(item, menuItem, lang = 'en') {
+  const notes = String(item?.notes || '')
+  if (!notes) return ''
+  const optionSet = new Set(getOrderItemOptionLines(item, menuItem, lang))
+  return notes
+    .split('\n')
+    .filter(line => {
+      const trimmed = line.trim()
+      if (!trimmed) return false
+      const optionText = trimmed.includes(':') ? trimmed.split(':').slice(1).join(':').trim() : trimmed
+      return !optionSet.has(optionText)
+    })
+    .join('\n')
+}
+
+function optionNoteLine(groups, selectedOptions) {
+  return groups.map(group => {
+    const selectedId = selectedOptions[group.id]
+    const option = group.options.find(item => item.id === selectedId)
+    return option ? `${group.title}: ${option.label}` : ''
+  }).filter(Boolean).join('\n')
+}
+
 async function copyTextToClipboard(text) {
   if (globalThis.navigator?.clipboard?.writeText) {
     try {
@@ -273,22 +356,31 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
 export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false, formatPrice = formatCurrency, linkBasePath = '/menu' }) {
   const [qty, setQty] = useState(Math.max(1, currentQty))
   const [notes, setNotes] = useState(currentNotes || '')
+  const [selectedOptions, setSelectedOptions] = useState({})
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     setQty(Math.max(1, currentQty))
     setNotes(currentNotes || '')
+    setSelectedOptions({})
   }, [item?.id, currentQty, currentNotes])
 
   if (!item) return null
 
   const name = getItemName(item, lang)
   const desc = getItemDesc(item, lang)
-  const total = item.price * qty
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const optionGroups = getMenuItemOptionGroups(item, lang)
+  const missingRequiredOptions = optionGroups.some(group => group.required && !selectedOptions[group.id])
+  const selectedOptionPriceDelta = optionGroups.reduce((sum, group) => {
+    const option = group.options.find(item => item.id === selectedOptions[group.id])
+    return sum + (Number(option?.price_delta) || 0)
+  }, 0)
+  const optionNotes = optionNoteLine(optionGroups, selectedOptions)
+  const finalNotes = [optionNotes, notes.trim()].filter(Boolean).join('\n')
   const labels = {
     back: lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Назад в меню' : 'Back to menu',
     description: lang === 'uz' ? 'Tavsif' : lang === 'ru' ? 'Описание' : 'Description',
@@ -303,6 +395,8 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     copy: lang === 'uz' ? 'Havolani nusxalash' : lang === 'ru' ? 'Скопировать ссылку' : 'Copy link',
     copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
   }
+
+  const total = (item.price + selectedOptionPriceDelta) * qty
 
   async function copyProductLink() {
     await copyTextToClipboard(getMenuItemPublicUrl(item, globalThis.location?.origin, linkBasePath))
@@ -420,6 +514,53 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                 </p>
               </div>
 
+              {!readOnly && optionGroups.length > 0 && (
+              <div className="rounded-[22px] border border-[#E5E7EB] bg-[#FBFCFE] p-4">
+                <div className="mb-3">
+                  <h3 className="text-base font-black text-[#111827]">
+                    {lang === 'uz' ? 'Variantlar' : lang === 'ru' ? 'Варианты' : 'Options'}
+                  </h3>
+                </div>
+                <div className="space-y-4">
+                  {optionGroups.map(group => (
+                    <div key={group.id}>
+                      <p className="mb-2 text-sm font-black text-[#111827]">
+                        {group.title}{group.required && <span className="text-[#ff5a00]">*</span>}
+                      </p>
+                      <div className="space-y-2">
+                        {group.options.map(option => (
+                          <label
+                            key={option.id}
+                            className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                              selectedOptions[group.id] === option.id
+                                ? 'border-[#ff5a00] bg-[#fff4ed] text-[#111827]'
+                                : 'border-[#E5E7EB] bg-white text-[#475569]'
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              <input
+                                type="radio"
+                                name={`option-${item.id}-${group.id}`}
+                                checked={selectedOptions[group.id] === option.id}
+                                onChange={() => setSelectedOptions(current => ({ ...current, [group.id]: option.id }))}
+                                className="h-4 w-4 accent-[#ff5a00]"
+                              />
+                              <span className="truncate">{option.label}</span>
+                            </span>
+                            {option.price_delta > 0 && (
+                              <span className="flex-shrink-0 text-xs font-black text-[#64748B]">
+                                +{formatPrice(option.price_delta)}
+                              </span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              )}
+
               {!readOnly && (
               <div className="rounded-[22px] border border-[#E5E7EB] bg-[#FBFCFE] p-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -476,8 +617,9 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
               {t(lang, 'cancel')}
           </button>
           <button
-            onClick={() => onAddToCart(item, qty, notes)}
-            className="h-14 flex-[2] rounded-2xl bg-[#0F3B2E] text-sm sm:text-base font-black text-white hover:bg-[#0A2A20] active:scale-[0.99] transition-all shadow-[0_8px_18px_rgba(15,59,46,0.22)]"
+            onClick={() => { if (!missingRequiredOptions) onAddToCart(item, qty, finalNotes, selectedOptions, selectedOptionPriceDelta) }}
+            disabled={missingRequiredOptions}
+            className="h-14 flex-[2] rounded-2xl bg-[#0F3B2E] text-sm sm:text-base font-black text-white hover:bg-[#0A2A20] active:scale-[0.99] transition-all shadow-[0_8px_18px_rgba(15,59,46,0.22)] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] disabled:shadow-none"
           >
             {labels.add} - {formatPrice(total)}
           </button>

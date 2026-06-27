@@ -25,6 +25,7 @@ import { getItemName } from '../lib/i18n'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import { formatDateTime, formatTime } from '../lib/dateFormat'
 import { canDeletePaidOrders, canMoveBackToTable } from '../lib/permissions'
+import { getOrderItemOptionLines } from '../components/MenuProductCards'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -364,6 +365,7 @@ function BillCard({
           {preview.map((item, i) => {
             const mi = menuItemMap[item.menu_item_id]
             const displayName = getCashierItemName(item, mi, lang)
+            const optionLines = getOrderItemOptionLines(item, mi, lang)
             const lineTotal = getOrderItemUnitPrice(item) * (Number(item.quantity) || 1)
             return (
               <div key={i} className="flex items-center gap-3">
@@ -378,7 +380,12 @@ function BillCard({
                     <UtensilsCrossed size={12} className="text-gray-300" />
                   </div>
                 )}
-                <p className="flex-1 text-[13px] text-[#1F2937] font-medium truncate">{displayName}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-medium text-[#1F2937]">{displayName}</p>
+                  {optionLines.map((line, index) => (
+                    <p key={`${item.id || i}-option-${index}`} className="truncate text-[11px] font-black text-[#111827]">{line}</p>
+                  ))}
+                </div>
                 <span className="text-[12px] text-[#9CA3AF] flex-shrink-0 w-8 text-center">×{item.quantity}</span>
                 <span className="text-[13px] font-semibold text-[#1F2937] flex-shrink-0 w-24 text-right">
                   {formatCurrency(lineTotal)}

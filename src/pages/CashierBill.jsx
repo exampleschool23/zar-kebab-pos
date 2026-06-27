@@ -34,6 +34,7 @@ import { useAppDataStatus } from '../store/appHooks'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
+import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -658,6 +659,8 @@ export default function CashierBill() {
                     const grams = gramsLabel(mi, lang)
                     const millilitres = millilitresLabel(mi, lang)
                     const kcal = kcalLabel(mi, lang)
+                    const optionLines = getOrderItemOptionLines(item, mi, lang)
+                    const manualNotes = getManualOrderNotes(item, mi, lang)
                     const isCounter = isCashierQuickItem(mi)
                     const unitPrice = getOrderItemUnitPrice(item)
                     const lineTotal = unitPrice * (Number(item.quantity) || 1)
@@ -684,6 +687,9 @@ export default function CashierBill() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-bold text-sm text-[#1F2937] line-clamp-1">{displayName}</p>
+                            {optionLines.map((line, index) => (
+                              <p key={`${item.id || i}-option-${index}`} className="text-[12px] font-black text-[#111827] line-clamp-1 mt-0.5">{line}</p>
+                            ))}
                             {desc && (
                               <p className="text-[11px] text-[#6B7280] line-clamp-1 mt-0.5">{desc}</p>
                             )}
@@ -706,9 +712,9 @@ export default function CashierBill() {
                                 )}
                               </div>
                             )}
-                            {item.notes && (
+                            {manualNotes && (
                               <p className="text-[11px] text-amber-600 mt-0.5 line-clamp-1">
-                                {lbl.noteLabel}: {item.notes}
+                                {lbl.noteLabel}: {manualNotes}
                               </p>
                             )}
                             {/* Mobile: qty + price */}

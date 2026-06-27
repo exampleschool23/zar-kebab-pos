@@ -617,6 +617,8 @@ const blankItem = {
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
   external_id: '', price: '', old_price: '', grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', available: true, sort_order: '',
+  option_groups: [],
+  option_groups_editor: [],
   show_in_cashier_quick_items: false,
   cashier_only: false,
   send_to_kitchen: false,
@@ -624,6 +626,150 @@ const blankItem = {
 }
 
 const blankCat = { id: '', name_uz: '', name_ru: '', name_en: '', image_url: '', sort_order: '', hidden: false }
+
+function parseOptionGroupsValue(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string') return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function optionGroupsToEditor(value) {
+  return parseOptionGroupsValue(value).flatMap((group, groupIndex) => {
+    const options = Array.isArray(group.options) ? group.options : []
+    return options.map((option, optionIndex) => ({
+      id: String(option.id || `option-${groupIndex + 1}-${optionIndex + 1}`),
+      name_uz: option.label_uz || option.label || option.name || '',
+      name_ru: option.label_ru || option.label || option.name || '',
+      name_en: option.label_en || option.label || option.name || '',
+    }))
+  })
+}
+
+function safeOptionId(value, fallback) {
+  return String(value || fallback)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || fallback
+}
+
+function editorToOptionGroups(options) {
+  const normalizedOptions = (options || []).map((option, optionIndex) => {
+    const nameUz = String(option.name_uz || '').trim()
+    const nameRu = String(option.name_ru || '').trim()
+    const nameEn = String(option.name_en || '').trim()
+    const fallback = nameUz || nameRu || nameEn
+    if (!fallback) return null
+    return {
+      id: safeOptionId(option.id, `option_${optionIndex + 1}`),
+      label_uz: nameUz || fallback,
+      label_ru: nameRu || fallback,
+      label_en: nameEn || fallback,
+      price_delta: 0,
+    }
+  }).filter(Boolean)
+
+  if (normalizedOptions.length === 0) return []
+  return [{
+    id: 'variants',
+    title_uz: 'Variantlar',
+    title_ru: 'Варианты',
+    title_en: 'Variants',
+    required: true,
+    options: normalizedOptions,
+  }]
+}
+
+function OptionGroupsEditor({ value = [], onChange, lang }) {
+  function updateOption(optionIndex, patch) {
+    onChange(value.map((option, index) => index === optionIndex ? { ...option, ...patch } : option))
+  }
+
+  function addOption() {
+    onChange([
+      ...value,
+      {
+        id: `option-${Date.now()}`,
+        name_uz: '',
+        name_ru: '',
+        name_en: '',
+      },
+    ])
+  }
+
+  function removeOption(index) {
+    onChange(value.filter((_, itemIndex) => itemIndex !== index))
+  }
+
+  const labels = {
+    title: lang === 'uz' ? 'Variantlar' : lang === 'ru' ? 'Варианты' : 'Variants',
+    add: lang === 'uz' ? 'Variant qo‘shish' : lang === 'ru' ? 'Добавить вариант' : 'Add variant',
+    nameUz: lang === 'uz' ? 'Nomi (UZ)' : lang === 'ru' ? 'Название (UZ)' : 'Name (UZ)',
+    nameRu: lang === 'uz' ? 'Nomi (RU)' : lang === 'ru' ? 'Название (RU)' : 'Name (RU)',
+    nameEn: lang === 'uz' ? 'Nomi (EN)' : lang === 'ru' ? 'Название (EN)' : 'Name (EN)',
+    empty: lang === 'uz' ? 'Mahsulotda variantlar bo‘lsa qo‘shing.' : lang === 'ru' ? 'Добавьте варианты, если они есть у товара.' : 'Add variants when this item has choices.',
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <label className="text-xs font-black uppercase tracking-wide text-gray-500">{labels.title}</label>
+        <button
+          type="button"
+          onClick={addOption}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-2.5 text-xs font-black text-[#ff5a00] hover:bg-orange-50"
+        >
+          <Plus size={13} />
+          {labels.add}
+        </button>
+      </div>
+
+      {value.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-gray-200 bg-white px-3 py-3 text-xs font-semibold text-gray-400">{labels.empty}</p>
+      ) : (
+        <div className="space-y-3">
+          {value.map((option, optionIndex) => (
+            <div key={option.id || optionIndex} className="grid gap-2 rounded-xl border border-gray-200 bg-white p-3 sm:grid-cols-[1fr_1fr_1fr_36px]">
+              <input
+                type="text"
+                value={option.name_uz}
+                onChange={event => updateOption(optionIndex, { name_uz: event.target.value })}
+                placeholder={labels.nameUz}
+                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+              />
+              <input
+                type="text"
+                value={option.name_ru}
+                onChange={event => updateOption(optionIndex, { name_ru: event.target.value })}
+                placeholder={labels.nameRu}
+                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+              />
+              <input
+                type="text"
+                value={option.name_en}
+                onChange={event => updateOption(optionIndex, { name_en: event.target.value })}
+                placeholder={labels.nameEn}
+                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+              />
+              <button
+                type="button"
+                onClick={() => removeOption(optionIndex)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -730,6 +876,7 @@ export default function AdminMenu() {
       cashier_only: false,
       send_to_kitchen: false,
       quick_item_sort_order: maxQuickOrder + 1,
+      option_groups_editor: [],
     })
     setItemModal('new')
   }
@@ -745,6 +892,7 @@ export default function AdminMenu() {
       cashier_only: !!(i.cashier_only || i.cashierOnly),
       send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
       quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
+      option_groups_editor: optionGroupsToEditor(i.option_groups ?? i.optionGroups),
     })
     setItemModal('edit')
   }
@@ -754,13 +902,16 @@ export default function AdminMenu() {
   }
   async function saveItem() {
     if (!form.name_uz || !form.price || !form.category_id) return
+    const optionGroups = editorToOptionGroups(form.option_groups_editor)
     const oldImageUrl = itemModal === 'edit'
       ? state.menuItems.find(item => item.id === form.id)?.image_url
       : ''
+    const { option_groups_editor: _optionGroupsEditor, option_groups: _optionGroups, ...formFields } = form
     const result = await dispatch({
       type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
       payload: {
-        ...form,
+        ...formFields,
+        option_groups: optionGroups,
         external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
         price: Number(form.price),
         old_price: Math.max(0, Math.round(Number(form.old_price) || 0)),
@@ -1399,6 +1550,11 @@ export default function AdminMenu() {
             <DescriptionField label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} lang={lang} />
             <DescriptionField label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} lang={lang} />
             <DescriptionField label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} lang={lang} />
+            <OptionGroupsEditor
+              value={form.option_groups_editor}
+              onChange={optionGroups => setForm(current => ({ ...current, option_groups_editor: optionGroups }))}
+              lang={lang}
+            />
             <Field label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="35000" />
             <Field label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} type="number" value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />

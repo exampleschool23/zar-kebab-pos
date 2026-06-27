@@ -13,6 +13,7 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { ORDER_TYPE_LABELS, inferOrderType, isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_BADGE = {
@@ -233,6 +234,8 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
   const grams = gramsLabel(menuItem, lang)
   const millilitres = millilitresLabel(menuItem, lang)
   const kcal = kcalLabel(menuItem, lang)
+  const optionLines = getOrderItemOptionLines(item, menuItem, lang)
+  const manualNotes = getManualOrderNotes(item, menuItem, lang)
 
   return (
     <div className={`flex gap-3 rounded-2xl border p-3 transition-all duration-300 ${
@@ -267,6 +270,9 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
 
         {/* Title — full width, wraps freely */}
         <p className="font-bold text-base text-[#1F2937] leading-tight whitespace-normal break-words line-clamp-3 mb-1">{title}</p>
+        {optionLines.map((line, index) => (
+          <p key={`${item.id || item.menu_item_id}-option-${index}`} className="text-sm font-black leading-tight text-[#111827]">{line}</p>
+        ))}
 
         {desc && (
           <p className="text-xs text-[#6B7280] line-clamp-2 leading-snug mb-1">{desc}</p>
@@ -291,10 +297,10 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
           </div>
         )}
 
-        {item.notes && (
+        {manualNotes && (
           <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mb-2">
             <AlertCircle size={11} className="text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-amber-800 font-semibold leading-snug">{item.notes}</p>
+            <p className="text-[11px] text-amber-800 font-semibold leading-snug">{manualNotes}</p>
           </div>
         )}
 

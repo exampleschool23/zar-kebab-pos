@@ -64,6 +64,7 @@ create table if not exists public.menu_items (
   kcal             integer     not null default 0,
   stock_count      integer     not null default 0,
   image_url        text        default '',
+  option_groups    jsonb       not null default '[]'::jsonb,
   available        boolean     not null default true,
   cashier_only     boolean     not null default false,
   sort_order       integer     not null default 0,
@@ -100,6 +101,7 @@ create table if not exists public.order_items (
   price        integer     not null default 0,
   quantity     integer     not null default 1,
   notes        text        default '',
+  selected_options jsonb   not null default '{}'::jsonb,
   status       text        not null default 'new'
                check (status in ('new', 'preparing', 'ready', 'served')),
   created_at   timestamptz not null default now()

@@ -23,6 +23,7 @@ import {
   removeSentCartItems,
   validateLoyaltyRedeemAmount,
 } from '../src/lib/analytics.js'
+import { cartReducer } from '../src/store/cartReducer.js'
 import { canDeleteTeamMember, canEditTeamMember, defaultPath, isPublicOnlyRole } from '../src/lib/permissions.js'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../src/lib/menuItems.js'
 
@@ -206,6 +207,38 @@ test('sent cart snapshot removal preserves items added while send is pending', (
     item({ id: 'lula-current', menu_item_id: 'lula', quantity: 1, price: 24000 }),
     item({ id: 'cola-current', menu_item_id: 'cola', quantity: 1, price: 12000 }),
   ])
+})
+
+test('selected option cart rows keep the parent product id but do not overwrite each other', () => {
+  const initial = { cart: [] }
+  const pomegranate = {
+    cart_item_key: 'juice::variants:pomegranate',
+    menu_item_id: 'juice',
+    name: 'Juice',
+    quantity: 1,
+    price: 18000,
+    selected_options: { variants: 'pomegranate' },
+  }
+  const cherry = {
+    cart_item_key: 'juice::variants:cherry',
+    menu_item_id: 'juice',
+    name: 'Juice',
+    quantity: 1,
+    price: 18000,
+    selected_options: { variants: 'cherry' },
+  }
+
+  const withFirst = cartReducer(initial, { type: 'ADD_TO_CART', payload: pomegranate })
+  const withBoth = cartReducer(withFirst, { type: 'ADD_TO_CART', payload: cherry })
+
+  assert.equal(withBoth.cart.length, 2)
+  assert.deepEqual(withBoth.cart.map(row => row.menu_item_id), ['juice', 'juice'])
+  assert.deepEqual(withBoth.cart.map(row => row.selected_options.variants), ['pomegranate', 'cherry'])
+
+  const afterSendingFirst = removeSentCartItems(withBoth.cart, [pomegranate])
+  assert.equal(afterSendingFirst.length, 1)
+  assert.equal(afterSendingFirst[0].menu_item_id, 'juice')
+  assert.equal(afterSendingFirst[0].selected_options.variants, 'cherry')
 })
 
 test('receipt total equals order details total', () => {

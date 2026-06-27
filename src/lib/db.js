@@ -49,7 +49,8 @@ function isMissingOptionalOrderTypeColumn(error) {
       message.includes('submitted_at') ||
       message.includes('price_mode') ||
       message.includes('base_price') ||
-      message.includes('unit_price')
+      message.includes('unit_price') ||
+      message.includes('selected_options')
     )
   )
 }
@@ -432,6 +433,7 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, ite
       price_mode: normalizePriceMode(i.price_mode || priceMode),
       quantity: Number(i.quantity) || 1,
       notes: i.notes || '',
+      selected_options: i.selected_options || i.selectedOptions || {},
       status: 'new',
       order_type: normalizeOrderType(i.order_type || orderType),
       item_type: i.item_type || i.itemType || 'menu',
@@ -793,6 +795,7 @@ export async function writeToSupabase(action, state) {
         price_mode:   normalizePriceMode(i.price_mode || priceMode),
         quantity:     i.quantity,
         notes:        i.notes || '',
+        selected_options: i.selected_options || i.selectedOptions || {},
         status:       'new',
         order_type:   normalizeOrderType(i.order_type || orderType),
         kitchen_round_id: i.kitchen_round_id || i.kitchenRoundId || '',
@@ -803,7 +806,7 @@ export async function writeToSupabase(action, state) {
         .insert(rows)
         .select('*')
       if (itemInsertError && isMissingOptionalOrderTypeColumn(itemInsertError)) {
-        const fallbackRows = rows.map(({ order_type, kitchen_round_id, submitted_at, base_price, unit_price, price_mode, ...row }) => row)
+        const fallbackRows = rows.map(({ order_type, kitchen_round_id, submitted_at, base_price, unit_price, price_mode, selected_options, ...row }) => row)
         ;({ data: insertedItems, error: itemInsertError } = await supabase
           .from('order_items')
           .insert(fallbackRows)

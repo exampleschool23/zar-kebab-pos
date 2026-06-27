@@ -116,13 +116,13 @@ export function removeSentCartItems(cart = [], sentItems = []) {
   const remainingByKey = new Map()
 
   for (const item of sentItems) {
-    const key = item?.menu_item_id
+    const key = item?.cart_item_key || item?.cartItemKey || item?.menu_item_id
     if (!key) continue
     remainingByKey.set(key, (remainingByKey.get(key) || 0) + (Number(item.quantity) || 0))
   }
 
   return cart.flatMap(item => {
-    const key = item?.menu_item_id
+    const key = item?.cart_item_key || item?.cartItemKey || item?.menu_item_id
     const sentQty = remainingByKey.get(key) || 0
     if (sentQty <= 0) return [item]
 

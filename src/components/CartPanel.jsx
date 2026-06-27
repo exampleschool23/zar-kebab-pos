@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react'
 import { X, ShoppingCart, Minus, Plus, Trash2, UtensilsCrossed, Loader2 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
-import { t, getItemDesc } from '../lib/i18n'
+import { t, getItemDesc, getItemName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { ORDER_TYPE_LABELS, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { DEFAULT_PRICE_MODE, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
+import { getManualOrderNotes, getOrderItemOptionLines } from './MenuProductCards'
 
 const ORDER_TYPES = [
   { key: 'dine_in', ...ORDER_TYPE_LABELS.dine_in },
@@ -15,20 +16,28 @@ const ORDER_TYPES = [
 ]
 
 // ── Cart item row ──────────────────────────────────────────────────────────────
+function getCartItemKey(item) {
+  return item?.cart_item_key || item?.cartItemKey || item?.menu_item_id
+}
+
 function CartItemRow({ item, lang, dispatch, menuItem }) {
   const desc = menuItem ? getItemDesc(menuItem, lang) : null
   const grams = gramsLabel(menuItem, lang)
   const millilitres = millilitresLabel(menuItem, lang)
   const kcal = kcalLabel(menuItem, lang)
+  const cartItemKey = getCartItemKey(item)
+  const optionLines = getOrderItemOptionLines(item, menuItem, lang)
+  const notesValue = getManualOrderNotes(item, menuItem, lang)
+  const displayName = menuItem ? getItemName(menuItem, lang) : item.name
 
   function decrement() {
     const qty = item.quantity - 1
-    if (qty <= 0) dispatch({ type: 'REMOVE_FROM_CART', payload: item.menu_item_id })
-    else dispatch({ type: 'UPDATE_CART_QTY', payload: { menu_item_id: item.menu_item_id, qty } })
+    if (qty <= 0) dispatch({ type: 'REMOVE_FROM_CART', payload: cartItemKey })
+    else dispatch({ type: 'UPDATE_CART_QTY', payload: { cart_item_key: cartItemKey, qty } })
   }
 
   function increment() {
-    dispatch({ type: 'UPDATE_CART_QTY', payload: { menu_item_id: item.menu_item_id, qty: item.quantity + 1 } })
+    dispatch({ type: 'UPDATE_CART_QTY', payload: { cart_item_key: cartItemKey, qty: item.quantity + 1 } })
   }
 
   return (
@@ -49,10 +58,10 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
         {/* Title row */}
         <div className="flex items-start justify-between gap-1 mb-0.5">
           <p className="font-bold text-[14px] text-[#1F2937] leading-snug line-clamp-1 flex-1 min-w-0">
-            {item.name}
+            {displayName}
           </p>
           <button
-            onClick={() => dispatch({ type: 'REMOVE_FROM_CART', payload: item.menu_item_id })}
+            onClick={() => dispatch({ type: 'REMOVE_FROM_CART', payload: cartItemKey })}
             className="p-1.5 rounded-xl hover:bg-red-50 text-[#D1D5DB] hover:text-red-400 transition-colors flex-shrink-0"
           >
             <Trash2 size={13} />
@@ -60,6 +69,11 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
         </div>
 
         {desc && <p className="text-[12px] text-[#9CA3AF] line-clamp-1 mb-1.5">{desc}</p>}
+        {optionLines.map((line, index) => (
+          <p key={`${cartItemKey}-option-${index}`} className="mb-0.5 text-[12px] font-black text-[#111827]">
+            {line}
+          </p>
+        ))}
         {(grams || millilitres || kcal) && (
           <div className="mb-2 flex flex-wrap gap-1">
             {grams && (
@@ -108,8 +122,8 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
         <input
           type="text"
           placeholder={t(lang, 'notes') || (lang === 'uz' ? 'Izoh...' : lang === 'ru' ? 'Заметка...' : 'Notes (optional)')}
-          value={item.notes || ''}
-          onChange={e => dispatch({ type: 'UPDATE_CART_NOTES', payload: { menu_item_id: item.menu_item_id, notes: e.target.value } })}
+          value={notesValue}
+          onChange={e => dispatch({ type: 'UPDATE_CART_NOTES', payload: { cart_item_key: cartItemKey, notes: e.target.value } })}
           className="mt-2 w-full text-[12px] border border-[#E5E7EB] rounded-xl px-3 py-2 focus:outline-none focus:border-[#ff5a00]/50 focus:ring-1 focus:ring-[#ff5a00]/20 bg-white placeholder-[#9CA3AF] transition-colors"
         />
       </div>
@@ -261,7 +275,7 @@ export default function CartPanel({
         ) : (
           cart.map(item => (
             <CartItemRow
-              key={item.menu_item_id}
+              key={getCartItemKey(item)}
               item={item}
               lang={lang}
               dispatch={isSending ? () => {} : dispatch}
