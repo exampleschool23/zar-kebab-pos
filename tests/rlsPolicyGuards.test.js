@@ -11,6 +11,7 @@ const deletePaidOrdersFeatureSql = fs.readFileSync(new URL('../supabase/066_dele
 const moveBackToTableFeatureSql = fs.readFileSync(new URL('../supabase/067_move_back_to_table_feature_access.sql', import.meta.url), 'utf8')
 const primaryOwnerFeatureAccessSql = fs.readFileSync(new URL('../supabase/068_primary_owner_feature_access_manager.sql', import.meta.url), 'utf8')
 const manageNonPrimaryOwnersSql = fs.readFileSync(new URL('../supabase/069_manage_non_primary_owner_profiles.sql', import.meta.url), 'utf8')
+const featureAccessPosPoliciesSql = fs.readFileSync(new URL('../supabase/073_feature_access_pos_policies.sql', import.meta.url), 'utf8')
 
 test('role-aware write migration removes broad menu and zone writes', () => {
   assert.match(sql, /drop policy if exists "staff_all_categories"/)
@@ -102,4 +103,18 @@ test('move back to table can be granted as explicit feature access', () => {
   assert.match(moveBackToTableFeatureSql, /current_staff_can_access\(feature_key text\)/)
   assert.match(moveBackToTableFeatureSql, /when feature_key = 'move_back_to_table' then false/)
   assert.match(moveBackToTableFeatureSql, /when feature_key = 'delete_paid_orders' then false/)
+})
+
+test('POS RLS policies honor explicit feature access instead of role-only checks', () => {
+  assert.match(featureAccessPosPoliciesSql, /current_staff_can_access_any\(feature_keys text\[\]\)/)
+  assert.match(featureAccessPosPoliciesSql, /feature_access_read_restaurant_tables/)
+  assert.match(featureAccessPosPoliciesSql, /public\.current_staff_can_access_any\(array\['dashboard','tables','cashier','reports','settings'\]\)/)
+  assert.match(featureAccessPosPoliciesSql, /feature_access_update_restaurant_table_status/)
+  assert.match(featureAccessPosPoliciesSql, /public\.current_staff_can_access_any\(array\['tables','cashier'\]\)/)
+  assert.match(featureAccessPosPoliciesSql, /feature_access_read_table_zones/)
+  assert.match(featureAccessPosPoliciesSql, /feature_access_read_menu_items/)
+  assert.match(featureAccessPosPoliciesSql, /feature_access_read_business_settings/)
+  assert.match(featureAccessPosPoliciesSql, /feature_access_read_order_payments/)
+  assert.doesNotMatch(featureAccessPosPoliciesSql, /current_staff_has_role/)
+  assert.doesNotMatch(featureAccessPosPoliciesSql, /array\['owner','admin','waiter','cashier','stakeholder'\]/)
 })
