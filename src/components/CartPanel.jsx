@@ -7,6 +7,7 @@ import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytic
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { ORDER_TYPE_LABELS, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { DEFAULT_PRICE_MODE, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
+import { isWriteTimeoutError } from '../lib/writeTimeout'
 import { getManualOrderNotes, getOrderItemOptionLines } from './MenuProductCards'
 
 const ORDER_TYPES = [
@@ -14,6 +15,18 @@ const ORDER_TYPES = [
   { key: 'take_away', ...ORDER_TYPE_LABELS.take_away },
   { key: 'delivery', ...ORDER_TYPE_LABELS.delivery },
 ]
+
+function submitErrorMessage(lang, error) {
+  if (isWriteTimeoutError(error)) {
+    if (lang === 'uz') return 'Saqlash juda uzoq davom etdi. Ulanishni tekshirib, qayta urinib ko‘ring.'
+    if (lang === 'ru') return 'Сохранение заняло слишком много времени. Проверьте подключение и попробуйте снова.'
+    return 'Saving took too long. Check the connection and try again.'
+  }
+
+  if (lang === 'uz') return 'Buyurtmani yuborib bo‘lmadi.'
+  if (lang === 'ru') return 'Не удалось отправить заказ.'
+  return 'Could not submit the order.'
+}
 
 // ── Cart item row ──────────────────────────────────────────────────────────────
 function getCartItemKey(item) {
@@ -178,11 +191,7 @@ export default function CartPanel({
       if (result?.error) {
         setMessage({
           tone: 'error',
-          text: lang === 'uz'
-            ? 'Buyurtmani yuborib bo‘lmadi.'
-            : lang === 'ru'
-              ? 'Не удалось отправить заказ.'
-              : 'Could not submit the order.',
+          text: submitErrorMessage(lang, result.error),
         })
         return
       }

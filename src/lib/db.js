@@ -407,7 +407,7 @@ async function rollbackLoyaltyWalletSettlement(rollback) {
     .eq('balance', rollback.balanceAfter)
 }
 
-async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, items, paymentFields, state, action }) {
+async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, items, paymentFields, state, action, signal }) {
   const isOffPremise = isOffPremiseOrderType(orderType)
   const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
   const payload = {
@@ -444,8 +444,13 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, ite
     table_status: isOffPremise ? null : 'occupied',
   }
 
-  const { error } = await supabase.rpc('submit_order_to_kitchen', { payload })
+  const { error } = await withAbortSignal(supabase.rpc('submit_order_to_kitchen', { payload }), signal)
   return { error }
+}
+
+function withAbortSignal(query, signal) {
+  if (signal && typeof query?.abortSignal === 'function') return query.abortSignal(signal)
+  return query
 }
 
 async function loadBusinessSettings(dbClient = supabase) {
@@ -683,7 +688,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
 
 // ── Writers ───────────────────────────────────────────────────────────────────
 
-export async function writeToSupabase(action, state) {
+export async function writeToSupabase(action, state, options = {}) {
   switch (action.type) {
 
     case 'SEND_TO_KITCHEN': {
@@ -713,12 +718,12 @@ export async function writeToSupabase(action, state) {
         created_at: i.created_at || submittedAt,
       }))
       const addedSubtotal = items.reduce((s, i) => s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1), 0)
-      const { data: existingOrder } = await supabase
+      const { data: existingOrder } = await withAbortSignal(supabase
         .from('orders')
         .select('id, subtotal, service_rate_pct')
         .eq('id', orderId)
         .neq('payment_status', 'paid')
-        .maybeSingle()
+        .maybeSingle(), options.signal)
 
       const subtotal    = (Number(existingOrder?.subtotal) || 0) + addedSubtotal
       const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(existingOrder?.service_rate_pct))
@@ -739,21 +744,22 @@ export async function writeToSupabase(action, state) {
         paymentFields,
         state,
         action,
+        signal: options.signal,
       })
       if (!rpcResult.error) break
       if (!isMissingKitchenSubmitRpc(rpcResult.error)) throw rpcResult.error
 
       if (existingOrder) {
-        let { data: updatedOrder, error: orderUpdateError } = await supabase.from('orders').update({
+        let { data: updatedOrder, error: orderUpdateError } = await withAbortSignal(supabase.from('orders').update({
           status: 'sent_to_kitchen',
           price_mode: priceMode,
           ...paymentFields,
-        }).eq('id', orderId).select('*').maybeSingle()
+        }).eq('id', orderId).select('*').maybeSingle(), options.signal)
         if (orderUpdateError && isMissingOptionalOrderTypeColumn(orderUpdateError)) {
-          ;({ data: updatedOrder, error: orderUpdateError } = await supabase.from('orders').update({
+          ;({ data: updatedOrder, error: orderUpdateError } = await withAbortSignal(supabase.from('orders').update({
             status: 'sent_to_kitchen',
             ...paymentFields,
-          }).eq('id', orderId).select('*').maybeSingle())
+          }).eq('id', orderId).select('*').maybeSingle(), options.signal))
         }
         if (orderUpdateError) throw orderUpdateError
       } else {
@@ -771,15 +777,15 @@ export async function writeToSupabase(action, state) {
           orderInsert.order_number = action._orderNumber || makeOrderNumber(orderId, orderType)
           orderInsert.order_type = orderType
         }
-        let { data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(orderInsert).select('*').maybeSingle()
+        let { data: createdOrder, error: orderInsertError } = await withAbortSignal(supabase.from('orders').insert(orderInsert).select('*').maybeSingle(), options.signal)
         if (orderInsertError && isOffPremise && isMissingOptionalOrderTypeColumn(orderInsertError)) {
           // Backward-compatible fallback while the take-away migration is being applied.
           // table_id=null + service_fee=0 still lets the order reach kitchen/cashier.
           const { order_type, order_number, price_mode, ...fallbackOrderInsert } = orderInsert
-          ;({ data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle())
+          ;({ data: createdOrder, error: orderInsertError } = await withAbortSignal(supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle(), options.signal))
         } else if (orderInsertError && isMissingOptionalOrderTypeColumn(orderInsertError)) {
           const { price_mode, ...fallbackOrderInsert } = orderInsert
-          ;({ data: createdOrder, error: orderInsertError } = await supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle())
+          ;({ data: createdOrder, error: orderInsertError } = await withAbortSignal(supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle(), options.signal))
         }
         if (orderInsertError) throw orderInsertError
       }
@@ -801,16 +807,16 @@ export async function writeToSupabase(action, state) {
         kitchen_round_id: i.kitchen_round_id || i.kitchenRoundId || '',
         submitted_at: i.submitted_at || i.submittedAt || i.created_at || i.createdAt || null,
       }))
-      let { data: insertedItems, error: itemInsertError } = await supabase
+      let { data: insertedItems, error: itemInsertError } = await withAbortSignal(supabase
         .from('order_items')
         .insert(rows)
-        .select('*')
+        .select('*'), options.signal)
       if (itemInsertError && isMissingOptionalOrderTypeColumn(itemInsertError)) {
         const fallbackRows = rows.map(({ order_type, kitchen_round_id, submitted_at, base_price, unit_price, price_mode, selected_options, ...row }) => row)
-        ;({ data: insertedItems, error: itemInsertError } = await supabase
+        ;({ data: insertedItems, error: itemInsertError } = await withAbortSignal(supabase
           .from('order_items')
           .insert(fallbackRows)
-          .select('*'))
+          .select('*'), options.signal))
       }
       if (itemInsertError) throw itemInsertError
 

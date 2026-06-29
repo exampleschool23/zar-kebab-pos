@@ -5,6 +5,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
 import { getMenuItemPublicUrl } from '../lib/menuLinks'
+import { calculateUnitPrice, normalizePriceMode } from '../lib/priceModes'
 import ImageLoadShimmer from './ImageLoadShimmer'
 
 function MenuImageFallback({ iconSize = 32, active = false }) {
@@ -92,7 +93,9 @@ export function getMenuItemOptionGroups(item, lang = 'en') {
       options: options.map((option, optionIndex) => ({
         id: String(option?.id || `option_${optionIndex + 1}`),
         label: localizedOptionText(option, lang, String(option?.label || option?.name || '')),
+        price: Math.max(0, Math.round(Number(option?.price ?? option?.variant_price ?? 0) || 0)),
         price_delta: Math.max(0, Math.round(Number(option?.price_delta ?? option?.priceDelta ?? 0) || 0)),
+        stock_count: Math.max(0, Math.round(Number(option?.stock_count ?? option?.stockCount ?? 0) || 0)),
       })).filter(option => option.label),
     }
   }).filter(group => group.options.length > 0)
@@ -379,6 +382,11 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     const option = group.options.find(item => item.id === selectedOptions[group.id])
     return sum + (Number(option?.price_delta) || 0)
   }, 0)
+  const itemPriceMode = normalizePriceMode(item.price_mode || item.priceMode)
+  const selectedOptionFullPrice = optionGroups.reduce((price, group) => {
+    const option = group.options.find(item => item.id === selectedOptions[group.id])
+    return Number(option?.price) > 0 ? calculateUnitPrice(option.price, itemPriceMode) : price
+  }, item.price)
   const optionNotes = optionNoteLine(optionGroups, selectedOptions)
   const finalNotes = [optionNotes, notes.trim()].filter(Boolean).join('\n')
   const labels = {
@@ -396,7 +404,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
   }
 
-  const total = (item.price + selectedOptionPriceDelta) * qty
+  const total = selectedOptionFullPrice * qty
 
   async function copyProductLink() {
     await copyTextToClipboard(getMenuItemPublicUrl(item, globalThis.location?.origin, linkBasePath))
@@ -547,11 +555,14 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                               />
                               <span className="truncate">{option.label}</span>
                             </span>
-                            {option.price_delta > 0 && (
-                              <span className="flex-shrink-0 text-xs font-black text-[#64748B]">
-                                +{formatPrice(option.price_delta)}
-                              </span>
-                            )}
+                            <span className="flex flex-shrink-0 items-center gap-2 text-xs font-black text-[#64748B]">
+                              {option.stock_count > 0 && (
+                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 ring-1 ring-emerald-100">
+                                  {option.stock_count}
+                                </span>
+                              )}
+                              {option.price > 0 ? formatPrice(calculateUnitPrice(option.price, itemPriceMode)) : option.price_delta > 0 ? `+${formatPrice(option.price_delta)}` : null}
+                            </span>
                           </label>
                         ))}
                       </div>
@@ -617,7 +628,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
               {t(lang, 'cancel')}
           </button>
           <button
-            onClick={() => { if (!missingRequiredOptions) onAddToCart(item, qty, finalNotes, selectedOptions, selectedOptionPriceDelta) }}
+            onClick={() => { if (!missingRequiredOptions) onAddToCart(item, qty, finalNotes, selectedOptions, selectedOptionFullPrice - item.price) }}
             disabled={missingRequiredOptions}
             className="h-14 flex-[2] rounded-2xl bg-[#0F3B2E] text-sm sm:text-base font-black text-white hover:bg-[#0A2A20] active:scale-[0.99] transition-all shadow-[0_8px_18px_rgba(15,59,46,0.22)] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] disabled:shadow-none"
           >

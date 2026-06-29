@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingBag, DollarSign, Package, Receipt,
   Clock, ArrowUpRight, ArrowDownRight, Users, Loader2,
-  Printer, ChevronRight, CreditCard,
+  Printer, ChevronRight, CreditCard, Trash2,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -33,6 +33,7 @@ import {
 } from '../lib/dashboardAnalytics'
 import AppShell from '../components/AppShell'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { canDeletePaidOrders } from '../lib/permissions'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 const L = {
@@ -92,6 +93,10 @@ const L = {
     footer:         'Barcha ma\'lumotlar to\'langan buyurtmalarga asoslangan',
     loading:        'Yuklanmoqda...',
     noData:         "Ma'lumot yo'q",
+    deleteOrder:    "O'chirish",
+    confirmDelete:  "Tasdiqlash",
+    deleting:       "O'chirilmoqda",
+    deleteFailed:   "Buyurtmani o'chirib bo'lmadi",
   },
   ru: {
     title:          'Панель управления',
@@ -149,6 +154,10 @@ const L = {
     footer:         'Все данные основаны на оплаченных заказах',
     loading:        'Загрузка...',
     noData:         'Нет данных',
+    deleteOrder:    'Удалить',
+    confirmDelete:  'Подтвердить',
+    deleting:       'Удаление',
+    deleteFailed:   'Не удалось удалить заказ',
   },
   en: {
     title:          'Dashboard',
@@ -206,6 +215,10 @@ const L = {
     footer:         'All data is based on paid orders',
     loading:        'Loading...',
     noData:         'No data yet',
+    deleteOrder:    'Delete',
+    confirmDelete:  'Confirm',
+    deleting:       'Deleting',
+    deleteFailed:   'Could not delete order',
   },
 }
 
@@ -239,6 +252,48 @@ function shortLabel(ds, mode) {
   if (mode === 'today')  return `${ds.slice(11, 16)}` // hour label passed in directly
   if (mode === 'year')   return ds.slice(5, 7)
   return formatDateOnly(ds)
+}
+
+function dashboardPeriodLabel(period, lang) {
+  const labels = {
+    uz: { today: 'Bugun', '7days': '7 kun', month: 'Bu oy', year: 'Bu yil' },
+    ru: { today: 'Сегодня', '7days': '7 дней', month: 'Этот месяц', year: 'Этот год' },
+    en: { today: 'Today', '7days': '7 days', month: 'This month', year: 'This year' },
+  }
+  return (labels[lang] || labels.en)[period] || (labels[lang] || labels.en)['7days']
+}
+
+function previousDashboardPeriodLabel(period, lang, fallback) {
+  if (period !== 'today') return fallback
+  if (lang === 'uz') return 'Kecha'
+  if (lang === 'ru') return 'Вчера'
+  return 'Yesterday'
+}
+
+function getPreviousDashboardPeriodOrders(orders, period) {
+  const todayDs = todayStr()
+
+  if (period === 'today') {
+    const yesterday = addRestaurantDays(todayDs, -1)
+    return orders.filter(order => localDateStr(getOrderDate(order)) === yesterday)
+  }
+
+  if (period === '7days') {
+    const days = new Set(Array.from({ length: 7 }, (_, index) => addRestaurantDays(todayDs, -(13 - index))))
+    return orders.filter(order => days.has(localDateStr(getOrderDate(order))))
+  }
+
+  if (period === 'month') {
+    const [year, monthNumber] = todayDs.split('-').map(Number)
+    const month = monthNumber - 1
+    const prevMonth = month === 0 ? 11 : month - 1
+    const prevYear = month === 0 ? year - 1 : year
+    const prefix = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-`
+    return orders.filter(order => localDateStr(getOrderDate(order)).startsWith(prefix))
+  }
+
+  const year = Number(todayDs.slice(0, 4)) - 1
+  return orders.filter(order => localDateStr(getOrderDate(order)).startsWith(`${year}-`))
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -310,7 +365,18 @@ function RecentSectionHeader({ title, count, urgent }) {
   )
 }
 
-function RecentOrderRow({ order, lang, methodLabel, onPrintBill, onView }) {
+function RecentOrderRow({
+  order,
+  lang,
+  methodLabel,
+  onPrintBill,
+  onView,
+  canDelete,
+  onDelete,
+  confirmDelete,
+  isDeleting,
+  deleteError,
+}) {
   const l = L[lang] || L.en
   const isNeedsBill = order.status === 'needs_bill'
   const shortId = String(order.id).slice(-4).toUpperCase()
@@ -362,17 +428,39 @@ function RecentOrderRow({ order, lang, methodLabel, onPrintBill, onView }) {
               {l.printBill}
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => onView(order)}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[#7B8AA4] text-xs font-semibold hover:text-[#0F3B2E] transition-colors"
-            >
-              {l.view}
-              <ChevronRight size={14} />
-            </button>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(order)}
+                  disabled={isDeleting}
+                  className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-black transition-colors disabled:opacity-60 ${
+                    confirmDelete
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-red-50 text-red-600 hover:bg-red-100'
+                  }`}
+                >
+                  {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  {isDeleting ? l.deleting : confirmDelete ? l.confirmDelete : l.deleteOrder}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onView(order)}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[#7B8AA4] text-xs font-semibold hover:text-[#0F3B2E] transition-colors"
+              >
+                {l.view}
+                <ChevronRight size={14} />
+              </button>
+            </div>
           )}
         </div>
       </div>
+      {deleteError && (
+        <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-[11px] font-bold text-red-600">
+          {l.deleteFailed}: {deleteError}
+        </p>
+      )}
     </div>
   )
 }
@@ -427,7 +515,7 @@ function DonutChart({ slices }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const { state }   = useApp()
+  const { state, dispatch } = useApp()
   const { profile } = useAuth()
   const navigate = useNavigate()
   const lang = normalizeDateLang(state.lang || 'ru')
@@ -437,6 +525,10 @@ export default function AdminDashboard() {
 
   const [period, setPeriod]           = useState('7days')
   const [staffProfiles, setStaffProfiles] = useState(null)
+  const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
+  const [deletingOrderId, setDeletingOrderId] = useState('')
+  const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
+  const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
 
   useEffect(() => {
     getAllProfiles()
@@ -465,47 +557,47 @@ export default function AdminDashboard() {
     [state.categories]
   )
 
-  // ── KPI: Today's revenue & orders ─────────────────────────────────────────
+  // ── KPI: selected period revenue & orders ─────────────────────────────────
+  const previousPeriodOrders = useMemo(
+    () => getPreviousDashboardPeriodOrders(paidOrders, period),
+    [paidOrders, period]
+  )
+
   const {
-    todayRevenue, yesterdayRevenue, revenueChange,
-    todayOrderCount, yesterdayOrderCount, orderChange,
-    avgOrderValue, avgYesterday, avgChange,
-    itemsSoldToday,
+    periodRevenue, previousKpiRevenue, revenueChange,
+    periodOrderCount, previousOrderCount, orderChange,
+    avgOrderValue, previousAvgOrder, avgChange,
+    periodItemsSold,
   } = useMemo(() => {
-    const today     = todayStr()
-    const yesterday = yesterdayStr()
-
-    const todayPaid = paidOrders.filter(o => localDateStr(getOrderDate(o)) === today)
-    const yestPaid  = paidOrders.filter(o => localDateStr(getOrderDate(o)) === yesterday)
-    const todayRevenue     = todayPaid.reduce((s, o) => s + getOrderTotal(o), 0)
-    const yesterdayRevenue = yestPaid.reduce((s, o) => s + getOrderTotal(o), 0)
-    const revenueChange    = yesterdayRevenue > 0
-      ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
-      : null
-
-    const todayOrderCount     = todayPaid.length
-    const yesterdayOrderCount = yestPaid.length
-    const orderChange         = yesterdayOrderCount > 0
-      ? Math.round(((todayOrderCount - yesterdayOrderCount) / yesterdayOrderCount) * 100)
-      : null
-
-    const avgOrderValue = todayPaid.length > 0 ? Math.round(todayRevenue / todayPaid.length) : 0
-    const avgYesterday  = yestPaid.length  > 0 ? Math.round(yesterdayRevenue / yestPaid.length) : 0
-    const avgChange     = avgYesterday > 0
-      ? Math.round(((avgOrderValue - avgYesterday) / avgYesterday) * 100)
-      : null
-
-    const itemsSoldToday = todayPaid
-      .flatMap(o => getOrderItems(o))
-      .reduce((s, i) => s + (Number(i.quantity) || 1), 0)
+    const currentRevenue = periodPaidOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+    const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+    const currentOrderCount = periodPaidOrders.length
+    const previousCount = previousPeriodOrders.length
+    const currentAvgOrder = currentOrderCount > 0 ? Math.round(currentRevenue / currentOrderCount) : 0
+    const previousAvg = previousCount > 0 ? Math.round(previousRevenue / previousCount) : 0
+    const itemsSold = periodPaidOrders
+      .flatMap(order => getOrderItems(order))
+      .reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
 
     return {
-      todayRevenue, yesterdayRevenue, revenueChange,
-      todayOrderCount, yesterdayOrderCount, orderChange,
-      avgOrderValue, avgYesterday, avgChange,
-      itemsSoldToday,
+      periodRevenue: currentRevenue,
+      previousKpiRevenue: previousRevenue,
+      revenueChange: previousRevenue > 0
+        ? Math.round(((currentRevenue - previousRevenue) / previousRevenue) * 100)
+        : null,
+      periodOrderCount: currentOrderCount,
+      previousOrderCount: previousCount,
+      orderChange: previousCount > 0
+        ? Math.round(((currentOrderCount - previousCount) / previousCount) * 100)
+        : null,
+      avgOrderValue: currentAvgOrder,
+      previousAvgOrder: previousAvg,
+      avgChange: previousAvg > 0
+        ? Math.round(((currentAvgOrder - previousAvg) / previousAvg) * 100)
+        : null,
+      periodItemsSold: itemsSold,
     }
-  }, [paidOrders, state.orders])
+  }, [periodPaidOrders, previousPeriodOrders])
 
   const activeBills = useMemo(
     () => state.tables.filter(t => t.status === 'needs_bill').length,
@@ -669,6 +761,30 @@ export default function AdminDashboard() {
     navigate(`/receipt/${order.id}`)
   }
 
+  async function deleteRecentOrder(order) {
+    if (!canDeleteOrder || !order?.id || deletingOrderId) return
+    setDeleteErrorByOrderId(errors => ({ ...errors, [order.id]: '' }))
+    if (confirmDeleteOrderId !== order.id) {
+      setConfirmDeleteOrderId(order.id)
+      return
+    }
+
+    setDeletingOrderId(order.id)
+    try {
+      const result = await dispatch({ type: 'DELETE_ORDER', payload: { orderId: order.id } })
+      if (result?.error) {
+        setDeleteErrorByOrderId(errors => ({
+          ...errors,
+          [order.id]: result.error.message || String(result.error),
+        }))
+        return
+      }
+      setConfirmDeleteOrderId('')
+    } finally {
+      setDeletingOrderId('')
+    }
+  }
+
   // ── KPI badges ────────────────────────────────────────────────────────────
   function pctBadge(change) {
     if (change === null) return null
@@ -682,6 +798,8 @@ export default function AdminDashboard() {
   const chartMax = Math.max(...chartBars.map(b => b.revenue), 1)
   const now      = new Date()
   const lastUpdated = formatReadableDateTime(now)
+  const currentKpiPeriodLabel = dashboardPeriodLabel(period, lang)
+  const previousKpiPeriodLabel = previousDashboardPeriodLabel(period, lang, l.prevPeriod)
 
   if (!state.loaded) {
     return (
@@ -714,30 +832,30 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
-            label={l.todayRevenue}
-            value={formatCurrency(todayRevenue)}
-            sub={`${l.yesterday}: ${formatCurrency(yesterdayRevenue)}`}
+            label={`${l.revenue} · ${currentKpiPeriodLabel}`}
+            value={formatCurrency(periodRevenue)}
+            sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousKpiRevenue)}`}
             badge={pctBadge(revenueChange)}
           />
           <KpiCard
             icon={ShoppingBag}
-            label={l.ordersToday}
-            value={todayOrderCount}
-            sub={`${l.yesterday}: ${yesterdayOrderCount}`}
+            label={`${l.orders} · ${currentKpiPeriodLabel}`}
+            value={periodOrderCount}
+            sub={`${previousKpiPeriodLabel}: ${previousOrderCount}`}
             badge={pctBadge(orderChange)}
           />
           <KpiCard
             icon={DollarSign}
-            label={l.avgOrder}
+            label={`${l.avgOrderShort} · ${currentKpiPeriodLabel}`}
             value={formatCurrency(avgOrderValue)}
-            sub={`${l.yesterday}: ${formatCurrency(avgYesterday)}`}
+            sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousAvgOrder)}`}
             badge={pctBadge(avgChange)}
           />
           <KpiCard
             icon={Package}
-            label={l.itemsSold}
-            value={itemsSoldToday}
-            sub={todayStr()}
+            label={`${l.items} · ${currentKpiPeriodLabel}`}
+            value={periodItemsSold}
+            sub={currentKpiPeriodLabel}
           />
           <KpiCard
             icon={Receipt}
@@ -952,6 +1070,7 @@ export default function AdminDashboard() {
                         methodLabel={getMethodLabel(order)}
                         onPrintBill={printRecentBill}
                         onView={viewRecentOrder}
+                        canDelete={false}
                       />
                     ))}
                     </div>
@@ -970,6 +1089,11 @@ export default function AdminDashboard() {
                         methodLabel={getMethodLabel(order)}
                         onPrintBill={printRecentBill}
                         onView={viewRecentOrder}
+                        canDelete={canDeleteOrder}
+                        onDelete={deleteRecentOrder}
+                        confirmDelete={confirmDeleteOrderId === order.id}
+                        isDeleting={deletingOrderId === order.id}
+                        deleteError={deleteErrorByOrderId[order.id]}
                       />
                     ))}
                     </div>

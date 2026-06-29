@@ -9,6 +9,7 @@ import { settingsReducer } from './settingsReducer'
 import { tablesReducer } from './tablesReducer'
 import { isOffPremiseOrderType } from '../lib/orderTypes'
 import { DEFAULT_PRICE_MODE, normalizePriceMode, withPriceModeFields } from '../lib/priceModes'
+import { isWriteTimeoutError, withWriteTimeout } from '../lib/writeTimeout'
 
 const AppContext = createContext(null)
 
@@ -75,12 +76,13 @@ export function AppProvider({ children }) {
 
   async function writeWithIdleRecovery(action, stateSnapshot) {
     try {
-      await writeToSupabase(action, stateSnapshot)
+      await withWriteTimeout(signal => writeToSupabase(action, stateSnapshot, { signal }), action.type)
     } catch (error) {
+      if (isWriteTimeoutError(error)) throw error
       if (!isRecoverableIdleError(error)) throw error
-      await refreshSupabaseSession()
+      await withWriteTimeout(refreshSupabaseSession(), 'REFRESH_SESSION')
       recoverFromIdleRef.current?.()
-      await writeToSupabase(action, stateRef.current)
+      await withWriteTimeout(signal => writeToSupabase(action, stateRef.current, { signal }), action.type)
     }
   }
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, DragOverlay,
@@ -20,7 +21,7 @@ import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
-  ImagePlus, Loader2, Bold,
+  ImagePlus, Loader2, Bold, ArrowLeft,
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -572,6 +573,8 @@ function optionGroupsToEditor(value) {
       name_uz: option.label_uz || option.label || option.name || '',
       name_ru: option.label_ru || option.label || option.name || '',
       name_en: option.label_en || option.label || option.name || '',
+      price: option.price ?? option.variant_price ?? '',
+      stock_count: option.stock_count ?? option.stockCount ?? '',
     }))
   })
 }
@@ -583,19 +586,24 @@ function safeOptionId(value, fallback) {
     .replace(/^_+|_+$/g, '') || fallback
 }
 
-function editorToOptionGroups(options) {
+function editorToOptionGroups(options, basePrice = 0) {
+  const parentPrice = Math.max(0, Math.round(Number(basePrice) || 0))
   const normalizedOptions = (options || []).map((option, optionIndex) => {
     const nameUz = String(option.name_uz || '').trim()
     const nameRu = String(option.name_ru || '').trim()
     const nameEn = String(option.name_en || '').trim()
     const fallback = nameUz || nameRu || nameEn
     if (!fallback) return null
+    const optionPrice = Math.max(0, Math.round(Number(option.price) || 0))
+    const stockCount = Math.max(0, Math.round(Number(option.stock_count) || 0))
     return {
       id: safeOptionId(option.id, `option_${optionIndex + 1}`),
       label_uz: nameUz || fallback,
       label_ru: nameRu || fallback,
       label_en: nameEn || fallback,
-      price_delta: 0,
+      price: optionPrice,
+      price_delta: Math.max(0, optionPrice - parentPrice),
+      stock_count: stockCount,
     }
   }).filter(Boolean)
 
@@ -623,6 +631,8 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
         name_uz: '',
         name_ru: '',
         name_en: '',
+        price: '',
+        stock_count: '',
       },
     ])
   }
@@ -637,6 +647,8 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
     nameUz: lang === 'uz' ? 'Nomi (UZ)' : lang === 'ru' ? 'Название (UZ)' : 'Name (UZ)',
     nameRu: lang === 'uz' ? 'Nomi (RU)' : lang === 'ru' ? 'Название (RU)' : 'Name (RU)',
     nameEn: lang === 'uz' ? 'Nomi (EN)' : lang === 'ru' ? 'Название (EN)' : 'Name (EN)',
+    price: lang === 'uz' ? 'Narx' : lang === 'ru' ? 'Цена' : 'Price',
+    stock: lang === 'uz' ? 'Qoldiq' : lang === 'ru' ? 'Остаток' : 'Stock',
     empty: lang === 'uz' ? 'Mahsulotda variantlar bo‘lsa qo‘shing.' : lang === 'ru' ? 'Добавьте варианты, если они есть у товара.' : 'Add variants when this item has choices.',
   }
 
@@ -659,35 +671,70 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
       ) : (
         <div className="space-y-3">
           {value.map((option, optionIndex) => (
-            <div key={option.id || optionIndex} className="grid gap-2 rounded-xl border border-gray-200 bg-white p-3 sm:grid-cols-[1fr_1fr_1fr_36px]">
-              <input
-                type="text"
-                value={option.name_uz}
-                onChange={event => updateOption(optionIndex, { name_uz: event.target.value })}
-                placeholder={labels.nameUz}
-                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
-              />
-              <input
-                type="text"
-                value={option.name_ru}
-                onChange={event => updateOption(optionIndex, { name_ru: event.target.value })}
-                placeholder={labels.nameRu}
-                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
-              />
-              <input
-                type="text"
-                value={option.name_en}
-                onChange={event => updateOption(optionIndex, { name_en: event.target.value })}
-                placeholder={labels.nameEn}
-                className="rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
-              />
-              <button
-                type="button"
-                onClick={() => removeOption(optionIndex)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600"
-              >
-                <Trash2 size={15} />
-              </button>
+            <div key={option.id || optionIndex} className="min-w-0 rounded-xl border border-gray-200 bg-white p-3">
+              <div className="grid min-w-0 gap-2 md:grid-cols-3">
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.nameUz}</span>
+                  <input
+                    type="text"
+                    value={option.name_uz}
+                    onChange={event => updateOption(optionIndex, { name_uz: event.target.value })}
+                    placeholder={labels.nameUz}
+                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.nameRu}</span>
+                  <input
+                    type="text"
+                    value={option.name_ru}
+                    onChange={event => updateOption(optionIndex, { name_ru: event.target.value })}
+                    placeholder={labels.nameRu}
+                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.nameEn}</span>
+                  <input
+                    type="text"
+                    value={option.name_en}
+                    onChange={event => updateOption(optionIndex, { name_en: event.target.value })}
+                    placeholder={labels.nameEn}
+                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                  />
+                </label>
+              </div>
+              <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px]">
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.price}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={option.price}
+                    onChange={event => updateOption(optionIndex, { price: event.target.value })}
+                    placeholder={labels.price}
+                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.stock}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={option.stock_count}
+                    onChange={event => updateOption(optionIndex, { stock_count: event.target.value })}
+                    placeholder={labels.stock}
+                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => removeOption(optionIndex)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 sm:self-end"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -696,12 +743,31 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
   )
 }
 
+function menuItemToProductForm(i) {
+  return {
+    ...blankItem,
+    ...i,
+    millilitres: i.millilitres ?? i.milliliters ?? (Number(i.litres ?? i.liters) > 0 ? Math.round(Number(i.litres ?? i.liters) * 1000) : ''),
+    stock_count: i.stock_count ?? i.stockCount ?? 0,
+    sort_order: i.sort_order ?? 0,
+    show_in_cashier_quick_items: isCashierQuickItem(i),
+    cashier_only: !!(i.cashier_only || i.cashierOnly),
+    send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
+    quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
+    option_groups_editor: optionGroupsToEditor(i.option_groups ?? i.optionGroups),
+  }
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminMenu() {
   const { state, dispatch } = useApp()
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
+  const navigate = useNavigate()
+  const { productId } = useParams()
+  const [searchParams] = useSearchParams()
+  const isProductEditorPage = !!productId
 
   const [tab,        setTab]        = useState('items')
   const [itemModal,  setItemModal]  = useState(null)
@@ -715,6 +781,7 @@ export default function AdminMenu() {
   const [activeId,   setActiveId]   = useState(null) // drag overlay
   const uploadedItemImageUrlsRef = useRef(new Set())
   const uploadedCatImageUrlsRef = useRef(new Set())
+  const productEditorInitializedRef = useRef('')
 
   // Sensors: pointer (mouse/trackpad) + touch
   const sensors = useSensors(
@@ -778,56 +845,77 @@ export default function AdminMenu() {
     }
   }
 
+  useEffect(() => {
+    if (!loaded || !isProductEditorPage) return
+    if (productEditorInitializedRef.current === productId) return
+    productEditorInitializedRef.current = productId
+    uploadedItemImageUrlsRef.current.clear()
+
+    if (productId === 'new') {
+      const maxOrder = state.menuItems.length > 0
+        ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
+      const maxQuickOrder = quickItems.length > 0
+        ? Math.max(...quickItems.map(i => getQuickItemSortOrder(i))) : 0
+      const quick = searchParams.get('quick') === '1'
+      if (quick) {
+        setForm({
+          ...blankItem,
+          id: 'i' + Date.now(),
+          external_id: generateMenuExternalId(),
+          sort_order: maxOrder + 1,
+          show_in_cashier_quick_items: true,
+          cashier_only: false,
+          send_to_kitchen: false,
+          quick_item_sort_order: maxQuickOrder + 1,
+          option_groups_editor: [],
+        })
+      } else {
+        setForm({
+          ...blankItem,
+          id: 'i' + Date.now(),
+          external_id: generateMenuExternalId(),
+          sort_order: maxOrder + 1,
+          show_in_cashier_quick_items: false,
+          cashier_only: false,
+          send_to_kitchen: false,
+          quick_item_sort_order: '',
+          option_groups_editor: [],
+        })
+      }
+      setItemModal('new')
+      return
+    }
+
+    const item = state.menuItems.find(row => row.id === productId)
+    if (!item) {
+      navigate('/admin/menu', { replace: true })
+      return
+    }
+    setForm(menuItemToProductForm(item))
+    setItemModal('edit')
+  }, [loaded, isProductEditorPage, productId, quickItems, searchParams, state.menuItems, navigate])
+
   // ── Item CRUD ──────────────────────────────────────────────────────────────
   function openNewItem() {
-    uploadedItemImageUrlsRef.current.clear()
-    const maxOrder = state.menuItems.length > 0
-      ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
-    setForm({ ...blankItem, id: 'i' + Date.now(), external_id: generateMenuExternalId(), sort_order: maxOrder + 1 })
-    setItemModal('new')
+    navigate('/admin/menu/product/new')
   }
   function openNewQuickItem() {
-    uploadedItemImageUrlsRef.current.clear()
-    const maxOrder = state.menuItems.length > 0
-      ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
-    const maxQuickOrder = quickItems.length > 0
-      ? Math.max(...quickItems.map(i => getQuickItemSortOrder(i))) : 0
-    setForm({
-      ...blankItem,
-      id: 'i' + Date.now(),
-      external_id: generateMenuExternalId(),
-      sort_order: maxOrder + 1,
-      show_in_cashier_quick_items: true,
-      cashier_only: false,
-      send_to_kitchen: false,
-      quick_item_sort_order: maxQuickOrder + 1,
-      option_groups_editor: [],
-    })
-    setItemModal('new')
+    navigate('/admin/menu/product/new?quick=1')
   }
   function openEditItem(i) {
-    uploadedItemImageUrlsRef.current.clear()
-    setForm({
-      ...blankItem,
-      ...i,
-      millilitres: i.millilitres ?? i.milliliters ?? (Number(i.litres ?? i.liters) > 0 ? Math.round(Number(i.litres ?? i.liters) * 1000) : ''),
-      stock_count: i.stock_count ?? i.stockCount ?? 0,
-      sort_order: i.sort_order ?? 0,
-      show_in_cashier_quick_items: isCashierQuickItem(i),
-      cashier_only: !!(i.cashier_only || i.cashierOnly),
-      send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
-      quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
-      option_groups_editor: optionGroupsToEditor(i.option_groups ?? i.optionGroups),
-    })
-    setItemModal('edit')
+    navigate(`/admin/menu/product/${encodeURIComponent(i.id)}`)
   }
   async function closeItemModal() {
     await cleanupTrackedUploads(uploadedItemImageUrlsRef)
     setItemModal(null)
+    if (isProductEditorPage) {
+      productEditorInitializedRef.current = ''
+      navigate('/admin/menu')
+    }
   }
   async function saveItem() {
     if (!form.name_uz || !form.price || !form.category_id) return
-    const optionGroups = editorToOptionGroups(form.option_groups_editor)
+    const optionGroups = editorToOptionGroups(form.option_groups_editor, form.price)
     const oldImageUrl = itemModal === 'edit'
       ? state.menuItems.find(item => item.id === form.id)?.image_url
       : ''
@@ -857,6 +945,10 @@ export default function AdminMenu() {
         await deleteMenuImageFromR2(oldImageUrl)
       }
       setItemModal(null)
+      if (isProductEditorPage) {
+        productEditorInitializedRef.current = ''
+        navigate('/admin/menu')
+      }
     }
   }
   function deleteItem(id) {
@@ -950,6 +1042,144 @@ export default function AdminMenu() {
               onAction={() => window.location.reload()}
             />
           )}
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (isProductEditorPage) {
+    const editorTitle = itemModal === 'new' ? t(lang, 'addItem') : t(lang, 'editItem')
+    return (
+      <AppShell title={editorTitle}>
+        <div className="min-h-screen bg-[#FAF6EE]">
+          <div className="border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
+            <div className="mx-auto flex w-full max-w-[1180px] items-center gap-3">
+              <button
+                type="button"
+                onClick={closeItemModal}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div className="min-w-0">
+                <h1 className="truncate text-2xl font-black text-gray-900">{editorTitle}</h1>
+                <p className="mt-0.5 text-sm text-gray-400">
+                  {lang === 'uz' ? 'Mahsulot, variant narxlari va qoldiqlarini boshqaring' :
+                   lang === 'ru' ? 'Управляйте товаром, ценами вариантов и остатками' :
+                   'Manage product details, variant prices, and stock counts'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
+            {!itemModal ? (
+              <OperationalLoading
+                title={lang === 'uz' ? 'Mahsulot ochilmoqda' : lang === 'ru' ? 'Открываем товар' : 'Opening product'}
+                description={lang === 'uz' ? 'Ma’lumotlar tayyorlanmoqda.' : lang === 'ru' ? 'Подготавливаем данные.' : 'Preparing the editor.'}
+              />
+            ) : (
+              <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 font-semibold mb-1.5">{t(lang, 'category')}</label>
+                      <select
+                        value={form.category_id}
+                        onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00]"
+                      >
+                        <option value="">— {t(lang, 'category')} —</option>
+                        {realSortedCats.map(c => (
+                          <option key={c.id} value={c.id}>{getCategoryName(c, lang)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <Field label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="35000" />
+                    <Field
+                      label={lang === 'uz' ? 'Tokchadagi soni' : lang === 'ru' ? 'Количество на полке' : 'Shelf count'}
+                      type="number"
+                      value={form.stock_count}
+                      onChange={setF('stock_count')}
+                      placeholder="24"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} />
+                    <Field label={t(lang, 'nameRu')} value={form.name_ru} onChange={setF('name_ru')} />
+                    <Field label={t(lang, 'nameEn')} value={form.name_en} onChange={setF('name_en')} />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <DescriptionField label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} lang={lang} />
+                    <DescriptionField label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} lang={lang} />
+                    <DescriptionField label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} lang={lang} />
+                  </div>
+
+                  <OptionGroupsEditor
+                    value={form.option_groups_editor}
+                    onChange={optionGroups => setForm(current => ({ ...current, option_groups_editor: optionGroups }))}
+                    lang={lang}
+                  />
+                </section>
+
+                <aside className="min-w-0 space-y-4">
+                  <section className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="rounded-xl border border-[#C7D2FE] bg-[#EEF2FF] px-3 py-2.5">
+                      <p className="mb-1 text-[11px] font-black uppercase tracking-wide text-[#818CF8]">
+                        {lang === 'uz' ? 'Tashqi ID' : lang === 'ru' ? 'Внешний ID' : 'External ID'}
+                      </p>
+                      <p className="font-black text-[#4F46E5]">{form.external_id || '—'}</p>
+                    </div>
+                    <ImageUploadField
+                      label={t(lang, 'imageUrl')}
+                      value={form.image_url}
+                      onChange={setF('image_url')}
+                      onUploadComplete={upload => handleTrackedUpload(uploadedItemImageUrlsRef, upload)}
+                      lang={lang}
+                      type="product"
+                      entityId={form.id}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} type="number" value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
+                      <Field label={t(lang, 'sortOrder')} type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
+                      <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
+                      <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
+                      <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />
+                      <Field
+                        label={lang === 'uz' ? 'Tezkor tartib' : lang === 'ru' ? 'Порядок быстрого' : 'Quick order'}
+                        type="number"
+                        value={form.quick_item_sort_order}
+                        onChange={setF('quick_item_sort_order')}
+                        placeholder="1"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
+                      <input type="checkbox" checked={form.available} onChange={e => setForm(f => ({ ...f, available: e.target.checked }))} className="h-4 w-4 accent-[#ff5a00]" />
+                      {t(lang, 'available_item')}
+                    </label>
+                    <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
+                      <input type="checkbox" checked={!!form.show_in_cashier_quick_items} onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked }))} className="h-4 w-4 accent-[#ff5a00]" />
+                      {lang === 'uz' ? 'Kassir tezkor mahsulotlarida ko‘rsatish' : lang === 'ru' ? 'Показывать в быстрых товарах кассира' : 'Show in cashier quick items'}
+                    </label>
+                    <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
+                      <input type="checkbox" checked={!!form.cashier_only} onChange={e => setForm(f => ({ ...f, cashier_only: e.target.checked }))} className="h-4 w-4 accent-[#ff5a00]" />
+                      {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
+                    </label>
+                  </section>
+                  <div className="sticky bottom-4 flex gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
+                    <button onClick={closeItemModal} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                      {t(lang, 'cancel')}
+                    </button>
+                    <button onClick={saveItem} className="flex-1 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200">
+                      {t(lang, 'save')}
+                    </button>
+                  </div>
+                </aside>
+              </div>
+            )}
+          </div>
         </div>
       </AppShell>
     )
