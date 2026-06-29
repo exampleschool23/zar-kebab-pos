@@ -853,6 +853,21 @@ test('WaiterTables elapsed label uses pending item submit time before stale orde
   assert.doesNotMatch(getPreparationCounts, /createdAt: active\.reduce\(\(earliest, o\)/)
 })
 
+test('AdminDashboard recent order elapsed label uses status activity time', () => {
+  const source = readSource('src/pages/AdminDashboard.jsx')
+  const row = functionBody(source, 'RecentOrderRow')
+  const appContext = readSource('src/store/AppContext.jsx')
+  const reducer = readSource('src/store/ordersReducer.js')
+
+  assert.match(source, /getOrderActivityDate/)
+  assert.match(source, /_recentActivityAt: getOrderActivityDate\(order, state\.tables\)/)
+  assert.match(row, /const elapsedAt = order\._recentActivityAt \|\| getOrderActivityDate\(order\) \|\| getOrderDate\(order\) \|\| order\.created_at/)
+  assert.match(row, /elapsedSince\(elapsedAt\)/)
+  assert.doesNotMatch(row, /elapsedSince\(getOrderDate\(order\) \|\| order\.created_at\)/)
+  assert.match(appContext, /_statusChangedAt: action\._statusChangedAt \|\| new Date\(\)\.toISOString\(\)/)
+  assert.match(reducer, /status: 'needs_bill', updated_at: statusChangedAt/)
+})
+
 test('WaiterTables hides zero-value active orders from table cards', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
   const activeOrdersFilter = functionBody(source, 'getVisibleActiveOrdersForTable')

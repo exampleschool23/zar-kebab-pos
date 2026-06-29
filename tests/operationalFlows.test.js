@@ -184,6 +184,45 @@ test('cashier can move requested bill back to occupied table for waiter addition
   assert.equal(recalled.orders.find(order => order.id === 'o2').status, 'paid')
 })
 
+test('request bill and recall stamp local status update times for elapsed labels', () => {
+  const base = {
+    ...state(),
+    tables: [{ id: 't1', name: 'Table 1', status: 'occupied', is_active: true }],
+    orders: [
+      {
+        id: 'o1',
+        table_id: 't1',
+        status: 'delivered',
+        payment_status: 'unpaid',
+        order_type: 'dine_in',
+        created_at: '2026-06-22T07:00:00.000Z',
+        updated_at: '2026-06-22T07:00:00.000Z',
+        items: [{ id: 'i1', status: 'served' }],
+      },
+    ],
+  }
+
+  const requestedAt = '2026-06-29T07:59:00.000Z'
+  const needsBill = ordersReducer(base, {
+    type: 'MARK_TABLE_NEEDS_BILL',
+    payload: 't1',
+    _statusChangedAt: requestedAt,
+  })
+
+  assert.equal(needsBill.tables[0].updated_at, requestedAt)
+  assert.equal(needsBill.orders[0].updated_at, requestedAt)
+
+  const recalledAt = '2026-06-29T08:10:00.000Z'
+  const recalled = ordersReducer(needsBill, {
+    type: 'RECALL_TABLE_FROM_CASHIER',
+    payload: 't1',
+    _statusChangedAt: recalledAt,
+  })
+
+  assert.equal(recalled.tables[0].updated_at, recalledAt)
+  assert.equal(recalled.orders[0].updated_at, recalledAt)
+})
+
 test('owner order deletion removes the order and resets table only when no active orders remain', () => {
   const base = {
     ...state(),

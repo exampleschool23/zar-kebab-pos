@@ -126,6 +126,15 @@ export function AppProvider({ children }) {
         ...action,
         _itemId: makeLocalId('oi'),
       }
+    } else if (
+      action.type === 'CONFIRM_ORDER_DELIVERED' ||
+      action.type === 'MARK_TABLE_NEEDS_BILL' ||
+      action.type === 'RECALL_TABLE_FROM_CASHIER'
+    ) {
+      enriched = {
+        ...action,
+        _statusChangedAt: action._statusChangedAt || new Date().toISOString(),
+      }
     }
 
     if (LOCAL_ONLY_ACTIONS.has(enriched.type)) {

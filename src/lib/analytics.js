@@ -59,6 +59,16 @@ export function getOrderDate(o) {
   return o?.paid_at || o?.created_at || null
 }
 
+export function getOrderActivityDate(order, tables = []) {
+  if (!order) return null
+  if (isActiveNeedsBillOrder(order, tables)) {
+    const table = tables.find(t => t.id === order.table_id)
+    return order.updated_at || table?.updated_at || order.created_at || null
+  }
+  if (isPaidOrder(order)) return order.paid_at || order.updated_at || order.created_at || null
+  return order.updated_at || order.created_at || null
+}
+
 export function getOrderItems(o) {
   return o?.items || o?.order_items || []
 }
@@ -621,6 +631,9 @@ export function groupOrdersBySession(orders) {
 
     if (!session.payment_method && o.payment_method) session.payment_method = o.payment_method
     if (o.created_at && new Date(o.created_at) < new Date(session.created_at)) session.created_at = o.created_at
+    if (o.updated_at && (!session.updated_at || new Date(o.updated_at) > new Date(session.updated_at))) {
+      session.updated_at = o.updated_at
+    }
     if (o.paid_at && (!session.paid_at || new Date(o.paid_at) > new Date(session.paid_at))) {
       session.paid_at = o.paid_at
     }

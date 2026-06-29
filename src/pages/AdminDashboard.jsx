@@ -14,6 +14,7 @@ import {
   addRestaurantDays,
   getRestaurantHour,
   getOrderDate,
+  getOrderActivityDate,
   getOrderItems,
   getOrderTotal,
   groupOrdersBySession,
@@ -380,6 +381,7 @@ function RecentOrderRow({
   const l = L[lang] || L.en
   const isNeedsBill = order.status === 'needs_bill'
   const shortId = String(order.id).slice(-4).toUpperCase()
+  const elapsedAt = order._recentActivityAt || getOrderActivityDate(order) || getOrderDate(order) || order.created_at
 
   return (
     <div className={`rounded-2xl border px-3 py-3 transition-all ${
@@ -403,7 +405,7 @@ function RecentOrderRow({
 
             <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#8EA0BB] min-w-0">
               <Clock size={13} className="flex-shrink-0" />
-              <span className="whitespace-nowrap flex-shrink-0">{elapsedSince(getOrderDate(order) || order.created_at)}</span>
+              <span className="whitespace-nowrap flex-shrink-0">{elapsedSince(elapsedAt)}</span>
               {methodLabel && (
                 <>
                   <CreditCard size={13} className="ml-0.5 flex-shrink-0" />
@@ -736,7 +738,11 @@ export default function AdminDashboard() {
         if (isPaidOrder(o)) return true
         return isActiveNeedsBillOrder(o, state.tables)
       })
-      .sort((a, b) => new Date(getOrderDate(b) || b.created_at) - new Date(getOrderDate(a) || a.created_at))
+      .map(order => ({
+        ...order,
+        _recentActivityAt: getOrderActivityDate(order, state.tables),
+      }))
+      .sort((a, b) => new Date(b._recentActivityAt || getOrderDate(b) || b.created_at) - new Date(a._recentActivityAt || getOrderDate(a) || a.created_at))
 
     const needsBill = grouped.filter(o => isActiveNeedsBillOrder(o, state.tables))
     const paid = grouped.filter(isPaidOrder)

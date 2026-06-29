@@ -143,35 +143,48 @@ export function ordersReducer(state, action) {
 
     case 'CONFIRM_ORDER_DELIVERED': {
       const tableId = action.payload
+      const statusChangedAt = action._statusChangedAt || new Date().toISOString()
       return {
         ...state,
         orders: state.orders.map(o =>
           o.table_id === tableId && o.payment_status !== 'paid'
-            ? { ...o, status: 'delivered', items: o.items.map(i => ({ ...i, status: 'served' })) }
+            ? {
+              ...o,
+              status: 'delivered',
+              updated_at: statusChangedAt,
+              items: o.items.map(i => ({ ...i, status: 'served', updated_at: statusChangedAt })),
+            }
             : o
         ),
       }
     }
 
-    case 'MARK_TABLE_NEEDS_BILL':
+    case 'MARK_TABLE_NEEDS_BILL': {
+      const statusChangedAt = action._statusChangedAt || new Date().toISOString()
       return {
         ...state,
-        tables: state.tables.map(t => t.id === action.payload ? { ...t, status: 'needs_bill' } : t),
+        tables: state.tables.map(t =>
+          t.id === action.payload ? { ...t, status: 'needs_bill', updated_at: statusChangedAt } : t
+        ),
         orders: state.orders.map(o =>
           o.table_id === action.payload && o.payment_status !== 'paid'
-            ? { ...o, status: 'needs_bill' }
+            ? { ...o, status: 'needs_bill', updated_at: statusChangedAt }
             : o
         ),
       }
+    }
 
     case 'RECALL_TABLE_FROM_CASHIER': {
       const tableId = action.payload
+      const statusChangedAt = action._statusChangedAt || new Date().toISOString()
       return {
         ...state,
-        tables: state.tables.map(t => t.id === tableId ? { ...t, status: 'occupied' } : t),
+        tables: state.tables.map(t =>
+          t.id === tableId ? { ...t, status: 'occupied', updated_at: statusChangedAt } : t
+        ),
         orders: state.orders.map(o =>
           o.table_id === tableId && o.status === 'needs_bill' && o.payment_status !== 'paid'
-            ? { ...o, status: 'delivered' }
+            ? { ...o, status: 'delivered', updated_at: statusChangedAt }
             : o
         ),
       }

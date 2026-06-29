@@ -9,7 +9,11 @@ import {
   getDashboardSalesByCategory,
   getDashboardStaffPerformance,
 } from '../src/lib/dashboardAnalytics.js'
-import { toRestaurantDateStr } from '../src/lib/analytics.js'
+import {
+  getOrderActivityDate,
+  groupOrdersBySession,
+  toRestaurantDateStr,
+} from '../src/lib/analytics.js'
 
 const menuItemMap = {
   kebab: { id: 'kebab', category_id: 'kebab', image_url: 'kebab.jpg' },
@@ -215,4 +219,58 @@ test('dashboard readable date format uses a clear date time separator', () => {
     formatReadableDateTime('2026-05-19T23:29:00'),
     '19.05.2026 23:29'
   )
+})
+
+test('recent order activity uses bill request time instead of stale open time', () => {
+  const order = {
+    id: 'o-needs-bill',
+    table_id: 't6',
+    status: 'needs_bill',
+    payment_status: 'unpaid',
+    created_at: '2026-06-22T07:00:00.000Z',
+    updated_at: '2026-06-29T07:59:00.000Z',
+  }
+  const tables = [{ id: 't6', status: 'needs_bill', updated_at: '2026-06-29T07:58:00.000Z' }]
+
+  assert.equal(getOrderActivityDate(order, tables), '2026-06-29T07:59:00.000Z')
+})
+
+test('recent order activity falls back to table bill time when legacy order update is missing', () => {
+  const order = {
+    id: 'o-legacy-needs-bill',
+    table_id: 't6',
+    status: 'needs_bill',
+    payment_status: 'unpaid',
+    created_at: '2026-06-22T07:00:00.000Z',
+  }
+  const tables = [{ id: 't6', status: 'needs_bill', updated_at: '2026-06-29T07:58:00.000Z' }]
+
+  assert.equal(getOrderActivityDate(order, tables), '2026-06-29T07:58:00.000Z')
+})
+
+test('merged recent order sessions keep the newest status update time', () => {
+  const [session] = groupOrdersBySession([
+    {
+      id: 'o-old-round',
+      table_id: 't6',
+      status: 'needs_bill',
+      payment_status: 'unpaid',
+      created_at: '2026-06-22T07:00:00.000Z',
+      updated_at: '2026-06-29T07:50:00.000Z',
+      total: 10000,
+      items: [],
+    },
+    {
+      id: 'o-new-round',
+      table_id: 't6',
+      status: 'needs_bill',
+      payment_status: 'unpaid',
+      created_at: '2026-06-22T08:00:00.000Z',
+      updated_at: '2026-06-29T07:59:00.000Z',
+      total: 15000,
+      items: [],
+    },
+  ])
+
+  assert.equal(session.updated_at, '2026-06-29T07:59:00.000Z')
 })
