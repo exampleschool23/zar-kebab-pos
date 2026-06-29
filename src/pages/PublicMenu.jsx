@@ -641,6 +641,9 @@ export default function PublicMenu({ premium = false }) {
             readOnly
             formatPrice={priceFormatter}
             linkBasePath={menuBasePath}
+            languageControl={premium
+              ? <LanguageSwitcher value={lang} onChange={setPremiumLang} />
+              : <LanguageSwitcher />}
           />
         </div>
       )}

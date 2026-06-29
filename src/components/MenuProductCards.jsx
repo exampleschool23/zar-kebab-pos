@@ -356,7 +356,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   )
 }
 
-export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false, formatPrice = formatCurrency, linkBasePath = '/menu' }) {
+export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false, formatPrice = formatCurrency, linkBasePath = '/menu', languageControl = null }) {
   const [qty, setQty] = useState(Math.max(1, currentQty))
   const [notes, setNotes] = useState(currentNotes || '')
   const [selectedOptions, setSelectedOptions] = useState({})
@@ -432,14 +432,17 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
         </div>
         <div className="flex flex-col items-end gap-1">
           {readOnly && (
-            <button
-              type="button"
-              onClick={copyProductLink}
-              className="mb-1 inline-flex h-9 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[12px] font-black text-[#1F2937] shadow-sm transition-colors hover:border-orange-200 hover:bg-[#fff4ed] hover:text-[#ff5a00]"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              <span className="hidden sm:inline">{copied ? labels.copied : labels.copy}</span>
-            </button>
+            <div className="mb-1 flex items-center justify-end gap-2">
+              {languageControl}
+              <button
+                type="button"
+                onClick={copyProductLink}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[12px] font-black text-[#1F2937] shadow-sm transition-colors hover:border-orange-200 hover:bg-[#fff4ed] hover:text-[#ff5a00]"
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                <span className="hidden sm:inline">{copied ? labels.copied : labels.copy}</span>
+              </button>
+            </div>
           )}
           {pricing.discounted && (
             <p className="whitespace-nowrap text-sm font-bold text-[#9CA3AF] line-through tabular-nums">
