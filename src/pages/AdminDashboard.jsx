@@ -525,7 +525,7 @@ export default function AdminDashboard() {
 
   const displayName = profile?.full_name || state.user?.name || 'Admin'
 
-  const [period, setPeriod]           = useState('7days')
+  const [period, setPeriod]           = useState('today')
   const [staffProfiles, setStaffProfiles] = useState(null)
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
   const [deletingOrderId, setDeletingOrderId] = useState('')

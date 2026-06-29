@@ -66,6 +66,8 @@ export const INCOME_CATEGORIES = [
   },
 ]
 
+export const MANUAL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.filter(category => !category.key.startsWith('salary_'))
+
 export function todayExpenseDate() {
   return toLocalDateStr(new Date().toISOString())
 }

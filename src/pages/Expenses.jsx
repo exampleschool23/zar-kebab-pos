@@ -27,6 +27,7 @@ import {
   EXPENSE_ENTRY_TYPES,
   EXPENSE_PAYMENT_METHODS,
   INCOME_CATEGORIES,
+  MANUAL_EXPENSE_CATEGORIES,
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
@@ -169,8 +170,8 @@ export default function Expenses() {
   const canAdd = role === 'owner'
   const canDelete = role === 'owner'
 
-  const [dateFrom, setDateFrom] = useState(todayExpenseDate())
-  const [dateTo, setDateTo] = useState(todayExpenseDate())
+  const [dateFrom, setDateFrom] = useState(() => todayExpenseDate().slice(0, 8) + '01')
+  const [dateTo, setDateTo] = useState(() => todayExpenseDate())
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -350,7 +351,7 @@ export default function Expenses() {
     },
   }
   const l = L[lang] || L.en
-  const categoryOptions = form.entry_type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  const categoryOptions = form.entry_type === 'income' ? INCOME_CATEGORIES : MANUAL_EXPENSE_CATEGORIES
 
   async function loadExpenses() {
     setLoading(true)
@@ -434,6 +435,13 @@ export default function Expenses() {
   const investorSupportTotal = incomeSummary.byCategory.investor_support || 0
   const currentAccountingDate = todayExpenseDate()
   const salaryDueDate = dateTo < currentAccountingDate ? dateTo : currentAccountingDate
+  const activeRangeKey = (() => {
+    const today = todayExpenseDate()
+    if (dateFrom === today && dateTo === today) return 'today'
+    if (dateFrom === addDays(today, -6) && dateTo === today) return 'week'
+    if (dateFrom === today.slice(0, 8) + '01' && dateTo === today) return 'month'
+    return ''
+  })()
   const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])
@@ -516,20 +524,27 @@ export default function Expenses() {
               { key: 'today', label: l.today },
               { key: 'week', label: l.week },
               { key: 'month', label: l.month },
-            ].map(option => (
-              <button
-                key={option.key}
-                onClick={() => {
-                  const today = todayExpenseDate()
-                  if (option.key === 'today') { setDateFrom(today); setDateTo(today) }
-                  if (option.key === 'week') { setDateFrom(addDays(today, -6)); setDateTo(today) }
-                  if (option.key === 'month') { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
-                }}
-                className="rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm hover:border-orange-200 hover:text-[#ff5a00]"
-              >
-                {option.label}
-              </button>
-            ))}
+            ].map(option => {
+              const selected = activeRangeKey === option.key
+              return (
+                <button
+                  key={option.key}
+                  onClick={() => {
+                    const today = todayExpenseDate()
+                    if (option.key === 'today') { setDateFrom(today); setDateTo(today) }
+                    if (option.key === 'week') { setDateFrom(addDays(today, -6)); setDateTo(today) }
+                    if (option.key === 'month') { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
+                  }}
+                  className={`rounded-xl border px-3 py-2 text-xs font-black shadow-sm ${
+                    selected
+                      ? 'border-[#ff5a00] bg-[#ff5a00] text-white shadow-orange-100'
+                      : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-orange-200 hover:text-[#ff5a00]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
             <button onClick={loadExpenses} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
               <RefreshCw size={14} />{l.refresh}
             </button>

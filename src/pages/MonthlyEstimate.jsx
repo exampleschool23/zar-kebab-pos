@@ -23,7 +23,6 @@ import { formatLongDate } from '../lib/dateFormat'
 import {
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
-  expenseCategoryLabel,
   expensePaymentMethodLabel,
   getEstimatedMonthlyExpenseSummary,
   normalizeExpenseAmount,
@@ -133,13 +132,18 @@ export default function MonthlyEstimate() {
       moneyWent: 'Pul qayerga ketdi',
       methodFlow: 'To‘lov turi bo‘yicha oqim',
       monthPlan: 'Oy rejasi',
+      clearOverview: 'Asosiy raqamlar',
       salesRevenue: 'Kafe savdosi',
+      cafePaidIn: 'Kafedan kelgan pul',
+      investorInvested: 'Investor kiritgan pul',
       investorSupport: 'Investor yordami',
       otherIncome: 'Boshqa daromad',
       salaryPaid: 'Xodimlarga to‘langan',
+      productsSpent: 'Mahsulotlarga ketgan',
       salaryBonus: 'Bonuslar',
       recordedExpenses: 'Yozilgan xarajatlar',
       salaryRemaining: 'Oy oxirigacha maosh',
+      rentRemaining: 'To‘lanishi kerak ijara',
       rent: 'Ijara',
       actualIn: 'Hozirgacha kirim',
       actualOut: 'Hozirgacha chiqim',
@@ -147,6 +151,7 @@ export default function MonthlyEstimate() {
       plannedUzs: 'Oy oxirigacha UZS xarajat',
       paidOrders: 'To‘langan buyurtmalar',
       rentNote: 'Alohida USD majburiyat',
+      rentPaid: 'Bu oy ijara to‘langan',
       inflow: 'Kirim',
       outflow: 'Chiqim',
       balance: 'Farq',
@@ -157,29 +162,35 @@ export default function MonthlyEstimate() {
     },
     ru: {
       title: 'Прогноз месяца',
-      sub: 'Откуда пришли деньги, куда ушли и что ещё нужно оплатить до конца месяца',
+      sub: 'Откуда поступили деньги, на что они ушли и сколько ещё нужно оплатить до конца месяца',
       back: 'Назад к бухгалтерии',
       refresh: 'Обновить',
       currentMonth: 'Текущий месяц',
-      moneyCame: 'Откуда пришли деньги',
-      moneyWent: 'Куда ушли деньги',
-      methodFlow: 'Поток по способам оплаты',
+      moneyCame: 'Откуда поступили деньги',
+      moneyWent: 'На что ушли деньги',
+      methodFlow: 'Движение по способам оплаты',
       monthPlan: 'План месяца',
+      clearOverview: 'Главные цифры',
       salesRevenue: 'Выручка кафе',
+      cafePaidIn: 'Пришло из кафе',
+      investorInvested: 'Инвестор вложил',
       investorSupport: 'Поддержка инвестора',
-      otherIncome: 'Другой доход',
+      otherIncome: 'Прочие поступления',
       salaryPaid: 'Выплачено сотрудникам',
+      productsSpent: 'Потрачено на продукты',
       salaryBonus: 'Бонусы',
-      recordedExpenses: 'Записанные расходы',
-      salaryRemaining: 'Зарплата до конца месяца',
+      recordedExpenses: 'Учтённые расходы',
+      salaryRemaining: 'Осталось выплатить зарплаты',
+      rentRemaining: 'Осталось оплатить аренду',
       rent: 'Аренда',
-      actualIn: 'Пришло на сегодня',
+      actualIn: 'Пришло до сегодня',
       actualOut: 'Ушло на сегодня',
       netLeft: 'Текущий остаток',
-      plannedUzs: 'UZS расход до конца месяца',
+      plannedUzs: 'План расходов в UZS до конца месяца',
       paidOrders: 'Оплаченные заказы',
       rentNote: 'Отдельное обязательство в USD',
-      inflow: 'Приход',
+      rentPaid: 'Аренда за месяц оплачена',
+      inflow: 'Поступления',
       outflow: 'Расход',
       balance: 'Разница',
       loading: 'Загружаем прогноз',
@@ -197,13 +208,18 @@ export default function MonthlyEstimate() {
       moneyWent: 'Where money went',
       methodFlow: 'Flow by payment method',
       monthPlan: 'Month plan',
+      clearOverview: 'Main numbers',
       salesRevenue: 'Cafe sales',
+      cafePaidIn: 'Came from cafe',
+      investorInvested: 'Investor invested',
       investorSupport: 'Investor support',
       otherIncome: 'Other income',
       salaryPaid: 'Paid to employees',
+      productsSpent: 'Spent on products',
       salaryBonus: 'Bonuses',
       recordedExpenses: 'Recorded expenses',
       salaryRemaining: 'Salary left this month',
+      rentRemaining: 'Rent still due',
       rent: 'Rent',
       actualIn: 'In so far',
       actualOut: 'Out so far',
@@ -211,6 +227,7 @@ export default function MonthlyEstimate() {
       plannedUzs: 'UZS spend by month end',
       paidOrders: 'Paid orders',
       rentNote: 'Separate USD commitment',
+      rentPaid: 'Rent recorded as paid this month',
       inflow: 'Inflow',
       outflow: 'Outflow',
       balance: 'Balance',
@@ -296,24 +313,51 @@ export default function MonthlyEstimate() {
   const actualExpenseSummary = summarizeExpenses(allActualExpenseRows)
   const salaryBonusTotal = summarizeExpenses(salaryBonusRows).total
   const recordedExpenseTotal = summarizeExpenses(manualExpenseRows).total
+  const investorInvestedTotal = incomeSummary.byCategory.investor_support || 0
+  const productsSpentTotal = actualExpenseSummary.byCategory.products_bazaar || 0
+  const recordedRentTotal = actualExpenseSummary.byCategory.rent || 0
   const totalInflow = salesRevenue + incomeSummary.total
   const totalOutflow = actualExpenseSummary.total
   const netLeft = totalInflow - totalOutflow
   const plannedMonthOutflowUzs = totalOutflow + monthlyEstimate.employeeRemainingThisMonth
   const rentUsd = monthlyEstimate.monthlyRentUsd
+  const rentDueUsd = recordedRentTotal > 0 ? 0 : rentUsd
 
   const cameRows = [
     { key: 'sales', label: l.salesRevenue, amount: salesRevenue, color: '#16A34A' },
-    { key: 'investor', label: l.investorSupport, amount: incomeSummary.byCategory.investor_support || 0, color: '#7C3AED' },
-    { key: 'other-income', label: l.otherIncome, amount: Math.max(0, incomeSummary.total - (incomeSummary.byCategory.investor_support || 0)), color: '#2563EB' },
+    { key: 'investor', label: l.investorSupport, amount: investorInvestedTotal, color: '#7C3AED' },
+    { key: 'other-income', label: l.otherIncome, amount: Math.max(0, incomeSummary.total - investorInvestedTotal), color: '#2563EB' },
   ].filter(row => row.amount > 0)
 
   const wentRows = [
     { key: 'salary-paid', label: l.salaryPaid, amount: monthlyEstimate.employeePaidToDate, color: '#2563EB' },
     { key: 'salary-bonus', label: l.salaryBonus, amount: salaryBonusTotal, color: '#9333EA' },
-    { key: 'recorded', label: l.recordedExpenses, amount: recordedExpenseTotal, color: '#FF5A00' },
+    { key: 'products', label: l.productsSpent, amount: productsSpentTotal, color: '#F97316' },
+    { key: 'recorded', label: l.recordedExpenses, amount: Math.max(0, recordedExpenseTotal - productsSpentTotal), color: '#FF5A00' },
     { key: 'salary-remaining', label: l.salaryRemaining, amount: monthlyEstimate.employeeRemainingThisMonth, color: '#DC2626' },
   ].filter(row => row.amount > 0)
+
+  const overviewRows = [
+    { key: 'investor-invested', icon: Banknote, label: l.investorInvested, value: formatCurrency(investorInvestedTotal), tone: 'purple' },
+    { key: 'cafe-paid-in', icon: TrendingUp, label: l.cafePaidIn, value: formatCurrency(salesRevenue), tone: 'green', sub: l.paidOrders },
+    { key: 'salary-paid', icon: Users, label: l.salaryPaid, value: formatCurrency(monthlyEstimate.employeePaidToDate), tone: 'blue' },
+    { key: 'products-spent', icon: ReceiptText, label: l.productsSpent, value: formatCurrency(productsSpentTotal), tone: 'orange' },
+    {
+      key: 'salary-remaining',
+      icon: Users,
+      label: l.salaryRemaining,
+      value: formatCurrency(monthlyEstimate.employeeRemainingThisMonth),
+      tone: monthlyEstimate.employeeRemainingThisMonth > 0 ? 'red' : 'green',
+    },
+    {
+      key: 'rent-remaining',
+      icon: Home,
+      label: l.rentRemaining,
+      value: formatUsd(rentDueUsd),
+      tone: rentDueUsd > 0 ? 'red' : 'green',
+      sub: rentDueUsd > 0 ? l.rentNote : l.rentPaid,
+    },
+  ]
 
   const methodRows = useMemo(() => {
     const inflow = {}
@@ -399,18 +443,24 @@ export default function MonthlyEstimate() {
             <>
               <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <h2 className="text-sm font-black text-[#1F2937]">{l.monthPlan}</h2>
+                  <h2 className="text-sm font-black text-[#1F2937]">{l.clearOverview}</h2>
                   <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">
                     <CalendarDays size={13} />
                     {formatLongDate(monthStart, lang, monthStart)} - {formatLongDate(monthEnd, lang, monthEnd)}
                   </span>
                 </div>
-                <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
-                  <Kpi icon={TrendingUp} label={l.actualIn} value={formatCurrency(totalInflow)} tone="green" sub={l.paidOrders} />
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {overviewRows.map(row => <Kpi key={row.key} {...row} />)}
+                </div>
+              </section>
+
+              <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+                <h2 className="mb-4 text-sm font-black text-[#1F2937]">{l.monthPlan}</h2>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Kpi icon={TrendingUp} label={l.actualIn} value={formatCurrency(totalInflow)} tone="green" />
                   <Kpi icon={TrendingDown} label={l.actualOut} value={formatCurrency(totalOutflow)} tone="orange" />
                   <Kpi icon={WalletCards} label={l.netLeft} value={formatCurrency(netLeft)} tone={netLeft >= 0 ? 'blue' : 'red'} />
                   <Kpi icon={Users} label={l.plannedUzs} value={formatCurrency(plannedMonthOutflowUzs)} tone="purple" />
-                  <Kpi icon={Home} label={l.rent} value={formatUsd(rentUsd)} tone="gray" sub={l.rentNote} />
                 </div>
               </section>
 
