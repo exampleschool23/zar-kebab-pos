@@ -32,6 +32,7 @@ const AdminUsers = lazy(() => import('./pages/AdminUsers'))
 const AdminLoyalty = lazy(() => import('./pages/AdminLoyalty'))
 const Expenses = lazy(() => import('./pages/Expenses'))
 const Salaries = lazy(() => import('./pages/Salaries'))
+const MonthlyEstimate = lazy(() => import('./pages/MonthlyEstimate'))
 const Employees = lazy(() => import('./pages/Employees'))
 const Reports = lazy(() => import('./pages/Reports'))
 const AdminAudit = lazy(() => import('./pages/AdminAudit'))
@@ -311,11 +312,15 @@ function InternalAppRoutes({ adminHost = false }) {
         <Route path="/admin/accounting/salaries" element={
           <LazyProtectedRoute page="expenses"><Salaries /></LazyProtectedRoute>
         } />
+        <Route path="/admin/accounting/estimate" element={
+          <LazyProtectedRoute page="expenses"><MonthlyEstimate /></LazyProtectedRoute>
+        } />
         <Route path="/admin/accounting/employees" element={
           <LazyProtectedRoute page="expenses"><Employees /></LazyProtectedRoute>
         } />
         <Route path="/admin/expenses" element={<Navigate to="/admin/accounting" replace />} />
         <Route path="/admin/expenses/salaries" element={<Navigate to="/admin/accounting/salaries" replace />} />
+        <Route path="/admin/expenses/estimate" element={<Navigate to="/admin/accounting/estimate" replace />} />
         <Route path="/admin/expenses/employees" element={<Navigate to="/admin/accounting/employees" replace />} />
         <Route path="/admin/discount-cards" element={<Navigate to="/admin/loyalty" replace />} />
         <Route path="/admin/reports" element={

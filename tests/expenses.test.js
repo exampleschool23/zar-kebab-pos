@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  DEFAULT_MONTHLY_RENT_USD,
   buildSalaryBonusExpenseRows,
   buildSalaryExpenseRows,
   buildSalaryPaymentExpenseRows,
@@ -10,6 +11,7 @@ import {
   expenseMatchesRange,
   expensePaymentMethodLabel,
   getDailySalaryAmount,
+  getEstimatedMonthlyExpenseSummary,
   getNetIncome,
   getSalaryActiveUntil,
   getSalaryDue,
@@ -561,4 +563,35 @@ test('salary payment note is shown instead of period range when present', () => 
   // payment note flows into description so the accounting tab can display it
   assert.equal(rows.find(r => r.id === 'salary-payment-p-note')?.description, 'June payout')
   assert.equal(rows.find(r => r.id === 'salary-payment-p-no-note')?.description, 'Salary payment')
+})
+
+test('monthly expense estimate tracks employee paid amount remaining salary and rent', () => {
+  const waiterProfile = {
+    id: 'salary-monthly-estimate-1',
+    profile_id: 'waiter-monthly-estimate-1',
+    employee_name: 'Monthly Waiter',
+    joined_at: '2026-06-01',
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
+    payments: [
+      { id: 'paid-before-now', paid_date: '2026-06-10', amount: 1_200_000 },
+      { id: 'paid-after-now', paid_date: '2026-06-25', amount: 900_000 },
+    ],
+    absences: [
+      { id: 'absence-before-now', absence_date: '2026-06-12' },
+      { id: 'absence-after-now', absence_date: '2026-06-20' },
+    ],
+  }
+
+  const summary = getEstimatedMonthlyExpenseSummary([waiterProfile], '2026-06-16')
+
+  assert.equal(summary.monthStart, '2026-06-01')
+  assert.equal(summary.monthEnd, '2026-06-30')
+  assert.equal(summary.paidThroughDate, '2026-06-16')
+  assert.equal(summary.monthlyRentUsd, DEFAULT_MONTHLY_RENT_USD)
+  assert.equal(summary.employeePaidToDate, 1_200_000)
+  assert.equal(summary.employeeProjectedMonth, 8_400_000)
+  assert.equal(summary.employeeRemainingThisMonth, 7_200_000)
+  assert.equal(summary.estimatedMonthlyExpenseUzs, 8_400_000)
 })

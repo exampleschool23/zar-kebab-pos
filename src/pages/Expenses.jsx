@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
+import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_ENTRY_TYPES,
@@ -213,6 +214,7 @@ export default function Expenses() {
       export: 'Eksport',
       salaries: 'Maoshlar',
       salaryDue: 'Maosh qarzi',
+      estimate: 'Taxmin',
       today: 'Bugun',
       week: '7 kun',
       month: 'Oy',
@@ -265,6 +267,7 @@ export default function Expenses() {
       export: 'Экспорт',
       salaries: 'Зарплаты',
       salaryDue: 'Долг по зарплате',
+      estimate: 'Прогноз',
       today: 'Сегодня',
       week: '7 дней',
       month: 'Месяц',
@@ -317,6 +320,7 @@ export default function Expenses() {
       export: 'Export',
       salaries: 'Salaries',
       salaryDue: 'Salary due',
+      estimate: 'Estimate',
       today: 'Today',
       week: '7 days',
       month: 'Month',
@@ -428,7 +432,8 @@ export default function Expenses() {
   const netIncome = getNetIncome(revenue, filteredExpenses)
   const totalIncome = revenue + incomeSummary.total
   const investorSupportTotal = incomeSummary.byCategory.investor_support || 0
-  const salaryDueDate = dateTo < todayExpenseDate() ? dateTo : todayExpenseDate()
+  const currentAccountingDate = todayExpenseDate()
+  const salaryDueDate = dateTo < currentAccountingDate ? dateTo : currentAccountingDate
   const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])
@@ -530,6 +535,9 @@ export default function Expenses() {
             </button>
             <button onClick={() => navigate('/admin/accounting/salaries')} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-[#ff5a00] shadow-sm">
               <Users size={14} />{l.salaries}
+            </button>
+            <button onClick={() => navigate('/admin/accounting/estimate')} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-600 shadow-sm">
+              <ReceiptText size={14} />{l.estimate}
             </button>
             <button onClick={() => exportExpensesCsv(filteredExpenses, lang)} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
               <Download size={14} />{l.export}
@@ -656,7 +664,14 @@ export default function Expenses() {
                       </div>
                     </Field>
                     <Field label={l.amount}>
-                      <input type="number" min="0" step="1000" value={form.amount} onChange={event => setForm(current => ({ ...current, amount: event.target.value }))} className={`${FIELD_INPUT_CLASS} text-lg font-black`} placeholder="0" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatMoneyInput(form.amount)}
+                        onChange={event => setForm(current => ({ ...current, amount: normalizeMoneyInput(event.target.value) }))}
+                        className={`${FIELD_INPUT_CLASS} text-lg font-black tabular-nums`}
+                        placeholder="0"
+                      />
                     </Field>
                     <Field label={form.entry_type === 'income' ? l.source : l.vendor}>
                       <input value={form.vendor} onChange={event => setForm(current => ({ ...current, vendor: event.target.value }))} className={FIELD_INPUT_CLASS} />

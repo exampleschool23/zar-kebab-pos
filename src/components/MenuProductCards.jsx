@@ -403,6 +403,9 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     copy: lang === 'uz' ? 'Havolani nusxalash' : lang === 'ru' ? 'Скопировать ссылку' : 'Copy link',
     copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
   }
+  const optionSectionTitle = lang === 'uz' ? 'Variantlar' : lang === 'ru' ? 'Варианты' : 'Options'
+  const shouldShowOptionSectionTitle = optionGroups.length !== 1 ||
+    String(optionGroups[0]?.title || '').trim().toLocaleLowerCase() !== optionSectionTitle.toLocaleLowerCase()
 
   const total = selectedOptionFullPrice * qty
 
@@ -525,13 +528,15 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                 </p>
               </div>
 
-              {!readOnly && optionGroups.length > 0 && (
+              {optionGroups.length > 0 && (
               <div className="rounded-[22px] border border-[#E5E7EB] bg-[#FBFCFE] p-4">
+                {shouldShowOptionSectionTitle && (
                 <div className="mb-3">
                   <h3 className="text-base font-black text-[#111827]">
-                    {lang === 'uz' ? 'Variantlar' : lang === 'ru' ? 'Варианты' : 'Options'}
+                    {optionSectionTitle}
                   </h3>
                 </div>
+                )}
                 <div className="space-y-4">
                   {optionGroups.map(group => (
                     <div key={group.id}>
@@ -542,7 +547,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                         {group.options.map(option => (
                           <label
                             key={option.id}
-                            className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                            className={`flex items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-colors ${readOnly ? 'cursor-default' : 'cursor-pointer'} ${
                               selectedOptions[group.id] === option.id
                                 ? 'border-[#ff5a00] bg-[#fff4ed] text-[#111827]'
                                 : 'border-[#E5E7EB] bg-white text-[#475569]'
@@ -553,7 +558,10 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                                 type="radio"
                                 name={`option-${item.id}-${group.id}`}
                                 checked={selectedOptions[group.id] === option.id}
-                                onChange={() => setSelectedOptions(current => ({ ...current, [group.id]: option.id }))}
+                                disabled={readOnly}
+                                onChange={() => {
+                                  if (!readOnly) setSelectedOptions(current => ({ ...current, [group.id]: option.id }))
+                                }}
                                 className="h-4 w-4 accent-[#ff5a00]"
                               />
                               <span className="truncate">{option.label}</span>

@@ -2,6 +2,7 @@ import { getOrderPayments, toLocalDateStr } from './analytics.js'
 
 export const EXPENSE_PAYMENT_METHODS = ['cash', 'card', 'terminal']
 export const EXPENSE_ENTRY_TYPES = ['expense', 'income']
+export const DEFAULT_MONTHLY_RENT_USD = 2000
 
 export const EXPENSE_CATEGORIES = [
   {
@@ -257,6 +258,36 @@ export function getTotalSalaryDue(salaryProfiles = [], dateTo = todayExpenseDate
   return (salaryProfiles || []).reduce((sum, salaryProfile) => (
     sum + getSalaryDue(salaryProfile, dateTo)
   ), 0)
+}
+
+function getMonthEndDate(asOfDate = todayExpenseDate()) {
+  const date = String(asOfDate || todayExpenseDate()).slice(0, 10)
+  const [year, month] = date.split('-').map(Number)
+  if (!year || !month) return date
+  const monthEnd = new Date(Date.UTC(year, month, 0, 12, 0, 0))
+  return toLocalDateStr(monthEnd.toISOString())
+}
+
+export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate = todayExpenseDate(), options = {}) {
+  const date = String(asOfDate || todayExpenseDate()).slice(0, 10)
+  const monthStart = `${date.slice(0, 8)}01`
+  const monthEnd = getMonthEndDate(date)
+  const paidThroughDate = date > monthEnd ? monthEnd : date
+  const monthlyRentUsd = Math.max(0, Math.round(Number(options.monthlyRentUsd ?? DEFAULT_MONTHLY_RENT_USD) || 0))
+  const employeePaidToDate = summarizeExpenses(buildSalaryPaymentExpenseRows(salaryProfiles, monthStart, paidThroughDate)).total
+  const employeeProjectedMonth = summarizeExpenses(buildSalaryExpenseRows(salaryProfiles, monthStart, monthEnd)).total
+  const employeeRemainingThisMonth = Math.max(0, employeeProjectedMonth - employeePaidToDate)
+
+  return {
+    monthStart,
+    monthEnd,
+    paidThroughDate,
+    monthlyRentUsd,
+    employeePaidToDate,
+    employeeProjectedMonth,
+    employeeRemainingThisMonth,
+    estimatedMonthlyExpenseUzs: employeeProjectedMonth,
+  }
 }
 
 function addLocalDateDays(isoDate, days) {
