@@ -185,6 +185,26 @@ test('AdminMenu has exactly one upload error render', () => {
   assert.equal(matches.length, 1)
 })
 
+test('AdminMenu preserves menu scroll when returning from product editor', () => {
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const appShell = readSource('src/components/AppShell.jsx')
+  const openEditItem = functionBody(adminMenu, 'openEditItem')
+  const openNewItem = functionBody(adminMenu, 'openNewItem')
+
+  assert.match(appShell, /function AppShell\(\{ children, title, contentRef \}\)/)
+  assert.match(appShell, /<main ref=\{contentRef\}/)
+  assert.match(adminMenu, /const ADMIN_MENU_SCROLL_KEY = 'zar-admin-menu-scroll-top'/)
+  assert.match(adminMenu, /const shellScrollRef = useRef\(null\)/)
+  assert.match(adminMenu, /saveAdminMenuScrollPosition\(shellScrollRef\.current\?\.scrollTop \|\| 0\)/)
+  assert.match(openEditItem, /saveMenuListScrollBeforeProductNavigation\(\)[\s\S]*navigate\(`\/admin\/menu\/product\/\$\{encodeURIComponent\(i\.id\)\}`\)/)
+  assert.match(openNewItem, /saveMenuListScrollBeforeProductNavigation\(\)[\s\S]*navigate\('\/admin\/menu\/product\/new'\)/)
+  assert.match(adminMenu, /takeSavedAdminMenuScrollPosition\(\)/)
+  assert.match(adminMenu, /scroller\.scrollTop = savedScrollTop/)
+  assert.match(adminMenu, /clearSavedAdminMenuScrollPosition\(\)/)
+  assert.match(adminMenu, /window\.requestAnimationFrame\(\(\) => restore\(\)\)/)
+  assert.match(adminMenu, /<AppShell title=\{t\(lang, 'menu'\)\} contentRef=\{shellScrollRef\}>/)
+})
+
 test('App ProfileSync depends on stable profile fields and dispatch', () => {
   const source = readSource('src/App.jsx')
   const body = functionBody(source, 'ProfileSync')
@@ -702,7 +722,7 @@ test('menu item discounts use old_price for display and public deals', () => {
   const migration = readSource('supabase/036_menu_item_old_price.sql')
 
   assert.match(adminMenu, /old_price: ''/)
-  assert.match(adminMenu, /old_price: Math\.max\(0, Math\.round\(Number\(form\.old_price\) \|\| 0\)\)/)
+  assert.match(adminMenu, /old_price: Math\.max\(0, Math\.round\(numberFromMoneyInput\(form\.old_price\)\)\)/)
   assert.match(adminMenu, /onChange=\{setF\('old_price'\)\}/)
   assert.match(productCards, /line-through/)
   assert.match(productCards, /text-red-600/)
@@ -713,6 +733,28 @@ test('menu item discounts use old_price for display and public deals', () => {
   assert.match(schema, /old_price\s+integer\s+not null default 0/)
   assert.match(migration, /add column if not exists old_price integer not null default 0/)
   assert.match(dbHealth, /'old_price'/)
+})
+
+test('AdminMenu product editor formats price inputs while storing digits', () => {
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const moneyInput = readSource('src/lib/moneyInput.js')
+  const moneyField = functionBody(adminMenu, 'MoneyField')
+  const optionEditor = functionBody(adminMenu, 'OptionGroupsEditor')
+
+  assert.match(moneyInput, /export function normalizeMoneyInput/)
+  assert.match(moneyInput, /export function formatMoneyInput/)
+  assert.match(moneyInput, /export function numberFromMoneyInput/)
+  assert.match(adminMenu, /import \{ formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput \} from '\.\.\/lib\/moneyInput'/)
+  assert.match(moneyField, /type="text"/)
+  assert.match(moneyField, /inputMode="numeric"/)
+  assert.match(moneyField, /value=\{formatMoneyInput\(value\)\}/)
+  assert.match(moneyField, /onChange=\{event => onChange\(\{ target: \{ value: normalizeMoneyInput\(event\.target\.value\) \} \}\)\}/)
+  assert.match(adminMenu, /price: numberFromMoneyInput\(form\.price\)/)
+  assert.match(adminMenu, /<MoneyField label=\{`\$\{lang === 'uz' \? 'Hozirgi narx'/)
+  assert.match(adminMenu, /<MoneyField label=\{`\$\{lang === 'uz' \? 'Eski narx'/)
+  assert.match(optionEditor, /<MoneyField[\s\S]*label=\{labels\.price\}[\s\S]*updateOption\(optionIndex, \{ price: event\.target\.value \}\)/)
+  assert.doesNotMatch(adminMenu, /<Field label=\{`\$\{lang === 'uz' \? 'Hozirgi narx'[\s\S]*type="number"/)
+  assert.doesNotMatch(adminMenu, /<Field label=\{`\$\{lang === 'uz' \? 'Eski narx'[\s\S]*type="number"/)
 })
 
 test('menu items expose generated immutable external provider ids', () => {

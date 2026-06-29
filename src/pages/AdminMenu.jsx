@@ -27,8 +27,34 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import ImageLoadShimmer from '../components/ImageLoadShimmer'
 import { supabase } from '../lib/supabase'
+import { formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput } from '../lib/moneyInput'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
+
+const ADMIN_MENU_SCROLL_KEY = 'zar-admin-menu-scroll-top'
+
+function saveAdminMenuScrollPosition(scrollTop) {
+  if (typeof sessionStorage === 'undefined') return
+  const normalized = Math.max(0, Math.round(Number(scrollTop) || 0))
+  if (normalized <= 0) {
+    clearSavedAdminMenuScrollPosition()
+    return
+  }
+  sessionStorage.setItem(ADMIN_MENU_SCROLL_KEY, String(normalized))
+}
+
+function takeSavedAdminMenuScrollPosition() {
+  if (typeof sessionStorage === 'undefined') return null
+  const raw = sessionStorage.getItem(ADMIN_MENU_SCROLL_KEY)
+  if (raw == null) return null
+  const scrollTop = Number(raw)
+  return Number.isFinite(scrollTop) && scrollTop > 0 ? scrollTop : null
+}
+
+function clearSavedAdminMenuScrollPosition() {
+  if (typeof sessionStorage === 'undefined') return
+  sessionStorage.removeItem(ADMIN_MENU_SCROLL_KEY)
+}
 
 function validateMenuImage(file) {
   if (!file.type.startsWith('image/')) throw new Error('Only image uploads are allowed')
@@ -119,6 +145,25 @@ function Field({ label, type = 'text', value, onChange, placeholder, ...inputPro
         placeholder={placeholder}
         {...inputProps}
         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
+      />
+    </div>
+  )
+}
+
+function MoneyField({ label, value, onChange, placeholder, className = '', labelClassName = '', ...inputProps }) {
+  const formattedPlaceholder = formatMoneyInput(placeholder) || placeholder
+  return (
+    <div>
+      <label className={labelClassName || 'block text-xs text-gray-500 font-semibold mb-1.5'}>{label}</label>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={formatMoneyInput(value)}
+        onChange={event => onChange({ target: { value: normalizeMoneyInput(event.target.value) } })}
+        placeholder={formattedPlaceholder}
+        autoComplete="off"
+        {...inputProps}
+        className={className || 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all'}
       />
     </div>
   )
@@ -587,14 +632,14 @@ function safeOptionId(value, fallback) {
 }
 
 function editorToOptionGroups(options, basePrice = 0) {
-  const parentPrice = Math.max(0, Math.round(Number(basePrice) || 0))
+  const parentPrice = Math.max(0, Math.round(numberFromMoneyInput(basePrice)))
   const normalizedOptions = (options || []).map((option, optionIndex) => {
     const nameUz = String(option.name_uz || '').trim()
     const nameRu = String(option.name_ru || '').trim()
     const nameEn = String(option.name_en || '').trim()
     const fallback = nameUz || nameRu || nameEn
     if (!fallback) return null
-    const optionPrice = Math.max(0, Math.round(Number(option.price) || 0))
+    const optionPrice = Math.max(0, Math.round(numberFromMoneyInput(option.price)))
     const stockCount = Math.max(0, Math.round(Number(option.stock_count) || 0))
     return {
       id: safeOptionId(option.id, `option_${optionIndex + 1}`),
@@ -705,17 +750,16 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
                 </label>
               </div>
               <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px]">
-                <label className="min-w-0">
-                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.price}</span>
-                  <input
-                    type="number"
-                    min="0"
+                <div className="min-w-0">
+                  <MoneyField
+                    label={labels.price}
                     value={option.price}
                     onChange={event => updateOption(optionIndex, { price: event.target.value })}
                     placeholder={labels.price}
-                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                    labelClassName="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400"
+                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm tabular-nums focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
                   />
-                </label>
+                </div>
                 <label className="min-w-0">
                   <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.stock}</span>
                   <input
@@ -782,6 +826,7 @@ export default function AdminMenu() {
   const uploadedItemImageUrlsRef = useRef(new Set())
   const uploadedCatImageUrlsRef = useRef(new Set())
   const productEditorInitializedRef = useRef('')
+  const shellScrollRef = useRef(null)
 
   // Sensors: pointer (mouse/trackpad) + touch
   const sensors = useSensors(
@@ -895,14 +940,49 @@ export default function AdminMenu() {
     setItemModal('edit')
   }, [loaded, isProductEditorPage, productId, quickItems, searchParams, state.menuItems, navigate])
 
+  useEffect(() => {
+    if (!loaded || isProductEditorPage) return undefined
+    const savedScrollTop = takeSavedAdminMenuScrollPosition()
+    if (savedScrollTop == null) return undefined
+
+    let frameId = 0
+    let cancelled = false
+
+    function restore(attemptsLeft = 10) {
+      if (cancelled) return
+      const scroller = shellScrollRef.current
+      if (scroller) {
+        scroller.scrollTop = savedScrollTop
+        if (Math.abs(scroller.scrollTop - savedScrollTop) <= 2 || attemptsLeft <= 0) {
+          clearSavedAdminMenuScrollPosition()
+          return
+        }
+      }
+      frameId = window.requestAnimationFrame(() => restore(attemptsLeft - 1))
+    }
+
+    frameId = window.requestAnimationFrame(() => restore())
+    return () => {
+      cancelled = true
+      if (frameId) window.cancelAnimationFrame(frameId)
+    }
+  }, [loaded, isProductEditorPage, tab, filteredItems.length])
+
   // ── Item CRUD ──────────────────────────────────────────────────────────────
+  function saveMenuListScrollBeforeProductNavigation() {
+    saveAdminMenuScrollPosition(shellScrollRef.current?.scrollTop || 0)
+  }
+
   function openNewItem() {
+    saveMenuListScrollBeforeProductNavigation()
     navigate('/admin/menu/product/new')
   }
   function openNewQuickItem() {
+    saveMenuListScrollBeforeProductNavigation()
     navigate('/admin/menu/product/new?quick=1')
   }
   function openEditItem(i) {
+    saveMenuListScrollBeforeProductNavigation()
     navigate(`/admin/menu/product/${encodeURIComponent(i.id)}`)
   }
   async function closeItemModal() {
@@ -926,8 +1006,8 @@ export default function AdminMenu() {
         ...formFields,
         option_groups: optionGroups,
         external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
-        price: Number(form.price),
-        old_price: Math.max(0, Math.round(Number(form.old_price) || 0)),
+        price: numberFromMoneyInput(form.price),
+        old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
         grams: Math.max(0, Math.round(Number(form.grams) || 0)),
         millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
         kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
@@ -1027,7 +1107,7 @@ export default function AdminMenu() {
   // ── Render ─────────────────────────────────────────────────────────────────
   if (!loaded || loadError) {
     return (
-      <AppShell title={t(lang, 'menu')}>
+      <AppShell title={t(lang, 'menu')} contentRef={shellScrollRef}>
         <div className="min-h-screen bg-[#FAF6EE]">
           {!loaded ? (
             <OperationalLoading
@@ -1095,7 +1175,7 @@ export default function AdminMenu() {
                         ))}
                       </select>
                     </div>
-                    <Field label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="35000" />
+                    <MoneyField label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} value={form.price} onChange={setF('price')} placeholder="35000" />
                     <Field
                       label={lang === 'uz' ? 'Tokchadagi soni' : lang === 'ru' ? 'Количество на полке' : 'Shelf count'}
                       type="number"
@@ -1142,7 +1222,7 @@ export default function AdminMenu() {
                       entityId={form.id}
                     />
                     <div className="grid grid-cols-2 gap-3">
-                      <Field label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} type="number" value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
+                      <MoneyField label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
                       <Field label={t(lang, 'sortOrder')} type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
                       <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
                       <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
@@ -1186,7 +1266,7 @@ export default function AdminMenu() {
   }
 
   return (
-    <AppShell title={t(lang, 'menu')}>
+    <AppShell title={t(lang, 'menu')} contentRef={shellScrollRef}>
       <div className="min-h-screen bg-[#FAF6EE]">
 
         {/* Page header */}
@@ -1710,8 +1790,8 @@ export default function AdminMenu() {
               onChange={optionGroups => setForm(current => ({ ...current, option_groups_editor: optionGroups }))}
               lang={lang}
             />
-            <Field label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} type="number" value={form.price} onChange={setF('price')} placeholder="35000" />
-            <Field label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} type="number" value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
+            <MoneyField label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} value={form.price} onChange={setF('price')} placeholder="35000" />
+            <MoneyField label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
             <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
             <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />

@@ -4,7 +4,7 @@ import { useApp } from '../store/AppContext'
 import { LogOut, Menu as MenuIcon } from 'lucide-react'
 import UnifiedSidebar from './UnifiedSidebar'
 
-export default function AppShell({ children, title }) {
+export default function AppShell({ children, title, contentRef }) {
   const { profile, signOut } = useAuth()
   const { state, dispatch } = useApp()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -77,7 +77,7 @@ export default function AppShell({ children, title }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <main ref={contentRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           {children}
         </main>
       </div>
