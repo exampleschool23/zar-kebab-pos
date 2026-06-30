@@ -6,7 +6,7 @@ const TABLE_CHECKS = [
   { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned', 'price_mode'] },
   { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity', 'base_price', 'unit_price', 'price_mode', 'selected_options'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
-  { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name'] },
+  { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name', 'monthly_rent_uzs'] },
   { name: 'loyalty_cards', columns: ['id', 'card_number', 'cashback_type', 'balance', 'total_earned', 'total_redeemed', 'is_active'] },
   { name: 'loyalty_transactions', columns: ['id', 'loyalty_card_id', 'type', 'amount', 'balance_before', 'balance_after', 'cashback_percent_used', 'card_type_at_transaction', 'card_number_at_transaction', 'customer_name_at_transaction', 'phone_number_at_transaction'] },
   { name: 'expenses', columns: ['id', 'entry_type', 'expense_date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by_name'] },
@@ -24,7 +24,7 @@ const TABLE_CHECKS = [
 
 const MIGRATION_HINTS = {
   order_payments: 'Run supabase/012_split_order_payments.sql',
-  business_settings: 'Run supabase/011_business_settings.sql',
+  business_settings: 'Run supabase/011_business_settings.sql and supabase/073_business_settings_monthly_rent.sql',
   table_zones: 'Run supabase/019_table_management.sql',
   loyalty_cards: 'Run supabase/022_loyalty_cashback_wallet.sql and supabase/061_loyalty_special_card.sql',
   loyalty_transactions: 'Run supabase/022_loyalty_cashback_wallet.sql, supabase/051_remove_loyalty_cards_preserve_history.sql, and supabase/061_loyalty_special_card.sql',

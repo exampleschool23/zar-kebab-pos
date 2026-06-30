@@ -121,6 +121,7 @@ function normalizeBusinessSettings(row) {
   return {
     restaurantName: row.restaurant_name || 'Zar Kebab',
     serviceRate: normalizeServiceRatePct(row.service_rate_pct),
+    monthlyRentUzs: Math.max(0, Math.round(Number(row.monthly_rent_uzs) || 0)),
     receiptFooter: row.receipt_footer || '',
     autoPrint: !!row.auto_print,
   }
@@ -1435,6 +1436,7 @@ export async function writeToSupabase(action, state, options = {}) {
           id: 'default',
           restaurant_name: settings.restaurantName || 'Zar Kebab',
           service_rate_pct: serviceRatePct,
+          monthly_rent_uzs: Math.max(0, Math.round(Number(settings.monthlyRentUzs) || 0)),
           receipt_footer: settings.receiptFooter || '',
           auto_print: !!settings.autoPrint,
           updated_at: new Date().toISOString(),

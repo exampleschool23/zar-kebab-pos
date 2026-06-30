@@ -2,7 +2,7 @@ import { getOrderPayments, toLocalDateStr } from './analytics.js'
 
 export const EXPENSE_PAYMENT_METHODS = ['cash', 'card', 'terminal']
 export const EXPENSE_ENTRY_TYPES = ['expense', 'income']
-export const DEFAULT_MONTHLY_RENT_USD = 2000
+export const DEFAULT_MONTHLY_RENT_UZS = 0
 
 export const EXPENSE_CATEGORIES = [
   {
@@ -275,16 +275,20 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
   const monthStart = `${date.slice(0, 8)}01`
   const monthEnd = getMonthEndDate(date)
   const paidThroughDate = date > monthEnd ? monthEnd : date
-  const monthlyRentUsd = Math.max(0, Math.round(Number(options.monthlyRentUsd ?? DEFAULT_MONTHLY_RENT_USD) || 0))
-  const employeePaidToDate = summarizeExpenses(buildSalaryPaymentExpenseRows(salaryProfiles, monthStart, paidThroughDate)).total
-  const employeeProjectedMonth = summarizeExpenses(buildSalaryExpenseRows(salaryProfiles, monthStart, monthEnd)).total
-  const employeeRemainingThisMonth = Math.max(0, employeeProjectedMonth - employeePaidToDate)
+  const activeFromDate = String(options.activeFromDate || '').slice(0, 10)
+  const isBeforeActiveMonth = activeFromDate && monthEnd < activeFromDate
+  const monthlyRentUzs = isBeforeActiveMonth ? 0 : Math.max(0, Math.round(Number(options.monthlyRentUzs ?? DEFAULT_MONTHLY_RENT_UZS) || 0))
+  const employeePaidToDate = isBeforeActiveMonth ? 0 : summarizeExpenses(buildSalaryPaymentExpenseRows(salaryProfiles, monthStart, paidThroughDate)).total
+  const employeeProjectedMonth = isBeforeActiveMonth ? 0 : summarizeExpenses(buildSalaryExpenseRows(salaryProfiles, monthStart, monthEnd)).total
+  const employeeRemainingThisMonth = isBeforeActiveMonth ? 0 : Math.max(0, employeeProjectedMonth - employeePaidToDate)
 
   return {
     monthStart,
     monthEnd,
     paidThroughDate,
-    monthlyRentUsd,
+    activeFromDate,
+    isBeforeActiveMonth: Boolean(isBeforeActiveMonth),
+    monthlyRentUzs,
     employeePaidToDate,
     employeeProjectedMonth,
     employeeRemainingThisMonth,

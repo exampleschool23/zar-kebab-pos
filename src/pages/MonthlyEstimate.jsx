@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
-import { getOrderPayments, getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getOrderDate, getOrderPayments, getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatLongDate } from '../lib/dateFormat'
 import {
   buildSalaryBonusExpenseRows,
@@ -87,14 +87,6 @@ function addMonths(monthStart, delta) {
   return monthStartFor(toLocalDateStr(date.toISOString()))
 }
 
-function formatUsd(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(Math.max(0, Math.round(Number(amount) || 0)))
-}
-
 function methodLabel(method, lang) {
   if (['cash', 'card', 'terminal'].includes(method)) return expensePaymentMethodLabel(method, lang)
   if (method === 'qr') return 'QR'
@@ -105,6 +97,22 @@ function methodLabel(method, lang) {
 function addToMap(map, key, amount) {
   const normalizedKey = key || 'unknown'
   map[normalizedKey] = (map[normalizedKey] || 0) + normalizeExpenseAmount(amount)
+}
+
+function addDateCandidate(dates, value) {
+  const date = String(value || '').slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) dates.push(date)
+}
+
+function getFirstFinancialActivityDate(orders = [], expenses = [], salaryProfiles = []) {
+  const dates = []
+  for (const order of orders || []) addDateCandidate(dates, getOrderDate(order))
+  for (const expense of expenses || []) addDateCandidate(dates, expense.expense_date || expense.created_at)
+  for (const salaryProfile of salaryProfiles || []) {
+    for (const payment of salaryProfile?.payments || []) addDateCandidate(dates, payment.paid_date || payment.created_at)
+    for (const bonus of salaryProfile?.bonuses || []) addDateCandidate(dates, bonus.bonus_date || bonus.created_at)
+  }
+  return dates.sort()[0] || ''
 }
 
 export default function MonthlyEstimate() {
@@ -150,7 +158,7 @@ export default function MonthlyEstimate() {
       netLeft: 'Hozirgi qoldiq',
       plannedUzs: 'Oy oxirigacha UZS xarajat',
       paidOrders: 'To‘langan buyurtmalar',
-      rentNote: 'Alohida USD majburiyat',
+      rentNote: 'Sozlamalarda belgilangan UZS ijara',
       rentPaid: 'Bu oy ijara to‘langan',
       inflow: 'Kirim',
       outflow: 'Chiqim',
@@ -184,11 +192,11 @@ export default function MonthlyEstimate() {
       rentRemaining: 'Осталось оплатить аренду',
       rent: 'Аренда',
       actualIn: 'Пришло до сегодня',
-      actualOut: 'Ушло на сегодня',
+      actualOut: 'Ушло до сегодня',
       netLeft: 'Текущий остаток',
       plannedUzs: 'План расходов в UZS до конца месяца',
       paidOrders: 'Оплаченные заказы',
-      rentNote: 'Отдельное обязательство в USD',
+      rentNote: 'Аренда в UZS из настроек',
       rentPaid: 'Аренда за месяц оплачена',
       inflow: 'Поступления',
       outflow: 'Расход',
@@ -226,7 +234,7 @@ export default function MonthlyEstimate() {
       netLeft: 'Current left',
       plannedUzs: 'UZS spend by month end',
       paidOrders: 'Paid orders',
-      rentNote: 'Separate USD commitment',
+      rentNote: 'UZS rent set in settings',
       rentPaid: 'Rent recorded as paid this month',
       inflow: 'Inflow',
       outflow: 'Outflow',
@@ -303,9 +311,15 @@ export default function MonthlyEstimate() {
   const salaryBonusRows = useMemo(() => (
     buildSalaryBonusExpenseRows(salaryProfiles, monthStart, cutoffEnd)
   ), [salaryProfiles, monthStart, cutoffEnd])
+  const firstFinancialActivityDate = useMemo(() => (
+    getFirstFinancialActivityDate(state.orders, expenses, salaryProfiles)
+  ), [state.orders, expenses, salaryProfiles])
   const monthlyEstimate = useMemo(() => (
-    getEstimatedMonthlyExpenseSummary(salaryProfiles, cutoffEnd)
-  ), [salaryProfiles, cutoffEnd])
+    getEstimatedMonthlyExpenseSummary(salaryProfiles, cutoffEnd, {
+      activeFromDate: firstFinancialActivityDate,
+      monthlyRentUzs: state.settings?.monthlyRentUzs || 0,
+    })
+  ), [salaryProfiles, cutoffEnd, firstFinancialActivityDate, state.settings?.monthlyRentUzs])
 
   const salesRevenue = paidOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
   const incomeSummary = summarizeIncomeEntries(incomeEntries)
@@ -319,9 +333,8 @@ export default function MonthlyEstimate() {
   const totalInflow = salesRevenue + incomeSummary.total
   const totalOutflow = actualExpenseSummary.total
   const netLeft = totalInflow - totalOutflow
-  const plannedMonthOutflowUzs = totalOutflow + monthlyEstimate.employeeRemainingThisMonth
-  const rentUsd = monthlyEstimate.monthlyRentUsd
-  const rentDueUsd = recordedRentTotal > 0 ? 0 : rentUsd
+  const rentDueUzs = Math.max(0, monthlyEstimate.monthlyRentUzs - recordedRentTotal)
+  const plannedMonthOutflowUzs = totalOutflow + monthlyEstimate.employeeRemainingThisMonth + rentDueUzs
 
   const cameRows = [
     { key: 'sales', label: l.salesRevenue, amount: salesRevenue, color: '#16A34A' },
@@ -353,9 +366,9 @@ export default function MonthlyEstimate() {
       key: 'rent-remaining',
       icon: Home,
       label: l.rentRemaining,
-      value: formatUsd(rentDueUsd),
-      tone: rentDueUsd > 0 ? 'red' : 'green',
-      sub: rentDueUsd > 0 ? l.rentNote : l.rentPaid,
+      value: formatCurrency(rentDueUzs),
+      tone: rentDueUzs > 0 ? 'red' : 'green',
+      sub: rentDueUzs > 0 ? l.rentNote : l.rentPaid,
     },
   ]
 

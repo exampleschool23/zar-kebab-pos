@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Store, Percent, Globe, Printer, Bell, Shield, Table2,
-  Check, ChevronRight, Activity, AlertTriangle, RefreshCw,
+  Check, ChevronRight, Activity, AlertTriangle, RefreshCw, Home,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import AppShell from '../components/AppShell'
 import { runDbHealthChecks } from '../lib/dbHealth'
+import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 
 function Section({ title, children }) {
   return (
@@ -70,6 +71,7 @@ export default function AdminSettings() {
 
   const [restaurantName, setRestaurantName] = useState(settings.restaurantName)
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
+  const [monthlyRentUzs, setMonthlyRentUzs] = useState(String(settings.monthlyRentUzs || ''))
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
   const [notifications,  setNotifications]  = useState(true)
   const [saved,          setSaved]          = useState(false)
@@ -82,13 +84,14 @@ export default function AdminSettings() {
   useEffect(() => {
     setRestaurantName(settings.restaurantName)
     setServiceRate(settings.serviceRate)
+    setMonthlyRentUzs(String(settings.monthlyRentUzs || ''))
     setAutoPrint(settings.autoPrint)
-  }, [settings.restaurantName, settings.serviceRate, settings.autoPrint])
+  }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.autoPrint])
 
   async function saveSettings(overrides = {}) {
     setSaving(true)
     setError('')
-    const nextSettings = { restaurantName, serviceRate, autoPrint, ...overrides }
+    const nextSettings = { restaurantName, serviceRate, monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0), autoPrint, ...overrides }
     const result = await dispatch({
       type: 'SET_SETTINGS',
       payload: nextSettings,
@@ -133,6 +136,8 @@ export default function AdminSettings() {
       billing:         'Hisob-kitob',
       serviceCharge:   'Xizmat to\'lovi',
       serviceChargeSub: 'Barcha buyurtmalarga qo\'shiladi',
+      monthlyRent:     'Oylik ijara',
+      monthlyRentSub:  'Buxgalteriya taxminida UZS ko‘rinadi',
       system:          'Tizim',
       tableManagement: 'Stollar',
       tableManagementSub: 'Restoran stollari, zonalari va sig‘imini boshqarish',
@@ -182,6 +187,8 @@ export default function AdminSettings() {
       billing:         'Выставление счётов',
       serviceCharge:   'Сервисный сбор',
       serviceChargeSub: 'Добавляется ко всем заказам',
+      monthlyRent:     'Ежемесячная аренда',
+      monthlyRentSub:  'Показывается в прогнозе бухгалтерии в UZS',
       system:          'Система',
       tableManagement: 'Столы',
       tableManagementSub: 'Управление столами, зонами и вместимостью',
@@ -231,6 +238,8 @@ export default function AdminSettings() {
       billing:         'Billing',
       serviceCharge:   'Service Charge',
       serviceChargeSub: 'Added to all orders',
+      monthlyRent:     'Monthly rent',
+      monthlyRentSub:  'Shown in accounting estimate as UZS',
       system:          'System',
       tableManagement: 'Tables',
       tableManagementSub: 'Manage restaurant tables, zones, and capacity',
@@ -315,6 +324,19 @@ export default function AdminSettings() {
                   </button>
                 ))}
               </div>
+            </div>
+          </SettingRow>
+          <SettingRow icon={Home} label={l.monthlyRent} sub={l.monthlyRentSub}>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatMoneyInput(monthlyRentUzs)}
+                onChange={event => setMonthlyRentUzs(normalizeMoneyInput(event.target.value))}
+                className="w-[180px] rounded-xl border border-[#E5E7EB] px-3 py-2 pr-12 text-right text-[13px] font-bold tabular-nums text-[#1F2937] transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                placeholder="0"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-black text-[#9CA3AF]">UZS</span>
             </div>
           </SettingRow>
         </Section>

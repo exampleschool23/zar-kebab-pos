@@ -13,6 +13,7 @@ export { normalizeOrderType }
 export const DEFAULT_SETTINGS = {
   restaurantName: 'Zar Kebab',
   serviceRate:    20,
+  monthlyRentUzs: 0,
   receiptFooter:  '',
   autoPrint:      false,
 }

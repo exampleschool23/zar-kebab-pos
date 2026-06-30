@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  DEFAULT_MONTHLY_RENT_USD,
+  DEFAULT_MONTHLY_RENT_UZS,
   buildSalaryBonusExpenseRows,
   buildSalaryExpenseRows,
   buildSalaryPaymentExpenseRows,
@@ -584,14 +584,44 @@ test('monthly expense estimate tracks employee paid amount remaining salary and 
     ],
   }
 
-  const summary = getEstimatedMonthlyExpenseSummary([waiterProfile], '2026-06-16')
+  const summary = getEstimatedMonthlyExpenseSummary([waiterProfile], '2026-06-16', { monthlyRentUzs: 24_000_000 })
 
   assert.equal(summary.monthStart, '2026-06-01')
   assert.equal(summary.monthEnd, '2026-06-30')
   assert.equal(summary.paidThroughDate, '2026-06-16')
-  assert.equal(summary.monthlyRentUsd, DEFAULT_MONTHLY_RENT_USD)
+  assert.equal(DEFAULT_MONTHLY_RENT_UZS, 0)
+  assert.equal(summary.monthlyRentUzs, 24_000_000)
   assert.equal(summary.employeePaidToDate, 1_200_000)
   assert.equal(summary.employeeProjectedMonth, 8_400_000)
   assert.equal(summary.employeeRemainingThisMonth, 7_200_000)
   assert.equal(summary.estimatedMonthlyExpenseUzs, 8_400_000)
+})
+
+test('monthly expense estimate does not project salary or rent before POS activity starts', () => {
+  const legacyProfileWithoutJoinDate = {
+    id: 'salary-before-pos-activity',
+    profile_id: 'waiter-before-pos-activity',
+    employee_name: 'Future Waiter',
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-05-01', amount: 10_000_000, rate_unit: 'monthly' }],
+    payments: [],
+    absences: [],
+  }
+
+  const summary = getEstimatedMonthlyExpenseSummary(
+    [legacyProfileWithoutJoinDate],
+    '2026-05-31',
+    { activeFromDate: '2026-06-01' },
+  )
+
+  assert.equal(summary.monthStart, '2026-05-01')
+  assert.equal(summary.monthEnd, '2026-05-31')
+  assert.equal(summary.activeFromDate, '2026-06-01')
+  assert.equal(summary.isBeforeActiveMonth, true)
+  assert.equal(summary.monthlyRentUzs, 0)
+  assert.equal(summary.employeePaidToDate, 0)
+  assert.equal(summary.employeeProjectedMonth, 0)
+  assert.equal(summary.employeeRemainingThisMonth, 0)
+  assert.equal(summary.estimatedMonthlyExpenseUzs, 0)
 })
