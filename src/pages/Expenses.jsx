@@ -710,6 +710,7 @@ export default function Expenses() {
 
               <ExpenseHistorySection
                 title={l.investorHistory}
+                titleAmount={investorSupportTotal}
                 rows={filteredInvestorSupport}
                 loading={loading}
                 emptyText={l.emptyInvestor}
@@ -752,6 +753,7 @@ export default function Expenses() {
 
 function ExpenseHistorySection({
   title,
+  titleAmount,
   rows,
   loading,
   emptyText,
@@ -768,7 +770,14 @@ function ExpenseHistorySection({
   return (
     <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
       <div className="border-b border-[#F3F4F6] px-4 py-4">
-        <h2 className="text-base font-black text-[#1F2937]">{title}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-black text-[#1F2937]">{title}</h2>
+          {titleAmount !== undefined && (
+            <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-black text-green-700 tabular-nums">
+              {formatCurrency(titleAmount)}
+            </span>
+          )}
+        </div>
       </div>
       {loading ? (
         <OperationalLoading title={loadingTitle} description="" />

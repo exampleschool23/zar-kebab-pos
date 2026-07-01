@@ -14,6 +14,7 @@ import {
   expensePaymentMethodLabel,
   getSalaryDue,
   getTotalSalaryDue,
+  getTotalMonthlySalaryCommitment,
   normalizeExpenseAmount,
 } from '../lib/expenses'
 import { todayExpenseDate } from '../lib/expenses'
@@ -149,6 +150,7 @@ export default function Salaries() {
       amount: 'Summa',
       due: 'To‘lanishi kerak',
       totalDue: 'Jami qarzdorlik',
+      monthlyPayroll: 'Oylik maoshlar',
       employees: 'Xodimlar',
       accruedToday: 'Bugungi xarajat',
       history: 'Maosh tarixi',
@@ -200,6 +202,7 @@ export default function Salaries() {
       amount: 'Сумма',
       due: 'К выплате',
       totalDue: 'Общий долг',
+      monthlyPayroll: 'Зарплаты в месяц',
       employees: 'Сотрудники',
       accruedToday: 'Расход за день',
       history: 'История зарплаты',
@@ -251,6 +254,7 @@ export default function Salaries() {
       amount: 'Amount',
       due: 'Salary due',
       totalDue: 'Total due',
+      monthlyPayroll: 'Monthly salaries',
       employees: 'Employees',
       accruedToday: 'Daily expense',
       history: 'Salary history',
@@ -346,6 +350,7 @@ export default function Salaries() {
     sortedSalaryProfiles.filter(item => item.is_active !== false)
   ), [sortedSalaryProfiles])
   const totalDue = useMemo(() => getTotalSalaryDue(salaryProfiles, today), [salaryProfiles, today])
+  const monthlyPayrollTotal = useMemo(() => getTotalMonthlySalaryCommitment(salaryProfiles, today), [salaryProfiles, today])
   const salaryHistoryLabels = useMemo(() => ({
     absence: l.absenceHistory,
     payment: l.paymentHistory,
@@ -630,6 +635,10 @@ export default function Salaries() {
               <div className="flex h-[70px] flex-col justify-center rounded-xl border border-orange-200 bg-orange-50 px-4">
                 <p className="text-[11px] font-black uppercase tracking-wide text-[#ff5a00]">{l.totalDue}</p>
                 <p className="text-sm font-black text-[#1F2937]">{formatCurrency(totalDue)}</p>
+              </div>
+              <div className="flex h-[70px] flex-col justify-center rounded-xl border border-blue-200 bg-blue-50 px-4">
+                <p className="text-[11px] font-black uppercase tracking-wide text-blue-700">{l.monthlyPayroll}</p>
+                <p className="text-sm font-black text-[#1F2937]">{formatCurrency(monthlyPayrollTotal)}</p>
               </div>
               <button onClick={() => navigate('/admin/accounting/employees')} className="inline-flex h-[70px] items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 text-xs font-black text-[#ff5a00] shadow-sm">
                 <Users size={14} />{l.employees}

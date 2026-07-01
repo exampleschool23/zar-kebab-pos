@@ -16,6 +16,7 @@ import {
   getSalaryActiveUntil,
   getSalaryDue,
   getSalaryCategoryForRole,
+  getTotalMonthlySalaryCommitment,
   getTotalSalaryDue,
   normalizeExpenseAmount,
   summarizeIncomeEntries,
@@ -147,6 +148,46 @@ test('employee salary ledger generates effective-dated daily expense rows and du
   assert.equal(summary.total, 970_000)
   assert.equal(summary.byCategory.salary_waiter, 620_000)
   assert.equal(summary.byCategory.salary_manager, 350_000)
+})
+
+test('monthly salary commitment sums current active employee rates', () => {
+  const employeeA = {
+    id: 'salary-monthly-commitment-a',
+    is_active: true,
+    rates: [{ effective_from: '2026-06-01', amount: 2_000_000, rate_unit: 'monthly' }],
+  }
+  const employeeB = {
+    id: 'salary-monthly-commitment-b',
+    is_active: true,
+    rates: [{ effective_from: '2026-06-01', amount: 5_000_000, rate_unit: 'monthly' }],
+  }
+  const dailyEmployee = {
+    id: 'salary-monthly-commitment-daily',
+    is_active: true,
+    rates: [{ effective_from: '2026-06-01', amount: 100_000, rate_unit: 'daily' }],
+  }
+  const inactiveEmployee = {
+    id: 'salary-monthly-commitment-inactive',
+    is_active: false,
+    rates: [{ effective_from: '2026-06-01', amount: 9_000_000, rate_unit: 'monthly' }],
+  }
+  const futureRaise = {
+    id: 'salary-monthly-commitment-future',
+    is_active: true,
+    rates: [
+      { effective_from: '2026-07-01', amount: 7_000_000, rate_unit: 'monthly' },
+      { effective_from: '2026-06-01', amount: 1_000_000, rate_unit: 'monthly' },
+    ],
+  }
+
+  assert.equal(
+    getTotalMonthlySalaryCommitment([employeeA, employeeB], '2026-06-20'),
+    7_000_000,
+  )
+  assert.equal(
+    getTotalMonthlySalaryCommitment([employeeA, employeeB, dailyEmployee, inactiveEmployee, futureRaise], '2026-06-20'),
+    11_000_000,
+  )
 })
 
 test('deactivated salary profiles stop accruing after ended_at while keeping due history', () => {

@@ -138,6 +138,24 @@ export function getDailySalaryAmount(salaryProfile, asOfDate = todayExpenseDate(
   return convertSalaryAmountToDaily(rate?.amount ?? rate?.daily_amount, rate?.rate_unit)
 }
 
+export function getMonthlySalaryCommitment(salaryProfile, asOfDate = todayExpenseDate()) {
+  if (!salaryProfile || salaryProfile.is_active === false) return 0
+  const rate = getCurrentSalaryRate(salaryProfile, asOfDate)
+  if (!rate) return 0
+  const rateUnit = normalizeSalaryRateUnit(rate.rate_unit)
+  if (rateUnit === 'monthly') {
+    const monthlyAmount = normalizeExpenseAmount(rate.amount)
+    if (monthlyAmount > 0) return monthlyAmount
+  }
+  return getDailySalaryAmount(salaryProfile, asOfDate) * 30
+}
+
+export function getTotalMonthlySalaryCommitment(salaryProfiles = [], asOfDate = todayExpenseDate()) {
+  return (salaryProfiles || []).reduce((sum, salaryProfile) => (
+    sum + getMonthlySalaryCommitment(salaryProfile, asOfDate)
+  ), 0)
+}
+
 export function getSalaryActiveUntil(salaryProfile, dateTo = todayExpenseDate()) {
   const endDate = String(salaryProfile?.ended_at || '').slice(0, 10)
   if (!endDate) return dateTo
