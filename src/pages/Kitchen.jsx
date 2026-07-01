@@ -14,6 +14,7 @@ import { useAppDataStatus } from '../store/appHooks'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { ORDER_TYPE_LABELS, inferOrderType, isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
+import { formatElapsedSince, parseInstantDate } from '../lib/dateFormat'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_BADGE = {
@@ -38,11 +39,11 @@ function statusSort(s) {
 }
 
 function elapsedSince(iso) {
-  if (!iso) return null
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (diff < 1)  return '< 1 min'
-  if (diff < 60) return `${diff} min ago`
-  return `${Math.floor(diff / 60)}h ${diff % 60}m ago`
+  return formatElapsedSince(iso, {
+    lessThanMinute: '< 1 min',
+    minutes: diff => `${diff} min ago`,
+    hoursMinutes: (hours, minutes) => `${hours}h ${minutes}m ago`,
+  })
 }
 
 function statusLabel(status, lang) {
@@ -589,7 +590,7 @@ function OrderCard({ order, menuItemMap, lang, onMark, pendingIds, itemErrors })
 function BottomBar({ orders, lang }) {
   const oldest = useMemo(() =>
     orders.length
-      ? [...orders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0]
+      ? [...orders].sort((a, b) => parseInstantDate(a.created_at) - parseInstantDate(b.created_at))[0]
       : null,
     [orders]
   )
@@ -785,7 +786,7 @@ export default function Kitchen() {
   const activeOrders = useMemo(() => {
     const raw = state.orders
       .filter(o => ['sent_to_kitchen', 'preparing'].includes(o.status))
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      .sort((a, b) => parseInstantDate(a.created_at) - parseInstantDate(b.created_at))
     // Merge dine-in orders with the same table_id; keep take-away orders separate.
     const grouped = {}
     raw.forEach(order => {
@@ -810,7 +811,7 @@ export default function Kitchen() {
             .map(i => ({ ...i, order_type: getOrderType({ ...i, order_type: i.order_type || order.order_type }), _orderId: order.id })),
         ]
         // Keep the earliest created_at for sorting
-        if (new Date(order.created_at) < new Date(grouped[key].created_at)) {
+        if (parseInstantDate(order.created_at) < parseInstantDate(grouped[key].created_at)) {
           grouped[key].created_at = order.created_at
         }
       }

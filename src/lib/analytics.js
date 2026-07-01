@@ -1,12 +1,12 @@
 import { inferOrderType, isOffPremiseOrderType } from './orderTypes.js'
 import { getOrderItemBasePrice, getOrderItemUnitPrice, normalizePriceMode } from './priceModes.js'
+import { parseInstantDate, RESTAURANT_UTC_OFFSET_MINUTES } from './dateFormat.js'
 
-export const RESTAURANT_TIME_ZONE = 'Asia/Tashkent'
-export const RESTAURANT_UTC_OFFSET_MINUTES = 5 * 60
+export { RESTAURANT_TIME_ZONE, RESTAURANT_UTC_OFFSET_MINUTES } from './dateFormat.js'
 
 function toRestaurantDate(value) {
-  const date = value instanceof Date ? value : new Date(value)
-  if (isNaN(date.getTime())) return null
+  const date = parseInstantDate(value)
+  if (!date || isNaN(date.getTime())) return null
   return new Date(date.getTime() + RESTAURANT_UTC_OFFSET_MINUTES * 60 * 1000)
 }
 
@@ -630,11 +630,11 @@ export function groupOrdersBySession(orders) {
     session._orderCount += 1
 
     if (!session.payment_method && o.payment_method) session.payment_method = o.payment_method
-    if (o.created_at && new Date(o.created_at) < new Date(session.created_at)) session.created_at = o.created_at
-    if (o.updated_at && (!session.updated_at || new Date(o.updated_at) > new Date(session.updated_at))) {
+    if (o.created_at && parseInstantDate(o.created_at) < parseInstantDate(session.created_at)) session.created_at = o.created_at
+    if (o.updated_at && (!session.updated_at || parseInstantDate(o.updated_at) > parseInstantDate(session.updated_at))) {
       session.updated_at = o.updated_at
     }
-    if (o.paid_at && (!session.paid_at || new Date(o.paid_at) > new Date(session.paid_at))) {
+    if (o.paid_at && (!session.paid_at || parseInstantDate(o.paid_at) > parseInstantDate(session.paid_at))) {
       session.paid_at = o.paid_at
     }
   })

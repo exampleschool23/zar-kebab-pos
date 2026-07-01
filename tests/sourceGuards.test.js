@@ -842,6 +842,17 @@ test('source uses shared date formatting instead of browser locale defaults', ()
   assert.deepEqual(offenders, [])
 })
 
+test('date formatting is centralized on Tashkent UTC plus five instead of device-local getters', () => {
+  const source = readSource('src/lib/dateFormat.js')
+
+  assert.match(source, /RESTAURANT_TIME_ZONE = 'Asia\/Tashkent'/)
+  assert.match(source, /RESTAURANT_UTC_OFFSET = '\+05:00'/)
+  assert.match(source, /RESTAURANT_UTC_OFFSET_MINUTES = 5 \* 60/)
+  assert.match(source, /getUTCFullYear/)
+  assert.match(source, /getUTCHours/)
+  assert.doesNotMatch(source, /\.getFullYear\(\)|\.getMonth\(\)|\.getDate\(\)|\.getHours\(\)|\.getMinutes\(\)/)
+})
+
 test('CartPanel exposes in-flight send state from its parent', () => {
   const source = readSource('src/components/CartPanel.jsx')
   const body = functionBody(source, 'CartPanel')
@@ -924,8 +935,11 @@ test('WaiterTables elapsed label uses pending item submit time before stale orde
   const source = readSource('src/pages/WaiterTables.jsx')
   const getPreparationCounts = functionBody(source, 'getPreparationCounts')
 
+  assert.match(source, /formatElapsedSince/)
+  assert.match(source, /parseInstantDate/)
   assert.match(getPreparationCounts, /const pendingItemTimes = active\.flatMap/)
   assert.match(getPreparationCounts, /i\.submitted_at \|\| i\.submittedAt \|\| i\.created_at \|\| i\.createdAt \|\| o\.created_at/)
+  assert.match(getPreparationCounts, /parseInstantDate\(time\) < parseInstantDate\(earliest\)/)
   assert.match(getPreparationCounts, /createdAt: earliestTime\(pendingItemTimes\) \|\| earliestTime\(billableItemTimes\) \|\| earliestTime\(orderTimes\)/)
   assert.doesNotMatch(getPreparationCounts, /createdAt: active\.reduce\(\(earliest, o\)/)
 })
@@ -940,9 +954,27 @@ test('AdminDashboard recent order elapsed label uses status activity time', () =
   assert.match(source, /_recentActivityAt: getOrderActivityDate\(order, state\.tables\)/)
   assert.match(row, /const elapsedAt = order\._recentActivityAt \|\| getOrderActivityDate\(order\) \|\| getOrderDate\(order\) \|\| order\.created_at/)
   assert.match(row, /elapsedSince\(elapsedAt\)/)
+  assert.match(source, /formatElapsedSince/)
+  assert.match(source, /parseInstantDate/)
   assert.doesNotMatch(row, /elapsedSince\(getOrderDate\(order\) \|\| order\.created_at\)/)
   assert.match(appContext, /_statusChangedAt: action\._statusChangedAt \|\| new Date\(\)\.toISOString\(\)/)
   assert.match(reducer, /status: 'needs_bill', updated_at: statusChangedAt/)
+})
+
+test('elapsed labels use timezone-safe instant parsing instead of browser-local timestamp math', () => {
+  const files = [
+    'src/pages/WaiterTables.jsx',
+    'src/pages/Kitchen.jsx',
+    'src/pages/CashierTables.jsx',
+    'src/pages/CashierBill.jsx',
+    'src/pages/AdminDashboard.jsx',
+  ]
+
+  for (const file of files) {
+    const source = readSource(file)
+    assert.match(source, /formatElapsedSince|parseInstantDate/, `${file} should use shared instant helpers`)
+    assert.doesNotMatch(source, /Date\.now\(\)\s*-\s*new Date\(/, `${file} should not calculate elapsed time with browser-local parsing`)
+  }
 })
 
 test('AdminDashboard defaults to today period', () => {
@@ -1017,7 +1049,7 @@ test('CashierTables shows full opened date and time on bill cards', () => {
   const source = readSource('src/pages/CashierTables.jsx')
   const dateTimeLabel = functionBody(source, 'dateTimeLabel')
 
-  assert.match(source, /import \{ formatDateTime, formatTime \} from '\.\.\/lib\/dateFormat'/)
+  assert.match(source, /import \{[^}]*formatDateTime[^}]*formatTime[^}]*\} from '\.\.\/lib\/dateFormat'/)
   assert.match(dateTimeLabel, /return formatDateTime\(iso\)/)
   assert.match(source, /\{dateTimeLabel\(order\.created_at\)\}/)
   assert.doesNotMatch(source, /\{timeLabel\(order\.created_at\)\}/)
@@ -1509,6 +1541,8 @@ test('AdminAudit localizes money audit labels statuses and payment methods', () 
 
   assert.match(audit, /function paymentMethodLabel/)
   assert.match(audit, /function statusLabel/)
+  assert.match(audit, /function groupAuditRows\(rows\)/)
+  assert.match(audit, /function orderAuditLabel\(row, lang\)/)
   assert.match(audit, /fmtDate\(value, lang = 'ru'\)/)
   assert.match(audit, /before: 'Oldin'/)
   assert.match(audit, /before: 'Было'/)
@@ -1520,6 +1554,10 @@ test('AdminAudit localizes money audit labels statuses and payment methods', () 
   assert.match(audit, /take_away: ORDER_TYPE_LABELS\.take_away/)
   assert.match(audit, /delivery: ORDER_TYPE_LABELS\.delivery/)
   assert.match(audit, /statusLabel\(status, lang\)/)
+  assert.match(audit, /\.from\('orders'\)[\s\S]*order_number[\s\S]*\.in\('id', orderIds\)/)
+  assert.match(audit, /order\.order_number \|\| row\.order_id/)
+  assert.match(audit, /const groupedRows = useMemo\(\(\) => groupAuditRows\(filteredRows\), \[filteredRows\]\)/)
+  assert.match(audit, /<details key=\{group\.orderId\}/)
   assert.match(audit, /paymentMethodLabel\(row\.old_payment_method, lang\)/)
   assert.match(audit, /beforeLabel=\{l\.before\}/)
 })

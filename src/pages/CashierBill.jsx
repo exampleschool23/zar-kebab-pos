@@ -35,6 +35,7 @@ import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/or
 import { canDeletePaidOrders } from '../lib/permissions'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
+import { formatElapsedSince } from '../lib/dateFormat'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -57,11 +58,11 @@ function payLabel(m, lang) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function elapsedSince(iso, lang) {
-  if (!iso) return null
-  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1)  return t(lang, 'justNow')
-  if (m < 60) return tf(lang, 'minutesAgo', m)
-  return tf(lang, 'hoursMinutesAgo', Math.floor(m / 60), m % 60)
+  return formatElapsedSince(iso, {
+    lessThanMinute: () => t(lang, 'justNow'),
+    minutes: minutes => tf(lang, 'minutesAgo', minutes),
+    hoursMinutes: (hours, minutes) => tf(lang, 'hoursMinutesAgo', hours, minutes),
+  })
 }
 
 function getDesc(menuItem, lang) {

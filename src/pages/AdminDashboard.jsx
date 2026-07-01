@@ -9,7 +9,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getAllProfiles } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
-import { formatDateOnly, formatLongDate, normalizeDateLang } from '../lib/dateFormat'
+import { formatDateOnly, formatElapsedSince, formatLongDate, normalizeDateLang, parseInstantDate } from '../lib/dateFormat'
 import {
   addRestaurantDays,
   getRestaurantHour,
@@ -237,11 +237,7 @@ function isOrderInPeriod(order, period) {
 }
 
 function elapsedSince(iso) {
-  if (!iso) return ''
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (diff < 1)  return '< 1 min'
-  if (diff < 60) return `${diff} min`
-  return `${Math.floor(diff / 60)}h ${diff % 60}m`
+  return formatElapsedSince(iso, { lessThanMinute: '< 1 min' }) || ''
 }
 
 function orderTableLabel(order, lang, fallback) {
@@ -742,7 +738,7 @@ export default function AdminDashboard() {
         ...order,
         _recentActivityAt: getOrderActivityDate(order, state.tables),
       }))
-      .sort((a, b) => new Date(b._recentActivityAt || getOrderDate(b) || b.created_at) - new Date(a._recentActivityAt || getOrderDate(a) || a.created_at))
+      .sort((a, b) => parseInstantDate(b._recentActivityAt || getOrderDate(b) || b.created_at) - parseInstantDate(a._recentActivityAt || getOrderDate(a) || a.created_at))
 
     const needsBill = grouped.filter(o => isActiveNeedsBillOrder(o, state.tables))
     const paid = grouped.filter(isPaidOrder)

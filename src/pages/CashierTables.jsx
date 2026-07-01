@@ -23,18 +23,14 @@ import UnifiedSidebar from '../components/UnifiedSidebar'
 import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { getItemName } from '../lib/i18n'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
-import { formatDateTime, formatTime } from '../lib/dateFormat'
+import { formatDateTime, formatElapsedSince, formatTime, parseInstantDate } from '../lib/dateFormat'
 import { canDeletePaidOrders, canMoveBackToTable } from '../lib/permissions'
 import { getOrderItemOptionLines } from '../components/MenuProductCards'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function elapsedSince(iso) {
-  if (!iso) return null
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (diff < 1) return '< 1 min'
-  if (diff < 60) return `${diff} min`
-  return `${Math.floor(diff / 60)}h ${diff % 60}m`
+  return formatElapsedSince(iso)
 }
 
 function timeLabel(iso) {
@@ -532,7 +528,7 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle }) {
   const l = L[lang] || L.en
   const total = orders.reduce((sum, order) => sum + getOrderTotal(order), 0)
   const latest = [...orders]
-    .sort((a, b) => new Date(getOrderDate(b)) - new Date(getOrderDate(a)))
+    .sort((a, b) => parseInstantDate(getOrderDate(b)) - parseInstantDate(getOrderDate(a)))
     .slice(0, 8)
 
   return (
@@ -644,7 +640,7 @@ export default function CashierTables() {
         grouped[key].items  = [...grouped[key].items, ...(order.items || [])]
         grouped[key].total  = (grouped[key].total || 0) + getOrderTotal(order)
         // Keep earliest created_at
-        if (new Date(order.created_at) < new Date(grouped[key].created_at)) {
+        if (parseInstantDate(order.created_at) < parseInstantDate(grouped[key].created_at)) {
           grouped[key].created_at = order.created_at
         }
         // Escalate to needs_bill if any sub-order is needs_bill
@@ -740,8 +736,8 @@ export default function CashierTables() {
 
     // Sort
     return [...result].sort((a, b) => {
-      if (sortKey === 'newest')  return new Date(b.created_at) - new Date(a.created_at)
-      if (sortKey === 'oldest')  return new Date(a.created_at) - new Date(b.created_at)
+      if (sortKey === 'newest')  return parseInstantDate(b.created_at) - parseInstantDate(a.created_at)
+      if (sortKey === 'oldest')  return parseInstantDate(a.created_at) - parseInstantDate(b.created_at)
       if (sortKey === 'highest') return (b.total || 0) - (a.total || 0)
       if (sortKey === 'lowest')  return (a.total || 0) - (b.total || 0)
       return 0

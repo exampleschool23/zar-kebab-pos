@@ -12,7 +12,7 @@ import {
 import { getOrderTotal } from '../lib/analytics'
 import { getReservationSummary, getWaiterTableStatus } from '../lib/tableManagement'
 import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
-import { formatDateTime, formatTime } from '../lib/dateFormat'
+import { formatDateTime, formatElapsedSince, formatTime, parseInstantDate } from '../lib/dateFormat'
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
@@ -269,7 +269,7 @@ function getPreparationCounts(tableId, orders) {
   )
   const orderTimes = active.map(o => o.created_at).filter(Boolean)
   const earliestTime = times => times.reduce((earliest, time) =>
-    !earliest || new Date(time) < new Date(earliest) ? time : earliest,
+    !earliest || parseInstantDate(time) < parseInstantDate(earliest) ? time : earliest,
     null
   )
   return {
@@ -283,11 +283,11 @@ function getPreparationCounts(tableId, orders) {
 }
 
 function elapsedSince(isoString, lang) {
-  if (!isoString) return null
-  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 60000)
-  if (diff < 1) return tr(lang, 'lessThanMinuteAgo')
-  if (diff < 60) return tr(lang, 'minutesAgo', diff)
-  return tr(lang, 'hoursMinutesAgo', Math.floor(diff / 60), diff % 60)
+  return formatElapsedSince(isoString, {
+    lessThanMinute: () => tr(lang, 'lessThanMinuteAgo'),
+    minutes: diff => tr(lang, 'minutesAgo', diff),
+    hoursMinutes: (hours, minutes) => tr(lang, 'hoursMinutesAgo', hours, minutes),
+  })
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
