@@ -364,6 +364,20 @@ test('AdminUsers exposes role and status approval controls for editable staff', 
   assert.match(permissions, /if \(viewerRole === 'admin'\) return all\.filter\(r => !\['owner', 'admin', 'stakeholder'\]\.includes\(r\)\)/)
 })
 
+test('AdminUsers team table keeps action controls inside the page layout', () => {
+  const adminUsers = readSource('src/pages/AdminUsers.jsx')
+
+  assert.match(adminUsers, /max-w-\[1280px\]/)
+  assert.match(adminUsers, /xl:grid-cols-\[minmax\(240px,1fr\)_100px_minmax\(540px,580px\)\]/)
+  assert.match(adminUsers, /className="flex min-w-0 flex-wrap items-center justify-start gap-2 xl:flex-nowrap"/)
+  assert.match(adminUsers, /className="h-10 w-\[124px\] flex-shrink-0/)
+  assert.match(adminUsers, /xl:col-start-3/)
+  assert.match(adminUsers, /xl:col-span-3/)
+  assert.doesNotMatch(adminUsers, /max-w-5xl/)
+  assert.doesNotMatch(adminUsers, /grid-cols-\[1fr_110px_480px\]/)
+  assert.doesNotMatch(adminUsers, /sm:col-span-3/)
+})
+
 test('Supabase browser reads bypass HTTP cache for live POS data', () => {
   const supabase = readSource('src/lib/supabase.js')
 

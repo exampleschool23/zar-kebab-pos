@@ -208,7 +208,7 @@ export default function AdminUsers() {
 
   return (
     <AppShell title={l.title}>
-      <div className="p-5 max-w-5xl mx-auto">
+      <div className="w-full max-w-[1280px] mx-auto px-4 py-5 sm:px-5 lg:px-6">
 
         {/* Read-only notice for non-editors */}
         {!['owner', 'admin'].includes(myRole) && (
@@ -279,7 +279,7 @@ export default function AdminUsers() {
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             {/* Table header */}
-            <div className="hidden sm:grid grid-cols-[1fr_110px_480px] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100">
+            <div className="hidden xl:grid xl:grid-cols-[minmax(240px,1fr)_100px_minmax(540px,580px)] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{l.nameEmail}</p>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{l.status}</p>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{l.actions}</p>
@@ -304,7 +304,7 @@ export default function AdminUsers() {
                 return (
                   <div
                     key={user.id}
-                    className={`grid grid-cols-1 sm:grid-cols-[1fr_110px_480px] gap-3 sm:gap-4 items-center px-5 py-4 transition-colors ${
+                    className={`grid grid-cols-1 xl:grid-cols-[minmax(240px,1fr)_100px_minmax(540px,580px)] gap-3 xl:gap-4 items-center px-4 py-4 sm:px-5 transition-colors ${
                       isSaving ? 'bg-orange-50/50' : 'hover:bg-gray-50/50'
                     }`}
                   >
@@ -333,14 +333,14 @@ export default function AdminUsers() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex flex-wrap items-center justify-start gap-2 lg:flex-nowrap">
+                    <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 xl:flex-nowrap">
                       {isSaving && <Loader2 size={15} className="animate-spin text-[#ff5a00]" />}
                       {canEditRoleStatus && (
                         <select
                           value={ROLES.includes(user.role) ? user.role : 'guest'}
                           disabled={isSaving}
                           onChange={e => handleChange(user.id, 'role', e.target.value)}
-                          className="h-10 w-[132px] flex-shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="h-10 w-[124px] flex-shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:opacity-50"
                           title={l.role}
                         >
                           {roleOptions.map(role => (
@@ -353,7 +353,7 @@ export default function AdminUsers() {
                           value={user.status || 'pending'}
                           disabled={isSaving}
                           onChange={e => handleChange(user.id, 'status', e.target.value)}
-                          className="h-10 w-[132px] flex-shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="h-10 w-[124px] flex-shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:opacity-50"
                           title={l.accountStatus}
                         >
                           {STATUSES.map(s => (
@@ -393,7 +393,7 @@ export default function AdminUsers() {
                           className="inline-flex h-10 flex-shrink-0 items-center gap-1.5 rounded-xl border border-red-100 bg-red-50 px-3 text-xs font-black text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                          <span className="sm:hidden lg:inline">{l.delete}</span>
+                          <span>{l.delete}</span>
                         </button>
                       )}
                       {canDelete && isConfirmingDelete && (
@@ -421,12 +421,12 @@ export default function AdminUsers() {
                       )}
                     </div>
                     {canDelete && isConfirmingDelete && (
-                      <p className="sm:col-start-3 text-xs font-medium leading-snug text-red-500">
+                      <p className="xl:col-start-3 text-xs font-medium leading-snug text-red-500">
                         {l.deleteHint}
                       </p>
                     )}
                     {canEditAccess && !isMe && isAccessExpanded && (
-                      <div className="sm:col-span-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-3">
+                      <div className="xl:col-span-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-3">
                         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-gray-600">
