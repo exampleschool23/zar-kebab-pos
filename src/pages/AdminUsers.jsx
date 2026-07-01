@@ -6,18 +6,30 @@ import AppShell from '../components/AppShell'
 import StatusBadge from '../components/StatusBadge'
 import {
   FEATURE_DEFINITIONS,
+  assignableRoles,
   canDeleteTeamMember,
+  canEditTeamMember,
   canManageFeatureAccess,
   featureAccessForProfile,
 } from '../lib/permissions'
 import { Search, RefreshCw, UserCircle2, Loader2, Eye, Trash2, X, Check, ShieldCheck, ChevronDown } from 'lucide-react'
 
 const STATUSES = ['pending', 'active', 'disabled']
+const ROLES = ['owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest']
 
 const STATUS_LABELS = {
   pending:  { uz: 'Kutilmoqda', ru: 'Ожидает',   en: 'Pending'  },
   active:   { uz: 'Faol',       ru: 'Активен',   en: 'Active'   },
   disabled: { uz: 'Bloklangan', ru: 'Заблокирован', en: 'Disabled' },
+}
+
+const ROLE_LABELS = {
+  owner:       { uz: 'Egasi',     ru: 'Владелец',   en: 'Owner' },
+  admin:       { uz: 'Admin',     ru: 'Админ',      en: 'Admin' },
+  waiter:      { uz: 'Ofitsiant', ru: 'Официант',   en: 'Waiter' },
+  cashier:     { uz: 'Kassir',    ru: 'Кассир',     en: 'Cashier' },
+  stakeholder: { uz: 'Kuzatuvchi', ru: 'Наблюдатель', en: 'Stakeholder' },
+  guest:       { uz: 'Mehmon',    ru: 'Гость',      en: 'Guest' },
 }
 
 const L = {
@@ -27,6 +39,7 @@ const L = {
     allStatuses: 'Barcha holatlar',
     refresh:     'Yangilash',
     nameEmail:   'Ism / Email',
+    role:        'Rol',
     status:      'Holat',
     accountStatus: 'Hisob holati',
     actions:     'Amallar',
@@ -51,6 +64,7 @@ const L = {
     allStatuses: 'Все статусы',
     refresh:     'Обновить',
     nameEmail:   'Имя / Email',
+    role:        'Роль',
     status:      'Статус',
     accountStatus: 'Статус аккаунта',
     actions:     'Действия',
@@ -75,6 +89,7 @@ const L = {
     allStatuses: 'All statuses',
     refresh:     'Refresh',
     nameEmail:   'Name / Email',
+    role:        'Role',
     status:      'Status',
     accountStatus: 'Account Status',
     actions:     'Actions',
@@ -100,7 +115,7 @@ export default function AdminUsers() {
   const { state } = useApp()
   const lang   = state.lang
   const l      = L[lang] || L.en
-  const myRole = myProfile?.role || 'waiter'
+  const myRole = (myProfile?.role || 'guest').toLowerCase()
   const canEditAccess = canManageFeatureAccess(myProfile)
 
   const [users, setUsers]               = useState([])
@@ -124,13 +139,25 @@ export default function AdminUsers() {
 
   async function handleChange(userId, field, value) {
     const target = users.find(u => u.id === userId)
+    if (!target || target.id === myProfile?.id) return
+    if (!canEditTeamMember(myRole, target.role)) return
+    if (field === 'status' && !STATUSES.includes(value)) return
+    if (field === 'role' && !assignableRoles(myRole).includes(value)) return
+
     // Guard: prevent removing/disabling the last active owner
     if (target?.role === 'owner') {
       const activeOwners = users.filter(u => u.role === 'owner' && u.status !== 'disabled')
       if (field === 'status' && value === 'disabled' && activeOwners.length <= 1) return
+      if (field === 'role' && value !== 'owner' && activeOwners.length <= 1) return
     }
     setSaving(userId)
-    await updateProfile(userId, { [field]: value })
+    setNotice(null)
+    const { error } = await updateProfile(userId, { [field]: value })
+    if (error) {
+      setNotice({ tone: 'error', message: error.message || l.accessError })
+      setSaving(null)
+      return
+    }
     setUsers(u => u.map(x => x.id === userId ? { ...x, [field]: value } : x))
     setSaving(null)
   }
@@ -263,12 +290,14 @@ export default function AdminUsers() {
               {filtered.map(user => {
                 const isMe       = user.id === myProfile?.id
                 const isSaving   = saving === user.id
-                const canEdit    = !isMe && canEditAccess
+                const canEditRoleStatus = !isMe && canEditTeamMember(myRole, user.role)
                 const canDelete  = canDeleteTeamMember(myProfile, user, isMe)
                 const isDeleting = deleting === user.id
                 const isConfirmingDelete = confirmDeleteId === user.id
                 const isAccessExpanded = expandedAccessId === user.id
                 const statusLabel = (STATUS_LABELS[user.status]?.[lang] || STATUS_LABELS[user.status]?.en) ?? user.status
+                const roleLabel = (ROLE_LABELS[user.role]?.[lang] || ROLE_LABELS[user.role]?.en) ?? user.role
+                const roleOptions = assignableRoles(myRole)
                 const featureAccess = featureAccessForProfile(user)
                 const accessCount = featureAccess.length
 
@@ -294,6 +323,7 @@ export default function AdminUsers() {
                           {isMe && <span className="text-[10px] text-[#ff5a00] font-bold">{l.you}</span>}
                         </div>
                         <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                        <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-400">{roleLabel}</p>
                       </div>
                     </div>
 
@@ -305,7 +335,20 @@ export default function AdminUsers() {
                     {/* Actions */}
                     <div className="flex flex-wrap items-center justify-start gap-2 lg:flex-nowrap">
                       {isSaving && <Loader2 size={15} className="animate-spin text-[#ff5a00]" />}
-                      {canEdit ? (
+                      {canEditRoleStatus && (
+                        <select
+                          value={ROLES.includes(user.role) ? user.role : 'guest'}
+                          disabled={isSaving}
+                          onChange={e => handleChange(user.id, 'role', e.target.value)}
+                          className="h-10 w-[132px] flex-shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          title={l.role}
+                        >
+                          {roleOptions.map(role => (
+                            <option key={role} value={role}>{(ROLE_LABELS[role]?.[lang] || ROLE_LABELS[role]?.en) ?? role}</option>
+                          ))}
+                        </select>
+                      )}
+                      {canEditRoleStatus ? (
                         <select
                           value={user.status || 'pending'}
                           disabled={isSaving}

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   FEATURE_KEYS,
+  assignableRoles,
   canDeleteTeamMember,
   canManageFeatureAccess,
   canViewPage,
@@ -50,6 +51,12 @@ test('only the primary owner account can manage feature access', () => {
   assert.equal(canManageFeatureAccess({ role: 'owner', email: 'other-owner@example.com' }), false)
   assert.equal(canManageFeatureAccess({ role: 'admin', email: 'dangerhoggish@gmail.com' }), false)
   assert.equal(canManageFeatureAccess('owner'), false)
+})
+
+test('assignable role options match owner and admin profile policy limits', () => {
+  assert.deepEqual(assignableRoles('owner'), ['owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest'])
+  assert.deepEqual(assignableRoles('admin'), ['waiter', 'cashier', 'guest'])
+  assert.deepEqual(assignableRoles('waiter'), [])
 })
 
 test('primary owner can delete non-primary owner profiles only', () => {

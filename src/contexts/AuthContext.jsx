@@ -16,18 +16,20 @@ function fallbackProfileFromUser(user, status = 'pending') {
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [profileError, setProfileError] = useState(null)
   const [loading, setLoading] = useState(true)
 
   async function loadProfile(user) {
     try {
+      setProfileError(null)
       const data = await getProfile(user.id)
       const next = data || fallbackProfileFromUser(user)
       setProfile(next)
       return next
-    } catch {
-      const fallback = fallbackProfileFromUser(user)
-      setProfile(fallback)
-      return fallback
+    } catch (error) {
+      setProfile(null)
+      setProfileError(error)
+      return null
     }
   }
 
@@ -47,6 +49,7 @@ export function AuthProvider({ children }) {
         loadProfile(session.user)
       } else {
         setProfile(null)
+        setProfileError(null)
       }
     })
 
@@ -55,7 +58,12 @@ export function AuthProvider({ children }) {
       clearTimeout(hardTimeout)
       setSession(session)
       setLoading(false)
-      if (session?.user) loadProfile(session.user)
+      if (session?.user) {
+        loadProfile(session.user)
+      } else {
+        setProfile(null)
+        setProfileError(null)
+      }
     })
 
     return () => {
@@ -95,6 +103,7 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
     setSession(null)
     setProfile(null)
+    setProfileError(null)
   }
 
   async function refreshProfile() {
@@ -103,7 +112,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      session, profile, loading,
+      session, profile, profileError, loading,
       signInWithEmail, signUpWithEmail, signInWithGoogle,
       resetPassword, signOut, refreshProfile,
     }}>

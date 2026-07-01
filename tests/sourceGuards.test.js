@@ -322,14 +322,46 @@ test('new signed-up users always start as guest', () => {
   assert.doesNotMatch(migration, /raw_user_meta_data->>'role'/)
 })
 
-test('missing auth profile falls back to pending approval, not active guest', () => {
+test('only a missing auth profile falls back to pending approval', () => {
   const auth = readSource('src/contexts/AuthContext.jsx')
+  const supabase = readSource('src/lib/supabase.js')
   const fallback = functionBody(auth, 'fallbackProfileFromUser')
 
   assert.match(auth, /const next = data \|\| fallbackProfileFromUser\(user\)/)
+  assert.match(auth, /const \[profileError, setProfileError\] = useState\(null\)/)
+  assert.match(auth, /catch \(error\) \{[\s\S]*setProfile\(null\)[\s\S]*setProfileError\(error\)/)
+  assert.match(supabase, /\.maybeSingle\(\)/)
+  assert.match(supabase, /if \(error\) throw error/)
   assert.match(auth, /function fallbackProfileFromUser\(user, status = 'pending'\)/)
   assert.match(fallback, /role: 'guest'/)
   assert.doesNotMatch(fallback, /status: 'active'/)
+})
+
+test('PendingApproval redirects approved users to their workspace route', () => {
+  const pending = readSource('src/pages/PendingApproval.jsx')
+  const approvedTarget = functionBody(pending, 'approvedTarget')
+
+  assert.match(pending, /import \{ useNavigate \} from 'react-router-dom'/)
+  assert.match(pending, /import \{ defaultPath \} from '..\/lib\/permissions'/)
+  assert.match(approvedTarget, /nextProfile\?\.status !== 'active'/)
+  assert.match(approvedTarget, /const path = defaultPath\(nextProfile\)/)
+  assert.match(approvedTarget, /return path === '\/menu' \? '' : path/)
+  assert.match(pending, /React\.useEffect\(\(\) => \{[\s\S]*navigate\(path, \{ replace: true \}\)/)
+  assert.match(pending, /const nextProfile = await refreshProfile\(\)[\s\S]*navigate\(path, \{ replace: true \}\)/)
+})
+
+test('AdminUsers exposes role and status approval controls for editable staff', () => {
+  const adminUsers = readSource('src/pages/AdminUsers.jsx')
+  const permissions = readSource('src/lib/permissions.js')
+
+  assert.match(adminUsers, /assignableRoles/)
+  assert.match(adminUsers, /canEditTeamMember/)
+  assert.match(adminUsers, /const canEditRoleStatus = !isMe && canEditTeamMember\(myRole, user\.role\)/)
+  assert.match(adminUsers, /handleChange\(user\.id, 'role', e\.target\.value\)/)
+  assert.match(adminUsers, /handleChange\(user\.id, 'status', e\.target\.value\)/)
+  assert.match(adminUsers, /if \(field === 'role' && !assignableRoles\(myRole\)\.includes\(value\)\) return/)
+  assert.doesNotMatch(adminUsers, /const canEdit\s+= !isMe && canEditAccess/)
+  assert.match(permissions, /if \(viewerRole === 'admin'\) return all\.filter\(r => !\['owner', 'admin', 'stakeholder'\]\.includes\(r\)\)/)
 })
 
 test('Supabase browser reads bypass HTTP cache for live POS data', () => {

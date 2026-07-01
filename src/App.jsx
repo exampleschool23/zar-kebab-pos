@@ -96,6 +96,46 @@ function Spinner() {
   )
 }
 
+function ProfileLoadError() {
+  const { state } = useApp()
+  const { refreshProfile, signOut } = useAuth()
+  const lang = state.lang || 'ru'
+  const [retrying, setRetrying] = React.useState(false)
+
+  async function handleRetry() {
+    setRetrying(true)
+    await refreshProfile()
+    setRetrying(false)
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#faf9f7] p-4">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-8 text-center max-w-sm w-full">
+        <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
+          <Loader2 size={26} className="text-amber-500" />
+        </div>
+        <h2 className="font-black text-[#141414] mb-2">{t(lang, 'profileLoadFailed')}</h2>
+        <p className="text-sm text-gray-500 mb-6">{t(lang, 'profileLoadFailedMessage')}</p>
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={handleRetry}
+            disabled={retrying}
+            className="w-full border-2 border-[#ff5a00] text-[#ff5a00] rounded-xl py-3 font-bold text-sm hover:bg-orange-50 transition-colors disabled:opacity-60"
+          >
+            {retrying ? t(lang, 'waiting') : t(lang, 'checkStatus')}
+          </button>
+          <button
+            onClick={signOut}
+            className="w-full text-gray-400 text-sm font-medium hover:text-gray-600 transition-colors"
+          >
+            {t(lang, 'signOutAndTryAgain')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Disabled account screen
 function DisabledAccount({ signOut }) {
   const { state } = useApp()
@@ -124,12 +164,13 @@ function DisabledAccount({ signOut }) {
 
 // Route guard: requires authentication + optional role check
 function ProtectedRoute({ children, page }) {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, profileError, loading } = useAuth()
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}${location.hash}`
 
   if (loading) return <Spinner />
   if (!session) return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />
+  if (profileError) return <ProfileLoadError />
   if (!profile) return <Spinner />
 
   if (profile?.status === 'disabled') return null // handled by RoleRedirect
@@ -143,12 +184,13 @@ function ProtectedRoute({ children, page }) {
 }
 
 function SignedOutRoute({ children }) {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, profileError, loading } = useAuth()
   const [searchParams] = useSearchParams()
   const returnTo = sanitizeReturnTo(searchParams.get('returnTo'))
 
   if (loading) return <Spinner />
   if (!session) return children
+  if (profileError) return <ProfileLoadError />
   if (!profile) return <Spinner />
   return <Navigate to={returnTo || defaultPathForHost(profile || 'guest')} replace />
 }
@@ -165,7 +207,7 @@ function LazyProtectedRoute({ page, children }) {
 
 // Decides where to send user after login
 function RoleRedirect({ signedOutPath = '/menu' }) {
-  const { session, profile, loading, signOut } = useAuth()
+  const { session, profile, profileError, loading, signOut } = useAuth()
   const navigate = useNavigate()
   const [profileTimeout, setProfileTimeout] = React.useState(false)
   const { state } = useApp()
@@ -173,22 +215,24 @@ function RoleRedirect({ signedOutPath = '/menu' }) {
 
   useEffect(() => {
     if (loading) return
+    if (profileError) return
     if (!session) { navigate(signedOutPath, { replace: true }); return }
     if (!profile) return
     if (profile?.status === 'disabled') return
     if (profile?.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
     navigate(defaultPathForHost(profile), { replace: true })
-  }, [session, profile, loading, navigate])
+  }, [session, profile, profileError, loading, navigate])
 
   // If session exists but profile never loads, show a retry option
   useEffect(() => {
-    if (!session || profile || loading) return
+    if (!session || profile || profileError || loading) return
     const t = setTimeout(() => setProfileTimeout(true), 6000)
     return () => clearTimeout(t)
-  }, [session, profile, loading])
+  }, [session, profile, profileError, loading])
 
   if (loading) return <Spinner />
   if (!session) return <Navigate to={signedOutPath} replace />
+  if (profileError) return <ProfileLoadError />
   if (profile?.status === 'disabled') return <DisabledAccount signOut={signOut} />
 
   if (profileTimeout) {

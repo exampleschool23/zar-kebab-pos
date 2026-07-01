@@ -173,7 +173,7 @@ export function canDeleteTeamMember(viewerRole, targetRole, isSelf = false) {
 export function assignableRoles(viewerRole) {
   const all = ['owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest']
   if (viewerRole === 'owner') return all
-  if (viewerRole === 'admin') return all.filter(r => r !== 'owner' && r !== 'stakeholder')
+  if (viewerRole === 'admin') return all.filter(r => !['owner', 'admin', 'stakeholder'].includes(r))
   return []
 }
 
