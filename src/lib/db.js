@@ -440,7 +440,7 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, ite
       item_type: i.item_type || i.itemType || 'menu',
       is_counter_item: !!(i.is_counter_item ?? i.isCounterItem),
       kitchen_round_id: i.kitchen_round_id || i.kitchenRoundId || '',
-      submitted_at: i.submitted_at || i.submittedAt || i.created_at || i.createdAt || null,
+      submitted_at: null,
     })),
     table_status: isOffPremise ? null : 'occupied',
   }
@@ -806,7 +806,7 @@ export async function writeToSupabase(action, state, options = {}) {
         status:       'new',
         order_type:   normalizeOrderType(i.order_type || orderType),
         kitchen_round_id: i.kitchen_round_id || i.kitchenRoundId || '',
-        submitted_at: i.submitted_at || i.submittedAt || i.created_at || i.createdAt || null,
+        submitted_at: null,
       }))
       let { data: insertedItems, error: itemInsertError } = await withAbortSignal(supabase
         .from('order_items')

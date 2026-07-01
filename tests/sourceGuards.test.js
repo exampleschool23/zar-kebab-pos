@@ -931,16 +931,17 @@ test('WaiterTables ready-card total uses shared payment math instead of stale st
   assert.doesNotMatch(getPreparationCounts, /Number\(o\.total\)/)
 })
 
-test('WaiterTables elapsed label uses pending item submit time before stale order time', () => {
+test('WaiterTables elapsed label uses server item time before stale client submitted time', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
   const getPreparationCounts = functionBody(source, 'getPreparationCounts')
 
   assert.match(source, /formatElapsedSince/)
-  assert.match(source, /parseInstantDate/)
+  assert.match(source, /getReliableOrderItemTime/)
+  assert.match(source, /earliestReliableTime/)
   assert.match(getPreparationCounts, /const pendingItemTimes = active\.flatMap/)
-  assert.match(getPreparationCounts, /i\.submitted_at \|\| i\.submittedAt \|\| i\.created_at \|\| i\.createdAt \|\| o\.created_at/)
-  assert.match(getPreparationCounts, /parseInstantDate\(time\) < parseInstantDate\(earliest\)/)
-  assert.match(getPreparationCounts, /createdAt: earliestTime\(pendingItemTimes\) \|\| earliestTime\(billableItemTimes\) \|\| earliestTime\(orderTimes\)/)
+  assert.match(getPreparationCounts, /getReliableOrderItemTime\(i, o\)/)
+  assert.match(getPreparationCounts, /createdAt: earliestReliableTime\(pendingItemTimes\) \|\| earliestReliableTime\(billableItemTimes\) \|\| earliestReliableTime\(orderTimes\)/)
+  assert.doesNotMatch(getPreparationCounts, /i\.submitted_at \|\| i\.submittedAt \|\| i\.created_at/)
   assert.doesNotMatch(getPreparationCounts, /createdAt: active\.reduce\(\(earliest, o\)/)
 })
 
@@ -959,6 +960,22 @@ test('AdminDashboard recent order elapsed label uses status activity time', () =
   assert.doesNotMatch(row, /elapsedSince\(getOrderDate\(order\) \|\| order\.created_at\)/)
   assert.match(appContext, /_statusChangedAt: action\._statusChangedAt \|\| new Date\(\)\.toISOString\(\)/)
   assert.match(reducer, /status: 'needs_bill', updated_at: statusChangedAt/)
+})
+
+test('AdminDashboard recent orders show explicit colored order context badges', () => {
+  const source = readSource('src/pages/AdminDashboard.jsx')
+  const row = functionBody(source, 'RecentOrderRow')
+
+  assert.match(source, /function orderContextBadge\(order, lang, fallback\)/)
+  assert.match(source, /orderType === 'delivery'/)
+  assert.match(source, /orderType === 'take_away'/)
+  assert.match(source, /bg-purple-50 text-purple-700 border-purple-200/)
+  assert.match(source, /bg-blue-50 text-blue-700 border-blue-200/)
+  assert.match(source, /bg-orange-50 text-\[#c2410c\] border-orange-200/)
+  assert.match(row, /const contextBadge = orderContextBadge\(order, lang, l\.table\)/)
+  assert.match(row, /contextBadge\.cls/)
+  assert.match(row, /contextBadge\.label/)
+  assert.doesNotMatch(row, /orderTableLabel\(order, lang, l\.table\)/)
 })
 
 test('elapsed labels use timezone-safe instant parsing instead of browser-local timestamp math', () => {
@@ -981,6 +998,27 @@ test('AdminDashboard defaults to today period', () => {
   const source = readSource('src/pages/AdminDashboard.jsx')
   assert.match(source, /const \[period, setPeriod\]\s*=\s*useState\('today'\)/)
   assert.doesNotMatch(source, /const \[period, setPeriod\]\s*=\s*useState\('7days'\)/)
+})
+
+test('AdminDashboard shows period-based order type performance', () => {
+  const dashboard = readSource('src/pages/AdminDashboard.jsx')
+  const analytics = readSource('src/lib/dashboardAnalytics.js')
+  const card = functionBody(dashboard, 'OrderTypePerformanceCard')
+
+  assert.match(analytics, /export function getDashboardOrderTypePerformance\(orders, lang = 'en'\)/)
+  assert.match(analytics, /ORDER_TYPE_KEYS/)
+  assert.match(analytics, /inferOrderType\(order\)/)
+  assert.match(analytics, /getOrderTotal\(order\)/)
+  assert.match(dashboard, /getDashboardOrderTypePerformance/)
+  assert.match(dashboard, /const orderTypePerformance = useMemo\(\(\) =>/)
+  assert.match(dashboard, /getDashboardOrderTypePerformance\(periodPaidOrders, lang\)/)
+  assert.match(dashboard, /<OrderTypePerformanceCard rows=\{orderTypePerformance\} lang=\{lang\} \/>/)
+  assert.match(card, /ORDER_TYPE_PERFORMANCE_STYLE/)
+  assert.match(card, /topKey/)
+  assert.match(card, /row\.orders/)
+  assert.match(card, /row\.items/)
+  assert.match(card, /row\.avgOrder/)
+  assert.match(card, /row\.pct/)
 })
 
 test('WaiterTables hides zero-value active orders from table cards', () => {
@@ -1257,7 +1295,8 @@ test('WaiterOrder prints cook checks by submitted order round', () => {
   assert.match(appContext, /kitchen_round_id: kitchenRoundId/)
   assert.match(appContext, /submitted_at: submittedAt/)
   assert.match(reducer, /submitted_at: submittedAt/)
-  assert.match(db, /submitted_at: submittedAt/)
+  assert.match(db, /submitted_at: null/)
+  assert.doesNotMatch(functionBody(db, 'submitOrderToKitchenRpc'), /submitted_at: i\.submitted_at/)
   assert.match(db, /kitchen_round_id: i\.kitchen_round_id/)
   assert.match(migration, /add column if not exists kitchen_round_id/)
   assert.match(migration, /add column if not exists submitted_at/)
@@ -1771,8 +1810,11 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(expenses, /formatMoneyInput\(form\.amount\)/)
   assert.match(expenses, /normalizeMoneyInput\(event\.target\.value\)/)
   assert.match(expenses, /const \[dateFrom, setDateFrom\] = useState\(\(\) => todayExpenseDate\(\)\.slice\(0, 8\) \+ '01'\)/)
-  assert.match(expenses, /const activeRangeKey = \(\(\) =>/)
-  assert.match(expenses, /dateFrom === today\.slice\(0, 8\) \+ '01' && dateTo === today\) return 'month'/)
+  assert.match(expenses, /const \[activeRangeKey, setActiveRangeKey\] = useState\('month'\)/)
+  assert.match(expenses, /function selectQuickRange\(key\)/)
+  assert.match(expenses, /setActiveRangeKey\(key\)/)
+  assert.match(expenses, /function setCustomDateFrom\(value\)/)
+  assert.match(expenses, /function setCustomDateTo\(value\)/)
   assert.match(expenses, /selected\s*\?\s*'border-\[#ff5a00\] bg-\[#ff5a00\] text-white shadow-orange-100'/)
   assert.match(expenses, /const canAdd = role === 'owner'/)
   assert.match(expenses, /const canDelete = role === 'owner'/)
@@ -2119,6 +2161,8 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(productCards, /export function getMenuItemOptionGroups/)
   assert.match(productCards, /export function menuItemRequiresOptions/)
   assert.match(productCards, /export function getOrderItemOptionLines/)
+  assert.match(productCards, /translatedNames\.includes\(normalizeComparableText\(rowName\)\)/)
+  assert.match(productCards, /function normalizeComparableText\(value\)/)
   assert.match(productCards, /export function getManualOrderNotes/)
   assert.match(productCards, /type="radio"/)
   assert.match(productCards, /\{optionGroups\.length > 0 && \(/)

@@ -126,9 +126,17 @@ export function getOrderItemOptionLines(item, menuItem, lang = 'en') {
 
   const parentName = menuItem ? getItemName(menuItem, lang) : ''
   const rowName = String(item?.name || '').trim()
+  const translatedNames = menuItem ? [menuItem.name_uz, menuItem.name_ru, menuItem.name_en]
+    .map(normalizeComparableText)
+    .filter(Boolean) : []
+  if (translatedNames.includes(normalizeComparableText(rowName))) return []
   if (parentName && rowName && rowName !== parentName) return [rowName]
 
   return []
+}
+
+function normalizeComparableText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLocaleLowerCase()
 }
 
 export function getManualOrderNotes(item, menuItem, lang = 'en') {

@@ -8,6 +8,7 @@ import {
   toLocalDateStr,
 } from './analytics.js'
 import { getOrderItemUnitPrice } from './priceModes.js'
+import { ORDER_TYPE_KEYS, inferOrderType, orderTypeLabel } from './orderTypes.js'
 
 function localDateStr(value) {
   return toLocalDateStr(value instanceof Date ? value.toISOString() : value)
@@ -94,6 +95,36 @@ export function getDashboardBestSelling(orders, menuItemMap) {
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 5)
     .map(row => ({ ...row, image_url: menuItemMap[row.menuItemId]?.image_url || '' }))
+}
+
+export function getDashboardOrderTypePerformance(orders, lang = 'en') {
+  const map = Object.fromEntries(ORDER_TYPE_KEYS.map(key => [key, {
+    key,
+    label: orderTypeLabel(key, lang),
+    orders: 0,
+    items: 0,
+    revenue: 0,
+  }]))
+
+  ;(orders || []).forEach(order => {
+    const key = inferOrderType(order)
+    const row = map[key] || map.dine_in
+    row.orders += 1
+    row.items += getOrderItems(order).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
+    row.revenue += getOrderTotal(order)
+  })
+
+  const total = Object.values(map).reduce((sum, row) => sum + row.revenue, 0)
+  return ORDER_TYPE_KEYS
+    .map(key => {
+      const row = map[key]
+      return {
+        ...row,
+        avgOrder: row.orders > 0 ? Math.round(row.revenue / row.orders) : 0,
+        pct: total > 0 ? Math.round((row.revenue / total) * 100) : 0,
+      }
+    })
+    .sort((a, b) => b.revenue - a.revenue || ORDER_TYPE_KEYS.indexOf(a.key) - ORDER_TYPE_KEYS.indexOf(b.key))
 }
 
 export function getDashboardPaymentMethods(orders, labels = {}) {

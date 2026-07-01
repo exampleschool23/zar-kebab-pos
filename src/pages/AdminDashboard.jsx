@@ -26,6 +26,7 @@ import {
 import {
   formatReadableDateTime,
   getDashboardBestSelling,
+  getDashboardOrderTypePerformance,
   getDashboardPaymentMethods,
   getDashboardPeriodOrders,
   getDashboardSalesByCategory,
@@ -33,7 +34,7 @@ import {
   isOrderInDashboardPeriod,
 } from '../lib/dashboardAnalytics'
 import AppShell from '../components/AppShell'
-import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
@@ -65,6 +66,8 @@ const L = {
     qr:             'QR Kod',
     unknown:        "Noma'lum",
     salesByCategory:'Kategoriya bo\'yicha savdo',
+    orderTypePerformance:'Buyurtma turi bo‘yicha savdo',
+    topOrderType:    'Eng yaxshisi',
     bestSelling:    "Eng ko'p sotilgan taomlar",
     noSales:        "Savdo ma'lumotlari yo'q",
     staffPerf:      'Xodimlar faolligi',
@@ -126,6 +129,8 @@ const L = {
     qr:             'QR Код',
     unknown:        'Неизвестно',
     salesByCategory:'Продажи по категориям',
+    orderTypePerformance:'Продажи по типу заказа',
+    topOrderType:    'Лучший',
     bestSelling:    'Самые продаваемые',
     noSales:        'Данных о продажах нет',
     staffPerf:      'Активность персонала',
@@ -187,6 +192,8 @@ const L = {
     qr:             'QR Code',
     unknown:        'Unknown',
     salesByCategory:'Sales by Category',
+    orderTypePerformance:'Order Type Performance',
+    topOrderType:    'Best',
     bestSelling:    'Best-Selling Dishes',
     noSales:        'No sales data yet',
     staffPerf:      'Staff Performance',
@@ -240,9 +247,24 @@ function elapsedSince(iso) {
   return formatElapsedSince(iso, { lessThanMinute: '< 1 min' }) || ''
 }
 
-function orderTableLabel(order, lang, fallback) {
+function orderContextBadge(order, lang, fallback) {
   const orderType = inferOrderType(order)
-  return isOffPremiseOrderType(orderType) ? orderTypeLabel(orderType, lang) : (order?.table_name || fallback)
+  if (orderType === 'delivery') {
+    return {
+      label: orderTypeLabel(orderType, lang),
+      cls: 'bg-purple-50 text-purple-700 border-purple-200',
+    }
+  }
+  if (orderType === 'take_away') {
+    return {
+      label: orderTypeLabel(orderType, lang),
+      cls: 'bg-blue-50 text-blue-700 border-blue-200',
+    }
+  }
+  return {
+    label: order?.table_name || fallback,
+    cls: 'bg-orange-50 text-[#c2410c] border-orange-200',
+  }
 }
 
 function shortLabel(ds, mode) {
@@ -378,6 +400,7 @@ function RecentOrderRow({
   const isNeedsBill = order.status === 'needs_bill'
   const shortId = String(order.id).slice(-4).toUpperCase()
   const elapsedAt = order._recentActivityAt || getOrderActivityDate(order) || getOrderDate(order) || order.created_at
+  const contextBadge = orderContextBadge(order, lang, l.table)
 
   return (
     <div className={`rounded-2xl border px-3 py-3 transition-all ${
@@ -395,7 +418,9 @@ function RecentOrderRow({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap min-w-0">
               <p className="text-base font-black text-[#1F2937] leading-none flex-shrink-0">#{shortId}</p>
-              <p className="text-sm text-[#718096] truncate min-w-0 max-w-[140px]">{orderTableLabel(order, lang, l.table)}</p>
+              <span className={`inline-flex max-w-[150px] items-center rounded-full border px-2 py-0.5 text-[11px] font-black leading-none ${contextBadge.cls}`}>
+                <span className="truncate">{contextBadge.label}</span>
+              </span>
               <RecentStatusPill status={isNeedsBill ? 'needs_bill' : 'paid'} lang={lang} />
             </div>
 
@@ -471,6 +496,30 @@ const PAYMENT_COLORS = {
   unknown:  '#D1D5DB',
 }
 
+const ORDER_TYPE_PERFORMANCE_STYLE = {
+  dine_in: {
+    Icon: Users,
+    panel: 'bg-orange-50 border-orange-200',
+    icon: 'bg-white text-[#ff5a00]',
+    text: 'text-[#c2410c]',
+    bar: 'bg-[#ff5a00]',
+  },
+  take_away: {
+    Icon: ShoppingBag,
+    panel: 'bg-blue-50 border-blue-200',
+    icon: 'bg-white text-blue-700',
+    text: 'text-blue-700',
+    bar: 'bg-blue-600',
+  },
+  delivery: {
+    Icon: Package,
+    panel: 'bg-purple-50 border-purple-200',
+    icon: 'bg-white text-purple-700',
+    text: 'text-purple-700',
+    bar: 'bg-purple-600',
+  },
+}
+
 const ROLE_BADGE = {
   owner:       'bg-orange-100 text-[#ff5a00] border-orange-200',
   admin:       'bg-blue-100 text-blue-700 border-blue-200',
@@ -508,6 +557,67 @@ function DonutChart({ slices }) {
         return el
       })}
     </svg>
+  )
+}
+
+function OrderTypePerformanceCard({ rows, lang }) {
+  const l = L[lang] || L.en
+  const maxRevenue = Math.max(...rows.map(row => row.revenue), 1)
+  const topKey = rows.find(row => row.revenue > 0)?.key || ''
+
+  return (
+    <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 mb-4 min-w-0">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h3 className="font-black text-[#1F2937] text-base">{l.orderTypePerformance}</h3>
+        {topKey && (
+          <span className="rounded-full bg-[#0F3B2E] px-3 py-1 text-[11px] font-black text-white">
+            {l.topOrderType}: {rows.find(row => row.key === topKey)?.label}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {rows.map(row => {
+          const visual = ORDER_TYPE_PERFORMANCE_STYLE[row.key] || ORDER_TYPE_PERFORMANCE_STYLE.dine_in
+          const Icon = visual.Icon
+          const width = row.revenue > 0 ? Math.max(6, Math.round((row.revenue / maxRevenue) * 100)) : 0
+          const isTop = row.key === topKey
+
+          return (
+            <div key={row.key} className={`rounded-2xl border px-4 py-3 min-w-0 ${visual.panel}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${visual.icon}`}>
+                    <Icon size={17} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-[#1F2937] truncate">{row.label}</p>
+                    <p className="text-xs font-semibold text-[#8EA0BB] truncate">{row.orders} {l.orders}</p>
+                  </div>
+                </div>
+                {isTop && (
+                  <span className={`rounded-full bg-white px-2 py-0.5 text-[10px] font-black ${visual.text}`}>
+                    {l.topOrderType}
+                  </span>
+                )}
+              </div>
+              <div className="mt-3">
+                <div className="flex items-end justify-between gap-2 mb-2">
+                  <p className={`text-lg font-black tabular-nums truncate ${visual.text}`}>{formatCurrency(row.revenue)}</p>
+                  <p className="text-xs font-black text-[#718096] flex-shrink-0">{row.pct}%</p>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/80 overflow-hidden">
+                  <div className={`h-full rounded-full ${visual.bar}`} style={{ width: `${width}%` }} />
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-2 text-[11px] font-bold text-[#718096]">
+                  <span>{row.items} {l.items}</span>
+                  <span>{l.avgOrderShort}: {formatCurrency(row.avgOrder)}</span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -716,6 +826,11 @@ export default function AdminDashboard() {
   const salesByCategory = useMemo(() => {
     return getDashboardSalesByCategory(periodPaidOrders, menuItemMap, categoryMap, lang)
   }, [periodPaidOrders, menuItemMap, categoryMap, lang])
+
+  // ── Sales by order type ───────────────────────────────────────────────────
+  const orderTypePerformance = useMemo(() => {
+    return getDashboardOrderTypePerformance(periodPaidOrders, lang)
+  }, [periodPaidOrders, lang])
 
   // ── Best-selling dishes ───────────────────────────────────────────────────
   const bestSelling = useMemo(() => {
@@ -986,6 +1101,8 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+
+        <OrderTypePerformanceCard rows={orderTypePerformance} lang={lang} />
 
         {/* ── Row 3: Sales by Category + Best-Selling + Recent Orders ── */}
         <div className="grid grid-cols-12 gap-4 mb-4 min-w-0">

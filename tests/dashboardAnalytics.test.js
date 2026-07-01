@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   formatReadableDateTime,
   getDashboardBestSelling,
+  getDashboardOrderTypePerformance,
   getDashboardPaymentMethods,
   getDashboardPeriodOrders,
   getDashboardSalesByCategory,
@@ -29,13 +30,15 @@ const categoryMap = {
   salads: { id: 'salads', name_en: 'Salads' },
 }
 
-function order({ id, paidAt, method = 'cash', items, total, waiter = 'Jasurbek' }) {
+function order({ id, paidAt, method = 'cash', items, total, waiter = 'Jasurbek', orderType, tableName }) {
   return {
     id,
     payment_status: 'paid',
     paid_at: paidAt,
     payment_method: method,
     waiter_name: waiter,
+    order_type: orderType,
+    table_name: tableName,
     total,
     service_rate_pct: 0,
     items,
@@ -179,13 +182,58 @@ test('dashboard empty selected period returns zero and empty widget states', () 
   const payments = getDashboardPaymentMethods(empty)
   const categories = getDashboardSalesByCategory(empty, menuItemMap, categoryMap, 'en')
   const best = getDashboardBestSelling(empty, menuItemMap)
+  const orderTypes = getDashboardOrderTypePerformance(empty, 'en')
   const staff = getDashboardStaffPerformance(empty)
 
   assert.equal(empty.reduce((sum, row) => sum + row.total, 0), 0)
   assert.deepEqual(payments, [])
   assert.deepEqual(categories, [])
   assert.deepEqual(best, [])
+  assert.deepEqual(orderTypes.map(row => row.key), ['dine_in', 'take_away', 'delivery'])
+  assert.deepEqual(orderTypes.map(row => row.revenue), [0, 0, 0])
   assert.deepEqual(staff, [])
+})
+
+test('dashboard order type performance ranks dine in take away and delivery revenue', () => {
+  const rows = getDashboardOrderTypePerformance([
+    order({
+      id: 'dine-in',
+      paidAt: '2026-05-19T10:00:00',
+      orderType: 'dine_in',
+      items: [item('kebab', 'Kebab', 2, 50000)],
+      total: 100000,
+    }),
+    order({
+      id: 'take-away',
+      paidAt: '2026-05-19T11:00:00',
+      orderType: 'take_away',
+      items: [item('cola', 'Cola', 3, 20000)],
+      total: 60000,
+    }),
+    order({
+      id: 'delivery',
+      paidAt: '2026-05-19T12:00:00',
+      orderType: 'delivery',
+      items: [item('lagman', 'Lagman', 4, 40000)],
+      total: 160000,
+    }),
+    order({
+      id: 'legacy-delivery',
+      paidAt: '2026-05-19T13:00:00',
+      tableName: 'Delivery #14',
+      items: [item('salad', 'Salad', 2, 20000)],
+      total: 40000,
+    }),
+  ], 'en')
+
+  assert.deepEqual(rows.map(row => row.key), ['delivery', 'dine_in', 'take_away'])
+  assert.deepEqual(rows.map(row => row.label), ['Delivery', 'Dine In', 'Take Away'])
+  assert.equal(rows[0].revenue, 200000)
+  assert.equal(rows[0].orders, 2)
+  assert.equal(rows[0].items, 6)
+  assert.equal(rows[0].pct, 56)
+  assert.equal(rows[1].avgOrder, 100000)
+  assert.equal(rows[2].pct, 17)
 })
 
 test('latest selected period wins when a slow analytics response resolves out of order', async () => {

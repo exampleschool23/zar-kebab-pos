@@ -12,7 +12,8 @@ import {
 import { getOrderTotal } from '../lib/analytics'
 import { getReservationSummary, getWaiterTableStatus } from '../lib/tableManagement'
 import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
-import { formatDateTime, formatElapsedSince, formatTime, parseInstantDate } from '../lib/dateFormat'
+import { formatDateTime, formatElapsedSince, formatTime } from '../lib/dateFormat'
+import { earliestReliableTime, getReliableOrderItemTime } from '../lib/orderTimestamps'
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
@@ -259,26 +260,22 @@ function getPreparationCounts(tableId, orders) {
   const items = active.flatMap(o => o.items || []).filter(i => i.status !== 'cancelled')
   const pendingItemTimes = active.flatMap(o => (o.items || [])
     .filter(i => i.status !== 'cancelled' && i.status !== 'served')
-    .map(i => i.submitted_at || i.submittedAt || i.created_at || i.createdAt || o.created_at)
+    .map(i => getReliableOrderItemTime(i, o))
     .filter(Boolean)
   )
   const billableItemTimes = active.flatMap(o => (o.items || [])
     .filter(i => i.status !== 'cancelled')
-    .map(i => i.submitted_at || i.submittedAt || i.created_at || i.createdAt || o.created_at)
+    .map(i => getReliableOrderItemTime(i, o))
     .filter(Boolean)
   )
   const orderTimes = active.map(o => o.created_at).filter(Boolean)
-  const earliestTime = times => times.reduce((earliest, time) =>
-    !earliest || parseInstantDate(time) < parseInstantDate(earliest) ? time : earliest,
-    null
-  )
   return {
     newCount: items.filter(i => (i.status || 'new') === 'new').length,
     preparingCount: items.filter(i => i.status === 'preparing').length,
     readyCount: items.filter(i => i.status === 'ready').length,
     itemCount: items.reduce((s, i) => s + (Number(i.quantity) || 1), 0),
     total: active.reduce((s, o) => s + getOrderTotal(o), 0),
-    createdAt: earliestTime(pendingItemTimes) || earliestTime(billableItemTimes) || earliestTime(orderTimes),
+    createdAt: earliestReliableTime(pendingItemTimes) || earliestReliableTime(billableItemTimes) || earliestReliableTime(orderTimes),
   }
 }
 

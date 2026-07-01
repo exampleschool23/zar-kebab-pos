@@ -172,6 +172,7 @@ export default function Expenses() {
 
   const [dateFrom, setDateFrom] = useState(() => todayExpenseDate().slice(0, 8) + '01')
   const [dateTo, setDateTo] = useState(() => todayExpenseDate())
+  const [activeRangeKey, setActiveRangeKey] = useState('month')
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -435,16 +436,27 @@ export default function Expenses() {
   const investorSupportTotal = incomeSummary.byCategory.investor_support || 0
   const currentAccountingDate = todayExpenseDate()
   const salaryDueDate = dateTo < currentAccountingDate ? dateTo : currentAccountingDate
-  const activeRangeKey = (() => {
-    const today = todayExpenseDate()
-    if (dateFrom === today && dateTo === today) return 'today'
-    if (dateFrom === addDays(today, -6) && dateTo === today) return 'week'
-    if (dateFrom === today.slice(0, 8) + '01' && dateTo === today) return 'month'
-    return ''
-  })()
   const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])
+
+  function setCustomDateFrom(value) {
+    setActiveRangeKey('')
+    setDateFrom(value)
+  }
+
+  function setCustomDateTo(value) {
+    setActiveRangeKey('')
+    setDateTo(value)
+  }
+
+  function selectQuickRange(key) {
+    const today = todayExpenseDate()
+    setActiveRangeKey(key)
+    if (key === 'today') { setDateFrom(today); setDateTo(today) }
+    if (key === 'week') { setDateFrom(addDays(today, -6)); setDateTo(today) }
+    if (key === 'month') { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
+  }
 
   async function saveExpense(event) {
     event.preventDefault()
@@ -515,10 +527,10 @@ export default function Expenses() {
           <div className="mb-5 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 shadow-sm">
               <span className="text-[11px] font-bold text-[#9CA3AF]">{l.from}</span>
-              <DateInput value={dateFrom} lang={lang} onChange={setDateFrom} className={RANGE_DATE_INPUT_CLASS} />
+              <DateInput value={dateFrom} lang={lang} onChange={setCustomDateFrom} className={RANGE_DATE_INPUT_CLASS} />
               <span className="text-[#9CA3AF]">—</span>
               <span className="text-[11px] font-bold text-[#9CA3AF]">{l.to}</span>
-              <DateInput value={dateTo} lang={lang} onChange={setDateTo} className={RANGE_DATE_INPUT_CLASS} />
+              <DateInput value={dateTo} lang={lang} onChange={setCustomDateTo} className={RANGE_DATE_INPUT_CLASS} />
             </div>
             {[
               { key: 'today', label: l.today },
@@ -529,12 +541,7 @@ export default function Expenses() {
               return (
                 <button
                   key={option.key}
-                  onClick={() => {
-                    const today = todayExpenseDate()
-                    if (option.key === 'today') { setDateFrom(today); setDateTo(today) }
-                    if (option.key === 'week') { setDateFrom(addDays(today, -6)); setDateTo(today) }
-                    if (option.key === 'month') { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
-                  }}
+                  onClick={() => selectQuickRange(option.key)}
                   className={`rounded-xl border px-3 py-2 text-xs font-black shadow-sm ${
                     selected
                       ? 'border-[#ff5a00] bg-[#ff5a00] text-white shadow-orange-100'
