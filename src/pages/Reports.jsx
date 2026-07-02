@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -31,6 +31,7 @@ import {
   BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck,
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
+import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
@@ -69,6 +70,7 @@ const PAGE_SIZE    = 8
 
 const TABS = [
   { key: 'best_selling',       label: { uz: 'Ko\'p sotiladigan', ru: 'Бестселлеры',    en: 'Best Selling'       }, Icon: TrendingUp  },
+  { key: 'dish_sales',         label: { uz: 'Taom tahlili',      ru: 'Анализ блюд',    en: 'Dish Analysis'      }, Icon: UtensilsCrossed },
   { key: 'by_category',        label: { uz: 'Kategoriya',         ru: 'По категории',   en: 'Sales by Category'  }, Icon: Tag         },
   { key: 'by_hour',            label: { uz: 'Soat bo\'yicha',     ru: 'По часам',       en: 'Sales by Hour'      }, Icon: Clock       },
   { key: 'payment_methods',    label: { uz: 'To\'lov usullari',   ru: 'Методы оплаты',  en: 'Payment Methods'    }, Icon: CreditCard  },
@@ -106,16 +108,53 @@ function fmtDate(iso, lang) {
 }
 
 function DateInput({ value, lang, onChange }) {
+  const inputRef = useRef(null)
+  const label = formatLongDate(value, lang, value)
+
+  function openPicker({ fallbackClick = true } = {}) {
+    const input = inputRef.current
+    if (!input) return
+
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker()
+        return
+      } catch {
+        // Fall back to focusing when showPicker is unavailable or blocked.
+      }
+    }
+
+    input.focus()
+    if (fallbackClick) input.click()
+  }
+
   return (
-    <div className="relative h-6 w-[138px]">
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      onClick={openPicker}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          openPicker()
+        }
+      }}
+      className="relative h-6 w-[138px] cursor-pointer"
+    >
       <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center whitespace-nowrap text-sm text-[#1F2937]">
-        {formatLongDate(value, lang, value)}
+        {label}
       </span>
       <input
+        ref={inputRef}
         type="date"
         value={value}
         onChange={event => onChange(event.target.value)}
-        className="h-6 w-full cursor-pointer bg-transparent text-sm text-transparent caret-transparent outline-none"
+        onClick={event => {
+          event.stopPropagation()
+          openPicker({ fallbackClick: false })
+        }}
+        className="absolute inset-0 h-full w-full cursor-pointer bg-transparent text-sm text-transparent caret-transparent opacity-0 outline-none"
       />
     </div>
   )
@@ -207,6 +246,49 @@ function SummaryRow({ label, value, bold, valueClass }) {
       <span className={`text-sm tabular-nums ${bold ? 'font-black text-[#ff5a00]' : `font-semibold text-[#1F2937] ${valueClass || ''}`}`}>
         {value}
       </span>
+    </div>
+  )
+}
+
+function formatQuantity(value) {
+  const qty = Number(value) || 0
+  if (Number.isInteger(qty)) return String(qty)
+  return qty.toFixed(1).replace(/\.0$/, '')
+}
+
+function dishDisplayName(dish, lang) {
+  if (!dish) return '—'
+  return dish[`name_${lang}`] || dish.name_en || dish.name_uz || dish.name_ru || dish.name || '—'
+}
+
+function dishCategoryLabel(dish, categories, lang) {
+  const category = categories.find(cat => cat.id === dish?.category_id)
+  return category ? getCategoryName(category, lang) : '—'
+}
+
+function hourLabel(hour) {
+  if (hour === null || hour === undefined || hour === '') return '—'
+  return `${String(hour).padStart(2, '0')}:00`
+}
+
+function CompactEmpty({ label }) {
+  return (
+    <div className="rounded-xl bg-gray-50 px-4 py-8 text-center">
+      <BarChart2 size={22} className="mx-auto mb-2 text-gray-200" />
+      <p className="text-sm font-semibold text-[#9CA3AF]">{label}</p>
+    </div>
+  )
+}
+
+function DishMetric({ icon: Icon, iconCls, label, value, sub }) {
+  return (
+    <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+      <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${iconCls}`}>
+        <Icon size={18} />
+      </div>
+      <p className="text-xs font-semibold text-[#6B7280]">{label}</p>
+      <p className="mt-1 text-xl font-black leading-tight text-[#1F2937]">{value}</p>
+      {sub && <p className="mt-1 text-[11px] font-semibold text-[#9CA3AF]">{sub}</p>}
     </div>
   )
 }
@@ -321,7 +403,423 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TAB 2 — SALES BY CATEGORY
+// TAB 2 — DISH SALES ANALYSIS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DishSalesTab({ orders, menuItems, categories, lang }) {
+  const [selectedDishKey, setSelectedDishKey] = useState(ALL_DISHES_KEY)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState('')
+  const [activeSectionKey, setActiveSectionKey] = useState('')
+  const pickerRef = useRef(null)
+
+  const analysis = useMemo(() => (
+    getDishSalesAnalysis({ orders, menuItems, selectedDishKey })
+  ), [orders, menuItems, selectedDishKey])
+
+  useEffect(() => {
+    if (selectedDishKey === ALL_DISHES_KEY) return
+    if (!analysis.dishes.some(dish => dish.key === selectedDishKey)) {
+      setSelectedDishKey(ALL_DISHES_KEY)
+    }
+  }, [analysis.dishes, selectedDishKey])
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    function handlePointerDown(event) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target)) {
+        setPickerOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [pickerOpen])
+
+  const dishSections = useMemo(() => {
+    const categoryMap = new Map(categories.map(category => [category.id, category]))
+    const sections = new Map()
+    const query = pickerSearch.trim().toLowerCase()
+
+    function ensureSection(key, label, sortOrder = 9999) {
+      if (!sections.has(key)) sections.set(key, { key, label, sortOrder, dishes: [] })
+      return sections.get(key)
+    }
+
+    analysis.dishes.forEach(dish => {
+      const category = categoryMap.get(dish.category_id)
+      const key = category ? category.id : dish.currentMenuItem ? '__uncategorized__' : '__removed__'
+      const label = category
+        ? getCategoryName(category, lang)
+        : dish.currentMenuItem
+          ? (lang === 'uz' ? 'Kategoriyasiz' : lang === 'ru' ? 'Без категории' : 'Uncategorized')
+          : (lang === 'uz' ? 'Menyudan olib tashlangan' : lang === 'ru' ? 'Удалено из меню' : 'Removed from menu')
+      const sortOrder = Number(category?.sort_order ?? 9999)
+      const name = dishDisplayName(dish, lang)
+      const haystack = `${name} ${label}`.toLowerCase()
+      if (query && !haystack.includes(query)) return
+      ensureSection(key, label, sortOrder).dishes.push(dish)
+    })
+
+    return Array.from(sections.values())
+      .map(section => ({
+        ...section,
+        dishes: section.dishes.sort((a, b) => (
+          dishDisplayName(a, lang).localeCompare(dishDisplayName(b, lang))
+        )),
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
+  }, [analysis.dishes, categories, lang, pickerSearch])
+
+  useEffect(() => {
+    if (dishSections.length === 0) {
+      setActiveSectionKey('')
+      return
+    }
+    if (!dishSections.some(section => section.key === activeSectionKey)) {
+      setActiveSectionKey(dishSections[0].key)
+    }
+  }, [dishSections, activeSectionKey])
+
+  const lowSellers = useMemo(() => (
+    analysis.dishes.filter(dish => dish.currentMenuItem).slice(0, 15)
+  ), [analysis.dishes])
+
+  const s = {
+    dish:       { uz: 'Taom',             ru: 'Блюдо',           en: 'Dish' },
+    allDishes:  { uz: 'Barcha taomlar',   ru: 'Все блюда',       en: 'All dishes' },
+    menuItems:  { uz: 'menyu taomi',      ru: 'позиций меню',    en: 'menu items' },
+    sold:       { uz: 'Sotildi',          ru: 'Продано',         en: 'Sold' },
+    orders:     { uz: 'Buyurtmalar',      ru: 'Заказов',         en: 'Orders' },
+    revenue:    { uz: 'Daromad',          ru: 'Выручка',         en: 'Revenue' },
+    lastSale:   { uz: 'Oxirgi sotuv',     ru: 'Последняя продажа', en: 'Last sale' },
+    avgOrder:   { uz: "O'rtacha",         ru: 'В среднем',       en: 'Avg per order' },
+    noSales:    { uz: 'Sotuv yo‘q',       ru: 'Нет продаж',      en: 'No sales' },
+    byDay:      { uz: 'Kun bo‘yicha',     ru: 'По дням',         en: 'Sales by day' },
+    byHour:     { uz: 'Soat bo‘yicha',    ru: 'По часам',        en: 'Sales by hour' },
+    lowSellers: { uz: 'Kam sotilganlar',  ru: 'Слабые продажи',  en: 'Low sellers' },
+    saleLog:    { uz: 'Sotuv vaqtlari',   ru: 'Время продаж',    en: 'Sale times' },
+    product:    { uz: 'Mahsulot',         ru: 'Продукт',         en: 'Product' },
+    category:   { uz: 'Kategoriya',       ru: 'Категория',       en: 'Category' },
+    qty:        { uz: 'Dona',             ru: 'Кол-во',          en: 'Qty' },
+    time:       { uz: 'Vaqt',             ru: 'Время',           en: 'Time' },
+    waiter:     { uz: 'Ofitsiant',        ru: 'Официант',        en: 'Waiter' },
+    order:      { uz: 'Buyurtma',         ru: 'Заказ',           en: 'Order' },
+    current:    { uz: 'Menyuda',          ru: 'В меню',          en: 'On menu' },
+    removed:    { uz: 'Olib tashlangan',  ru: 'Удалено',         en: 'Removed' },
+    search:     { uz: 'Taom yoki kategoriya', ru: 'Блюдо или категория', en: 'Dish or category' },
+  }
+
+  const selectedName = selectedDishKey === ALL_DISHES_KEY
+    ? (s.allDishes[lang] || s.allDishes.en)
+    : dishDisplayName(analysis.selectedDish, lang)
+  const activeSection = dishSections.find(section => section.key === activeSectionKey) || dishSections[0]
+  const maxDailyQty = Math.max(...analysis.daily.map(row => row.quantity), 1)
+  const maxHourlyQty = Math.max(...analysis.hourly.map(row => row.quantity), 1)
+  const visibleSales = selectedDishKey === ALL_DISHES_KEY ? analysis.sales.slice(0, 18) : analysis.sales
+
+  function selectDish(key) {
+    setSelectedDishKey(key)
+    setPickerOpen(false)
+    setPickerSearch('')
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-black text-[#1F2937]">{selectedName}</p>
+            <p className="text-xs font-semibold text-[#9CA3AF]">
+              {analysis.dishes.length} {s.menuItems[lang] || s.menuItems.en}
+            </p>
+          </div>
+          <div ref={pickerRef} className="relative flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+            <button
+              type="button"
+              onClick={() => setPickerOpen(open => !open)}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-left shadow-sm transition-colors hover:border-orange-300 lg:min-w-[360px]"
+            >
+              <SlidersHorizontal size={14} className="flex-shrink-0 text-[#9CA3AF]" />
+              <span className="flex-shrink-0 text-[11px] font-bold uppercase tracking-wide text-[#9CA3AF]">{s.dish[lang] || s.dish.en}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#1F2937]">{selectedName}</span>
+              <ChevronRight size={14} className={`flex-shrink-0 text-[#9CA3AF] transition-transform ${pickerOpen ? 'rotate-90' : ''}`} />
+            </button>
+
+            {pickerOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-full overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl sm:w-[620px]">
+                <div className="border-b border-gray-100 p-3">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                    <input
+                      value={pickerSearch}
+                      onChange={event => setPickerSearch(event.target.value)}
+                      placeholder={s.search[lang] || s.search.en}
+                      className="h-10 w-full rounded-xl border border-[#E5E7EB] bg-gray-50 pl-9 pr-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:bg-white focus:ring-2 focus:ring-[#ff5a00]/15"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid max-h-[440px] min-h-[260px] grid-cols-1 overflow-hidden sm:grid-cols-[230px_1fr]">
+                  <div className="border-b border-gray-100 bg-gray-50/70 p-2 sm:border-b-0 sm:border-r">
+                    <button
+                      type="button"
+                      onClick={() => selectDish(ALL_DISHES_KEY)}
+                      className={`mb-1 flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                        selectedDishKey === ALL_DISHES_KEY
+                          ? 'bg-[#ff5a00] text-white'
+                          : 'text-[#1F2937] hover:bg-white'
+                      }`}
+                    >
+                      <span className="truncate text-sm font-black">{s.allDishes[lang] || s.allDishes.en}</span>
+                      <span className={`text-[11px] font-black ${selectedDishKey === ALL_DISHES_KEY ? 'text-white/80' : 'text-[#9CA3AF]'}`}>
+                        {analysis.dishes.length}
+                      </span>
+                    </button>
+                    <div className="max-h-[362px] space-y-1 overflow-y-auto pr-1">
+                      {dishSections.map(section => (
+                        <button
+                          key={section.key}
+                          type="button"
+                          onMouseEnter={() => setActiveSectionKey(section.key)}
+                          onFocus={() => setActiveSectionKey(section.key)}
+                          onClick={() => setActiveSectionKey(section.key)}
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                            activeSection?.key === section.key ? 'bg-white text-[#ff5a00] shadow-sm' : 'text-[#1F2937] hover:bg-white'
+                          }`}
+                        >
+                          <span className="min-w-0 truncate text-sm font-bold">{section.label}</span>
+                          <span className="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black text-[#6B7280]">
+                            {section.dishes.length}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="max-h-[440px] overflow-y-auto p-2">
+                    {activeSection ? (
+                      <>
+                        <div className="sticky top-0 z-10 mb-1 rounded-xl bg-white/95 px-3 py-2 backdrop-blur">
+                          <p className="truncate text-xs font-black uppercase tracking-wide text-[#9CA3AF]">{activeSection.label}</p>
+                        </div>
+                        {activeSection.dishes.map(dish => {
+                          const isSelected = selectedDishKey === dish.key
+                          return (
+                            <button
+                              key={dish.key}
+                              type="button"
+                              onClick={() => selectDish(dish.key)}
+                              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                                isSelected ? 'bg-orange-50 text-[#ff5a00]' : 'text-[#1F2937] hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-orange-50">
+                                {dish.image_url ? (
+                                  <img src={dish.image_url} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center">
+                                    <UtensilsCrossed size={13} className="text-orange-200" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-black">{dishDisplayName(dish, lang)}</p>
+                                <p className="text-[11px] font-semibold text-[#9CA3AF]">
+                                  {formatQuantity(dish.quantity)} {s.sold[lang] || s.sold.en}
+                                </p>
+                              </div>
+                              {isSelected && <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[#ff5a00]" />}
+                            </button>
+                          )
+                        })}
+                      </>
+                    ) : (
+                      <CompactEmpty label={s.noSales[lang] || s.noSales.en} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DishMetric
+          icon={Package}
+          iconCls="bg-orange-50 text-[#ff5a00]"
+          label={s.sold[lang] || s.sold.en}
+          value={formatQuantity(analysis.totals.quantity)}
+          sub={`${analysis.totals.saleLines} ${lang === 'uz' ? 'qator' : lang === 'ru' ? 'строк' : 'lines'}`}
+        />
+        <DishMetric
+          icon={ShoppingBag}
+          iconCls="bg-blue-50 text-blue-600"
+          label={s.orders[lang] || s.orders.en}
+          value={analysis.totals.orders}
+          sub={`${s.avgOrder[lang] || s.avgOrder.en}: ${formatQuantity(analysis.totals.averagePerOrder)}`}
+        />
+        <DishMetric
+          icon={DollarSign}
+          iconCls="bg-green-50 text-green-600"
+          label={s.revenue[lang] || s.revenue.en}
+          value={formatCurrency(analysis.totals.revenue)}
+        />
+        <DishMetric
+          icon={Clock}
+          iconCls="bg-purple-50 text-purple-600"
+          label={s.lastSale[lang] || s.lastSale.en}
+          value={analysis.totals.lastSoldAt ? formatLongDateTime(analysis.totals.lastSoldAt, lang) : '—'}
+        />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-sm font-black text-[#1F2937]">{s.byDay[lang] || s.byDay.en}</p>
+            <span className="text-[11px] font-bold text-[#9CA3AF]">{analysis.daily.length}</span>
+          </div>
+          {analysis.daily.length === 0 ? (
+            <CompactEmpty label={s.noSales[lang] || s.noSales.en} />
+          ) : (
+            <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
+              {analysis.daily.map(row => {
+                const pct = Math.round(row.quantity / maxDailyQty * 100)
+                return (
+                  <div key={row.date} className="flex items-center gap-3">
+                    <span className="w-28 flex-shrink-0 text-right text-[12px] font-bold text-[#6B7280]">
+                      {formatLongDate(row.date, lang, row.date, { includeYear: false })}
+                    </span>
+                    <div className="h-8 flex-1 overflow-hidden rounded-lg bg-gray-100">
+                      <div
+                        className="flex h-full items-center rounded-lg bg-[#ff5a00] px-2"
+                        style={{ width: `${Math.max(pct, 3)}%` }}
+                      >
+                        {pct > 16 && <span className="truncate text-[10px] font-black text-white">{formatQuantity(row.quantity)}</span>}
+                      </div>
+                    </div>
+                    <span className="w-20 flex-shrink-0 text-right text-[12px] font-black text-[#1F2937]">
+                      {formatQuantity(row.quantity)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-sm font-black text-[#1F2937]">{s.byHour[lang] || s.byHour.en}</p>
+            <span className="text-[11px] font-bold text-[#9CA3AF]">{analysis.hourly.length}</span>
+          </div>
+          {analysis.hourly.length === 0 ? (
+            <CompactEmpty label={s.noSales[lang] || s.noSales.en} />
+          ) : (
+            <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
+              {analysis.hourly.map(row => {
+                const pct = Math.round(row.quantity / maxHourlyQty * 100)
+                return (
+                  <div key={row.hour} className="flex items-center gap-3">
+                    <span className="w-14 flex-shrink-0 text-right text-[12px] font-bold text-[#6B7280]">{hourLabel(row.hour)}</span>
+                    <div className="h-8 flex-1 overflow-hidden rounded-lg bg-gray-100">
+                      <div
+                        className="flex h-full items-center rounded-lg bg-[#FDBA74] px-2"
+                        style={{ width: `${Math.max(pct, 3)}%` }}
+                      >
+                        {pct > 16 && <span className="truncate text-[10px] font-black text-white">{formatQuantity(row.quantity)}</span>}
+                      </div>
+                    </div>
+                    <span className="w-20 flex-shrink-0 text-right text-[12px] font-black text-[#1F2937]">
+                      {formatQuantity(row.quantity)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-5 py-3.5">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">{s.lowSellers[lang] || s.lowSellers.en}</p>
+            <span className="text-[11px] font-black text-[#ff5a00]">{lowSellers.length}</span>
+          </div>
+          {lowSellers.length === 0 ? (
+            <CompactEmpty label={s.noSales[lang] || s.noSales.en} />
+          ) : (
+            <div className="max-h-[440px] overflow-y-auto">
+              {lowSellers.map((dish, index) => (
+                <div key={dish.key} className="grid grid-cols-[30px_44px_1fr_76px_96px] items-center gap-3 border-b border-[#F9FAFB] px-5 py-3 last:border-0">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-[10px] font-black text-[#6B7280]">{index + 1}</span>
+                  <div className="h-11 w-11 overflow-hidden rounded-xl border border-gray-100 bg-orange-50">
+                    {dish.image_url ? (
+                      <img src={dish.image_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <UtensilsCrossed size={13} className="text-orange-200" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[#1F2937]">{dishDisplayName(dish, lang)}</p>
+                    <p className="truncate text-[11px] font-semibold text-[#9CA3AF]">{dishCategoryLabel(dish, categories, lang)}</p>
+                  </div>
+                  <span className={`text-right text-sm font-black ${dish.quantity === 0 ? 'text-red-500' : 'text-[#1F2937]'}`}>
+                    {dish.quantity === 0 ? '0' : formatQuantity(dish.quantity)}
+                  </span>
+                  <span className="text-right text-sm font-black text-[#ff5a00]">{formatCurrency(dish.revenue)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
+          <div className="flex items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-5 py-3.5">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">{s.saleLog[lang] || s.saleLog.en}</p>
+            <span className="text-[11px] font-black text-[#ff5a00]">{analysis.sales.length}</span>
+          </div>
+          {visibleSales.length === 0 ? (
+            <CompactEmpty label={s.noSales[lang] || s.noSales.en} />
+          ) : (
+            <div className="max-h-[440px] overflow-y-auto">
+              {visibleSales.map((sale, index) => (
+                <div key={`${sale.orderId}-${sale.dishKey}-${index}`} className="border-b border-[#F9FAFB] px-5 py-3 last:border-0">
+                  <div className="mb-1 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-[#1F2937]">
+                        {selectedDishKey === ALL_DISHES_KEY ? sale.dishName : `#${String(sale.orderId).slice(-4).toUpperCase()}`}
+                      </p>
+                      <p className="text-[11px] font-semibold text-[#9CA3AF]">{formatLongDateTime(sale.orderDate, lang, '—')}</p>
+                    </div>
+                    <p className="flex-shrink-0 text-sm font-black text-[#ff5a00]">{formatCurrency(sale.revenue)}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#6B7280]">
+                    <span>{s.qty[lang] || s.qty.en}: {formatQuantity(sale.quantity)}</span>
+                    <span>·</span>
+                    <span>{s.order[lang] || s.order.en}: #{String(sale.orderId).slice(-4).toUpperCase()}</span>
+                    {sale.waiterName && (
+                      <>
+                        <span>·</span>
+                        <span>{s.waiter[lang] || s.waiter.en}: {sale.waiterName.split(' ')[0]}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB 3 — SALES BY CATEGORY
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ByCategoryTab({ orders, categories, menuItemMap, lang }) {
@@ -1414,6 +1912,9 @@ export default function Reports() {
             {/* Tab content — all use filteredForAnalytics (same as KPI) */}
             {activeTab === 'best_selling'       && (
               <BestSellingTab orders={filteredForAnalytics} menuItemMap={menuItemMap} categories={state.categories} lang={lang} />
+            )}
+            {activeTab === 'dish_sales'         && (
+              <DishSalesTab orders={filteredForAnalytics} menuItems={state.menuItems} categories={state.categories} lang={lang} />
             )}
             {activeTab === 'by_category'        && (
               <ByCategoryTab  orders={filteredForAnalytics} categories={state.categories} menuItemMap={menuItemMap} lang={lang} />
