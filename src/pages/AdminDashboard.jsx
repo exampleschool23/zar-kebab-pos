@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingBag, DollarSign, Package, Receipt,
   Clock, ArrowUpRight, ArrowDownRight, Users, Loader2,
-  Printer, ChevronRight, CreditCard, Trash2,
+  Printer, CreditCard, Trash2, Wallet, Monitor, QrCode,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { getAllProfiles } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
-import { formatDateOnly, formatElapsedSince, formatLongDate, normalizeDateLang, parseInstantDate } from '../lib/dateFormat'
+import { formatDateOnly, formatLongDate, formatTime, normalizeDateLang, parseInstantDate } from '../lib/dateFormat'
 import {
   addRestaurantDays,
   getRestaurantHour,
@@ -243,8 +243,44 @@ function isOrderInPeriod(order, period) {
   return isOrderInDashboardPeriod(order, period)
 }
 
-function elapsedSince(iso) {
-  return formatElapsedSince(iso, { lessThanMinute: '< 1 min' }) || ''
+function recentOrderActivityAt(order) {
+  return order?._recentActivityAt || getOrderActivityDate(order) || getOrderDate(order) || order?.created_at
+}
+
+function recentDateTimeLabel(iso, lang) {
+  if (!iso) return ''
+  const date = formatLongDate(iso, lang, '', { includeYear: false })
+  const time = formatTime(iso)
+  return date && time ? `${date}, ${time}` : date || time
+}
+
+function recentTimeLabel(iso) {
+  return formatTime(iso)
+}
+
+function groupPaidRecentOrders(orders, lang) {
+  const groups = []
+  const byKey = new Map()
+
+  orders.forEach(order => {
+    const paidAt = order?.paid_at || getOrderDate(order) || recentOrderActivityAt(order)
+    const key = toRestaurantDateStr(paidAt) || 'unknown'
+    let group = byKey.get(key)
+
+    if (!group) {
+      group = {
+        key,
+        label: formatLongDate(paidAt || key, lang, key, { includeYear: false }) || key,
+        orders: [],
+      }
+      byKey.set(key, group)
+      groups.push(group)
+    }
+
+    group.orders.push(order)
+  })
+
+  return groups
 }
 
 function orderContextBadge(order, lang, fallback) {
@@ -387,7 +423,7 @@ function RecentSectionHeader({ title, count, urgent }) {
 function RecentOrderRow({
   order,
   lang,
-  methodLabel,
+  paymentMeta,
   onPrintBill,
   onView,
   canDelete,
@@ -395,56 +431,85 @@ function RecentOrderRow({
   confirmDelete,
   isDeleting,
   deleteError,
+  showDate = true,
 }) {
   const l = L[lang] || L.en
   const isNeedsBill = order.status === 'needs_bill'
   const shortId = String(order.id).slice(-4).toUpperCase()
-  const elapsedAt = order._recentActivityAt || getOrderActivityDate(order) || getOrderDate(order) || order.created_at
+  const activityAt = recentOrderActivityAt(order)
+  const timeText = showDate ? recentDateTimeLabel(activityAt, lang) : recentTimeLabel(activityAt)
   const contextBadge = orderContextBadge(order, lang, l.table)
+  const PaymentIcon = paymentMeta?.Icon
+  const LeadingIcon = !isNeedsBill && PaymentIcon ? PaymentIcon : Receipt
+  const leadingIconClass = isNeedsBill
+    ? 'bg-white text-[#EF3D32]'
+    : paymentMeta
+      ? `bg-[#F8FAFC] ${paymentMeta.cls}`
+      : 'bg-[#FFF7ED] text-[#FF5A00]'
+
+  function openOrder() {
+    onView?.(order)
+  }
+
+  function handleKeyDown(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    openOrder()
+  }
 
   return (
-    <div className={`rounded-2xl border px-3 py-3 transition-all ${
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={openOrder}
+      onKeyDown={handleKeyDown}
+      className={`cursor-pointer rounded-xl border px-3 py-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 ${
       isNeedsBill
         ? 'bg-[#FFF8F8] border-[#FFD6D3]'
         : 'bg-white border-[#EDF1F5] hover:bg-[#FAFBFC]'
     }`}>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-center max-[1320px]:grid-cols-1">
         <div className="flex items-start gap-3 min-w-0">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            isNeedsBill ? 'bg-white text-[#EF3D32]' : 'bg-[#FFF7ED] text-[#FF5A00]'
-          }`}>
-            <Receipt size={14} />
+          <div
+            className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${leadingIconClass}`}
+            title={!isNeedsBill && paymentMeta ? paymentMeta.label : undefined}
+            aria-label={!isNeedsBill && paymentMeta ? paymentMeta.label : undefined}
+          >
+            <LeadingIcon size={14} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-              <p className="text-base font-black text-[#1F2937] leading-none flex-shrink-0">#{shortId}</p>
+              <p className="text-[15px] font-black text-[#1F2937] leading-none flex-shrink-0">#{shortId}</p>
               <span className={`inline-flex max-w-[150px] items-center rounded-full border px-2 py-0.5 text-[11px] font-black leading-none ${contextBadge.cls}`}>
                 <span className="truncate">{contextBadge.label}</span>
               </span>
-              <RecentStatusPill status={isNeedsBill ? 'needs_bill' : 'paid'} lang={lang} />
+              {isNeedsBill && <RecentStatusPill status="needs_bill" lang={lang} />}
             </div>
 
-            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-[#8EA0BB] min-w-0">
-              <Clock size={13} className="flex-shrink-0" />
-              <span className="whitespace-nowrap flex-shrink-0">{elapsedSince(elapsedAt)}</span>
-              {methodLabel && (
-                <>
-                  <CreditCard size={13} className="ml-0.5 flex-shrink-0" />
-                  <span className="truncate font-semibold text-[#63738A] min-w-0">{methodLabel}</span>
-                </>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#8EA0BB] min-w-0">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap flex-shrink-0">
+                <Clock size={13} />
+                {timeText}
+              </span>
+              {order.waiter_name && (
+                <span className="font-semibold text-[#63738A] whitespace-normal break-words">· {order.waiter_name}</span>
               )}
             </div>
           </div>
         </div>
 
         <div className="flex flex-col items-end gap-2 flex-shrink-0 max-[1320px]:flex-row max-[1320px]:justify-between max-[1320px]:items-center">
-          <p className="text-[15px] font-black text-[#111827] tabular-nums whitespace-nowrap">
+          <p className="text-[14px] font-black text-[#111827] tabular-nums whitespace-nowrap">
             {formatCurrency(getOrderTotal(order))}
           </p>
           {isNeedsBill ? (
             <button
               type="button"
-              onClick={() => onPrintBill(order)}
+              onClick={event => {
+                event.stopPropagation()
+                onPrintBill(order)
+              }}
+              onKeyDown={event => event.stopPropagation()}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0F3B2E] text-white text-[12px] font-black hover:bg-[#0A2A20] active:scale-[0.98] transition-all shadow-[0_3px_8px_rgba(15,59,46,0.22)]"
             >
               <Printer size={13} />
@@ -455,7 +520,11 @@ function RecentOrderRow({
               {canDelete && (
                 <button
                   type="button"
-                  onClick={() => onDelete(order)}
+                  onClick={event => {
+                    event.stopPropagation()
+                    onDelete(order)
+                  }}
+                  onKeyDown={event => event.stopPropagation()}
                   disabled={isDeleting}
                   className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-black transition-colors disabled:opacity-60 ${
                     confirmDelete
@@ -467,14 +536,6 @@ function RecentOrderRow({
                   {isDeleting ? l.deleting : confirmDelete ? l.confirmDelete : l.deleteOrder}
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => onView(order)}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[#7B8AA4] text-xs font-semibold hover:text-[#0F3B2E] transition-colors"
-              >
-                {l.view}
-                <ChevronRight size={14} />
-              </button>
             </div>
           )}
         </div>
@@ -860,14 +921,26 @@ export default function AdminDashboard() {
     const visibleNeedsBill = needsBill.slice(0, 8)
     const visiblePaid = paid.slice(0, Math.max(0, 8 - visibleNeedsBill.length))
 
-    return { needsBill: visibleNeedsBill, paid: visiblePaid, needsBillTotal: needsBill.length }
-  }, [state.orders, state.tables])
+    return {
+      needsBill: visibleNeedsBill,
+      paid: visiblePaid,
+      paidDateGroups: groupPaidRecentOrders(visiblePaid, lang),
+      needsBillTotal: needsBill.length,
+    }
+  }, [state.orders, state.tables, lang])
 
   const recentOrdersCount = recentOrderGroups.needsBill.length + recentOrderGroups.paid.length
 
-  function getMethodLabel(order) {
+  function getPaymentMeta(order) {
     const method = (order.payment_method || '').toLowerCase()
-    return { cash: l.cash, card: l.card, terminal: l.terminal, qr: l.qr }[method] || ''
+    const map = {
+      cash: { Icon: Wallet, label: l.cash, cls: 'text-green-600' },
+      card: { Icon: CreditCard, label: l.card, cls: 'text-violet-600' },
+      terminal: { Icon: Monitor, label: l.terminal, cls: 'text-blue-600' },
+      qr: { Icon: QrCode, label: l.qr, cls: 'text-amber-600' },
+      loyalty: { Icon: CreditCard, label: lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty', cls: 'text-emerald-600' },
+    }
+    return map[method] || null
   }
 
   function printRecentBill(order) {
@@ -1186,7 +1259,7 @@ export default function AdminDashboard() {
                         key={order.id}
                         order={order}
                         lang={lang}
-                        methodLabel={getMethodLabel(order)}
+                        paymentMeta={getPaymentMeta(order)}
                         onPrintBill={printRecentBill}
                         onView={viewRecentOrder}
                         canDelete={false}
@@ -1199,21 +1272,32 @@ export default function AdminDashboard() {
                 {recentOrderGroups.paid.length > 0 && (
                   <div>
                     <RecentSectionHeader title={l.paidSection} count={recentOrderGroups.paid.length} />
-                    <div className="space-y-2.5">
-                    {recentOrderGroups.paid.map(order => (
-                      <RecentOrderRow
-                        key={order.id}
-                        order={order}
-                        lang={lang}
-                        methodLabel={getMethodLabel(order)}
-                        onPrintBill={printRecentBill}
-                        onView={viewRecentOrder}
-                        canDelete={canDeleteOrder}
-                        onDelete={deleteRecentOrder}
-                        confirmDelete={confirmDeleteOrderId === order.id}
-                        isDeleting={deletingOrderId === order.id}
-                        deleteError={deleteErrorByOrderId[order.id]}
-                      />
+                    <div className="space-y-3">
+                    {recentOrderGroups.paidDateGroups.map(group => (
+                      <div key={group.key} className="space-y-2">
+                        <div className="flex items-center justify-between gap-2 px-1.5 py-0.5 text-[11px] font-black text-[#64748B]">
+                          <span className="uppercase tracking-[0.12em]">{group.label}</span>
+                          <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[#8EA0BB]">{group.orders.length}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {group.orders.map(order => (
+                            <RecentOrderRow
+                              key={order.id}
+                              order={order}
+                              lang={lang}
+                              paymentMeta={getPaymentMeta(order)}
+                              onPrintBill={printRecentBill}
+                              onView={viewRecentOrder}
+                              canDelete={canDeleteOrder}
+                              onDelete={deleteRecentOrder}
+                              confirmDelete={confirmDeleteOrderId === order.id}
+                              isDeleting={deletingOrderId === order.id}
+                              deleteError={deleteErrorByOrderId[order.id]}
+                              showDate={false}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     ))}
                     </div>
                   </div>

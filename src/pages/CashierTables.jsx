@@ -47,9 +47,6 @@ function countLabel(count, lang) {
   return `${count} bill${count === 1 ? '' : 's'}`
 }
 
-function paidTimeLabel(iso) {
-  return formatTime(iso)
-}
 
 function getCashierItemName(item, menuItem, lang) {
   return menuItem ? getItemName(menuItem, lang) : item.name
@@ -108,6 +105,7 @@ const L = {
     addQuickFailed:  "Tezkor mahsulotni qo'shib bo'lmadi",
     payments:        n => `${n} ta to'lov`,
     ofTodayRev:      'bugungi daromaddan',
+    openCheck:       'Chekni ochish',
   },
   ru: {
     title:           'Кассир',
@@ -524,7 +522,7 @@ function BillsSection({ title, count, icon: Icon, tone, children }) {
   )
 }
 
-function PaidTodaySummary({ orders, lang, expanded, onToggle }) {
+function PaidTodaySummary({ orders, lang, expanded, onToggle, onOpenReceipt }) {
   const l = L[lang] || L.en
   const total = orders.reduce((sum, order) => sum + getOrderTotal(order), 0)
   const latest = [...orders]
@@ -566,16 +564,29 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle }) {
               const orderType = inferOrderType(order)
               return (
                 <div key={order.id} className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[#F3F4F6] last:border-b-0">
-                  <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => onOpenReceipt(order)}
+                    className="min-w-0 text-left flex-1 rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-[#F9FAFB]"
+                  >
                     <p className="font-bold text-[#1F2937] text-[13px] truncate">
                       {isOffPremiseOrderType(orderType) ? `${orderTypeLabel(orderType, lang)} · ${order.order_number || order.id}` : order.table_name}
                     </p>
                     <p className="text-[11px] text-[#9CA3AF]">
-                      {paidTimeLabel(order.paid_at || getOrderDate(order))}
+                      {dateTimeLabel(order.paid_at || getOrderDate(order))}
                       {order.waiter_name ? ` · ${order.waiter_name}` : ''}
                     </p>
+                  </button>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <p className="font-black text-[#16A34A] text-[13px] whitespace-nowrap">{formatCurrency(getOrderTotal(order))}</p>
+                    <button
+                      type="button"
+                      onClick={() => onOpenReceipt(order)}
+                      className="hidden sm:inline-flex items-center rounded-xl border border-[#E5E7EB] bg-gray-50 px-3 py-1.5 text-[12px] font-bold text-[#1F2937] transition-colors hover:bg-gray-100"
+                    >
+                      {l.openCheck}
+                    </button>
                   </div>
-                  <p className="font-black text-[#16A34A] text-[13px] flex-shrink-0">{formatCurrency(getOrderTotal(order))}</p>
                 </div>
               )
             })
@@ -1023,6 +1034,7 @@ export default function CashierTables() {
             lang={lang}
             expanded={showPaidToday}
             onToggle={() => setShowPaidToday(value => !value)}
+            onOpenReceipt={order => navigate(`/receipt/${order.id}`)}
           />
 
           {/* ── Bottom info bar ── */}

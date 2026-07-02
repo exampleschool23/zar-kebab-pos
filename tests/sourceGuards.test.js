@@ -959,7 +959,7 @@ test('WaiterTables elapsed label uses server item time before stale client submi
   assert.doesNotMatch(getPreparationCounts, /createdAt: active\.reduce\(\(earliest, o\)/)
 })
 
-test('AdminDashboard recent order elapsed label uses status activity time', () => {
+test('AdminDashboard recent order date label uses status activity time', () => {
   const source = readSource('src/pages/AdminDashboard.jsx')
   const row = functionBody(source, 'RecentOrderRow')
   const appContext = readSource('src/store/AppContext.jsx')
@@ -967,11 +967,17 @@ test('AdminDashboard recent order elapsed label uses status activity time', () =
 
   assert.match(source, /getOrderActivityDate/)
   assert.match(source, /_recentActivityAt: getOrderActivityDate\(order, state\.tables\)/)
-  assert.match(row, /const elapsedAt = order\._recentActivityAt \|\| getOrderActivityDate\(order\) \|\| getOrderDate\(order\) \|\| order\.created_at/)
-  assert.match(row, /elapsedSince\(elapsedAt\)/)
-  assert.match(source, /formatElapsedSince/)
+  assert.match(source, /function recentOrderActivityAt\(order\)/)
+  assert.match(source, /groupPaidRecentOrders\(visiblePaid, lang\)/)
+  assert.match(source, /toRestaurantDateStr\(paidAt\)/)
+  assert.match(row, /const activityAt = recentOrderActivityAt\(order\)/)
+  assert.match(row, /showDate \? recentDateTimeLabel\(activityAt, lang\) : recentTimeLabel\(activityAt\)/)
+  assert.match(row, /order\.waiter_name/)
+  assert.match(source, /formatLongDate/)
+  assert.match(source, /formatTime/)
   assert.match(source, /parseInstantDate/)
   assert.doesNotMatch(row, /elapsedSince\(getOrderDate\(order\) \|\| order\.created_at\)/)
+  assert.doesNotMatch(row, /formatElapsedSince/)
   assert.match(appContext, /_statusChangedAt: action\._statusChangedAt \|\| new Date\(\)\.toISOString\(\)/)
   assert.match(reducer, /status: 'needs_bill', updated_at: statusChangedAt/)
 })
