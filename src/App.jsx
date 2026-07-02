@@ -103,14 +103,21 @@ function Spinner() {
 
 function ProfileLoadError() {
   const { state } = useApp()
-  const { refreshProfile, signOut } = useAuth()
+  const { authError, session, refreshAuth, refreshProfile, signOut } = useAuth()
   const lang = state.lang || 'ru'
   const [retrying, setRetrying] = React.useState(false)
 
   async function handleRetry() {
     setRetrying(true)
-    await refreshProfile()
-    setRetrying(false)
+    try {
+      if (authError || !session) {
+        await refreshAuth()
+      } else {
+        await refreshProfile()
+      }
+    } finally {
+      setRetrying(false)
+    }
   }
 
   return (
@@ -169,13 +176,14 @@ function DisabledAccount({ signOut }) {
 
 // Route guard: requires authentication + optional role check
 function ProtectedRoute({ children, page }) {
-  const { session, profile, profileError, loading } = useAuth()
+  const { session, profile, profileError, authError, loading } = useAuth()
   const location = useLocation()
   const returnTo = `${location.pathname}${location.search}${location.hash}`
 
   if (loading) return <Spinner />
-  if (!session) return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />
+  if (authError) return <ProfileLoadError />
   if (profileError) return <ProfileLoadError />
+  if (!session) return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />
   if (!profile) return <Spinner />
 
   if (profile?.status === 'disabled') return null // handled by RoleRedirect
@@ -189,13 +197,14 @@ function ProtectedRoute({ children, page }) {
 }
 
 function SignedOutRoute({ children }) {
-  const { session, profile, profileError, loading } = useAuth()
+  const { session, profile, profileError, authError, loading } = useAuth()
   const [searchParams] = useSearchParams()
   const returnTo = sanitizeReturnTo(searchParams.get('returnTo'))
 
   if (loading) return <Spinner />
-  if (!session) return children
+  if (authError) return <ProfileLoadError />
   if (profileError) return <ProfileLoadError />
+  if (!session) return children
   if (!profile) return <Spinner />
   return <Navigate to={returnTo || defaultPathForHost(profile || 'guest')} replace />
 }
@@ -212,7 +221,7 @@ function LazyProtectedRoute({ page, children }) {
 
 // Decides where to send user after login
 function RoleRedirect({ signedOutPath = '/menu' }) {
-  const { session, profile, profileError, loading, signOut } = useAuth()
+  const { session, profile, profileError, authError, loading, signOut } = useAuth()
   const navigate = useNavigate()
   const [profileTimeout, setProfileTimeout] = React.useState(false)
   const { state } = useApp()
@@ -220,13 +229,14 @@ function RoleRedirect({ signedOutPath = '/menu' }) {
 
   useEffect(() => {
     if (loading) return
+    if (authError) return
     if (profileError) return
     if (!session) { navigate(signedOutPath, { replace: true }); return }
     if (!profile) return
     if (profile?.status === 'disabled') return
     if (profile?.status === 'pending') { navigate('/pending-approval', { replace: true }); return }
     navigate(defaultPathForHost(profile), { replace: true })
-  }, [session, profile, profileError, loading, navigate])
+  }, [session, profile, profileError, authError, loading, navigate])
 
   // If session exists but profile never loads, show a retry option
   useEffect(() => {
@@ -236,8 +246,9 @@ function RoleRedirect({ signedOutPath = '/menu' }) {
   }, [session, profile, profileError, loading])
 
   if (loading) return <Spinner />
-  if (!session) return <Navigate to={signedOutPath} replace />
+  if (authError) return <ProfileLoadError />
   if (profileError) return <ProfileLoadError />
+  if (!session) return <Navigate to={signedOutPath} replace />
   if (profile?.status === 'disabled') return <DisabledAccount signOut={signOut} />
 
   if (profileTimeout) {

@@ -218,11 +218,33 @@ test('App waits for profile before role-based route redirects', () => {
   const roleRedirect = functionBody(source, 'RoleRedirect')
   const signedOutRoute = functionBody(source, 'SignedOutRoute')
 
+  assert.match(protectedRoute, /if \(authError\) return <ProfileLoadError \/>/)
   assert.match(protectedRoute, /if \(!profile\) return <Spinner \/>/)
   assert.match(protectedRoute, /defaultPathForHost\(profile\)/)
+  assert.match(signedOutRoute, /if \(authError\) return <ProfileLoadError \/>/)
   assert.match(signedOutRoute, /defaultPathForHost\(profile \|\| 'guest'\)/)
+  assert.match(roleRedirect, /if \(authError\) return/)
+  assert.match(roleRedirect, /if \(authError\) return <ProfileLoadError \/>/)
   assert.match(roleRedirect, /if \(!profile\) return/)
   assert.match(roleRedirect, /defaultPathForHost\(profile\)/)
+})
+
+test('auth startup timeout does not redirect protected staff routes to login', () => {
+  const auth = readSource('src/contexts/AuthContext.jsx')
+  const app = readSource('src/App.jsx')
+  const protectedRoute = functionBody(app, 'ProtectedRoute')
+  const signedOutRoute = functionBody(app, 'SignedOutRoute')
+  const roleRedirect = functionBody(app, 'RoleRedirect')
+
+  assert.match(auth, /const \[authError, setAuthError\] = useState\(null\)/)
+  assert.match(auth, /Session lookup timed out/)
+  assert.match(auth, /failAuthSession\(error\)/)
+  assert.match(auth, /if \(event === 'INITIAL_SESSION' && !nextSession\) return/)
+  assert.doesNotMatch(auth, /setTimeout\(\(\) => \{\s*setLoading\(false\)\s*\}, 4000\)/)
+  assert.match(protectedRoute, /if \(authError\) return <ProfileLoadError \/>[\s\S]*if \(!session\) return <Navigate/)
+  assert.match(signedOutRoute, /if \(authError\) return <ProfileLoadError \/>[\s\S]*if \(!session\) return children/)
+  assert.match(roleRedirect, /if \(authError\) return[\s\S]*if \(!session\) \{ navigate\(signedOutPath/)
+  assert.match(roleRedirect, /if \(authError\) return <ProfileLoadError \/>[\s\S]*if \(!session\) return <Navigate/)
 })
 
 test('protected deep links preserve their target through login', () => {
