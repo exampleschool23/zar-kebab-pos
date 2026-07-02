@@ -6,7 +6,7 @@ import { clearReservationPatch } from '../src/lib/tableActivity.js'
 
 const state = () => ({
   settings: { serviceRate: 15 },
-  user: { name: 'Jasurbek' },
+  user: { id: 'user-1', name: 'Jasurbek' },
   currentTableId: 't1',
   tables: [{ id: 't1', name: 'Table 1', status: 'available', is_active: true, capacity: 4, sort_order: 1 }],
   orders: [],
@@ -23,6 +23,8 @@ test('end-to-end floor flow: waiter sends, kitchen marks ready, waiter requests 
 
   assert.equal(sent.orders.length, 1)
   assert.equal(sent.orders[0].status, 'sent_to_kitchen')
+  assert.equal(sent.orders[0].opened_by, 'user-1')
+  assert.equal(sent.orders[0].opened_by_name, 'Jasurbek')
   assert.equal(sent.orders[0].service_rate_pct, 15)
   assert.equal(sent.tables[0].status, 'occupied')
   assert.equal(sent.cart.length, 0)
@@ -47,6 +49,8 @@ test('end-to-end floor flow: waiter sends, kitchen marks ready, waiter requests 
   })
   assert.equal(paid.tables[0].status, 'available')
   assert.equal(paid.orders[0].payment_status, 'paid')
+  assert.equal(paid.orders[0].completed_by, 'user-1')
+  assert.equal(paid.orders[0].completed_by_name, 'Jasurbek')
   assert.equal(paid.orders[0].payment_method, 'cash')
 })
 

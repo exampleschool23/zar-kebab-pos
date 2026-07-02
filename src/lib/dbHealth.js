@@ -3,7 +3,7 @@ import { supabase } from './supabase.js'
 const TABLE_CHECKS = [
   { name: 'restaurant_tables', columns: ['id', 'name', 'status', 'capacity', 'sort_order', 'is_active', 'reserved_at'] },
   { name: 'table_zones', columns: ['id', 'name', 'sort_order', 'is_active'] },
-  { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned', 'price_mode'] },
+  { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned', 'price_mode', 'opened_by_name', 'completed_by_name'] },
   { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity', 'base_price', 'unit_price', 'price_mode', 'selected_options'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
   { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name', 'monthly_rent_uzs', 'receipt_marketing'] },
@@ -31,6 +31,7 @@ const MIGRATION_HINTS = {
   expenses: 'Run supabase/048_expenses.sql and supabase/059_expense_income_entries.sql',
   order_items: 'Run supabase/070_price_modes.sql and supabase/072_order_item_selected_options.sql',
   order_payment_audit: 'Run supabase/010_order_payment_audit_and_guards.sql',
+  orders: 'Run supabase/075_order_actor_tracking.sql',
   profile_audit: 'Run supabase/028_profile_role_audit.sql',
   menu_items: 'Run supabase/033_menu_item_grams.sql, supabase/034_menu_item_millilitres.sql, supabase/036_menu_item_old_price.sql, supabase/037_menu_item_external_id.sql, supabase/038_generate_immutable_menu_item_external_ids.sql, supabase/050_menu_item_stock_count.sql, supabase/052_cashier_only_menu_items.sql, and supabase/071_menu_item_option_groups.sql',
   menu_categories: 'Run supabase/053_hidden_menu_categories.sql',

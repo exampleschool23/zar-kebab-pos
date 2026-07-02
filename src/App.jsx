@@ -78,7 +78,12 @@ function ProfileSync() {
     if (profile) {
       dispatch({
         type: 'LOGIN',
-        payload: { role: profile.role || 'guest', name: profile.full_name || profile.email },
+        payload: {
+          id: profile.id,
+          role: profile.role || 'guest',
+          name: profile.full_name || profile.email,
+          email: profile.email,
+        },
       })
     } else {
       dispatch({ type: 'LOGIN', payload: { role: 'guest', name: 'Guest' } })
@@ -273,8 +278,17 @@ function PublicCustomerRoutes() {
       <Route path="/premium-menu/item/:itemId" element={<PublicMenu premium />} />
       <Route path="/catering" element={<CateringPage />} />
       <Route path="/telegram" element={<TelegramMiniApp />} />
+      <Route path="/login" element={<PublicHostAdminRedirect />} />
+      <Route path="/auth/callback" element={<PublicHostAdminRedirect />} />
+      <Route path="/reset-password" element={<PublicHostAdminRedirect />} />
+      <Route path="/pending-approval" element={<PublicHostAdminRedirect />} />
       <Route path="/admin" element={<PublicHostAdminRedirect />} />
       <Route path="/admin/*" element={<PublicHostAdminRedirect />} />
+      <Route path="/waiter/*" element={<PublicHostAdminRedirect />} />
+      <Route path="/cashier/*" element={<PublicHostAdminRedirect />} />
+      <Route path="/receipt/*" element={<PublicHostAdminRedirect />} />
+      <Route path="/kitchen" element={<PublicHostAdminRedirect />} />
+      <Route path="/kitchen-check/*" element={<PublicHostAdminRedirect />} />
       <Route path="*" element={<Navigate to="/menu" replace />} />
     </Routes>
   )

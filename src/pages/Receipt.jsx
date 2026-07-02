@@ -23,6 +23,7 @@ const L = {
     table:       'Stol',
     menuType:    'Menyu turi',
     waiter:      'Ofitsiant',
+    completedBy: 'Yopgan',
     date:        'Sana',
     itemCol:     'Taom',
     qtyCol:      'Soni',
@@ -47,6 +48,7 @@ const L = {
     table:       'Стол',
     menuType:    'Тип меню',
     waiter:      'Официант',
+    completedBy: 'Закрыл',
     date:        'Дата',
     itemCol:     'Блюдо',
     qtyCol:      'Кол-во',
@@ -71,6 +73,7 @@ const L = {
     table:       'Table',
     menuType:    'Menu type',
     waiter:      'Waiter',
+    completedBy: 'Completed by',
     date:        'Date',
     itemCol:     'Item',
     qtyCol:      'Qty',
@@ -320,7 +323,17 @@ function ReceiptMarketingFooter({ labels, mode }) {
   )
 }
 
-function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
+function firstNonEmpty(orders, keys, fallback = '—') {
+  for (const order of orders) {
+    for (const key of keys) {
+      const value = String(order?.[key] || '').trim()
+      if (value) return value
+    }
+  }
+  return fallback
+}
+
+function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
   const marketingMode = normalizeReceiptMarketing(receiptMarketing)
 
   return (
@@ -368,6 +381,7 @@ function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, service
         <tbody>
           <MetaRow label={labels.table} value={tableName} />
           <MetaRow label={labels.waiter} value={waiterName} />
+          {completedByName && completedByName !== '—' && <MetaRow label={labels.completedBy} value={completedByName} />}
           <MetaRow label={labels.date} value={dateStr} />
         </tbody>
       </table>
@@ -571,7 +585,8 @@ export function TableReceipt() {
     return {
       tableName:  receiptTableLabel(orders[0], table, lang, tableId),
       priceMode: normalizePriceMode(orders[0]?.price_mode),
-      waiterName: orders[0]?.waiter_name || '—',
+      waiterName: firstNonEmpty(orders, ['opened_by_name', 'waiter_name']),
+      completedByName: firstNonEmpty(orders, ['completed_by_name']),
       receiptAt:  orders[0]?.paid_at || orders[0]?.created_at,
       items,
       subtotal: summary.subtotal,
@@ -658,7 +673,8 @@ export default function Receipt() {
     return {
       tableName:  receiptTableLabel(order, table, lang, '—'),
       priceMode: normalizePriceMode(order.price_mode),
-      waiterName: order.waiter_name || '—',
+      waiterName: firstNonEmpty(allOrders, ['opened_by_name', 'waiter_name']),
+      completedByName: firstNonEmpty(allOrders, ['completed_by_name']),
       receiptAt:  order.paid_at || order.created_at,
       items,
       subtotal: summary.subtotal,

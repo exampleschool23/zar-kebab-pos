@@ -26,6 +26,11 @@ import {
 import { getLoyaltyCardCashbackPercent } from '../lib/loyalty.js'
 import { isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes.js'
 
+function orderActorFields(user, fallbackName) {
+  const name = user?.name || user?.email || fallbackName
+  return { id: user?.id || null, name }
+}
+
 export function ordersReducer(state, action) {
   switch (action.type) {
     case 'SET_ORDERS':
@@ -37,6 +42,7 @@ export function ordersReducer(state, action) {
       const table = isOffPremise ? null : state.tables.find(t => t.id === state.currentTableId)
       if ((!isOffPremise && !table) || state.cart.length === 0) return state
       const orderId = action._orderId || ('o' + Date.now())
+      const opener = orderActorFields(state.user, 'Waiter')
       const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
       const submittedAt = action._submittedAt || new Date().toISOString()
       const kitchenRoundId = action._kitchenRoundId || `${orderId}-${submittedAt}`
@@ -88,7 +94,9 @@ export function ordersReducer(state, action) {
             price_mode: priceMode,
             table_id: isOffPremise ? null : state.currentTableId,
             table_name: isOffPremise ? orderTypeLabel(orderType, 'en') : table.name,
-            waiter_name: state.user?.name || 'Waiter',
+            waiter_name: opener.name,
+            opened_by: opener.id,
+            opened_by_name: opener.name,
             status: 'sent_to_kitchen',
             payment_status: 'unpaid',
             items: cartItems,
@@ -314,6 +322,7 @@ export function ordersReducer(state, action) {
       const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
       const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
       const paidAt = new Date().toISOString()
+      const completer = orderActorFields(state.user, 'Cashier')
       const cashbackPercent = getLoyaltyCardCashbackPercent(loyalty?.cashback_type || loyalty?.cashbackType || 'bronze')
       let remainingLoyalty = Math.max(0, Math.round(Number(loyalty?.loyalty_used_amount ?? loyalty?.loyalty_redeem_amount ?? 0) || 0))
       const activeOrderSummaries = state.orders
@@ -411,6 +420,8 @@ export function ordersReducer(state, action) {
             status: 'paid',
             payment_status: 'paid',
             paid_at: paidAt,
+            completed_by: completer.id,
+            completed_by_name: completer.name,
             payment_method: finalPaymentMethod,
             payments: paymentAllocations.get(o.id) || [],
             loyalty_card_number: loyalty?.loyalty_card_number || null,

@@ -421,6 +421,7 @@ export default function CashierBill() {
     backTables:   lang === 'uz' ? 'Storlarga qaytish' : lang === 'ru' ? 'Назад к столам' : 'Back to Tables',
     waiter:       lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант' : 'Waiter',
     opened:       lang === 'uz' ? 'Ochildi' : lang === 'ru' ? 'Открыт' : 'Opened',
+    openedBy:     lang === 'uz' ? 'Ochgan' : lang === 'ru' ? 'Открыл' : 'Opened by',
     orderItems:   lang === 'uz' ? 'Buyurtma elementlari' : lang === 'ru' ? 'Позиции заказа' : 'Order Items',
     item:         lang === 'uz' ? 'Mahsulot' : lang === 'ru' ? 'Блюдо' : 'Item',
     qty:          lang === 'uz' ? 'Miqdor' : lang === 'ru' ? 'Кол-во' : 'Qty',
@@ -616,7 +617,7 @@ export default function CashierBill() {
                         {order.waiter_name && (
                           <span className="flex items-center gap-1">
                             <Users size={11} />
-                            {lbl.waiter}: {order.waiter_name}
+                            {lbl.openedBy}: {order.opened_by_name || order.waiter_name}
                           </span>
                         )}
                         {order.created_at && (

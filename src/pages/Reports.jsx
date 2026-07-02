@@ -1270,7 +1270,8 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: lang === 'uz' ? 'Stol'      : lang === 'ru' ? 'Стол'      : 'Table',    value: orderTableLabel(order, lang) },
-            { label: lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант'  : 'Waiter',   value: order.waiter_name || '—' },
+            { label: lang === 'uz' ? 'Ochgan'    : lang === 'ru' ? 'Открыл'    : 'Opened By', value: order.opened_by_name || order.waiter_name || '—' },
+            { label: lang === 'uz' ? 'Yopgan'    : lang === 'ru' ? 'Закрыл'    : 'Completed By', value: order.completed_by_name || '—' },
             { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PayBadge method={order.payment_method} lang={lang} /> },
             { label: lang === 'uz' ? 'Yaratildi' : lang === 'ru' ? 'Создан'    : 'Created',  value: fmtDate(order.created_at, lang) },
             { label: lang === 'uz' ? "To'landi"  : lang === 'ru' ? 'Оплачен'   : 'Paid At',  value: fmtDate(order.paid_at, lang) },
@@ -1421,6 +1422,8 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
         (o.id          && String(o.id).toLowerCase().includes(q)) ||
         (orderTableLabel(o, lang).toLowerCase().includes(q)) ||
         (o.waiter_name && o.waiter_name.toLowerCase().includes(q)) ||
+        (o.opened_by_name && o.opened_by_name.toLowerCase().includes(q)) ||
+        (o.completed_by_name && o.completed_by_name.toLowerCase().includes(q)) ||
         getOrderItems(o).some(i => (i.name || '').toLowerCase().includes(q))
       return matchPay && matchQ
     })
@@ -1439,7 +1442,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
           <input
             type="text" value={search}
             onChange={e => { setSearch(e.target.value); resetPage() }}
-            placeholder={lang === 'uz' ? 'Buyurtma, stol, ofitsiant...' : lang === 'ru' ? 'Заказ, стол, официант...' : 'Search by order, table, waiter...'}
+            placeholder={lang === 'uz' ? 'Buyurtma, stol, xodim...' : lang === 'ru' ? 'Заказ, стол, сотрудник...' : 'Search by order, table, staff...'}
             className="w-full pl-8 pr-3 py-2 bg-white border border-[#E5E7EB] rounded-xl text-sm placeholder-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
           />
         </div>
@@ -1457,12 +1460,13 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
         <EmptyState label={lang === 'uz' ? 'Buyurtmalar topilmadi' : lang === 'ru' ? 'Заказы не найдены' : 'No orders found'} lang={lang} />
       ) : (
         <div className="w-full overflow-x-auto rounded-2xl border border-[#E5E7EB] shadow-sm">
-        <div className="bg-white rounded-2xl overflow-hidden min-w-[1050px]">
+        <div className="bg-white rounded-2xl overflow-hidden min-w-[1180px]">
           {/* Desktop header */}
-          <div className="hidden lg:grid grid-cols-[80px_90px_130px_150px_90px_110px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
+          <div className="hidden lg:grid grid-cols-[80px_90px_120px_120px_145px_90px_110px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
             <span>{lang === 'uz' ? 'Buyurtma' : lang === 'ru' ? 'Заказ' : 'Order ID'}</span>
             <span>{lang === 'uz' ? 'Stol' : lang === 'ru' ? 'Стол' : 'Table'}</span>
-            <span>{lang === 'uz' ? 'Ofitsiant' : lang === 'ru' ? 'Официант' : 'Waiter'}</span>
+            <span>{lang === 'uz' ? 'Ochgan' : lang === 'ru' ? 'Открыл' : 'Opened by'}</span>
+            <span>{lang === 'uz' ? 'Yopgan' : lang === 'ru' ? 'Закрыл' : 'Completed by'}</span>
             <span>{lang === 'uz' ? 'Sana va vaqt' : lang === 'ru' ? 'Дата и время' : 'Date & Time'}</span>
             <span>{lang === 'uz' ? 'Holat' : lang === 'ru' ? 'Статус' : 'Status'}</span>
             <span>{lang === 'uz' ? "To'lov" : lang === 'ru' ? 'Оплата' : 'Payment'}</span>
@@ -1487,7 +1491,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                   className={`px-4 py-3 transition-colors cursor-pointer ${isSelected ? 'bg-orange-50/60' : 'hover:bg-gray-50/60'}`}
                 >
                   {/* Desktop row */}
-                  <div className="hidden lg:grid grid-cols-[80px_90px_130px_150px_90px_110px_60px_60px_110px_100px] gap-2 items-center">
+                  <div className="hidden lg:grid grid-cols-[80px_90px_120px_120px_145px_90px_110px_60px_60px_110px_100px] gap-2 items-center">
                     <span className="font-black text-[#ff5a00] text-sm flex items-center gap-1">
                       {orderNum}
                       {sessionCnt > 1 && (
@@ -1495,7 +1499,8 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                       )}
                     </span>
                     <span className="text-sm font-medium text-[#1F2937] truncate">{orderTableLabel(order, lang)}</span>
-                    <span className="text-sm text-[#6B7280] truncate">{(order.waiter_name || '—').split(' ')[0]}</span>
+                    <span className="text-sm text-[#6B7280] truncate">{(order.opened_by_name || order.waiter_name || '—').split(' ')[0]}</span>
+                    <span className="text-sm text-[#6B7280] truncate">{(order.completed_by_name || '—').split(' ')[0]}</span>
                     <span className="text-[12px] text-[#6B7280]">{fmtDate(getOrderDate(order), lang)}</span>
                     <span><StatusBadge status={status} lang={lang} /></span>
                     <span><PayBadge method={order.payment_method} lang={lang} /></span>
@@ -1523,7 +1528,12 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                         <span className="font-black text-[#ff5a00] text-sm">{orderNum}</span>
                         <StatusBadge status={status} lang={lang} />
                       </div>
-                      <p className="text-sm font-medium text-[#1F2937]">{orderTableLabel(order, lang)} · {(order.waiter_name || '').split(' ')[0]}</p>
+                      <p className="text-sm font-medium text-[#1F2937]">{orderTableLabel(order, lang)} · {(order.opened_by_name || order.waiter_name || '').split(' ')[0]}</p>
+                      {order.completed_by_name && (
+                        <p className="text-[11px] text-[#6B7280] mt-0.5">
+                          {lang === 'uz' ? 'Yopgan' : lang === 'ru' ? 'Закрыл' : 'Completed by'}: {order.completed_by_name.split(' ')[0]}
+                        </p>
+                      )}
                       <p className="text-[11px] text-[#9CA3AF] mt-0.5">{fmtDate(getOrderDate(order), lang)}</p>
                       <div className="mt-1.5"><PayBadge method={order.payment_method} lang={lang} /></div>
                     </div>

@@ -50,7 +50,11 @@ function isMissingOptionalOrderTypeColumn(error) {
       message.includes('price_mode') ||
       message.includes('base_price') ||
       message.includes('unit_price') ||
-      message.includes('selected_options')
+      message.includes('selected_options') ||
+      message.includes('opened_by') ||
+      message.includes('opened_by_name') ||
+      message.includes('completed_by') ||
+      message.includes('completed_by_name')
     )
   )
 }
@@ -114,6 +118,22 @@ function assertUpdatedRows(data, message) {
 function makeOrderNumber(orderId, orderType = 'take_away') {
   const suffix = String(orderId || Date.now()).replace(/\D/g, '').slice(-4).padStart(4, '0')
   return `${orderTypePrefix(orderType)}-${suffix}`
+}
+
+function orderActorFields(user, fallbackName) {
+  const name = user?.name || user?.email || fallbackName
+  return { id: user?.id || null, name }
+}
+
+function omitOrderTrackingFields(row) {
+  const {
+    opened_by,
+    opened_by_name,
+    completed_by,
+    completed_by_name,
+    ...fallback
+  } = row
+  return fallback
 }
 
 const RECEIPT_MARKETING_MODES = new Set(['none', 'compactFooter', 'loyaltyOnly', 'instagramOnly', 'full'])
@@ -418,12 +438,15 @@ async function rollbackLoyaltyWalletSettlement(rollback) {
 async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, items, paymentFields, state, action, signal }) {
   const isOffPremise = isOffPremiseOrderType(orderType)
   const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
+  const opener = orderActorFields(state.user, 'Waiter')
   const payload = {
     order: {
       id: orderId,
       table_id: isOffPremise ? null : tableId,
       table_name: isOffPremise ? orderTypeLabel(orderType, 'en') : table.name,
-      waiter_name: state.user?.name || 'Waiter',
+      waiter_name: opener.name,
+      opened_by: opener.id,
+      opened_by_name: opener.name,
       status: 'sent_to_kitchen',
       payment_status: 'unpaid',
       order_type: orderType,
@@ -771,11 +794,14 @@ export async function writeToSupabase(action, state, options = {}) {
         }
         if (orderUpdateError) throw orderUpdateError
       } else {
+        const opener = orderActorFields(state.user, 'Waiter')
         const orderInsert = {
           id:             orderId,
           table_id:       isOffPremise ? null : tableId,
           table_name:     isOffPremise ? orderTypeLabel(orderType, 'en') : table.name,
-          waiter_name:    state.user?.name || 'Waiter',
+          waiter_name:    opener.name,
+          opened_by:      opener.id,
+          opened_by_name: opener.name,
           status:         'sent_to_kitchen',
           payment_status: 'unpaid',
           price_mode:     priceMode,
@@ -789,10 +815,10 @@ export async function writeToSupabase(action, state, options = {}) {
         if (orderInsertError && isOffPremise && isMissingOptionalOrderTypeColumn(orderInsertError)) {
           // Backward-compatible fallback while the take-away migration is being applied.
           // table_id=null + service_fee=0 still lets the order reach kitchen/cashier.
-          const { order_type, order_number, price_mode, ...fallbackOrderInsert } = orderInsert
+          const { order_type, order_number, price_mode, ...fallbackOrderInsert } = omitOrderTrackingFields(orderInsert)
           ;({ data: createdOrder, error: orderInsertError } = await withAbortSignal(supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle(), options.signal))
         } else if (orderInsertError && isMissingOptionalOrderTypeColumn(orderInsertError)) {
-          const { price_mode, ...fallbackOrderInsert } = orderInsert
+          const { price_mode, ...fallbackOrderInsert } = omitOrderTrackingFields(orderInsert)
           ;({ data: createdOrder, error: orderInsertError } = await withAbortSignal(supabase.from('orders').insert(fallbackOrderInsert).select('*').maybeSingle(), options.signal))
         }
         if (orderInsertError) throw orderInsertError
@@ -1253,6 +1279,7 @@ export async function writeToSupabase(action, state, options = {}) {
       const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
 
       const paidAt  = new Date().toISOString()
+      const completer = orderActorFields(state.user, 'Cashier')
 
       // Fetch each unpaid order so we can write correct proportional values per round.
       // Writing the combined total to every row then summing in Reports caused double-counting.
@@ -1387,6 +1414,8 @@ export async function writeToSupabase(action, state, options = {}) {
               status:         'paid',
               payment_status: 'paid',
               paid_at:        paidAt,
+              completed_by:   completer.id,
+              completed_by_name: completer.name,
               ...o.paymentFields,
               loyalty_card_number: o.loyaltyCardNumber,
               cashback_earned: o.cashbackEarned,
@@ -1398,6 +1427,7 @@ export async function writeToSupabase(action, state, options = {}) {
               .update(updateFields)
               .eq('id', o.id)
               .select('id')
+            let compatibleUpdateFields = updateFields
             if (updateError && isMissingLoyaltyColumn(updateError)) {
               const {
                 loyalty_used_amount,
@@ -1406,10 +1436,19 @@ export async function writeToSupabase(action, state, options = {}) {
                 cashback_earned,
                 cashback_percent,
                 ...fallbackFields
-              } = updateFields
+              } = compatibleUpdateFields
+              compatibleUpdateFields = fallbackFields
               ;({ data: paidRows, error: updateError } = await supabase
                 .from('orders')
-                .update(fallbackFields)
+                .update(compatibleUpdateFields)
+                .eq('id', o.id)
+                .select('id'))
+            }
+            if (updateError && isMissingOptionalOrderTypeColumn(updateError)) {
+              compatibleUpdateFields = omitOrderTrackingFields(compatibleUpdateFields)
+              ;({ data: paidRows, error: updateError } = await supabase
+                .from('orders')
+                .update(compatibleUpdateFields)
                 .eq('id', o.id)
                 .select('id'))
             }
