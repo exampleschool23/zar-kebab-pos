@@ -439,11 +439,17 @@ export default function Login({ googleOnly = false, staffOnly = false }) {
         return setError(t(lang, 'authPasswordMismatch'))
       }
 
-      const { error } = await signUpWithEmail(loginId, password, name.trim())
+      const { data, error } = await signUpWithEmail(loginId, password, name.trim())
       setLoading(false)
       if (error) return setError(error.message)
+      if (data?.session) {
+        navigate(returnTo || '/', { replace: true })
+        return
+      }
+      setPassword('')
+      setConfirmPassword('')
+      setMode('signin')
       setInfo(t(lang, 'accountCreated'))
-      navigate('/', { replace: true })
       return
     }
 

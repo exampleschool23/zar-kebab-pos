@@ -13,6 +13,20 @@ function fallbackProfileFromUser(user, status = 'pending') {
   }
 }
 
+function authError(message, status) {
+  return Object.assign(new Error(message), { status })
+}
+
+async function readApiResponse(response) {
+  const text = await response.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { error: text }
+  }
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -96,14 +110,55 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function signInWithEmail(email, password) {
-    return supabase.auth.signInWithPassword({ email, password })
+    return supabase.auth.signInWithPassword({
+      email: String(email || '').trim().toLowerCase(),
+      password,
+    })
   }
 
   async function signUpWithEmail(email, password, fullName) {
+    const normalizedEmail = String(email || '').trim().toLowerCase()
+    const normalizedName = String(fullName || '').trim()
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password,
+          fullName: normalizedName,
+        }),
+      })
+      const body = await readApiResponse(response)
+      const endpointMissing = response.status === 404 || String(response.headers.get('content-type') || '').includes('text/html')
+      if (!endpointMissing) {
+        if (!response.ok) {
+          throw authError(body?.error || 'Could not create account.', response.status)
+        }
+        const signInResult = await signInWithEmail(normalizedEmail, password)
+        if (signInResult.error) return signInResult
+        if (signInResult.data?.session) await applyAuthSession(signInResult.data.session)
+        return {
+          ...signInResult,
+          data: {
+            ...(signInResult.data || {}),
+            profile: body?.profile || null,
+            createdWithPassword: true,
+          },
+        }
+      }
+    } catch (error) {
+      if (error?.status) return { data: null, error }
+    }
+
     return supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
-      options: { data: { full_name: fullName, role: 'guest' } },
+      options: {
+        data: { full_name: normalizedName, role: 'guest' },
+        emailRedirectTo: `${globalThis.location?.origin || ''}/auth/callback`,
+      },
     })
   }
 

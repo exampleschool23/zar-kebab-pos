@@ -342,11 +342,32 @@ test('new signed-up users always start as guest', () => {
   const auth = readSource('src/contexts/AuthContext.jsx')
   const migration = readSource('supabase/024_profiles_force_guest_signup.sql')
 
-  assert.match(auth, /options: \{ data: \{ full_name: fullName, role: 'guest' \} \}/)
+  assert.match(auth, /data: \{ full_name: normalizedName, role: 'guest' \}/)
   assert.match(migration, /alter column role set default 'guest'/)
   assert.match(migration, /public\.handle_new_user/)
   assert.match(migration, /'guest',\s*\n\s*'active'/)
   assert.doesNotMatch(migration, /raw_user_meta_data->>'role'/)
+})
+
+test('email password signup uses server registration instead of Supabase email throttling', () => {
+  const auth = readSource('src/contexts/AuthContext.jsx')
+  const login = readSource('src/pages/Login.jsx')
+  const api = readSource('api/auth/register.js')
+  const vite = readSource('vite.config.js')
+  const signup = functionBody(auth, 'signUpWithEmail')
+  const submit = functionBody(login, 'handleSubmit')
+
+  assert.match(api, /supabase\.auth\.admin\.createUser\(\{[\s\S]*email_confirm: true/)
+  assert.match(api, /role: 'guest'/)
+  assert.match(api, /status: 'active'/)
+  assert.match(api, /\.from\('profiles'\)[\s\S]*\.upsert\(/)
+  assert.match(vite, /import registerAuth from '\.\/api\/auth\/register\.js'/)
+  assert.match(vite, /server\.middlewares\.use\('\/api\/auth\/register'/)
+  assert.match(signup, /fetch\('\/api\/auth\/register'/)
+  assert.match(signup, /const signInResult = await signInWithEmail\(normalizedEmail, password\)/)
+  assert.match(signup, /emailRedirectTo: `\$\{globalThis\.location\?\.origin \|\| ''\}\/auth\/callback`/)
+  assert.match(submit, /if \(data\?\.session\) \{[\s\S]*navigate\(returnTo \|\| '\/', \{ replace: true \}\)/)
+  assert.match(submit, /setMode\('signin'\)[\s\S]*setInfo\(t\(lang, 'accountCreated'\)\)/)
 })
 
 test('only a missing auth profile falls back to pending approval', () => {
