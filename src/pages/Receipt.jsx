@@ -2,7 +2,6 @@ import React, { useMemo, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { getItemName, t } from '../lib/i18n'
-import { getBrandLogo } from '../lib/brandLogo'
 import { ArrowLeft, Printer } from 'lucide-react'
 import {
   getGroupedOrderItems,
@@ -10,7 +9,7 @@ import {
   getOrderPaymentBreakdown,
   getOrderPaymentSummary,
 } from '../lib/analytics'
-import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
+import { getOrderItemUnitPrice, normalizePriceMode } from '../lib/priceModes'
 import { isCashierQuickItem } from '../lib/menuItems'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatDateTime } from '../lib/dateFormat'
@@ -36,6 +35,11 @@ const L = {
     thanks1:     'Tashrifingiz uchun rahmat!',
     thanks2:     'Sizni yana kutib qolamiz!',
     scanLabel:   'Instagram uchun skanerlang',
+    scanPitch:   "Har hafta yangi aksiyalar — o'tkazib yubormang!",
+    cashbackPromo: 'Cashback 10% gacha',
+    loyaltyTitle: 'Sodiqlik kartalarimiz',
+    loyaltyPitch: 'Kartani oling va keyingi tashriflarda kamroq tolang',
+    loyaltyInfo:  "Batafsil ma'lumot uchun menejerga murojaat qiling",
   },
   ru: {
     slogan:      'Огонь. Вкус. Традиции.',
@@ -54,7 +58,12 @@ const L = {
     total:       'Итого к оплате',
     thanks1:     'Спасибо, что выбрали ZarKebab!',
     thanks2:     'Будем рады видеть вас снова!',
-    scanLabel:   'Отсканируйте для Instagram',
+    scanLabel:   'Сканируйте Instagram',
+    scanPitch:   'Каждую неделю новые акции — не пропустите!',
+    cashbackPromo: 'Cashback до 10%',
+    loyaltyTitle: 'Наши карты лояльности',
+    loyaltyPitch: 'Оформите карту и платите меньше в следующий раз',
+    loyaltyInfo:  'Подробности уточняйте у менеджера',
   },
   en: {
     slogan:      'Fire. Flavor. Tradition.',
@@ -73,7 +82,12 @@ const L = {
     total:       'Total to pay',
     thanks1:     'Thank you for choosing ZarKebab!',
     thanks2:     'We hope to see you again!',
-    scanLabel:   'Scan for Instagram',
+    scanLabel:   'Scan our Instagram',
+    scanPitch:   "New deals every week — don't miss out!",
+    cashbackPromo: 'Cashback up to 10%',
+    loyaltyTitle: 'Our loyalty cards',
+    loyaltyPitch: 'Get a card and pay less on your next visit',
+    loyaltyInfo:  'Ask our manager for more details',
   },
 }
 
@@ -208,22 +222,28 @@ const PRINT_CSS = `
     box-shadow: none !important;
     border-radius: 0 !important;
     margin: 0 !important;
-    padding: 4mm !important;
+    padding: 3mm !important;
     border: none !important;
     overflow: visible !important;
     box-sizing: border-box !important;
     background: #fff !important;
     color: #000 !important;
     font-family: Arial, sans-serif !important;
-    font-size: 12px !important;
-    line-height: 1.35 !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
   }
   .receipt-print-area *,
   .receipt-print-area svg,
   .receipt-print-area img {
     color: #000 !important;
+    background: #fff !important;
     border-color: #000 !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
+  }
+  .receipt-marketing {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }
 `
@@ -237,111 +257,155 @@ function handlePrintReceipt(delay = 300) {
 
 // ── ReceiptPaper ──────────────────────────────────────────────────────────────
 
-function ReceiptPaper({ tableName, waiterName, dateStr, priceMode, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, lang, restaurantName, receiptFooter }) {
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=https://instagram.com/zarkebab&size=220x220&margin=6&color=111111&bgcolor=ffffff`
+const RECEIPT_MARKETING_MODES = new Set(['none', 'compactFooter', 'loyaltyOnly', 'instagramOnly', 'full'])
+const LOYALTY_LEVELS = 'Bronze 3% | Silver 5% | Gold 7% | Premium 10%'
+
+function normalizeReceiptMarketing(value) {
+  return RECEIPT_MARKETING_MODES.has(value) ? value : 'compactFooter'
+}
+
+function shouldShowQr(mode) {
+  return mode === 'compactFooter' || mode === 'instagramOnly' || mode === 'full'
+}
+
+function ReceiptMarketingFooter({ labels, mode }) {
+  const marketingMode = normalizeReceiptMarketing(mode)
+  if (marketingMode === 'none') return null
+
+  const showThanks = ['compactFooter', 'full'].includes(marketingMode)
+  const showLoyalty = ['compactFooter', 'loyaltyOnly', 'full'].includes(marketingMode)
+  const showInstagram = ['compactFooter', 'instagramOnly', 'full'].includes(marketingMode)
+  const isFull = marketingMode === 'full'
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=https://instagram.com/zarkebab&size=132x132&margin=4&color=111111&bgcolor=ffffff`
+
+  return (
+    <>
+      <Divider dashed style={{ margin: '8px 0 6px' }} />
+      <div className={`receipt-marketing receipt-marketing-${marketingMode}`} style={{
+        textAlign: 'center',
+        fontFamily: INTER,
+        fontSize: '11px',
+        lineHeight: 1.32,
+        color: '#111',
+        pageBreakInside: 'avoid',
+      }}>
+        {showThanks && <div style={{ fontSize: '11.5px', fontWeight: 700, marginBottom: '5px' }}>{labels.thanks1}</div>}
+        {showLoyalty && (
+          <>
+            <div style={{ fontSize: '11.2px', fontWeight: 700, marginBottom: '4px' }}>{labels.cashbackPromo}</div>
+            <div style={{ fontSize: '10.4px', color: '#333', marginBottom: showInstagram ? '6px' : 0 }}>{LOYALTY_LEVELS}</div>
+          </>
+        )}
+        {showInstagram && (
+          <>
+            <div style={{ fontWeight: 600, marginBottom: shouldShowQr(marketingMode) ? '7px' : 0 }}>Instagram: @zarkebab</div>
+            {shouldShowQr(marketingMode) && (
+              <img
+                src={qrUrl}
+                alt="Instagram QR"
+                width={isFull ? 84 : 72}
+                height={isFull ? 84 : 72}
+                style={{
+                  display: 'block',
+                  margin: '0 auto 8px',
+                  width: isFull ? '22mm' : '19mm',
+                  height: isFull ? '22mm' : '19mm',
+                }}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
+function ReceiptPaper({ tableName, waiterName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
+  const marketingMode = normalizeReceiptMarketing(receiptMarketing)
 
   return (
     <div
       className="receipt-paper receipt-print-area bg-white"
       style={{
-        width: '340px',
+        width: '320px',
         maxWidth: '100%',
-        padding: '32px 26px',
+        padding: '18px 22px 22px',
         fontFamily: INTER,
         fontVariantNumeric: 'tabular-nums',
         color: '#111',
-        fontSize: '14px',
-        lineHeight: 1.5,
+        fontSize: '12px',
+        lineHeight: 1.32,
       }}
     >
 
       {/* ── Brand header ─────────────────────────────────────────────────── */}
-      <div style={{ textAlign: 'center', marginBottom: '4px' }}>
-        <img
-          src={getBrandLogo(lang)}
-          alt={restaurantName}
-          style={{
-            display: 'block',
-            width: '128px',
-            maxWidth: '70%',
-            height: 'auto',
-            margin: '0 auto 6px',
-          }}
-        />
+      <div style={{ textAlign: 'center', marginBottom: '6px' }}>
         <div style={{
           fontFamily: INTER,
-          fontSize: '12px',
+          fontSize: '23px',
+          fontWeight: 800,
+          color: '#111',
+          letterSpacing: '0',
+          lineHeight: 1.05,
+          marginBottom: '4px',
+        }}>
+          ZarKebab
+        </div>
+        <div style={{
+          fontFamily: INTER,
+          fontSize: '10.5px',
           fontWeight: 500,
-          color: '#555',
-          marginTop: '5px',
-          letterSpacing: '0.1px',
+          color: '#333',
         }}>
           {labels.slogan}
         </div>
       </div>
 
-      <Divider dashed style={{ margin: '16px 0 12px' }} />
-
-      {/* ── Receipt title ─────────────────────────────────────────────────── */}
-      <div style={{ textAlign: 'center', margin: '10px 0 14px' }}>
-        <div style={{
-          fontFamily: POPPINS,
-          fontSize: '22px',
-          fontWeight: 800,
-          letterSpacing: '4px',
-          textTransform: 'uppercase',
-          color: '#111',
-        }}>
-          {labels.receiptTitle}
-        </div>
-      </div>
-
-      <Divider dashed style={{ margin: '0 0 12px' }} />
+      <Divider dashed style={{ margin: '7px 0' }} />
 
       {/* ── Order meta ───────────────────────────────────────────────────── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '14px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
         <tbody>
-          <MetaRow label={labels.table}  value={tableName}  />
-          <MetaRow label={labels.menuType} value={getPriceModeLabel(priceMode, lang)} />
+          <MetaRow label={labels.table} value={tableName} />
           <MetaRow label={labels.waiter} value={waiterName} />
-          <MetaRow label={labels.date}   value={dateStr}    />
+          <MetaRow label={labels.date} value={dateStr} />
         </tbody>
       </table>
 
-      <Divider dashed style={{ margin: '0 0 12px' }} />
+      <Divider dashed style={{ margin: '0 0 6px' }} />
 
       {/* ── Items table header ───────────────────────────────────────────── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 36px 88px',
+        gridTemplateColumns: '1fr 48px 74px',
         fontFamily: INTER,
-        fontSize: '13px',
+        fontSize: '11px',
         fontWeight: 700,
         color: '#111',
-        paddingBottom: '8px',
-        borderBottom: '1px solid #e0e0e0',
-        marginBottom: '4px',
+        paddingBottom: '4px',
+        borderBottom: '1px solid #ddd',
+        marginBottom: '2px',
       }}>
-        <span>{labels.itemCol}</span>
-        <span style={{ textAlign: 'center' }}>{labels.qtyCol}</span>
+        <span style={{ fontStyle: 'italic' }}>{labels.itemCol}</span>
+        <span style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{labels.qtyCol}</span>
         <span style={{ textAlign: 'right' }}>{labels.amountCol}</span>
       </div>
 
       {/* ── Item rows ────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: '12px' }}>
+      <div style={{ marginBottom: '6px' }}>
         {items.map((item, i) => (
           <div key={i} style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 36px 88px',
+            gridTemplateColumns: '1fr 48px 74px',
             alignItems: 'baseline',
-            padding: '6px 0',
-            borderBottom: '1px solid #f0f0f0',
+            padding: '3px 0',
+            borderBottom: '1px solid #eee',
             fontFamily: INTER,
-            fontSize: '14px',
+            fontSize: '12px',
             fontWeight: 400,
           }}>
-            <span style={{ paddingRight: '8px', lineHeight: 1.4, color: '#222' }}>{item.name}</span>
-            <span style={{ textAlign: 'center', fontWeight: 500, color: '#444' }}>{item.quantity}</span>
+            <span style={{ paddingRight: '6px', lineHeight: 1.25, color: '#111', fontStyle: 'italic' }}>{item.name}</span>
+            <span style={{ textAlign: 'center', fontWeight: 500, color: '#333' }}>{item.quantity}</span>
             <span style={{ textAlign: 'right', fontWeight: 600, color: '#111' }}>
               {fmtNum(getOrderItemUnitPrice(item) * (Number(item.quantity) || 1))}
             </span>
@@ -349,24 +413,21 @@ function ReceiptPaper({ tableName, waiterName, dateStr, priceMode, items, subtot
         ))}
       </div>
 
-      <Divider dashed style={{ margin: '0 0 10px' }} />
-
       {/* ── Subtotals ────────────────────────────────────────────────────── */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4px' }}>
         <tbody>
-          <TotalRow label={labels.orderAmount}              value={fmtUZS(subtotal)}   />
-          <TotalRow label={labels.servicePct(serviceRate)}  value={fmtUZS(serviceFee)} />
+          <TotalRow label={labels.orderAmount} value={fmtUZS(subtotal)} />
+          <TotalRow label={labels.servicePct(serviceRate)} value={fmtUZS(serviceFee)} />
           {loyaltyAmt > 0 && (
-            <TotalRow label={labels.loyaltyUsed} value={`− ${fmtUZS(loyaltyAmt)}`} color="#16a34a" />
+            <TotalRow label={labels.loyaltyUsed} value={`− ${fmtUZS(loyaltyAmt)}`} color="#111" />
           )}
           {cashbackEarned > 0 && (
-            <TotalRow label={labels.cashbackEarned} value={`+ ${fmtUZS(cashbackEarned)}`} color="#d97706" />
+            <TotalRow label={labels.cashbackEarned} value={`+ ${fmtUZS(cashbackEarned)}`} color="#111" />
           )}
         </tbody>
       </table>
 
-      {/* Solid divider before grand total */}
-      <Divider solid style={{ margin: '12px 0' }} />
+      <Divider solid style={{ margin: '7px 0' }} />
 
       {/* ── Grand total ──────────────────────────────────────────────────── */}
       <div style={{
@@ -374,87 +435,30 @@ function ReceiptPaper({ tableName, waiterName, dateStr, priceMode, items, subtot
         justifyContent: 'space-between',
         alignItems: 'baseline',
         fontFamily: POPPINS,
-        fontSize: '18px',
+        fontSize: '16px',
         fontWeight: 800,
         color: '#111',
-        marginBottom: '16px',
+        marginBottom: marketingMode === 'none' ? '0' : '4px',
         fontVariantNumeric: 'tabular-nums',
       }}>
         <span>{labels.total}</span>
         <span>{fmtUZS(total)}</span>
       </div>
 
-      <Divider dashed style={{ margin: '0 0 16px' }} />
-
-      {/* ── Thank-you footer ─────────────────────────────────────────────── */}
-      <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+      {receiptFooter && marketingMode !== 'none' && (
         <div style={{
+          textAlign: 'center',
           fontFamily: INTER,
-          fontSize: '14px',
-          fontWeight: 600,
-          color: '#111',
-          marginBottom: '3px',
+          fontSize: '10px',
+          fontWeight: 400,
+          color: '#333',
+          marginTop: '4px',
         }}>
-          {labels.thanks1}
+          {receiptFooter}
         </div>
-        {receiptFooter && (
-          <div style={{
-            fontFamily: INTER,
-            fontSize: '13px',
-            fontWeight: 400,
-            color: '#555',
-            marginBottom: '8px',
-          }}>
-            {receiptFooter}
-          </div>
-        )}
-        <div style={{
-          fontFamily: INTER,
-          fontSize: '11px',
-          fontWeight: 500,
-          color: '#999',
-          letterSpacing: '0.2px',
-        }}>
-          {restaurantName} — {labels.slogan}
-        </div>
-      </div>
+      )}
 
-      <Divider dashed style={{ margin: '0 0 18px' }} />
-
-      {/* ── QR code section ──────────────────────────────────────────────── */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{
-          fontFamily: POPPINS,
-          fontSize: '14px',
-          fontWeight: 700,
-          color: '#111',
-          marginBottom: '14px',
-          letterSpacing: '0.3px',
-        }}>
-          {labels.scanLabel}
-        </div>
-        <img
-          src={qrUrl}
-          alt="Instagram QR"
-          width={140}
-          height={140}
-          style={{
-            display: 'block',
-            margin: '0 auto 10px',
-            borderRadius: '6px',
-          }}
-        />
-        <div style={{
-          fontFamily: INTER,
-          fontSize: '12px',
-          fontWeight: 500,
-          color: '#555',
-          marginTop: '6px',
-        }}>
-          Instagram: @zarkebab
-        </div>
-      </div>
-
+      <ReceiptMarketingFooter labels={labels} mode={marketingMode} />
     </div>
   )
 }
@@ -596,6 +600,7 @@ export function TableReceipt() {
         lang={lang}
         restaurantName={settings.restaurantName}
         receiptFooter={settings.receiptFooter}
+        receiptMarketing={settings.receiptMarketing}
       />
     </ReceiptShell>
   )
@@ -682,6 +687,7 @@ export default function Receipt() {
         lang={lang}
         restaurantName={settings.restaurantName}
         receiptFooter={settings.receiptFooter}
+        receiptMarketing={settings.receiptMarketing}
       />
     </ReceiptShell>
   )

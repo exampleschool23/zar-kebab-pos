@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = {
   serviceRate:    20,
   monthlyRentUzs: 0,
   receiptFooter:  '',
+  receiptMarketing: 'compactFooter',
   autoPrint:      false,
 }
 

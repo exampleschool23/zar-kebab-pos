@@ -73,6 +73,7 @@ export default function AdminSettings() {
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
   const [monthlyRentUzs, setMonthlyRentUzs] = useState(String(settings.monthlyRentUzs || ''))
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
+  const [receiptMarketing, setReceiptMarketing] = useState(settings.receiptMarketing || 'compactFooter')
   const [notifications,  setNotifications]  = useState(true)
   const [saved,          setSaved]          = useState(false)
   const [saving,         setSaving]         = useState(false)
@@ -86,12 +87,13 @@ export default function AdminSettings() {
     setServiceRate(settings.serviceRate)
     setMonthlyRentUzs(String(settings.monthlyRentUzs || ''))
     setAutoPrint(settings.autoPrint)
-  }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.autoPrint])
+    setReceiptMarketing(settings.receiptMarketing || 'compactFooter')
+  }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.autoPrint, settings.receiptMarketing])
 
   async function saveSettings(overrides = {}) {
     setSaving(true)
     setError('')
-    const nextSettings = { restaurantName, serviceRate, monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0), autoPrint, ...overrides }
+    const nextSettings = { restaurantName, serviceRate, monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0), autoPrint, receiptMarketing, ...overrides }
     const result = await dispatch({
       type: 'SET_SETTINGS',
       payload: nextSettings,
@@ -145,6 +147,15 @@ export default function AdminSettings() {
       languageSub:     'Interfeys tili',
       autoPrint:       'Avtomatik bosib chiqarish',
       autoPrintSub:    'To\'lovdan keyin chekni avtomatik bosib chiqarish',
+      receiptMarketing: 'Chek marketingi',
+      receiptMarketingSub: 'Jami summadan keyin nima chiqishini tanlang',
+      receiptMarketingModes: {
+        none: 'Marketing yoq',
+        compactFooter: 'Ixcham footer',
+        loyaltyOnly: 'Faqat sodiqlik',
+        instagramOnly: 'Faqat Instagram',
+        full: 'To\'liq footer',
+      },
       notifications:   'Bildirishnomalar',
       notifSub:        'Yangi buyurtmalar uchun ovozli signal',
       systemHealth:    'Tizim holati',
@@ -196,6 +207,15 @@ export default function AdminSettings() {
       languageSub:     'Язык интерфейса',
       autoPrint:       'Автоматическая печать',
       autoPrintSub:    'Печатать чек автоматически после оплаты',
+      receiptMarketing: 'Маркетинг в чеке',
+      receiptMarketingSub: 'Что печатать под итогом оплаты',
+      receiptMarketingModes: {
+        none: 'Без маркетинга',
+        compactFooter: 'Компактный footer',
+        loyaltyOnly: 'Только лояльность',
+        instagramOnly: 'Только Instagram',
+        full: 'Полный footer',
+      },
       notifications:   'Уведомления',
       notifSub:        'Звук при новых заказах',
       systemHealth:    'Состояние системы',
@@ -247,6 +267,15 @@ export default function AdminSettings() {
       languageSub:     'Interface language',
       autoPrint:       'Auto-print Receipt',
       autoPrintSub:    'Print receipt automatically after payment',
+      receiptMarketing: 'Receipt marketing',
+      receiptMarketingSub: 'Choose what prints under the total',
+      receiptMarketingModes: {
+        none: 'No marketing',
+        compactFooter: 'Compact footer',
+        loyaltyOnly: 'Loyalty only',
+        instagramOnly: 'Instagram only',
+        full: 'Full footer',
+      },
       notifications:   'Notifications',
       notifSub:        'Sound alert for new orders',
       systemHealth:    'System health',
@@ -369,6 +398,17 @@ export default function AdminSettings() {
           </SettingRow>
           <SettingRow icon={Printer} label={l.autoPrint} sub={l.autoPrintSub}>
             <Toggle value={autoPrint} onChange={setAutoPrint} />
+          </SettingRow>
+          <SettingRow icon={Printer} label={l.receiptMarketing} sub={l.receiptMarketingSub}>
+            <select
+              value={receiptMarketing}
+              onChange={event => setReceiptMarketing(event.target.value)}
+              className="w-[170px] rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] font-bold text-[#1F2937] focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+            >
+              {['none', 'compactFooter', 'loyaltyOnly', 'instagramOnly', 'full'].map(mode => (
+                <option key={mode} value={mode}>{l.receiptMarketingModes[mode]}</option>
+              ))}
+            </select>
           </SettingRow>
           <SettingRow icon={Bell} label={l.notifications} sub={l.notifSub}>
             <Toggle value={notifications} onChange={setNotifications} />

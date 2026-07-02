@@ -116,6 +116,12 @@ function makeOrderNumber(orderId, orderType = 'take_away') {
   return `${orderTypePrefix(orderType)}-${suffix}`
 }
 
+const RECEIPT_MARKETING_MODES = new Set(['none', 'compactFooter', 'loyaltyOnly', 'instagramOnly', 'full'])
+
+function normalizeReceiptMarketing(value) {
+  return RECEIPT_MARKETING_MODES.has(value) ? value : 'compactFooter'
+}
+
 function normalizeBusinessSettings(row) {
   if (!row) return null
   return {
@@ -123,6 +129,7 @@ function normalizeBusinessSettings(row) {
     serviceRate: normalizeServiceRatePct(row.service_rate_pct),
     monthlyRentUzs: Math.max(0, Math.round(Number(row.monthly_rent_uzs) || 0)),
     receiptFooter: row.receipt_footer || '',
+    receiptMarketing: normalizeReceiptMarketing(row.receipt_marketing),
     autoPrint: !!row.auto_print,
   }
 }
@@ -1438,6 +1445,7 @@ export async function writeToSupabase(action, state, options = {}) {
           service_rate_pct: serviceRatePct,
           monthly_rent_uzs: Math.max(0, Math.round(Number(settings.monthlyRentUzs) || 0)),
           receipt_footer: settings.receiptFooter || '',
+          receipt_marketing: normalizeReceiptMarketing(settings.receiptMarketing),
           auto_print: !!settings.autoPrint,
           updated_at: new Date().toISOString(),
         })
