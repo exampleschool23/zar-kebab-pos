@@ -122,7 +122,7 @@ async function checkRpc(name, invoke, expectedError, required = true) {
 
 const checks = await Promise.all([
   checkTable('profiles', 'id, role, status, full_name, email'),
-  checkTable('employee_salary_profiles', 'id, profile_id, employee_name, joined_at, ended_at, pay_schedule, payment_method, is_active', false),
+  checkTable('employee_salary_profiles', 'id, profile_id, employee_name, joined_at, ended_at, deleted_at, pay_schedule, payment_method, is_active', false),
   checkTable('employee_salary_rates', 'id, salary_profile_id, effective_from, amount, rate_unit', false),
   checkTable('employee_salary_payments', 'id, salary_profile_id, paid_date, amount, payment_method', false),
   checkTable('employee_salary_bonuses', 'id, salary_profile_id, bonus_date, amount, payment_method', false),

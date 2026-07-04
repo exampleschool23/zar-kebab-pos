@@ -6,6 +6,7 @@ import {
   buildSalaryBonusExpenseRows,
   buildSalaryExpenseRows,
   buildSalaryPaymentExpenseRows,
+  buildSalaryReactivationAbsenceRows,
   convertSalaryAmountToDaily,
   expenseCategoryLabel,
   expenseMatchesRange,
@@ -18,6 +19,7 @@ import {
   getSalaryCategoryForRole,
   getTotalMonthlySalaryCommitment,
   getTotalSalaryDue,
+  listLocalDateRange,
   normalizeExpenseAmount,
   summarizeIncomeEntries,
   summarizeExpenseCashflow,
@@ -239,6 +241,80 @@ test('deactivated salary profiles stop accruing after ended_at while keeping due
   assert.equal(rows.at(-1).expense_date, '2026-06-10')
   assert.equal(getSalaryDue(formerWaiter, '2026-06-16'), 2_100_000)
   assert.equal(getTotalSalaryDue([formerWaiter], '2026-06-16'), 2_100_000)
+})
+
+test('reactivated salary profiles skip the inactive dates before accruing again', () => {
+  const employee = {
+    id: 'salary-reactivated-gap-1',
+    profile_id: 'waiter-reactivated-gap-1',
+    employee_name: 'Reactivated Waiter',
+    joined_at: '2026-05-28',
+    ended_at: '2026-06-01',
+    is_active: false,
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-05-28', amount: 100_000, rate_unit: 'daily' }],
+    payments: [],
+    absences: [],
+  }
+
+  const reactivationAbsences = buildSalaryReactivationAbsenceRows(employee, '2026-06-05')
+  const reactivatedEmployee = {
+    ...employee,
+    ended_at: null,
+    is_active: true,
+    absences: reactivationAbsences,
+  }
+  const rows = buildSalaryExpenseRows([reactivatedEmployee], '2026-06-01', '2026-06-07')
+
+  assert.deepEqual(listLocalDateRange('2026-06-01', '2026-06-05'), [
+    '2026-06-01',
+    '2026-06-02',
+    '2026-06-03',
+    '2026-06-04',
+    '2026-06-05',
+  ])
+  assert.deepEqual(reactivationAbsences.map(row => row.absence_date), [
+    '2026-06-01',
+    '2026-06-02',
+    '2026-06-03',
+    '2026-06-04',
+    '2026-06-05',
+  ])
+  assert.deepEqual(rows.map(row => row.expense_date), ['2026-06-06', '2026-06-07'])
+  assert.equal(getSalaryDue(reactivatedEmployee, '2026-06-07'), 600_000)
+})
+
+test('safe-deleted salary profiles keep recorded accounting payment and bonus history', () => {
+  const deletedEmployee = {
+    id: 'salary-safe-deleted-1',
+    profile_id: 'deleted-user-1',
+    employee_name: 'Deleted Employee Name',
+    joined_at: '2026-06-01',
+    ended_at: '2026-06-10',
+    deleted_at: '2026-06-12T09:00:00Z',
+    is_active: false,
+    payment_method: 'cash',
+    profile: { role: 'cashier' },
+    rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
+    payments: [
+      { id: 'deleted-payment-1', paid_date: '2026-06-10', amount: 1_500_000, payment_method: 'terminal', note: 'Final payout' },
+    ],
+    bonuses: [
+      { id: 'deleted-bonus-1', bonus_date: '2026-06-08', amount: 250_000, payment_method: 'cash', note: 'Shift bonus' },
+    ],
+  }
+
+  const accountingRows = [
+    ...buildSalaryPaymentExpenseRows([deletedEmployee], '2026-06-01', '2026-06-30'),
+    ...buildSalaryBonusExpenseRows([deletedEmployee], '2026-06-01', '2026-06-30'),
+  ]
+
+  assert.deepEqual(accountingRows.map(row => [row.id, row.vendor, row.amount, row.payment_method]), [
+    ['salary-payment-deleted-payment-1', 'Deleted Employee Name', 1_500_000, 'terminal'],
+    ['salary-bonus-deleted-bonus-1', 'Deleted Employee Name', 250_000, 'cash'],
+  ])
+  assert.equal(summarizeExpenses(accountingRows).total, 1_750_000)
 })
 
 test('salary absences skip daily accrual and reduce salary due for those dates', () => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarDays, CalendarX2, History, Loader2, Power, RefreshCw, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CalendarX2, History, Loader2, Power, RefreshCw, Trash2, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -11,6 +11,7 @@ import {
   getDailySalaryAmount,
   getSalaryActiveUntil,
   getSalaryDue,
+  buildSalaryReactivationAbsenceRows,
   todayExpenseDate,
 } from '../lib/expenses'
 
@@ -71,6 +72,7 @@ export default function Employees() {
       absentLabel: 'Kelmagan',
       deactivate: 'Faolsizlantirish',
       reactivate: 'Qayta yoqish',
+      delete: 'O‘chirish',
       confirm: 'Tasdiqlash',
       empty: 'Xodimlar hali qo‘shilmagan',
       migration: 'Maosh jadvallari yangilanmagan. Supabase SQL editorida employee_salary migratsiyalarini ishga tushiring.',
@@ -96,6 +98,7 @@ export default function Employees() {
       absentLabel: 'Отсутствовал',
       deactivate: 'Деактивировать',
       reactivate: 'Включить снова',
+      delete: 'Удалить',
       confirm: 'Подтвердить',
       empty: 'Сотрудники еще не добавлены',
       migration: 'Таблицы зарплат не обновлены. Запустите миграции employee_salary в Supabase SQL Editor.',
@@ -121,6 +124,7 @@ export default function Employees() {
       absentLabel: 'Absent',
       deactivate: 'Deactivate',
       reactivate: 'Reactivate',
+      delete: 'Delete',
       confirm: 'Confirm',
       empty: 'No employees added yet',
       migration: 'Salary tables are not up to date. Run the employee_salary migrations in Supabase SQL Editor.',
@@ -159,7 +163,7 @@ export default function Employees() {
         bonusRes.data || [],
         absenceRes.data || [],
         teamRes.data || [],
-      ))
+      ).filter(employee => !employee.deleted_at))
     }
     setLoading(false)
   }
@@ -186,12 +190,52 @@ export default function Employees() {
     setSaving(key)
     setError('')
     const nextActive = employee.is_active === false
+    if (nextActive) {
+      const absenceRows = buildSalaryReactivationAbsenceRows(employee, today)
+      if (absenceRows.length > 0) {
+        const { error: absenceError } = await supabase
+          .from('employee_salary_absences')
+          .upsert(absenceRows, { onConflict: 'salary_profile_id,absence_date', ignoreDuplicates: true })
+        if (absenceError) {
+          setSaving('')
+          setConfirmActionKey('')
+          setError(absenceError.message)
+          return
+        }
+      }
+    }
     const patch = nextActive
       ? { is_active: true, ended_at: null }
       : { is_active: false, ended_at: today }
     const { error: updateError } = await supabase
       .from('employee_salary_profiles')
       .update(patch)
+      .eq('id', employee.id)
+    setSaving('')
+    setConfirmActionKey('')
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+    await loadEmployees()
+  }
+
+  async function deleteEmployee(employee) {
+    if (!employee?.id) return
+    const key = `employee-delete-${employee.id}`
+    if (confirmActionKey !== key) {
+      setConfirmActionKey(key)
+      return
+    }
+    setSaving(key)
+    setError('')
+    const { error: updateError } = await supabase
+      .from('employee_salary_profiles')
+      .update({
+        is_active: false,
+        ended_at: employee.ended_at || today,
+        deleted_at: new Date().toISOString(),
+      })
       .eq('id', employee.id)
     setSaving('')
     setConfirmActionKey('')
@@ -276,6 +320,15 @@ export default function Employees() {
                       >
                         {saving === `employee-toggle-${employee.id}` ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
                         {confirmActionKey === `employee-toggle-${employee.id}` ? l.confirm : inactive ? l.reactivate : l.deactivate}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteEmployee(employee)}
+                        disabled={saving === `employee-delete-${employee.id}`}
+                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-xs font-black text-red-600"
+                      >
+                        {saving === `employee-delete-${employee.id}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        {confirmActionKey === `employee-delete-${employee.id}` ? l.confirm : l.delete}
                       </button>
                     </div>
                   </section>

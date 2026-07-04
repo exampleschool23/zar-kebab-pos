@@ -10,6 +10,7 @@ import { formatLongDate } from '../lib/dateFormat'
 import {
   EXPENSE_PAYMENT_METHODS,
   SALARY_RATE_UNITS,
+  buildSalaryReactivationAbsenceRows,
   convertSalaryAmountToDaily,
   expensePaymentMethodLabel,
   getSalaryDue,
@@ -327,7 +328,8 @@ export default function Salaries() {
       setSalaryProfiles([])
     } else {
       const teamRows = teamRes.data || []
-      setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], absenceRes.data || [], teamRows))
+      setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], absenceRes.data || [], teamRows)
+        .filter(salaryProfile => !salaryProfile.deleted_at))
     }
     setLoading(false)
   }
@@ -582,6 +584,20 @@ export default function Salaries() {
     }
     setSaving(key)
     const nextActive = salaryProfile.is_active === false
+    if (nextActive) {
+      const absenceRows = buildSalaryReactivationAbsenceRows(salaryProfile, today)
+      if (absenceRows.length > 0) {
+        const { error: absenceError } = await supabase
+          .from('employee_salary_absences')
+          .upsert(absenceRows, { onConflict: 'salary_profile_id,absence_date', ignoreDuplicates: true })
+        if (absenceError) {
+          setSaving('')
+          setConfirmActionKey('')
+          setError(absenceError.message)
+          return
+        }
+      }
+    }
     const patch = nextActive
       ? { is_active: true, ended_at: null }
       : { is_active: false, ended_at: today }
@@ -608,7 +624,11 @@ export default function Salaries() {
     setSaving(key)
     const { error: deleteError } = await supabase
       .from('employee_salary_profiles')
-      .delete()
+      .update({
+        is_active: false,
+        ended_at: salaryProfile.ended_at || today,
+        deleted_at: new Date().toISOString(),
+      })
       .eq('id', salaryProfile.id)
     setSaving('')
     setConfirmActionKey('')

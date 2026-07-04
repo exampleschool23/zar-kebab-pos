@@ -172,6 +172,32 @@ export function getSalaryAbsenceDates(salaryProfile) {
   )
 }
 
+export function listLocalDateRange(dateFrom, dateTo) {
+  const start = String(dateFrom || '').slice(0, 10)
+  const end = String(dateTo || '').slice(0, 10)
+  if (!start || !end || start > end) return []
+  const dates = []
+  for (let date = start; date <= end; date = addLocalDateDays(date, 1)) {
+    dates.push(date)
+  }
+  return dates
+}
+
+export function buildSalaryReactivationAbsenceRows(salaryProfile, reactivatedAt = todayExpenseDate(), note = 'Inactive employment period') {
+  const salaryProfileId = salaryProfile?.id
+  const inactiveFrom = String(salaryProfile?.ended_at || '').slice(0, 10)
+  const inactiveUntil = String(reactivatedAt || todayExpenseDate()).slice(0, 10)
+  if (!salaryProfileId || !inactiveFrom || !inactiveUntil) return []
+  const existingAbsences = getSalaryAbsenceDates(salaryProfile)
+  return listLocalDateRange(inactiveFrom, inactiveUntil)
+    .filter(absenceDate => !existingAbsences.has(absenceDate))
+    .map(absenceDate => ({
+      salary_profile_id: salaryProfileId,
+      absence_date: absenceDate,
+      note,
+    }))
+}
+
 export function buildSalaryExpenseRows(salaryProfiles = [], dateFrom, dateTo) {
   if (!dateFrom || !dateTo) return []
   const rows = []
