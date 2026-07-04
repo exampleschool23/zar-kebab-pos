@@ -8,6 +8,8 @@ import {
   Plus,
   ReceiptText,
   RefreshCw,
+  QrCode,
+  Tag,
   Users,
   Terminal,
   Trash2,
@@ -57,6 +59,8 @@ function addDays(isoDate, n) {
 function methodIcon(method) {
   if (method === 'card') return CreditCard
   if (method === 'terminal') return Terminal
+  if (method === 'qr') return QrCode
+  if (method === 'loyalty_card') return Tag
   return Banknote
 }
 
@@ -579,7 +583,7 @@ export default function Expenses() {
               <h2 className="text-sm font-black text-[#1F2937]">{l.methodBalances}</h2>
               <span className="text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.remaining}</span>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               {cashflow.rows.map(row => {
                 const Icon = methodIcon(row.method)
                 return (

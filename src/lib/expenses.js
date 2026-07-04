@@ -1,6 +1,7 @@
 import { getOrderPayments, toLocalDateStr } from './analytics.js'
 
 export const EXPENSE_PAYMENT_METHODS = ['cash', 'card', 'terminal']
+export const ACCOUNTING_CASHFLOW_METHODS = ['cash', 'card', 'terminal', 'qr', 'loyalty_card']
 export const EXPENSE_ENTRY_TYPES = ['expense', 'income']
 export const DEFAULT_MONTHLY_RENT_UZS = 0
 
@@ -87,6 +88,8 @@ export function expensePaymentMethodLabel(method, lang = 'en') {
     cash: { uz: 'Naqd', ru: 'Наличные', en: 'Cash' },
     card: { uz: 'Karta', ru: 'Карта', en: 'Card' },
     terminal: { uz: 'Terminal', ru: 'Терминал', en: 'Terminal' },
+    qr: { uz: 'QR Code', ru: 'QR Code', en: 'QR Code' },
+    loyalty_card: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' },
   }
   const cfg = labels[method] || labels.cash
   return cfg[lang] || cfg.en
@@ -375,33 +378,39 @@ export function summarizeExpenses(expenses = []) {
 }
 
 export function summarizeExpenseCashflow(paidOrders = [], expenses = []) {
-  const byMethod = EXPENSE_PAYMENT_METHODS.reduce((acc, method) => {
+  const byMethod = ACCOUNTING_CASHFLOW_METHODS.reduce((acc, method) => {
     acc[method] = { income: 0, expenses: 0, left: 0 }
     return acc
   }, {})
 
   for (const order of paidOrders || []) {
+    let hasLoyaltyPaymentRow = false
     for (const payment of getOrderPayments(order)) {
       const method = payment.method || payment.payment_method
+      if (method === 'loyalty_card') hasLoyaltyPaymentRow = true
       if (!byMethod[method]) continue
       byMethod[method].income += normalizeExpenseAmount(payment.amount)
+    }
+    const loyaltyUsed = normalizeExpenseAmount(order?.loyalty_used_amount ?? order?.loyalty_redeem_amount ?? 0)
+    if (loyaltyUsed > 0 && !hasLoyaltyPaymentRow) {
+      byMethod.loyalty_card.income += loyaltyUsed
     }
   }
 
   const incomeSummary = summarizeIncomeEntries(expenses)
-  for (const method of EXPENSE_PAYMENT_METHODS) {
+  for (const method of ACCOUNTING_CASHFLOW_METHODS) {
     byMethod[method].income += incomeSummary.byMethod[method] || 0
   }
 
   const expenseSummary = summarizeExpenses(expenses)
-  for (const method of EXPENSE_PAYMENT_METHODS) {
+  for (const method of ACCOUNTING_CASHFLOW_METHODS) {
     byMethod[method].expenses = expenseSummary.byMethod[method] || 0
     byMethod[method].left = byMethod[method].income - byMethod[method].expenses
   }
 
   return {
     byMethod,
-    rows: EXPENSE_PAYMENT_METHODS.map(method => ({ method, ...byMethod[method] })),
+    rows: ACCOUNTING_CASHFLOW_METHODS.map(method => ({ method, ...byMethod[method] })),
   }
 }
 

@@ -50,17 +50,23 @@ test('net income subtracts expenses from cafe revenue', () => {
   ]), 1_850_000)
 })
 
-test('expense cashflow shows what is left in cash card and terminal', () => {
+test('expense cashflow shows what is left by tracked payment method', () => {
   const cashflow = summarizeExpenseCashflow([
     { payment_status: 'paid', payment_method: 'cash', total: 1_000_000 },
     {
       payment_status: 'paid',
       payment_method: 'mixed',
       total: 600_000,
+      loyalty_used_amount: 50_000,
       payments: [
         { method: 'card', amount: 250_000 },
         { method: 'terminal', amount: 350_000 },
       ],
+    },
+    {
+      payment_status: 'paid',
+      payment_method: 'qr',
+      total: 90_000,
     },
   ], [
     { payment_method: 'cash', amount: 300_000 },
@@ -74,7 +80,29 @@ test('expense cashflow shows what is left in cash card and terminal', () => {
   assert.equal(cashflow.byMethod.cash.left, 900_000)
   assert.equal(cashflow.byMethod.card.left, 150_000)
   assert.equal(cashflow.byMethod.terminal.left, -50_000)
-  assert.deepEqual(cashflow.rows.map(row => row.method), ['cash', 'card', 'terminal'])
+  assert.equal(cashflow.byMethod.qr.income, 90_000)
+  assert.equal(cashflow.byMethod.qr.left, 90_000)
+  assert.equal(cashflow.byMethod.loyalty_card.income, 50_000)
+  assert.equal(cashflow.byMethod.loyalty_card.left, 50_000)
+  assert.deepEqual(cashflow.rows.map(row => row.method), ['cash', 'card', 'terminal', 'qr', 'loyalty_card'])
+})
+
+test('expense cashflow does not double count explicit loyalty payment rows', () => {
+  const cashflow = summarizeExpenseCashflow([
+    {
+      payment_status: 'paid',
+      payment_method: 'mixed',
+      total: 120_000,
+      loyalty_used_amount: 30_000,
+      payments: [
+        { method: 'cash', amount: 90_000 },
+        { method: 'loyalty_card', amount: 30_000 },
+      ],
+    },
+  ], [])
+
+  assert.equal(cashflow.byMethod.cash.income, 90_000)
+  assert.equal(cashflow.byMethod.loyalty_card.income, 30_000)
 })
 
 test('income summary tracks investor support separately from cafe sales', () => {
