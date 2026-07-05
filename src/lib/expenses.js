@@ -165,6 +165,17 @@ export function getSalaryActiveUntil(salaryProfile, dateTo = todayExpenseDate())
   return endDate < dateTo ? endDate : dateTo
 }
 
+export function normalizeSalaryEndDate(salaryProfile, value, fallbackDate = todayExpenseDate()) {
+  const fallback = String(fallbackDate || todayExpenseDate()).slice(0, 10)
+  let endDate = String(value || salaryProfile?.ended_at || fallback).slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) endDate = fallback
+
+  const joinedAt = String(salaryProfile?.joined_at || '').slice(0, 10)
+  if (joinedAt && endDate < joinedAt) return joinedAt
+  if (fallback && endDate > fallback) return fallback
+  return endDate
+}
+
 export function getSalaryAbsenceDates(salaryProfile) {
   return new Set((salaryProfile?.absences || [])
     .map(absence => String(absence?.absence_date || absence?.date || '').slice(0, 10))

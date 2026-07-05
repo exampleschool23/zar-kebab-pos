@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CalendarDays, CalendarX2, History, Loader2, Power, RefreshCw, Trash2, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
@@ -12,6 +12,7 @@ import {
   getSalaryActiveUntil,
   getSalaryDue,
   buildSalaryReactivationAbsenceRows,
+  normalizeSalaryEndDate,
   todayExpenseDate,
 } from '../lib/expenses'
 
@@ -62,6 +63,7 @@ export default function Employees() {
       ended: 'Tugagan',
       daily: 'Kunlik',
       due: 'Qarz',
+      endDate: 'Tugash sanasi',
       status: 'Holat',
       history: 'Maosh tarixi',
       historyBtn: 'Tarix',
@@ -88,6 +90,7 @@ export default function Employees() {
       ended: 'Дата окончания',
       daily: 'За день',
       due: 'Долг',
+      endDate: 'Дата окончания',
       status: 'Статус',
       history: 'История зарплаты',
       historyBtn: 'История',
@@ -114,6 +117,7 @@ export default function Employees() {
       ended: 'Ended',
       daily: 'Daily',
       due: 'Due',
+      endDate: 'End date',
       status: 'Status',
       history: 'Salary history',
       historyBtn: 'History',
@@ -136,6 +140,7 @@ export default function Employees() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState('')
   const [confirmActionKey, setConfirmActionKey] = useState('')
+  const [deactivateDates, setDeactivateDates] = useState({})
   const [historyOpenId, setHistoryOpenId] = useState(null)
   const [error, setError] = useState('')
 
@@ -183,13 +188,19 @@ export default function Employees() {
   async function toggleEmployeeActive(employee) {
     if (!employee?.id) return
     const key = `employee-toggle-${employee.id}`
+    const nextActive = employee.is_active === false
     if (confirmActionKey !== key) {
       setConfirmActionKey(key)
+      if (!nextActive) {
+        setDeactivateDates(current => ({
+          ...current,
+          [employee.id]: normalizeSalaryEndDate(employee, current[employee.id], today),
+        }))
+      }
       return
     }
     setSaving(key)
     setError('')
-    const nextActive = employee.is_active === false
     if (nextActive) {
       const absenceRows = buildSalaryReactivationAbsenceRows(employee, today)
       if (absenceRows.length > 0) {
@@ -206,7 +217,7 @@ export default function Employees() {
     }
     const patch = nextActive
       ? { is_active: true, ended_at: null }
-      : { is_active: false, ended_at: today }
+      : { is_active: false, ended_at: normalizeSalaryEndDate(employee, deactivateDates[employee.id], today) }
     const { error: updateError } = await supabase
       .from('employee_salary_profiles')
       .update(patch)
@@ -217,6 +228,11 @@ export default function Employees() {
       setError(updateError.message)
       return
     }
+    setDeactivateDates(current => {
+      const next = { ...current }
+      delete next[employee.id]
+      return next
+    })
     await loadEmployees()
   }
 
@@ -278,6 +294,10 @@ export default function Employees() {
               {sortedEmployees.map(employee => {
                 const inactive = employee.is_active === false
                 const activeUntil = getSalaryActiveUntil(employee, today)
+                const toggleKey = `employee-toggle-${employee.id}`
+                const confirmToggle = confirmActionKey === toggleKey
+                const joinedDate = String(employee.joined_at || '').slice(0, 10)
+                const deactivateDate = normalizeSalaryEndDate(employee, deactivateDates[employee.id], today)
                 return (
                   <section key={employee.id} className={`rounded-2xl border p-4 shadow-sm ${inactive ? 'border-[#E5E7EB] bg-[#F3F4F6]' : 'border-[#E5E7EB] bg-white'}`}>
                     <div className="mb-4 flex items-start justify-between gap-3">
@@ -302,6 +322,22 @@ export default function Employees() {
                       <Row label={l.due} value={formatCurrency(getSalaryDue(employee, today))} hot />
                     </div>
 
+                    {!inactive && confirmToggle && (
+                      <label className="mt-3 block rounded-xl border border-red-100 bg-red-50 px-3 py-2">
+                        <span className="mb-1 block text-[11px] font-black uppercase tracking-wide text-red-600">{l.endDate}</span>
+                        <DateInput
+                          value={deactivateDate}
+                          min={joinedDate || undefined}
+                          max={today}
+                          lang={lang}
+                          onChange={value => setDeactivateDates(current => ({
+                            ...current,
+                            [employee.id]: normalizeSalaryEndDate(employee, value, today),
+                          }))}
+                        />
+                      </label>
+                    )}
+
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <button
                         type="button"
@@ -318,8 +354,8 @@ export default function Employees() {
                           inactive ? 'border-[#E5E7EB] bg-white text-[#1F2937]' : 'border-red-200 bg-red-50 text-red-600'
                         }`}
                       >
-                        {saving === `employee-toggle-${employee.id}` ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
-                        {confirmActionKey === `employee-toggle-${employee.id}` ? l.confirm : inactive ? l.reactivate : l.deactivate}
+                        {saving === toggleKey ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
+                        {confirmToggle ? l.confirm : inactive ? l.reactivate : l.deactivate}
                       </button>
                       <button
                         type="button"
@@ -438,6 +474,41 @@ function Row({ icon: Icon, label, value, hot = false }) {
     <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] px-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-[#9CA3AF]">{Icon && <Icon size={13} />}{label}</span>
       <span className={`text-right font-black ${hot ? 'text-[#ff5a00]' : 'text-[#1F2937]'}`}>{value}</span>
+    </div>
+  )
+}
+
+function DateInput({ value, lang, onChange, min, max }) {
+  const inputRef = useRef(null)
+
+  function openPicker(event) {
+    if (event.button && event.button !== 0) return
+    const input = inputRef.current
+    if (!input) return
+    input.focus()
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker()
+      } catch {
+        // Some browsers only allow showPicker during specific user gestures.
+      }
+    }
+  }
+
+  return (
+    <div className="relative cursor-pointer" onPointerDown={openPicker}>
+      <span className="pointer-events-none absolute inset-y-0 left-3 right-10 flex items-center overflow-hidden whitespace-nowrap text-sm font-black text-[#1F2937]">
+        {formatLongDate(value, lang, value)}
+      </span>
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        min={min}
+        max={max}
+        onChange={event => onChange(event.target.value)}
+        className="w-full cursor-pointer rounded-lg border border-red-100 bg-white px-2 py-2 text-sm font-black text-transparent caret-transparent outline-none focus:border-red-300"
+      />
     </div>
   )
 }

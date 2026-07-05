@@ -21,6 +21,7 @@ import {
   getTotalSalaryDue,
   listLocalDateRange,
   normalizeExpenseAmount,
+  normalizeSalaryEndDate,
   summarizeIncomeEntries,
   summarizeExpenseCashflow,
   summarizeExpenses,
@@ -241,6 +242,39 @@ test('deactivated salary profiles stop accruing after ended_at while keeping due
   assert.equal(rows.at(-1).expense_date, '2026-06-10')
   assert.equal(getSalaryDue(formerWaiter, '2026-06-16'), 2_100_000)
   assert.equal(getTotalSalaryDue([formerWaiter], '2026-06-16'), 2_100_000)
+})
+
+test('backdated salary deactivation uses selected end date for due balance', () => {
+  const forgottenDeactivation = {
+    id: 'salary-backdated-end-1',
+    profile_id: 'oybek-1',
+    employee_name: 'Oybek',
+    joined_at: '2026-05-01',
+    ended_at: '2026-05-30',
+    is_active: false,
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-05-01', amount: 400_000, rate_unit: 'daily' }],
+    payments: [],
+  }
+
+  const rows = buildSalaryExpenseRows([forgottenDeactivation], '2026-05-01', '2026-07-05')
+
+  assert.equal(normalizeSalaryEndDate(forgottenDeactivation, '2026-05-30', '2026-07-05'), '2026-05-30')
+  assert.equal(rows.length, 30)
+  assert.equal(rows.at(-1).expense_date, '2026-05-30')
+  assert.equal(getSalaryDue(forgottenDeactivation, '2026-07-05'), 12_000_000)
+})
+
+test('salary end date normalization keeps deactivation dates inside valid employment window', () => {
+  const employee = {
+    joined_at: '2026-05-10',
+    ended_at: null,
+  }
+
+  assert.equal(normalizeSalaryEndDate(employee, '2026-05-09', '2026-07-05'), '2026-05-10')
+  assert.equal(normalizeSalaryEndDate(employee, '2026-08-01', '2026-07-05'), '2026-07-05')
+  assert.equal(normalizeSalaryEndDate(employee, '', '2026-07-05'), '2026-07-05')
 })
 
 test('reactivated salary profiles skip the inactive dates before accruing again', () => {
