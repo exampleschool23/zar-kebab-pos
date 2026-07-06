@@ -227,8 +227,6 @@ function deriveStatus(tableId, orders) {
   const active = getVisibleActiveOrdersForTable(tableId, orders)
   if (active.length === 0) return 'available'
 
-  // needs_bill takes top priority
-  if (active.some(o => o.status === 'needs_bill')) return 'needs_bill'
   // delivered = waiter confirmed → occupied (eating)
   if (active.every(o => o.status === 'delivered')) return 'occupied'
 
@@ -240,7 +238,12 @@ function deriveStatus(tableId, orders) {
   const hasPreparing = statuses.some(s => s === 'preparing')
   const hasReady = statuses.some(s => s === 'ready')
   const allServed = statuses.every(s => s === 'served')
+  const hasWaitingOrder = active.some(o => o.status === 'sent_to_kitchen')
 
+  if (allServed && hasWaitingOrder) return 'waiting_kitchen'
+  if (hasWaitingOrder) return 'waiting_kitchen'
+  // needs_bill only applies while the bill is still with the cashier.
+  if (active.some(o => o.status === 'needs_bill')) return 'needs_bill'
   if (allServed) return 'occupied'
   if (hasReady && !hasNew && !hasPreparing) return 'ready'
   if (hasPreparing) return 'preparing'

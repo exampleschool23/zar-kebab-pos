@@ -157,7 +157,7 @@ test('requested-bill quantity edits can reduce or remove served items before pay
   assert.equal(removedLast.tables[0].status, 'available')
 })
 
-test('cashier can move requested bill back to occupied table for waiter additions', () => {
+test('cashier can move requested bill back to waiter waiting flow for additions', () => {
   const base = {
     ...state(),
     tables: [{ id: 't1', name: 'Table 1', status: 'needs_bill', is_active: true }],
@@ -173,6 +173,14 @@ test('cashier can move requested bill back to occupied table for waiter addition
       {
         id: 'o2',
         table_id: 't1',
+        status: 'delivered',
+        payment_status: 'unpaid',
+        order_type: 'dine_in',
+        items: [{ id: 'i2', menu_item_id: 'm2', name: 'Tea', price: 10000, quantity: 1, status: 'served' }],
+      },
+      {
+        id: 'o3',
+        table_id: 't1',
         status: 'paid',
         payment_status: 'paid',
         order_type: 'dine_in',
@@ -184,8 +192,10 @@ test('cashier can move requested bill back to occupied table for waiter addition
   const recalled = ordersReducer(base, { type: 'RECALL_TABLE_FROM_CASHIER', payload: 't1' })
 
   assert.equal(recalled.tables[0].status, 'occupied')
-  assert.equal(recalled.orders.find(order => order.id === 'o1').status, 'delivered')
-  assert.equal(recalled.orders.find(order => order.id === 'o2').status, 'paid')
+  assert.equal(recalled.orders.find(order => order.id === 'o1').status, 'sent_to_kitchen')
+  assert.equal(recalled.orders.find(order => order.id === 'o1').items[0].status, 'served')
+  assert.equal(recalled.orders.find(order => order.id === 'o2').status, 'sent_to_kitchen')
+  assert.equal(recalled.orders.find(order => order.id === 'o3').status, 'paid')
 })
 
 test('request bill and recall stamp local status update times for elapsed labels', () => {

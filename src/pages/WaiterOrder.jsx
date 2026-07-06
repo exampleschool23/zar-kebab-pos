@@ -38,12 +38,19 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   const allReady    = items.length > 0 && !inPreparation
   const isDelivered = !inPreparation && order.status === 'delivered'
   const isNeedsBill = !inPreparation && order.status === 'needs_bill'
+  const isRecalledWaiting = !inPreparation &&
+    order.status === 'sent_to_kitchen' &&
+    readyCount === 0 &&
+    items.some(i => String(i.status || '').toLowerCase() === 'served') &&
+    items.every(i => ['served', 'cancelled'].includes(String(i.status || '').toLowerCase()))
   const canEditRequestedBill = ['admin', 'owner'].includes(String(viewerRole || '').toLowerCase())
 
   const L = {
     uz: {
       preparationTitle: 'Buyurtma tayyorlanmoqda',
       preparationSub: (n, p) => [n > 0 && `${n} yangi`, p > 0 && `${p} tayyorlanmoqda`].filter(Boolean).join(' · '),
+      waitingTitle: 'Kutilmoqda',
+      waitingSub: 'Ofitsiantga qaytarildi',
       readyTitle: 'Barcha taomlar tayyor!',
       readySub: 'Mijozga yetkazilganini tasdiqlang',
       confirmBtn: 'Yetkazildi ✓',
@@ -63,6 +70,8 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     ru: {
       preparationTitle: 'Заказ готовится',
       preparationSub: (n, p) => [n > 0 && `${n} новых`, p > 0 && `${p} готовится`].filter(Boolean).join(' · '),
+      waitingTitle: 'Ожидание',
+      waitingSub: 'Возвращено официанту',
       readyTitle: 'Все блюда готовы!',
       readySub: 'Подтвердите, что заказ подан гостю',
       confirmBtn: 'Подано ✓',
@@ -82,6 +91,8 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     en: {
       preparationTitle: 'Order is preparing',
       preparationSub: (n, p) => [n > 0 && `${n} new`, p > 0 && `${p} preparing`].filter(Boolean).join(' · '),
+      waitingTitle: 'Waiting',
+      waitingSub: 'Back with waiter',
       readyTitle: 'All items ready!',
       readySub: 'Confirm the order has been served to the guest',
       confirmBtn: 'Mark as Served ✓',
@@ -105,6 +116,9 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   const requestedBillEditableItems = canEditRequestedBill
     ? items.filter(item => String(item.status || '').toLowerCase() !== 'cancelled')
     : []
+  const recalledEditableItems = isRecalledWaiting
+    ? items.filter(item => String(item.status || '').toLowerCase() !== 'cancelled')
+    : []
   const kitchenCheckGroups = getKitchenCheckGroups(order)
   const preparationEditableGroups = kitchenCheckGroups
     .map(group => ({
@@ -113,6 +127,14 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     }))
     .filter(group => group.items.length > 0)
   const requestedBillEditableGroups = canEditRequestedBill
+    ? kitchenCheckGroups
+      .map(group => ({
+        ...group,
+        items: group.items.filter(item => String(item.status || '').toLowerCase() !== 'cancelled'),
+      }))
+      .filter(group => group.items.length > 0)
+    : []
+  const recalledEditableGroups = isRecalledWaiting
     ? kitchenCheckGroups
       .map(group => ({
         ...group,
@@ -258,6 +280,35 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       </div>
     )
   }
+  if (isRecalledWaiting) {
+    return (
+      <div className="mx-4 mb-3 rounded-2xl border border-yellow-100 bg-yellow-50 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-yellow-100 flex items-center justify-center flex-shrink-0">
+            <Clock size={16} className="text-yellow-700" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-yellow-700">{l.waitingTitle}</p>
+            <p className="text-[11px] text-[#6B7280] mt-0.5">{l.waitingSub}</p>
+          </div>
+        </div>
+        {recalledEditableItems.length > 0 && (
+          <div className="mt-3 space-y-3 border-t border-yellow-100 pt-3">
+            {recalledEditableGroups.map((group, index) => (
+              <div key={group.roundId} className="space-y-2 rounded-2xl border border-yellow-100 bg-white/45 p-2">
+                <p className="px-1 text-[11px] font-black uppercase tracking-wide text-yellow-700">
+                  {l.roundLabel(index + 1)}
+                </p>
+                {group.items.map(item => (
+                  <OrderItemQtyRow key={item.id || `${group.roundId}-${item.menu_item_id}`} item={item} />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
   if (allReady && !isDelivered && !isNeedsBill) {
     return (
       <div className="mx-4 mb-3 rounded-2xl border-2 border-green-300 bg-[#f0fdf4] px-4 py-3">
@@ -359,7 +410,7 @@ function BottomTableChips({ currentTableId, onNewOrder }) {
       } else {
         byTable[o.table_id].itemCount += o.items?.length ?? 0
         // escalate status
-        const priority = ['needs_bill', 'preparing', 'sent_to_kitchen', 'delivered']
+        const priority = ['preparing', 'sent_to_kitchen', 'needs_bill', 'delivered']
         const cur = priority.indexOf(byTable[o.table_id].status)
         const nxt = priority.indexOf(o.status)
         if (nxt !== -1 && (cur === -1 || nxt < cur)) byTable[o.table_id].status = o.status
@@ -454,6 +505,69 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
   )
 }
 
+function cartFlyerSize(rect) {
+  return Math.min(86, Math.max(50, Math.min(rect.width, rect.height) * 0.26))
+}
+
+function FlyingCartItem({ flyer, onDone }) {
+  const [active, setActive] = useState(false)
+  const source = flyer.sourceRect
+  const target = flyer.targetRect
+  const targetSize = cartFlyerSize(target)
+  const targetScale = Math.min(0.32, Math.max(0.18, targetSize / Math.max(source.width, source.height)))
+  const startCenterX = source.left + source.width / 2
+  const startCenterY = source.top + source.height / 2
+  const endCenterX = target.left + target.width / 2
+  const endCenterY = target.top + target.height / 2
+  const dx = endCenterX - startCenterX
+  const dy = endCenterY - startCenterY
+
+  useEffect(() => {
+    const firstFrame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setActive(true))
+    })
+    const doneTimer = window.setTimeout(() => onDone(flyer.id), 760)
+    return () => {
+      window.cancelAnimationFrame(firstFrame)
+      window.clearTimeout(doneTimer)
+    }
+  }, [flyer.id])
+
+  return (
+    <div
+      className="pointer-events-none fixed z-[90] flex items-center justify-center overflow-hidden rounded-[22px] border-2 border-white bg-orange-50 shadow-2xl ring-2 ring-[#ff5a00]/25 will-change-transform"
+      style={{
+        left: source.left,
+        top: source.top,
+        width: source.width,
+        height: source.height,
+        transform: active
+          ? `translate3d(${dx}px, ${dy}px, 0) scale(${targetScale})`
+          : 'translate3d(0, 0, 0) scale(1)',
+        opacity: active ? 0.08 : 0.98,
+        transformOrigin: 'center center',
+        transition: 'transform 720ms cubic-bezier(0.16, 1, 0.3, 1), opacity 720ms ease-out, border-radius 720ms cubic-bezier(0.16, 1, 0.3, 1)',
+        borderRadius: active ? 18 : 22,
+      }}
+      aria-hidden="true"
+    >
+      {flyer.imageUrl ? (
+        <img
+          src={flyer.imageUrl}
+          alt=""
+          draggable="false"
+          className="h-full w-full object-cover object-center"
+        />
+      ) : (
+        <UtensilsCrossed size={Math.max(28, Math.min(source.width, source.height) * 0.24)} className="text-[#ff5a00]" />
+      )}
+      <span className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#ff5a00] text-white shadow-lg">
+        <Plus size={14} />
+      </span>
+    </div>
+  )
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function WaiterOrder() {
   const { tableId }         = useParams()
@@ -475,8 +589,13 @@ export default function WaiterOrder() {
   const [priceMode,     setPriceMode]    = useState(DEFAULT_PRICE_MODE)
   const [pendingPriceMode, setPendingPriceMode] = useState(null)
   const [detailItem,    setDetailItem]   = useState(null)
+  const [cartFlyers, setCartFlyers] = useState([])
+  const [cartPulse, setCartPulse] = useState(false)
   const productScrollRef = useRef(null)
   const savedMenuScrollRef = useRef(0)
+  const cartButtonRef = useRef(null)
+  const cartAnimationIdRef = useRef(0)
+  const cartPulseTimerRef = useRef(null)
   const shouldOpenOrderPanel = searchParams.get('panel') === 'order'
   const isManageOrderPanel = shouldOpenOrderPanel
   const routeOrderType = isTakeAwayFlow
@@ -506,7 +625,7 @@ export default function WaiterOrder() {
       waiter_name: item.waiter_name || o.waiter_name,
       created_at: item.created_at || o.created_at,
     })))
-    const priority = ['needs_bill', 'preparing', 'sent_to_kitchen', 'delivered']
+    const priority = ['preparing', 'sent_to_kitchen', 'needs_bill', 'delivered']
     for (const p of priority) {
       if (orders.some(o => o.status === p)) { merged.status = p; break }
     }
@@ -614,28 +733,76 @@ export default function WaiterOrder() {
     return map
   }, [state.menuItems])
 
+  useEffect(() => () => {
+    if (cartPulseTimerRef.current) window.clearTimeout(cartPulseTimerRef.current)
+  }, [])
+
   // ── Cart handlers ──────────────────────────────────────────────────────────
 
-  function handleAdd(item) {
-    if (isSendingOrder) return
-    if (menuItemRequiresOptions(item)) {
-      openDetail(item)
-      return
-    }
-    dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
+  function pulseCartButton() {
+    if (cartPulseTimerRef.current) window.clearTimeout(cartPulseTimerRef.current)
+    setCartPulse(true)
+    cartPulseTimerRef.current = window.setTimeout(() => setCartPulse(false), 280)
   }
 
-  function handleIncrement(item) {
+  function finishCartFlyer(id) {
+    setCartFlyers(current => current.filter(flyer => flyer.id !== id))
+    pulseCartButton()
+  }
+
+  function playCartAnimation(item, animation) {
+    const target = cartButtonRef.current
+    if (!target) return
+    const shouldReduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    if (!animation?.sourceRect || shouldReduceMotion) {
+      pulseCartButton()
+      return
+    }
+    const targetRect = target.getBoundingClientRect()
+    cartAnimationIdRef.current += 1
+    setCartFlyers(current => [
+      ...current,
+      {
+        id: cartAnimationIdRef.current,
+        sourceRect: animation.sourceRect,
+        targetRect: {
+          left: targetRect.left,
+          top: targetRect.top,
+          width: targetRect.width,
+          height: targetRect.height,
+        },
+        imageUrl: animation.imageUrl || item.image_url || '',
+        name: animation.name || getItemName(item, lang),
+      },
+    ].slice(-4))
+  }
+
+  function handleAdd(item, animation) {
     if (isSendingOrder) return
     if (menuItemRequiresOptions(item)) {
       openDetail(item)
       return
     }
     dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
+    playCartAnimation(item, animation)
+  }
+
+  function handleIncrement(item, animation) {
+    if (isSendingOrder) return
+    if (menuItemRequiresOptions(item)) {
+      openDetail(item)
+      return
+    }
+    dispatch({ type: 'ADD_TO_CART', payload: makeCartPayload(item) })
+    playCartAnimation(item, animation)
   }
 
   function handleDecrement(item) {
     if (isSendingOrder) return
+    if (menuItemRequiresOptions(item)) {
+      openDetail(item)
+      return
+    }
     const qty = (cartQtyMap[item.id] || 0) - 1
     if (qty <= 0) dispatch({ type: 'REMOVE_FROM_CART', payload: item.id })
     else dispatch({ type: 'UPDATE_CART_QTY', payload: { menu_item_id: item.id, qty } })
@@ -903,12 +1070,13 @@ export default function WaiterOrder() {
           />
 
           <button
+            ref={cartButtonRef}
             onClick={() => setCartOpen(true)}
             className={`relative ml-auto min-w-0 max-w-[min(260px,38vw)] flex-shrink rounded-xl border font-black transition-all active:scale-[0.98] ${
               cartCount > 0
                 ? 'bg-[#ff5a00] border-[#ff5a00] text-white shadow-md shadow-orange-100 hover:bg-[#e64d00]'
                 : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-orange-200 hover:bg-orange-50'
-            }`}
+            } ${cartPulse ? 'scale-[1.03] ring-4 ring-orange-200 ring-offset-2 ring-offset-white' : ''}`}
             title={cartCount > 0
               ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
               : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
@@ -1029,6 +1197,10 @@ export default function WaiterOrder() {
           </>
         )}
       </div>
+
+      {cartFlyers.map(flyer => (
+        <FlyingCartItem key={flyer.id} flyer={flyer} onDone={finishCartFlyer} />
+      ))}
 
       {/* ── Cart drawer ─────────────────────────────────────────────────── */}
       {!detailItem && cartOpen && (

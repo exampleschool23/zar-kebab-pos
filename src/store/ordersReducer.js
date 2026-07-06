@@ -191,8 +191,8 @@ export function ordersReducer(state, action) {
           t.id === tableId ? { ...t, status: 'occupied', updated_at: statusChangedAt } : t
         ),
         orders: state.orders.map(o =>
-          o.table_id === tableId && o.status === 'needs_bill' && o.payment_status !== 'paid'
-            ? { ...o, status: 'delivered', updated_at: statusChangedAt }
+          o.table_id === tableId && o.payment_status !== 'paid' && o.status !== 'cancelled'
+            ? { ...o, status: 'sent_to_kitchen', updated_at: statusChangedAt }
             : o
         ),
       }

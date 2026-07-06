@@ -111,10 +111,12 @@ function DateInput({ value, lang, onChange }) {
   const inputRef = useRef(null)
   const label = formatLongDate(value, lang, value)
 
-  function openPicker({ fallbackClick = true } = {}) {
+  function openPicker(event) {
+    if (event?.button && event.button !== 0) return
     const input = inputRef.current
     if (!input) return
 
+    input.focus()
     if (typeof input.showPicker === 'function') {
       try {
         input.showPicker()
@@ -123,38 +125,23 @@ function DateInput({ value, lang, onChange }) {
         // Fall back to focusing when showPicker is unavailable or blocked.
       }
     }
-
-    input.focus()
-    if (fallbackClick) input.click()
   }
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-label={label}
-      onClick={openPicker}
-      onKeyDown={event => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          openPicker()
-        }
-      }}
-      className="relative h-6 w-[138px] cursor-pointer"
+      onPointerDown={openPicker}
+      className="relative h-6 w-[138px] cursor-pointer rounded-md focus-within:ring-2 focus-within:ring-orange-100"
     >
-      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center whitespace-nowrap text-sm text-[#1F2937]">
+      <span className="pointer-events-none absolute inset-y-0 left-0 right-7 flex items-center overflow-hidden whitespace-nowrap text-sm text-[#1F2937]">
         {label}
       </span>
       <input
         ref={inputRef}
         type="date"
         value={value}
+        aria-label={label}
         onChange={event => onChange(event.target.value)}
-        onClick={event => {
-          event.stopPropagation()
-          openPicker({ fallbackClick: false })
-        }}
-        className="absolute inset-0 h-full w-full cursor-pointer bg-transparent text-sm text-transparent caret-transparent opacity-0 outline-none"
+        className="absolute inset-0 h-full w-full cursor-pointer bg-transparent text-sm text-transparent caret-transparent outline-none"
       />
     </div>
   )

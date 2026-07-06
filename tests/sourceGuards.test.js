@@ -669,6 +669,37 @@ test('hidden menu categories are hidden from customer-facing menus only', () => 
   assert.match(health, /menu_categories', 'id, name_uz, name_ru, name_en, hidden, sort_order'/)
 })
 
+test('AdminMenu visibility toggles show scoped loading feedback', () => {
+  const source = readSource('src/pages/AdminMenu.jsx')
+  const toggleButton = functionBody(source, 'VisibilityToggleButton')
+  const adminMenu = functionBody(source, 'AdminMenu')
+
+  assert.match(source, /Eye, EyeOff/)
+  assert.match(toggleButton, /const Icon = visible \? EyeOff : Eye/)
+  assert.match(toggleButton, /disabled=\{pending\}/)
+  assert.match(toggleButton, /pending \? <Loader2 size=\{14\} className="animate-spin" \/> : <Icon size=\{14\} \/>/)
+  assert.match(adminMenu, /const \[savingItemId, setSavingItemId\] = useState\(''\)/)
+  assert.match(adminMenu, /const \[savingCatId, setSavingCatId\] = useState\(''\)/)
+  assert.match(adminMenu, /async function toggleItemVisibility\(item\)/)
+  assert.match(adminMenu, /async function toggleCategoryVisibility\(cat\)/)
+  assert.match(source, /visibilityPending=\{savingItemId === item\.id\}/)
+  assert.match(source, /visibilityPending=\{savingCatId === cat\.id\}/)
+  assert.match(adminMenu, /return \(matchAvail \|\| savingItemId === item\.id\) && matchSearch/)
+  assert.match(source, /closeDisabled=\{savingItemForm\}/)
+  assert.match(source, /closeDisabled=\{savingCatForm\}/)
+})
+
+test('menu and category writes surface Supabase errors', () => {
+  const db = readSource('src/lib/db.js')
+
+  assert.match(db, /case 'ADD_MENU_ITEM': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_items'\)\.insert\(action\.payload\)[\s\S]*if \(error\) throw error/)
+  assert.match(db, /case 'UPDATE_MENU_ITEM': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_items'\)\.update\(fields\)\.eq\('id', id\)[\s\S]*if \(error\) throw error/)
+  assert.match(db, /case 'ADD_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.insert\(action\.payload\)[\s\S]*if \(error\) throw error/)
+  assert.match(db, /case 'UPDATE_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.update\(fields\)\.eq\('id', id\)[\s\S]*if \(error\) throw error/)
+  assert.match(db, /const results = await Promise\.all\(\[[\s\S]*supabase\.from\('menu_items'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
+  assert.match(db, /const results = await Promise\.all\(\[[\s\S]*supabase\.from\('menu_categories'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
+})
+
 test('Catering public page is routed and has Russian SEO and contact CTAs', () => {
   const app = readSource('src/App.jsx')
   const page = readSource('src/pages/CateringPage.jsx')
@@ -1147,7 +1178,7 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(db, /case 'CONFIRM_ORDER_DELIVERED':[\s\S]*if \(ordersError\) throw ordersError[\s\S]*assertUpdatedRows\(deliveredOrders[\s\S]*if \(itemsError\) throw itemsError[\s\S]*assertUpdatedRows\(servedItems/)
   // Bug fix (Jun 2026): uses neq('payment_status','paid') + null fallback so legacy orders are never skipped
   assert.match(db, /case 'MARK_TABLE_NEEDS_BILL':[\s\S]*\.neq\('payment_status', 'paid'\)[\s\S]*\.is\('payment_status', null\)[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'needs_bill' \}/)
-  assert.match(db, /case 'RECALL_TABLE_FROM_CASHIER':[\s\S]*\.update\(\{ status: 'delivered' \}\)[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'occupied' \}/)
+  assert.match(db, /case 'RECALL_TABLE_FROM_CASHIER':[\s\S]*\.update\(\{ status: 'sent_to_kitchen' \}\)[\s\S]*\.neq\('payment_status', 'paid'\)[\s\S]*\.neq\('status', 'cancelled'\)[\s\S]*updateRestaurantTableStatus\(tableId, \{ status: 'occupied' \}/)
   assert.match(appContext, /'RECALL_TABLE_FROM_CASHIER'/)
 })
 
@@ -1247,6 +1278,15 @@ test('WaiterTables keeps an explicit manage path for active waiting orders', () 
   assert.match(functionBody(source, 'handleManageOrder'), /navigate\(`\/waiter\/order\/\$\{table\.id\}\?panel=order`\)/)
 })
 
+test('WaiterTables shows recalled served bills as waiting for waiter edits', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+  const deriveStatus = functionBody(source, 'deriveStatus')
+
+  assert.match(deriveStatus, /const hasWaitingOrder = active\.some\(o => o\.status === 'sent_to_kitchen'\)/)
+  assert.match(deriveStatus, /if \(allServed && hasWaitingOrder\) return 'waiting_kitchen'/)
+  assert.match(deriveStatus, /if \(hasWaitingOrder\) return 'waiting_kitchen'[\s\S]*if \(active\.some\(o => o\.status === 'needs_bill'\)\) return 'needs_bill'/)
+})
+
 test('WaiterOrder opens the cart drawer from manage-order links', () => {
   const source = readSource('src/pages/WaiterOrder.jsx')
 
@@ -1314,7 +1354,31 @@ test('WaiterOrder keeps tablet product grids at three columns', () => {
   assert.doesNotMatch(source, /grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
 })
 
-test('WaiterOrder lets active and requested-bill order items be quantity-adjusted', () => {
+test('WaiterOrder animates menu item additions into the cart button', () => {
+  const waiterOrderSource = readSource('src/pages/WaiterOrder.jsx')
+  const productCardsSource = readSource('src/components/MenuProductCards.jsx')
+  const productCard = functionBody(productCardsSource, 'ProductCard')
+  const flyingCartItem = functionBody(waiterOrderSource, 'FlyingCartItem')
+  const waiterOrder = functionBody(waiterOrderSource, 'WaiterOrder')
+
+  assert.match(productCard, /data-menu-product-card/)
+  assert.match(productCard, /data-menu-product-image/)
+  assert.match(productCard, /function cartAnimationPayload\(event\)/)
+  assert.match(productCard, /onAdd\(item, cartAnimationPayload\(e\)\)/)
+  assert.match(productCard, /onIncrement\(item, cartAnimationPayload\(e\)\)/)
+  assert.match(waiterOrder, /const \[cartFlyers, setCartFlyers\] = useState\(\[\]\)/)
+  assert.match(waiterOrder, /const cartButtonRef = useRef\(null\)/)
+  assert.match(waiterOrder, /function playCartAnimation\(item, animation\)/)
+  assert.match(waiterOrderSource, /ref=\{cartButtonRef\}/)
+  assert.match(waiterOrderSource, /cartFlyers\.map\(flyer =>/)
+  assert.match(flyingCartItem, /const \[active, setActive\] = useState\(false\)/)
+  assert.match(flyingCartItem, /requestAnimationFrame\(\(\) => setActive\(true\)\)/)
+  assert.match(flyingCartItem, /translate3d\(\$\{dx\}px, \$\{dy\}px, 0\) scale\(\$\{targetScale\}\)/)
+  assert.match(flyingCartItem, /transition: 'transform 720ms cubic-bezier\(0\.16, 1, 0\.3, 1\)/)
+  assert.match(flyingCartItem, /onDone\(flyer\.id\)/)
+})
+
+test('WaiterOrder lets active, recalled and requested-bill order items be quantity-adjusted', () => {
   const source = readSource('src/pages/WaiterOrder.jsx')
   const panel = functionBody(source, 'OrderActionPanel')
 
@@ -1323,12 +1387,17 @@ test('WaiterOrder lets active and requested-bill order items be quantity-adjuste
   assert.match(source, /menuItemMap/)
   assert.match(source, /order_id: item\.order_id \|\| o\.id/)
   assert.match(panel, /canEditRequestedBill = \['admin', 'owner'\]/)
+  assert.match(panel, /const isRecalledWaiting = !inPreparation/)
   assert.match(panel, /function handleUpdateItemQty\(item, qty\)/)
   assert.match(panel, /type: 'UPDATE_BILL_ITEM_QTY'/)
+  assert.match(panel, /recalledEditableItems/)
+  assert.match(panel, /recalledEditableGroups/)
   assert.match(panel, /requestedBillEditableItems/)
   assert.match(panel, /const preparationEditableGroups = kitchenCheckGroups/)
   assert.match(panel, /const requestedBillEditableGroups = canEditRequestedBill/)
+  assert.match(panel, /const recalledEditableGroups = isRecalledWaiting/)
   assert.match(panel, /preparationEditableGroups\.map\(\(group, index\)/)
+  assert.match(panel, /recalledEditableGroups\.map\(\(group, index\)/)
   assert.match(panel, /requestedBillEditableGroups\.map\(\(group, index\)/)
   assert.match(panel, /<OrderItemQtyRow key=\{item\.id \|\| `\$\{group\.roundId\}-\$\{item\.menu_item_id\}`\} item=\{item\} \/>/)
   assert.match(source, /max-h-\[48dvh\][^"]*overflow-y-auto/)
@@ -1426,6 +1495,18 @@ test('completed order details do not show kitchen-cancelled items', () => {
   assert.match(reports, /isCancelledOrderItem/)
   assert.match(reports, /\(fetchedItems \|\| getOrderItems\(order\)\)\.filter\(item => !isCancelledOrderItem\(item\)\)/)
   assert.match(reports, /Ordered Items'} \(\{items\.length\}\)/)
+})
+
+test('reports date range text opens the native calendar picker', () => {
+  const reports = readSource('src/pages/Reports.jsx')
+  const dateInput = functionBody(reports, 'DateInput')
+
+  assert.match(dateInput, /const inputRef = useRef\(null\)/)
+  assert.match(dateInput, /onPointerDown=\{openPicker\}/)
+  assert.match(dateInput, /input\.showPicker\(\)/)
+  assert.match(dateInput, /formatLongDate\(value, lang, value\)/)
+  assert.match(dateInput, /text-transparent caret-transparent/)
+  assert.doesNotMatch(dateInput, /opacity-0/)
 })
 
 test('AdminTables protects table history and manages zones', () => {
@@ -2285,6 +2366,7 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(waiterOrder, /menuItemRequiresOptions\(item\)/)
   assert.match(waiterOrder, /map\[i\.menu_item_id\] = \(map\[i\.menu_item_id\] \|\| 0\) \+ \(Number\(i\.quantity\) \|\| 0\)/)
   assert.match(waiterOrder, /if \(menuItemRequiresOptions\(item\)\) \{\s*openDetail\(item\)/)
+  assert.match(functionBody(waiterOrder, 'handleDecrement'), /if \(menuItemRequiresOptions\(item\)\) \{\s*openDetail\(item\)[\s\S]*return/)
   assert.match(kitchenCheckReceipt, /getManualOrderNotes\(item, menuItem, lang\)/)
   assert.match(waiterOrder, /cart_item_key/)
   assert.match(waiterOrder, /menu_item_id: pricedItem\.id/)

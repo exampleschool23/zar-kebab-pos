@@ -21,7 +21,7 @@ import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
-  ImagePlus, Loader2, Bold, ArrowLeft,
+  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff,
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -117,14 +117,18 @@ function SafeMenuImage({ src, alt = '', className = '', fallbackClassName = '', 
   )
 }
 
-function Modal({ title, onClose, children }) {
+function Modal({ title, onClose, children, closeDisabled = false }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeDisabled ? undefined : onClose} />
       <div className="relative bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h3 className="font-bold text-gray-900">{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 transition-colors">
+          <button
+            onClick={onClose}
+            disabled={closeDisabled}
+            className="p-1.5 rounded-full hover:bg-gray-100 transition-colors disabled:cursor-wait disabled:opacity-50"
+          >
             <X size={17} className="text-gray-400" />
           </button>
         </div>
@@ -334,9 +338,64 @@ function ExternalIdBadge({ item, compact = false }) {
   )
 }
 
+function savingLabel(lang) {
+  return lang === 'uz' ? 'Saqlanmoqda' : lang === 'ru' ? 'Сохранение' : 'Saving'
+}
+
+function itemVisibilityStatusLabel(lang, visible) {
+  if (visible) return lang === 'uz' ? 'Mavjud' : lang === 'ru' ? 'Доступно' : 'Available'
+  return lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden'
+}
+
+function categoryVisibilityStatusLabel(lang, visible) {
+  if (visible) return lang === 'uz' ? 'Faol' : lang === 'ru' ? 'Активно' : 'Active'
+  return lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden'
+}
+
+function visibilityActionLabel(lang, visible, kind = 'item') {
+  if (kind === 'category') {
+    if (visible) return lang === 'uz' ? 'Kategoriyani yashirish' : lang === 'ru' ? 'Скрыть категорию' : 'Hide category'
+    return lang === 'uz' ? 'Kategoriyani ko‘rsatish' : lang === 'ru' ? 'Показать категорию' : 'Show category'
+  }
+  if (visible) return lang === 'uz' ? 'Mahsulotni yashirish' : lang === 'ru' ? 'Скрыть позицию' : 'Hide item'
+  return lang === 'uz' ? 'Mahsulotni ko‘rsatish' : lang === 'ru' ? 'Показать позицию' : 'Show item'
+}
+
+function saveFailedLabel(lang) {
+  return lang === 'uz'
+    ? 'O‘zgarishni saqlab bo‘lmadi. Internet ulanishini tekshiring.'
+    : lang === 'ru'
+      ? 'Не удалось сохранить изменение. Проверьте подключение.'
+      : 'Could not save the change. Check the connection.'
+}
+
+function VisibilityToggleButton({ visible, pending, onClick, lang, kind = 'item', compact = false }) {
+  const label = visibilityActionLabel(lang, visible, kind)
+  const Icon = visible ? EyeOff : Eye
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onPointerDown={event => event.stopPropagation()}
+      disabled={pending}
+      title={pending ? savingLabel(lang) : label}
+      aria-label={pending ? savingLabel(lang) : label}
+      className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border text-xs font-black transition-colors disabled:cursor-wait ${
+        visible
+          ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+      } ${compact ? 'w-9 px-0' : 'px-3'}`}
+    >
+      {pending ? <Loader2 size={14} className="animate-spin" /> : <Icon size={14} />}
+      {!compact && <span className="whitespace-nowrap">{pending ? savingLabel(lang) : label}</span>}
+    </button>
+  )
+}
+
 // ── Sortable grid card ────────────────────────────────────────────────────────
 
-function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging: _isDragging }) {
+function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, isDragging: _isDragging }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -409,26 +468,35 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
             </span>
           )}
         </div>
-        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit mb-3 ${
-          item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
-        }`}>
-          {item.available
-            ? (lang === 'uz' ? 'Mavjud' : lang === 'ru' ? 'Доступно' : 'Available')
-            : (lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто'  : 'Hidden')}
-        </span>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit ${
+            item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
+          }`}>
+            {itemVisibilityStatusLabel(lang, item.available)}
+          </span>
+          <VisibilityToggleButton
+            visible={!!item.available}
+            pending={visibilityPending}
+            onClick={() => onToggleVisibility(item)}
+            lang={lang}
+            compact
+          />
+        </div>
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-gray-50">
           <button
             onClick={() => onEdit(item)}
-            className="flex-1 flex h-10 items-center justify-center gap-1 rounded-xl border border-[#ff5a00]/20 bg-[#fff1e8] text-[#ff5a00] hover:bg-[#ff5a00] hover:text-white transition-colors text-[12px] font-bold"
+            disabled={visibilityPending}
+            className="flex-1 flex h-10 items-center justify-center gap-1 rounded-xl border border-[#ff5a00]/20 bg-[#fff1e8] text-[#ff5a00] hover:bg-[#ff5a00] hover:text-white transition-colors text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Edit2 size={11} />
             {lang === 'uz' ? 'Tahrirl' : lang === 'ru' ? 'Ред.' : 'Edit'}
           </button>
           <button
             onClick={() => onDelete(item.id)}
-            className="h-10 w-10 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center"
+            disabled={visibilityPending}
+            className="h-10 w-10 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Trash2 size={12} />
           </button>
@@ -440,7 +508,7 @@ function SortableItemCard({ item, lang, onEdit, onDelete, categories, isDragging
 
 // ── Sortable list row ─────────────────────────────────────────────────────────
 
-function SortableItemRow({ item, lang, onEdit, onDelete, categories }) {
+function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -477,21 +545,28 @@ function SortableItemRow({ item, lang, onEdit, onDelete, categories }) {
       <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ${
         item.available ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'
       }`}>
-        {item.available
-          ? (lang === 'uz' ? 'Mavjud' : lang === 'ru' ? 'Доступно' : 'Available')
-          : (lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто'  : 'Hidden')}
+        {itemVisibilityStatusLabel(lang, item.available)}
       </span>
       <div className="flex gap-1.5 flex-shrink-0">
+        <VisibilityToggleButton
+          visible={!!item.available}
+          pending={visibilityPending}
+          onClick={() => onToggleVisibility(item)}
+          lang={lang}
+          compact
+        />
         <button
           onClick={() => onEdit(item)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold"
+          disabled={visibilityPending}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Edit2 size={12} />
           {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Редакт.' : 'Edit'}
         </button>
         <button
           onClick={() => onDelete(item.id)}
-          className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+          disabled={visibilityPending}
+          className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Trash2 size={14} />
         </button>
@@ -505,7 +580,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, categories }) {
 // Shared grid template — header and every row must use the same string exactly.
 const CAT_GRID = 'grid grid-cols-[20px_52px_1fr_110px_90px_160px] items-center gap-4 px-5'
 
-function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, sortIndex }) {
+function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibility, visibilityPending, sortIndex }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id })
 
   const style = {
@@ -545,13 +620,21 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, sortIndex }) {
 
       {/* col 4 – status */}
       <div>
-        <span className={`text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full whitespace-nowrap ${
-          cat.hidden ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'
-        }`}>
-          {cat.hidden
-            ? (lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden')
-            : (lang === 'uz' ? 'Faol' : lang === 'ru' ? 'Активно' : 'Active')}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full whitespace-nowrap ${
+            cat.hidden ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'
+          }`}>
+            {categoryVisibilityStatusLabel(lang, !cat.hidden)}
+          </span>
+          <VisibilityToggleButton
+            visible={!cat.hidden}
+            pending={visibilityPending}
+            onClick={() => onToggleVisibility(cat)}
+            lang={lang}
+            kind="category"
+            compact
+          />
+        </div>
       </div>
 
       {/* col 5 – sort order (centred) */}
@@ -565,14 +648,16 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, sortIndex }) {
       <div className="flex gap-1.5 justify-end">
         <button
           onClick={() => onEdit(cat)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold"
+          disabled={visibilityPending}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Edit2 size={12} />
           {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Ред.' : 'Edit'}
         </button>
         <button
           onClick={() => onDelete(cat.id)}
-          className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+          disabled={visibilityPending}
+          className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Trash2 size={14} />
         </button>
@@ -823,6 +908,11 @@ export default function AdminMenu() {
   const [filterAvail,setFilterAvail]= useState('all')
   const [gridView,   setGridView]   = useState(true)
   const [activeId,   setActiveId]   = useState(null) // drag overlay
+  const [savingItemId, setSavingItemId] = useState('')
+  const [savingCatId, setSavingCatId] = useState('')
+  const [savingItemForm, setSavingItemForm] = useState(false)
+  const [savingCatForm, setSavingCatForm] = useState(false)
+  const [menuNotice, setMenuNotice] = useState(null)
   const uploadedItemImageUrlsRef = useRef(new Set())
   const uploadedCatImageUrlsRef = useRef(new Set())
   const productEditorInitializedRef = useRef('')
@@ -865,9 +955,9 @@ export default function AdminMenu() {
       const q           = search.trim().toLowerCase()
       const externalId  = String(item.external_id || item.externalId || '').toLowerCase()
       const matchSearch = !q || getItemName(item, lang).toLowerCase().includes(q) || externalId.includes(q)
-      return matchAvail && matchSearch
+      return (matchAvail || savingItemId === item.id) && matchSearch
     })
-  }, [sortedItems, filterAvail, search, lang])
+  }, [sortedItems, filterAvail, search, lang, savingItemId])
 
   const itemCountByCat = useMemo(() => {
     const m = { all: state.menuItems.length }
@@ -986,6 +1076,7 @@ export default function AdminMenu() {
     navigate(`/admin/menu/product/${encodeURIComponent(i.id)}`)
   }
   async function closeItemModal() {
+    if (savingItemForm) return
     await cleanupTrackedUploads(uploadedItemImageUrlsRef)
     setItemModal(null)
     if (isProductEditorPage) {
@@ -994,32 +1085,39 @@ export default function AdminMenu() {
     }
   }
   async function saveItem() {
+    if (savingItemForm) return
     if (!form.name_uz || !form.price || !form.category_id) return
-    const optionGroups = editorToOptionGroups(form.option_groups_editor, form.price)
-    const oldImageUrl = itemModal === 'edit'
-      ? state.menuItems.find(item => item.id === form.id)?.image_url
-      : ''
-    const { option_groups_editor: _optionGroupsEditor, option_groups: _optionGroups, ...formFields } = form
-    const result = await dispatch({
-      type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
-      payload: {
-        ...formFields,
-        option_groups: optionGroups,
-        external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
-        price: numberFromMoneyInput(form.price),
-        old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
-        grams: Math.max(0, Math.round(Number(form.grams) || 0)),
-        millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
-        kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
-        stock_count: Math.max(0, Math.round(Number(form.stock_count) || 0)),
-        sort_order: Number(form.sort_order) || 0,
-        quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
-        show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
-        cashier_only: !!form.cashier_only,
-        send_to_kitchen: !!form.send_to_kitchen,
-      },
-    })
-    if (!result?.error) {
+    setSavingItemForm(true)
+    setMenuNotice(null)
+    try {
+      const optionGroups = editorToOptionGroups(form.option_groups_editor, form.price)
+      const oldImageUrl = itemModal === 'edit'
+        ? state.menuItems.find(item => item.id === form.id)?.image_url
+        : ''
+      const { option_groups_editor: _optionGroupsEditor, option_groups: _optionGroups, ...formFields } = form
+      const result = await dispatch({
+        type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
+        payload: {
+          ...formFields,
+          option_groups: optionGroups,
+          external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
+          price: numberFromMoneyInput(form.price),
+          old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
+          grams: Math.max(0, Math.round(Number(form.grams) || 0)),
+          millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
+          kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
+          stock_count: Math.max(0, Math.round(Number(form.stock_count) || 0)),
+          sort_order: Number(form.sort_order) || 0,
+          quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
+          show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
+          cashier_only: !!form.cashier_only,
+          send_to_kitchen: !!form.send_to_kitchen,
+        },
+      })
+      if (result?.error) {
+        setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
+        return
+      }
       await cleanupTrackedUploads(uploadedItemImageUrlsRef, [form.image_url])
       if (oldImageUrl && oldImageUrl !== form.image_url) {
         await deleteMenuImageFromR2(oldImageUrl)
@@ -1029,6 +1127,24 @@ export default function AdminMenu() {
         productEditorInitializedRef.current = ''
         navigate('/admin/menu')
       }
+    } finally {
+      setSavingItemForm(false)
+    }
+  }
+  async function toggleItemVisibility(item) {
+    if (!item?.id || savingItemId) return
+    setSavingItemId(item.id)
+    setMenuNotice(null)
+    try {
+      const result = await dispatch({
+        type: 'UPDATE_MENU_ITEM',
+        payload: { ...item, available: !item.available },
+      })
+      if (result?.error) {
+        setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
+      }
+    } finally {
+      setSavingItemId('')
     }
   }
   function deleteItem(id) {
@@ -1049,24 +1165,50 @@ export default function AdminMenu() {
     setCatModal('edit')
   }
   async function closeCatModal() {
+    if (savingCatForm) return
     await cleanupTrackedUploads(uploadedCatImageUrlsRef)
     setCatModal(null)
   }
   async function saveCat() {
+    if (savingCatForm) return
     if (!catForm.name_uz) return
-    const oldImageUrl = catModal === 'edit'
-      ? state.categories.find(category => category.id === catForm.id)?.image_url
-      : ''
-    const result = await dispatch({
-      type: catModal === 'new' ? 'ADD_CATEGORY' : 'UPDATE_CATEGORY',
-      payload: { ...catForm, sort_order: Number(catForm.sort_order) || 0, hidden: !!catForm.hidden },
-    })
-    if (!result?.error) {
+    setSavingCatForm(true)
+    setMenuNotice(null)
+    try {
+      const oldImageUrl = catModal === 'edit'
+        ? state.categories.find(category => category.id === catForm.id)?.image_url
+        : ''
+      const result = await dispatch({
+        type: catModal === 'new' ? 'ADD_CATEGORY' : 'UPDATE_CATEGORY',
+        payload: { ...catForm, sort_order: Number(catForm.sort_order) || 0, hidden: !!catForm.hidden },
+      })
+      if (result?.error) {
+        setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
+        return
+      }
       await cleanupTrackedUploads(uploadedCatImageUrlsRef, [catForm.image_url])
       if (oldImageUrl && oldImageUrl !== catForm.image_url) {
         await deleteMenuImageFromR2(oldImageUrl)
       }
       setCatModal(null)
+    } finally {
+      setSavingCatForm(false)
+    }
+  }
+  async function toggleCategoryVisibility(cat) {
+    if (!cat?.id || cat.id === 'all' || savingCatId) return
+    setSavingCatId(cat.id)
+    setMenuNotice(null)
+    try {
+      const result = await dispatch({
+        type: 'UPDATE_CATEGORY',
+        payload: { ...cat, hidden: !cat.hidden },
+      })
+      if (result?.error) {
+        setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
+      }
+    } finally {
+      setSavingCatId('')
     }
   }
   function deleteCat(id) {
@@ -1137,7 +1279,8 @@ export default function AdminMenu() {
               <button
                 type="button"
                 onClick={closeItemModal}
-                className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900"
+                disabled={savingItemForm}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-wait disabled:opacity-50"
               >
                 <ArrowLeft size={18} />
               </button>
@@ -1153,6 +1296,11 @@ export default function AdminMenu() {
           </div>
 
           <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
+            {menuNotice && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                {menuNotice.message}
+              </div>
+            )}
             {!itemModal ? (
               <OperationalLoading
                 title={lang === 'uz' ? 'Mahsulot ochilmoqda' : lang === 'ru' ? 'Открываем товар' : 'Opening product'}
@@ -1236,24 +1384,25 @@ export default function AdminMenu() {
                       />
                     </div>
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
-                      <input type="checkbox" checked={form.available} onChange={e => setForm(f => ({ ...f, available: e.target.checked }))} className="h-4 w-4 accent-[#ff5a00]" />
+                      <input type="checkbox" checked={form.available} onChange={e => setForm(f => ({ ...f, available: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
                       {t(lang, 'available_item')}
                     </label>
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
-                      <input type="checkbox" checked={!!form.show_in_cashier_quick_items} onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked }))} className="h-4 w-4 accent-[#ff5a00]" />
+                      <input type="checkbox" checked={!!form.show_in_cashier_quick_items} onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
                       {lang === 'uz' ? 'Kassir tezkor mahsulotlarida ko‘rsatish' : lang === 'ru' ? 'Показывать в быстрых товарах кассира' : 'Show in cashier quick items'}
                     </label>
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
-                      <input type="checkbox" checked={!!form.cashier_only} onChange={e => setForm(f => ({ ...f, cashier_only: e.target.checked }))} className="h-4 w-4 accent-[#ff5a00]" />
+                      <input type="checkbox" checked={!!form.cashier_only} onChange={e => setForm(f => ({ ...f, cashier_only: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
                       {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
                     </label>
                   </section>
                   <div className="sticky bottom-4 flex gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
-                    <button onClick={closeItemModal} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                    <button onClick={closeItemModal} disabled={savingItemForm} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-50">
                       {t(lang, 'cancel')}
                     </button>
-                    <button onClick={saveItem} className="flex-1 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200">
-                      {t(lang, 'save')}
+                    <button onClick={saveItem} disabled={savingItemForm} className="flex-1 inline-flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200 disabled:cursor-wait disabled:bg-gray-300 disabled:shadow-none">
+                      {savingItemForm && <Loader2 size={15} className="animate-spin" />}
+                      {savingItemForm ? savingLabel(lang) : t(lang, 'save')}
                     </button>
                   </div>
                 </aside>
@@ -1299,6 +1448,11 @@ export default function AdminMenu() {
         </div>
 
         <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
+          {menuNotice && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              {menuNotice.message}
+            </div>
+          )}
 
           {/* ══ Menu Items tab ═══════════════════════════════════════════════ */}
           {tab === 'items' && (
@@ -1489,6 +1643,8 @@ export default function AdminMenu() {
                                       lang={lang}
                                       onEdit={openEditItem}
                                       onDelete={deleteItem}
+                                      onToggleVisibility={toggleItemVisibility}
+                                      visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
                                     />
                                   ))}
@@ -1502,6 +1658,8 @@ export default function AdminMenu() {
                                       lang={lang}
                                       onEdit={openEditItem}
                                       onDelete={deleteItem}
+                                      onToggleVisibility={toggleItemVisibility}
+                                      visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
                                     />
                                   ))}
@@ -1524,13 +1682,31 @@ export default function AdminMenu() {
                               {gridView ? (
                                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                                   {uncategorised.map(item => (
-                                    <SortableItemCard key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
+                                    <SortableItemCard
+                                      key={item.id}
+                                      item={item}
+                                      lang={lang}
+                                      onEdit={openEditItem}
+                                      onDelete={deleteItem}
+                                      onToggleVisibility={toggleItemVisibility}
+                                      visibilityPending={savingItemId === item.id}
+                                      categories={realSortedCats}
+                                    />
                                   ))}
                                 </div>
                               ) : (
                                 <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
                                   {uncategorised.map(item => (
-                                    <SortableItemRow key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
+                                    <SortableItemRow
+                                      key={item.id}
+                                      item={item}
+                                      lang={lang}
+                                      onEdit={openEditItem}
+                                      onDelete={deleteItem}
+                                      onToggleVisibility={toggleItemVisibility}
+                                      visibilityPending={savingItemId === item.id}
+                                      categories={realSortedCats}
+                                    />
                                   ))}
                                 </div>
                               )}
@@ -1542,13 +1718,31 @@ export default function AdminMenu() {
                         gridView ? (
                           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
                             {filteredItems.map(item => (
-                              <SortableItemCard key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
+                              <SortableItemCard
+                                key={item.id}
+                                item={item}
+                                lang={lang}
+                                onEdit={openEditItem}
+                                onDelete={deleteItem}
+                                onToggleVisibility={toggleItemVisibility}
+                                visibilityPending={savingItemId === item.id}
+                                categories={realSortedCats}
+                              />
                             ))}
                           </div>
                         ) : (
                           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
                             {filteredItems.map(item => (
-                              <SortableItemRow key={item.id} item={item} lang={lang} onEdit={openEditItem} onDelete={deleteItem} categories={realSortedCats} />
+                              <SortableItemRow
+                                key={item.id}
+                                item={item}
+                                lang={lang}
+                                onEdit={openEditItem}
+                                onDelete={deleteItem}
+                                onToggleVisibility={toggleItemVisibility}
+                                visibilityPending={savingItemId === item.id}
+                                categories={realSortedCats}
+                              />
                             ))}
                           </div>
                         )
@@ -1627,6 +1821,8 @@ export default function AdminMenu() {
                             itemCount={itemCountByCat[cat.id] || 0}
                             onEdit={openEditCat}
                             onDelete={deleteCat}
+                            onToggleVisibility={toggleCategoryVisibility}
+                            visibilityPending={savingCatId === cat.id}
                             sortIndex={idx + 1}
                           />
                         ))}
@@ -1727,6 +1923,8 @@ export default function AdminMenu() {
                             lang={lang}
                             onEdit={openEditItem}
                             onDelete={deleteItem}
+                            onToggleVisibility={toggleItemVisibility}
+                            visibilityPending={savingItemId === item.id}
                             categories={realSortedCats}
                           />
                         ))}
@@ -1758,8 +1956,13 @@ export default function AdminMenu() {
 
       {/* ── Item modal ──────────────────────────────────────────────────────── */}
       {itemModal && (
-        <Modal title={itemModal === 'new' ? t(lang, 'addItem') : t(lang, 'editItem')} onClose={closeItemModal}>
+        <Modal title={itemModal === 'new' ? t(lang, 'addItem') : t(lang, 'editItem')} onClose={closeItemModal} closeDisabled={savingItemForm}>
           <div className="space-y-3">
+            {menuNotice && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                {menuNotice.message}
+              </div>
+            )}
             <div>
               <label className="block text-xs text-gray-500 font-semibold mb-1.5">{t(lang, 'category')}</label>
               <select
@@ -1825,7 +2028,8 @@ export default function AdminMenu() {
                 type="checkbox"
                 checked={form.available}
                 onChange={e => setForm(f => ({ ...f, available: e.target.checked }))}
-                className="accent-[#ff5a00] w-4 h-4"
+                disabled={savingItemForm}
+                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
               />
               <label htmlFor="avail" className="text-sm text-gray-700 font-medium">{t(lang, 'available_item')}</label>
             </div>
@@ -1835,7 +2039,8 @@ export default function AdminMenu() {
                 type="checkbox"
                 checked={!!form.show_in_cashier_quick_items}
                 onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked }))}
-                className="accent-[#ff5a00] w-4 h-4"
+                disabled={savingItemForm}
+                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
               />
               <label htmlFor="cashierQuick" className="text-sm text-gray-700 font-medium">
                 {lang === 'uz' ? 'Kassir tezkor mahsulotlarida ko‘rsatish' : lang === 'ru' ? 'Показывать в быстрых товарах кассира' : 'Show in cashier quick items'}
@@ -1847,18 +2052,20 @@ export default function AdminMenu() {
                 type="checkbox"
                 checked={!!form.cashier_only}
                 onChange={e => setForm(f => ({ ...f, cashier_only: e.target.checked }))}
-                className="accent-[#ff5a00] w-4 h-4"
+                disabled={savingItemForm}
+                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
               />
               <label htmlFor="cashierOnly" className="text-sm text-gray-700 font-medium">
                 {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
               </label>
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={closeItemModal} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+              <button onClick={closeItemModal} disabled={savingItemForm} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-50">
                 {t(lang, 'cancel')}
               </button>
-              <button onClick={saveItem} className="flex-1 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200">
-                {t(lang, 'save')}
+              <button onClick={saveItem} disabled={savingItemForm} className="flex-1 inline-flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200 disabled:cursor-wait disabled:bg-gray-300 disabled:shadow-none">
+                {savingItemForm && <Loader2 size={15} className="animate-spin" />}
+                {savingItemForm ? savingLabel(lang) : t(lang, 'save')}
               </button>
             </div>
           </div>
@@ -1870,8 +2077,14 @@ export default function AdminMenu() {
         <Modal
           title={catModal === 'new' ? t(lang, 'addCategory') : (lang === 'uz' ? 'Kategoriyani tahrirlash' : lang === 'ru' ? 'Редактировать категорию' : 'Edit Category')}
           onClose={closeCatModal}
+          closeDisabled={savingCatForm}
         >
           <div className="space-y-3">
+            {menuNotice && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                {menuNotice.message}
+              </div>
+            )}
             <Field label={t(lang, 'nameUz')} value={catForm.name_uz} onChange={setCF('name_uz')} />
             <Field label={t(lang, 'nameRu')} value={catForm.name_ru} onChange={setCF('name_ru')} />
             <Field label={t(lang, 'nameEn')} value={catForm.name_en} onChange={setCF('name_en')} />
@@ -1891,18 +2104,20 @@ export default function AdminMenu() {
                 type="checkbox"
                 checked={!!catForm.hidden}
                 onChange={e => setCatForm(f => ({ ...f, hidden: e.target.checked }))}
-                className="accent-[#ff5a00] w-4 h-4"
+                disabled={savingCatForm}
+                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
               />
               <label htmlFor="categoryHidden" className="text-sm text-gray-700 font-medium">
                 {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
               </label>
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={closeCatModal} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+              <button onClick={closeCatModal} disabled={savingCatForm} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-50">
                 {t(lang, 'cancel')}
               </button>
-              <button onClick={saveCat} className="flex-1 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200">
-                {t(lang, 'save')}
+              <button onClick={saveCat} disabled={savingCatForm} className="flex-1 inline-flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200 disabled:cursor-wait disabled:bg-gray-300 disabled:shadow-none">
+                {savingCatForm && <Loader2 size={15} className="animate-spin" />}
+                {savingCatForm ? savingLabel(lang) : t(lang, 'save')}
               </button>
             </div>
           </div>

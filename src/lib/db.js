@@ -1005,19 +1005,19 @@ export async function writeToSupabase(action, state, options = {}) {
       const tableId = action.payload
       const { data: recalledOrders, error: ordersError } = await supabase
         .from('orders')
-        .update({ status: 'delivered' })
+        .update({ status: 'sent_to_kitchen' })
         .eq('table_id', tableId)
-        .eq('status', 'needs_bill')
         .neq('payment_status', 'paid')
+        .neq('status', 'cancelled')
         .select('id')
       if (ordersError) throw ordersError
 
       const { data: legacyOrders, error: legacyError } = await supabase
         .from('orders')
-        .update({ status: 'delivered' })
+        .update({ status: 'sent_to_kitchen' })
         .eq('table_id', tableId)
-        .eq('status', 'needs_bill')
         .is('payment_status', null)
+        .neq('status', 'cancelled')
         .select('id')
       if (legacyError) throw legacyError
 
@@ -1525,7 +1525,8 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'ADD_MENU_ITEM': {
-      await supabase.from('menu_items').insert(action.payload)
+      const { error } = await supabase.from('menu_items').insert(action.payload)
+      if (error) throw error
       break
     }
 
@@ -1533,12 +1534,14 @@ export async function writeToSupabase(action, state, options = {}) {
       const { id, ...fields } = action.payload
       delete fields.external_id
       delete fields.externalId
-      await supabase.from('menu_items').update(fields).eq('id', id)
+      const { error } = await supabase.from('menu_items').update(fields).eq('id', id)
+      if (error) throw error
       break
     }
 
     case 'DELETE_MENU_ITEM': {
-      await supabase.from('menu_items').delete().eq('id', action.payload)
+      const { error } = await supabase.from('menu_items').delete().eq('id', action.payload)
+      if (error) throw error
       break
     }
 
@@ -1548,10 +1551,12 @@ export async function writeToSupabase(action, state, options = {}) {
       const itemB = state.menuItems.find(i => i.id === idB)
       if (!itemA || !itemB) return
 
-      await Promise.all([
+      const results = await Promise.all([
         supabase.from('menu_items').update({ sort_order: itemB.sort_order ?? 0 }).eq('id', idA),
         supabase.from('menu_items').update({ sort_order: itemA.sort_order ?? 0 }).eq('id', idB),
       ])
+      const error = results.find(result => result.error)?.error
+      if (error) throw error
       break
     }
 
@@ -1563,26 +1568,31 @@ export async function writeToSupabase(action, state, options = {}) {
 
       const orderA = Number(itemA.quick_item_sort_order ?? itemA.sort_order ?? 0)
       const orderB = Number(itemB.quick_item_sort_order ?? itemB.sort_order ?? 0)
-      await Promise.all([
+      const results = await Promise.all([
         supabase.from('menu_items').update({ quick_item_sort_order: orderB }).eq('id', idA),
         supabase.from('menu_items').update({ quick_item_sort_order: orderA }).eq('id', idB),
       ])
+      const error = results.find(result => result.error)?.error
+      if (error) throw error
       break
     }
 
     case 'ADD_CATEGORY': {
-      await supabase.from('menu_categories').insert(action.payload)
+      const { error } = await supabase.from('menu_categories').insert(action.payload)
+      if (error) throw error
       break
     }
 
     case 'UPDATE_CATEGORY': {
       const { id, ...fields } = action.payload
-      await supabase.from('menu_categories').update(fields).eq('id', id)
+      const { error } = await supabase.from('menu_categories').update(fields).eq('id', id)
+      if (error) throw error
       break
     }
 
     case 'DELETE_CATEGORY': {
-      await supabase.from('menu_categories').delete().eq('id', action.payload)
+      const { error } = await supabase.from('menu_categories').delete().eq('id', action.payload)
+      if (error) throw error
       break
     }
 
@@ -1592,10 +1602,12 @@ export async function writeToSupabase(action, state, options = {}) {
       const catB = state.categories.find(c => c.id === idB)
       if (!catA || !catB) return
 
-      await Promise.all([
+      const results = await Promise.all([
         supabase.from('menu_categories').update({ sort_order: catB.sort_order ?? 0 }).eq('id', idA),
         supabase.from('menu_categories').update({ sort_order: catA.sort_order ?? 0 }).eq('id', idB),
       ])
+      const error = results.find(result => result.error)?.error
+      if (error) throw error
       break
     }
 

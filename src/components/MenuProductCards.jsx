@@ -249,8 +249,25 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
     window.setTimeout(() => setCopied(false), 1400)
   }
 
+  function cartAnimationPayload(event) {
+    const card = event.currentTarget.closest('[data-menu-product-card]')
+    const source = card?.querySelector('[data-menu-product-image]') || event.currentTarget
+    const rect = source.getBoundingClientRect()
+    return {
+      sourceRect: {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      },
+      imageUrl: item.image_url || '',
+      name: getItemName(item, lang),
+    }
+  }
+
   return (
     <div
+      data-menu-product-card
       onClick={() => onOpenDetail(item)}
       role="button"
       tabIndex={0}
@@ -263,7 +280,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             : 'rounded-[18px] border-2 border-[#E5E7EB] shadow-sm hover:shadow-md hover:border-gray-200'
       }`}
     >
-      <div className={`relative aspect-square w-full flex-shrink-0 overflow-hidden bg-orange-50 ${showCompactPublicCard ? 'rounded-b-[14px]' : ''}`}>
+      <div data-menu-product-image className={`relative aspect-square w-full flex-shrink-0 overflow-hidden bg-orange-50 ${showCompactPublicCard ? 'rounded-b-[14px]' : ''}`}>
         <SafeMenuImage
           src={item.image_url}
           alt={getItemName(item, lang)}
@@ -343,7 +360,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             </button>
             <span className="font-black text-[18px] text-[#ff5a00] min-w-[24px] text-center">{qty}</span>
             <button
-              onClick={e => { e.stopPropagation(); onIncrement(item) }}
+              onClick={e => { e.stopPropagation(); onIncrement(item, cartAnimationPayload(e)) }}
               className="w-9 h-9 rounded-xl bg-[#ff5a00] flex items-center justify-center hover:bg-[#cc4800] active:scale-90 transition-all shadow-sm"
             >
               <Plus size={14} className="text-white" />
@@ -351,7 +368,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           </div>
         ) : (
           <button
-            onClick={e => { e.stopPropagation(); onAdd(item) }}
+            onClick={e => { e.stopPropagation(); onAdd(item, cartAnimationPayload(e)) }}
             className="w-full rounded-xl bg-[#fff1e8] text-[#ff5a00] border border-[#ff5a00]/20 text-[13px] font-bold hover:bg-[#ff5a00] hover:text-white active:scale-95 transition-all flex items-center justify-center gap-1.5"
             style={{ height: dense ? '34px' : '40px' }}
           >
