@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
-import { canViewPage } from '../lib/permissions'
+import { canViewPage, normalizeRole } from '../lib/permissions'
 import { t } from '../lib/i18n'
 
 // ── Nav definition — roles come from PAGE_ACCESS to stay in sync ───────────────
@@ -77,9 +77,7 @@ const NAV = [
 const ROLE_LABELS = {
   owner:       { uz: 'Egasi',       ru: 'Владелец',      en: 'Owner'        },
   admin:       { uz: 'Admin',       ru: 'Администратор', en: 'Admin'        },
-  waiter:      { uz: 'Ofitsiant',   ru: 'Официант',      en: 'Waiter'       },
-  cashier:     { uz: 'Kassir',      ru: 'Кассир',        en: 'Cashier'      },
-  stakeholder: { uz: 'Stakeholder', ru: 'Стейкхолдер',   en: 'Stakeholder'  },
+  viewer:      { uz: 'Ko‘ruvchi',   ru: 'Просмотр',      en: 'Viewer'       },
   guest:       { uz: 'Mehmon',      ru: 'Гость',         en: 'Guest'        },
 }
 
@@ -109,7 +107,7 @@ export default function UnifiedSidebar({ onClose }) {
   const { profile, signOut } = useAuth()
 
   const lang    = state.lang
-  const role    = (profile?.role || state.user?.role || 'guest').toLowerCase()
+  const role    = normalizeRole(profile?.role || state.user?.role || 'guest')
   const current = activeKey(pathname)
 
   const displayName = profile?.full_name || state.user?.name || profile?.email || ''
@@ -141,7 +139,7 @@ export default function UnifiedSidebar({ onClose }) {
             {(ROLE_LABELS[role]?.[lang] || ROLE_LABELS[role]?.en) ?? role}
           </p>
         </div>
-        {role === 'stakeholder' && (
+        {role === 'viewer' && (
           <span className="ml-auto flex-shrink-0 text-[9px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md px-1.5 py-0.5 leading-none uppercase tracking-wide">
             {t(lang, 'viewer')}
           </span>

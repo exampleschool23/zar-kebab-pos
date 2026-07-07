@@ -584,14 +584,11 @@ const ORDER_TYPE_PERFORMANCE_STYLE = {
 const ROLE_BADGE = {
   owner:       'bg-orange-100 text-[#ff5a00] border-orange-200',
   admin:       'bg-blue-100 text-blue-700 border-blue-200',
-  waiter:      'bg-green-100 text-green-700 border-green-200',
-  cashier:     'bg-teal-100 text-teal-700 border-teal-200',
-  stakeholder: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  viewer:      'bg-indigo-100 text-indigo-700 border-indigo-200',
 }
 
 const ROLE_LABEL = {
-  owner: 'Owner', admin: 'Admin', waiter: 'Waiter',
-  cashier: 'Cashier', stakeholder: 'Stakeholder',
+  owner: 'Owner', admin: 'Admin', viewer: 'Viewer',
 }
 
 function DonutChart({ slices }) {

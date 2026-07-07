@@ -5,6 +5,7 @@ import { deleteProfile, getAllProfiles, updateProfile } from '../lib/supabase'
 import AppShell from '../components/AppShell'
 import StatusBadge from '../components/StatusBadge'
 import {
+  APP_ROLES,
   FEATURE_DEFINITIONS,
   assignableRoles,
   canDeleteTeamMember,
@@ -15,7 +16,7 @@ import {
 import { Search, RefreshCw, UserCircle2, Loader2, Eye, Trash2, X, Check, ShieldCheck, ChevronDown } from 'lucide-react'
 
 const STATUSES = ['pending', 'active', 'disabled']
-const ROLES = ['owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest']
+const ROLES = APP_ROLES
 
 const STATUS_LABELS = {
   pending:  { uz: 'Kutilmoqda', ru: 'Ожидает',   en: 'Pending'  },
@@ -26,9 +27,7 @@ const STATUS_LABELS = {
 const ROLE_LABELS = {
   owner:       { uz: 'Egasi',     ru: 'Владелец',   en: 'Owner' },
   admin:       { uz: 'Admin',     ru: 'Админ',      en: 'Admin' },
-  waiter:      { uz: 'Ofitsiant', ru: 'Официант',   en: 'Waiter' },
-  cashier:     { uz: 'Kassir',    ru: 'Кассир',     en: 'Cashier' },
-  stakeholder: { uz: 'Kuzatuvchi', ru: 'Наблюдатель', en: 'Stakeholder' },
+  viewer:      { uz: 'Ko‘ruvchi', ru: 'Просмотр',   en: 'Viewer' },
   guest:       { uz: 'Mehmon',    ru: 'Гость',      en: 'Guest' },
 }
 

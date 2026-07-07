@@ -12,6 +12,7 @@ const moveBackToTableFeatureSql = fs.readFileSync(new URL('../supabase/067_move_
 const primaryOwnerFeatureAccessSql = fs.readFileSync(new URL('../supabase/068_primary_owner_feature_access_manager.sql', import.meta.url), 'utf8')
 const manageNonPrimaryOwnersSql = fs.readFileSync(new URL('../supabase/069_manage_non_primary_owner_profiles.sql', import.meta.url), 'utf8')
 const featureAccessPosPoliciesSql = fs.readFileSync(new URL('../supabase/073_feature_access_pos_policies.sql', import.meta.url), 'utf8')
+const fourRoleFeatureAccessSql = fs.readFileSync(new URL('../supabase/077_four_role_feature_access.sql', import.meta.url), 'utf8')
 
 test('role-aware write migration removes broad menu and zone writes', () => {
   assert.match(sql, /drop policy if exists "staff_all_categories"/)
@@ -56,6 +57,14 @@ test('admin profile update policy cannot edit or assign admin role', () => {
   assert.match(adminCannotEditAdminsSql, /role not in \('owner', 'admin', 'stakeholder'\)/)
 })
 
+test('four-role migration maps legacy roles to feature-gated admin and viewer users', () => {
+  assert.match(fourRoleFeatureAccessSql, /set role = 'viewer'\s+where role = 'stakeholder'/)
+  assert.match(fourRoleFeatureAccessSql, /set role = 'admin'\s+where role in \('waiter', 'cashier', 'kitchen'\)/)
+  assert.match(fourRoleFeatureAccessSql, /check \(role in \('owner', 'admin', 'viewer', 'guest'\)\)/)
+  assert.match(fourRoleFeatureAccessSql, /array\['tables','team'\]::text\[\][\s\S]*where role = 'waiter'/)
+  assert.match(fourRoleFeatureAccessSql, /array\['dashboard','team','reports'\]::text\[\][\s\S]*where role = 'stakeholder'/)
+})
+
 test('profile feature access migration protects owner-managed feature overrides', () => {
   assert.match(featureAccessSql, /add column if not exists feature_access text\[\]/)
   assert.match(featureAccessSql, /current_staff_can_access\(feature_key text\)/)
@@ -64,20 +73,27 @@ test('profile feature access migration protects owner-managed feature overrides'
   assert.match(featureAccessSql, /Only owners can change feature access/)
 })
 
-test('feature access changes are limited to the primary owner account', () => {
-  assert.match(primaryOwnerFeatureAccessSql, /is_feature_access_manager\(\)/)
-  assert.match(primaryOwnerFeatureAccessSql, /lower\(p\.email\) = 'dangerhoggish@gmail\.com'/)
-  assert.match(primaryOwnerFeatureAccessSql, /not public\.is_feature_access_manager\(\)/)
-  assert.match(primaryOwnerFeatureAccessSql, /Only the primary owner can change feature access/)
+test('feature access changes are limited to owners in the final role model', () => {
+  assert.match(fourRoleFeatureAccessSql, /prevent_non_owner_feature_access_update/)
+  assert.match(fourRoleFeatureAccessSql, /not public\.is_owner\(\)/)
+  assert.match(fourRoleFeatureAccessSql, /Only owners can change feature access/)
+  assert.match(fourRoleFeatureAccessSql, /when p\.role = 'owner' and lower\(coalesce\(p\.email, ''\)\) = 'dangerhoggish@gmail\.com' then true/)
 })
 
-test('primary owner can restrict and delete non-primary owner profiles', () => {
-  assert.match(manageNonPrimaryOwnersSql, /public\.is_feature_access_manager\(\)/)
-  assert.match(manageNonPrimaryOwnersSql, /role <> 'stakeholder'/)
-  assert.match(manageNonPrimaryOwnersSql, /lower\(coalesce\(email, ''\)\) <> 'dangerhoggish@gmail\.com'/)
-  assert.match(manageNonPrimaryOwnersSql, /when p\.role = 'owner' and lower\(p\.email\) = 'dangerhoggish@gmail\.com' then true/)
-  assert.match(manageNonPrimaryOwnersSql, /when p\.feature_access is not null then feature_key = any\(p\.feature_access\)/)
-  assert.match(manageNonPrimaryOwnersSql, /when p\.role = 'owner' then true/)
+test('owner can delete admins but owners remain protected from profile deletion', () => {
+  assert.match(fourRoleFeatureAccessSql, /create policy "Owner: delete staff profiles"/)
+  assert.match(fourRoleFeatureAccessSql, /public\.is_owner\(\)/)
+  assert.match(fourRoleFeatureAccessSql, /id <> auth\.uid\(\)/)
+  assert.match(fourRoleFeatureAccessSql, /role <> 'owner'/)
+  assert.doesNotMatch(fourRoleFeatureAccessSql, /role <> 'stakeholder'/)
+})
+
+test('admins can update only viewer and guest profiles when team write access is granted', () => {
+  assert.match(fourRoleFeatureAccessSql, /create policy "Admin: update staff profiles"/)
+  assert.match(fourRoleFeatureAccessSql, /public\.current_staff_role\(\) = 'admin'/)
+  assert.match(fourRoleFeatureAccessSql, /public\.current_staff_can_write\('team'\)/)
+  assert.match(fourRoleFeatureAccessSql, /role in \('viewer', 'guest'\)/)
+  assert.doesNotMatch(fourRoleFeatureAccessSql, /role not in \('owner', 'admin', 'stakeholder'\)/)
 })
 
 test('accounting read policies honor explicit expenses feature access', () => {
@@ -86,6 +102,17 @@ test('accounting read policies honor explicit expenses feature access', () => {
   assert.match(featureAccessSql, /feature_access_read_employee_salary_profiles/)
   assert.match(featureAccessSql, /feature_access_read_employee_salary_rates/)
   assert.match(featureAccessSql, /feature_access_read_employee_salary_payments/)
+})
+
+test('accounting write policies require editor role plus expenses feature access', () => {
+  assert.match(fourRoleFeatureAccessSql, /current_staff_can_write\(feature_key text\)/)
+  assert.match(fourRoleFeatureAccessSql, /p\.role in \('owner', 'admin'\)/)
+  assert.match(fourRoleFeatureAccessSql, /feature_access_write_expenses/)
+  assert.match(fourRoleFeatureAccessSql, /public\.current_staff_can_write\('expenses'\)/)
+  assert.match(fourRoleFeatureAccessSql, /feature_access_write_employee_salary_profiles/)
+  assert.match(fourRoleFeatureAccessSql, /feature_access_write_employee_salary_payments/)
+  assert.match(fourRoleFeatureAccessSql, /feature_access_write_employee_salary_bonuses/)
+  assert.match(fourRoleFeatureAccessSql, /feature_access_write_employee_salary_absences/)
 })
 
 test('paid order deletion can be granted as explicit feature access', () => {
@@ -117,4 +144,15 @@ test('POS RLS policies honor explicit feature access instead of role-only checks
   assert.match(featureAccessPosPoliciesSql, /feature_access_read_order_payments/)
   assert.doesNotMatch(featureAccessPosPoliciesSql, /current_staff_has_role/)
   assert.doesNotMatch(featureAccessPosPoliciesSql, /array\['owner','admin','waiter','cashier','stakeholder'\]/)
+})
+
+test('final POS write policies require feature write access, not viewer-only access', () => {
+  assert.match(fourRoleFeatureAccessSql, /feature_access_write_menu_items/)
+  assert.match(fourRoleFeatureAccessSql, /public\.current_staff_can_write\('menu'\)/)
+  assert.match(fourRoleFeatureAccessSql, /feature_access_update_restaurant_table_status/)
+  assert.match(fourRoleFeatureAccessSql, /public\.current_staff_can_write\('tables'\) or public\.current_staff_can_write\('cashier'\)/)
+  assert.match(fourRoleFeatureAccessSql, /feature_access_insert_order_payments/)
+  assert.match(fourRoleFeatureAccessSql, /public\.current_staff_can_write\('cashier'\)/)
+  assert.match(fourRoleFeatureAccessSql, /feature_access_insert_order_item_cancellations/)
+  assert.doesNotMatch(fourRoleFeatureAccessSql, /array\['owner','admin','waiter','cashier','stakeholder'\]/)
 })

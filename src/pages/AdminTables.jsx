@@ -5,10 +5,12 @@ import {
   CalendarClock, Phone, CheckCircle2, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
 import AppShell from '../components/AppShell'
 import { canDeleteTable, canDisableTable } from '../lib/tableManagement'
 import { clearReservationPatch, compactTimelineLabels, getTodaysReservations } from '../lib/tableActivity'
 import { formatDateTime, formatTime } from '../lib/dateFormat'
+import { canEditFeature } from '../lib/permissions'
 
 const DEFAULT_ZONES = ['Main Hall', 'VIP', 'Outdoor', 'Second Floor']
 
@@ -386,7 +388,7 @@ function SummaryCard({ icon: Icon, label, value, tone }) {
   )
 }
 
-function ReservationStrip({ reservations, labels, onSeat, onCancel, onCall }) {
+function ReservationStrip({ reservations, labels, canEdit, onSeat, onCancel, onCall }) {
   return (
     <div className="mb-5 rounded-2xl border border-purple-100 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -415,14 +417,18 @@ function ReservationStrip({ reservations, labels, onSeat, onCancel, onCall }) {
                   {formatTime(reservation.startsAt)}
                 </span>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
-                <button onClick={() => onSeat(table)} className="inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-purple-600 text-[11px] font-black text-white">
-                  <CheckCircle2 size={12} />
-                  {labels.seat}
-                </button>
-                <button onClick={() => onCancel(table)} className="h-8 rounded-lg border border-purple-100 bg-white text-[11px] font-black text-purple-700">
-                  {labels.cancelReservation}
-                </button>
+              <div className={`mt-3 grid gap-1.5 ${canEdit ? 'grid-cols-3' : 'grid-cols-1'}`}>
+                {canEdit && (
+                  <>
+                    <button onClick={() => onSeat(table)} className="inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-purple-600 text-[11px] font-black text-white">
+                      <CheckCircle2 size={12} />
+                      {labels.seat}
+                    </button>
+                    <button onClick={() => onCancel(table)} className="h-8 rounded-lg border border-purple-100 bg-white text-[11px] font-black text-purple-700">
+                      {labels.cancelReservation}
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => onCall(reservation.phone)}
                   disabled={!reservation.phone}
@@ -457,9 +463,11 @@ function ActivityTimeline({ labels, table, orders }) {
 
 export default function AdminTables() {
   const { state, dispatch } = useApp()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const lang = state.lang || 'en'
   const l = L[lang] || L.en
+  const canManageTables = canEditFeature(profile || { role: state.user?.role }, 'settings')
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(() => normalizeTable({}))
   const [zoneName, setZoneName] = useState('')
@@ -531,6 +539,7 @@ export default function AdminTables() {
   )
 
   function openNew() {
+    if (!canManageTables) return
     const nextSort = state.tables.reduce((max, table) => Math.max(max, Number(table.sort_order) || 0), 0) + 1
     const firstZone = tableZones[0] || { id: 'main-hall', name: 'Main Hall' }
     setForm(normalizeTable({
@@ -553,6 +562,7 @@ export default function AdminTables() {
   }
 
   function openEdit(table) {
+    if (!canManageTables) return
     setForm(normalizeTable(table, tableZones))
     setErrors({})
     setModal('edit')
@@ -593,6 +603,7 @@ export default function AdminTables() {
   }
 
   async function save() {
+    if (!canManageTables) return
     const selectedZone = tableZones.find(z => z.id === form.zone_id || z.name === form.zone_name)
     const payload = {
       ...form,
@@ -624,6 +635,7 @@ export default function AdminTables() {
   }
 
   async function addZone() {
+    if (!canManageTables) return
     const name = zoneName.trim()
     setZoneError('')
     if (!name) {
@@ -650,6 +662,7 @@ export default function AdminTables() {
   }
 
   function requestDisable(table) {
+    if (!canManageTables) return
     const check = canDisableTable(table, state.orders)
     if (!check.ok && check.reason === 'active_orders') {
       setNotice({ tone: 'error', message: l.closeActiveBeforeDisable })
@@ -685,6 +698,7 @@ export default function AdminTables() {
   }
 
   function requestDelete(table) {
+    if (!canManageTables) return
     const check = canDeleteTable(table, state.orders)
     if (!check.ok && check.reason === 'active_orders') {
       setNotice({ tone: 'error', message: l.activeOrdersDeleteBlock })
@@ -712,6 +726,7 @@ export default function AdminTables() {
   }
 
   function toggleSelected(tableId) {
+    if (!canManageTables) return
     setSelectedIds(current => current.includes(tableId)
       ? current.filter(id => id !== tableId)
       : [...current, tableId]
@@ -719,6 +734,7 @@ export default function AdminTables() {
   }
 
   function toggleAllSelected() {
+    if (!canManageTables) return
     if (selectedIds.length === sortedTables.length) {
       setSelectedIds([])
     } else {
@@ -727,6 +743,7 @@ export default function AdminTables() {
   }
 
   async function applyBulkUpdates({ renumber = false } = {}) {
+    if (!canManageTables) return
     if (selectedTables.length === 0) return
     const selectedZone = tableZones.find(zone => zone.id === bulkZoneId)
     const nextCapacity = bulkCapacity === '' ? null : Math.max(1, Math.round(Number(bulkCapacity) || 1))
@@ -746,6 +763,7 @@ export default function AdminTables() {
   }
 
   async function moveTable(table, direction) {
+    if (!canManageTables) return
     const zoneTables = sortedTables
       .filter(row => (row.zone_id || row.zone_name) === (table.zone_id || table.zone_name))
       .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
@@ -757,11 +775,13 @@ export default function AdminTables() {
   }
 
   function seatReservation(table) {
+    if (!canManageTables) return
     dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
     navigate(`/waiter/order/${table.id}`)
   }
 
   function cancelReservation(table) {
+    if (!canManageTables) return
     dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
   }
 
@@ -778,13 +798,15 @@ export default function AdminTables() {
             <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
             <p className="mt-0.5 text-sm text-[#6B7280]">{l.description}</p>
           </div>
-          <button
-            onClick={openNew}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-lg shadow-orange-100 transition-colors hover:bg-[#cc4800]"
-          >
-            <Plus size={16} />
-            {l.addTable}
-          </button>
+          {canManageTables && (
+            <button
+              onClick={openNew}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-lg shadow-orange-100 transition-colors hover:bg-[#cc4800]"
+            >
+              <Plus size={16} />
+              {l.addTable}
+            </button>
+          )}
         </div>
 
         {notice && (
@@ -807,6 +829,7 @@ export default function AdminTables() {
         <ReservationStrip
           reservations={todaysReservations}
           labels={l}
+          canEdit={canManageTables}
           onSeat={seatReservation}
           onCancel={cancelReservation}
           onCall={callReservation}
@@ -826,24 +849,28 @@ export default function AdminTables() {
               </span>
             ))}
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              value={zoneName}
-              onChange={e => setZoneName(e.target.value)}
-              placeholder={l.addZonePlaceholder}
-              className="h-10 flex-1 rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
-            />
-            <button
-              onClick={addZone}
-              className="h-10 rounded-xl border border-[#E5E7EB] bg-gray-50 px-4 text-sm font-black text-[#1F2937] transition-colors hover:bg-gray-100"
-            >
-              {l.addZone}
-            </button>
-          </div>
-          {zoneError && <p className="mt-2 text-xs font-bold text-red-600">{zoneError}</p>}
+          {canManageTables && (
+            <>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={zoneName}
+                  onChange={e => setZoneName(e.target.value)}
+                  placeholder={l.addZonePlaceholder}
+                  className="h-10 flex-1 rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
+                />
+                <button
+                  onClick={addZone}
+                  className="h-10 rounded-xl border border-[#E5E7EB] bg-gray-50 px-4 text-sm font-black text-[#1F2937] transition-colors hover:bg-gray-100"
+                >
+                  {l.addZone}
+                </button>
+              </div>
+              {zoneError && <p className="mt-2 text-xs font-bold text-red-600">{zoneError}</p>}
+            </>
+          )}
         </div>
 
-        {selectedIds.length > 0 && (
+        {canManageTables && selectedIds.length > 0 && (
           <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -908,6 +935,7 @@ export default function AdminTables() {
                     <input
                       type="checkbox"
                       checked={selected}
+                      disabled={!canManageTables}
                       onChange={() => toggleSelected(table.id)}
                       className="h-4 w-4 rounded border-gray-300 text-[#ff5a00]"
                       aria-label={`${l.select} ${table.name}`}
@@ -942,52 +970,58 @@ export default function AdminTables() {
                     {Number(table.sort_order) || 0}
                   </div>
                   <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={() => moveTable(table, -1)}
-                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                      title={l.moveUp}
-                    >
-                      <ArrowUp size={15} />
-                    </button>
-                    <button
-                      onClick={() => moveTable(table, 1)}
-                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                      title={l.moveDown}
-                    >
-                      <ArrowDown size={15} />
-                    </button>
-                    <button
-                      onClick={() => openEdit(table)}
-                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-orange-50 hover:text-[#ff5a00]"
-                      title={l.edit}
-                    >
-                      <Edit2 size={15} />
-                    </button>
-                    <button
-                      onClick={() => openEdit({ ...table, status: 'reserved' })}
-                      disabled={activeOrders || table.is_active === false}
-                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-purple-50 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-40"
-                      title={l.reserve}
-                    >
-                      <CalendarClock size={15} />
-                    </button>
-                    <button
-                      onClick={() => requestDisable(table)}
-                      disabled={table.is_active === false}
-                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
-                      title={l.disable}
-                    >
-                      <PowerOff size={15} />
-                    </button>
-                    <button
-                      onClick={() => requestDelete(table)}
-                      disabled={!canHardDelete}
-                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-gray-400"
-                      title={deleteTitle}
-                      aria-label={deleteTitle}
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {canManageTables ? (
+                      <>
+                        <button
+                          onClick={() => moveTable(table, -1)}
+                          className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                          title={l.moveUp}
+                        >
+                          <ArrowUp size={15} />
+                        </button>
+                        <button
+                          onClick={() => moveTable(table, 1)}
+                          className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                          title={l.moveDown}
+                        >
+                          <ArrowDown size={15} />
+                        </button>
+                        <button
+                          onClick={() => openEdit(table)}
+                          className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-orange-50 hover:text-[#ff5a00]"
+                          title={l.edit}
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                        <button
+                          onClick={() => openEdit({ ...table, status: 'reserved' })}
+                          disabled={activeOrders || table.is_active === false}
+                          className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-purple-50 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          title={l.reserve}
+                        >
+                          <CalendarClock size={15} />
+                        </button>
+                        <button
+                          onClick={() => requestDisable(table)}
+                          disabled={table.is_active === false}
+                          className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          title={l.disable}
+                        >
+                          <PowerOff size={15} />
+                        </button>
+                        <button
+                          onClick={() => requestDelete(table)}
+                          disabled={!canHardDelete}
+                          className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-gray-400"
+                          title={deleteTitle}
+                          aria-label={deleteTitle}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-xs font-bold text-gray-300">—</span>
+                    )}
                   </div>
                 </div>
               )

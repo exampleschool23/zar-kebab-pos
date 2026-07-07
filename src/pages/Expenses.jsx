@@ -20,6 +20,7 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
+import { canEditFeature } from '../lib/permissions'
 import { getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
@@ -36,6 +37,7 @@ import {
   expensePaymentMethodLabel,
   getNetIncome,
   getTotalSalaryDue,
+  isGeneratedSalaryExpense,
   normalizeExpenseAmount,
   normalizeExpenseEntryType,
   summarizeExpenseCashflow,
@@ -171,8 +173,8 @@ export default function Expenses() {
   const navigate = useNavigate()
   const lang = state.lang || 'ru'
   const role = (profile?.role || state.user?.role || 'guest').toLowerCase()
-  const canAdd = role === 'owner'
-  const canDelete = role === 'owner'
+  const canAdd = canEditFeature(profile || { role }, 'expenses')
+  const canDelete = canEditFeature(profile || { role }, 'expenses')
 
   const [dateFrom, setDateFrom] = useState(() => todayExpenseDate().slice(0, 8) + '01')
   const [dateTo, setDateTo] = useState(() => todayExpenseDate())
@@ -502,7 +504,7 @@ export default function Expenses() {
   }
 
   async function deleteExpense(expense) {
-    if (!canDelete || !expense?.id) return
+    if (!canDelete || !expense?.id || isGeneratedSalaryExpense(expense)) return
     if (confirmDeleteId !== expense.id) {
       setConfirmDeleteId(expense.id)
       return
@@ -815,7 +817,7 @@ function ExpenseHistorySection({
                 </div>
                 <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
                   <p className={`text-lg font-black ${tone.amount}`}>{formatCurrency(expense.amount)}</p>
-                  {canDelete && !expense.is_salary_auto && (
+                  {canDelete && !isGeneratedSalaryExpense(expense) && (
                     <button onClick={() => onDelete(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
                       confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
                     }`}>

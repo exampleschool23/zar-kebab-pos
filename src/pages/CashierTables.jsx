@@ -24,7 +24,7 @@ import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLa
 import { getItemName } from '../lib/i18n'
 import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import { formatDateTime, formatElapsedSince, formatTime, parseInstantDate } from '../lib/dateFormat'
-import { canDeletePaidOrders, canMoveBackToTable } from '../lib/permissions'
+import { canDeletePaidOrders, canEditFeature, canMoveBackToTable } from '../lib/permissions'
 import { getOrderItemOptionLines } from '../components/MenuProductCards'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -286,6 +286,7 @@ function BillCard({
   quickAddBusyKey = '',
   quickAddError = '',
   onRecall,
+  canEdit,
   canDelete,
   onDelete,
   confirmDelete,
@@ -394,7 +395,7 @@ function BillCard({
           )}
         </div>
 
-        {readyForCashier && quickItems.length > 0 && (
+        {canEdit && readyForCashier && quickItems.length > 0 && (
           <div className="mt-4 rounded-xl border border-orange-100 bg-orange-50/40 p-3">
             <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#ff5a00]">{l.quickItems}</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -436,7 +437,7 @@ function BillCard({
               <Receipt size={16} />
               {l.openBill}
             </button>
-            {order.status === 'needs_bill' && !isOffPremiseOrderType(orderType) && onRecall && (
+            {canEdit && order.status === 'needs_bill' && !isOffPremiseOrderType(orderType) && onRecall && (
               <button
                 onClick={() => onRecall(order)}
                 className="w-full flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 text-gray-600 py-2.5 text-[13px] font-bold hover:bg-gray-100 active:scale-[0.98] transition-all"
@@ -617,6 +618,7 @@ export default function CashierTables() {
   const [quickAddBusyKey, setQuickAddBusyKey] = useState('')
   const [quickAddErrorByOrderId, setQuickAddErrorByOrderId] = useState({})
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
+  const canEditCashier = canEditFeature(profile || { role: state.user?.role }, 'cashier')
   const canRecallTable = canMoveBackToTable(profile || { role: state.user?.role })
 
   // ── Menu item lookup map ────────────────────────────────────────────────────
@@ -778,7 +780,7 @@ export default function CashierTables() {
   const visibleBillCount = billSections.reduce((sum, section) => sum + section.bills.length, 0)
 
   function handleRecallTable(order) {
-    if (!order?.table_id) return
+    if (!canEditCashier || !order?.table_id) return
     dispatch({ type: 'RECALL_TABLE_FROM_CASHIER', payload: order.table_id })
   }
 
@@ -810,7 +812,7 @@ export default function CashierTables() {
   }
 
   async function handleAddQuickItem(order, item) {
-    if (!order?.id || !item?.id) return
+    if (!canEditCashier || !order?.id || !item?.id) return
     const orderType = inferOrderType(order)
     const busyKey = `${order.id}:${item.id}`
     setQuickAddBusyKey(busyKey)
@@ -1017,8 +1019,9 @@ export default function CashierTables() {
                     onAddQuickItem={handleAddQuickItem}
                     quickAddBusyKey={quickAddBusyKey}
                     quickAddError={quickAddErrorByOrderId[order.id]}
+                    canEdit={canEditCashier}
                     canDelete={canDeleteOrder}
-                    onRecall={canRecallTable ? handleRecallTable : null}
+                    onRecall={canEditCashier && canRecallTable ? handleRecallTable : null}
                     onDelete={handleDeleteOrder}
                     confirmDelete={confirmDeleteOrderId === order.id}
                     isDeleting={deletingOrderId === order.id}

@@ -323,7 +323,7 @@ function InternalAppRoutes({ adminHost = false }) {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
 
-        {/* Waiter — tables & order flow only; no cashier */}
+        {/* Tables/order flow: visible to profiles with the tables feature. */}
         <Route path="/waiter/tables" element={
           <LazyProtectedRoute page="tables"><WaiterTables /></LazyProtectedRoute>
         } />
@@ -339,7 +339,7 @@ function InternalAppRoutes({ adminHost = false }) {
 
         <Route path="/kitchen" element={<Navigate to="/admin" replace />} />
 
-        {/* Cashier — cashier + admin/owner; waiters are redirected */}
+        {/* Cashier flow: visible to profiles with the cashier feature. */}
         <Route path="/cashier/tables" element={
           <LazyProtectedRoute page="cashier"><CashierTables /></LazyProtectedRoute>
         } />
@@ -356,7 +356,7 @@ function InternalAppRoutes({ adminHost = false }) {
           <LazyProtectedRoute page="cashier"><TableReceipt /></LazyProtectedRoute>
         } />
 
-        {/* Dashboard — admin, owner, cashier, stakeholder */}
+        {/* Dashboard: visible to profiles with the dashboard feature. */}
         <Route path="/admin" element={
           <LazyProtectedRoute page="dashboard"><AdminDashboard /></LazyProtectedRoute>
         } />

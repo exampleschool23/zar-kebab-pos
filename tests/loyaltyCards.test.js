@@ -114,7 +114,7 @@ test('loyalty card registration is owner/admin and preserves exact 8-digit card 
 
   const adminCreated = createLoyaltyCardRecord({ role: 'admin', cardNumber: '11112222' })
   assert.equal(adminCreated.card_number, '11112222')
-  assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'cashier', cardNumber: '11112222' }), 'forbidden')
+  assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'viewer', cardNumber: '11112222' }), 'forbidden')
   assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'owner', cardNumber: '1234567' }), 'invalid_card_number')
   assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'owner', cardNumber: '123456789' }), 'invalid_card_number')
   assertLoyaltyError(() => createLoyaltyCardRecord({ role: 'owner', cardNumber: '1234abcd' }), 'invalid_card_number')
@@ -278,7 +278,7 @@ test('cashback type is immutable after registration while customer details remai
   assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { cashback_type: 'black' } }), 'cashback_type_locked')
   assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { cashbackType: 'black' } }), 'cashback_type_locked')
   assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'owner', card: original, patch: { card_number: '87654321' } }), 'card_number_locked')
-  assertLoyaltyError(() => editLoyaltyCardRecord({ role: 'admin', card: original, patch: { customer_name: 'Admin Edit' } }), 'forbidden')
+  assert.equal(editLoyaltyCardRecord({ role: 'admin', card: original, patch: { customer_name: 'Admin Edit' } }).customer_name, 'Admin Edit')
 })
 
 test('manual balance adjustment is owner-only, reasoned, transactional and never negative', () => {
@@ -316,24 +316,28 @@ test('manual balance adjustment is owner-only, reasoned, transactional and never
   assert.equal(base.balance, 50000)
 })
 
-test('loyalty permissions allow admin creation while keeping financial mutations owner-only', () => {
+test('loyalty permissions allow admin card editing while keeping financial mutations owner-only', () => {
   assert.equal(canViewLoyaltyCards('owner'), true)
   assert.equal(canViewLoyaltyCards('admin'), true)
-  assert.equal(canViewLoyaltyCards('cashier'), true)
-  assert.equal(canViewLoyaltyCards('waiter'), false)
+  assert.equal(canViewLoyaltyCards('viewer'), true)
+  assert.equal(canViewLoyaltyCards('guest'), false)
   assert.equal(canCreateLoyaltyCard('owner'), true)
   assert.equal(canCreateLoyaltyCard('admin'), true)
   assert.equal(canEditLoyaltyCard('owner'), true)
+  assert.equal(canEditLoyaltyCard('admin'), true)
   assert.equal(canAdjustLoyaltyBalance('owner'), true)
   assert.equal(canRemoveLoyaltyCard('owner'), true)
   assert.equal(canDeleteLoyaltyTransaction('owner'), true)
 
-  for (const role of ['cashier', 'waiter', 'stakeholder', 'guest']) {
+  for (const role of ['viewer', 'guest']) {
     assert.equal(canCreateLoyaltyCard(role), false)
   }
 
-  for (const role of ['admin', 'cashier', 'waiter', 'stakeholder', 'guest']) {
+  for (const role of ['viewer', 'guest']) {
     assert.equal(canEditLoyaltyCard(role), false)
+  }
+
+  for (const role of ['admin', 'viewer', 'guest']) {
     assert.equal(canAdjustLoyaltyBalance(role), false)
     assert.equal(canRemoveLoyaltyCard(role), false)
     assert.equal(canDeleteLoyaltyTransaction(role), false)

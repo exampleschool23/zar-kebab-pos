@@ -300,6 +300,16 @@ export function buildSalaryBonusExpenseRows(salaryProfiles = [], dateFrom, dateT
   return rows
 }
 
+export function isGeneratedSalaryExpense(expense) {
+  const id = String(expense?.id || '')
+  return Boolean(
+    expense?.is_salary_auto ||
+    expense?.is_salary_payment ||
+    expense?.is_salary_bonus ||
+    id.startsWith('salary-')
+  )
+}
+
 export function getSalaryPaidAmount(salaryProfile, dateTo = todayExpenseDate()) {
   return (salaryProfile?.payments || []).reduce((sum, payment) => {
     if (payment?.paid_date && payment.paid_date > dateTo) return sum

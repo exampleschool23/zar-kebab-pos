@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
@@ -28,6 +29,7 @@ import { useAppDataStatus } from '../store/appHooks'
 import ImageLoadShimmer from '../components/ImageLoadShimmer'
 import { supabase } from '../lib/supabase'
 import { formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput } from '../lib/moneyInput'
+import { canEditFeature } from '../lib/permissions'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -395,7 +397,7 @@ function VisibilityToggleButton({ visible, pending, onClick, lang, kind = 'item'
 
 // ── Sortable grid card ────────────────────────────────────────────────────────
 
-function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, isDragging: _isDragging }) {
+function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, isDragging: _isDragging, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -422,14 +424,16 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
           fallbackClassName="aspect-square w-full"
         />
         {/* Drag handle overlay */}
-        <button
-          {...listeners}
-          {...attributes}
-          className="absolute top-2 left-2 p-1.5 rounded-xl bg-white/85 backdrop-blur-sm text-gray-400 hover:text-gray-700 hover:bg-white transition-colors cursor-grab active:cursor-grabbing touch-none shadow-sm"
-          tabIndex={-1}
-        >
-          <GripVertical size={15} />
-        </button>
+        {!readOnly && (
+          <button
+            {...listeners}
+            {...attributes}
+            className="absolute top-2 left-2 p-1.5 rounded-xl bg-white/85 backdrop-blur-sm text-gray-400 hover:text-gray-700 hover:bg-white transition-colors cursor-grab active:cursor-grabbing touch-none shadow-sm"
+            tabIndex={-1}
+          >
+            <GripVertical size={15} />
+          </button>
+        )}
       </div>
 
       {/* Body */}
@@ -474,33 +478,37 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
           }`}>
             {itemVisibilityStatusLabel(lang, item.available)}
           </span>
-          <VisibilityToggleButton
-            visible={!!item.available}
-            pending={visibilityPending}
-            onClick={() => onToggleVisibility(item)}
-            lang={lang}
-            compact
-          />
+          {!readOnly && (
+            <VisibilityToggleButton
+              visible={!!item.available}
+              pending={visibilityPending}
+              onClick={() => onToggleVisibility(item)}
+              lang={lang}
+              compact
+            />
+          )}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-gray-50">
-          <button
-            onClick={() => onEdit(item)}
-            disabled={visibilityPending}
-            className="flex-1 flex h-10 items-center justify-center gap-1 rounded-xl border border-[#ff5a00]/20 bg-[#fff1e8] text-[#ff5a00] hover:bg-[#ff5a00] hover:text-white transition-colors text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Edit2 size={11} />
-            {lang === 'uz' ? 'Tahrirl' : lang === 'ru' ? 'Ред.' : 'Edit'}
-          </button>
-          <button
-            onClick={() => onDelete(item.id)}
-            disabled={visibilityPending}
-            className="h-10 w-10 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-gray-50">
+            <button
+              onClick={() => onEdit(item)}
+              disabled={visibilityPending}
+              className="flex-1 flex h-10 items-center justify-center gap-1 rounded-xl border border-[#ff5a00]/20 bg-[#fff1e8] text-[#ff5a00] hover:bg-[#ff5a00] hover:text-white transition-colors text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Edit2 size={11} />
+              {lang === 'uz' ? 'Tahrirl' : lang === 'ru' ? 'Ред.' : 'Edit'}
+            </button>
+            <button
+              onClick={() => onDelete(item.id)}
+              disabled={visibilityPending}
+              className="h-10 w-10 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -508,7 +516,7 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
 
 // ── Sortable list row ─────────────────────────────────────────────────────────
 
-function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending }) {
+function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -526,7 +534,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
       style={style}
       className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
     >
-      <DragHandle listeners={listeners} attributes={attributes} />
+      {!readOnly && <DragHandle listeners={listeners} attributes={attributes} />}
       {item.image_url ? (
         <img src={item.image_url} alt="" className="h-12 w-12 flex-shrink-0 rounded-xl object-cover object-center" />
       ) : (
@@ -547,30 +555,32 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
       }`}>
         {itemVisibilityStatusLabel(lang, item.available)}
       </span>
-      <div className="flex gap-1.5 flex-shrink-0">
-        <VisibilityToggleButton
-          visible={!!item.available}
-          pending={visibilityPending}
-          onClick={() => onToggleVisibility(item)}
-          lang={lang}
-          compact
-        />
-        <button
-          onClick={() => onEdit(item)}
-          disabled={visibilityPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Edit2 size={12} />
-          {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Редакт.' : 'Edit'}
-        </button>
-        <button
-          onClick={() => onDelete(item.id)}
-          disabled={visibilityPending}
-          className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
+      {!readOnly && (
+        <div className="flex gap-1.5 flex-shrink-0">
+          <VisibilityToggleButton
+            visible={!!item.available}
+            pending={visibilityPending}
+            onClick={() => onToggleVisibility(item)}
+            lang={lang}
+            compact
+          />
+          <button
+            onClick={() => onEdit(item)}
+            disabled={visibilityPending}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Edit2 size={12} />
+            {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Редакт.' : 'Edit'}
+          </button>
+          <button
+            onClick={() => onDelete(item.id)}
+            disabled={visibilityPending}
+            className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -580,7 +590,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
 // Shared grid template — header and every row must use the same string exactly.
 const CAT_GRID = 'grid grid-cols-[20px_52px_1fr_110px_90px_160px] items-center gap-4 px-5'
 
-function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibility, visibilityPending, sortIndex }) {
+function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibility, visibilityPending, sortIndex, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id })
 
   const style = {
@@ -597,7 +607,7 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
       className={`${CAT_GRID} py-4 hover:bg-gray-50/60 transition-colors border-b border-gray-100 last:border-0`}
     >
       {/* col 1 – drag handle */}
-      <DragHandle listeners={listeners} attributes={attributes} />
+      {!readOnly && <DragHandle listeners={listeners} attributes={attributes} />}
 
       {/* col 2 – image */}
       {cat.image_url ? (
@@ -626,14 +636,16 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
           }`}>
             {categoryVisibilityStatusLabel(lang, !cat.hidden)}
           </span>
-          <VisibilityToggleButton
-            visible={!cat.hidden}
-            pending={visibilityPending}
-            onClick={() => onToggleVisibility(cat)}
-            lang={lang}
-            kind="category"
-            compact
-          />
+          {!readOnly && (
+            <VisibilityToggleButton
+              visible={!cat.hidden}
+              pending={visibilityPending}
+              onClick={() => onToggleVisibility(cat)}
+              lang={lang}
+              kind="category"
+              compact
+            />
+          )}
         </div>
       </div>
 
@@ -646,21 +658,27 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
 
       {/* col 6 – actions */}
       <div className="flex gap-1.5 justify-end">
-        <button
-          onClick={() => onEdit(cat)}
-          disabled={visibilityPending}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Edit2 size={12} />
-          {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Ред.' : 'Edit'}
-        </button>
-        <button
-          onClick={() => onDelete(cat.id)}
-          disabled={visibilityPending}
-          className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Trash2 size={14} />
-        </button>
+        {!readOnly ? (
+          <>
+            <button
+              onClick={() => onEdit(cat)}
+              disabled={visibilityPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 hover:border-orange-300 hover:text-[#ff5a00] hover:bg-orange-50 transition-colors text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Edit2 size={12} />
+              {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Ред.' : 'Edit'}
+            </button>
+            <button
+              onClick={() => onDelete(cat.id)}
+              disabled={visibilityPending}
+              className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+            </button>
+          </>
+        ) : (
+          <span className="text-xs font-bold text-gray-300">—</span>
+        )}
       </div>
     </div>
   )
@@ -891,8 +909,10 @@ function menuItemToProductForm(i) {
 
 export default function AdminMenu() {
   const { state, dispatch } = useApp()
+  const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
+  const canEditMenu = canEditFeature(profile || { role: state.user?.role }, 'menu')
   const navigate = useNavigate()
   const { productId } = useParams()
   const [searchParams] = useSearchParams()
@@ -986,6 +1006,11 @@ export default function AdminMenu() {
     productEditorInitializedRef.current = productId
     uploadedItemImageUrlsRef.current.clear()
 
+    if (!canEditMenu) {
+      navigate('/admin/menu', { replace: true })
+      return
+    }
+
     if (productId === 'new') {
       const maxOrder = state.menuItems.length > 0
         ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
@@ -1028,7 +1053,7 @@ export default function AdminMenu() {
     }
     setForm(menuItemToProductForm(item))
     setItemModal('edit')
-  }, [loaded, isProductEditorPage, productId, quickItems, searchParams, state.menuItems, navigate])
+  }, [loaded, isProductEditorPage, productId, quickItems, searchParams, state.menuItems, navigate, canEditMenu])
 
   useEffect(() => {
     if (!loaded || isProductEditorPage) return undefined
@@ -1064,14 +1089,17 @@ export default function AdminMenu() {
   }
 
   function openNewItem() {
+    if (!canEditMenu) return
     saveMenuListScrollBeforeProductNavigation()
     navigate('/admin/menu/product/new')
   }
   function openNewQuickItem() {
+    if (!canEditMenu) return
     saveMenuListScrollBeforeProductNavigation()
     navigate('/admin/menu/product/new?quick=1')
   }
   function openEditItem(i) {
+    if (!canEditMenu) return
     saveMenuListScrollBeforeProductNavigation()
     navigate(`/admin/menu/product/${encodeURIComponent(i.id)}`)
   }
@@ -1085,7 +1113,7 @@ export default function AdminMenu() {
     }
   }
   async function saveItem() {
-    if (savingItemForm) return
+    if (savingItemForm || !canEditMenu) return
     if (!form.name_uz || !form.price || !form.category_id) return
     setSavingItemForm(true)
     setMenuNotice(null)
@@ -1132,7 +1160,7 @@ export default function AdminMenu() {
     }
   }
   async function toggleItemVisibility(item) {
-    if (!item?.id || savingItemId) return
+    if (!canEditMenu || !item?.id || savingItemId) return
     setSavingItemId(item.id)
     setMenuNotice(null)
     try {
@@ -1148,11 +1176,13 @@ export default function AdminMenu() {
     }
   }
   function deleteItem(id) {
+    if (!canEditMenu) return
     if (window.confirm('Delete this item?')) dispatch({ type: 'DELETE_MENU_ITEM', payload: id })
   }
 
   // ── Category CRUD ──────────────────────────────────────────────────────────
   function openNewCat() {
+    if (!canEditMenu) return
     uploadedCatImageUrlsRef.current.clear()
     const maxOrder = realSortedCats.length > 0
       ? Math.max(...realSortedCats.map(c => c.sort_order ?? 0)) : 0
@@ -1160,6 +1190,7 @@ export default function AdminMenu() {
     setCatModal('new')
   }
   function openEditCat(c) {
+    if (!canEditMenu) return
     uploadedCatImageUrlsRef.current.clear()
     setCatForm({ ...blankCat, ...c, sort_order: c.sort_order ?? 0, hidden: !!c.hidden })
     setCatModal('edit')
@@ -1170,7 +1201,7 @@ export default function AdminMenu() {
     setCatModal(null)
   }
   async function saveCat() {
-    if (savingCatForm) return
+    if (savingCatForm || !canEditMenu) return
     if (!catForm.name_uz) return
     setSavingCatForm(true)
     setMenuNotice(null)
@@ -1196,7 +1227,7 @@ export default function AdminMenu() {
     }
   }
   async function toggleCategoryVisibility(cat) {
-    if (!cat?.id || cat.id === 'all' || savingCatId) return
+    if (!canEditMenu || !cat?.id || cat.id === 'all' || savingCatId) return
     setSavingCatId(cat.id)
     setMenuNotice(null)
     try {
@@ -1212,6 +1243,7 @@ export default function AdminMenu() {
     }
   }
   function deleteCat(id) {
+    if (!canEditMenu) return
     if (id === 'all') return
     if (window.confirm('Delete category?')) dispatch({ type: 'DELETE_CATEGORY', payload: id })
   }
@@ -1224,6 +1256,7 @@ export default function AdminMenu() {
   function handleItemDragEnd(event) {
     const { active, over } = event
     setActiveId(null)
+    if (!canEditMenu) return
     if (!over || active.id === over.id) return
     dispatch({ type: 'REORDER_MENU_ITEM', payload: { idA: active.id, idB: over.id } })
   }
@@ -1231,6 +1264,7 @@ export default function AdminMenu() {
   function handleCatDragEnd(event) {
     const { active, over } = event
     setActiveId(null)
+    if (!canEditMenu) return
     if (!over || active.id === over.id) return
     dispatch({ type: 'REORDER_CATEGORY', payload: { idA: active.id, idB: over.id } })
   }
@@ -1238,6 +1272,7 @@ export default function AdminMenu() {
   function handleQuickItemDragEnd(event) {
     const { active, over } = event
     setActiveId(null)
+    if (!canEditMenu) return
     if (!over || active.id === over.id) return
     dispatch({ type: 'REORDER_QUICK_ITEM', payload: { idA: active.id, idB: over.id } })
   }
@@ -1503,7 +1538,7 @@ export default function AdminMenu() {
                     <List size={15} />
                   </button>
                 </div>
-                <OrangeBtn onClick={openNewItem} icon={Plus}>{t(lang, 'addItem')}</OrangeBtn>
+                {canEditMenu && <OrangeBtn onClick={openNewItem} icon={Plus}>{t(lang, 'addItem')}</OrangeBtn>}
               </div>
 
               {/* Toolbar row 2: category cards */}
@@ -1524,7 +1559,7 @@ export default function AdminMenu() {
               </div>
 
               {/* Hint */}
-              {filteredItems.length > 1 && (
+              {canEditMenu && filteredItems.length > 1 && (
                 <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
                   <GripVertical size={12} />
                   {lang === 'uz' ? 'Tartiblash uchun sudrang' : lang === 'ru' ? 'Перетащите для сортировки' : 'Drag to reorder'}
@@ -1553,7 +1588,7 @@ export default function AdminMenu() {
                       <p className="text-sm text-gray-400 mb-5">
                         {lang === 'uz' ? 'Birinchi elementni qo\'shing' : lang === 'ru' ? 'Добавьте первую позицию' : 'Add your first item'}
                       </p>
-                      <OrangeBtn onClick={openNewItem} icon={Plus}>{t(lang, 'addItem')}</OrangeBtn>
+                      {canEditMenu && <OrangeBtn onClick={openNewItem} icon={Plus}>{t(lang, 'addItem')}</OrangeBtn>}
                     </>
                   )}
                 </div>
@@ -1646,6 +1681,7 @@ export default function AdminMenu() {
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
+                                      readOnly={!canEditMenu}
                                     />
                                   ))}
                                 </div>
@@ -1661,6 +1697,7 @@ export default function AdminMenu() {
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
+                                      readOnly={!canEditMenu}
                                     />
                                   ))}
                                 </div>
@@ -1691,6 +1728,7 @@ export default function AdminMenu() {
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
+                                      readOnly={!canEditMenu}
                                     />
                                   ))}
                                 </div>
@@ -1706,6 +1744,7 @@ export default function AdminMenu() {
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
+                                      readOnly={!canEditMenu}
                                     />
                                   ))}
                                 </div>
@@ -1727,6 +1766,7 @@ export default function AdminMenu() {
                                 onToggleVisibility={toggleItemVisibility}
                                 visibilityPending={savingItemId === item.id}
                                 categories={realSortedCats}
+                                readOnly={!canEditMenu}
                               />
                             ))}
                           </div>
@@ -1742,6 +1782,7 @@ export default function AdminMenu() {
                                 onToggleVisibility={toggleItemVisibility}
                                 visibilityPending={savingItemId === item.id}
                                 categories={realSortedCats}
+                                readOnly={!canEditMenu}
                               />
                             ))}
                           </div>
@@ -1769,9 +1810,11 @@ export default function AdminMenu() {
           {/* ══ Categories tab ═══════════════════════════════════════════════ */}
           {tab === 'categories' && (
             <>
-              <div className="flex justify-end mb-5">
-                <OrangeBtn onClick={openNewCat} icon={Plus}>{t(lang, 'addCategory')}</OrangeBtn>
-              </div>
+              {canEditMenu && (
+                <div className="flex justify-end mb-5">
+                  <OrangeBtn onClick={openNewCat} icon={Plus}>{t(lang, 'addCategory')}</OrangeBtn>
+                </div>
+              )}
 
               {realSortedCats.length === 0 ? (
                 <div className="bg-white border border-gray-100 rounded-2xl py-20 text-center shadow-sm">
@@ -1783,14 +1826,14 @@ export default function AdminMenu() {
                     {lang === 'uz' ? 'Birinchi kategoriyani qo\'shing' :
                      lang === 'ru' ? 'Добавьте первую категорию' : 'Add your first category'}
                   </p>
-                  <OrangeBtn onClick={openNewCat} icon={Plus}>{t(lang, 'addCategory')}</OrangeBtn>
+                  {canEditMenu && <OrangeBtn onClick={openNewCat} icon={Plus}>{t(lang, 'addCategory')}</OrangeBtn>}
                 </div>
               ) : (
                 <>
-                  <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+                  {canEditMenu && <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
                     <GripVertical size={12} />
                     {lang === 'uz' ? 'Tartiblash uchun sudrang' : lang === 'ru' ? 'Перетащите для сортировки' : 'Drag to reorder'}
-                  </p>
+                  </p>}
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -1824,6 +1867,7 @@ export default function AdminMenu() {
                             onToggleVisibility={toggleCategoryVisibility}
                             visibilityPending={savingCatId === cat.id}
                             sortIndex={idx + 1}
+                            readOnly={!canEditMenu}
                           />
                         ))}
 
@@ -1876,9 +1920,11 @@ export default function AdminMenu() {
                         : 'These items appear only on the cashier payment screen.'}
                   </p>
                 </div>
-                <OrangeBtn onClick={openNewQuickItem} icon={Plus}>
-                  {lang === 'uz' ? 'Tezkor mahsulot qo‘shish' : lang === 'ru' ? 'Добавить быстрый товар' : 'Add Quick Item'}
-                </OrangeBtn>
+                {canEditMenu && (
+                  <OrangeBtn onClick={openNewQuickItem} icon={Plus}>
+                    {lang === 'uz' ? 'Tezkor mahsulot qo‘shish' : lang === 'ru' ? 'Добавить быстрый товар' : 'Add Quick Item'}
+                  </OrangeBtn>
+                )}
               </div>
 
               {quickItems.length === 0 ? (
@@ -1894,16 +1940,18 @@ export default function AdminMenu() {
                         ? 'Создайте товар, который кассир сможет быстро добавить.'
                         : 'Create items cashiers can add quickly at checkout.'}
                   </p>
-                  <OrangeBtn onClick={openNewQuickItem} icon={Plus}>
-                    {lang === 'uz' ? 'Tezkor mahsulot qo‘shish' : lang === 'ru' ? 'Добавить быстрый товар' : 'Add Quick Item'}
-                  </OrangeBtn>
+                  {canEditMenu && (
+                    <OrangeBtn onClick={openNewQuickItem} icon={Plus}>
+                      {lang === 'uz' ? 'Tezkor mahsulot qo‘shish' : lang === 'ru' ? 'Добавить быстрый товар' : 'Add Quick Item'}
+                    </OrangeBtn>
+                  )}
                 </div>
               ) : (
                 <>
-                  <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+                  {canEditMenu && <p className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
                     <GripVertical size={12} />
                     {lang === 'uz' ? 'Tartiblash uchun sudrang' : lang === 'ru' ? 'Перетащите для сортировки' : 'Drag to reorder'}
-                  </p>
+                  </p>}
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -1926,6 +1974,7 @@ export default function AdminMenu() {
                             onToggleVisibility={toggleItemVisibility}
                             visibilityPending={savingItemId === item.id}
                             categories={realSortedCats}
+                            readOnly={!canEditMenu}
                           />
                         ))}
                       </div>

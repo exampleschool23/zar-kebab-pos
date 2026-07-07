@@ -2,20 +2,11 @@
 // All sidebar visibility and route protection should reference these — never hardcode role arrays elsewhere.
 
 export const PAGE_ACCESS = {
-  publicMenu: ['guest', 'owner', 'admin', 'waiter', 'cashier', 'stakeholder'],
-  dashboard: ['owner', 'admin', 'cashier', 'stakeholder'],
-  tables:    ['owner', 'admin', 'waiter',  'cashier'],
-  menu:      ['owner', 'admin'],
-  cashier:   ['owner', 'admin', 'cashier'],
-  loyalty:   ['owner', 'admin', 'cashier'],
-  expenses:  ['owner'],
-  team:      ['owner', 'admin', 'waiter', 'cashier', 'stakeholder'],
-  reports:   ['owner', 'admin', 'cashier', 'stakeholder'],
-  audit:     ['owner', 'admin'],
-  settings:  ['owner', 'admin'],
-  move_back_to_table: ['owner'],
-  delete_paid_orders: ['owner'],
+  publicMenu: ['guest', 'owner', 'admin', 'viewer'],
 }
+
+export const APP_ROLES = ['owner', 'admin', 'viewer', 'guest']
+export const EDITOR_ROLES = ['owner', 'admin']
 
 export const FEATURE_DEFINITIONS = [
   {
@@ -84,7 +75,10 @@ export const FEATURE_KEYS = FEATURE_DEFINITIONS.map(feature => feature.key)
 export const FEATURE_ACCESS_MANAGER_EMAILS = ['dangerhoggish@gmail.com']
 
 export function normalizeRole(role) {
-  return (role || 'guest').toLowerCase()
+  const normalized = String(role || 'guest').toLowerCase()
+  if (normalized === 'stakeholder') return 'viewer'
+  if (normalized === 'waiter' || normalized === 'cashier' || normalized === 'kitchen') return 'admin'
+  return APP_ROLES.includes(normalized) ? normalized : 'guest'
 }
 
 export function normalizeEmail(email) {
@@ -102,8 +96,12 @@ export function normalizeFeatureAccess(featureAccess) {
 }
 
 export function defaultFeaturesForRole(role) {
-  const normalizedRole = normalizeRole(role)
-  return FEATURE_KEYS.filter(key => (PAGE_ACCESS[key] || []).includes(normalizedRole))
+  const rawRole = String(role || 'guest').toLowerCase()
+  if (rawRole === 'waiter') return ['tables', 'team']
+  if (rawRole === 'cashier') return ['dashboard', 'tables', 'cashier', 'loyalty', 'team', 'reports']
+  if (rawRole === 'stakeholder') return ['dashboard', 'team', 'reports']
+  if (rawRole === 'kitchen') return ['tables']
+  return normalizeRole(role) === 'owner' ? FEATURE_KEYS : []
 }
 
 export function featureAccessForProfile(profileOrRole) {
@@ -119,7 +117,7 @@ export function canViewPage(profileOrRole, page) {
 }
 
 export function canManageFeatureAccess(profileOrRole) {
-  return isFeatureAccessManager(profileOrRole)
+  return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
 }
 
 export function canDeletePaidOrders(profileOrRole) {
@@ -130,10 +128,14 @@ export function canMoveBackToTable(profileOrRole) {
   return canViewPage(profileOrRole, 'move_back_to_table')
 }
 
-export function canEditMenu(role)          { return ['owner', 'admin'].includes(role) }
-export function canManageSettings(role)    { return ['owner', 'admin'].includes(role) }
-export function canUseCashierActions(role) { return ['owner', 'admin', 'cashier'].includes(role) }
-export function isReadOnlyUser(role)       { return role === 'stakeholder' }
+export function canEditFeature(profileOrRole, featureKey) {
+  return EDITOR_ROLES.includes(normalizeRole(profileOrRole?.role || profileOrRole)) && canViewPage(profileOrRole, featureKey)
+}
+
+export function canEditMenu(profileOrRole)       { return canEditFeature(profileOrRole, 'menu') }
+export function canManageSettings(profileOrRole) { return canEditFeature(profileOrRole, 'settings') }
+export function canUseCashierActions(profileOrRole) { return canEditFeature(profileOrRole, 'cashier') }
+export function isReadOnlyUser(role)             { return normalizeRole(role) === 'viewer' }
 export function isPublicOnlyRole(role) {
   return ['guest', 'customer'].includes((role || 'guest').toLowerCase())
 }
@@ -145,10 +147,10 @@ export function isPublicOnlyRole(role) {
  * - others  → view-only, no edits
  */
 export function canEditTeamMember(viewerRole, targetRole) {
-  const viewer = (viewerRole || '').toLowerCase()
-  const target = (targetRole || '').toLowerCase()
+  const viewer = normalizeRole(viewerRole)
+  const target = normalizeRole(targetRole)
   if (viewer === 'owner') return true
-  if (viewer === 'admin') return !['owner', 'admin', 'stakeholder'].includes(target)
+  if (viewer === 'admin') return ['viewer', 'guest'].includes(target)
   return false
 }
 
@@ -162,26 +164,23 @@ export function canDeleteTeamMember(viewerRole, targetRole, isSelf = false) {
   const target = normalizeRole(targetRole?.role || targetRole)
   if (isSelf) return false
   if (viewer !== 'owner') return false
-  if (target === 'stakeholder') return false
-  if (target === 'owner') {
-    return isFeatureAccessManager(viewerRole) && !isFeatureAccessManager(targetRole)
-  }
-  return true
+  return target !== 'owner'
 }
 
 /** Roles the viewer is allowed to assign. Owner can assign any role; admin cannot assign owner. */
 export function assignableRoles(viewerRole) {
-  const all = ['owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest']
-  if (viewerRole === 'owner') return all
-  if (viewerRole === 'admin') return all.filter(r => !['owner', 'admin', 'stakeholder'].includes(r))
+  const role = normalizeRole(viewerRole)
+  if (role === 'owner') return APP_ROLES
+  if (role === 'admin') return ['viewer', 'guest']
   return []
 }
 
 export function defaultPath(role) {
   const profile = typeof role === 'object' && role ? role : { role }
+  const rawRole = String(profile.role || 'guest').toLowerCase()
   role = normalizeRole(profile.role)
-  if (role === 'waiter' && canViewPage(profile, 'tables')) return '/waiter/tables'
-  if (role === 'cashier' && canViewPage(profile, 'cashier')) return '/cashier/tables'
+  if (rawRole === 'cashier' && canViewPage(profile, 'cashier')) return '/cashier/tables'
+  if ((rawRole === 'waiter' || rawRole === 'kitchen') && canViewPage(profile, 'tables')) return '/waiter/tables'
   if (canViewPage(profile, 'dashboard')) return '/admin'
   if (canViewPage(profile, 'cashier')) return '/cashier/tables'
   if (canViewPage(profile, 'tables')) return '/waiter/tables'
@@ -192,6 +191,5 @@ export function defaultPath(role) {
   if (canViewPage(profile, 'reports')) return '/admin/reports'
   if (canViewPage(profile, 'audit')) return '/admin/audit'
   if (canViewPage(profile, 'settings')) return '/admin/settings'
-  if (role === 'kitchen') return '/pending-approval'
   return '/menu'
 }

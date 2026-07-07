@@ -42,7 +42,7 @@ export function normalizeRole(role) {
 }
 
 export function canViewLoyaltyCards(role) {
-  return ['owner', 'admin', 'cashier'].includes(normalizeRole(role))
+  return ['owner', 'admin', 'viewer'].includes(normalizeRole(role))
 }
 
 export function canCreateLoyaltyCard(role) {
@@ -50,7 +50,7 @@ export function canCreateLoyaltyCard(role) {
 }
 
 export function canEditLoyaltyCard(role) {
-  return normalizeRole(role) === 'owner'
+  return ['owner', 'admin'].includes(normalizeRole(role))
 }
 
 export function canRemoveLoyaltyCard(role) {

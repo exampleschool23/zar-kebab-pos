@@ -32,7 +32,7 @@ import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { canDeletePaidOrders } from '../lib/permissions'
+import { canDeletePaidOrders, canEditFeature } from '../lib/permissions'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 import { formatElapsedSince } from '../lib/dateFormat'
@@ -83,6 +83,7 @@ export default function CashierBill() {
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
+  const canEditCashier = canEditFeature(profile || { role: state.user?.role }, 'cashier')
 
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
 
@@ -200,7 +201,7 @@ export default function CashierBill() {
   const loyaltyReady = loyaltyAmt <= 0
     ? (!hasLoyaltyCardEntry || !!loyaltyCard)
     : (loyaltyCard && loyaltyValidation.ok)
-  const canProcess = paymentValidation.canConfirmPayment && loyaltyReady && !isProcessingPayment
+  const canProcess = canEditCashier && paymentValidation.canConfirmPayment && loyaltyReady && !isProcessingPayment
   const isOverpaid = paymentValidation.isOverpaid
   const isFullyPaid = paymentValidation.isFullyPaid
 
@@ -384,6 +385,7 @@ export default function CashierBill() {
   }
 
   function addQuickItem(item) {
+    if (!canEditCashier) return
     dispatch({
       type: 'ADD_QUICK_ITEM_TO_ORDER',
       payload: {
@@ -402,6 +404,7 @@ export default function CashierBill() {
   }
 
   function updateBillItemQty(item, qty) {
+    if (!canEditCashier) return
     const sourceItemIds = item.source_item_ids || item.sourceItemIds || []
     dispatch({
       type: 'UPDATE_BILL_ITEM_QTY',

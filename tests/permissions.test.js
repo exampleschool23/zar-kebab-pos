@@ -5,6 +5,8 @@ import {
   FEATURE_KEYS,
   assignableRoles,
   canDeleteTeamMember,
+  canEditFeature,
+  canEditTeamMember,
   canManageFeatureAccess,
   canViewPage,
   defaultFeaturesForRole,
@@ -14,20 +16,24 @@ import {
 
 test('role defaults still cover existing app features', () => {
   assert.deepEqual(defaultFeaturesForRole('owner'), FEATURE_KEYS)
-  assert.ok(defaultFeaturesForRole('admin').includes('menu'))
+  assert.deepEqual(defaultFeaturesForRole('admin'), [])
+  assert.deepEqual(defaultFeaturesForRole('viewer'), [])
   assert.ok(defaultFeaturesForRole('waiter').includes('tables'))
   assert.ok(defaultFeaturesForRole('cashier').includes('cashier'))
   assert.ok(defaultFeaturesForRole('stakeholder').includes('reports'))
-  assert.equal(defaultFeaturesForRole('admin').includes('expenses'), false)
-  assert.equal(defaultFeaturesForRole('admin').includes('move_back_to_table'), false)
-  assert.equal(defaultFeaturesForRole('admin').includes('delete_paid_orders'), false)
+  assert.deepEqual(defaultFeaturesForRole('guest'), [])
 })
 
-test('profile feature_access overrides role defaults for one user', () => {
+test('feature access controls visibility while role controls write access', () => {
   const adminWithAccounting = { role: 'admin', feature_access: ['dashboard', 'expenses'] }
+  const viewerWithAccounting = { role: 'viewer', feature_access: ['dashboard', 'expenses'] }
+
   assert.equal(canViewPage(adminWithAccounting, 'expenses'), true)
+  assert.equal(canEditFeature(adminWithAccounting, 'expenses'), true)
   assert.equal(canViewPage(adminWithAccounting, 'menu'), false)
   assert.deepEqual(featureAccessForProfile(adminWithAccounting), ['dashboard', 'expenses'])
+  assert.equal(canViewPage(viewerWithAccounting, 'expenses'), true)
+  assert.equal(canEditFeature(viewerWithAccounting, 'expenses'), false)
 })
 
 test('non-primary owner feature_access can be restricted', () => {
@@ -40,32 +46,40 @@ test('non-primary owner feature_access can be restricted', () => {
 })
 
 test('null feature_access keeps role defaults and default path follows enabled features', () => {
-  assert.equal(canViewPage({ role: 'admin', feature_access: null }, 'menu'), true)
+  assert.equal(canViewPage({ role: 'admin', feature_access: null }, 'menu'), false)
   assert.equal(defaultPath({ role: 'admin', feature_access: ['expenses'] }), '/admin/accounting')
+  assert.equal(defaultPath({ role: 'viewer', feature_access: ['cashier'] }), '/cashier/tables')
   assert.equal(defaultPath({ role: 'waiter', feature_access: [] }), '/menu')
 })
 
-test('only the primary owner account can manage feature access', () => {
+test('owners can manage feature access', () => {
   assert.equal(canManageFeatureAccess({ role: 'owner', email: 'dangerhoggish@gmail.com' }), true)
   assert.equal(canManageFeatureAccess({ role: 'owner', email: 'DANGERHOGGISH@GMAIL.COM' }), true)
-  assert.equal(canManageFeatureAccess({ role: 'owner', email: 'other-owner@example.com' }), false)
+  assert.equal(canManageFeatureAccess({ role: 'owner', email: 'other-owner@example.com' }), true)
   assert.equal(canManageFeatureAccess({ role: 'admin', email: 'dangerhoggish@gmail.com' }), false)
-  assert.equal(canManageFeatureAccess('owner'), false)
+  assert.equal(canManageFeatureAccess('owner'), true)
 })
 
 test('assignable role options match owner and admin profile policy limits', () => {
-  assert.deepEqual(assignableRoles('owner'), ['owner', 'admin', 'waiter', 'cashier', 'stakeholder', 'guest'])
-  assert.deepEqual(assignableRoles('admin'), ['waiter', 'cashier', 'guest'])
-  assert.deepEqual(assignableRoles('waiter'), [])
+  assert.deepEqual(assignableRoles('owner'), ['owner', 'admin', 'viewer', 'guest'])
+  assert.deepEqual(assignableRoles('admin'), ['viewer', 'guest'])
+  assert.deepEqual(assignableRoles('viewer'), [])
 })
 
-test('primary owner can delete non-primary owner profiles only', () => {
-  const primaryOwner = { role: 'owner', email: 'dangerhoggish@gmail.com' }
-  const otherOwner = { role: 'owner', email: 'ddk9499@gmail.com' }
+test('owner can delete non-owner profiles but cannot delete self or owners', () => {
+  assert.equal(canDeleteTeamMember('owner', 'admin'), true)
+  assert.equal(canDeleteTeamMember('owner', 'viewer'), true)
+  assert.equal(canDeleteTeamMember('owner', 'guest'), true)
+  assert.equal(canDeleteTeamMember('owner', 'owner'), false)
+  assert.equal(canDeleteTeamMember('owner', 'admin', true), false)
+  assert.equal(canDeleteTeamMember('admin', 'viewer'), false)
+})
 
-  assert.equal(canDeleteTeamMember(primaryOwner, otherOwner), true)
-  assert.equal(canDeleteTeamMember(primaryOwner, primaryOwner), false)
-  assert.equal(canDeleteTeamMember(otherOwner, primaryOwner), false)
-  assert.equal(canDeleteTeamMember(primaryOwner, otherOwner, true), false)
-  assert.equal(canDeleteTeamMember(primaryOwner, { role: 'stakeholder', email: 'stakeholder@example.com' }), false)
+test('admin can edit only viewer and guest team members', () => {
+  assert.equal(canEditTeamMember('owner', 'admin'), true)
+  assert.equal(canEditTeamMember('admin', 'viewer'), true)
+  assert.equal(canEditTeamMember('admin', 'guest'), true)
+  assert.equal(canEditTeamMember('admin', 'admin'), false)
+  assert.equal(canEditTeamMember('admin', 'owner'), false)
+  assert.equal(canEditTeamMember('viewer', 'guest'), false)
 })

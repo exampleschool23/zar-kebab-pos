@@ -21,9 +21,10 @@ import { getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
 import { DEFAULT_PRICE_MODE, getMenuItemForPriceMode, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
+import { canEditFeature } from '../lib/permissions'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
-function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, viewerRole, onPrintKitchenCheck }) {
+function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, canEditOrder, onPrintKitchenCheck }) {
   const [busy, setBusy] = useState(false)
   const [updatingItemId, setUpdatingItemId] = useState(null)
 
@@ -43,7 +44,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     readyCount === 0 &&
     items.some(i => String(i.status || '').toLowerCase() === 'served') &&
     items.every(i => ['served', 'cancelled'].includes(String(i.status || '').toLowerCase()))
-  const canEditRequestedBill = ['admin', 'owner'].includes(String(viewerRole || '').toLowerCase())
+  const canEditRequestedBill = canEditOrder
 
   const L = {
     uz: {
@@ -112,20 +113,23 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   }
   const l = L[lang] || L.en
 
-  const preparationEditableItems = items.filter(item => !['served', 'cancelled'].includes(String(item.status || '').toLowerCase()))
+  const preparationEditableItems = canEditOrder
+    ? items.filter(item => !['served', 'cancelled'].includes(String(item.status || '').toLowerCase()))
+    : []
   const requestedBillEditableItems = canEditRequestedBill
     ? items.filter(item => String(item.status || '').toLowerCase() !== 'cancelled')
     : []
-  const recalledEditableItems = isRecalledWaiting
+  const recalledEditableItems = canEditOrder && isRecalledWaiting
     ? items.filter(item => String(item.status || '').toLowerCase() !== 'cancelled')
     : []
   const kitchenCheckGroups = getKitchenCheckGroups(order)
-  const preparationEditableGroups = kitchenCheckGroups
+  const preparationEditableGroups = canEditOrder ? kitchenCheckGroups
     .map(group => ({
       ...group,
       items: group.items.filter(item => !['served', 'cancelled'].includes(String(item.status || '').toLowerCase())),
     }))
     .filter(group => group.items.length > 0)
+    : []
   const requestedBillEditableGroups = canEditRequestedBill
     ? kitchenCheckGroups
       .map(group => ({
@@ -134,7 +138,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
       }))
       .filter(group => group.items.length > 0)
     : []
-  const recalledEditableGroups = isRecalledWaiting
+  const recalledEditableGroups = canEditOrder && isRecalledWaiting
     ? kitchenCheckGroups
       .map(group => ({
         ...group,
@@ -144,6 +148,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     : []
 
   async function handleUpdateItemQty(item, qty) {
+    if (!canEditOrder) return
     const itemKey = item.id || item.menu_item_id
     const sourceOrderId = item.order_id || item._orderId || order.id
     if (!sourceOrderId || !itemKey || updatingItemId) return
@@ -212,13 +217,13 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   }
 
   function handleConfirmDelivery() {
-    if (busy) return
+    if (busy || !canEditOrder) return
     setBusy(true)
     dispatch({ type: 'CONFIRM_ORDER_DELIVERED', payload: tableId })
     setTimeout(() => setBusy(false), 700)
   }
   function handleRequestBill() {
-    if (busy) return
+    if (busy || !canEditOrder) return
     setBusy(true)
     dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: tableId })
     setTimeout(() => setBusy(false), 700)
@@ -323,7 +328,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
         </div>
         <button
           onClick={handleConfirmDelivery}
-          disabled={busy}
+          disabled={busy || !canEditOrder}
           className={`w-full py-2.5 rounded-xl font-black text-[13px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
             busy ? 'bg-green-200 text-green-500 cursor-not-allowed' : 'bg-[#16A34A] text-white hover:bg-[#15803D] shadow-sm'
           }`}
@@ -348,7 +353,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
         </div>
         <button
           onClick={handleRequestBill}
-          disabled={busy}
+          disabled={busy || !canEditOrder}
           className={`w-full py-2.5 rounded-xl font-black text-[13px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
             busy ? 'bg-blue-200 text-blue-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
           }`}
@@ -578,7 +583,8 @@ export default function WaiterOrder() {
   const { profile, signOut } = useAuth()
   const lang                = state.lang
   const role                = (profile?.role || state.user?.role || '').toLowerCase()
-  const shouldShowSidebar   = role !== 'waiter'
+  const shouldShowSidebar   = role !== 'guest'
+  const canEditTables       = canEditFeature(profile || { role }, 'tables')
   const [search,        setSearch]       = useState('')
   const [activeCategory,setCategory]     = useState('all')
   const [cartOpen,      setCartOpen]     = useState(false)
@@ -778,7 +784,7 @@ export default function WaiterOrder() {
   }
 
   function handleAdd(item, animation) {
-    if (isSendingOrder) return
+    if (isSendingOrder || !canEditTables) return
     if (menuItemRequiresOptions(item)) {
       openDetail(item)
       return
@@ -788,7 +794,7 @@ export default function WaiterOrder() {
   }
 
   function handleIncrement(item, animation) {
-    if (isSendingOrder) return
+    if (isSendingOrder || !canEditTables) return
     if (menuItemRequiresOptions(item)) {
       openDetail(item)
       return
@@ -798,7 +804,7 @@ export default function WaiterOrder() {
   }
 
   function handleDecrement(item) {
-    if (isSendingOrder) return
+    if (isSendingOrder || !canEditTables) return
     if (menuItemRequiresOptions(item)) {
       openDetail(item)
       return
@@ -811,7 +817,7 @@ export default function WaiterOrder() {
   // ── Modal handlers ─────────────────────────────────────────────────────────
 
   function openDetail(item) {
-    if (isSendingOrder) return
+    if (isSendingOrder || !canEditTables) return
     savedMenuScrollRef.current = productScrollRef.current?.scrollTop ?? 0
     setDetailItem(item)
   }
@@ -828,7 +834,7 @@ export default function WaiterOrder() {
   }
 
   function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionPriceDelta = 0) {
-    if (isSendingOrder) return
+    if (isSendingOrder || !canEditTables) return
     const payload = makeCartPayload(item, { selectedOptions, selectedOptionPriceDelta })
     const cartItemKey = payload.cart_item_key || payload.menu_item_id
     const alreadyInCart = state.cart.some(row => (row.cart_item_key || row.menu_item_id) === cartItemKey)
@@ -886,7 +892,7 @@ export default function WaiterOrder() {
 
   function requestPriceModeChange(nextMode) {
     const normalized = normalizePriceMode(nextMode)
-    if (normalized === priceMode || isSendingOrder) return
+    if (normalized === priceMode || isSendingOrder || !canEditTables) return
     const hasPricedItems = cartCount > 0 || ((activeOrder?.items || []).length > 0 && activeOrder?.payment_status !== 'paid')
     if (hasPricedItems) {
       setPendingPriceMode(normalized)
@@ -896,7 +902,7 @@ export default function WaiterOrder() {
   }
 
   function confirmPriceModeChange() {
-    if (!pendingPriceMode) return
+    if (!pendingPriceMode || !canEditTables) return
     const nextMode = pendingPriceMode
     setPriceMode(nextMode)
     dispatch({ type: 'UPDATE_CART_PRICE_MODE', payload: { priceMode: nextMode } })
@@ -1048,7 +1054,7 @@ export default function WaiterOrder() {
                 key={mode}
                 type="button"
                 onClick={() => requestPriceModeChange(mode)}
-                disabled={isSendingOrder}
+                disabled={isSendingOrder || !canEditTables}
                 className={`h-8 rounded-lg px-3 text-[12px] font-black transition-all disabled:cursor-wait disabled:opacity-60 ${
                   priceMode === mode
                     ? 'bg-white text-[#ff5a00] shadow-sm'
@@ -1226,16 +1232,16 @@ export default function WaiterOrder() {
                 dispatch={dispatch}
                 cartCount={cartCount}
                 menuItemMap={menuItemMap}
-                viewerRole={role}
+                canEditOrder={canEditTables}
                 onPrintKitchenCheck={handlePrintKitchenCheck}
               />
             </div>
-            {!isManageOrderOnly && (
+            {!isManageOrderOnly && canEditTables && (
             <div className="flex-1 min-h-0 overflow-hidden">
               <CartPanel
                 tableName={orderTitle}
                 orderType={orderType}
-                onOrderTypeChange={setOrderType}
+                onOrderTypeChange={canEditTables ? setOrderType : undefined}
                 priceMode={priceMode}
                 allowOrderTypeChange
                 isSending={isSendingOrder}

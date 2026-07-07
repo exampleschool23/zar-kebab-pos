@@ -5,9 +5,11 @@ import {
   Check, ChevronRight, Activity, AlertTriangle, RefreshCw, Home,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
 import AppShell from '../components/AppShell'
 import { runDbHealthChecks } from '../lib/dbHealth'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
+import { canEditFeature } from '../lib/permissions'
 
 function Section({ title, children }) {
   return (
@@ -37,11 +39,12 @@ function SettingRow({ icon: Icon, label, sub, children }) {
   )
 }
 
-function Toggle({ value, onChange }) {
+function Toggle({ value, onChange, disabled = false }) {
   return (
     <button
+      disabled={disabled}
       onClick={() => onChange(!value)}
-      className={`relative w-11 h-6 rounded-full transition-colors ${value ? 'bg-[#ff5a00]' : 'bg-[#E5E7EB]'}`}
+      className={`relative w-11 h-6 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${value ? 'bg-[#ff5a00]' : 'bg-[#E5E7EB]'}`}
     >
       <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${value ? 'left-[22px]' : 'left-0.5'}`} />
     </button>
@@ -65,9 +68,11 @@ function healthCheckName(check, labels) {
 
 export default function AdminSettings() {
   const { state, dispatch } = useApp()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const lang     = state.lang
   const settings = state.settings
+  const canManageSettings = canEditFeature(profile || { role: state.user?.role }, 'settings')
 
   const [restaurantName, setRestaurantName] = useState(settings.restaurantName)
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
@@ -91,6 +96,7 @@ export default function AdminSettings() {
   }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.autoPrint, settings.receiptMarketing])
 
   async function saveSettings(overrides = {}) {
+    if (!canManageSettings) return
     setSaving(true)
     setError('')
     const nextSettings = { restaurantName, serviceRate, monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0), autoPrint, receiptMarketing, ...overrides }
@@ -112,6 +118,7 @@ export default function AdminSettings() {
   }
 
   async function handleServiceRateChange(nextRate) {
+    if (!canManageSettings) return
     setServiceRate(nextRate)
     await saveSettings({ serviceRate: nextRate })
   }
@@ -329,7 +336,8 @@ export default function AdminSettings() {
               type="text"
               value={restaurantName}
               onChange={e => setRestaurantName(e.target.value)}
-              className="w-[180px] border border-[#E5E7EB] rounded-xl px-3 py-2 text-[13px] text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all text-right"
+              disabled={!canManageSettings}
+              className="w-[180px] border border-[#E5E7EB] rounded-xl px-3 py-2 text-[13px] text-[#1F2937] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all text-right disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]"
             />
           </SettingRow>
         </Section>
@@ -343,6 +351,7 @@ export default function AdminSettings() {
                   <button
                     key={v}
                     onClick={() => handleServiceRateChange(v)}
+                    disabled={!canManageSettings}
                     className={`px-2.5 py-1.5 rounded-lg text-[12px] font-bold transition-all ${
                       serviceRate === v
                         ? 'bg-[#ff5a00] text-white'
@@ -362,7 +371,8 @@ export default function AdminSettings() {
                 inputMode="numeric"
                 value={formatMoneyInput(monthlyRentUzs)}
                 onChange={event => setMonthlyRentUzs(normalizeMoneyInput(event.target.value))}
-                className="w-[180px] rounded-xl border border-[#E5E7EB] px-3 py-2 pr-12 text-right text-[13px] font-bold tabular-nums text-[#1F2937] transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                disabled={!canManageSettings}
+                className="w-[180px] rounded-xl border border-[#E5E7EB] px-3 py-2 pr-12 text-right text-[13px] font-bold tabular-nums text-[#1F2937] transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]"
                 placeholder="0"
               />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-black text-[#9CA3AF]">UZS</span>
@@ -397,13 +407,14 @@ export default function AdminSettings() {
             </div>
           </SettingRow>
           <SettingRow icon={Printer} label={l.autoPrint} sub={l.autoPrintSub}>
-            <Toggle value={autoPrint} onChange={setAutoPrint} />
+            <Toggle value={autoPrint} onChange={setAutoPrint} disabled={!canManageSettings} />
           </SettingRow>
           <SettingRow icon={Printer} label={l.receiptMarketing} sub={l.receiptMarketingSub}>
             <select
               value={receiptMarketing}
               onChange={event => setReceiptMarketing(event.target.value)}
-              className="w-[170px] rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] font-bold text-[#1F2937] focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+              disabled={!canManageSettings}
+              className="w-[170px] rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] font-bold text-[#1F2937] focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]"
             >
               {['none', 'compactFooter', 'loyaltyOnly', 'instagramOnly', 'full'].map(mode => (
                 <option key={mode} value={mode}>{l.receiptMarketingModes[mode]}</option>
@@ -411,7 +422,7 @@ export default function AdminSettings() {
             </select>
           </SettingRow>
           <SettingRow icon={Bell} label={l.notifications} sub={l.notifSub}>
-            <Toggle value={notifications} onChange={setNotifications} />
+            <Toggle value={notifications} onChange={setNotifications} disabled={!canManageSettings} />
           </SettingRow>
         </Section>
 
@@ -470,7 +481,7 @@ export default function AdminSettings() {
         {/* Save button */}
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !canManageSettings}
           className={`w-full rounded-2xl font-black text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
             saved
               ? 'bg-green-500 text-white'

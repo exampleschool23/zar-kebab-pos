@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
+import { canEditFeature } from '../lib/permissions'
 import {
   EXPENSE_PAYMENT_METHODS,
   SALARY_RATE_UNITS,
@@ -113,7 +114,7 @@ export default function Salaries() {
   const navigate = useNavigate()
   const lang = state.lang || 'ru'
   const role = (profile?.role || state.user?.role || 'guest').toLowerCase()
-  const canManage = role === 'owner'
+  const canManage = canEditFeature(profile || { role }, 'expenses')
   const today = todayExpenseDate()
 
   const L = {

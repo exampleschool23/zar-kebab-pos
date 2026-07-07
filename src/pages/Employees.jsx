@@ -6,6 +6,8 @@ import { useApp } from '../store/AppContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
+import { useAuth } from '../contexts/AuthContext'
+import { canEditFeature } from '../lib/permissions'
 import {
   expensePaymentMethodLabel,
   getDailySalaryAmount,
@@ -47,9 +49,11 @@ function employeeName(employee) {
 
 export default function Employees() {
   const { state } = useApp()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const lang = state.lang || 'ru'
   const today = todayExpenseDate()
+  const canManage = canEditFeature(profile || { role: state.user?.role }, 'expenses')
 
   const L = {
     uz: {
@@ -186,7 +190,7 @@ export default function Employees() {
   const totalDue = useMemo(() => employees.reduce((sum, item) => sum + getSalaryDue(item, today), 0), [employees, today])
 
   async function toggleEmployeeActive(employee) {
-    if (!employee?.id) return
+    if (!canManage || !employee?.id) return
     const key = `employee-toggle-${employee.id}`
     const nextActive = employee.is_active === false
     if (confirmActionKey !== key) {
@@ -237,7 +241,7 @@ export default function Employees() {
   }
 
   async function deleteEmployee(employee) {
-    if (!employee?.id) return
+    if (!canManage || !employee?.id) return
     const key = `employee-delete-${employee.id}`
     if (confirmActionKey !== key) {
       setConfirmActionKey(key)
@@ -346,26 +350,30 @@ export default function Employees() {
                       >
                         <History size={14} />{l.historyBtn}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleEmployeeActive(employee)}
-                        disabled={saving === `employee-toggle-${employee.id}`}
-                        className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black ${
-                          inactive ? 'border-[#E5E7EB] bg-white text-[#1F2937]' : 'border-red-200 bg-red-50 text-red-600'
-                        }`}
-                      >
-                        {saving === toggleKey ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
-                        {confirmToggle ? l.confirm : inactive ? l.reactivate : l.deactivate}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteEmployee(employee)}
-                        disabled={saving === `employee-delete-${employee.id}`}
-                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-xs font-black text-red-600"
-                      >
-                        {saving === `employee-delete-${employee.id}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                        {confirmActionKey === `employee-delete-${employee.id}` ? l.confirm : l.delete}
-                      </button>
+                      {canManage && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleEmployeeActive(employee)}
+                            disabled={saving === `employee-toggle-${employee.id}`}
+                            className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black ${
+                              inactive ? 'border-[#E5E7EB] bg-white text-[#1F2937]' : 'border-red-200 bg-red-50 text-red-600'
+                            }`}
+                          >
+                            {saving === toggleKey ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
+                            {confirmToggle ? l.confirm : inactive ? l.reactivate : l.deactivate}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteEmployee(employee)}
+                            disabled={saving === `employee-delete-${employee.id}`}
+                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-xs font-black text-red-600"
+                          >
+                            {saving === `employee-delete-${employee.id}` ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                            {confirmActionKey === `employee-delete-${employee.id}` ? l.confirm : l.delete}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </section>
                 )

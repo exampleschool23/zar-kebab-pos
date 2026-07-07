@@ -19,6 +19,7 @@ import {
   getSalaryCategoryForRole,
   getTotalMonthlySalaryCommitment,
   getTotalSalaryDue,
+  isGeneratedSalaryExpense,
   listLocalDateRange,
   normalizeExpenseAmount,
   normalizeSalaryEndDate,
@@ -742,6 +743,13 @@ test('salary payment note is shown instead of period range when present', () => 
   // payment note flows into description so the accounting tab can display it
   assert.equal(rows.find(r => r.id === 'salary-payment-p-note')?.description, 'June payout')
   assert.equal(rows.find(r => r.id === 'salary-payment-p-no-note')?.description, 'Salary payment')
+})
+
+test('generated salary accounting rows are not real manual expenses', () => {
+  assert.equal(isGeneratedSalaryExpense({ id: 'salary-payment-0983840e-ddeb-4291-bec4-c1726a50b37e' }), true)
+  assert.equal(isGeneratedSalaryExpense({ id: 'salary-bonus-0983840e-ddeb-4291-bec4-c1726a50b37e' }), true)
+  assert.equal(isGeneratedSalaryExpense({ id: 'salary-0983840e-ddeb-4291-bec4-c1726a50b37e-2026-07-07' }), true)
+  assert.equal(isGeneratedSalaryExpense({ id: '0983840e-ddeb-4291-bec4-c1726a50b37e' }), false)
 })
 
 test('monthly expense estimate tracks employee paid amount remaining salary and rent', () => {

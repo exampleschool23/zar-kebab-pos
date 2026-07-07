@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../store/AppContext'
 import { LogOut, Menu as MenuIcon } from 'lucide-react'
 import UnifiedSidebar from './UnifiedSidebar'
+import { normalizeRole } from '../lib/permissions'
 
 export default function AppShell({ children, title, contentRef }) {
   const { profile, signOut } = useAuth()
@@ -10,8 +11,8 @@ export default function AppShell({ children, title, contentRef }) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const displayName = profile?.full_name || state.user?.name || profile?.email || ''
-  const role = (profile?.role || state.user?.role || '').toLowerCase()
-  const shouldShowSidebar = role !== 'waiter'
+  const role = normalizeRole(profile?.role || state.user?.role || 'guest')
+  const shouldShowSidebar = role !== 'guest'
 
   function handleSignOut() {
     dispatch({ type: 'LOGOUT' })

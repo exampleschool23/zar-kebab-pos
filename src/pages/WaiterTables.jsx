@@ -14,6 +14,7 @@ import { getReservationSummary, getWaiterTableStatus } from '../lib/tableManagem
 import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
 import { formatDateTime, formatElapsedSince, formatTime } from '../lib/dateFormat'
 import { earliestReliableTime, getReliableOrderItemTime } from '../lib/orderTimestamps'
+import { canEditFeature } from '../lib/permissions'
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ function actionForStatus(lang, status) {
   return null
 }
 
-function TableCard({ table, status, counts, lang, onClick, onAction, onManage }) {
+function TableCard({ table, status, counts, lang, canEdit, onClick, onAction, onManage }) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.available
   const StatusIcon = cfg.icon
   const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt, lang) : null
@@ -351,11 +352,11 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
 
   return (
     <div
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onClick()}
-      className={`group relative flex min-h-[116px] w-full cursor-pointer flex-col rounded-xl border border-[#E5E7EB] border-l-4 bg-white p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${cfg.border} ${cfg.hoverBorder}`}
+      onClick={canEdit ? onClick : undefined}
+      role={canEdit ? 'button' : undefined}
+      tabIndex={canEdit ? 0 : undefined}
+      onKeyDown={e => canEdit && e.key === 'Enter' && onClick()}
+      className={`group relative flex min-h-[116px] w-full flex-col rounded-xl border border-[#E5E7EB] border-l-4 bg-white p-3 text-left shadow-sm transition-all ${canEdit ? `cursor-pointer hover:-translate-y-0.5 hover:shadow-md ${cfg.hoverBorder}` : ''} ${cfg.border}`}
     >
       {/* Header */}
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -453,7 +454,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
         </div>
       )}
 
-      {(action || canManageActiveOrder) && (
+      {canEdit && (action || canManageActiveOrder) && (
         <div className="mt-4 grid grid-cols-1 gap-2">
           {canManageActiveOrder && (
             <button
@@ -487,7 +488,7 @@ function TableCard({ table, status, counts, lang, onClick, onAction, onManage })
   )
 }
 
-function ReservationStrip({ reservations, lang, onSeat, onCancel, onCall }) {
+function ReservationStrip({ reservations, lang, canEdit, onSeat, onCancel, onCall }) {
   if (reservations.length === 0) {
     return null
   }
@@ -517,13 +518,17 @@ function ReservationStrip({ reservations, lang, onSeat, onCancel, onCall }) {
                 {formatTime(reservation.startsAt)}
               </span>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-1.5">
-              <button onClick={() => onSeat(table)} className="h-8 rounded-lg bg-purple-600 text-[11px] font-black text-white">
-                {tr(lang, 'seat')}
-              </button>
-              <button onClick={() => onCancel(table)} className="h-8 rounded-lg border border-purple-100 bg-white text-[11px] font-black text-purple-700">
-                {tr(lang, 'cancelReservation')}
-              </button>
+            <div className={`mt-3 grid gap-1.5 ${canEdit ? 'grid-cols-3' : 'grid-cols-1'}`}>
+              {canEdit && (
+                <>
+                  <button onClick={() => onSeat(table)} className="h-8 rounded-lg bg-purple-600 text-[11px] font-black text-white">
+                    {tr(lang, 'seat')}
+                  </button>
+                  <button onClick={() => onCancel(table)} className="h-8 rounded-lg border border-purple-100 bg-white text-[11px] font-black text-purple-700">
+                    {tr(lang, 'cancelReservation')}
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => onCall(reservation.phone)}
                 disabled={!reservation.phone}
@@ -553,7 +558,9 @@ export default function WaiterTables() {
   const [activeFilter, setActiveFilter] = useState('all')
 
   const waiterName = profile?.full_name || state.user?.name || 'Waiter'
-  const canManageTables = ['owner', 'admin'].includes((profile?.role || state.user?.role || '').toLowerCase())
+  const role = (profile?.role || state.user?.role || '').toLowerCase()
+  const canEditTables = canEditFeature(profile || { role }, 'tables')
+  const canManageTables = canEditFeature(profile || { role }, 'settings')
 
   const tableInfos = useMemo(() =>
     state.tables
@@ -600,18 +607,21 @@ export default function WaiterTables() {
   )
 
   function handleTable(table, status) {
+    if (!canEditTables) return
     dispatch({ type: 'SET_TABLE', payload: table.id })
     dispatch({ type: 'CLEAR_CART' })
     navigate(`/waiter/order/${table.id}`)
   }
 
   function handleManageOrder(table) {
+    if (!canEditTables) return
     dispatch({ type: 'SET_TABLE', payload: table.id })
     dispatch({ type: 'CLEAR_CART' })
     navigate(`/waiter/order/${table.id}?panel=order`)
   }
 
   function handleCardAction(status, table) {
+    if (!canEditTables) return
     if (status === 'ready') {
       dispatch({ type: 'CONFIRM_ORDER_DELIVERED', payload: table.id })
       return
@@ -636,11 +646,13 @@ export default function WaiterTables() {
   }
 
   function seatReservation(table) {
+    if (!canEditTables) return
     dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
     handleTable(table, 'reserved')
   }
 
   function cancelReservation(table) {
+    if (!canEditTables) return
     dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
   }
 
@@ -650,12 +662,14 @@ export default function WaiterTables() {
   }
 
   function handleTakeAway() {
+    if (!canEditTables) return
     dispatch({ type: 'SET_TABLE', payload: null })
     dispatch({ type: 'CLEAR_CART' })
     navigate('/waiter/take-away')
   }
 
   function handleDelivery() {
+    if (!canEditTables) return
     dispatch({ type: 'SET_TABLE', payload: null })
     dispatch({ type: 'CLEAR_CART' })
     navigate('/waiter/take-away?orderType=delivery')
@@ -678,20 +692,24 @@ export default function WaiterTables() {
               <p className="text-sm text-gray-400 mt-0.5">{tr(lang, 'welcome')}, {waiterName}</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-              <button
-                onClick={handleTakeAway}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-sm shadow-orange-200 transition-colors hover:bg-[#cc4800]"
-              >
-                <Plus size={15} className="shrink-0" />
-                <span className="truncate whitespace-nowrap">{tr(lang, 'takeAwayOrder')}</span>
-              </button>
-              <button
-                onClick={handleDelivery}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 text-sm font-black text-white shadow-sm shadow-purple-100 transition-colors hover:bg-purple-700"
-              >
-                <Plus size={15} className="shrink-0" />
-                <span className="truncate whitespace-nowrap">{tr(lang, 'deliveryOrder')}</span>
-              </button>
+              {canEditTables && (
+                <>
+                  <button
+                    onClick={handleTakeAway}
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-sm shadow-orange-200 transition-colors hover:bg-[#cc4800]"
+                  >
+                    <Plus size={15} className="shrink-0" />
+                    <span className="truncate whitespace-nowrap">{tr(lang, 'takeAwayOrder')}</span>
+                  </button>
+                  <button
+                    onClick={handleDelivery}
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 text-sm font-black text-white shadow-sm shadow-purple-100 transition-colors hover:bg-purple-700"
+                  >
+                    <Plus size={15} className="shrink-0" />
+                    <span className="truncate whitespace-nowrap">{tr(lang, 'deliveryOrder')}</span>
+                  </button>
+                </>
+              )}
               {canManageTables && (
                 <button
                   onClick={() => navigate('/admin/tables')}
@@ -707,6 +725,7 @@ export default function WaiterTables() {
           <ReservationStrip
             reservations={todaysReservations}
             lang={lang}
+            canEdit={canEditTables}
             onSeat={seatReservation}
             onCancel={cancelReservation}
             onCall={callReservation}
@@ -766,6 +785,7 @@ export default function WaiterTables() {
                         status={itemStatus}
                         counts={counts}
                         lang={lang}
+                        canEdit={canEditTables}
                         onClick={() => itemStatus === 'reserved' ? handleCardAction(itemStatus, table) : handleTable(table, itemStatus)}
                         onAction={handleCardAction}
                         onManage={handleManageOrder}
