@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Banknote,
@@ -101,16 +101,36 @@ function expenseTone(expense) {
 }
 
 function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS }) {
+  const inputRef = useRef(null)
+
+  function openPicker(event) {
+    if (event?.button && event.button !== 0) return
+    const input = inputRef.current
+    if (!input) return
+
+    input.focus()
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker()
+        return
+      } catch {
+        // Fall back to focusing when showPicker is unavailable or blocked.
+      }
+    }
+  }
+
   return (
-    <div className="relative">
+    <div className="relative cursor-pointer" onPointerDown={openPicker}>
       <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center whitespace-nowrap text-sm font-semibold text-[#1F2937]">
         {formatLongDate(value, lang, value)}
       </span>
       <input
+        ref={inputRef}
         type="date"
         value={value}
+        aria-label={formatLongDate(value, lang, value)}
         onChange={event => onChange(event.target.value)}
-        className={className}
+        className={`native-date-input cursor-pointer ${className}`}
       />
     </div>
   )
@@ -201,6 +221,11 @@ export default function Expenses() {
       title: 'Buxgalteriya',
       sub: 'Daromad, xarajat, investor yordami va maoshlarni kuzatish',
       income: 'Daromad',
+      cafeIncome: 'Kafe daromadi',
+      cafeIncomeSub: 'Investor yordamisiz',
+      investorIncome: 'Investor daromadi',
+      investorIncomeSub: 'Investor kiritgan pul',
+      otherIncomeSub: 'Boshqa daromad',
       investorSupport: 'Investor yordami',
       expenses: 'Xarajatlar',
       left: 'Qolgan pul',
@@ -229,6 +254,7 @@ export default function Expenses() {
       from: 'Dan',
       to: 'Gacha',
       methodBalances: 'To‘lov turi qoldig‘i',
+      methodBalancesHint: 'Kirim minus chiqim',
       moneyFlow: 'Pul qayerga ketmoqda',
       incomeSources: 'Qo‘shimcha daromad manbalari',
       incomeIn: 'Kirdi',
@@ -254,6 +280,11 @@ export default function Expenses() {
       title: 'Бухгалтерия',
       sub: 'Учёт доходов, расходов, поддержки инвестора и зарплат',
       income: 'Доход',
+      cafeIncome: 'Доход кафе',
+      cafeIncomeSub: 'Без поддержки инвестора',
+      investorIncome: 'Доход инвестора',
+      investorIncomeSub: 'Внесено инвестором',
+      otherIncomeSub: 'Другой доход',
       investorSupport: 'Поддержка инвестора',
       expenses: 'Расходы',
       left: 'Остаток',
@@ -282,6 +313,7 @@ export default function Expenses() {
       from: 'С',
       to: 'По',
       methodBalances: 'Остаток по способам оплаты',
+      methodBalancesHint: 'Приход минус расход',
       moneyFlow: 'Куда уходят деньги',
       incomeSources: 'Источники внешнего дохода',
       incomeIn: 'Приход',
@@ -307,6 +339,11 @@ export default function Expenses() {
       title: 'Accounting',
       sub: 'Track income, expenses, investor support, and salaries',
       income: 'Income',
+      cafeIncome: 'Cafe income',
+      cafeIncomeSub: 'Excludes investor support',
+      investorIncome: 'Investor income',
+      investorIncomeSub: 'Investor support entries',
+      otherIncomeSub: 'Other income',
       investorSupport: 'Investor support',
       expenses: 'Expenses',
       left: 'Left',
@@ -335,6 +372,7 @@ export default function Expenses() {
       from: 'From',
       to: 'To',
       methodBalances: 'Left by payment method',
+      methodBalancesHint: 'In minus out',
       moneyFlow: 'Where money is going',
       incomeSources: 'Other income sources',
       incomeIn: 'In',
@@ -411,6 +449,7 @@ export default function Expenses() {
   ), [state.orders, dateFrom, dateTo])
 
   const revenue = paidOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+  const cafeIncome = revenue
   const salaryExpenses = useMemo(() => (
     buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
       .map(row => ({ ...row, description: l.automaticSalary }))
@@ -438,8 +477,8 @@ export default function Expenses() {
   const summary = useMemo(() => summarizeExpenses(filteredExpenses), [filteredExpenses])
   const cashflow = useMemo(() => summarizeExpenseCashflow(paidOrders, filteredExpenses), [paidOrders, filteredExpenses])
   const netIncome = getNetIncome(revenue, filteredExpenses)
-  const totalIncome = revenue + incomeSummary.total
   const investorSupportTotal = incomeSummary.byCategory.investor_support || 0
+  const otherIncomeTotal = Math.max(0, incomeSummary.total - investorSupportTotal)
   const currentAccountingDate = todayExpenseDate()
   const salaryDueDate = dateTo < currentAccountingDate ? dateTo : currentAccountingDate
   const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
@@ -573,37 +612,53 @@ export default function Expenses() {
           </div>
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <Kpi icon={WalletCards} label={l.income} value={formatCurrency(totalIncome)} tone="green" />
-            <Kpi icon={HandCoins} label={l.investorSupport} value={formatCurrency(investorSupportTotal)} tone="purple" />
+            <Kpi icon={WalletCards} label={l.cafeIncome} value={formatCurrency(cafeIncome)} sub={l.cafeIncomeSub} tone="green" />
+            <Kpi
+              icon={HandCoins}
+              label={l.investorIncome}
+              value={formatCurrency(investorSupportTotal)}
+              sub={otherIncomeTotal > 0 ? `${l.otherIncomeSub}: ${formatCurrency(otherIncomeTotal)}` : l.investorIncomeSub}
+              tone="purple"
+            />
             <Kpi icon={ReceiptText} label={l.expenses} value={formatCurrency(summary.total)} sub={`${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" />
             <Kpi icon={Banknote} label={l.left} value={formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
             <Kpi icon={Users} label={l.salaryDue} value={formatCurrency(totalSalaryDue)} tone={totalSalaryDue > 0 ? 'orange' : 'green'} />
           </div>
 
           <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-black text-[#1F2937]">{l.methodBalances}</h2>
-              <span className="text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.remaining}</span>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-black text-[#1F2937]">{l.methodBalances}</h2>
+                <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-[#9CA3AF]">{l.methodBalancesHint}</p>
+              </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {cashflow.rows.map(row => {
                 const Icon = methodIcon(row.method)
                 return (
-                  <div key={row.method} className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2 text-sm font-black text-[#1F2937]">
-                        <Icon size={16} className="text-[#ff5a00]" />{expensePaymentMethodLabel(row.method, lang)}
+                  <div key={row.method} className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-3.5">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-orange-50 text-[#ff5a00]">
+                        <Icon size={15} />
                       </span>
-                      <span className={`text-lg font-black ${row.left >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(row.left)}</span>
+                      <span className="min-w-0 truncate text-sm font-black text-[#1F2937]">{expensePaymentMethodLabel(row.method, lang)}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs font-bold">
-                      <div className="rounded-lg bg-green-50 px-2 py-2 text-green-700">
-                        <span className="block text-[10px] uppercase text-green-500">{l.incomeIn}</span>
-                        {formatCurrency(row.income)}
+                    <div className="mt-3 rounded-xl border border-[#EEF0F3] bg-white px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.remaining}</span>
+                        <span className={`text-right text-xl font-black leading-tight tabular-nums ${row.left >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(row.left)}
+                        </span>
                       </div>
-                      <div className="rounded-lg bg-orange-50 px-2 py-2 text-[#ff5a00]">
-                        <span className="block text-[10px] uppercase text-orange-400">{l.spentOut}</span>
-                        {formatCurrency(row.expenses)}
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="min-w-0 rounded-lg bg-green-50 px-2.5 py-2 text-green-700">
+                        <span className="block text-[10px] font-black uppercase tracking-wide text-green-500">{l.incomeIn}</span>
+                        <span className="mt-1 block break-words text-sm font-black leading-tight tabular-nums">{formatCurrency(row.income)}</span>
+                      </div>
+                      <div className="min-w-0 rounded-lg bg-orange-50 px-2.5 py-2 text-[#ff5a00]">
+                        <span className="block text-[10px] font-black uppercase tracking-wide text-orange-400">{l.spentOut}</span>
+                        <span className="mt-1 block break-words text-sm font-black leading-tight tabular-nums">{formatCurrency(row.expenses)}</span>
                       </div>
                     </div>
                   </div>

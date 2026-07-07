@@ -141,7 +141,7 @@ function DateInput({ value, lang, onChange }) {
         value={value}
         aria-label={label}
         onChange={event => onChange(event.target.value)}
-        className="absolute inset-0 h-full w-full cursor-pointer bg-transparent text-sm text-transparent caret-transparent outline-none"
+        className="native-date-input absolute inset-0 h-full w-full cursor-pointer bg-transparent text-sm text-transparent caret-transparent outline-none"
       />
     </div>
   )

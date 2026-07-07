@@ -46,6 +46,37 @@ h3 { font-size: 1.0625rem; } /* 17px */
   display: none;
 }
 
+.native-date-input {
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.native-date-input::selection {
+  background: transparent;
+  color: transparent;
+}
+
+.native-date-input::-webkit-datetime-edit,
+.native-date-input::-webkit-datetime-edit-fields-wrapper,
+.native-date-input::-webkit-datetime-edit-text,
+.native-date-input::-webkit-datetime-edit-month-field,
+.native-date-input::-webkit-datetime-edit-day-field,
+.native-date-input::-webkit-datetime-edit-year-field {
+  background: transparent !important;
+  color: transparent !important;
+}
+
+.native-date-input:focus::-webkit-datetime-edit-month-field,
+.native-date-input:focus::-webkit-datetime-edit-day-field,
+.native-date-input:focus::-webkit-datetime-edit-year-field {
+  background: transparent !important;
+  color: transparent !important;
+  outline: none;
+}
+
 @media print {
   @page {
     size: 80mm auto;

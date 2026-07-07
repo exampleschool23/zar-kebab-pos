@@ -1508,6 +1508,20 @@ test('reports date range text opens the native calendar picker', () => {
   assert.doesNotMatch(dateInput, /opacity-0/)
 })
 
+test('expenses date range text opens the native calendar picker', () => {
+  const expenses = readSource('src/pages/Expenses.jsx')
+  const dateInput = functionBody(expenses, 'DateInput')
+
+  assert.match(dateInput, /const inputRef = useRef\(null\)/)
+  assert.match(dateInput, /onPointerDown=\{openPicker\}/)
+  assert.match(dateInput, /input\.showPicker\(\)/)
+  assert.match(dateInput, /formatLongDate\(value, lang, value\)/)
+  assert.match(dateInput, /type="date"/)
+  assert.match(dateInput, /native-date-input/)
+  assert.match(expenses, /const DATE_INPUT_CLASS = .*text-transparent caret-transparent/)
+  assert.match(expenses, /const RANGE_DATE_INPUT_CLASS = .*text-transparent caret-transparent/)
+})
+
 test('AdminTables protects table history and manages zones', () => {
   const source = readSource('src/pages/AdminTables.jsx')
 
@@ -1979,6 +1993,12 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(expenses, /getNetIncome\(revenue, filteredExpenses\)/)
   assert.match(expenses, /summarizeExpenseCashflow\(paidOrders, filteredExpenses\)/)
   assert.match(expenses, /l\.methodBalances/)
+  assert.match(expenses, /const cafeIncome = revenue/)
+  assert.match(expenses, /label=\{l\.cafeIncome\} value=\{formatCurrency\(cafeIncome\)\}/)
+  assert.match(expenses, /cafeIncomeSub: 'Excludes investor support'/)
+  assert.match(expenses, /label=\{l\.investorIncome\}[\s\S]*value=\{formatCurrency\(investorSupportTotal\)\}/)
+  assert.match(expenses, /const otherIncomeTotal = Math\.max\(0, incomeSummary\.total - investorSupportTotal\)/)
+  assert.match(expenses, /xl:grid-cols-3/)
   assert.match(expenses, /ExpenseCategoryChart/)
   assert.match(expenses, /l\.moneyFlow/)
   assert.match(expenses, /titleAmount=\{investorSupportTotal\}/)
