@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin()
     const { data: order, error } = await supabase
       .from('orders')
-      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, name_ru, name_uz, name_en, menu_item_id, quantity, price, unit_price, status), payments:order_payments(method, amount)')
+      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, status), payments:order_payments(method, amount)')
       .eq('id', orderId)
       .maybeSingle()
     if (error) throw error

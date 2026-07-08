@@ -1237,12 +1237,19 @@ test('delivery order type is wired through POS surfaces and reports', () => {
   assert.match(telegramOrder, /normalizeOrderType\(body\.orderType\)/)
 })
 
-test('local menu image upload API receives server auth env from Vite', () => {
+test('local API routes receive server auth and telegram env from Vite', () => {
   const viteConfig = readSource('vite.config.js')
+  const telegramOrderStatusApi = readSource('api/telegram/order-status.js')
 
   assert.match(viteConfig, /'VITE_SUPABASE_URL'/)
   assert.match(viteConfig, /'SUPABASE_URL'/)
   assert.match(viteConfig, /'SUPABASE_SERVICE_ROLE_KEY'/)
+  assert.match(viteConfig, /'TELEGRAM_BOT_TOKEN'/)
+  assert.match(viteConfig, /'TELEGRAM_COMPLETED_ORDERS_CHAT_ID'/)
+  assert.match(viteConfig, /import notifyTelegramOrderStatus from '\.\/api\/telegram\/order-status\.js'/)
+  assert.match(viteConfig, /server\.middlewares\.use\('\/api\/telegram\/order-status'/)
+  assert.match(telegramOrderStatusApi, /items:order_items\(name, menu_item_id, quantity, price, unit_price, status\)/)
+  assert.doesNotMatch(telegramOrderStatusApi, /items:order_items\([^)]*name_ru/)
 })
 
 test('WaiterTables hides disabled tables and links admins to management', () => {

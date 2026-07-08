@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import registerAuth from './api/auth/register.js'
 import uploadMenuImage from './api/menu-image/upload.js'
 import deleteMenuImage from './api/menu-image/delete.js'
+import notifyTelegramOrderStatus from './api/telegram/order-status.js'
 
 const SERVER_ENV_KEYS = [
   'VITE_SUPABASE_URL',
@@ -14,6 +15,10 @@ const SERVER_ENV_KEYS = [
   'R2_BUCKET',
   'R2_PUBLIC_BASE_URL',
   'R2_ENDPOINT',
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_COMPLETED_ORDERS_CHAT_ID',
+  'TELEGRAM_COMPLETED_ORDERS_CHAT_IDS',
+  'TELEGRAM_SESSION_SECRET',
 ]
 
 function loadServerEnv(mode) {
@@ -30,6 +35,7 @@ function localApiRoutes() {
       server.middlewares.use('/api/auth/register', (req, res) => registerAuth(req, res))
       server.middlewares.use('/api/menu-image/upload', (req, res) => uploadMenuImage(req, res))
       server.middlewares.use('/api/menu-image/delete', (req, res) => deleteMenuImage(req, res))
+      server.middlewares.use('/api/telegram/order-status', (req, res) => notifyTelegramOrderStatus(req, res))
     },
   }
 }
