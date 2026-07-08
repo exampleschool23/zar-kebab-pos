@@ -1856,6 +1856,8 @@ test('cashier payment waits for database success and supports legacy loyalty tra
   assert.match(appContext, /'MARK_ORDER_PAID'/)
   assert.match(db, /mergeOrderItemsByIdentity/)
   assert.match(db, /case 'MARK_ORDER_PAID':[\s\S]*updateRestaurantTableStatus\([\s\S]*status: 'available'[\s\S]*\.update\(updateFields\)[\s\S]*\.select\('id'\)[\s\S]*assertUpdatedRows\(paidRows/)
+  assert.match(db, /assertUpdatedRows\(paidRows[\s\S]*notifyTelegramOrderStatus\(o\.id, 'completed'\)/)
+  assert.doesNotMatch(db, /await notifyTelegramOrderStatus\(o\.id, 'completed'\)/)
   assert.match(db, /isLegacyPositiveTransactionAmountConstraint\(transactionError\)/)
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(transactions\)\)/)
   assert.match(db, /insert\(toLegacyPositiveTransactionAmounts\(legacyTransactions\)\)/)

@@ -12,10 +12,12 @@ Add these to local `.env.local` and to your deployment provider:
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_WEB_APP_URL=https://your-domain.com/telegram
 TELEGRAM_SESSION_SECRET=use-a-long-random-string
+TELEGRAM_COMPLETED_ORDERS_CHAT_ID=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Keep `TELEGRAM_BOT_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` server-only. Do not prefix them with `VITE_`.
+Set `TELEGRAM_COMPLETED_ORDERS_CHAT_ID` to the Telegram group chat id that should receive paid order completion messages. Add the bot to the group first; group and supergroup chat ids are usually negative numbers. You can also provide multiple chat ids separated by commas.
 
 ### BotFather setup
 

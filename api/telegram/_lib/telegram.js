@@ -133,6 +133,14 @@ export async function sendTelegramMessage(chatId, text) {
   return body
 }
 
+export function escapeTelegramHtml(value) {
+  return String(value ?? '').replace(/[&<>]/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+  })[char])
+}
+
 export const TELEGRAM_STATUS_MESSAGES = {
   accepted: '✅ Order accepted',
   preparing: '👨‍🍳 Your order is being prepared',
