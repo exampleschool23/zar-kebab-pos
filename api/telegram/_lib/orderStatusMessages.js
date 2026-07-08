@@ -19,6 +19,8 @@ const PAYMENT_METHOD_LABELS_RU = {
   pay_at_cashier: 'Оплата на кассе',
 }
 
+const PRICE_MODE_TOURIST = 'tourist'
+
 function formatMoney(amount) {
   const rounded = Math.round(Number(amount) || 0)
   return `${new Intl.NumberFormat('ru-RU').format(rounded).replace(/\s/g, ' ')} UZS`
@@ -63,6 +65,15 @@ function formatPaymentLine(order) {
   return paymentMethodLabel(order?.payment_method)
 }
 
+function normalizePriceMode(value) {
+  return value === PRICE_MODE_TOURIST ? PRICE_MODE_TOURIST : 'regular'
+}
+
+function formatPriceModeLine(order) {
+  const mode = normalizePriceMode(order?.price_mode)
+  return mode === PRICE_MODE_TOURIST ? 'Тип меню: 🧳 Турист' : 'Тип меню: Обычное'
+}
+
 function isPaidOrder(order) {
   return order?.payment_status === 'paid' || order?.status === 'paid' || order?.status === 'completed'
 }
@@ -97,7 +108,7 @@ function buildItemRows(items) {
   ]
 
   for (const item of items) {
-    const name = truncateText(item?.name || item?.name_ru || item?.name_uz || item?.name_en || item?.menu_item_id, 21)
+    const name = truncateText(item?.menu_name_ru || item?.name_ru || item?.name || item?.menu_item_id, 21)
     const quantity = Math.max(0, Number(item?.quantity) || 0)
     const amount = formatRowMoney(getItemAmount(item))
     rows.push(`${name.padEnd(21)} ${String(quantity).padStart(3)} ${amount.padStart(10)}`)
@@ -151,6 +162,7 @@ export function buildCompletedOrderGroupMessage(order) {
     `Официант: ${escapeTelegramHtml(order?.waiter_name || '-')}`,
     `Закрыл: ${escapeTelegramHtml(order?.completed_by_name || '-')}`,
     `Дата: ${escapeTelegramHtml(closedAt)}`,
+    escapeTelegramHtml(formatPriceModeLine(order)),
   ]
 
   if (items.length > 0) lines.push('', `<pre>${escapeTelegramHtml(buildItemRows(items))}</pre>`)
@@ -158,9 +170,8 @@ export function buildCompletedOrderGroupMessage(order) {
   lines.push(`Сумма заказа: ${escapeTelegramHtml(formatMoney(subtotal))}`)
   if (serviceFee > 0) lines.push(`Сервис ${escapeTelegramHtml(serviceRate)}%: ${escapeTelegramHtml(formatMoney(serviceFee))}`)
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
-  lines.push(`<b>К оплате: ${escapeTelegramHtml(formatMoney(total))}</b>`)
   if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
-    lines.push(`Выручка сегодня: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
+    lines.push(`Доход · Сегодня: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
   }
 
   return lines.join('\n')

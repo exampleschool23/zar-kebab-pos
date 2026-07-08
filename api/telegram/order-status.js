@@ -46,6 +46,30 @@ async function loadPaidRevenueForRestaurantDay(supabase, paidAt) {
   return (data || []).reduce((sum, row) => sum + (Number(row.total) || 0), 0)
 }
 
+async function loadRussianMenuItemNames(supabase, items = []) {
+  const ids = [...new Set(items.map(item => item?.menu_item_id).filter(Boolean))]
+  if (ids.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('menu_items')
+    .select('id, name_ru')
+    .in('id', ids)
+  if (error) throw error
+
+  return new Map((data || []).map(item => [item.id, item.name_ru || '']))
+}
+
+async function withRussianMenuItemNames(supabase, order) {
+  const itemNames = await loadRussianMenuItemNames(supabase, order?.items || [])
+  return {
+    ...order,
+    items: (order?.items || []).map(item => ({
+      ...item,
+      menu_name_ru: itemNames.get(item.menu_item_id) || '',
+    })),
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
@@ -61,7 +85,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin()
     const { data: order, error } = await supabase
       .from('orders')
-      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, status), payments:order_payments(method, amount)')
+      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, price_mode, status), payments:order_payments(method, amount)')
       .eq('id', orderId)
       .maybeSingle()
     if (error) throw error
@@ -88,8 +112,9 @@ export default async function handler(req, res) {
     }
 
     if (shouldNotifyCompletedOrderGroup(telegramStatus, order)) {
+      const localizedOrder = await withRussianMenuItemNames(supabase, order)
       const dailyRevenueTotal = await loadPaidRevenueForRestaurantDay(supabase, order.paid_at || order.updated_at || new Date())
-      const text = buildCompletedOrderGroupMessage({ ...order, dailyRevenueTotal })
+      const text = buildCompletedOrderGroupMessage({ ...localizedOrder, dailyRevenueTotal })
       for (const chatId of getCompletedOrdersChatIds()) {
         sends.push(
           sendTelegramMessage(chatId, text)

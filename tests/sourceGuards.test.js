@@ -1248,7 +1248,8 @@ test('local API routes receive server auth and telegram env from Vite', () => {
   assert.match(viteConfig, /'TELEGRAM_COMPLETED_ORDERS_CHAT_ID'/)
   assert.match(viteConfig, /import notifyTelegramOrderStatus from '\.\/api\/telegram\/order-status\.js'/)
   assert.match(viteConfig, /server\.middlewares\.use\('\/api\/telegram\/order-status'/)
-  assert.match(telegramOrderStatusApi, /items:order_items\(name, menu_item_id, quantity, price, unit_price, status\)/)
+  assert.match(telegramOrderStatusApi, /items:order_items\(name, menu_item_id, quantity, price, unit_price, price_mode, status\)/)
+  assert.match(telegramOrderStatusApi, /\.from\('menu_items'\)[\s\S]*\.select\('id, name_ru'\)/)
   assert.doesNotMatch(telegramOrderStatusApi, /items:order_items\([^)]*name_ru/)
 })
 
