@@ -19,7 +19,7 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import { getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { isCustomerMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
+import { isWaiterMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
 import { DEFAULT_PRICE_MODE, getMenuItemForPriceMode, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { canEditFeature } from '../lib/permissions'
 
@@ -675,7 +675,7 @@ export default function WaiterOrder() {
   // Categories
   const sortedCategories = useMemo(() =>
     [...state.categories]
-      .filter(isCustomerMenuCategory)
+      .filter(isWaiterMenuCategory)
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
     [state.categories]
   )

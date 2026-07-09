@@ -5,6 +5,8 @@ import { Loader2 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { t } from '../lib/i18n'
 
+const OAUTH_RETURN_TO_KEY = 'zk_oauth_return_to'
+
 export default function AuthCallback() {
   const navigate = useNavigate()
   const { state } = useApp()
@@ -27,7 +29,7 @@ export default function AuthCallback() {
     const code         = url.searchParams.get('code')
     const accessToken  = hashParams.get('access_token')
     const refreshToken = hashParams.get('refresh_token')
-    const returnTo     = sanitizeReturnTo(url.searchParams.get('returnTo'))
+    const returnTo     = sanitizeReturnTo(url.searchParams.get('returnTo') || readStoredReturnTo())
 
     log(`URL params — code: ${!!code}, token: ${!!accessToken}, error: ${oauthError || 'none'}`)
 
@@ -175,6 +177,16 @@ export default function AuthCallback() {
       </div>
     </div>
   )
+}
+
+function readStoredReturnTo() {
+  try {
+    const value = window.sessionStorage.getItem(OAUTH_RETURN_TO_KEY)
+    window.sessionStorage.removeItem(OAUTH_RETURN_TO_KEY)
+    return value
+  } catch {
+    return ''
+  }
 }
 
 function sanitizeReturnTo(value) {

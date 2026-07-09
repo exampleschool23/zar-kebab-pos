@@ -19,8 +19,21 @@ export function isHiddenMenuCategory(category) {
   return !!(category?.hidden || category?.is_hidden || category?.isHidden)
 }
 
+export function isWaiterHiddenMenuCategory(category) {
+  return !!(
+    category?.waiter_hidden ||
+    category?.waiterHidden ||
+    category?.hide_from_waiter ||
+    category?.hideFromWaiter
+  )
+}
+
 export function isCustomerMenuCategory(category) {
   return !isHiddenMenuCategory(category)
+}
+
+export function isWaiterMenuCategory(category) {
+  return !isWaiterHiddenMenuCategory(category)
 }
 
 export function isDeletedMenuItem(item) {

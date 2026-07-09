@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, getProfile } from '../lib/supabase'
 
 const AuthContext = createContext(null)
+const OAUTH_RETURN_TO_KEY = 'zk_oauth_return_to'
 
 function fallbackProfileFromUser(user, status = 'pending') {
   return {
@@ -164,7 +165,16 @@ export function AuthProvider({ children }) {
 
   async function signInWithGoogle(returnTo = '') {
     const redirectUrl = new URL('/auth/callback', window.location.origin)
-    if (returnTo) redirectUrl.searchParams.set('returnTo', returnTo)
+    try {
+      const target = String(returnTo || '').trim()
+      if (target && target.startsWith('/') && !target.startsWith('//')) {
+        window.sessionStorage.setItem(OAUTH_RETURN_TO_KEY, target)
+      } else {
+        window.sessionStorage.removeItem(OAUTH_RETURN_TO_KEY)
+      }
+    } catch {
+      // OAuth can still continue without preserving the deep link.
+    }
     return supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: redirectUrl.toString() },

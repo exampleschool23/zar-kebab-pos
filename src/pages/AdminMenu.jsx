@@ -710,7 +710,16 @@ const blankItem = {
   quick_item_sort_order: '',
 }
 
-const blankCat = { id: '', name_uz: '', name_ru: '', name_en: '', image_url: '', sort_order: '', hidden: false }
+const blankCat = {
+  id: '',
+  name_uz: '',
+  name_ru: '',
+  name_en: '',
+  image_url: '',
+  sort_order: '',
+  hidden: false,
+  waiter_hidden: false,
+}
 
 function parseOptionGroupsValue(value) {
   if (!value) return []
@@ -1220,7 +1229,13 @@ export default function AdminMenu() {
   function openEditCat(c) {
     if (!canEditMenu) return
     uploadedCatImageUrlsRef.current.clear()
-    setCatForm({ ...blankCat, ...c, sort_order: c.sort_order ?? 0, hidden: !!c.hidden })
+    setCatForm({
+      ...blankCat,
+      ...c,
+      sort_order: c.sort_order ?? 0,
+      hidden: !!c.hidden,
+      waiter_hidden: !!(c.waiter_hidden || c.waiterHidden || c.hide_from_waiter || c.hideFromWaiter),
+    })
     setCatModal('edit')
   }
   async function closeCatModal() {
@@ -1239,7 +1254,12 @@ export default function AdminMenu() {
         : ''
       const result = await dispatch({
         type: catModal === 'new' ? 'ADD_CATEGORY' : 'UPDATE_CATEGORY',
-        payload: { ...catForm, sort_order: Number(catForm.sort_order) || 0, hidden: !!catForm.hidden },
+        payload: {
+          ...catForm,
+          sort_order: Number(catForm.sort_order) || 0,
+          hidden: !!catForm.hidden,
+          waiter_hidden: !!catForm.waiter_hidden,
+        },
       })
       if (result?.error) {
         setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
@@ -2206,6 +2226,19 @@ export default function AdminMenu() {
               />
               <label htmlFor="categoryHidden" className="text-sm text-gray-700 font-medium">
                 {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
+              </label>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="categoryWaiterHidden"
+                type="checkbox"
+                checked={!!catForm.waiter_hidden}
+                onChange={e => setCatForm(f => ({ ...f, waiter_hidden: e.target.checked }))}
+                disabled={savingCatForm}
+                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
+              />
+              <label htmlFor="categoryWaiterHidden" className="text-sm text-gray-700 font-medium">
+                {lang === 'uz' ? 'Ofitsiant stol menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню столов официанта' : 'Hide from waiter table'}
               </label>
             </div>
             <div className="flex gap-2 pt-2">

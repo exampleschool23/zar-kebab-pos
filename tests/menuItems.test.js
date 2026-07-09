@@ -10,6 +10,8 @@ import {
   isDeletedMenuItem,
   isHiddenMenuCategory,
   isPublicHiddenMenuItem,
+  isWaiterHiddenMenuCategory,
+  isWaiterMenuCategory,
   isWaiterMenuItem,
 } from '../src/lib/menuItems.js'
 
@@ -54,4 +56,11 @@ test('hidden menu categories are excluded from customer menus', () => {
   assert.equal(isCustomerMenuCategory({ hidden: true }), false)
   assert.equal(isCustomerMenuCategory({ hidden: false }), true)
   assert.equal(isCustomerMenuCategory({}), true)
+})
+
+test('waiter-hidden categories are excluded from waiter ordering only', () => {
+  assert.equal(isWaiterHiddenMenuCategory({ waiter_hidden: true }), true)
+  assert.equal(isWaiterMenuCategory({ waiter_hidden: true }), false)
+  assert.equal(isWaiterMenuCategory({ hidden: true, waiter_hidden: false }), true)
+  assert.equal(isCustomerMenuCategory({ hidden: false, waiter_hidden: true }), true)
 })
