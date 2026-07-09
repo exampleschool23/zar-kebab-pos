@@ -19,8 +19,16 @@ export function isCustomerMenuCategory(category) {
   return !isHiddenMenuCategory(category)
 }
 
+export function isDeletedMenuItem(item) {
+  return !!(item?.deleted_at || item?.deletedAt || item?.is_deleted || item?.isDeleted)
+}
+
+export function isActiveMenuItem(item) {
+  return !!item && !isDeletedMenuItem(item)
+}
+
 export function isCustomerMenuItem(item) {
-  return !!item?.available && !isCashierOnlyItem(item)
+  return isActiveMenuItem(item) && !!item?.available && !isCashierOnlyItem(item)
 }
 
 export function getQuickItemSortOrder(item) {

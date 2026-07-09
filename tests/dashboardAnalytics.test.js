@@ -155,6 +155,22 @@ test('dashboard period change from today to 7 days removes stale today-only cate
   assert.deepEqual(week.staff.map(row => row.name), ['Dildora', 'Jasurbek'])
 })
 
+test('dashboard analytics keep category context for soft-deleted menu items', () => {
+  const deletedMenuMap = {
+    ...menuItemMap,
+    kebab: { ...menuItemMap.kebab, deleted_at: '2026-07-09T10:00:00.000Z' },
+  }
+  const rows = getDashboardSalesByCategory(
+    getDashboardPeriodOrders(orders, 'today', now),
+    deletedMenuMap,
+    categoryMap,
+    'en'
+  )
+
+  assert.deepEqual(rows.map(row => row.name), ['Kebab', 'Drinks'])
+  assert.equal(rows.find(row => row.name === 'Kebab').revenue, 50000)
+})
+
 test('dashboard period change from 7 days to month updates all widgets to month data', () => {
   const month = analyticsFor('month')
 

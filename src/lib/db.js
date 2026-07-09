@@ -1540,8 +1540,29 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'DELETE_MENU_ITEM': {
-      const { error } = await supabase.from('menu_items').delete().eq('id', action.payload)
-      if (error) throw error
+      const deletedAt = new Date().toISOString()
+      const payload = {
+        available: false,
+        show_in_cashier_quick_items: false,
+        deleted_at: deletedAt,
+      }
+      const { error } = await supabase.from('menu_items').update(payload).eq('id', action.payload)
+      if (error) {
+        const text = `${error.code || ''} ${error.message || ''} ${error.details || ''}`.toLowerCase()
+        const missingDeletedAt = text.includes('deleted_at') && (
+          text.includes('column') ||
+          text.includes('schema cache') ||
+          text.includes('42703')
+        )
+        if (!missingDeletedAt) throw error
+
+        const fallback = await supabase
+          .from('menu_items')
+          .update({ available: false, show_in_cashier_quick_items: false })
+          .eq('id', action.payload)
+        if (fallback.error) throw fallback.error
+      }
+      action.meta = { ...(action.meta || {}), deleted_at: deletedAt }
       break
     }
 

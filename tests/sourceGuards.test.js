@@ -699,6 +699,27 @@ test('menu and category writes surface Supabase errors', () => {
   assert.match(db, /const results = await Promise\.all\(\[[\s\S]*supabase\.from\('menu_categories'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
 })
 
+test('menu item deletion is soft-delete only so history analytics keep lookup context', () => {
+  const db = readSource('src/lib/db.js')
+  const menuReducer = readSource('src/store/menuReducer.js')
+  const appContext = readSource('src/store/AppContext.jsx')
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const menuItems = readSource('src/lib/menuItems.js')
+  const migration = readSource('supabase/078_menu_item_safe_delete.sql')
+  const health = readSource('scripts/check-db-health.js')
+
+  assert.match(db, /case 'DELETE_MENU_ITEM': \{[\s\S]*\.from\('menu_items'\)\.update\(payload\)\.eq\('id', action\.payload\)/)
+  assert.match(db, /deleted_at: deletedAt/)
+  assert.doesNotMatch(db, /case 'DELETE_MENU_ITEM': \{[\s\S]{0,900}\.delete\(\)/)
+  assert.match(menuReducer, /case 'DELETE_MENU_ITEM': \{[\s\S]*available: false,[\s\S]*deleted_at: deletedAt/)
+  assert.match(appContext, /'DELETE_MENU_ITEM'/)
+  assert.match(adminMenu, /filter\(isActiveMenuItem\)/)
+  assert.match(menuItems, /function isDeletedMenuItem/)
+  assert.match(menuItems, /function isActiveMenuItem/)
+  assert.match(migration, /add column if not exists deleted_at timestamptz/)
+  assert.match(health, /deleted_at/)
+})
+
 test('Catering public page is routed and has Russian SEO and contact CTAs', () => {
   const app = readSource('src/App.jsx')
   const page = readSource('src/pages/CateringPage.jsx')

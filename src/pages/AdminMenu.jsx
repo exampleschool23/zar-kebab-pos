@@ -18,7 +18,7 @@ import { getMenuPricing } from '../lib/menuPricing'
 import { generateMenuExternalId } from '../lib/menuExternalId'
 import AppShell from '../components/AppShell'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
-import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
+import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
@@ -955,7 +955,9 @@ export default function AdminMenu() {
   )
 
   const sortedItems = useMemo(() =>
-    [...state.menuItems].sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
+    state.menuItems
+      .filter(isActiveMenuItem)
+      .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
     [state.menuItems]
   )
 
@@ -980,10 +982,10 @@ export default function AdminMenu() {
   }, [sortedItems, filterAvail, search, lang, savingItemId])
 
   const itemCountByCat = useMemo(() => {
-    const m = { all: state.menuItems.length }
-    state.menuItems.forEach(i => { m[i.category_id] = (m[i.category_id] || 0) + 1 })
+    const m = { all: sortedItems.length }
+    sortedItems.forEach(i => { m[i.category_id] = (m[i.category_id] || 0) + 1 })
     return m
-  }, [state.menuItems])
+  }, [sortedItems])
 
   async function cleanupTrackedUploads(ref, keepUrls = []) {
     const keep = new Set(keepUrls.filter(Boolean))
@@ -1012,8 +1014,8 @@ export default function AdminMenu() {
     }
 
     if (productId === 'new') {
-      const maxOrder = state.menuItems.length > 0
-        ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0)) : 0
+      const maxOrder = sortedItems.length > 0
+        ? Math.max(...sortedItems.map(i => i.sort_order ?? 0)) : 0
       const maxQuickOrder = quickItems.length > 0
         ? Math.max(...quickItems.map(i => getQuickItemSortOrder(i))) : 0
       const quick = searchParams.get('quick') === '1'
@@ -1046,14 +1048,14 @@ export default function AdminMenu() {
       return
     }
 
-    const item = state.menuItems.find(row => row.id === productId)
+    const item = sortedItems.find(row => row.id === productId)
     if (!item) {
       navigate('/admin/menu', { replace: true })
       return
     }
     setForm(menuItemToProductForm(item))
     setItemModal('edit')
-  }, [loaded, isProductEditorPage, productId, quickItems, searchParams, state.menuItems, navigate, canEditMenu])
+  }, [loaded, isProductEditorPage, productId, quickItems, searchParams, sortedItems, navigate, canEditMenu])
 
   useEffect(() => {
     if (!loaded || isProductEditorPage) return undefined
@@ -1175,9 +1177,19 @@ export default function AdminMenu() {
       setSavingItemId('')
     }
   }
-  function deleteItem(id) {
-    if (!canEditMenu) return
-    if (window.confirm('Delete this item?')) dispatch({ type: 'DELETE_MENU_ITEM', payload: id })
+  async function deleteItem(id) {
+    if (!canEditMenu || savingItemId) return
+    if (!window.confirm('Delete this item?')) return
+    setSavingItemId(id)
+    setMenuNotice(null)
+    try {
+      const result = await dispatch({ type: 'DELETE_MENU_ITEM', payload: id })
+      if (result?.error) {
+        setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
+      }
+    } finally {
+      setSavingItemId('')
+    }
   }
 
   // ── Category CRUD ──────────────────────────────────────────────────────────

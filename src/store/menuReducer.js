@@ -25,8 +25,22 @@ export function menuReducer(state, action) {
         ),
       }
 
-    case 'DELETE_MENU_ITEM':
-      return { ...state, menuItems: state.menuItems.filter(i => i.id !== action.payload) }
+    case 'DELETE_MENU_ITEM': {
+      const deletedAt = action.meta?.deleted_at || action.meta?.deletedAt || new Date().toISOString()
+      return {
+        ...state,
+        menuItems: state.menuItems.map(i =>
+          i.id === action.payload
+            ? {
+                ...i,
+                available: false,
+                show_in_cashier_quick_items: false,
+                deleted_at: deletedAt,
+              }
+            : i
+        ),
+      }
+    }
 
     case 'REORDER_MENU_ITEM': {
       const { idA, idB } = action.payload

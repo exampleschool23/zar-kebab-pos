@@ -68,6 +68,7 @@ create table if not exists public.menu_items (
   available        boolean     not null default true,
   cashier_only     boolean     not null default false,
   sort_order       integer     not null default 0,
+  deleted_at       timestamptz,
   created_at       timestamptz not null default now()
 );
 
@@ -112,6 +113,7 @@ create index if not exists idx_orders_table_id    on public.orders(table_id);
 create index if not exists idx_orders_status      on public.orders(status, payment_status);
 create index if not exists idx_order_items_order  on public.order_items(order_id);
 create index if not exists idx_menu_items_cat     on public.menu_items(category_id);
+create index if not exists idx_menu_items_deleted_at on public.menu_items(deleted_at);
 create unique index if not exists idx_menu_items_external_id_unique
   on public.menu_items(external_id)
   where external_id <> '';
