@@ -19,7 +19,7 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import { getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
+import { isCustomerMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
 import { DEFAULT_PRICE_MODE, getMenuItemForPriceMode, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { canEditFeature } from '../lib/permissions'
 
@@ -688,7 +688,7 @@ export default function WaiterOrder() {
   const categoryItemCounts = useMemo(() => {
     const counts = { all: 0 }
     state.menuItems.forEach(item => {
-      if (!isCustomerMenuItem(item)) return
+      if (!isWaiterMenuItem(item)) return
       if (item.category_id && !visibleCategoryIds.has(item.category_id)) return
       counts.all = (counts.all || 0) + 1
       counts[item.category_id] = (counts[item.category_id] || 0) + 1
@@ -706,7 +706,7 @@ export default function WaiterOrder() {
   const filteredItems = useMemo(() => {
     return state.menuItems
       .filter(item => {
-        if (!isCustomerMenuItem(item)) return false
+        if (!isWaiterMenuItem(item)) return false
         if (item.category_id && !visibleCategoryIds.has(item.category_id)) return false
         const matchSearch = !q || [item.name_uz, item.name_ru, item.name_en].some(n => n?.toLowerCase().includes(q))
         return matchSearch

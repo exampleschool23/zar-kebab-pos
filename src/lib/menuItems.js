@@ -11,6 +11,10 @@ export function isCashierOnlyItem(item) {
   return !!(item?.cashier_only || item?.cashierOnly)
 }
 
+export function isPublicHiddenMenuItem(item) {
+  return !!(item?.public_hidden || item?.publicHidden || item?.hide_from_public || item?.hideFromPublic)
+}
+
 export function isHiddenMenuCategory(category) {
   return !!(category?.hidden || category?.is_hidden || category?.isHidden)
 }
@@ -28,6 +32,10 @@ export function isActiveMenuItem(item) {
 }
 
 export function isCustomerMenuItem(item) {
+  return isActiveMenuItem(item) && !!item?.available && !isCashierOnlyItem(item) && !isPublicHiddenMenuItem(item)
+}
+
+export function isWaiterMenuItem(item) {
   return isActiveMenuItem(item) && !!item?.available && !isCashierOnlyItem(item)
 }
 

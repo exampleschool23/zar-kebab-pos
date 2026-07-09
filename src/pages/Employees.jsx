@@ -66,6 +66,7 @@ export default function Employees() {
       joined: 'Ishga kirgan',
       ended: 'Tugagan',
       daily: 'Kunlik',
+      activeDaily: 'Kunlik faol',
       due: 'Qarz',
       endDate: 'Tugash sanasi',
       status: 'Holat',
@@ -93,6 +94,7 @@ export default function Employees() {
       joined: 'Дата выхода',
       ended: 'Дата окончания',
       daily: 'За день',
+      activeDaily: 'Активные за день',
       due: 'Долг',
       endDate: 'Дата окончания',
       status: 'Статус',
@@ -120,6 +122,7 @@ export default function Employees() {
       joined: 'Joined',
       ended: 'Ended',
       daily: 'Daily',
+      activeDaily: 'Active daily',
       due: 'Due',
       endDate: 'End date',
       status: 'Status',
@@ -186,7 +189,11 @@ export default function Employees() {
     })
   ), [employees])
 
-  const activeCount = useMemo(() => employees.filter(item => item.is_active !== false).length, [employees])
+  const activeEmployees = useMemo(() => employees.filter(item => item.is_active !== false), [employees])
+  const activeCount = activeEmployees.length
+  const activeDailySalary = useMemo(() => (
+    activeEmployees.reduce((sum, item) => sum + getDailySalaryAmount(item, today), 0)
+  ), [activeEmployees, today])
   const totalDue = useMemo(() => employees.reduce((sum, item) => sum + getSalaryDue(item, today), 0), [employees, today])
 
   async function toggleEmployeeActive(employee) {
@@ -280,6 +287,7 @@ export default function Employees() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Kpi icon={Users} label={l.active} value={activeCount} />
+              <Kpi icon={CalendarDays} label={l.activeDaily} value={formatCurrency(activeDailySalary)} />
               <Kpi icon={WalletCards} label={l.due} value={formatCurrency(totalDue)} hot={totalDue > 0} />
               <button onClick={loadEmployees} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />{l.refresh}

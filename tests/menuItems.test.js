@@ -9,6 +9,8 @@ import {
   isCustomerMenuItem,
   isDeletedMenuItem,
   isHiddenMenuCategory,
+  isPublicHiddenMenuItem,
+  isWaiterMenuItem,
 } from '../src/lib/menuItems.js'
 
 test('cashier-only items stay available for cashier quick items but hidden from customer menus', () => {
@@ -29,12 +31,21 @@ test('normal available items remain visible to customer menus', () => {
   assert.equal(isCustomerMenuItem({ available: false, cashier_only: false }), false)
 })
 
+test('public-hidden items are hidden from customer menus but available to waiter ordering', () => {
+  const item = { available: true, public_hidden: true, cashier_only: false }
+
+  assert.equal(isPublicHiddenMenuItem(item), true)
+  assert.equal(isCustomerMenuItem(item), false)
+  assert.equal(isWaiterMenuItem(item), true)
+})
+
 test('soft-deleted menu items stay out of active menus', () => {
   const deleted = { available: true, deleted_at: '2026-07-09T10:00:00.000Z' }
 
   assert.equal(isDeletedMenuItem(deleted), true)
   assert.equal(isActiveMenuItem(deleted), false)
   assert.equal(isCustomerMenuItem(deleted), false)
+  assert.equal(isWaiterMenuItem(deleted), false)
 })
 
 test('hidden menu categories are excluded from customer menus', () => {
