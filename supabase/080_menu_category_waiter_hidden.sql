@@ -5,3 +5,5 @@ alter table public.menu_categories
 
 create index if not exists idx_menu_categories_waiter_visible
   on public.menu_categories(waiter_hidden, sort_order);
+
+notify pgrst, 'reload schema';
