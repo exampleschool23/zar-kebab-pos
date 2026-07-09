@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
-import { getOrderDate, getOrderPayments, getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getOrderDate, getOrderPayments, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatLongDate } from '../lib/dateFormat'
 import {
   buildSalaryBonusExpenseRows,
@@ -321,7 +321,7 @@ export default function MonthlyEstimate() {
     })
   ), [salaryProfiles, cutoffEnd, firstFinancialActivityDate, state.settings?.monthlyRentUzs])
 
-  const salesRevenue = paidOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+  const salesRevenue = paidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
   const incomeSummary = summarizeIncomeEntries(incomeEntries)
   const allActualExpenseRows = [...salaryPaymentRows, ...salaryBonusRows, ...manualExpenseRows]
   const actualExpenseSummary = summarizeExpenses(allActualExpenseRows)

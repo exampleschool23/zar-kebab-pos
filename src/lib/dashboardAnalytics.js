@@ -3,7 +3,7 @@ import {
   getOrderDate,
   getOrderItems,
   getOrderPaymentBreakdown,
-  getOrderTotal,
+  getOrderRevenueTotal,
   restaurantTodayStr,
   toLocalDateStr,
 } from './analytics.js'
@@ -111,7 +111,7 @@ export function getDashboardOrderTypePerformance(orders, lang = 'en') {
     const row = map[key] || map.dine_in
     row.orders += 1
     row.items += getOrderItems(order).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
-    row.revenue += getOrderTotal(order)
+    row.revenue += getOrderRevenueTotal(order)
   })
 
   const total = Object.values(map).reduce((sum, row) => sum + row.revenue, 0)
@@ -143,7 +143,7 @@ export function getDashboardPaymentMethods(orders, labels = {}) {
     const breakdown = getOrderPaymentBreakdown(order)
     const rows = breakdown.length > 0
       ? breakdown
-      : [{ method: order.payment_method, amount: getOrderTotal(order) }]
+      : [{ method: order.payment_method, amount: getOrderRevenueTotal(order) }]
 
     rows.forEach(row => {
       const raw = (row.method || '').toLowerCase().trim()
@@ -171,7 +171,7 @@ export function getDashboardStaffPerformance(orders, staffProfiles = []) {
     const name = order.waiter_name || order.waiter_email || 'Unknown'
     if (!map[name]) map[name] = { name, orders: 0, revenue: 0, items: 0 }
     map[name].orders += 1
-    map[name].revenue += getOrderTotal(order)
+    map[name].revenue += getOrderRevenueTotal(order)
     map[name].items += getOrderItems(order).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
   })
 

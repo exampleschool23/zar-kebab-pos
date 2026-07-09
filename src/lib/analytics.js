@@ -161,6 +161,33 @@ export function getOrderTotal(o, fallbackServicePct = 20) {
   return getOrderPaymentSummary(o, getOrderItems(o), fallbackServicePct).total
 }
 
+export function getOrderLoyaltyWalletPaymentAmount(order) {
+  return Math.max(0, Math.round(
+    Number(
+      order?.loyalty_used_amount ??
+      order?.loyaltyUsedAmount ??
+      order?.loyalty_redeem_amount ??
+      order?.loyaltyRedeemAmount ??
+      0
+    ) || 0
+  ))
+}
+
+function hasOrderLoyaltyWalletPaymentField(order) {
+  return order?.loyalty_used_amount != null ||
+    order?.loyaltyUsedAmount != null ||
+    order?.loyalty_redeem_amount != null ||
+    order?.loyaltyRedeemAmount != null
+}
+
+export function getOrderRevenueTotal(o, fallbackServicePct = 20) {
+  const summary = getOrderPaymentSummary(o, getOrderItems(o), fallbackServicePct)
+  const walletPayment = getOrderLoyaltyWalletPaymentAmount(o)
+  if (walletPayment <= 0) return summary.total
+  if (summary.grossAmount <= 0) return summary.total
+  return Math.min(summary.grossAmount, summary.total + walletPayment)
+}
+
 export function getLoyaltyUsedAmount(order) {
   return Math.max(0, Math.round(
     Number(
@@ -471,6 +498,15 @@ export function getOrderPaymentBreakdown(order) {
     const method = normalizePaymentMethod(row.method)
     map[method] = (map[method] || 0) + (Number(row.amount) || 0)
   })
+  if (isPaidOrder(order)) {
+    const paymentSum = Object.values(map).reduce((sum, amount) => sum + (Number(amount) || 0), 0)
+    const revenueTotal = getOrderRevenueTotal(order)
+    const missingRevenue = Math.max(0, revenueTotal - paymentSum)
+    const walletPayment = Math.min(getOrderLoyaltyWalletPaymentAmount(order), missingRevenue)
+    if (walletPayment > 0) {
+      map.loyalty_card = (map.loyalty_card || 0) + walletPayment
+    }
+  }
   return Object.entries(map).map(([method, amount]) => ({ method, amount }))
 }
 
@@ -608,6 +644,13 @@ export function groupOrdersBySession(orders) {
         service_rate_pct: getGroupedServiceRatePct(o),
         loyalty_discount_pct: Number(o.loyalty_discount_pct ?? o.discount_percent) || 0,
         loyalty_discount_amount: Number(o.loyalty_discount_amount) || 0,
+        cashback_earned: Number(o.cashback_earned) || 0,
+        ...(hasOrderLoyaltyWalletPaymentField(o)
+          ? {
+              loyalty_used_amount: Number(o.loyalty_used_amount ?? o.loyaltyUsedAmount) || 0,
+              loyalty_redeem_amount: Number(o.loyalty_redeem_amount ?? o.loyaltyRedeemAmount) || 0,
+            }
+          : {}),
         payments: [...getOrderPayments(o)],
         _orderCount: 1,
         _mergedIds: [o.id],
@@ -626,6 +669,14 @@ export function groupOrdersBySession(orders) {
     }
     session.loyalty_discount_amount =
       (session.loyalty_discount_amount || 0) + (Number(o.loyalty_discount_amount) || 0)
+    if (hasOrderLoyaltyWalletPaymentField(o) || hasOrderLoyaltyWalletPaymentField(session)) {
+      session.loyalty_used_amount =
+        (session.loyalty_used_amount || 0) + (Number(o.loyalty_used_amount ?? o.loyaltyUsedAmount) || 0)
+      session.loyalty_redeem_amount =
+        (session.loyalty_redeem_amount || 0) + (Number(o.loyalty_redeem_amount ?? o.loyaltyRedeemAmount) || 0)
+    }
+    session.cashback_earned =
+      (session.cashback_earned || 0) + (Number(o.cashback_earned) || 0)
     session.payments = [...(session.payments || []), ...getOrderPayments(o)]
     const discountPct = Number(o.loyalty_discount_pct ?? o.discount_percent)
     if (!session.loyalty_discount_pct && Number.isFinite(discountPct)) {
@@ -649,16 +700,20 @@ export function groupOrdersBySession(orders) {
 
 export function getMonthToDateCafeIncome(orders = [], now = new Date()) {
   const today = restaurantTodayStr(now)
-  const dayCount = Math.max(1, Number(today.slice(8, 10)) || 1)
   const monthStart = `${today.slice(0, 8)}01`
   const monthOrders = groupOrdersBySession(orders)
     .filter(order => isPaidOrder(order) && matchesRange(order, monthStart, today))
-  const total = monthOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+  const total = monthOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
+  const salesDayCount = new Set(
+    monthOrders
+      .map(order => toRestaurantDateStr(getOrderDate(order)))
+      .filter(Boolean)
+  ).size
 
   return {
     total,
-    averageDaily: Math.round(total / dayCount),
-    dayCount,
+    averageDaily: salesDayCount > 0 ? Math.round(total / salesDayCount) : 0,
+    dayCount: salesDayCount,
     from: monthStart,
     to: today,
   }

@@ -17,6 +17,7 @@ import {
   getOrderActivityDate,
   getOrderItems,
   getMonthToDateCafeIncome,
+  getOrderRevenueTotal,
   getOrderTotal,
   groupOrdersBySession,
   isActiveNeedsBillOrder,
@@ -739,8 +740,8 @@ export default function AdminDashboard() {
     avgOrderValue, previousAvgOrder, avgChange,
     periodItemsSold,
   } = useMemo(() => {
-    const currentRevenue = periodPaidOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
-    const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+    const currentRevenue = periodPaidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
+    const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
     const currentOrderCount = periodPaidOrders.length
     const previousCount = previousPeriodOrders.length
     const currentAvgOrder = currentOrderCount > 0 ? Math.round(currentRevenue / currentOrderCount) : 0
@@ -793,13 +794,13 @@ export default function AdminDashboard() {
         label:   `${h}:00`,
         revenue: todayPaid
           .filter(o => getRestaurantHour(getOrderDate(o)) === h)
-          .reduce((s, o) => s + getOrderTotal(o), 0),
+          .reduce((s, o) => s + getOrderRevenueTotal(o), 0),
         isToday: h === currentHour,
       }))
       return {
         chartBars: bars,
-        currentPeriodTotal:  todayPaid.reduce((s, o) => s + getOrderTotal(o), 0),
-        previousPeriodTotal: yestPaid.reduce((s, o) => s + getOrderTotal(o), 0),
+        currentPeriodTotal:  todayPaid.reduce((s, o) => s + getOrderRevenueTotal(o), 0),
+        previousPeriodTotal: yestPaid.reduce((s, o) => s + getOrderRevenueTotal(o), 0),
       }
     }
 
@@ -809,11 +810,11 @@ export default function AdminDashboard() {
       const prev = Array.from({ length: 7 }, (_, i) => addRestaurantDays(todayDs, -(13 - i)))
       const bars = days.map(ds => ({
         label:   formatLongDate(ds, lang, ds, { includeYear: false }),
-        revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
+        revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderRevenueTotal(o), 0),
         isToday: ds === todayDs,
       }))
       const prevTotal = prev.reduce((s, ds) =>
-        s + paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s2, o) => s2 + getOrderTotal(o), 0), 0)
+        s + paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s2, o) => s2 + getOrderRevenueTotal(o), 0), 0)
       return {
         chartBars: bars,
         currentPeriodTotal:  bars.reduce((s, b) => s + b.revenue, 0),
@@ -830,7 +831,7 @@ export default function AdminDashboard() {
         const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
         return {
           label:   String(i + 1),
-          revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0),
+          revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderRevenueTotal(o), 0),
           isToday: ds === todayDs,
         }
       })
@@ -840,7 +841,7 @@ export default function AdminDashboard() {
       const daysInPrevMonth = new Date(Date.UTC(prevYear, prevMonth + 1, 0)).getUTCDate()
       const prevTotal = Array.from({ length: daysInPrevMonth }, (_, i) => {
         const ds = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
-        return paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderTotal(o), 0)
+        return paidOrders.filter(o => localDateStr(getOrderDate(o)) === ds).reduce((s, o) => s + getOrderRevenueTotal(o), 0)
       }).reduce((s, v) => s + v, 0)
       return {
         chartBars: bars,
@@ -857,7 +858,7 @@ export default function AdminDashboard() {
       const prefix = `${year}-${String(m + 1).padStart(2, '0')}-`
       return {
         label:   monthNames[m],
-        revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)).startsWith(prefix)).reduce((s, o) => s + getOrderTotal(o), 0),
+        revenue: paidOrders.filter(o => localDateStr(getOrderDate(o)).startsWith(prefix)).reduce((s, o) => s + getOrderRevenueTotal(o), 0),
         isToday: todayDs.startsWith(prefix),
       }
     })

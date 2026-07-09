@@ -22,7 +22,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
-import { getMonthToDateCafeIncome, getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getMonthToDateCafeIncome, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
@@ -455,7 +455,7 @@ export default function Expenses() {
     state.orders.filter(order => isPaidOrder(order) && matchesRange(order, dateFrom, dateTo))
   ), [state.orders, dateFrom, dateTo])
 
-  const revenue = paidOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+  const revenue = paidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
   const cafeIncome = revenue
   const monthToDateCafeIncome = useMemo(
     () => getMonthToDateCafeIncome(state.orders),

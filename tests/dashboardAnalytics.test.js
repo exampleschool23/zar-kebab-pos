@@ -183,7 +183,7 @@ test('dashboard period change from 7 days to month updates all widgets to month 
   assert.deepEqual(month.staff.map(row => row.revenue), [156000, 62000])
 })
 
-test('month-to-date cafe income averages paid revenue across elapsed restaurant month days', () => {
+test('month-to-date cafe income averages paid revenue across paid sales days', () => {
   const result = getMonthToDateCafeIncome([
     ...orders,
     order({
@@ -204,9 +204,26 @@ test('month-to-date cafe income averages paid revenue across elapsed restaurant 
 
   assert.equal(result.from, '2026-05-01')
   assert.equal(result.to, '2026-05-19')
-  assert.equal(result.dayCount, 19)
+  assert.equal(result.dayCount, 3)
   assert.equal(result.total, 218000)
-  assert.equal(result.averageDaily, 11474)
+  assert.equal(result.averageDaily, 72667)
+})
+
+test('month-to-date cafe income average is zero when there are no paid sales days', () => {
+  const result = getMonthToDateCafeIncome([
+    {
+      id: 'unpaid-month',
+      status: 'needs_bill',
+      payment_status: 'unpaid',
+      created_at: '2026-05-19T10:00:00',
+      total: 90000,
+      items: [],
+    },
+  ], new Date('2026-05-19T12:00:00+05:00'))
+
+  assert.equal(result.dayCount, 0)
+  assert.equal(result.total, 0)
+  assert.equal(result.averageDaily, 0)
 })
 
 test('dashboard period change from month to year updates all widgets to year data', () => {

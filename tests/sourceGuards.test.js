@@ -1185,7 +1185,7 @@ test('AdminDashboard shows period-based order type performance', () => {
   assert.match(analytics, /export function getDashboardOrderTypePerformance\(orders, lang = 'en'\)/)
   assert.match(analytics, /ORDER_TYPE_KEYS/)
   assert.match(analytics, /inferOrderType\(order\)/)
-  assert.match(analytics, /getOrderTotal\(order\)/)
+  assert.match(analytics, /getOrderRevenueTotal\(order\)/)
   assert.match(dashboard, /getDashboardOrderTypePerformance/)
   assert.match(dashboard, /const orderTypePerformance = useMemo\(\(\) =>/)
   assert.match(dashboard, /getDashboardOrderTypePerformance\(periodPaidOrders, lang\)/)

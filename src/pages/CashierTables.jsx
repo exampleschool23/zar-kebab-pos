@@ -12,6 +12,7 @@ import {
   getGroupedOrderItems,
   getOrderDate,
   getOrderPaymentBreakdown,
+  getOrderRevenueTotal,
   getOrderTotal,
   groupOrdersBySession,
   isPaidOrder,
@@ -675,7 +676,7 @@ export default function CashierTables() {
   const paidTodayCount = useMemo(() => {
     return paidTodayOrders.length
   }, [paidTodayOrders])
-  const todayRevenue   = paidTodayOrders.reduce((s, o) => s + getOrderTotal(o), 0)
+  const todayRevenue   = paidTodayOrders.reduce((s, o) => s + getOrderRevenueTotal(o), 0)
 
   // Payment method breakdown — tracks { amount, count } per method
   const payMethodTotals = useMemo(() => {
@@ -683,7 +684,7 @@ export default function CashierTables() {
     const map = {}
     paidTodayOrders.forEach(o => {
       const breakdown = getOrderPaymentBreakdown(o)
-      const rows = breakdown.length > 0 ? breakdown : [{ method: o.payment_method, amount: getOrderTotal(o) }]
+      const rows = breakdown.length > 0 ? breakdown : [{ method: o.payment_method, amount: getOrderRevenueTotal(o) }]
       rows.forEach(row => {
         const raw = (row.method || '').toLowerCase().trim()
         const key = KNOWN.includes(raw) ? raw : 'unknown'

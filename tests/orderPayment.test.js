@@ -7,6 +7,7 @@ import {
   getGroupedOrderItems,
   getOrderPaymentBreakdown,
   getOrderPaymentFields,
+  getOrderRevenueTotal,
   getOrderTotal,
   getOrderPaymentSummary,
   getPaymentMethodSummary,
@@ -322,6 +323,29 @@ test('cashier-entered loyalty redeem amount reduces remaining payable total', ()
   assert.equal(summary.discountAmount, 8000)
   assert.equal(summary.loyaltyUsedAmount, 8000)
   assert.equal(summary.total, 73650)
+})
+
+test('loyalty wallet payment is included in cafe revenue while payable total stays reduced', () => {
+  const rows = [
+    item({ id: 'chicken', menu_item_id: 'chicken', quantity: 1, price: 22000 }),
+    item({ id: 'beef', menu_item_id: 'beef', quantity: 1, price: 25000 }),
+    item({ id: 'lula', menu_item_id: 'lula', quantity: 1, price: 24000 }),
+  ]
+  const order = paidOrder({
+    id: 'wallet-revenue',
+    payment_method: 'cash',
+    service_rate_pct: 15,
+    loyalty_used_amount: 8000,
+    loyalty_redeem_amount: 8000,
+    items: rows,
+  })
+
+  assert.equal(getOrderTotal(order), 73650)
+  assert.equal(getOrderRevenueTotal(order), 81650)
+  assert.deepEqual(getOrderPaymentBreakdown(order), [
+    { method: 'cash', amount: 73650 },
+    { method: 'loyalty_card', amount: 8000 },
+  ])
 })
 
 test('dine-in counter items are included in subtotal cashback while excluded from service fee', () => {

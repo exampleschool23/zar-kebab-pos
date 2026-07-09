@@ -11,6 +11,7 @@ import {
   getOrderItems,
   getOrderPaymentBreakdown,
   getOrderPaymentSummary,
+  getOrderRevenueTotal,
   getOrderTotal,
   groupOrdersBySession,
   isCancelledOrderItem,
@@ -879,7 +880,7 @@ function ByHourTab({ orders, lang }) {
       const d = getOrderDate(o)
       if (!d) return
       const h = new Date(d).getHours()   // local hour
-      hrs[h].revenue += getOrderTotal(o)
+      hrs[h].revenue += getOrderRevenueTotal(o)
       hrs[h].count   += 1
     })
     const active  = hrs.filter(h => h.count > 0)
@@ -955,7 +956,7 @@ function PaymentMethodsTab({ orders, lang }) {
     let total = 0
     orders.forEach(o => {
       const breakdown = getOrderPaymentBreakdown(o)
-      const rows = breakdown.length > 0 ? breakdown : [{ method: getPaymentMethod(o), amount: getOrderTotal(o) }]
+      const rows = breakdown.length > 0 ? breakdown : [{ method: getPaymentMethod(o), amount: getOrderRevenueTotal(o) }]
       rows.forEach(row => {
         const key = (row.method || '').toLowerCase()
         const m   = PAY_CFG[key] ? key : 'unknown'
@@ -1042,11 +1043,11 @@ function PaymentMethodsTab({ orders, lang }) {
 
 function OrderTypesTab({ orders, lang }) {
   const data = useMemo(() => {
-    const totalRevenue = orders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+    const totalRevenue = orders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
     return ['dine_in', 'take_away', 'delivery']
       .map(type => {
         const rows = orders.filter(order => inferOrderType(order) === type)
-        const revenue = rows.reduce((sum, order) => sum + getOrderTotal(order), 0)
+        const revenue = rows.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
         const items = rows.reduce(
           (sum, order) => sum + getOrderItems(order).reduce((itemSum, item) => itemSum + (Number(item.quantity) || 1), 0),
           0
@@ -1122,7 +1123,7 @@ function WaiterPerformanceTab({ orders, lang }) {
     orders.forEach(o => {
       const w = o.waiter_name || o.waiter_email || 'Unknown'
       if (!map[w]) map[w] = { name: w, revenue: 0, orders: 0, items: 0 }
-      map[w].revenue += getOrderTotal(o)
+      map[w].revenue += getOrderRevenueTotal(o)
       map[w].orders  += 1
       map[w].items   += getOrderItems(o).reduce((s, i) => s + (Number(i.quantity) || 1), 0)
     })
@@ -1621,7 +1622,7 @@ export default function Reports() {
 
   // ── KPI ───────────────────────────────────────────────────────────────────
 
-  const kpiRevenue   = filteredForAnalytics.reduce((s, o) => s + getOrderTotal(o), 0)
+  const kpiRevenue   = filteredForAnalytics.reduce((s, o) => s + getOrderRevenueTotal(o), 0)
   const kpiOrders    = filteredForAnalytics.length
   const kpiAvg       = kpiOrders > 0 ? Math.round(kpiRevenue / kpiOrders) : 0
   const kpiItemsSold = filteredForAnalytics.reduce(
@@ -1635,7 +1636,7 @@ export default function Reports() {
     filteredForAnalytics.forEach(order => {
       const mode = normalizePriceMode(order.price_mode)
       rows[mode].orders += 1
-      rows[mode].revenue += getOrderTotal(order)
+      rows[mode].revenue += getOrderRevenueTotal(order)
     })
     return Object.values(rows)
   }, [filteredForAnalytics])
