@@ -583,6 +583,11 @@ export function matchesRange(o, from, to) {
   return true
 }
 
+function getGroupedServiceRatePct(order) {
+  const servicePct = Number(order?.service_rate_pct ?? order?.service_percent ?? order?.servicePercent)
+  return Number.isFinite(servicePct) ? servicePct : null
+}
+
 export function groupOrdersBySession(orders) {
   const map = {}
 
@@ -600,7 +605,7 @@ export function groupOrdersBySession(orders) {
         total: Number(o.total) || 0,
         subtotal: Number(o.subtotal) || 0,
         service_fee: Number(o.service_fee) || 0,
-        service_rate_pct: Number(o.service_rate_pct ?? o.service_percent ?? o.servicePercent) || null,
+        service_rate_pct: getGroupedServiceRatePct(o),
         loyalty_discount_pct: Number(o.loyalty_discount_pct ?? o.discount_percent) || 0,
         loyalty_discount_amount: Number(o.loyalty_discount_amount) || 0,
         payments: [...getOrderPayments(o)],
@@ -640,4 +645,21 @@ export function groupOrdersBySession(orders) {
   })
 
   return Object.values(map)
+}
+
+export function getMonthToDateCafeIncome(orders = [], now = new Date()) {
+  const today = restaurantTodayStr(now)
+  const dayCount = Math.max(1, Number(today.slice(8, 10)) || 1)
+  const monthStart = `${today.slice(0, 8)}01`
+  const monthOrders = groupOrdersBySession(orders)
+    .filter(order => isPaidOrder(order) && matchesRange(order, monthStart, today))
+  const total = monthOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+
+  return {
+    total,
+    averageDaily: Math.round(total / dayCount),
+    dayCount,
+    from: monthStart,
+    to: today,
+  }
 }

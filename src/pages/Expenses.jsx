@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Banknote,
+  CalendarDays,
   CreditCard,
   Download,
   HandCoins,
@@ -21,7 +22,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
-import { getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getMonthToDateCafeIncome, getOrderTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
@@ -223,6 +224,8 @@ export default function Expenses() {
       income: 'Daromad',
       cafeIncome: 'Kafe daromadi',
       cafeIncomeSub: 'Investor yordamisiz',
+      avgDailyCafeIncome: "Kafe o'rtacha kunlik daromadi",
+      monthCafeIncome: 'Bu oy kafe daromadi',
       investorIncome: 'Investor daromadi',
       investorIncomeSub: 'Investor kiritgan pul',
       otherIncomeSub: 'Boshqa daromad',
@@ -282,6 +285,8 @@ export default function Expenses() {
       income: 'Доход',
       cafeIncome: 'Доход кафе',
       cafeIncomeSub: 'Без поддержки инвестора',
+      avgDailyCafeIncome: 'Среднедневной доход кафе',
+      monthCafeIncome: 'Доход кафе за месяц',
       investorIncome: 'Доход инвестора',
       investorIncomeSub: 'Внесено инвестором',
       otherIncomeSub: 'Другой доход',
@@ -341,6 +346,8 @@ export default function Expenses() {
       income: 'Income',
       cafeIncome: 'Cafe income',
       cafeIncomeSub: 'Excludes investor support',
+      avgDailyCafeIncome: 'Avg daily cafe income',
+      monthCafeIncome: 'This month cafe income',
       investorIncome: 'Investor income',
       investorIncomeSub: 'Investor support entries',
       otherIncomeSub: 'Other income',
@@ -450,6 +457,10 @@ export default function Expenses() {
 
   const revenue = paidOrders.reduce((sum, order) => sum + getOrderTotal(order), 0)
   const cafeIncome = revenue
+  const monthToDateCafeIncome = useMemo(
+    () => getMonthToDateCafeIncome(state.orders),
+    [state.orders]
+  )
   const salaryExpenses = useMemo(() => (
     buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
       .map(row => ({ ...row, description: l.automaticSalary }))
@@ -611,8 +622,15 @@ export default function Expenses() {
             </button>
           </div>
 
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             <Kpi icon={WalletCards} label={l.cafeIncome} value={formatCurrency(cafeIncome)} sub={l.cafeIncomeSub} tone="green" />
+            <Kpi
+              icon={CalendarDays}
+              label={l.avgDailyCafeIncome}
+              value={formatCurrency(monthToDateCafeIncome.averageDaily)}
+              sub={`${l.monthCafeIncome}: ${formatCurrency(monthToDateCafeIncome.total)}`}
+              tone="blue"
+            />
             <Kpi
               icon={HandCoins}
               label={l.investorIncome}
@@ -941,12 +959,12 @@ function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange' }) {
     purple: 'bg-purple-50 text-purple-600',
   }
   return (
-    <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+    <div className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
       <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl ${tones[tone] || tones.orange}`}>
         <Icon size={20} />
       </div>
       <p className="text-xs font-black uppercase tracking-wide text-[#9CA3AF]">{label}</p>
-      <p className="mt-1 text-2xl font-black text-[#1F2937]">{value}</p>
+      <p className="mt-1 break-words text-2xl font-black text-[#1F2937]">{value}</p>
       {sub && <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{sub}</p>}
     </div>
   )

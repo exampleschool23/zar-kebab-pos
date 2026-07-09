@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingBag, DollarSign, Package, Receipt,
-  Clock, ArrowUpRight, ArrowDownRight, Users, Loader2,
+  Clock, CalendarDays, ArrowUpRight, ArrowDownRight, Users, Loader2,
   Printer, CreditCard, Trash2, Wallet, Monitor, QrCode,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -16,6 +16,7 @@ import {
   getOrderDate,
   getOrderActivityDate,
   getOrderItems,
+  getMonthToDateCafeIncome,
   getOrderTotal,
   groupOrdersBySession,
   isActiveNeedsBillOrder,
@@ -52,6 +53,7 @@ const L = {
     yesterday:      'Kecha',
     vsYesterday:    'kechaga nisbatan',
     revenueStats:   'Daromad statistikasi',
+    avgDailyCafeIncome: "Kafe o'rtacha kunlik daromadi",
     today:          'Bugun',
     days7:          '7 kun',
     thisMonth:      'Bu oy',
@@ -115,6 +117,7 @@ const L = {
     yesterday:      'Вчера',
     vsYesterday:    'vs вчера',
     revenueStats:   'Статистика дохода',
+    avgDailyCafeIncome: 'Среднедневной доход кафе',
     today:          'Сегодня',
     days7:          '7 дней',
     thisMonth:      'Этот месяц',
@@ -178,6 +181,7 @@ const L = {
     yesterday:      'Yesterday',
     vsYesterday:    'vs yesterday',
     revenueStats:   'Revenue Statistics',
+    avgDailyCafeIncome: 'Avg daily cafe income',
     today:          'Today',
     days7:          '7 Days',
     thisMonth:      'This Month',
@@ -770,6 +774,11 @@ export default function AdminDashboard() {
     [state.tables]
   )
 
+  const monthToDateCafeIncome = useMemo(
+    () => getMonthToDateCafeIncome(paidOrders),
+    [paidOrders]
+  )
+
   // ── Revenue chart & period comparison ─────────────────────────────────────
   const { chartBars, currentPeriodTotal, previousPeriodTotal } = useMemo(() => {
     const now = new Date()
@@ -1016,13 +1025,19 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
             label={`${l.revenue} · ${currentKpiPeriodLabel}`}
             value={formatCurrency(periodRevenue)}
             sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousKpiRevenue)}`}
             badge={pctBadge(revenueChange)}
+          />
+          <KpiCard
+            icon={CalendarDays}
+            label={`${l.avgDailyCafeIncome} · ${l.thisMonth}`}
+            value={formatCurrency(monthToDateCafeIncome.averageDaily)}
+            sub={`${l.total}: ${formatCurrency(monthToDateCafeIncome.total)}`}
           />
           <KpiCard
             icon={ShoppingBag}
@@ -1178,16 +1193,16 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-12 gap-4 mb-4 min-w-0">
 
           {/* Sales by Category */}
-          <div className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
-            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.salesByCategory}</h3>
+          <div className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-4 min-w-0">
+            <h3 className="font-black text-[#1F2937] text-base mb-3">{l.salesByCategory}</h3>
             {salesByCategory.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
             ) : (
-              <div className="space-y-3">
+              <div className="max-h-[230px] space-y-2 overflow-y-auto pr-1">
                 {salesByCategory.map(cat => (
                   <div key={cat.name}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-semibold text-[#1F2937] truncate flex-1 mr-2">{cat.name}</p>
+                    <div className="flex items-center justify-between mb-1 gap-2">
+                      <p className="text-xs font-bold text-[#1F2937] truncate flex-1">{cat.name}</p>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <p className="text-xs font-bold text-[#1F2937]">{formatCurrency(cat.revenue)}</p>
                         <p className="text-xs text-[#9CA3AF] w-8 text-right">{cat.pct}%</p>
@@ -1308,20 +1323,20 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
 
           {/* Staff Performance */}
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5">
-            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.staffPerf}</h3>
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-4">
+            <h3 className="font-black text-[#1F2937] text-base mb-3">{l.staffPerf}</h3>
             {staffPerformance.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noStaff}</p>
             ) : (
-              <div className="divide-y divide-[#F9FAFB]">
+              <div className="max-h-[310px] divide-y divide-[#F9FAFB] overflow-y-auto pr-1">
                 {staffPerformance.map((s, idx) => {
                   const maxRev = staffPerformance[0]?.revenue || 1
                   const pct    = Math.round((s.revenue / maxRev) * 100)
                   return (
-                    <div key={s.name} className="py-3 first:pt-0 last:pb-0">
+                    <div key={s.name} className="py-2.5 first:pt-0 last:pb-0">
                       {/* Avatar + name + role */}
                       <div className="flex items-center gap-2.5 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
                           <span className="text-[#ff5a00] text-sm font-black">{(s.name || '?')[0].toUpperCase()}</span>
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1339,7 +1354,7 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       {/* Stats row */}
-                      <div className="grid grid-cols-3 gap-2 mb-2 ml-10">
+                      <div className="grid grid-cols-3 gap-2 mb-2 ml-9">
                         <div>
                           <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase mb-0.5">{l.orders}</p>
                           <p className="text-sm font-bold text-[#1F2937]">{s.orders}</p>
@@ -1354,7 +1369,7 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       {/* Revenue + progress */}
-                      <div className="ml-10">
+                      <div className="ml-9">
                         <div className="flex items-center justify-between mb-1">
                           <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase">{l.revenue}</p>
                           <p className="text-xs font-black text-[#ff5a00] tabular-nums">{formatCurrency(s.revenue)}</p>

@@ -11,6 +11,7 @@ import {
   getDashboardStaffPerformance,
 } from '../src/lib/dashboardAnalytics.js'
 import {
+  getMonthToDateCafeIncome,
   getOrderActivityDate,
   groupOrdersBySession,
   toRestaurantDateStr,
@@ -164,6 +165,32 @@ test('dashboard period change from 7 days to month updates all widgets to month 
   assert.deepEqual(month.best.map(row => row.menuItemId), ['salad', 'lagman', 'kebab', 'cola'])
   assert.deepEqual(month.staff.map(row => row.name), ['Dildora', 'Jasurbek'])
   assert.deepEqual(month.staff.map(row => row.revenue), [156000, 62000])
+})
+
+test('month-to-date cafe income averages paid revenue across elapsed restaurant month days', () => {
+  const result = getMonthToDateCafeIncome([
+    ...orders,
+    order({
+      id: 'next-month',
+      paidAt: '2026-06-01T10:00:00',
+      items: [],
+      total: 500000,
+    }),
+    {
+      id: 'unpaid-month',
+      status: 'needs_bill',
+      payment_status: 'unpaid',
+      created_at: '2026-05-19T10:00:00',
+      total: 90000,
+      items: [],
+    },
+  ], new Date('2026-05-19T12:00:00+05:00'))
+
+  assert.equal(result.from, '2026-05-01')
+  assert.equal(result.to, '2026-05-19')
+  assert.equal(result.dayCount, 19)
+  assert.equal(result.total, 218000)
+  assert.equal(result.averageDaily, 11474)
 })
 
 test('dashboard period change from month to year updates all widgets to year data', () => {
