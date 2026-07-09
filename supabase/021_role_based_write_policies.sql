@@ -38,6 +38,7 @@ create table if not exists public.business_settings (
                    check (service_rate_pct between 0 and 100),
   receipt_footer   text not null default 'Thank you for visiting!',
   auto_print       boolean not null default false,
+  auto_print_kitchen_check boolean not null default false,
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );

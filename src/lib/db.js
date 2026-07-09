@@ -151,6 +151,7 @@ function normalizeBusinessSettings(row) {
     receiptFooter: row.receipt_footer || '',
     receiptMarketing: normalizeReceiptMarketing(row.receipt_marketing),
     autoPrint: !!row.auto_print,
+    autoPrintKitchenCheck: !!row.auto_print_kitchen_check,
   }
 }
 
@@ -1486,6 +1487,7 @@ export async function writeToSupabase(action, state, options = {}) {
           receipt_footer: settings.receiptFooter || '',
           receipt_marketing: normalizeReceiptMarketing(settings.receiptMarketing),
           auto_print: !!settings.autoPrint,
+          auto_print_kitchen_check: !!settings.autoPrintKitchenCheck,
           updated_at: new Date().toISOString(),
         })
       if (error) throw error
@@ -1567,6 +1569,15 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'REORDER_MENU_ITEM': {
+      if (Array.isArray(action.payload?.updates)) {
+        const updates = action.payload.updates.filter(update => update?.id && Number.isFinite(Number(update.sort_order)))
+        const results = await Promise.all(updates.map(update =>
+          supabase.from('menu_items').update({ sort_order: Number(update.sort_order) }).eq('id', update.id)
+        ))
+        const error = results.find(result => result.error)?.error
+        if (error) throw error
+        break
+      }
       const { idA, idB } = action.payload
       const itemA = state.menuItems.find(i => i.id === idA)
       const itemB = state.menuItems.find(i => i.id === idB)
@@ -1582,6 +1593,15 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'REORDER_QUICK_ITEM': {
+      if (Array.isArray(action.payload?.updates)) {
+        const updates = action.payload.updates.filter(update => update?.id && Number.isFinite(Number(update.quick_item_sort_order)))
+        const results = await Promise.all(updates.map(update =>
+          supabase.from('menu_items').update({ quick_item_sort_order: Number(update.quick_item_sort_order) }).eq('id', update.id)
+        ))
+        const error = results.find(result => result.error)?.error
+        if (error) throw error
+        break
+      }
       const { idA, idB } = action.payload
       const itemA = state.menuItems.find(i => i.id === idA)
       const itemB = state.menuItems.find(i => i.id === idB)
@@ -1618,6 +1638,15 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'REORDER_CATEGORY': {
+      if (Array.isArray(action.payload?.updates)) {
+        const updates = action.payload.updates.filter(update => update?.id && Number.isFinite(Number(update.sort_order)))
+        const results = await Promise.all(updates.map(update =>
+          supabase.from('menu_categories').update({ sort_order: Number(update.sort_order) }).eq('id', update.id)
+        ))
+        const error = results.find(result => result.error)?.error
+        if (error) throw error
+        break
+      }
       const { idA, idB } = action.payload
       const catA = state.categories.find(c => c.id === idA)
       const catB = state.categories.find(c => c.id === idB)

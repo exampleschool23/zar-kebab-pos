@@ -140,7 +140,7 @@ export function AppProvider({ children }) {
 
     if (LOCAL_ONLY_ACTIONS.has(enriched.type)) {
       dispatch(enriched)
-      return { error: null }
+      return { error: null, action: enriched }
     }
 
     if (WRITE_BEFORE_LOCAL_ACTIONS.has(enriched.type)) {
@@ -148,7 +148,7 @@ export function AppProvider({ children }) {
         .then(() => {
           dispatch(enriched)
           dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
-          return { error: null }
+          return { error: null, action: enriched }
         })
         .catch(err => {
           console.error('[db] write failed:', action.type, err)
@@ -171,7 +171,7 @@ export function AppProvider({ children }) {
     return writeWithIdleRecovery(enriched, stateRef.current)
       .then(() => {
         dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
-        return { error: null }
+        return { error: null, action: enriched }
       })
       .catch(err => {
         console.error('[db] write failed:', action.type, err)

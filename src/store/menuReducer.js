@@ -1,4 +1,14 @@
-import { getQuickSortOrder } from './reducerHelpers'
+import { getQuickSortOrder } from './reducerHelpers.js'
+
+function applySortUpdates(rows, updates) {
+  const updatesById = new Map(
+    (updates || []).map(update => {
+      const { id, ...fields } = update || {}
+      return [id, fields]
+    })
+  )
+  return rows.map(row => updatesById.has(row.id) ? { ...row, ...updatesById.get(row.id) } : row)
+}
 
 export function menuReducer(state, action) {
   switch (action.type) {
@@ -43,6 +53,9 @@ export function menuReducer(state, action) {
     }
 
     case 'REORDER_MENU_ITEM': {
+      if (Array.isArray(action.payload?.updates)) {
+        return { ...state, menuItems: applySortUpdates(state.menuItems, action.payload.updates) }
+      }
       const { idA, idB } = action.payload
       const itemA = state.menuItems.find(i => i.id === idA)
       const itemB = state.menuItems.find(i => i.id === idB)
@@ -60,6 +73,9 @@ export function menuReducer(state, action) {
     }
 
     case 'REORDER_QUICK_ITEM': {
+      if (Array.isArray(action.payload?.updates)) {
+        return { ...state, menuItems: applySortUpdates(state.menuItems, action.payload.updates) }
+      }
       const { idA, idB } = action.payload
       const itemA = state.menuItems.find(i => i.id === idA)
       const itemB = state.menuItems.find(i => i.id === idB)
@@ -91,6 +107,9 @@ export function menuReducer(state, action) {
       return { ...state, categories: state.categories.filter(c => c.id !== action.payload) }
 
     case 'REORDER_CATEGORY': {
+      if (Array.isArray(action.payload?.updates)) {
+        return { ...state, categories: applySortUpdates(state.categories, action.payload.updates) }
+      }
       const { idA, idB } = action.payload
       const catA = state.categories.find(c => c.id === idA)
       const catB = state.categories.find(c => c.id === idB)

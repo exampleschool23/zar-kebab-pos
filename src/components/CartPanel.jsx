@@ -154,6 +154,7 @@ export default function CartPanel({
   allowOrderTypeChange = true,
   isSending = false,
   onSendingChange,
+  onSubmitSuccess,
 }) {
   const { state, dispatch } = useApp()
   const lang    = state.lang
@@ -202,6 +203,12 @@ export default function CartPanel({
           : lang === 'ru'
             ? 'Заказ отправлен.'
             : 'Order submitted.',
+      })
+      onSubmitSuccess?.({
+        orderId: result?.action?._orderId,
+        kitchenRoundId,
+        submittedAt,
+        orderType,
       })
       onClose?.()
     } finally {

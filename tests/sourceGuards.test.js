@@ -329,7 +329,7 @@ test('waiter cart edits stay local until send to kitchen', () => {
   assert.match(source, /'UPDATE_CART_QTY'/)
   assert.match(source, /'UPDATE_CART_NOTES'/)
   assert.match(source, /'CLEAR_CART'/)
-  assert.match(body, /if \(LOCAL_ONLY_ACTIONS\.has\(enriched\.type\)\) \{[\s\S]*dispatch\(enriched\)[\s\S]*return \{ error: null \}/)
+  assert.match(body, /if \(LOCAL_ONLY_ACTIONS\.has\(enriched\.type\)\) \{[\s\S]*dispatch\(enriched\)[\s\S]*return \{ error: null, action: enriched \}/)
   assert.match(source, /'SEND_TO_KITCHEN'/)
 })
 
@@ -753,8 +753,8 @@ test('menu and category writes surface Supabase errors', () => {
   assert.match(db, /case 'UPDATE_MENU_ITEM': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_items'\)\.update\(fields\)\.eq\('id', id\)[\s\S]*if \(error\) throw error/)
   assert.match(db, /case 'ADD_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.insert\(action\.payload\)[\s\S]*if \(error\) throw error/)
   assert.match(db, /case 'UPDATE_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.update\(fields\)\.eq\('id', id\)[\s\S]*if \(error\) throw error/)
-  assert.match(db, /const results = await Promise\.all\(\[[\s\S]*supabase\.from\('menu_items'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
-  assert.match(db, /const results = await Promise\.all\(\[[\s\S]*supabase\.from\('menu_categories'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
+  assert.match(db, /const results = await Promise\.all\(updates\.map\(update =>[\s\S]*supabase\.from\('menu_items'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
+  assert.match(db, /const results = await Promise\.all\(updates\.map\(update =>[\s\S]*supabase\.from\('menu_categories'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
 })
 
 test('menu item deletion is soft-delete only so history analytics keep lookup context', () => {

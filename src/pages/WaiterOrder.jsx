@@ -833,6 +833,16 @@ export default function WaiterOrder() {
     navigate(`/kitchen-check/${encodeURIComponent(sourceOrderId)}?${params.toString()}`)
   }
 
+  function handleSubmittedOrderPrint(info) {
+    if (!state.settings?.autoPrintKitchenCheck || !info?.orderId) return
+    const params = new URLSearchParams({
+      print: '1',
+      round: String(info.kitchenRoundId || ''),
+      back: isTakeAwayFlow ? '/waiter/take-away?panel=order' : `/waiter/order/${tableId}?panel=order`,
+    })
+    navigate(`/kitchen-check/${encodeURIComponent(info.orderId)}?${params.toString()}`)
+  }
+
   function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionPriceDelta = 0) {
     if (isSendingOrder || !canEditTables) return
     const payload = makeCartPayload(item, { selectedOptions, selectedOptionPriceDelta })
@@ -1246,6 +1256,7 @@ export default function WaiterOrder() {
                 allowOrderTypeChange
                 isSending={isSendingOrder}
                 onSendingChange={setSendingOrder}
+                onSubmitSuccess={handleSubmittedOrderPrint}
                 onClose={() => { if (!isSendingOrder) setCartOpen(false) }}
               />
             </div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Store, Percent, Globe, Printer, Bell, Shield, Table2,
+  Store, Percent, Globe, Printer, Bell, Shield, Table2, ChefHat,
   Check, ChevronRight, Activity, AlertTriangle, RefreshCw, Home,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -78,6 +78,7 @@ export default function AdminSettings() {
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
   const [monthlyRentUzs, setMonthlyRentUzs] = useState(String(settings.monthlyRentUzs || ''))
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
+  const [autoPrintKitchenCheck, setAutoPrintKitchenCheck] = useState(!!settings.autoPrintKitchenCheck)
   const [receiptMarketing, setReceiptMarketing] = useState(settings.receiptMarketing || 'compactFooter')
   const [notifications,  setNotifications]  = useState(true)
   const [saved,          setSaved]          = useState(false)
@@ -92,14 +93,23 @@ export default function AdminSettings() {
     setServiceRate(settings.serviceRate)
     setMonthlyRentUzs(String(settings.monthlyRentUzs || ''))
     setAutoPrint(settings.autoPrint)
+    setAutoPrintKitchenCheck(!!settings.autoPrintKitchenCheck)
     setReceiptMarketing(settings.receiptMarketing || 'compactFooter')
-  }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.autoPrint, settings.receiptMarketing])
+  }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.autoPrint, settings.autoPrintKitchenCheck, settings.receiptMarketing])
 
   async function saveSettings(overrides = {}) {
     if (!canManageSettings) return
     setSaving(true)
     setError('')
-    const nextSettings = { restaurantName, serviceRate, monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0), autoPrint, receiptMarketing, ...overrides }
+    const nextSettings = {
+      restaurantName,
+      serviceRate,
+      monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0),
+      autoPrint,
+      autoPrintKitchenCheck,
+      receiptMarketing,
+      ...overrides,
+    }
     const result = await dispatch({
       type: 'SET_SETTINGS',
       payload: nextSettings,
@@ -154,6 +164,8 @@ export default function AdminSettings() {
       languageSub:     'Interfeys tili',
       autoPrint:       'Avtomatik bosib chiqarish',
       autoPrintSub:    'To\'lovdan keyin chekni avtomatik bosib chiqarish',
+      autoPrintKitchenCheck: 'Oshxona chekini avtomatik chop etish',
+      autoPrintKitchenCheckSub: 'Buyurtma oshxonaga yuborilganda darhol oshxona cheki chiqadi',
       receiptMarketing: 'Chek marketingi',
       receiptMarketingSub: 'Jami summadan keyin nima chiqishini tanlang',
       receiptMarketingModes: {
@@ -214,6 +226,8 @@ export default function AdminSettings() {
       languageSub:     'Язык интерфейса',
       autoPrint:       'Автоматическая печать',
       autoPrintSub:    'Печатать чек автоматически после оплаты',
+      autoPrintKitchenCheck: 'Автопечать кухонного чека',
+      autoPrintKitchenCheckSub: 'Печатать кухонный чек сразу после отправки заказа',
       receiptMarketing: 'Маркетинг в чеке',
       receiptMarketingSub: 'Что печатать под итогом оплаты',
       receiptMarketingModes: {
@@ -274,6 +288,8 @@ export default function AdminSettings() {
       languageSub:     'Interface language',
       autoPrint:       'Auto-print Receipt',
       autoPrintSub:    'Print receipt automatically after payment',
+      autoPrintKitchenCheck: 'Auto-print kitchen check',
+      autoPrintKitchenCheckSub: 'Print the kitchen check immediately when an order is submitted',
       receiptMarketing: 'Receipt marketing',
       receiptMarketingSub: 'Choose what prints under the total',
       receiptMarketingModes: {
@@ -408,6 +424,9 @@ export default function AdminSettings() {
           </SettingRow>
           <SettingRow icon={Printer} label={l.autoPrint} sub={l.autoPrintSub}>
             <Toggle value={autoPrint} onChange={setAutoPrint} disabled={!canManageSettings} />
+          </SettingRow>
+          <SettingRow icon={ChefHat} label={l.autoPrintKitchenCheck} sub={l.autoPrintKitchenCheckSub}>
+            <Toggle value={autoPrintKitchenCheck} onChange={setAutoPrintKitchenCheck} disabled={!canManageSettings} />
           </SettingRow>
           <SettingRow icon={Printer} label={l.receiptMarketing} sub={l.receiptMarketingSub}>
             <select

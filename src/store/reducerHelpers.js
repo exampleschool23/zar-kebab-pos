@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
   receiptFooter:  '',
   receiptMarketing: 'compactFooter',
   autoPrint:      false,
+  autoPrintKitchenCheck: false,
 }
 
 export function loadSettings() {

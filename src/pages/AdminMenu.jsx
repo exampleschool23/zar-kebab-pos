@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  DndContext, closestCenter, PointerSensor, TouchSensor,
+  DndContext, closestCenter, pointerWithin, PointerSensor, TouchSensor,
   useSensor, useSensors, DragOverlay,
 } from '@dnd-kit/core'
 import {
   SortableContext, useSortable,
-  rectSortingStrategy, verticalListSortingStrategy,
+  arrayMove, rectSortingStrategy, verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useApp } from '../store/AppContext'
@@ -295,6 +295,11 @@ function OrangeBtn({ onClick, icon: Icon, children, small }) {
 }
 
 // ── Drag handle ───────────────────────────────────────────────────────────────
+
+function pointerWithinOrClosestCenter(args) {
+  const pointerCollisions = pointerWithin(args)
+  return pointerCollisions.length > 0 ? pointerCollisions : closestCenter(args)
+}
 
 function DragHandle({ listeners, attributes }) {
   return (
@@ -1301,12 +1306,28 @@ export default function AdminMenu() {
 
   // ── DnD handlers ──────────────────────────────────────────────────────────
 
+  function movedSortUpdates(rows, activeIdValue, overIdValue, sortKey = 'sort_order', getOrder = row => row?.[sortKey]) {
+    const oldIndex = rows.findIndex(row => row.id === activeIdValue)
+    const newIndex = rows.findIndex(row => row.id === overIdValue)
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return []
+    const sortSlots = rows.map((row, index) => {
+      const value = Number(getOrder(row))
+      return Number.isFinite(value) ? value : index + 1
+    })
+    return arrayMove(rows, oldIndex, newIndex).map((row, index) => ({
+      id: row.id,
+      [sortKey]: sortSlots[index],
+    }))
+  }
+
   function handleItemDragEnd(event) {
     const { active, over } = event
     setActiveId(null)
     if (!canEditMenu) return
     if (!over || active.id === over.id) return
-    dispatch({ type: 'REORDER_MENU_ITEM', payload: { idA: active.id, idB: over.id } })
+    const updates = movedSortUpdates(filteredItems, active.id, over.id)
+    if (updates.length === 0) return
+    dispatch({ type: 'REORDER_MENU_ITEM', payload: { updates } })
   }
 
   function handleCatDragEnd(event) {
@@ -1314,7 +1335,9 @@ export default function AdminMenu() {
     setActiveId(null)
     if (!canEditMenu) return
     if (!over || active.id === over.id) return
-    dispatch({ type: 'REORDER_CATEGORY', payload: { idA: active.id, idB: over.id } })
+    const updates = movedSortUpdates(realSortedCats, active.id, over.id)
+    if (updates.length === 0) return
+    dispatch({ type: 'REORDER_CATEGORY', payload: { updates } })
   }
 
   function handleQuickItemDragEnd(event) {
@@ -1322,7 +1345,9 @@ export default function AdminMenu() {
     setActiveId(null)
     if (!canEditMenu) return
     if (!over || active.id === over.id) return
-    dispatch({ type: 'REORDER_QUICK_ITEM', payload: { idA: active.id, idB: over.id } })
+    const updates = movedSortUpdates(quickItems, active.id, over.id, 'quick_item_sort_order', getQuickItemSortOrder)
+    if (updates.length === 0) return
+    dispatch({ type: 'REORDER_QUICK_ITEM', payload: { updates } })
   }
 
   // Overlay item for drag ghost
@@ -1693,7 +1718,7 @@ export default function AdminMenu() {
                 return (
                   <DndContext
                     sensors={sensors}
-                    collisionDetection={closestCenter}
+                    collisionDetection={pointerWithinOrClosestCenter}
                     onDragStart={e => setActiveId(e.active.id)}
                     onDragEnd={handleItemDragEnd}
                     onDragCancel={() => setActiveId(null)}
@@ -1891,7 +1916,7 @@ export default function AdminMenu() {
                   </p>}
                   <DndContext
                     sensors={sensors}
-                    collisionDetection={closestCenter}
+                    collisionDetection={pointerWithinOrClosestCenter}
                     onDragStart={e => setActiveId(e.active.id)}
                     onDragEnd={handleCatDragEnd}
                     onDragCancel={() => setActiveId(null)}
@@ -2009,7 +2034,7 @@ export default function AdminMenu() {
                   </p>}
                   <DndContext
                     sensors={sensors}
-                    collisionDetection={closestCenter}
+                    collisionDetection={pointerWithinOrClosestCenter}
                     onDragStart={e => setActiveId(e.active.id)}
                     onDragEnd={handleQuickItemDragEnd}
                     onDragCancel={() => setActiveId(null)}
