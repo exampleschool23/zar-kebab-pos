@@ -18,7 +18,7 @@ import { getMenuPricing } from '../lib/menuPricing'
 import { generateMenuExternalId } from '../lib/menuExternalId'
 import AppShell from '../components/AppShell'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
-import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem } from '../lib/menuItems'
+import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem, isWaiterHiddenMenuItem } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
@@ -376,6 +376,33 @@ function saveFailedLabel(lang) {
       : 'Could not save the change. Check the connection.'
 }
 
+function menuScheduleLabels(lang) {
+  return {
+    section: lang === 'uz' ? 'Vaqt oralig‘i' : lang === 'ru' ? 'Временной интервал' : 'Time interval',
+    from: lang === 'uz' ? 'Ko‘rsatish boshlanishi' : lang === 'ru' ? 'Показывать с' : 'Show from',
+    until: lang === 'uz' ? 'Ko‘rsatish tugashi' : lang === 'ru' ? 'Показывать до' : 'Show until',
+    hint: lang === 'uz'
+      ? 'Bo‘sh qoldirilsa doim ko‘rinadi.'
+      : lang === 'ru'
+        ? 'Оставьте пустым, чтобы показывать всегда.'
+        : 'Leave empty to show all day.',
+  }
+}
+
+function scheduleBadgeLabel(entity) {
+  const from = String(entity?.visible_from_time || entity?.visibleFromTime || '').slice(0, 5)
+  const until = String(entity?.visible_until_time || entity?.visibleUntilTime || '').slice(0, 5)
+  if (from && until) return `${from}-${until}`
+  if (from) return `${from}+`
+  if (until) return `<${until}`
+  return ''
+}
+
+function nullableMenuTime(value) {
+  const normalized = String(value || '').trim()
+  return normalized || null
+}
+
 function VisibilityToggleButton({ visible, pending, onClick, lang, kind = 'item', compact = false }) {
   const label = visibilityActionLabel(lang, visible, kind)
   const Icon = visible ? EyeOff : Eye
@@ -413,6 +440,7 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
   }
 
   const cat = categories.find(c => c.id === item.category_id)
+  const scheduleLabel = scheduleBadgeLabel(item)
 
   return (
     <div
@@ -481,6 +509,16 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
               {lang === 'uz' ? 'Ommaviyda yo‘q' : lang === 'ru' ? 'Скрыто публично' : 'Public hidden'}
             </span>
           )}
+          {isWaiterHiddenMenuItem(item) && (
+            <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-black text-purple-700 ring-1 ring-purple-200">
+              {lang === 'uz' ? 'Ofitsiantda yo‘q' : lang === 'ru' ? 'Скрыто у официанта' : 'Waiter hidden'}
+            </span>
+          )}
+          {scheduleLabel && (
+            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-200">
+              {scheduleLabel}
+            </span>
+          )}
         </div>
         <div className="mb-3 flex items-center justify-between gap-2">
           <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full w-fit ${
@@ -537,6 +575,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
   }
 
   const cat = categories.find(c => c.id === item.category_id)
+  const scheduleLabel = scheduleBadgeLabel(item)
 
   return (
     <div
@@ -560,6 +599,16 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
           {item.public_hidden && (
             <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-700">
               {lang === 'uz' ? 'Ommaviyda yo‘q' : lang === 'ru' ? 'Скрыто публично' : 'Public hidden'}
+            </span>
+          )}
+          {isWaiterHiddenMenuItem(item) && (
+            <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-black text-purple-700">
+              {lang === 'uz' ? 'Ofitsiantda yo‘q' : lang === 'ru' ? 'Скрыто у официанта' : 'Waiter hidden'}
+            </span>
+          )}
+          {scheduleLabel && (
+            <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black text-emerald-700">
+              {scheduleLabel}
             </span>
           )}
         </div>
@@ -607,6 +656,7 @@ const CAT_GRID = 'grid grid-cols-[20px_52px_1fr_110px_90px_160px] items-center g
 
 function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibility, visibilityPending, sortIndex, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id })
+  const scheduleLabel = scheduleBadgeLabel(cat)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -641,6 +691,20 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
            lang === 'ru' ? `${itemCount} позиций` :
            `${itemCount} item${itemCount !== 1 ? 's' : ''}`}
         </p>
+        {(cat.waiter_hidden || scheduleLabel) && (
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {cat.waiter_hidden && (
+              <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-black text-purple-700">
+                {lang === 'uz' ? 'Ofitsiantda yo‘q' : lang === 'ru' ? 'Скрыто у официанта' : 'Waiter hidden'}
+              </span>
+            )}
+            {scheduleLabel && (
+              <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black text-emerald-700">
+                {scheduleLabel}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* col 4 – status */}
@@ -711,6 +775,9 @@ const blankItem = {
   show_in_cashier_quick_items: false,
   cashier_only: false,
   public_hidden: false,
+  waiter_hidden: false,
+  visible_from_time: '',
+  visible_until_time: '',
   send_to_kitchen: false,
   quick_item_sort_order: '',
 }
@@ -724,6 +791,8 @@ const blankCat = {
   sort_order: '',
   hidden: false,
   waiter_hidden: false,
+  visible_from_time: '',
+  visible_until_time: '',
 }
 
 function parseOptionGroupsValue(value) {
@@ -925,6 +994,9 @@ function menuItemToProductForm(i) {
     show_in_cashier_quick_items: isCashierQuickItem(i),
     cashier_only: !!(i.cashier_only || i.cashierOnly),
     public_hidden: !!(i.public_hidden || i.publicHidden || i.hide_from_public || i.hideFromPublic),
+    waiter_hidden: isWaiterHiddenMenuItem(i),
+    visible_from_time: String(i.visible_from_time || i.visibleFromTime || '').slice(0, 5),
+    visible_until_time: String(i.visible_until_time || i.visibleUntilTime || '').slice(0, 5),
     send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
     quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
     option_groups_editor: optionGroupsToEditor(i.option_groups ?? i.optionGroups),
@@ -939,6 +1011,7 @@ export default function AdminMenu() {
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
   const canEditMenu = canEditFeature(profile || { role: state.user?.role }, 'menu')
+  const scheduleLabels = menuScheduleLabels(lang)
   const navigate = useNavigate()
   const { productId } = useParams()
   const [searchParams] = useSearchParams()
@@ -1001,6 +1074,7 @@ export default function AdminMenu() {
         || (filterAvail === 'hidden' && !item.available)
         || (filterAvail === 'cashier_only' && !!item.cashier_only)
         || (filterAvail === 'public_hidden' && !!item.public_hidden)
+        || (filterAvail === 'waiter_hidden' && isWaiterHiddenMenuItem(item))
       const q           = search.trim().toLowerCase()
       const externalId  = String(item.external_id || item.externalId || '').toLowerCase()
       const matchSearch = !q || getItemName(item, lang).toLowerCase().includes(q) || externalId.includes(q)
@@ -1171,6 +1245,9 @@ export default function AdminMenu() {
           show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
           cashier_only: !!form.cashier_only,
           public_hidden: !!form.public_hidden,
+          waiter_hidden: !!form.waiter_hidden,
+          visible_from_time: nullableMenuTime(form.visible_from_time),
+          visible_until_time: nullableMenuTime(form.visible_until_time),
           send_to_kitchen: !!form.send_to_kitchen,
         },
       })
@@ -1240,6 +1317,8 @@ export default function AdminMenu() {
       sort_order: c.sort_order ?? 0,
       hidden: !!c.hidden,
       waiter_hidden: !!(c.waiter_hidden || c.waiterHidden || c.hide_from_waiter || c.hideFromWaiter),
+      visible_from_time: String(c.visible_from_time || c.visibleFromTime || '').slice(0, 5),
+      visible_until_time: String(c.visible_until_time || c.visibleUntilTime || '').slice(0, 5),
     })
     setCatModal('edit')
   }
@@ -1264,6 +1343,8 @@ export default function AdminMenu() {
           sort_order: Number(catForm.sort_order) || 0,
           hidden: !!catForm.hidden,
           waiter_hidden: !!catForm.waiter_hidden,
+          visible_from_time: nullableMenuTime(catForm.visible_from_time),
+          visible_until_time: nullableMenuTime(catForm.visible_until_time),
         },
       })
       if (result?.error) {
@@ -1491,6 +1572,14 @@ export default function AdminMenu() {
                         placeholder="1"
                       />
                     </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-gray-500">{scheduleLabels.section}</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label={scheduleLabels.from} type="time" value={form.visible_from_time || ''} onChange={setF('visible_from_time')} />
+                        <Field label={scheduleLabels.until} type="time" value={form.visible_until_time || ''} onChange={setF('visible_until_time')} />
+                      </div>
+                      <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
+                    </div>
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
                       <input type="checkbox" checked={form.available} onChange={e => setForm(f => ({ ...f, available: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
                       {t(lang, 'available_item')}
@@ -1502,6 +1591,10 @@ export default function AdminMenu() {
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
                       <input type="checkbox" checked={!!form.public_hidden} onChange={e => setForm(f => ({ ...f, public_hidden: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
                       {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
+                    </label>
+                    <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
+                      <input type="checkbox" checked={!!form.waiter_hidden} onChange={e => setForm(f => ({ ...f, waiter_hidden: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
+                      {lang === 'uz' ? 'Ofitsiant stol menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню столов официанта' : 'Hide from waiter table'}
                     </label>
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
                       <input type="checkbox" checked={!!form.cashier_only} onChange={e => setForm(f => ({ ...f, cashier_only: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
@@ -1602,6 +1695,9 @@ export default function AdminMenu() {
                   </option>
                   <option value="public_hidden">
                     {lang === 'uz' ? 'Ommaviyda yashirin' : lang === 'ru' ? 'Скрыто публично' : 'Public hidden'}
+                  </option>
+                  <option value="waiter_hidden">
+                    {lang === 'uz' ? 'Ofitsiantda yashirin' : lang === 'ru' ? 'Скрыто у официанта' : 'Waiter hidden'}
                   </option>
                 </select>
                 <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -2151,6 +2247,14 @@ export default function AdminMenu() {
               onChange={setF('quick_item_sort_order')}
               placeholder="1"
             />
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-gray-500">{scheduleLabels.section}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={scheduleLabels.from} type="time" value={form.visible_from_time || ''} onChange={setF('visible_from_time')} />
+                <Field label={scheduleLabels.until} type="time" value={form.visible_until_time || ''} onChange={setF('visible_until_time')} />
+              </div>
+              <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
+            </div>
             <div className="flex items-center gap-2 pt-1">
               <input
                 id="avail"
@@ -2186,6 +2290,19 @@ export default function AdminMenu() {
               />
               <label htmlFor="publicHidden" className="text-sm text-gray-700 font-medium">
                 {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
+              </label>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="waiterHidden"
+                type="checkbox"
+                checked={!!form.waiter_hidden}
+                onChange={e => setForm(f => ({ ...f, waiter_hidden: e.target.checked }))}
+                disabled={savingItemForm}
+                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
+              />
+              <label htmlFor="waiterHidden" className="text-sm text-gray-700 font-medium">
+                {lang === 'uz' ? 'Ofitsiant stol menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню столов официанта' : 'Hide from waiter table'}
               </label>
             </div>
             <div className="flex items-center gap-2 pt-1">
@@ -2240,6 +2357,14 @@ export default function AdminMenu() {
               entityId={catForm.id}
             />
             <Field label={t(lang, 'sortOrder')} type="number" value={catForm.sort_order} onChange={setCF('sort_order')} placeholder="1" />
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-gray-500">{scheduleLabels.section}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={scheduleLabels.from} type="time" value={catForm.visible_from_time || ''} onChange={setCF('visible_from_time')} />
+                <Field label={scheduleLabels.until} type="time" value={catForm.visible_until_time || ''} onChange={setCF('visible_until_time')} />
+              </div>
+              <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
+            </div>
             <div className="flex items-center gap-2 pt-1">
               <input
                 id="categoryHidden"

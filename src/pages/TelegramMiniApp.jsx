@@ -29,14 +29,14 @@ import {
   telegramApi,
 } from '../lib/telegramWebApp'
 
-async function loadTelegramMenuData() {
+async function loadTelegramMenuData(now = new Date()) {
   const rpcRes = await supabase.rpc('get_public_menu_data')
   if (!rpcRes.error && rpcRes.data) {
-    const categories = (rpcRes.data.categories || []).filter(isCustomerMenuCategory)
+    const categories = (rpcRes.data.categories || []).filter(category => isCustomerMenuCategory(category, now))
     const categoryIds = new Set(categories.map(category => category.id))
     return {
       categories,
-      items: (rpcRes.data.items || []).filter(item => isCustomerMenuItem(item) && (!item.category_id || categoryIds.has(item.category_id))),
+      items: (rpcRes.data.items || []).filter(item => isCustomerMenuItem(item, now) && (!item.category_id || categoryIds.has(item.category_id))),
     }
   }
 
@@ -45,11 +45,11 @@ async function loadTelegramMenuData() {
     supabase.from('menu_items').select('*').eq('available', true).order('sort_order'),
   ])
   if (catRes.error || itemRes.error) throw catRes.error || itemRes.error
-  const categories = (catRes.data || []).filter(isCustomerMenuCategory)
+  const categories = (catRes.data || []).filter(category => isCustomerMenuCategory(category, now))
   const categoryIds = new Set(categories.map(category => category.id))
   return {
     categories,
-    items: (itemRes.data || []).filter(item => isCustomerMenuItem(item) && (!item.category_id || categoryIds.has(item.category_id))),
+    items: (itemRes.data || []).filter(item => isCustomerMenuItem(item, now) && (!item.category_id || categoryIds.has(item.category_id))),
   }
 }
 
@@ -577,6 +577,14 @@ export default function TelegramMiniApp() {
 
   useEffect(() => {
     let cancelled = false
+    let refreshInterval = 0
+    async function refreshMenu() {
+      const menu = await loadTelegramMenuData(new Date())
+      if (!cancelled) {
+        setCategories(menu.categories)
+        setItems(menu.items)
+      }
+    }
     async function boot() {
       setLoading(true)
       setError('')
@@ -599,11 +607,10 @@ export default function TelegramMiniApp() {
           throw new Error(l.authError)
         }
 
-        const menu = await loadTelegramMenuData()
-        if (!cancelled) {
-          setCategories(menu.categories)
-          setItems(menu.items)
-        }
+        await refreshMenu()
+        refreshInterval = window.setInterval(() => {
+          refreshMenu().catch(() => {})
+        }, 60_000)
       } catch (err) {
         if (!cancelled) setError(err.message || l.loadError)
       } finally {
@@ -611,7 +618,10 @@ export default function TelegramMiniApp() {
       }
     }
     boot()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      if (refreshInterval) window.clearInterval(refreshInterval)
+    }
   }, [])
 
   function addItem(item) {

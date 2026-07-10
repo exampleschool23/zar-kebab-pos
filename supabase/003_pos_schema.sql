@@ -21,6 +21,8 @@ create table if not exists public.menu_categories (
   image_url  text        default '',
   hidden     boolean     not null default false,
   waiter_hidden boolean  not null default false,
+  visible_from_time time,
+  visible_until_time time,
   sort_order integer     not null default 0,
   created_at timestamptz not null default now()
 );
@@ -69,6 +71,9 @@ create table if not exists public.menu_items (
   available        boolean     not null default true,
   cashier_only     boolean     not null default false,
   public_hidden    boolean     not null default false,
+  waiter_hidden    boolean     not null default false,
+  visible_from_time time,
+  visible_until_time time,
   sort_order       integer     not null default 0,
   deleted_at       timestamptz,
   created_at       timestamptz not null default now()

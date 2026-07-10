@@ -595,6 +595,7 @@ export default function WaiterOrder() {
   const [priceMode,     setPriceMode]    = useState(DEFAULT_PRICE_MODE)
   const [pendingPriceMode, setPendingPriceMode] = useState(null)
   const [detailItem,    setDetailItem]   = useState(null)
+  const [visibilityNow, setVisibilityNow] = useState(() => new Date())
   const [cartFlyers, setCartFlyers] = useState([])
   const [cartPulse, setCartPulse] = useState(false)
   const productScrollRef = useRef(null)
@@ -675,9 +676,9 @@ export default function WaiterOrder() {
   // Categories
   const sortedCategories = useMemo(() =>
     [...state.categories]
-      .filter(isWaiterMenuCategory)
+      .filter(category => isWaiterMenuCategory(category, visibilityNow))
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
-    [state.categories]
+    [state.categories, visibilityNow]
   )
 
   const visibleCategoryIds = useMemo(
@@ -688,13 +689,13 @@ export default function WaiterOrder() {
   const categoryItemCounts = useMemo(() => {
     const counts = { all: 0 }
     state.menuItems.forEach(item => {
-      if (!isWaiterMenuItem(item)) return
+      if (!isWaiterMenuItem(item, visibilityNow)) return
       if (item.category_id && !visibleCategoryIds.has(item.category_id)) return
       counts.all = (counts.all || 0) + 1
       counts[item.category_id] = (counts[item.category_id] || 0) + 1
     })
     return counts
-  }, [state.menuItems, visibleCategoryIds])
+  }, [state.menuItems, visibleCategoryIds, visibilityNow])
 
   const allCategoryCards = useMemo(() => [
     { id: 'all' },
@@ -706,13 +707,13 @@ export default function WaiterOrder() {
   const filteredItems = useMemo(() => {
     return state.menuItems
       .filter(item => {
-        if (!isWaiterMenuItem(item)) return false
+        if (!isWaiterMenuItem(item, visibilityNow)) return false
         if (item.category_id && !visibleCategoryIds.has(item.category_id)) return false
         const matchSearch = !q || [item.name_uz, item.name_ru, item.name_en].some(n => n?.toLowerCase().includes(q))
         return matchSearch
       })
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
-  }, [state.menuItems, visibleCategoryIds, q])
+  }, [state.menuItems, visibleCategoryIds, q, visibilityNow])
 
   const pricedFilteredItems = useMemo(
     () => filteredItems.map(item => getMenuItemForPriceMode(item, priceMode)),
@@ -741,6 +742,11 @@ export default function WaiterOrder() {
 
   useEffect(() => () => {
     if (cartPulseTimerRef.current) window.clearTimeout(cartPulseTimerRef.current)
+  }, [])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setVisibilityNow(new Date()), 60_000)
+    return () => window.clearInterval(interval)
   }, [])
 
   // ── Cart handlers ──────────────────────────────────────────────────────────

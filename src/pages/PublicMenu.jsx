@@ -208,15 +208,15 @@ function MobileSearchPage({
   )
 }
 
-async function loadPublicMenuData() {
+async function loadPublicMenuData(now = new Date()) {
   const rpcRes = await supabase.rpc('get_public_menu_data')
 
   if (!rpcRes.error && rpcRes.data) {
-    const categories = (rpcRes.data.categories || []).filter(isCustomerMenuCategory)
+    const categories = (rpcRes.data.categories || []).filter(category => isCustomerMenuCategory(category, now))
     const categoryIds = new Set(categories.map(category => category.id))
     return {
       categories,
-      items: (rpcRes.data.items || []).filter(item => isCustomerMenuItem(item) && (!item.category_id || categoryIds.has(item.category_id))),
+      items: (rpcRes.data.items || []).filter(item => isCustomerMenuItem(item, now) && (!item.category_id || categoryIds.has(item.category_id))),
       source: 'rpc',
     }
   }
@@ -231,11 +231,11 @@ async function loadPublicMenuData() {
     throw catRes.error || itemRes.error
   }
 
-  const categories = (catRes.data || []).filter(isCustomerMenuCategory)
+  const categories = (catRes.data || []).filter(category => isCustomerMenuCategory(category, now))
   const categoryIds = new Set(categories.map(category => category.id))
   return {
     categories,
-    items: (itemRes.data || []).filter(item => isCustomerMenuItem(item) && (!item.category_id || categoryIds.has(item.category_id))),
+    items: (itemRes.data || []).filter(item => isCustomerMenuItem(item, now) && (!item.category_id || categoryIds.has(item.category_id))),
     source: 'direct',
     rpcError: rpcRes.error,
   }
@@ -260,6 +260,7 @@ export default function PublicMenu({ premium = false }) {
   const [premiumLang, setPremiumLang] = useState('en')
   const [menuCurrency, setMenuCurrency] = useState(() => premium ? 'USD' : getDefaultMenuCurrency())
   const [currencyRates, setCurrencyRates] = useState({ UZS: 1 })
+  const [visibilityNow, setVisibilityNow] = useState(() => new Date())
   const menuBasePath = premium ? '/premium-menu' : '/menu'
   const lang = premium ? premiumLang : appLang
   const showDetailOverlay = Boolean(detailItem)
@@ -273,8 +274,10 @@ export default function PublicMenu({ premium = false }) {
     if (showLoading) setLoading(true)
     setError('')
     try {
-      const data = await loadPublicMenuData()
+      const now = new Date()
+      const data = await loadPublicMenuData(now)
       if (menuLoadSeqRef.current !== seq) return
+      setVisibilityNow(now)
       if (data.source === 'direct' && data.categories.length === 0 && data.items.length === 0 && data.rpcError) {
         throw new Error('Public menu SQL has not been applied yet. Run supabase/009_guest_public_menu.sql.')
       }
@@ -291,6 +294,13 @@ export default function PublicMenu({ premium = false }) {
 
   useEffect(() => {
     refreshPublicMenu({ showLoading: true })
+  }, [refreshPublicMenu])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      refreshPublicMenu({ showLoading: false })
+    }, 60_000)
+    return () => window.clearInterval(interval)
   }, [refreshPublicMenu])
 
   useEffect(() => {
@@ -395,7 +405,7 @@ export default function PublicMenu({ premium = false }) {
     }
 
     return sections
-  }, [categories, displayItems])
+  }, [categories, displayItems, visibilityNow])
 
   const dealItems = useMemo(() =>
     displayItems.filter(item => getMenuPricing(item).discounted),

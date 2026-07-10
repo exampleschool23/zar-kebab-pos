@@ -10,9 +10,11 @@ import {
   isDeletedMenuItem,
   isHiddenMenuCategory,
   isPublicHiddenMenuItem,
+  isWaiterHiddenMenuItem,
   isWaiterHiddenMenuCategory,
   isWaiterMenuCategory,
   isWaiterMenuItem,
+  isWithinMenuTimeWindow,
 } from '../src/lib/menuItems.js'
 
 test('cashier-only items stay available for cashier quick items but hidden from customer menus', () => {
@@ -41,6 +43,14 @@ test('public-hidden items are hidden from customer menus but available to waiter
   assert.equal(isWaiterMenuItem(item), true)
 })
 
+test('waiter-hidden items are hidden from waiter ordering but can stay public', () => {
+  const item = { available: true, waiter_hidden: true, cashier_only: false }
+
+  assert.equal(isWaiterHiddenMenuItem(item), true)
+  assert.equal(isWaiterMenuItem(item), false)
+  assert.equal(isCustomerMenuItem(item), true)
+})
+
 test('soft-deleted menu items stay out of active menus', () => {
   const deleted = { available: true, deleted_at: '2026-07-09T10:00:00.000Z' }
 
@@ -63,4 +73,29 @@ test('waiter-hidden categories are excluded from waiter ordering only', () => {
   assert.equal(isWaiterMenuCategory({ waiter_hidden: true }), false)
   assert.equal(isWaiterMenuCategory({ hidden: true, waiter_hidden: false }), true)
   assert.equal(isCustomerMenuCategory({ hidden: false, waiter_hidden: true }), true)
+})
+
+test('menu time windows include normal, open-ended, and overnight intervals', () => {
+  const atLunch = new Date('2026-07-10T11:30:00')
+  const afterLunch = new Date('2026-07-10T14:00:00')
+  const lateNight = new Date('2026-07-10T23:30:00')
+  const earlyMorning = new Date('2026-07-10T01:30:00')
+
+  assert.equal(isWithinMenuTimeWindow({ visible_from_time: '11:00', visible_until_time: '14:00' }, atLunch), true)
+  assert.equal(isWithinMenuTimeWindow({ visible_from_time: '11:00', visible_until_time: '14:00' }, afterLunch), false)
+  assert.equal(isWithinMenuTimeWindow({ visible_from_time: '11:00' }, atLunch), true)
+  assert.equal(isWithinMenuTimeWindow({ visible_until_time: '14:00' }, atLunch), true)
+  assert.equal(isWithinMenuTimeWindow({ visible_from_time: '22:00', visible_until_time: '02:00' }, lateNight), true)
+  assert.equal(isWithinMenuTimeWindow({ visible_from_time: '22:00', visible_until_time: '02:00' }, earlyMorning), true)
+  assert.equal(isWithinMenuTimeWindow({ visible_from_time: '22:00', visible_until_time: '02:00' }, atLunch), false)
+})
+
+test('scheduled categories and items are hidden outside their time window', () => {
+  const breakfast = { visible_from_time: '08:00', visible_until_time: '10:00', available: true }
+  const now = new Date('2026-07-10T11:30:00')
+
+  assert.equal(isCustomerMenuCategory(breakfast, now), false)
+  assert.equal(isWaiterMenuCategory(breakfast, now), false)
+  assert.equal(isCustomerMenuItem(breakfast, now), false)
+  assert.equal(isWaiterMenuItem(breakfast, now), false)
 })
