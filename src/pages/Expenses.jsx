@@ -265,6 +265,8 @@ export default function Expenses() {
       remaining: 'Qoldi',
       investorHistory: 'Investor yordami',
       history: 'Xarajatlar tarixi',
+      seeAll: 'Barchasini ko‘rish',
+      showLess: 'Kamroq ko‘rsatish',
       empty: 'Bu davrda xarajat yozilmagan',
       emptyInvestor: 'Bu davrda investor yordami yo‘q',
       salaryBonus: 'Maosh bonusi',
@@ -326,6 +328,8 @@ export default function Expenses() {
       remaining: 'Остаток',
       investorHistory: 'Поддержка инвестора',
       history: 'История расходов',
+      seeAll: 'Показать все',
+      showLess: 'Свернуть',
       empty: 'За этот период расходов нет',
       emptyInvestor: 'За этот период поддержки инвестора нет',
       salaryBonus: 'Бонус к зарплате',
@@ -387,6 +391,8 @@ export default function Expenses() {
       remaining: 'Left',
       investorHistory: 'Investor support',
       history: 'Expense history',
+      seeAll: 'See all',
+      showLess: 'Show less',
       empty: 'No expenses in this period',
       emptyInvestor: 'No investor support in this period',
       salaryBonus: 'Salary bonus',
@@ -802,6 +808,8 @@ export default function Expenses() {
                 onDelete={deleteExpense}
                 salaryPaymentLabel={l.automaticSalary}
                 salaryBonusLabel={l.salaryBonus}
+                seeAllLabel={l.seeAll}
+                onSeeAll={() => navigate('/admin/accounting/history')}
               />
             </div>
 
@@ -821,6 +829,8 @@ export default function Expenses() {
                 onDelete={deleteExpense}
                 salaryPaymentLabel={l.automaticSalary}
                 salaryBonusLabel={l.salaryBonus}
+                seeAllLabel={l.seeAll}
+                onSeeAll={() => navigate('/admin/accounting/history')}
               />
             </div>
           </div>
@@ -845,17 +855,30 @@ function ExpenseHistorySection({
   onDelete,
   salaryPaymentLabel,
   salaryBonusLabel,
+  seeAllLabel,
+  onSeeAll,
 }) {
   return (
     <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
       <div className="border-b border-[#F3F4F6] px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-black text-[#1F2937]">{title}</h2>
-          {titleAmount !== undefined && (
-            <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-black text-green-700 tabular-nums">
-              {formatCurrency(titleAmount)}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {titleAmount !== undefined && (
+              <span className="rounded-full bg-green-50 px-3 py-1 text-sm font-black text-green-700 tabular-nums">
+                {formatCurrency(titleAmount)}
+              </span>
+            )}
+            {!loading && rows.length > 0 && (
+              <button
+                type="button"
+                onClick={onSeeAll}
+                className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-100"
+              >
+                {seeAllLabel}
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {loading ? (
