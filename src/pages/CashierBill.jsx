@@ -922,13 +922,14 @@ export default function CashierBill() {
                   <input
                     type="text"
                     inputMode="numeric"
-                    value={loyaltyCardNumber}
+                    value={String(loyaltyCardNumber || '').replace(/(\d{4})(?=\d)/g, '$1 ')}
                     onChange={e => {
                       setLoyaltyCardNumber(e.target.value.replace(/\D/g, '').slice(0, 8))
                       setLoyaltyCard(null)
                       setLoyaltyRedeemAmount('')
                       setLoyaltyLookupMessage('')
                     }}
+                    maxLength={9}
                     placeholder={lbl.cardNumber}
                     className="min-w-0 flex-1 border-2 border-[#E5E7EB] rounded-xl px-4 py-2.5 text-sm font-semibold text-[#1F2937] focus:outline-none focus:border-[#ff5a00] transition-all"
                   />
