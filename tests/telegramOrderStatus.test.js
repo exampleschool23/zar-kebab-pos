@@ -5,8 +5,41 @@ import {
   buildCompletedOrderGroupMessage,
   buildCustomerStatusMessage,
   getCompletedOrdersChatIds,
+  mergeCompletedOrders,
   shouldNotifyCompletedOrderGroup,
 } from '../api/telegram/_lib/orderStatusMessages.js'
+
+test('completed table rounds merge into one Telegram order summary', () => {
+  const order = mergeCompletedOrders([
+    {
+      id: 'drinks', table_name: 'Table 3', waiter_name: 'Ali', price_mode: 'tourist',
+      subtotal: 20000, service_fee: 3000, service_rate_pct: 15, total: 23000, payment_method: 'cash',
+      items: [{ name: 'Tea', quantity: 2, unit_price: 10000, status: 'served' }],
+      payments: [{ method: 'cash', amount: 23000 }], paid_at: '2026-07-12T13:00:00Z',
+    },
+    {
+      id: 'meal', table_name: 'Table 3', waiter_name: 'Bek', price_mode: 'tourist',
+      subtotal: 70000, service_fee: 10500, service_rate_pct: 15, total: 80500, payment_method: 'cash',
+      items: [{ name: 'Kebab', quantity: 2, unit_price: 35000, status: 'served' }],
+      payments: [{ method: 'cash', amount: 80500 }], paid_at: '2026-07-12T13:00:00Z',
+    },
+  ])
+
+  assert.equal(order.subtotal, 90000)
+  assert.equal(order.service_fee, 13500)
+  assert.equal(order.total, 103500)
+  assert.equal(order.items.length, 2)
+  assert.equal(order.waiter_name, 'Ali, Bek')
+  assert.deepEqual(order.payments, [{ method: 'cash', amount: 103500 }])
+
+  const message = buildCompletedOrderGroupMessage({ ...order, dailyRevenueTotal: 500000 })
+  assert.match(message, /Tea/)
+  assert.match(message, /Kebab/)
+  assert.match(message, /Сумма заказа: 90 000 UZS/)
+  assert.match(message, /Сервис 15%: 13 500 UZS/)
+  assert.match(message, /Оплата: Наличные 103 500 UZS/)
+  assert.equal((message.match(/Стол: Table 3/g) || []).length, 1)
+})
 
 test('completed order group chat ids parse comma-separated env values', () => {
   assert.deepEqual(

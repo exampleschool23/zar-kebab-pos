@@ -1455,8 +1455,8 @@ export async function writeToSupabase(action, state, options = {}) {
             }
             if (updateError) throw updateError
             assertUpdatedRows(paidRows, `Order ${o.id} was not marked paid. Refresh and try again.`)
-            notifyTelegramOrderStatus(o.id, 'completed')
           }
+          notifyTelegramOrderStatus(finalSummaries.map(order => order.id), 'completed')
         } catch (error) {
           await rollbackLoyaltyWalletSettlement(loyaltyRollback)
           throw error

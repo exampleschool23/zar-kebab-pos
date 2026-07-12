@@ -55,6 +55,42 @@ function getOrderPayments(order) {
     .filter(row => row.method && row.amount > 0)
 }
 
+export function mergeCompletedOrders(orders = []) {
+  const rows = orders.filter(Boolean)
+  if (rows.length <= 1) return rows[0] || null
+
+  const first = rows[0]
+  const unique = values => [...new Set(values.filter(Boolean))]
+  const waiterNames = unique(rows.map(order => order.waiter_name))
+  const completedByNames = unique(rows.map(order => order.completed_by_name))
+  const priceModes = unique(rows.map(order => normalizePriceMode(order.price_mode)))
+  const paymentsByMethod = new Map()
+
+  for (const order of rows) {
+    for (const payment of getOrderPayments(order)) {
+      paymentsByMethod.set(payment.method, (paymentsByMethod.get(payment.method) || 0) + payment.amount)
+    }
+  }
+
+  return {
+    ...first,
+    id: rows.map(order => order.id).join(','),
+    waiter_name: waiterNames.join(', '),
+    completed_by_name: completedByNames.join(', '),
+    price_mode: priceModes.length === 1 ? priceModes[0] : first.price_mode,
+    subtotal: rows.reduce((sum, order) => sum + (Number(order.subtotal) || 0), 0),
+    service_fee: rows.reduce((sum, order) => sum + (Number(order.service_fee) || 0), 0),
+    total: rows.reduce((sum, order) => sum + (Number(order.total) || 0), 0),
+    items: rows.flatMap(order => getOrderItems(order)),
+    payments: paymentsByMethod.size > 0
+      ? [...paymentsByMethod].map(([method, amount]) => ({ method, amount }))
+      : [],
+    payment_method: unique(rows.map(order => order.payment_method)).join(', '),
+    paid_at: rows.map(order => order.paid_at).filter(Boolean).sort().at(-1) || first.paid_at,
+    updated_at: rows.map(order => order.updated_at).filter(Boolean).sort().at(-1) || first.updated_at,
+  }
+}
+
 function formatPaymentLine(order) {
   const payments = getOrderPayments(order)
   if (payments.length > 0) {

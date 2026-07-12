@@ -5,6 +5,7 @@ import {
   buildCompletedOrderGroupMessage,
   buildCustomerStatusMessage,
   getCompletedOrdersChatIds,
+  mergeCompletedOrders,
   shouldNotifyCompletedOrderGroup,
 } from './_lib/orderStatusMessages.js'
 
@@ -74,22 +75,22 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
   try {
-    const { orderId, status } = await readJson(req)
+    const { orderId, orderIds: requestedOrderIds, status } = await readJson(req)
+    const orderIds = [...new Set((Array.isArray(requestedOrderIds) ? requestedOrderIds : [orderId]).filter(Boolean))]
     const telegramStatus = TELEGRAM_STATUS_MESSAGES[status]
       ? status
       : ITEM_STATUS_TO_TELEGRAM_STATUS[status]
-    if (!orderId || !telegramStatus || !TELEGRAM_STATUS_MESSAGES[telegramStatus]) {
-      return json(res, 400, { error: 'Valid orderId and status are required' })
+    if (orderIds.length === 0 || !telegramStatus || !TELEGRAM_STATUS_MESSAGES[telegramStatus]) {
+      return json(res, 400, { error: 'Valid orderId/orderIds and status are required' })
     }
 
     const supabase = getSupabaseAdmin()
-    const { data: order, error } = await supabase
+    const { data: orders, error } = await supabase
       .from('orders')
       .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, price_mode, status), payments:order_payments(method, amount)')
-      .eq('id', orderId)
-      .maybeSingle()
+      .in('id', orderIds)
     if (error) throw error
-    if (!order) {
+    if (!orders?.length) {
       return json(res, 200, { skipped: true })
     }
 
@@ -97,7 +98,7 @@ export default async function handler(req, res) {
     let customerSent = false
     let completedGroupSentCount = 0
 
-    if (order.source === 'telegram' && order.telegram_user_id) {
+    for (const order of orders) if (order.source === 'telegram' && order.telegram_user_id) {
       const { data: telegramUser } = await supabase
         .from('telegram_users')
         .select('chat_id')
@@ -111,9 +112,11 @@ export default async function handler(req, res) {
       )
     }
 
-    if (shouldNotifyCompletedOrderGroup(telegramStatus, order)) {
-      const localizedOrder = await withRussianMenuItemNames(supabase, order)
-      const dailyRevenueTotal = await loadPaidRevenueForRestaurantDay(supabase, order.paid_at || order.updated_at || new Date())
+    const completedOrders = orders.filter(order => shouldNotifyCompletedOrderGroup(telegramStatus, order))
+    if (completedOrders.length > 0) {
+      const combinedOrder = mergeCompletedOrders(completedOrders)
+      const localizedOrder = await withRussianMenuItemNames(supabase, combinedOrder)
+      const dailyRevenueTotal = await loadPaidRevenueForRestaurantDay(supabase, combinedOrder.paid_at || combinedOrder.updated_at || new Date())
       const text = buildCompletedOrderGroupMessage({ ...localizedOrder, dailyRevenueTotal })
       for (const chatId of getCompletedOrdersChatIds()) {
         sends.push(
