@@ -1003,6 +1003,36 @@ function menuItemToProductForm(i) {
   }
 }
 
+function getItemFormFingerprint(form = {}) {
+  return JSON.stringify({
+    category_id: String(form.category_id || ''),
+    name_uz: String(form.name_uz || ''),
+    name_ru: String(form.name_ru || ''),
+    name_en: String(form.name_en || ''),
+    description_uz: String(form.description_uz || ''),
+    description_ru: String(form.description_ru || ''),
+    description_en: String(form.description_en || ''),
+    image_url: String(form.image_url || ''),
+    price: numberFromMoneyInput(form.price),
+    old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
+    grams: Math.max(0, Math.round(Number(form.grams) || 0)),
+    millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
+    kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
+    stock_count: Math.max(0, Math.round(Number(form.stock_count) || 0)),
+    sort_order: Number(form.sort_order) || 0,
+    quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
+    available: !!form.available,
+    show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
+    cashier_only: !!form.cashier_only,
+    public_hidden: !!form.public_hidden,
+    waiter_hidden: !!form.waiter_hidden,
+    visible_from_time: nullableMenuTime(form.visible_from_time),
+    visible_until_time: nullableMenuTime(form.visible_until_time),
+    send_to_kitchen: !!form.send_to_kitchen,
+    option_groups: editorToOptionGroups(form.option_groups_editor, form.price),
+  })
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminMenu() {
@@ -1031,11 +1061,21 @@ export default function AdminMenu() {
   const [savingCatId, setSavingCatId] = useState('')
   const [savingItemForm, setSavingItemForm] = useState(false)
   const [savingCatForm, setSavingCatForm] = useState(false)
+  const [originalItemFormFingerprint, setOriginalItemFormFingerprint] = useState('')
   const [menuNotice, setMenuNotice] = useState(null)
   const uploadedItemImageUrlsRef = useRef(new Set())
   const uploadedCatImageUrlsRef = useRef(new Set())
   const productEditorInitializedRef = useRef('')
   const shellScrollRef = useRef(null)
+  const currentItemFormFingerprint = useMemo(() => getItemFormFingerprint(form), [form])
+  const isItemFormDirty = itemModal === 'new'
+    || (itemModal === 'edit' && !!originalItemFormFingerprint && currentItemFormFingerprint !== originalItemFormFingerprint)
+  const canSaveItemForm = !savingItemForm
+    && canEditMenu
+    && !!form.name_uz
+    && !!form.price
+    && !!form.category_id
+    && isItemFormDirty
 
   // Sensors: pointer (mouse/trackpad) + touch
   const sensors = useSensors(
@@ -1121,7 +1161,7 @@ export default function AdminMenu() {
         ? Math.max(...quickItems.map(i => getQuickItemSortOrder(i))) : 0
       const quick = searchParams.get('quick') === '1'
       if (quick) {
-        setForm({
+        const nextForm = {
           ...blankItem,
           id: 'i' + Date.now(),
           external_id: generateMenuExternalId(),
@@ -1132,9 +1172,11 @@ export default function AdminMenu() {
           send_to_kitchen: false,
           quick_item_sort_order: maxQuickOrder + 1,
           option_groups_editor: [],
-        })
+        }
+        setForm(nextForm)
+        setOriginalItemFormFingerprint(getItemFormFingerprint(nextForm))
       } else {
-        setForm({
+        const nextForm = {
           ...blankItem,
           id: 'i' + Date.now(),
           external_id: generateMenuExternalId(),
@@ -1145,7 +1187,9 @@ export default function AdminMenu() {
           send_to_kitchen: false,
           quick_item_sort_order: '',
           option_groups_editor: [],
-        })
+        }
+        setForm(nextForm)
+        setOriginalItemFormFingerprint(getItemFormFingerprint(nextForm))
       }
       setItemModal('new')
       return
@@ -1156,7 +1200,9 @@ export default function AdminMenu() {
       navigate('/admin/menu', { replace: true })
       return
     }
-    setForm(menuItemToProductForm(item))
+    const nextForm = menuItemToProductForm(item)
+    setForm(nextForm)
+    setOriginalItemFormFingerprint(getItemFormFingerprint(nextForm))
     setItemModal('edit')
   }, [loaded, isProductEditorPage, productId, quickItems, searchParams, sortedItems, navigate, canEditMenu])
 
@@ -1218,7 +1264,7 @@ export default function AdminMenu() {
     }
   }
   async function saveItem() {
-    if (savingItemForm || !canEditMenu) return
+    if (savingItemForm || !canEditMenu || !isItemFormDirty) return
     if (!form.name_uz || !form.price || !form.category_id) return
     setSavingItemForm(true)
     setMenuNotice(null)
@@ -1605,7 +1651,7 @@ export default function AdminMenu() {
                     <button onClick={closeItemModal} disabled={savingItemForm} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-50">
                       {t(lang, 'cancel')}
                     </button>
-                    <button onClick={saveItem} disabled={savingItemForm} className="flex-1 inline-flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200 disabled:cursor-wait disabled:bg-gray-300 disabled:shadow-none">
+                    <button onClick={saveItem} disabled={!canSaveItemForm} className="flex-1 inline-flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none">
                       {savingItemForm && <Loader2 size={15} className="animate-spin" />}
                       {savingItemForm ? savingLabel(lang) : t(lang, 'save')}
                     </button>
@@ -2322,7 +2368,7 @@ export default function AdminMenu() {
               <button onClick={closeItemModal} disabled={savingItemForm} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-50">
                 {t(lang, 'cancel')}
               </button>
-              <button onClick={saveItem} disabled={savingItemForm} className="flex-1 inline-flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200 disabled:cursor-wait disabled:bg-gray-300 disabled:shadow-none">
+              <button onClick={saveItem} disabled={!canSaveItemForm} className="flex-1 inline-flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none">
                 {savingItemForm && <Loader2 size={15} className="animate-spin" />}
                 {savingItemForm ? savingLabel(lang) : t(lang, 'save')}
               </button>

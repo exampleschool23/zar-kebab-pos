@@ -779,6 +779,19 @@ test('AdminMenu visibility toggles show scoped loading feedback', () => {
   assert.match(source, /closeDisabled=\{savingCatForm\}/)
 })
 
+test('AdminMenu edit save stays disabled until product fields change', () => {
+  const source = readSource('src/pages/AdminMenu.jsx')
+  const adminMenu = functionBody(source, 'AdminMenu')
+
+  assert.match(source, /function getItemFormFingerprint\(form = \{\}\)/)
+  assert.match(adminMenu, /const \[originalItemFormFingerprint, setOriginalItemFormFingerprint\] = useState\(''\)/)
+  assert.match(adminMenu, /currentItemFormFingerprint !== originalItemFormFingerprint/)
+  assert.match(adminMenu, /const canSaveItemForm = !savingItemForm[\s\S]*&& isItemFormDirty/)
+  assert.match(adminMenu, /if \(savingItemForm \|\| !canEditMenu \|\| !isItemFormDirty\) return/)
+  assert.match(source, /disabled=\{!canSaveItemForm\}/)
+  assert.match(source, /disabled:bg-gray-300 disabled:text-gray-500/)
+})
+
 test('menu and category writes surface Supabase errors', () => {
   const db = readSource('src/lib/db.js')
 
