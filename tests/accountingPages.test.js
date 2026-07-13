@@ -72,7 +72,8 @@ test('Accounting page composes cafe income, daily average, external income, expe
   assert.equal(summary.expenseSummary.total, 650)
   assert.equal(summary.expenseSummary.count, 3)
   assert.equal(summary.salaryExpensesTotal, 250)
-  assert.equal(summary.otherExpensesTotal, 400)
+  assert.equal(summary.productBazaarExpensesTotal, 400)
+  assert.equal(summary.otherExpensesTotal, 0)
   assert.equal(summary.incomeSummary.total, 900)
   assert.equal(summary.investorSupportTotal, 800)
   assert.equal(summary.otherIncomeTotal, 100)
@@ -145,21 +146,25 @@ test('All Accounting daily headers keep full-day cafe, expense, and investor tot
   )
 })
 
-test('All Accounting top cards separate cafe, expense, and other income totals', () => {
+test('All Accounting top cards separate cafe, salary, bazaar, other expense, and investor totals', () => {
   const rows = [
     { expense_date: '2026-07-12', category: 'products_bazaar', amount: 500 },
     { expense_date: '2026-07-12', category: 'salary_waiter', amount: 200, is_salary_payment: true },
+    { expense_date: '2026-07-12', category: 'other', amount: 75 },
     { entry_type: 'income', expense_date: '2026-07-12', category: 'investor_support', amount: 300 },
+    { entry_type: 'income', expense_date: '2026-07-12', category: 'other_income', amount: 9_000 },
   ]
   const orders = [paidOrder('cafe', '2026-07-12', 900)]
 
   const summary = getAccountingHistoryPageSummary(rows, orders, '2026-07-01', '2026-07-14')
 
   assert.equal(summary.cafeIncomeSummary.total, 900)
-  assert.equal(summary.expenseSummary.total, 700)
+  assert.equal(summary.expenseSummary.total, 775)
   assert.equal(summary.salaryExpensesTotal, 200)
-  assert.equal(summary.otherExpensesTotal, 500)
-  assert.equal(summary.incomeSummary.total, 300)
+  assert.equal(summary.productBazaarExpensesTotal, 500)
+  assert.equal(summary.otherExpensesTotal, 75)
+  assert.equal(summary.investorSupportTotal, 300)
+  assert.equal(summary.incomeSummary.total, 9_300)
 })
 
 test('All Accounting salary breakdown includes payments bonuses and legacy salary categories only', () => {
@@ -171,5 +176,9 @@ test('All Accounting salary breakdown includes payments bonuses and legacy salar
     { entry_type: 'income', category: 'investor_support', amount: 10_000 },
   ])
 
-  assert.deepEqual(summary, { salaryExpensesTotal: 250, otherExpensesTotal: 600 })
+  assert.deepEqual(summary, {
+    salaryExpensesTotal: 250,
+    productBazaarExpensesTotal: 500,
+    otherExpensesTotal: 100,
+  })
 })

@@ -4,7 +4,6 @@ import {
   Banknote,
   CalendarDays,
   CreditCard,
-  Download,
   HandCoins,
   Plus,
   ReceiptText,
@@ -42,7 +41,6 @@ import {
   normalizeExpenseEntryType,
   todayExpenseDate,
 } from '../lib/expenses'
-import { downloadCsv } from '../lib/closeout'
 import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
@@ -167,24 +165,6 @@ function loadPagedResult(loadPage) {
     .catch(error => ({ data: [], error }))
 }
 
-function exportExpensesCsv(expenses, lang) {
-  const header = ['entry_type', 'date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by']
-  const rows = expenses.map(expense => [
-    normalizeExpenseEntryType(expense.entry_type),
-    expense.expense_date,
-    expenseCategoryLabel(expense.category, lang),
-    expensePaymentMethodLabel(expense.payment_method, lang),
-    expense.amount,
-    expense.vendor || '',
-    expense.description || '',
-    expense.created_by_name || '',
-  ])
-  const csv = [header, ...rows]
-    .map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  downloadCsv(`zar-kebab-expenses-${todayExpenseDate()}.csv`, csv)
-}
-
 export default function Expenses() {
   const { state } = useApp()
   const { profile } = useAuth()
@@ -246,7 +226,6 @@ export default function Expenses() {
       save: 'Saqlash',
       saving: 'Saqlanmoqda...',
       refresh: 'Yangilash',
-      export: 'Eksport',
       salaries: 'Maoshlar',
       salaryDue: 'Maosh qarzi',
       estimate: 'Taxmin',
@@ -310,7 +289,6 @@ export default function Expenses() {
       save: 'Сохранить',
       saving: 'Сохраняется...',
       refresh: 'Обновить',
-      export: 'Экспорт',
       salaries: 'Зарплаты',
       salaryDue: 'Долг по зарплате',
       estimate: 'Прогноз',
@@ -374,7 +352,6 @@ export default function Expenses() {
       save: 'Save',
       saving: 'Saving...',
       refresh: 'Refresh',
-      export: 'Export',
       salaries: 'Salaries',
       salaryDue: 'Salary due',
       estimate: 'Estimate',
@@ -653,9 +630,6 @@ export default function Expenses() {
             </button>
             <button onClick={() => navigate('/admin/accounting/estimate')} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-600 shadow-sm">
               <ReceiptText size={14} />{l.estimate}
-            </button>
-            <button onClick={() => exportExpensesCsv(filteredExpenses, lang)} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
-              <Download size={14} />{l.export}
             </button>
           </div>
 

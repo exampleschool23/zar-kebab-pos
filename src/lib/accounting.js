@@ -69,9 +69,11 @@ export function getAccountingExpenseBreakdown(rows = []) {
     String(row?.category || '').startsWith('salary_')
   )
   const salaryRows = expenseRows.filter(isSalaryRow)
-  const otherRows = expenseRows.filter(row => !isSalaryRow(row))
+  const productBazaarRows = expenseRows.filter(row => !isSalaryRow(row) && row?.category === 'products_bazaar')
+  const otherRows = expenseRows.filter(row => !isSalaryRow(row) && row?.category !== 'products_bazaar')
   return {
     salaryExpensesTotal: summarizeExpenses(salaryRows).total,
+    productBazaarExpensesTotal: summarizeExpenses(productBazaarRows).total,
     otherExpensesTotal: summarizeExpenses(otherRows).total,
   }
 }
@@ -93,10 +95,12 @@ export function filterAccountingHistoryRows(rows = [], { type = 'all', query = '
 }
 
 export function getAccountingHistoryPageSummary(rows = [], orders = [], dateFrom, dateTo) {
+  const incomeSummary = summarizeIncomeEntries(rows)
   return {
     expenseSummary: summarizeExpenses(rows),
     ...getAccountingExpenseBreakdown(rows),
-    incomeSummary: summarizeIncomeEntries(rows),
+    incomeSummary,
+    investorSupportTotal: incomeSummary.byCategory.investor_support || 0,
     cafeIncomeSummary: getCafeIncomeForRange(orders, dateFrom, dateTo),
   }
 }
