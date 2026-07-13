@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Instagram, Phone, Search, Send, UtensilsCrossed, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Coins, Instagram, Phone, Search, Send, UtensilsCrossed, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
@@ -40,14 +40,23 @@ const PUBLIC_CONTACTS = {
   },
 }
 
-function HeaderSelect({ value, onChange, options, ariaLabel, className = '' }) {
+function HeaderSelect({ value, onChange, options, ariaLabel, icon: Icon, className = '' }) {
   return (
     <label className={`relative inline-flex h-9 items-center rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-xs font-black text-[#1F2937] shadow-sm transition-colors hover:bg-white ${className}`}>
+      {Icon && (
+        <Icon
+          size={15}
+          strokeWidth={2.5}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2.5 text-[#ff5a00]"
+        />
+      )}
       <select
         value={value}
         onChange={event => onChange(event.target.value)}
         aria-label={ariaLabel}
-        className="h-full appearance-none rounded-xl bg-transparent py-0 pl-3 pr-7 text-xs font-black uppercase outline-none"
+        title={ariaLabel}
+        className={`h-full appearance-none rounded-xl bg-transparent py-0 pr-7 text-xs font-black uppercase outline-none ${Icon ? 'pl-8' : 'pl-3'}`}
       >
         {options.map(option => (
           <option key={option.value} value={option.value}>
@@ -480,9 +489,10 @@ export default function PublicMenu({ premium = false }) {
             <HeaderSelect
               value={menuCurrency}
               onChange={changeMenuCurrency}
+              icon={Coins}
               options={MENU_CURRENCIES.map(currency => ({
                 value: currency,
-                label: currency === 'UZS' ? '🇺🇿 UZS' : currency === 'USD' ? '🇺🇸 USD' : '🇪🇺 EUR',
+                label: currency === 'UZS' ? "so'm UZS" : currency === 'USD' ? '$ USD' : '€ EUR',
               }))}
               ariaLabel={lang === 'uz' ? 'Valyuta' : lang === 'ru' ? 'Валюта' : 'Currency'}
             />
