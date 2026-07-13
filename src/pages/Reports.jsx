@@ -12,6 +12,7 @@ import {
   getOrderPaymentBreakdown,
   getOrderPaymentSummary,
   getOrderRevenueTotal,
+  getSoldOrderItems,
   getOrderTotal,
   groupOrdersBySession,
   isCancelledOrderItem,
@@ -37,6 +38,7 @@ import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderT
 import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
 import { canDeletePaidOrders, canViewPage } from '../lib/permissions'
+import { collectPagedRows, loadOrdersForRange, mergeOrderHistory } from '../lib/orderHistory'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -61,6 +63,12 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
     bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
     absences: absences.filter(absence => absence.salary_profile_id === row.id),
   }))
+}
+
+function loadPagedResult(loadPage) {
+  return collectPagedRows(loadPage)
+    .then(data => ({ data, error: null }))
+    .catch(error => ({ data: [], error }))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -291,7 +299,7 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
   const items = useMemo(() => {
     const map = {}
     orders.forEach(o => {
-      getOrderItems(o).forEach(item => {
+      getSoldOrderItems(o).forEach(item => {
         const key = item.menu_item_id || item.name || 'unknown'
         const mi  = menuItemMap[item.menu_item_id]
         const cat = mi ? categories.find(c => c.id === mi.category_id) : null
@@ -815,7 +823,7 @@ function ByCategoryTab({ orders, categories, menuItemMap, lang }) {
     const map = {}
     let totalRev = 0
     orders.forEach(o => {
-      getOrderItems(o).forEach(item => {
+      getSoldOrderItems(o).forEach(item => {
         const mi  = menuItemMap[item.menu_item_id]
         const cat = mi ? categories.find(c => c.id === mi.category_id) : null
         const key = cat?.id || '__uncategorized__'
@@ -1049,7 +1057,7 @@ function OrderTypesTab({ orders, lang }) {
         const rows = orders.filter(order => inferOrderType(order) === type)
         const revenue = rows.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
         const items = rows.reduce(
-          (sum, order) => sum + getOrderItems(order).reduce((itemSum, item) => itemSum + (Number(item.quantity) || 1), 0),
+          (sum, order) => sum + getSoldOrderItems(order).reduce((itemSum, item) => itemSum + (Number(item.quantity) || 1), 0),
           0
         )
         return {
@@ -1125,7 +1133,7 @@ function WaiterPerformanceTab({ orders, lang }) {
       if (!map[w]) map[w] = { name: w, revenue: 0, orders: 0, items: 0 }
       map[w].revenue += getOrderRevenueTotal(o)
       map[w].orders  += 1
-      map[w].items   += getOrderItems(o).reduce((s, i) => s + (Number(i.quantity) || 1), 0)
+      map[w].items   += getSoldOrderItems(o).reduce((s, i) => s + (Number(i.quantity) || 1), 0)
     })
     return Object.values(map)
       .map(d => ({ ...d, avg: d.orders > 0 ? Math.round(d.revenue / d.orders) : 0 }))
@@ -1584,6 +1592,8 @@ export default function Reports() {
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [expensesError, setExpensesError] = useState('')
+  const [historyOrders, setHistoryOrders] = useState([])
+  const [ordersError, setOrdersError] = useState('')
 
   // ── Lookups ────────────────────────────────────────────────────────────────
 
@@ -1593,10 +1603,15 @@ export default function Reports() {
     return m
   }, [state.menuItems])
 
+  const reportOrders = useMemo(
+    () => mergeOrderHistory(historyOrders, state.orders, dateFrom, dateTo),
+    [historyOrders, state.orders, dateFrom, dateTo]
+  )
+
   const uniqueWaiters = useMemo(() => {
-    const s = new Set(state.orders.map(o => o.waiter_name).filter(Boolean))
+    const s = new Set(reportOrders.map(o => o.waiter_name).filter(Boolean))
     return [...s]
-  }, [state.orders])
+  }, [reportOrders])
 
   // ── Base date-filtered order sets ─────────────────────────────────────────
   //
@@ -1604,7 +1619,7 @@ export default function Reports() {
   // these two lists so they are always in sync.
 
   const allDateFiltered = useMemo(() => {
-    return groupOrdersBySession([...state.orders])
+    return groupOrdersBySession([...reportOrders])
       .filter(o => {
         const matchDate   = matchesRange(o, dateFrom, dateTo)
         const matchTable  = tableFilter  === 'all' || o.table_id === tableFilter
@@ -1612,7 +1627,7 @@ export default function Reports() {
         return matchDate && matchTable && matchWaiter
       })
       .sort((a, b) => new Date(getOrderDate(b) || 0) - new Date(getOrderDate(a) || 0))
-  }, [state.orders, dateFrom, dateTo, tableFilter, waiterFilter])
+  }, [reportOrders, dateFrom, dateTo, tableFilter, waiterFilter])
 
   // Paid subset — used for KPI cards and all analytics tabs
   const filteredForAnalytics = useMemo(() =>
@@ -1626,7 +1641,7 @@ export default function Reports() {
   const kpiOrders    = filteredForAnalytics.length
   const kpiAvg       = kpiOrders > 0 ? Math.round(kpiRevenue / kpiOrders) : 0
   const kpiItemsSold = filteredForAnalytics.reduce(
-    (s, o) => s + getOrderItems(o).reduce((a, i) => a + (Number(i.quantity) || 1), 0), 0
+    (s, o) => s + getSoldOrderItems(o).reduce((a, i) => a + (Number(i.quantity) || 1), 0), 0
   )
   const priceModeBreakdown = useMemo(() => {
     const rows = {
@@ -1640,7 +1655,7 @@ export default function Reports() {
     })
     return Object.values(rows)
   }, [filteredForAnalytics])
-  const closeout = useMemo(() => getDailyCloseout(state.orders, dateTo), [state.orders, dateTo])
+  const closeout = useMemo(() => getDailyCloseout(reportOrders, dateTo), [reportOrders, dateTo])
   const salaryExpenses = useMemo(() => (
     buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
   ), [salaryProfiles, dateFrom, dateTo])
@@ -1653,6 +1668,21 @@ export default function Reports() {
 
   useEffect(() => {
     let cancelled = false
+    setOrdersError('')
+    loadOrdersForRange(dateFrom, dateTo)
+      .then(rows => {
+        if (!cancelled) setHistoryOrders(rows)
+      })
+      .catch(error => {
+        if (cancelled) return
+        setHistoryOrders([])
+        setOrdersError(error?.message || 'Could not load complete order history')
+      })
+    return () => { cancelled = true }
+  }, [dateFrom, dateTo])
+
+  useEffect(() => {
+    let cancelled = false
     async function loadExpenses() {
       if (!canViewExpenses) {
         setExpenses([])
@@ -1660,17 +1690,20 @@ export default function Reports() {
         return
       }
       const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult] = await Promise.all([
-        supabase
+        loadPagedResult((from, to) => supabase
           .from('expenses')
           .select('id, entry_type, expense_date, category, payment_method, amount')
           .gte('expense_date', dateFrom)
-          .lte('expense_date', dateTo),
-        supabase.from('employee_salary_profiles').select('*'),
-        supabase.from('employee_salary_rates').select('*'),
-        supabase.from('employee_salary_payments').select('*'),
-        supabase.from('employee_salary_bonuses').select('*'),
-        supabase.from('employee_salary_absences').select('*'),
-        supabase.from('profiles').select('id, full_name, email, role, status'),
+          .lte('expense_date', dateTo)
+          .order('expense_date')
+          .order('id')
+          .range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_salary_profiles').select('*').order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_salary_rates').select('*').order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_salary_payments').select('*').order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select('*').order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
       ])
       if (cancelled) return
       const { data, error } = expenseResult
@@ -1832,6 +1865,12 @@ export default function Reports() {
                 </div>
               </div>
             </div>
+
+            {ordersError && (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                {ordersError}
+              </div>
+            )}
 
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">

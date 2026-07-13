@@ -10,6 +10,8 @@
     "migrate:menu-images:r2": "node scripts/migrate-menu-images-to-r2.js",
     "optimize:menu-images": "node scripts/optimize-menu-images.js",
     "cleanup:test-operations": "node scripts/cleanup-test-operations.js",
+    "mcp:nav": "node mcp/server.js",
+    "mcp:benchmark": "node scripts/benchmark-repo-nav.js",
     "test": "node --test",
     "build": "vite build",
     "preview": "vite preview"

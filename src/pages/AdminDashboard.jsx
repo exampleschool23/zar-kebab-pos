@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  TrendingUp, ShoppingBag, DollarSign, Package, Receipt,
+  TrendingUp, ShoppingBag, Package, Receipt,
   Clock, CalendarDays, ArrowUpRight, ArrowDownRight, Users, Loader2,
   Printer, CreditCard, Trash2, Wallet, Monitor, QrCode,
 } from 'lucide-react'
@@ -16,13 +16,13 @@ import {
   getOrderDate,
   getOrderActivityDate,
   getOrderItems,
-  getMonthToDateCafeIncome,
   getOrderRevenueTotal,
   getOrderTotal,
   groupOrdersBySession,
   isActiveNeedsBillOrder,
   isPaidOrder,
   restaurantTodayStr,
+  getSoldOrderItems,
   toRestaurantDateStr,
 } from '../lib/analytics'
 import {
@@ -30,6 +30,7 @@ import {
   getDashboardBestSelling,
   getDashboardOrderTypePerformance,
   getDashboardPaymentMethods,
+  getDashboardPeriodCafeIncome,
   getDashboardPeriodOrders,
   getDashboardSalesByCategory,
   getDashboardStaffPerformance,
@@ -38,6 +39,7 @@ import {
 import AppShell from '../components/AppShell'
 import { inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
+import { loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 const L = {
@@ -354,6 +356,16 @@ function getPreviousDashboardPeriodOrders(orders, period) {
 
   const year = Number(todayDs.slice(0, 4)) - 1
   return orders.filter(order => localDateStr(getOrderDate(order)).startsWith(`${year}-`))
+}
+
+function getDashboardHistoryRange(period, today = todayStr()) {
+  if (period === 'today') return { dateFrom: addRestaurantDays(today, -1), dateTo: today }
+  if (period === '7days') return { dateFrom: addRestaurantDays(today, -13), dateTo: today }
+  if (period === 'month') {
+    const previousMonthEnd = addRestaurantDays(`${today.slice(0, 8)}01`, -1)
+    return { dateFrom: `${previousMonthEnd.slice(0, 8)}01`, dateTo: today }
+  }
+  return { dateFrom: `${Number(today.slice(0, 4)) - 1}-01-01`, dateTo: today }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -699,6 +711,8 @@ export default function AdminDashboard() {
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
   const [deletingOrderId, setDeletingOrderId] = useState('')
   const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
+  const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
+  const [historyError, setHistoryError] = useState('')
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
 
   useEffect(() => {
@@ -707,10 +721,36 @@ export default function AdminDashboard() {
       .catch(() => setStaffProfiles([]))
   }, [])
 
+  const dashboardHistoryRange = useMemo(() => getDashboardHistoryRange(period), [period])
+
+  useEffect(() => {
+    let cancelled = false
+    setHistoryError('')
+    loadPaidOrdersForRange(dashboardHistoryRange.dateFrom, dashboardHistoryRange.dateTo)
+      .then(orders => {
+        if (!cancelled) setPaidHistoryOrders(orders)
+      })
+      .catch(error => {
+        if (cancelled) return
+        setPaidHistoryOrders([])
+        setHistoryError(error?.message || 'Could not load complete dashboard history')
+      })
+    return () => { cancelled = true }
+  }, [dashboardHistoryRange])
+
   // ── Core derived sets ─────────────────────────────────────────────────────
+  const dashboardOrders = useMemo(
+    () => mergePaidOrderHistory(
+      paidHistoryOrders,
+      state.orders,
+      dashboardHistoryRange.dateFrom,
+      dashboardHistoryRange.dateTo,
+    ),
+    [paidHistoryOrders, state.orders, dashboardHistoryRange]
+  )
   const paidOrders = useMemo(
-    () => groupOrdersBySession(state.orders).filter(isPaidOrder),
-    [state.orders]
+    () => groupOrdersBySession(dashboardOrders).filter(isPaidOrder),
+    [dashboardOrders]
   )
 
   const periodPaidOrders = useMemo(
@@ -737,17 +777,14 @@ export default function AdminDashboard() {
   const {
     periodRevenue, previousKpiRevenue, revenueChange,
     periodOrderCount, previousOrderCount, orderChange,
-    avgOrderValue, previousAvgOrder, avgChange,
     periodItemsSold,
   } = useMemo(() => {
     const currentRevenue = periodPaidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
     const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
     const currentOrderCount = periodPaidOrders.length
     const previousCount = previousPeriodOrders.length
-    const currentAvgOrder = currentOrderCount > 0 ? Math.round(currentRevenue / currentOrderCount) : 0
-    const previousAvg = previousCount > 0 ? Math.round(previousRevenue / previousCount) : 0
     const itemsSold = periodPaidOrders
-      .flatMap(order => getOrderItems(order))
+      .flatMap(order => getSoldOrderItems(order))
       .reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
 
     return {
@@ -761,11 +798,6 @@ export default function AdminDashboard() {
       orderChange: previousCount > 0
         ? Math.round(((currentOrderCount - previousCount) / previousCount) * 100)
         : null,
-      avgOrderValue: currentAvgOrder,
-      previousAvgOrder: previousAvg,
-      avgChange: previousAvg > 0
-        ? Math.round(((currentAvgOrder - previousAvg) / previousAvg) * 100)
-        : null,
       periodItemsSold: itemsSold,
     }
   }, [periodPaidOrders, previousPeriodOrders])
@@ -775,9 +807,9 @@ export default function AdminDashboard() {
     [state.tables]
   )
 
-  const monthToDateCafeIncome = useMemo(
-    () => getMonthToDateCafeIncome(paidOrders),
-    [paidOrders]
+  const selectedPeriodCafeIncome = useMemo(
+    () => getDashboardPeriodCafeIncome(paidOrders, period),
+    [paidOrders, period]
   )
 
   // ── Revenue chart & period comparison ─────────────────────────────────────
@@ -1025,8 +1057,14 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {historyError && (
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {historyError}
+          </div>
+        )}
+
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
             label={`${l.revenue} · ${currentKpiPeriodLabel}`}
@@ -1036,9 +1074,9 @@ export default function AdminDashboard() {
           />
           <KpiCard
             icon={CalendarDays}
-            label={`${l.avgDailyCafeIncome} · ${l.thisMonth}`}
-            value={formatCurrency(monthToDateCafeIncome.averageDaily)}
-            sub={`${l.total}: ${formatCurrency(monthToDateCafeIncome.total)}`}
+            label={`${l.avgDailyCafeIncome} · ${currentKpiPeriodLabel}`}
+            value={formatCurrency(selectedPeriodCafeIncome.averageDaily)}
+            sub={`${l.total}: ${formatCurrency(selectedPeriodCafeIncome.total)}`}
           />
           <KpiCard
             icon={ShoppingBag}
@@ -1046,13 +1084,6 @@ export default function AdminDashboard() {
             value={periodOrderCount}
             sub={`${previousKpiPeriodLabel}: ${previousOrderCount}`}
             badge={pctBadge(orderChange)}
-          />
-          <KpiCard
-            icon={DollarSign}
-            label={`${l.avgOrderShort} · ${currentKpiPeriodLabel}`}
-            value={formatCurrency(avgOrderValue)}
-            sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousAvgOrder)}`}
-            badge={pctBadge(avgChange)}
           />
           <KpiCard
             icon={Package}

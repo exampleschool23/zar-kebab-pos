@@ -1,0 +1,110 @@
+{
+  "name": "Zar Kebab POS",
+  "summary": "Vite React 18 POS backed by Supabase. Covers public menus, waiter ordering, cashier payment, admin, accounting, reporting, loyalty, and Telegram flows.",
+  "commands": [
+    "npm run dev",
+    "npm test",
+    "npm run build",
+    "npm run db:health"
+  ],
+  "landmarks": [
+    ["routes", "src/App.jsx", "host-aware routes and access guards"],
+    ["auth", "src/contexts/AuthContext.jsx", "Supabase sessions, OAuth, and profiles"],
+    ["state", "src/store/AppContext.jsx", "hydration, realtime, and DB dispatch policy"],
+    ["writes", "src/lib/db.js", "Supabase reads, writes, RPCs, and realtime"],
+    ["money", "src/lib/analytics.js", "authoritative payment and service math"],
+    ["dates", "src/lib/dateFormat.js", "Asia/Tashkent date boundaries"],
+    ["schema", "src/lib/dbHealth.js", "schema inventory plus ordered SQL migration hints"],
+    ["tests", "tests/sourceGuards.test.js", "Node test runner regression guard index"]
+  ],
+  "tasks": [
+    {
+      "name": "atomic cashier settlement",
+      "aliases": ["atomic payment write", "cashier transaction settlement"],
+      "path": "supabase/083_atomic_order_payment_settlement.sql",
+      "symbol": "settle_orders_payment"
+    },
+    {
+      "name": "paid order range loading",
+      "aliases": ["paid order history pagination", "accounting paid orders"],
+      "path": "src/lib/orderHistory.js",
+      "symbol": "loadPaidOrdersForRange"
+    },
+    {
+      "name": "large menu editor",
+      "aliases": ["admin menu editing", "menu product editor"],
+      "path": "src/pages/AdminMenu.jsx",
+      "symbol": "AdminMenu"
+    },
+    {
+      "name": "sent cart snapshot removal",
+      "aliases": ["preserve new cart items after kitchen submit", "remove submitted cart quantities"],
+      "path": "src/lib/analytics.js",
+      "symbol": "removeSentCartItems"
+    },
+    {
+      "name": "stable profile synchronization",
+      "aliases": ["profile sync login loop", "stable auth profile dispatch"],
+      "path": "src/App.jsx",
+      "symbol": "ProfileSync"
+    }
+  ],
+  "features": [
+    {
+      "name": "accounting",
+      "keywords": ["expense", "income", "salary", "estimate", "report", "dashboard"],
+      "files": ["src/pages/Expenses.jsx", "src/pages/AccountingHistory.jsx", "src/pages/MonthlyEstimate.jsx", "src/pages/Reports.jsx", "src/lib/accounting.js", "src/lib/expenses.js", "src/lib/orderHistory.js", "src/lib/monthlyEstimate.js"],
+      "tests": ["tests/accountingPages.test.js", "tests/orderHistory.test.js", "tests/salaryAccrual.test.js", "tests/monthlyEstimate.test.js", "tests/dashboardAnalytics.test.js"]
+    },
+    {
+      "name": "payments",
+      "keywords": ["cashier", "bill", "payment", "service", "split", "loyalty"],
+      "files": ["src/pages/CashierBill.jsx", "src/pages/Receipt.jsx", "src/lib/analytics.js", "src/lib/cashierBills.js", "src/lib/loyalty.js", "src/lib/db.js"],
+      "tests": ["tests/orderPayment.test.js", "tests/cashierPaymentFixes.test.js", "tests/atomicPaymentSettlement.test.js"]
+    },
+    {
+      "name": "waiter-kitchen",
+      "keywords": ["cart", "waiter", "kitchen", "submit", "order", "table"],
+      "files": ["src/pages/WaiterTables.jsx", "src/pages/WaiterOrder.jsx", "src/components/CartPanel.jsx", "src/store/AppContext.jsx", "src/store/ordersReducer.js", "src/store/cartReducer.js", "src/lib/db.js"],
+      "tests": ["tests/operationalFlows.test.js", "tests/kitchenCheck.test.js", "tests/writeTimeout.test.js", "tests/dbRealtime.test.js"]
+    },
+    {
+      "name": "menu",
+      "keywords": ["dish", "category", "variant", "price", "currency", "image", "nutrition"],
+      "files": ["src/pages/AdminMenu.jsx", "src/pages/PublicMenu.jsx", "src/components/MenuProductCards.jsx", "src/lib/menuItems.js", "src/lib/menuPricing.js", "src/lib/menuCurrency.js", "src/store/menuReducer.js"],
+      "tests": ["tests/menuItems.test.js", "tests/menuPricing.test.js", "tests/menuCurrency.test.js", "tests/menuReorder.test.js", "tests/nutrition.test.js"]
+    },
+    {
+      "name": "auth-access",
+      "keywords": ["login", "oauth", "google", "role", "permission", "profile", "redirect"],
+      "files": ["src/App.jsx", "src/contexts/AuthContext.jsx", "src/pages/AuthCallback.jsx", "src/pages/Login.jsx", "src/lib/permissions.js", "src/components/UnifiedSidebar.jsx"],
+      "tests": ["tests/permissions.test.js", "tests/rlsPolicyGuards.test.js", "tests/dbHealth.test.js"]
+    },
+    {
+      "name": "tables",
+      "keywords": ["reservation", "zone", "occupied", "available", "table"],
+      "files": ["src/pages/WaiterTables.jsx", "src/pages/AdminTables.jsx", "src/lib/tableManagement.js", "src/lib/tableActivity.js"],
+      "tests": ["tests/tableManagement.test.js", "tests/tableActivity.test.js", "tests/operationalFlows.test.js"]
+    },
+    {
+      "name": "loyalty",
+      "keywords": ["card", "cashback", "discount", "wallet", "redeem"],
+      "files": ["src/pages/AdminLoyalty.jsx", "src/pages/CashierBill.jsx", "src/pages/Receipt.jsx", "src/lib/loyalty.js"],
+      "tests": ["tests/loyaltyCards.test.js", "tests/orderPayment.test.js", "tests/monthlyEstimate.test.js"]
+    },
+    {
+      "name": "telegram",
+      "keywords": ["bot", "mini app", "telegram", "customer order"],
+      "files": ["src/pages/TelegramMiniApp.jsx", "src/lib/telegramWebApp.js", "src/lib/telegramNotifications.js", "bots/telegram-bot.js"],
+      "tests": ["tests/telegramOrderStatus.test.js"]
+    }
+  ],
+  "rules": [
+    "Use analytics.js helpers for all order, service, loyalty, and revenue totals.",
+    "Use paid_at and Asia/Tashkent boundaries for paid-order reporting ranges.",
+    "Keep AppContext dbDispatch stable; ProfileSync dependencies stay field-based.",
+    "Kitchen submission removes only the sent cart snapshot and rejects paid orders.",
+    "Apply Supabase migrations in filename order; duplicate numeric prefixes exist.",
+    "Run npm test and npm run build after changes."
+  ]
+}

@@ -158,21 +158,57 @@ export function convertSalaryAmountToDaily(amount, rateUnit) {
     : normalized
 }
 
+function getCalendarMonthParts(asOfDate = todayExpenseDate()) {
+  const date = String(asOfDate || todayExpenseDate()).slice(0, 10)
+  const [year, month, day] = date.split('-').map(Number)
+  if (!year || !month || !day) return { date, year: 0, month: 0, day: 0, daysInMonth: 0 }
+  return {
+    date,
+    year,
+    month,
+    day,
+    daysInMonth: new Date(Date.UTC(year, month, 0, 12, 0, 0)).getUTCDate(),
+  }
+}
+
+function getMonthlyRateAmount(rate) {
+  const explicitAmount = normalizeExpenseAmount(rate?.amount)
+  if (explicitAmount > 0) return explicitAmount
+  // Older rows could have only the compatibility daily_amount column. Monthly
+  // rows stored that value as amount / 30, so reconstruct the monthly rate.
+  return normalizeSalaryRateUnit(rate?.rate_unit) === 'monthly'
+    ? normalizeExpenseAmount(rate?.daily_amount) * 30
+    : normalizeExpenseAmount(rate?.daily_amount)
+}
+
+export function allocateMonthlySalaryToDate(amount, asOfDate = todayExpenseDate()) {
+  const normalized = normalizeExpenseAmount(amount)
+  const { day, daysInMonth } = getCalendarMonthParts(asOfDate)
+  if (normalized <= 0 || daysInMonth <= 0 || day <= 0 || day > daysInMonth) return 0
+
+  // Spread indivisible UZS deterministically over the first days of the month.
+  // This guarantees that every complete calendar month totals the configured
+  // monthly salary exactly, including February and leap years.
+  const baseAmount = Math.floor(normalized / daysInMonth)
+  const remainder = normalized % daysInMonth
+  return baseAmount + (day <= remainder ? 1 : 0)
+}
+
 export function getDailySalaryAmount(salaryProfile, asOfDate = todayExpenseDate()) {
   const rate = getCurrentSalaryRate(salaryProfile, asOfDate)
-  return convertSalaryAmountToDaily(rate?.amount ?? rate?.daily_amount, rate?.rate_unit)
+  if (normalizeSalaryRateUnit(rate?.rate_unit) === 'monthly') {
+    return allocateMonthlySalaryToDate(getMonthlyRateAmount(rate), asOfDate)
+  }
+  return getMonthlyRateAmount(rate)
 }
 
 export function getMonthlySalaryCommitment(salaryProfile, asOfDate = todayExpenseDate()) {
   if (!salaryProfile || salaryProfile.is_active === false) return 0
-  const rate = getCurrentSalaryRate(salaryProfile, asOfDate)
-  if (!rate) return 0
-  const rateUnit = normalizeSalaryRateUnit(rate.rate_unit)
-  if (rateUnit === 'monthly') {
-    const monthlyAmount = normalizeExpenseAmount(rate.amount)
-    if (monthlyAmount > 0) return monthlyAmount
-  }
-  return getDailySalaryAmount(salaryProfile, asOfDate) * 30
+  const { year, month, daysInMonth } = getCalendarMonthParts(asOfDate)
+  if (!year || !month || !daysInMonth) return 0
+  const monthStart = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`
+  const monthEnd = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`
+  return getSalaryAccruedAmount(salaryProfile, monthStart, monthEnd)
 }
 
 export function getTotalMonthlySalaryCommitment(salaryProfiles = [], asOfDate = todayExpenseDate()) {
@@ -264,6 +300,11 @@ export function buildSalaryExpenseRows(salaryProfiles = [], dateFrom, dateTo) {
   return rows
 }
 
+export function getSalaryAccruedAmount(salaryProfile, dateFrom, dateTo) {
+  return buildSalaryExpenseRows([salaryProfile], dateFrom, dateTo)
+    .reduce((sum, row) => sum + normalizeExpenseAmount(row.amount), 0)
+}
+
 export function buildSalaryPaymentExpenseRows(salaryProfiles = [], dateFrom, dateTo) {
   if (!dateFrom || !dateTo) return []
   const rows = []
@@ -334,7 +375,8 @@ export function isGeneratedSalaryExpense(expense) {
 
 export function getSalaryPaidAmount(salaryProfile, dateTo = todayExpenseDate()) {
   return (salaryProfile?.payments || []).reduce((sum, payment) => {
-    if (payment?.paid_date && payment.paid_date > dateTo) return sum
+    const paidDate = String(payment?.paid_date || '').slice(0, 10)
+    if (paidDate && paidDate > dateTo) return sum
     return sum + normalizeExpenseAmount(payment?.amount)
   }, 0)
 }
@@ -342,7 +384,7 @@ export function getSalaryPaidAmount(salaryProfile, dateTo = todayExpenseDate()) 
 export function getSalaryDue(salaryProfile, dateTo = todayExpenseDate()) {
   const joinedAt = String(salaryProfile?.joined_at || dateTo).slice(0, 10)
   const activeUntil = getSalaryActiveUntil(salaryProfile, dateTo)
-  const accrued = summarizeExpenses(buildSalaryExpenseRows([salaryProfile], joinedAt, activeUntil)).total
+  const accrued = getSalaryAccruedAmount(salaryProfile, joinedAt, activeUntil)
   return Math.max(0, accrued - getSalaryPaidAmount(salaryProfile, dateTo))
 }
 
@@ -368,9 +410,48 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
   const activeFromDate = String(options.activeFromDate || '').slice(0, 10)
   const isBeforeActiveMonth = activeFromDate && monthEnd < activeFromDate
   const monthlyRentUzs = isBeforeActiveMonth ? 0 : Math.max(0, Math.round(Number(options.monthlyRentUzs ?? DEFAULT_MONTHLY_RENT_UZS) || 0))
-  const employeePaidToDate = isBeforeActiveMonth ? 0 : summarizeExpenses(buildSalaryPaymentExpenseRows(salaryProfiles, monthStart, paidThroughDate)).total
-  const employeeProjectedMonth = isBeforeActiveMonth ? 0 : summarizeExpenses(buildSalaryExpenseRows(salaryProfiles, monthStart, monthEnd)).total
-  const employeeRemainingThisMonth = isBeforeActiveMonth ? 0 : Math.max(0, employeeProjectedMonth - employeePaidToDate)
+  let employeePaidToDate = 0
+  let employeeProjectedMonth = 0
+  let employeeOpeningArrears = 0
+  let employeePaidTowardArrears = 0
+  let employeeAppliedToCurrentMonth = 0
+
+  if (!isBeforeActiveMonth) {
+    const dayBeforeMonth = addLocalDateDays(monthStart, -1)
+    for (const salaryProfile of salaryProfiles || []) {
+      if (!salaryProfile) continue
+      const joinedAt = String(salaryProfile.joined_at || monthStart).slice(0, 10)
+      const projectedThisMonth = getSalaryAccruedAmount(salaryProfile, monthStart, monthEnd)
+      const accruedBeforeMonth = joinedAt < monthStart
+        ? getSalaryAccruedAmount(salaryProfile, joinedAt, dayBeforeMonth)
+        : 0
+      const paidBeforeMonth = (salaryProfile.payments || []).reduce((sum, payment) => {
+        const paidDate = String(payment?.paid_date || '').slice(0, 10)
+        return paidDate && paidDate < monthStart
+          ? sum + normalizeExpenseAmount(payment.amount)
+          : sum
+      }, 0)
+      const paidThisMonth = (salaryProfile.payments || []).reduce((sum, payment) => {
+        const paidDate = String(payment?.paid_date || '').slice(0, 10)
+        return paidDate >= monthStart && paidDate <= paidThroughDate
+          ? sum + normalizeExpenseAmount(payment.amount)
+          : sum
+      }, 0)
+      const openingArrears = Math.max(0, accruedBeforeMonth - paidBeforeMonth)
+      const paidTowardArrears = Math.min(openingArrears, paidThisMonth)
+      const appliedToCurrentMonth = Math.min(
+        projectedThisMonth,
+        Math.max(0, paidThisMonth - paidTowardArrears),
+      )
+
+      employeePaidToDate += paidThisMonth
+      employeeProjectedMonth += projectedThisMonth
+      employeeOpeningArrears += openingArrears
+      employeePaidTowardArrears += paidTowardArrears
+      employeeAppliedToCurrentMonth += appliedToCurrentMonth
+    }
+  }
+  const employeeRemainingThisMonth = Math.max(0, employeeProjectedMonth - employeeAppliedToCurrentMonth)
 
   return {
     monthStart,
@@ -381,6 +462,9 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
     monthlyRentUzs,
     employeePaidToDate,
     employeeProjectedMonth,
+    employeeOpeningArrears,
+    employeePaidTowardArrears,
+    employeeAppliedToCurrentMonth,
     employeeRemainingThisMonth,
     estimatedMonthlyExpenseUzs: employeeProjectedMonth,
   }

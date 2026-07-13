@@ -1,9 +1,10 @@
 import {
   addRestaurantDays,
+  getCafeIncomeForRange,
   getOrderDate,
-  getOrderItems,
   getOrderPaymentBreakdown,
   getOrderRevenueTotal,
+  getSoldOrderItems,
   restaurantTodayStr,
   toLocalDateStr,
 } from './analytics.js'
@@ -49,10 +50,19 @@ export function getDashboardPeriodOrders(orders, period, now = new Date()) {
   return (orders || []).filter(order => isOrderInDashboardPeriod(order, period, now))
 }
 
+export function getDashboardPeriodCafeIncome(orders, period, now = new Date()) {
+  const today = todayStr(now)
+  let dateFrom = today
+  if (period === '7days') dateFrom = addRestaurantDays(today, -6)
+  else if (period === 'month') dateFrom = `${today.slice(0, 8)}01`
+  else if (period === 'year') dateFrom = `${today.slice(0, 4)}-01-01`
+  return getCafeIncomeForRange(orders, dateFrom, today, now)
+}
+
 export function getDashboardSalesByCategory(orders, menuItemMap, categoryMap, lang = 'en') {
   const map = {}
   ;(orders || []).forEach(order => {
-    getOrderItems(order).forEach(item => {
+    getSoldOrderItems(order).forEach(item => {
       const mi = menuItemMap[item.menu_item_id]
       const cat = mi ? categoryMap[mi.category_id] : null
       const name = cat
@@ -76,7 +86,7 @@ export function getDashboardSalesByCategory(orders, menuItemMap, categoryMap, la
 export function getDashboardBestSelling(orders, menuItemMap) {
   const map = {}
   ;(orders || []).forEach(order => {
-    getOrderItems(order).forEach(item => {
+    getSoldOrderItems(order).forEach(item => {
       const key = item.menu_item_id || item.name
       if (!map[key]) {
         map[key] = {
@@ -110,7 +120,7 @@ export function getDashboardOrderTypePerformance(orders, lang = 'en') {
     const key = inferOrderType(order)
     const row = map[key] || map.dine_in
     row.orders += 1
-    row.items += getOrderItems(order).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
+    row.items += getSoldOrderItems(order).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
     row.revenue += getOrderRevenueTotal(order)
   })
 
@@ -172,7 +182,7 @@ export function getDashboardStaffPerformance(orders, staffProfiles = []) {
     if (!map[name]) map[name] = { name, orders: 0, revenue: 0, items: 0 }
     map[name].orders += 1
     map[name].revenue += getOrderRevenueTotal(order)
-    map[name].items += getOrderItems(order).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
+    map[name].items += getSoldOrderItems(order).reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
   })
 
   return Object.values(map)

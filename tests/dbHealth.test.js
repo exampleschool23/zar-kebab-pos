@@ -61,8 +61,10 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.deepEqual(result.failed.map(check => check.name).sort(), [
     'order_payments',
     'settle_loyalty_wallet_payment',
+    'settle_orders_payment',
     'submit_order_to_kitchen',
   ])
   assert.equal(result.failed.find(check => check.name === 'order_payments').messageKey, 'rawError')
   assert.match(result.failed.find(check => check.name === 'settle_loyalty_wallet_payment').hint, /027_atomic_loyalty_wallet_settlement/)
+  assert.match(result.failed.find(check => check.name === 'settle_orders_payment').hint, /083_atomic_order_payment_settlement/)
 })

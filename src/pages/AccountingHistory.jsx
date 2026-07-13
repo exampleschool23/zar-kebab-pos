@@ -7,7 +7,12 @@ import { useApp } from '../store/AppContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
-import { getCafeIncomeForRange, getOrderRevenueTotal, isPaidOrder, matchesRange } from '../lib/analytics'
+import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
+import {
+  filterAccountingHistoryRows,
+  getAccountingHistoryPageSummary,
+  groupAccountingHistoryRows,
+} from '../lib/accounting'
 import {
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
@@ -15,9 +20,6 @@ import {
   expensePaymentMethodLabel,
   getAccountingHistoryRange,
   normalizeExpenseEntryType,
-  summarizeExpenses,
-  summarizeIncomeEntries,
-  todayExpenseDate,
 } from '../lib/expenses'
 
 const EXPENSE_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by_name, created_at'
@@ -58,12 +60,22 @@ function composeSalaryProfiles(profiles, payments, bonuses, team) {
   }))
 }
 
+function loadPagedResult(loadPage) {
+  return collectPagedRows(loadPage)
+    .then(data => ({ data, error: null }))
+    .catch(error => ({ data: [], error }))
+}
+
 export default function AccountingHistory() {
   const { state } = useApp()
   const navigate = useNavigate()
   const lang = state.lang || 'ru'
-  const [rows, setRows] = useState([])
+  const [expenseRows, setExpenseRows] = useState([])
+  const [salaryRows, setSalaryRows] = useState([])
+  const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [salaryLoading, setSalaryLoading] = useState(true)
+  const [orderLoading, setOrderLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [type, setType] = useState('all')
@@ -71,9 +83,9 @@ export default function AccountingHistory() {
   const { dateFrom, dateTo } = useMemo(() => getAccountingHistoryRange(period), [period])
 
   const labels = {
-    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', totalExpenses: 'Jami xarajat', totalIncome: 'Jami boshqa daromad', cafeIncome: 'Kafe daromadi', investorIncome: 'Investor daromadi', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
-    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', totalExpenses: 'Всего расходов', totalIncome: 'Всего внешних доходов', cafeIncome: 'Доход кафе', investorIncome: 'Доход инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
-    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', totalExpenses: 'Total expenses', totalIncome: 'Total other income', cafeIncome: 'Cafe income', investorIncome: 'Investor income', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
+    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', totalExpenses: 'Jami xarajat', salaryExpenses: 'Maosh xarajatlari', otherExpenses: 'Boshqa xarajatlar', totalIncome: 'Jami boshqa daromad', cafeIncome: 'Kafe daromadi', investorIncome: 'Investor daromadi', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
+    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', totalExpenses: 'Всего расходов', salaryExpenses: 'Расходы на зарплаты', otherExpenses: 'Остальные расходы', totalIncome: 'Всего внешних доходов', cafeIncome: 'Доход кафе', investorIncome: 'Доход инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
+    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', totalExpenses: 'Total expenses', salaryExpenses: 'Salary expenses', otherExpenses: 'Other expenses', totalIncome: 'Total other income', cafeIncome: 'Cafe income', investorIncome: 'Investor income', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
   }
   const l = labels[lang] || labels.en
 
@@ -81,69 +93,77 @@ export default function AccountingHistory() {
     let active = true
     async function load() {
       setLoading(true)
+      setSalaryLoading(true)
+      setOrderLoading(true)
       setError('')
-      const results = await Promise.all([
-        supabase.from('expenses').select(EXPENSE_COLUMNS).gte('expense_date', dateFrom).lte('expense_date', dateTo).order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
-        supabase.from('employee_salary_profiles').select(SALARY_PROFILE_COLUMNS),
-        supabase.from('employee_salary_payments').select(SALARY_PAYMENT_COLUMNS).gte('paid_date', dateFrom).lte('paid_date', dateTo),
-        supabase.from('employee_salary_bonuses').select(SALARY_BONUS_COLUMNS).gte('bonus_date', dateFrom).lte('bonus_date', dateTo),
-        supabase.from('profiles').select('id, full_name, email, role, status'),
+      const expensePromise = loadPagedResult((from, to) => supabase.from('expenses').select(EXPENSE_COLUMNS).gte('expense_date', dateFrom).lte('expense_date', dateTo).order('expense_date', { ascending: false }).order('created_at', { ascending: false }).order('id').range(from, to))
+      const salaryPromise = Promise.all([
+        loadPagedResult((from, to) => supabase.from('employee_salary_profiles').select(SALARY_PROFILE_COLUMNS).order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_salary_payments').select(SALARY_PAYMENT_COLUMNS).gte('paid_date', dateFrom).lte('paid_date', dateTo).order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select(SALARY_BONUS_COLUMNS).gte('bonus_date', dateFrom).lte('bonus_date', dateTo).order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
       ])
-      if (!active) return
-      const firstError = results.find(result => result.error)?.error
-      if (firstError) {
-        setError(firstError.message || l.loadFailed)
-        setRows([])
-      } else {
-        const [expenseResult, profileResult, paymentResult, bonusResult, teamResult] = results
-        const salaryProfiles = composeSalaryProfiles(profileResult.data || [], paymentResult.data || [], bonusResult.data || [], teamResult.data || [])
-        const salaryPayments = buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
-          .map(row => ({ ...row, description: row.description || l.salaryPayment }))
-        const salaryBonuses = buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
-        setRows([...(expenseResult.data || []), ...salaryPayments, ...salaryBonuses].sort((a, b) => b.expense_date.localeCompare(a.expense_date) || String(b.created_at || '').localeCompare(String(a.created_at || ''))))
-      }
-      setLoading(false)
+      const orderPromise = loadPaidOrdersForRange(dateFrom, dateTo)
+        .then(data => ({ data, error: null }))
+        .catch(error => ({ data: [], error }))
+
+      await Promise.all([
+        expensePromise.then(expenseResult => {
+          if (!active) return
+          setExpenseRows(expenseResult.error ? [] : expenseResult.data || [])
+          if (expenseResult.error) setError(expenseResult.error.message || l.loadFailed)
+          setLoading(false)
+        }),
+        salaryPromise.then(([profileResult, paymentResult, bonusResult, teamResult]) => {
+          if (!active) return
+          const salaryError = [profileResult, paymentResult, bonusResult, teamResult].find(result => result.error)?.error
+          if (salaryError) {
+            setSalaryRows([])
+            setError(salaryError.message || l.loadFailed)
+            setSalaryLoading(false)
+            return
+          }
+          const salaryProfiles = composeSalaryProfiles(profileResult.data || [], paymentResult.data || [], bonusResult.data || [], teamResult.data || [])
+          const salaryPayments = buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
+            .map(row => ({ ...row, description: row.description || l.salaryPayment }))
+          const salaryBonuses = buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
+          setSalaryRows([...salaryPayments, ...salaryBonuses])
+          setSalaryLoading(false)
+        }),
+        orderPromise.then(orderHistoryResult => {
+          if (!active) return
+          setPaidHistoryOrders(orderHistoryResult.error ? [] : orderHistoryResult.data || [])
+          if (orderHistoryResult.error) setError(orderHistoryResult.error.message || l.loadFailed)
+          setOrderLoading(false)
+        }),
+      ])
     }
     load()
     return () => { active = false }
   }, [dateFrom, dateTo, l.loadFailed, l.salaryPayment])
 
+  const rows = useMemo(() => (
+    [...expenseRows, ...salaryRows]
+      .sort((a, b) => b.expense_date.localeCompare(a.expense_date) || String(b.created_at || '').localeCompare(String(a.created_at || '')))
+  ), [expenseRows, salaryRows])
+
   const visibleRows = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return rows.filter(row => {
-      const entryType = normalizeExpenseEntryType(row.entry_type)
-      if (type !== 'all' && entryType !== type) return false
-      if (!needle) return true
-      return [row.vendor, row.description, row.created_by_name, expenseCategoryLabel(row.category, lang), expensePaymentMethodLabel(row.payment_method, lang)]
-        .some(value => String(value || '').toLowerCase().includes(needle))
-    })
+    return filterAccountingHistoryRows(rows, { type, query, lang })
   }, [rows, query, type, lang])
 
-  const expenseSummary = useMemo(() => summarizeExpenses(rows), [rows])
-  const incomeSummary = useMemo(() => summarizeIncomeEntries(rows), [rows])
-  const cafeIncomeSummary = useMemo(
-    () => getCafeIncomeForRange(state.orders, dateFrom, dateTo),
-    [state.orders, dateFrom, dateTo]
+  const accountingOrders = useMemo(
+    () => mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo),
+    [paidHistoryOrders, state.orders, dateFrom, dateTo]
   )
-  const rowsByDate = useMemo(() => {
-    const groups = []
-    for (const row of visibleRows) {
-      const date = row.expense_date || ''
-      const current = groups[groups.length - 1]
-      if (!current || current.date !== date) groups.push({ date, rows: [row] })
-      else current.rows.push(row)
-    }
-    return groups.map(group => ({
-      ...group,
-      totalExpenses: summarizeExpenses(rows.filter(row => row.expense_date === group.date)).total,
-      cafeIncome: state.orders
-        .filter(order => isPaidOrder(order) && matchesRange(order, group.date, group.date))
-        .reduce((sum, order) => sum + getOrderRevenueTotal(order), 0),
-      investorIncome: rows
-        .filter(row => row.expense_date === group.date && normalizeExpenseEntryType(row.entry_type) === 'income' && row.category === 'investor_support')
-        .reduce((sum, row) => sum + Number(row.amount || 0), 0),
-    }))
-  }, [visibleRows, rows, state.orders])
+
+  const { expenseSummary, incomeSummary, cafeIncomeSummary, salaryExpensesTotal, otherExpensesTotal } = useMemo(
+    () => getAccountingHistoryPageSummary(rows, accountingOrders, dateFrom, dateTo),
+    [rows, accountingOrders, dateFrom, dateTo]
+  )
+  const rowsByDate = useMemo(
+    () => groupAccountingHistoryRows(visibleRows, rows, accountingOrders),
+    [visibleRows, rows, accountingOrders]
+  )
 
   return (
     <AppShell title={l.title}>
@@ -166,10 +186,12 @@ export default function AccountingHistory() {
               </label>
             </div>
           </div>
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.cafeIncome}</p><p className="mt-1 text-2xl font-black text-emerald-600">{formatCurrency(cafeIncomeSummary.total)}</p></div>
-            <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalExpenses}</p><p className="mt-1 text-2xl font-black text-[#ff5a00]">{formatCurrency(expenseSummary.total)}</p></div>
-            <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalIncome}</p><p className="mt-1 text-2xl font-black text-purple-600">{formatCurrency(incomeSummary.total)}</p></div>
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.cafeIncome}</p><p className="mt-1 text-2xl font-black text-emerald-600">{orderLoading ? '—' : formatCurrency(cafeIncomeSummary.total)}</p></div>
+            <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalExpenses}</p><p className="mt-1 text-2xl font-black text-[#ff5a00]">{loading || salaryLoading ? '—' : formatCurrency(expenseSummary.total)}</p></div>
+            <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.salaryExpenses}</p><p className="mt-1 text-2xl font-black text-red-600">{salaryLoading ? '—' : formatCurrency(salaryExpensesTotal)}</p></div>
+            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.otherExpenses}</p><p className="mt-1 text-2xl font-black text-sky-600">{loading ? '—' : formatCurrency(otherExpensesTotal)}</p></div>
+            <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalIncome}</p><p className="mt-1 text-2xl font-black text-purple-600">{loading ? '—' : formatCurrency(incomeSummary.total)}</p></div>
           </div>
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div>}
           <section className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">

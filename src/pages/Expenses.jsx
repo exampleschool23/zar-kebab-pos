@@ -22,7 +22,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
-import { getCafeIncomeForRange, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getAccountingPageSummary, getAccountingQuickRange } from '../lib/accounting'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
@@ -36,28 +36,19 @@ import {
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
   expensePaymentMethodLabel,
-  getNetIncome,
   getTotalSalaryDue,
   isGeneratedSalaryExpense,
   normalizeExpenseAmount,
   normalizeExpenseEntryType,
-  summarizeExpenseCashflow,
-  summarizeExpenses,
-  summarizeIncomeEntries,
   todayExpenseDate,
 } from '../lib/expenses'
 import { downloadCsv } from '../lib/closeout'
+import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 const FIELD_INPUT_CLASS = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00]'
 const DATE_INPUT_CLASS = `${FIELD_INPUT_CLASS} text-transparent caret-transparent`
 const RANGE_DATE_INPUT_CLASS = 'h-6 w-[138px] bg-transparent text-sm text-transparent caret-transparent outline-none'
-
-function addDays(isoDate, n) {
-  const d = new Date(isoDate + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return toLocalDateStr(d.toISOString())
-}
 
 function methodIcon(method) {
   if (method === 'card') return CreditCard
@@ -170,6 +161,12 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
   }))
 }
 
+function loadPagedResult(loadPage) {
+  return collectPagedRows(loadPage)
+    .then(data => ({ data, error: null }))
+    .catch(error => ({ data: [], error }))
+}
+
 function exportExpensesCsv(expenses, lang) {
   const header = ['entry_type', 'date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by']
   const rows = expenses.map(expense => [
@@ -202,11 +199,13 @@ export default function Expenses() {
   const [activeRangeKey, setActiveRangeKey] = useState('month')
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
+  const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState('')
+  const loadRequestRef = useRef(0)
   const [form, setForm] = useState({
     entry_type: 'expense',
     expense_date: todayExpenseDate(),
@@ -415,61 +414,76 @@ export default function Expenses() {
   const categoryOptions = form.entry_type === 'income' ? INCOME_CATEGORIES : MANUAL_EXPENSE_CATEGORIES
 
   async function loadExpenses() {
+    const requestId = loadRequestRef.current + 1
+    loadRequestRef.current = requestId
     setLoading(true)
     setError('')
-    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult] = await Promise.all([
-      supabase
+    const expensePromise = loadPagedResult((from, to) => supabase
         .from('expenses')
         .select(SELECT_COLUMNS)
         .gte('expense_date', dateFrom)
         .lte('expense_date', dateTo)
         .order('expense_date', { ascending: false })
-        .order('created_at', { ascending: false }),
-      supabase.from('employee_salary_profiles').select('*'),
-      supabase.from('employee_salary_rates').select('*'),
-      supabase.from('employee_salary_payments').select('*'),
-      supabase.from('employee_salary_bonuses').select('*'),
-      supabase.from('employee_salary_absences').select('*'),
-      supabase.from('profiles').select('id, full_name, email, role, status'),
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(from, to))
+    const salaryPromise = Promise.all([
+      loadPagedResult((from, to) => supabase.from('employee_salary_profiles').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_rates').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_payments').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
     ])
+    const orderPromise = loadPaidOrdersForRange(dateFrom, dateTo)
+      .then(data => ({ data, error: null }))
+      .catch(error => ({ data: [], error }))
 
-    if (expenseResult.error) {
-      setError(isMissingExpensesMigration(expenseResult.error) ? l.migrationMissing : expenseResult.error.message || l.loadFailed)
-      setExpenses([])
-    } else {
-      setExpenses(expenseResult.data || [])
-    }
-    const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
-    if (salaryError) {
-      setSalaryProfiles([])
-      if (!expenseResult.error && isMissingSalaryMigration(salaryError)) setError(l.salaryMigrationMissing)
-    } else {
-      setSalaryProfiles(composeSalaryProfiles(
-        salaryProfileResult.data || [],
-        salaryRateResult.data || [],
-        salaryPaymentResult.data || [],
-        salaryBonusResult.data || [],
-        salaryAbsenceResult.data || [],
-        teamResult.data || [],
-      ))
-    }
-    setLoading(false)
+    await Promise.all([
+      expensePromise.then(expenseResult => {
+        if (requestId !== loadRequestRef.current) return
+        if (expenseResult.error) {
+          setError(isMissingExpensesMigration(expenseResult.error) ? l.migrationMissing : expenseResult.error.message || l.loadFailed)
+          setExpenses([])
+        } else {
+          setExpenses(expenseResult.data || [])
+        }
+        setLoading(false)
+      }),
+      orderPromise.then(orderHistoryResult => {
+        if (requestId !== loadRequestRef.current) return
+        if (orderHistoryResult.error) {
+          setPaidHistoryOrders([])
+          setError(orderHistoryResult.error.message || l.loadFailed)
+        } else {
+          setPaidHistoryOrders(orderHistoryResult.data || [])
+        }
+      }),
+      salaryPromise.then(([salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult]) => {
+        if (requestId !== loadRequestRef.current) return
+        const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
+        if (salaryError) {
+          setSalaryProfiles([])
+          if (isMissingSalaryMigration(salaryError)) setError(l.salaryMigrationMissing)
+          return
+        }
+        setSalaryProfiles(composeSalaryProfiles(
+          salaryProfileResult.data || [],
+          salaryRateResult.data || [],
+          salaryPaymentResult.data || [],
+          salaryBonusResult.data || [],
+          salaryAbsenceResult.data || [],
+          teamResult.data || [],
+        ))
+      }),
+    ])
   }
 
   useEffect(() => {
     loadExpenses()
+    return () => { loadRequestRef.current += 1 }
   }, [dateFrom, dateTo]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const paidOrders = useMemo(() => (
-    state.orders.filter(order => isPaidOrder(order) && matchesRange(order, dateFrom, dateTo))
-  ), [state.orders, dateFrom, dateTo])
-
-  const revenue = paidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
-  const cafeIncome = revenue
-  const selectedRangeCafeIncome = useMemo(
-    () => getCafeIncomeForRange(state.orders, dateFrom, dateTo),
-    [state.orders, dateFrom, dateTo]
-  )
   const salaryExpenses = useMemo(() => (
     buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
       .map(row => ({ ...row, description: l.automaticSalary }))
@@ -488,17 +502,31 @@ export default function Expenses() {
   const filteredExpenses = allExpenses
 
   const filteredInvestorSupport = useMemo(() => (
-    filteredExpenses.filter(expense => normalizeExpenseEntryType(expense.entry_type) === 'income')
+    filteredExpenses.filter(expense => (
+      normalizeExpenseEntryType(expense.entry_type) === 'income' &&
+      expense.category === 'investor_support'
+    ))
   ), [filteredExpenses])
   const filteredExpenseRows = useMemo(() => (
     filteredExpenses.filter(expense => normalizeExpenseEntryType(expense.entry_type) !== 'income')
   ), [filteredExpenses])
-  const incomeSummary = useMemo(() => summarizeIncomeEntries(filteredExpenses), [filteredExpenses])
-  const summary = useMemo(() => summarizeExpenses(filteredExpenses), [filteredExpenses])
-  const cashflow = useMemo(() => summarizeExpenseCashflow(paidOrders, filteredExpenses), [paidOrders, filteredExpenses])
-  const netIncome = getNetIncome(revenue, filteredExpenses)
-  const investorSupportTotal = incomeSummary.byCategory.investor_support || 0
-  const otherIncomeTotal = Math.max(0, incomeSummary.total - investorSupportTotal)
+  const accountingOrders = useMemo(
+    () => mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo),
+    [paidHistoryOrders, state.orders, dateFrom, dateTo]
+  )
+  const accountingSummary = useMemo(
+    () => getAccountingPageSummary(accountingOrders, filteredExpenses, dateFrom, dateTo),
+    [accountingOrders, filteredExpenses, dateFrom, dateTo]
+  )
+  const {
+    cafeIncome,
+    cafeIncomeSummary: selectedRangeCafeIncome,
+    expenseSummary: summary,
+    cashflow,
+    netIncome,
+    investorSupportTotal,
+    otherIncomeTotal,
+  } = accountingSummary
   const currentAccountingDate = todayExpenseDate()
   const salaryDueDate = dateTo < currentAccountingDate ? dateTo : currentAccountingDate
   const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
@@ -516,16 +544,10 @@ export default function Expenses() {
   }
 
   function selectQuickRange(key) {
-    const today = todayExpenseDate()
+    const range = getAccountingQuickRange(key)
     setActiveRangeKey(key)
-    if (key === 'today') { setDateFrom(today); setDateTo(today) }
-    if (key === 'week') { setDateFrom(addDays(today, -6)); setDateTo(today) }
-    if (key === 'month') { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
-    if (key === 'previousMonth') {
-      const previousMonthEnd = addDays(today.slice(0, 8) + '01', -1)
-      setDateFrom(previousMonthEnd.slice(0, 8) + '01')
-      setDateTo(previousMonthEnd)
-    }
+    setDateFrom(range.dateFrom)
+    setDateTo(range.dateTo)
   }
 
   async function saveExpense(event) {
@@ -649,7 +671,7 @@ export default function Expenses() {
             <Kpi
               icon={HandCoins}
               label={l.investorIncome}
-              value={formatCurrency(investorSupportTotal)}
+              value={loading ? '—' : formatCurrency(investorSupportTotal)}
               sub={otherIncomeTotal > 0 ? `${l.otherIncomeSub}: ${formatCurrency(otherIncomeTotal)}` : l.investorIncomeSub}
               tone="purple"
             />

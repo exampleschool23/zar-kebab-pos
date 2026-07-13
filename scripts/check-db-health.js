@@ -127,6 +127,7 @@ const checks = await Promise.all([
   checkTable('employee_salary_payments', 'id, salary_profile_id, paid_date, amount, payment_method', false),
   checkTable('employee_salary_bonuses', 'id, salary_profile_id, bonus_date, amount, payment_method', false),
   checkTable('employee_salary_absences', 'id, salary_profile_id, absence_date', false),
+  checkTable('accounting_record_audit', 'id, entity_type, entity_id, action, old_record, new_record, changed_by, changed_at', false),
   checkTable('restaurant_tables', 'id, name, status, zone_id, zone_name, capacity, sort_order, is_active, reserved_for_name, reserved_for_phone, reserved_at, reserved_until, reservation_notes, created_at, updated_at'),
   checkTable('table_zones', 'id, name, sort_order, is_active, created_at, updated_at'),
   checkTable('menu_categories', 'id, name_uz, name_ru, name_en, hidden, waiter_hidden, visible_from_time, visible_until_time, sort_order'),
@@ -148,6 +149,11 @@ const checks = await Promise.all([
     'submit_order_to_kitchen(payload)',
     () => supabase.rpc('submit_order_to_kitchen', { payload: {} }),
     'order id is required'
+  ),
+  checkRpc(
+    'settle_orders_payment(payload)',
+    () => supabase.rpc('settle_orders_payment', { payload: {} }),
+    'cashier write access is required'
   ),
   checkRpc(
     'remove_loyalty_card(p_card_id)',

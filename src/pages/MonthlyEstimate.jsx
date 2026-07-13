@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -18,22 +18,23 @@ import {
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
-import { getOrderDate, getOrderPayments, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getOrderDate, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatLongDate } from '../lib/dateFormat'
 import {
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   expensePaymentMethodLabel,
   getEstimatedMonthlyExpenseSummary,
-  normalizeExpenseAmount,
   normalizeExpenseEntryType,
   summarizeExpenses,
   summarizeIncomeEntries,
   todayExpenseDate,
 } from '../lib/expenses'
 import { formatCurrency } from '../lib/formatCurrency'
+import { getMonthlyEstimateMethodRows } from '../lib/monthlyEstimate'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
+import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 
@@ -70,6 +71,12 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
   }))
 }
 
+function loadPagedResult(loadPage) {
+  return collectPagedRows(loadPage)
+    .then(data => ({ data, error: null }))
+    .catch(error => ({ data: [], error }))
+}
+
 function monthStartFor(date) {
   return String(date || todayExpenseDate()).slice(0, 8) + '01'
 }
@@ -92,11 +99,6 @@ function methodLabel(method, lang) {
   if (method === 'qr') return 'QR'
   if (method === 'loyalty_card') return lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty'
   return method || '—'
-}
-
-function addToMap(map, key, amount) {
-  const normalizedKey = key || 'unknown'
-  map[normalizedKey] = (map[normalizedKey] || 0) + normalizeExpenseAmount(amount)
 }
 
 function addDateCandidate(dates, value) {
@@ -126,8 +128,10 @@ export default function MonthlyEstimate() {
 
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
+  const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const loadRequestRef = useRef(0)
 
   const L = {
     uz: {
@@ -248,27 +252,42 @@ export default function MonthlyEstimate() {
   const l = L[lang] || L.en
 
   async function loadEstimate() {
+    const requestId = loadRequestRef.current + 1
+    loadRequestRef.current = requestId
     setLoading(true)
     setError('')
-    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult] = await Promise.all([
-      supabase
+    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult, orderHistoryResult] = await Promise.all([
+      loadPagedResult((from, to) => supabase
         .from('expenses')
         .select(SELECT_COLUMNS)
         .gte('expense_date', monthStart)
-        .lte('expense_date', monthEnd),
-      supabase.from('employee_salary_profiles').select('*'),
-      supabase.from('employee_salary_rates').select('*'),
-      supabase.from('employee_salary_payments').select('*'),
-      supabase.from('employee_salary_bonuses').select('*'),
-      supabase.from('employee_salary_absences').select('*'),
-      supabase.from('profiles').select('id, full_name, email, role, status'),
+        .lte('expense_date', monthEnd)
+        .order('expense_date')
+        .order('id')
+        .range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_profiles').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_rates').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_payments').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
+      loadPaidOrdersForRange(monthStart, monthEnd)
+        .then(data => ({ data, error: null }))
+        .catch(error => ({ data: [], error })),
     ])
+    if (requestId !== loadRequestRef.current) return
 
     if (expenseResult.error) {
       setExpenses([])
       setError(isMissingExpensesMigration(expenseResult.error) ? l.migrationMissing : expenseResult.error.message || l.loadFailed)
     } else {
       setExpenses(expenseResult.data || [])
+    }
+    if (orderHistoryResult.error) {
+      setPaidHistoryOrders([])
+      if (!expenseResult.error) setError(orderHistoryResult.error.message || l.loadFailed)
+    } else {
+      setPaidHistoryOrders(orderHistoryResult.data || [])
     }
 
     const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
@@ -292,12 +311,17 @@ export default function MonthlyEstimate() {
 
   useEffect(() => {
     loadEstimate()
+    return () => { loadRequestRef.current += 1 }
   }, [monthStart, monthEnd]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const cutoffEnd = actualThroughDate < monthStart ? monthStart : actualThroughDate
+  const accountingOrders = useMemo(
+    () => mergePaidOrderHistory(paidHistoryOrders, state.orders, monthStart, cutoffEnd),
+    [paidHistoryOrders, state.orders, monthStart, cutoffEnd]
+  )
   const paidOrders = useMemo(() => (
-    state.orders.filter(order => isPaidOrder(order) && matchesRange(order, monthStart, cutoffEnd))
-  ), [state.orders, monthStart, cutoffEnd])
+    accountingOrders.filter(order => isPaidOrder(order) && matchesRange(order, monthStart, cutoffEnd))
+  ), [accountingOrders, monthStart, cutoffEnd])
 
   const actualEntries = useMemo(() => (
     expenses.filter(row => String(row.expense_date || '').slice(0, 10) <= cutoffEnd)
@@ -312,8 +336,8 @@ export default function MonthlyEstimate() {
     buildSalaryBonusExpenseRows(salaryProfiles, monthStart, cutoffEnd)
   ), [salaryProfiles, monthStart, cutoffEnd])
   const firstFinancialActivityDate = useMemo(() => (
-    getFirstFinancialActivityDate(state.orders, expenses, salaryProfiles)
-  ), [state.orders, expenses, salaryProfiles])
+    getFirstFinancialActivityDate([...state.orders, ...accountingOrders], expenses, salaryProfiles)
+  ), [state.orders, accountingOrders, expenses, salaryProfiles])
   const monthlyEstimate = useMemo(() => (
     getEstimatedMonthlyExpenseSummary(salaryProfiles, cutoffEnd, {
       activeFromDate: firstFinancialActivityDate,
@@ -373,21 +397,7 @@ export default function MonthlyEstimate() {
   ]
 
   const methodRows = useMemo(() => {
-    const inflow = {}
-    const outflow = {}
-    for (const order of paidOrders) {
-      for (const payment of getOrderPayments(order)) addToMap(inflow, payment.method, payment.amount)
-    }
-    for (const income of incomeEntries) addToMap(inflow, income.payment_method || 'cash', income.amount)
-    for (const expense of allActualExpenseRows) addToMap(outflow, expense.payment_method || 'cash', expense.amount)
-    const methods = ['cash', 'card', 'terminal', 'qr', 'loyalty_card']
-    return methods
-      .map(method => ({
-        method,
-        inflow: inflow[method] || 0,
-        outflow: outflow[method] || 0,
-      }))
-      .filter(row => row.inflow > 0 || row.outflow > 0)
+    return getMonthlyEstimateMethodRows(paidOrders, incomeEntries, allActualExpenseRows)
   }, [paidOrders, incomeEntries, allActualExpenseRows])
 
   if (loading) {

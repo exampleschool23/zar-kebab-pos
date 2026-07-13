@@ -73,6 +73,10 @@ export function getOrderItems(o) {
   return o?.items || o?.order_items || []
 }
 
+export function getSoldOrderItems(order) {
+  return getOrderItems(order).filter(item => !isCancelledOrderItem(item))
+}
+
 export function mergeOrderItemsByIdentity(primaryItems = [], fallbackItems = []) {
   const merged = []
   const seen = new Set()
@@ -698,27 +702,62 @@ export function groupOrdersBySession(orders) {
   return Object.values(map)
 }
 
-export function getCafeIncomeForRange(orders = [], from, to) {
+function parseIsoCalendarDay(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''))
+  if (!match) return null
+  const [, yearText, monthText, dayText] = match
+  const year = Number(yearText)
+  const month = Number(monthText)
+  const day = Number(dayText)
+  const time = Date.UTC(year, month - 1, day)
+  const date = new Date(time)
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) return null
+  return time
+}
+
+export function getInclusiveCalendarDayCount(from, to) {
+  const fromTime = parseIsoCalendarDay(from)
+  const toTime = parseIsoCalendarDay(to)
+  if (fromTime == null || toTime == null || fromTime > toTime) return 0
+  return Math.floor((toTime - fromTime) / (24 * 60 * 60 * 1000)) + 1
+}
+
+export function getCafeIncomeForRange(orders = [], from, to, now = new Date()) {
+  const today = restaurantTodayStr(now)
+  const requestedTo = parseIsoCalendarDay(to) == null ? today : to
+  const effectiveTo = requestedTo > today ? today : requestedTo
+  const requestedFrom = parseIsoCalendarDay(from) == null ? '' : from
   const rangeOrders = groupOrdersBySession(orders)
-    .filter(order => isPaidOrder(order) && matchesRange(order, from, to))
+    .filter(order => isPaidOrder(order) && matchesRange(order, requestedFrom, effectiveTo))
   const total = rangeOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
   const salesDayCount = new Set(
     rangeOrders
       .map(order => toRestaurantDateStr(getOrderDate(order)))
       .filter(Boolean)
   ).size
+  const effectiveFrom = requestedFrom || rangeOrders
+    .map(order => toRestaurantDateStr(getOrderDate(order)))
+    .filter(Boolean)
+    .sort()[0] || effectiveTo
+  const dayCount = getInclusiveCalendarDayCount(effectiveFrom, effectiveTo)
 
   return {
     total,
-    averageDaily: salesDayCount > 0 ? Math.round(total / salesDayCount) : 0,
-    dayCount: salesDayCount,
+    averageDaily: dayCount > 0 ? Math.round(total / dayCount) : 0,
+    dayCount,
+    salesDayCount,
     from,
     to,
+    effectiveTo,
   }
 }
 
 export function getMonthToDateCafeIncome(orders = [], now = new Date()) {
   const today = restaurantTodayStr(now)
   const monthStart = `${today.slice(0, 8)}01`
-  return getCafeIncomeForRange(orders, monthStart, today)
+  return getCafeIncomeForRange(orders, monthStart, today, now)
 }

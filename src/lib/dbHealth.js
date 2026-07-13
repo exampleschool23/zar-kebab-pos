@@ -18,6 +18,7 @@ const TABLE_CHECKS = [
   { name: 'employee_salary_payments', columns: ['id', 'salary_profile_id', 'paid_date', 'amount', 'payment_method'] },
   { name: 'employee_salary_bonuses', columns: ['id', 'salary_profile_id', 'bonus_date', 'amount', 'payment_method'] },
   { name: 'employee_salary_absences', columns: ['id', 'salary_profile_id', 'absence_date'] },
+  { name: 'accounting_record_audit', columns: ['id', 'entity_type', 'entity_id', 'action', 'old_record', 'new_record', 'changed_by', 'changed_at'] },
   { name: 'order_payment_audit', columns: ['id', 'order_id', 'action', 'changed_at'] },
   { name: 'profile_audit', columns: ['id', 'profile_id', 'action', 'changed_at'] },
 ]
@@ -40,8 +41,10 @@ const MIGRATION_HINTS = {
   employee_salary_payments: 'Run supabase/054_employee_salary_profiles.sql and supabase/062_drop_salary_payment_period_columns.sql',
   employee_salary_bonuses: 'Run supabase/057_employee_salary_bonuses.sql',
   employee_salary_absences: 'Run supabase/063_employee_salary_absences.sql',
+  accounting_record_audit: 'Run supabase/084_accounting_record_audit.sql',
   submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
+  settle_orders_payment: 'Run supabase/083_atomic_order_payment_settlement.sql',
 }
 
 function missingColumnMessage(error) {
@@ -95,6 +98,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
   const checks = await Promise.all(TABLE_CHECKS.map(check => checkTable(dbClient, check)))
   checks.push(await checkRpc(dbClient, 'submit_order_to_kitchen'))
   checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))
+  checks.push(await checkRpc(dbClient, 'settle_orders_payment'))
   const failed = checks.filter(check => !check.ok)
   return {
     ok: failed.length === 0,

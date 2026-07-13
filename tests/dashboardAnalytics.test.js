@@ -6,14 +6,17 @@ import {
   getDashboardBestSelling,
   getDashboardOrderTypePerformance,
   getDashboardPaymentMethods,
+  getDashboardPeriodCafeIncome,
   getDashboardPeriodOrders,
   getDashboardSalesByCategory,
   getDashboardStaffPerformance,
 } from '../src/lib/dashboardAnalytics.js'
 import {
   getCafeIncomeForRange,
+  getInclusiveCalendarDayCount,
   getMonthToDateCafeIncome,
   getOrderActivityDate,
+  getSoldOrderItems,
   groupOrdersBySession,
   toRestaurantDateStr,
 } from '../src/lib/analytics.js'
@@ -184,7 +187,19 @@ test('dashboard period change from 7 days to month updates all widgets to month 
   assert.deepEqual(month.staff.map(row => row.revenue), [156000, 62000])
 })
 
-test('month-to-date cafe income averages paid revenue across paid sales days', () => {
+test('dashboard daily cafe income follows the selected period', () => {
+  const today = getDashboardPeriodCafeIncome(orders, 'today', now)
+  const week = getDashboardPeriodCafeIncome(orders, '7days', now)
+  const month = getDashboardPeriodCafeIncome(orders, 'month', now)
+  const year = getDashboardPeriodCafeIncome(orders, 'year', now)
+
+  assert.deepEqual([today.total, today.dayCount, today.averageDaily], [62_000, 1, 62_000])
+  assert.deepEqual([week.total, week.dayCount, week.averageDaily], [158_000, 7, 22_571])
+  assert.deepEqual([month.total, month.dayCount, month.averageDaily], [218_000, 19, 11_474])
+  assert.deepEqual([year.total, year.dayCount, year.averageDaily], [278_000, 139, 2_000])
+})
+
+test('month-to-date cafe income averages paid revenue across all elapsed calendar days', () => {
   const result = getMonthToDateCafeIncome([
     ...orders,
     order({
@@ -205,12 +220,13 @@ test('month-to-date cafe income averages paid revenue across paid sales days', (
 
   assert.equal(result.from, '2026-05-01')
   assert.equal(result.to, '2026-05-19')
-  assert.equal(result.dayCount, 3)
+  assert.equal(result.dayCount, 19)
+  assert.equal(result.salesDayCount, 3)
   assert.equal(result.total, 218000)
-  assert.equal(result.averageDaily, 72667)
+  assert.equal(result.averageDaily, 11474)
 })
 
-test('month-to-date cafe income average is zero when there are no paid sales days', () => {
+test('month-to-date cafe income keeps elapsed calendar days when there are no sales', () => {
   const result = getMonthToDateCafeIncome([
     {
       id: 'unpaid-month',
@@ -222,7 +238,8 @@ test('month-to-date cafe income average is zero when there are no paid sales day
     },
   ], new Date('2026-05-19T12:00:00+05:00'))
 
-  assert.equal(result.dayCount, 0)
+  assert.equal(result.dayCount, 19)
+  assert.equal(result.salesDayCount, 0)
   assert.equal(result.total, 0)
   assert.equal(result.averageDaily, 0)
 })
@@ -232,11 +249,86 @@ test('cafe income average follows the selected accounting date range', () => {
   const earlyMonthRange = getCafeIncomeForRange(orders, '2026-05-01', '2026-05-14')
 
   assert.equal(weekRange.total, 158000)
-  assert.equal(weekRange.dayCount, 2)
-  assert.equal(weekRange.averageDaily, 79000)
+  assert.equal(weekRange.dayCount, 5)
+  assert.equal(weekRange.salesDayCount, 2)
+  assert.equal(weekRange.averageDaily, 31600)
   assert.equal(earlyMonthRange.total, 60000)
-  assert.equal(earlyMonthRange.dayCount, 1)
-  assert.equal(earlyMonthRange.averageDaily, 60000)
+  assert.equal(earlyMonthRange.dayCount, 14)
+  assert.equal(earlyMonthRange.salesDayCount, 1)
+  assert.equal(earlyMonthRange.averageDaily, 4286)
+})
+
+test('cafe income average caps future ranges at the current restaurant day', () => {
+  const edgeOrders = [
+    order({
+      id: 'restaurant-may-19',
+      paidAt: '2026-05-18T19:30:00.000Z',
+      items: [item('kebab', 'Kebab', 1, 25000)],
+      total: 25000,
+    }),
+    order({
+      id: 'restaurant-may-20',
+      paidAt: '2026-05-19T19:30:00.000Z',
+      items: [item('cola', 'Cola', 1, 12000)],
+      total: 12000,
+    }),
+  ]
+  const beforeRestaurantMidnight = new Date('2026-05-19T18:59:00.000Z')
+
+  const result = getCafeIncomeForRange(
+    edgeOrders,
+    '2026-05-19',
+    '2026-05-22',
+    beforeRestaurantMidnight
+  )
+  const futureOnly = getCafeIncomeForRange(
+    edgeOrders,
+    '2026-05-20',
+    '2026-05-22',
+    beforeRestaurantMidnight
+  )
+
+  assert.equal(result.effectiveTo, '2026-05-19')
+  assert.equal(result.dayCount, 1)
+  assert.equal(result.total, 25000)
+  assert.equal(result.averageDaily, 25000)
+  assert.equal(futureOnly.dayCount, 0)
+  assert.equal(futureOnly.total, 0)
+  assert.equal(futureOnly.averageDaily, 0)
+})
+
+test('calendar-day averaging counts inclusive leap-year ranges safely', () => {
+  assert.equal(getInclusiveCalendarDayCount('2024-02-28', '2024-03-01'), 3)
+  assert.equal(getInclusiveCalendarDayCount('2025-02-28', '2025-03-01'), 2)
+  assert.equal(getInclusiveCalendarDayCount('2026-05-20', '2026-05-19'), 0)
+  assert.equal(getInclusiveCalendarDayCount('2026-02-30', '2026-03-01'), 0)
+})
+
+test('cancelled items never contribute to sold-item dashboard or report metrics', () => {
+  const mixedOrder = order({
+    id: 'mixed-items',
+    paidAt: '2026-05-19T10:00:00.000Z',
+    orderType: 'dine_in',
+    waiter: 'Jasurbek',
+    items: [
+      item('kebab', 'Kebab', 2, 25000),
+      { ...item('cola', 'Cola', 9, 12000), status: 'cancelled' },
+    ],
+    total: 50000,
+  })
+
+  const soldItems = getSoldOrderItems(mixedOrder)
+  const categories = getDashboardSalesByCategory([mixedOrder], menuItemMap, categoryMap, 'en')
+  const best = getDashboardBestSelling([mixedOrder], menuItemMap)
+  const orderType = getDashboardOrderTypePerformance([mixedOrder], 'en').find(row => row.key === 'dine_in')
+  const staff = getDashboardStaffPerformance([mixedOrder])
+
+  assert.deepEqual(soldItems.map(row => row.menu_item_id), ['kebab'])
+  assert.deepEqual(categories.map(row => [row.name, row.qty, row.revenue]), [['Kebab', 2, 50000]])
+  assert.deepEqual(best.map(row => [row.menuItemId, row.qty, row.revenue]), [['kebab', 2, 50000]])
+  assert.equal(orderType.items, 2)
+  assert.equal(orderType.revenue, 50000)
+  assert.deepEqual(staff.map(row => [row.name, row.items, row.revenue]), [['Jasurbek', 2, 50000]])
 })
 
 test('dashboard period change from month to year updates all widgets to year data', () => {

@@ -617,25 +617,18 @@ test('DB guard – CONFIRM_ORDER_DELIVERED uses neq(payment_status, paid) not eq
   )
 })
 
-test('DB guard – MARK_ORDER_PAID fetch uses neq(payment_status, paid) not eq(unpaid)', () => {
-  // This was the root cause of "payment completes but order comes back":
-  // The DB fetch used .eq('payment_status','unpaid') so legacy orders with NULL
-  // payment_status returned 0 rows → the if(unpaidOrders?.length) block was skipped
-  // → no DB write → realtime reload brought the order back as unpaid.
+test('DB guard – MARK_ORDER_PAID delegates legacy/null matching to the atomic RPC', () => {
   const caseStart = dbSource.indexOf("case 'MARK_ORDER_PAID':")
   const caseEnd = dbSource.lastIndexOf('break\n    }') + 10
   const caseSource = dbSource.slice(caseStart, caseEnd)
+  const migrationSource = readFileSync(
+    new URL('../supabase/083_atomic_order_payment_settlement.sql', import.meta.url),
+    'utf8'
+  )
 
-  assert.ok(
-    !caseSource.includes(".eq('payment_status', 'unpaid')"),
-    "MARK_ORDER_PAID must not use .eq('payment_status','unpaid') for the order fetch — misses NULL rows"
-  )
-  // The initial order fetch must use neq('paid') so legacy orders are found
-  assert.ok(
-    /\.neq\('payment_status', 'paid'\)[\s\S]*unpaidQuery/.test(caseSource) ||
-    caseSource.indexOf(".neq('payment_status', 'paid')") < caseSource.indexOf('unpaidOrders?.length'),
-    "MARK_ORDER_PAID must fetch orders with .neq('payment_status','paid')"
-  )
+  assert.match(caseSource, /supabase\.rpc\('settle_orders_payment', \{ payload \}\)/)
+  assert.doesNotMatch(caseSource, /\.from\('orders'\)/)
+  assert.match(migrationSource, /coalesce\(o\.payment_status, 'unpaid'\) <> 'paid'/)
 })
 
 test('DB guard – ADD_QUICK_ITEM_TO_ORDER and UPDATE_BILL_ITEM_QTY use neq not eq for fetch', () => {
@@ -665,24 +658,19 @@ test('DB guard – no remaining eq(payment_status, unpaid) calls anywhere in db.
   )
 })
 
-test('DB guard – MARK_ORDER_PAID by orderId uses post-payment re-query for table reset', () => {
+test('DB guard – atomic settlement resets a table only when no unpaid order remains', () => {
   const caseStart = dbSource.indexOf("case 'MARK_ORDER_PAID':")
   const caseEnd = dbSource.lastIndexOf('break\n    }') + 10
   const caseSource = dbSource.slice(caseStart, caseEnd)
+  const migrationSource = readFileSync(
+    new URL('../supabase/083_atomic_order_payment_settlement.sql', import.meta.url),
+    'utf8'
+  )
 
-  // The fix uses a re-query of remaining unpaid orders to decide whether to reset
-  assert.ok(
-    caseSource.includes('affectedTableIds') || caseSource.includes('paidIds'),
-    'MARK_ORDER_PAID orderId path must compute affected table IDs from the paid orders'
-  )
-  // Must NOT skip the table reset when orderId is present (original bug: `if (!orderId)` only)
-  const onlyResetsWhenNoOrderId =
-    /if\s*\(\s*!orderId\s*&&\s*tableId\s*\)\s*\{[^}]*updateRestaurantTableStatus/.test(caseSource) &&
-    !caseSource.includes('affectedTableIds')
-  assert.ok(
-    !onlyResetsWhenNoOrderId,
-    'MARK_ORDER_PAID must also reset the table when paying by orderId — not skip it'
-  )
+  assert.match(caseSource, /settle_orders_payment/)
+  assert.match(migrationSource, /for affected_table_id in/)
+  assert.match(migrationSource, /if not exists \([\s\S]*remaining\.table_id = affected_table_id[\s\S]*payment_status, 'unpaid'\) <> 'paid'/)
+  assert.match(migrationSource, /update public\.restaurant_tables[\s\S]*status = 'available'/)
 })
 
 // ─── Full end-to-end reducer flows incorporating all three fixes ──────────────

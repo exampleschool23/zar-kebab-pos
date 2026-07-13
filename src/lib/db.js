@@ -1,13 +1,8 @@
 import { supabase } from './supabase.js'
 import {
-  allocateSplitPaymentsToOrders,
-  calculateLoyaltyCashback,
   getOrderPaymentFields,
-  mergeOrderItemsByIdentity,
-  getPaymentMethodSummary,
   normalizeServiceRatePct,
-  normalizeSplitPayments,
-  validateLoyaltyRedeemAmount,
+  restaurantTodayStr,
 } from './analytics.js'
 import {
   DEFAULT_PRICE_MODE,
@@ -17,7 +12,6 @@ import {
   normalizePriceMode,
   withPriceModeFields,
 } from './priceModes.js'
-import { getLoyaltyCardCashbackPercent, getLoyaltyCardCashbackType } from './loyalty.js'
 import { notifyTelegramOrderStatus } from './telegramNotifications.js'
 import {
   isOffPremiseOrderType,
@@ -25,12 +19,9 @@ import {
   orderTypeLabel,
   orderTypePrefix,
 } from './orderTypes.js'
+import { loadActiveOrders, loadOrdersForRange } from './orderHistory.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
-
-function startOfYear() {
-  return new Date(new Date().getFullYear(), 0, 1).toISOString()
-}
 
 function serviceRatePctFromSettings(settings) {
   return normalizeServiceRatePct(settings?.serviceRate)
@@ -155,31 +146,6 @@ function normalizeBusinessSettings(row) {
   }
 }
 
-function isMissingLoyaltyColumn(error) {
-  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
-  return message.includes('schema cache') && (
-    message.includes('loyalty_used_amount') ||
-    message.includes('loyalty_card_number') ||
-    message.includes('cashback_earned') ||
-    message.includes('cashback_percent')
-  )
-}
-
-function isMissingSchemaColumn(error, columnName) {
-  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
-  return message.includes('schema cache') && message.includes(String(columnName || '').toLowerCase())
-}
-
-function isLegacyPositiveTransactionAmountConstraint(error) {
-  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
-  return (
-    message.includes('loyalty_transactions_amount_check') ||
-    message.includes('amount_check') ||
-    message.includes('amount > 0') ||
-    message.includes('check constraint') && message.includes('loyalty_transactions') && message.includes('amount')
-  )
-}
-
 export function isRecoverableIdleError(error) {
   const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
   return (
@@ -208,232 +174,6 @@ export async function refreshSupabaseSession(dbClient = supabase) {
   } catch {
     return null
   }
-}
-
-function toLegacyPositiveTransactionAmounts(transactions) {
-  return transactions.map(row => (
-    row.type === 'redeemed' && Number(row.amount) < 0
-      ? { ...row, amount: Math.abs(Number(row.amount) || 0) }
-      : row
-  ))
-}
-
-async function applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt }) {
-  const cardNumber = String(loyalty?.loyalty_card_number || loyalty?.cardNumber || '').trim()
-  const requestedRedeemAmount = Math.max(0, Math.round(Number(loyalty?.loyalty_used_amount ?? loyalty?.loyalty_redeem_amount ?? 0) || 0))
-
-  if (!cardNumber && requestedRedeemAmount <= 0) {
-    return orderSummaries.map(row => ({ ...row, loyaltyUsedAmount: 0, cashbackEarned: 0 }))
-  }
-
-  const { data: card, error: cardError } = await supabase
-    .from('loyalty_cards')
-    .select('*')
-    .eq('card_number', cardNumber)
-    .maybeSingle()
-  if (cardError) throw cardError
-  if (!card || card.is_active === false) throw new Error('Loyalty card is not active')
-
-  const cardType = getLoyaltyCardCashbackType({
-    ...card,
-    cashback_type: loyalty?.cashback_type ?? loyalty?.cashbackType ?? card.cashback_type,
-    cashbackType: loyalty?.cashbackType ?? card.cashbackType,
-  })
-  const cashbackPercent = getLoyaltyCardCashbackPercent(cardType)
-  const balance = Math.max(0, Math.round(Number(card.balance ?? card.balance_amount ?? 0) || 0))
-  const totalBeforeLoyalty = orderSummaries.reduce((sum, row) => sum + row.grossTotal, 0)
-  const validation = validateLoyaltyRedeemAmount(requestedRedeemAmount, balance, totalBeforeLoyalty)
-  if (!validation.ok) {
-    throw new Error(validation.reason === 'balance'
-      ? 'Loyalty redeem amount exceeds available balance'
-      : 'Loyalty redeem amount exceeds remaining bill')
-  }
-
-  let remainingRedeem = validation.amount
-  const settled = orderSummaries.map(row => {
-    const loyaltyUsedAmount = Math.min(remainingRedeem, row.grossTotal)
-    remainingRedeem -= loyaltyUsedAmount
-    const cashbackEarned = calculateLoyaltyCashback(
-      { ...row.sourceOrder, loyalty_used_amount: loyaltyUsedAmount, status: 'paid', payment_status: 'paid' },
-      row.sourceOrder.items || [],
-      cashbackPercent
-    )
-    return { ...row, loyaltyUsedAmount, cashbackEarned }
-  })
-
-  const totalRedeemed = settled.reduce((sum, row) => sum + row.loyaltyUsedAmount, 0)
-  const totalCashback = settled.reduce((sum, row) => sum + row.cashbackEarned, 0)
-  const afterRedeem = balance - totalRedeemed
-  const finalBalance = afterRedeem + totalCashback
-  const previousTotalEarned = Math.max(0, Math.round(Number(card.total_earned ?? 0) || 0))
-  const previousTotalRedeemed = Math.max(0, Math.round(Number(card.total_redeemed ?? 0) || 0))
-
-  if (totalRedeemed > 0 || totalCashback > 0) {
-    const transactions = []
-    let runningBalance = balance
-    for (const row of settled) {
-      if (row.loyaltyUsedAmount > 0) {
-        transactions.push({
-          loyalty_card_id: card.id,
-          order_id: row.id,
-          type: 'redeemed',
-          amount: -row.loyaltyUsedAmount,
-          balance_before: runningBalance,
-          balance_after: runningBalance - row.loyaltyUsedAmount,
-          reason: 'Loyalty used for order payment',
-          created_at: paidAt,
-        })
-        runningBalance -= row.loyaltyUsedAmount
-      }
-    }
-    for (const row of settled) {
-      if (row.cashbackEarned > 0) {
-        transactions.push({
-          loyalty_card_id: card.id,
-          order_id: row.id,
-          type: 'cashback_earned',
-          amount: row.cashbackEarned,
-          balance_before: runningBalance,
-          balance_after: runningBalance + row.cashbackEarned,
-          reason: `Cashback ${cashbackPercent}%`,
-          cashback_percent_used: cashbackPercent,
-          card_type_at_transaction: cardType,
-          created_at: paidAt,
-        })
-        runningBalance += row.cashbackEarned
-      }
-    }
-
-    const { error: rpcError } = await supabase.rpc('settle_loyalty_wallet_payment', {
-      payload: {
-        card_id: card.id,
-        card_number: cardNumber,
-        expected_balance: balance,
-        final_balance: finalBalance,
-        total_redeemed: totalRedeemed,
-        total_cashback: totalCashback,
-        cashback_percent: cashbackPercent,
-        card_type: cardType,
-        paid_at: paidAt,
-        transactions,
-      },
-    })
-    if (rpcError && !isMissingRpc(rpcError, 'settle_loyalty_wallet_payment')) throw rpcError
-    if (!rpcError) {
-      return settled.map(row => ({
-        ...row,
-        loyaltyCardNumber: cardNumber,
-        cashbackPercent,
-        loyaltyRollback: {
-          cardId: card.id,
-          orderIds: settled.map(settledRow => settledRow.id),
-          createdAt: paidAt,
-          balanceBefore: balance,
-          totalEarnedBefore: previousTotalEarned,
-          totalRedeemedBefore: previousTotalRedeemed,
-          balanceAfter: finalBalance,
-          updatedAtBefore: card.updated_at || paidAt,
-        },
-      }))
-    }
-
-    const { data: updatedCard, error: updateError } = await supabase
-      .from('loyalty_cards')
-      .update({
-        balance: finalBalance,
-        total_earned: previousTotalEarned + totalCashback,
-        total_redeemed: previousTotalRedeemed + totalRedeemed,
-        updated_at: paidAt,
-      })
-      .eq('id', card.id)
-      .eq('balance', balance)
-      .select('id,balance')
-      .maybeSingle()
-    if (updateError) throw updateError
-    if (!updatedCard) throw new Error('Loyalty balance changed. Refresh the card and try again.')
-
-    if (transactions.length > 0) {
-      let { error: transactionError } = await supabase
-        .from('loyalty_transactions')
-        .insert(transactions)
-      if (transactionError && isLegacyPositiveTransactionAmountConstraint(transactionError)) {
-        ;({ error: transactionError } = await supabase
-          .from('loyalty_transactions')
-          .insert(toLegacyPositiveTransactionAmounts(transactions)))
-      }
-      if (
-        transactionError &&
-        (isMissingSchemaColumn(transactionError, 'cashback_percent_used') ||
-          isMissingSchemaColumn(transactionError, 'card_type_at_transaction'))
-      ) {
-        const legacyTransactions = transactions.map(({
-          cashback_percent_used,
-          card_type_at_transaction,
-          ...row
-        }) => row)
-        ;({ error: transactionError } = await supabase
-          .from('loyalty_transactions')
-          .insert(legacyTransactions))
-        if (transactionError && isLegacyPositiveTransactionAmountConstraint(transactionError)) {
-          ;({ error: transactionError } = await supabase
-            .from('loyalty_transactions')
-            .insert(toLegacyPositiveTransactionAmounts(legacyTransactions)))
-        }
-      }
-      if (transactionError) {
-        await supabase
-          .from('loyalty_cards')
-          .update({
-            balance,
-            total_earned: previousTotalEarned,
-            total_redeemed: previousTotalRedeemed,
-            updated_at: card.updated_at || paidAt,
-          })
-          .eq('id', card.id)
-          .eq('balance', finalBalance)
-        throw transactionError
-      }
-    }
-  }
-
-  return settled.map(row => ({
-    ...row,
-    loyaltyCardNumber: cardNumber,
-    cashbackPercent,
-    loyaltyRollback: totalRedeemed > 0 || totalCashback > 0
-      ? {
-          cardId: card.id,
-          orderIds: settled.map(settledRow => settledRow.id),
-          createdAt: paidAt,
-          balanceBefore: balance,
-          totalEarnedBefore: previousTotalEarned,
-          totalRedeemedBefore: previousTotalRedeemed,
-          balanceAfter: finalBalance,
-          updatedAtBefore: card.updated_at || paidAt,
-        }
-      : null,
-  }))
-}
-
-async function rollbackLoyaltyWalletSettlement(rollback) {
-  if (!rollback?.cardId) return
-  await supabase
-    .from('loyalty_transactions')
-    .delete()
-    .eq('loyalty_card_id', rollback.cardId)
-    .in('order_id', rollback.orderIds || [])
-    .eq('created_at', rollback.createdAt)
-
-  await supabase
-    .from('loyalty_cards')
-    .update({
-      balance: rollback.balanceBefore,
-      total_earned: rollback.totalEarnedBefore,
-      total_redeemed: rollback.totalRedeemedBefore,
-      updated_at: rollback.updatedAtBefore,
-    })
-    .eq('id', rollback.cardId)
-    .eq('balance', rollback.balanceAfter)
 }
 
 async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, items, paymentFields, state, action, signal }) {
@@ -483,6 +223,30 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, ite
 function withAbortSignal(query, signal) {
   if (signal && typeof query?.abortSignal === 'function') return query.abortSignal(signal)
   return query
+}
+
+export function buildAtomicPaymentPayload(action) {
+  const source = action?.payload && typeof action.payload === 'object' ? action.payload : {}
+  const orderId = String(source.orderId || '').trim() || null
+  const tableId = String(source.tableId || '').trim() || null
+  if ((orderId && tableId) || (!orderId && !tableId)) {
+    throw new Error('Payment requires exactly one order or table')
+  }
+  if (!Array.isArray(source.payments)) {
+    throw new Error('Payment amounts are required and must match the current bill exactly')
+  }
+
+  const loyalty = source.loyalty && typeof source.loyalty === 'object' ? source.loyalty : {}
+  return {
+    order_id: orderId,
+    table_id: tableId,
+    payments: source.payments.map(row => ({
+      method: row?.method ?? row?.payment_method,
+      amount: row?.amount,
+    })),
+    loyalty_card_number: String(loyalty.loyalty_card_number || loyalty.cardNumber || '').trim() || null,
+    loyalty_used_amount: loyalty.loyalty_used_amount ?? loyalty.loyalty_redeem_amount ?? 0,
+  }
 }
 
 async function loadBusinessSettings(dbClient = supabase) {
@@ -544,44 +308,28 @@ export async function loadMenuCatalog(dbClient = supabase) {
   }
 }
 
-async function fetchOrdersByPaymentStatus(paymentStatus, includeRecentPaidFilter = false) {
-  const buildQuery = (select) => {
-    let query = supabase.from('orders').select(select)
-    query = paymentStatus === 'paid'
-      ? query.eq('payment_status', 'paid')
-      : query.neq('payment_status', 'paid')
-    if (includeRecentPaidFilter) query = query.gte('created_at', startOfYear())
-    return query.order('created_at', { ascending: false })
-  }
-
-  const withPayments = await buildQuery('*, items:order_items(*), payments:order_payments(*)')
-  if (!withPayments.error) return withPayments
-
-  console.warn('[db] order_payments relation unavailable, loading orders without split payments:', withPayments.error.message)
-  return buildQuery('*, items:order_items(*)')
+async function loadCurrentOrderState() {
+  const today = restaurantTodayStr()
+  const yearStart = `${today.slice(0, 4)}-01-01`
+  const [activeOrders, currentYearOrders] = await Promise.all([
+    loadActiveOrders(),
+    loadOrdersForRange(yearStart, today),
+  ])
+  const byId = new Map(currentYearOrders.map(order => [order.id, order]))
+  activeOrders.forEach(order => byId.set(order.id, order))
+  return [...byId.values()]
 }
 
 export async function loadOrders() {
-  const [unpaidRes, paidRes] = await Promise.all([
-    fetchOrdersByPaymentStatus('unpaid'),
-    fetchOrdersByPaymentStatus('paid', true),
-  ])
-
-  if (unpaidRes.error) throw unpaidRes.error
-  if (paidRes.error) throw paidRes.error
-
-  return [...(unpaidRes.data || []), ...(paidRes.data || [])]
+  return loadCurrentOrderState()
 }
 
 export async function loadPOSData() {
-  const [tables, tableZones, menuCatalog, unpaidRes, paidRes, settings] = await Promise.all([
+  const [tables, tableZones, menuCatalog, orders, settings] = await Promise.all([
     loadRestaurantTables(),
     loadTableZones(),
     loadMenuCatalog(),
-    // All unpaid/active orders (no date limit)
-    fetchOrdersByPaymentStatus('unpaid'),
-    // Paid orders from the last 7 days (for revenue & best-sellers)
-    fetchOrdersByPaymentStatus('paid', true),
+    loadCurrentOrderState(),
     loadBusinessSettings(),
   ])
 
@@ -590,7 +338,7 @@ export async function loadPOSData() {
     tableZones,
     categories: menuCatalog.categories,
     menuItems:  menuCatalog.menuItems,
-    orders:     [...(unpaidRes.data || []), ...(paidRes.data || [])],
+    orders,
     settings,
   }
 }
@@ -1273,196 +1021,18 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'MARK_ORDER_PAID': {
-      const tableId        = typeof action.payload === 'string' ? action.payload : action.payload.tableId
-      const orderId        = typeof action.payload === 'object' ? action.payload.orderId : null
-      const loyalty        = typeof action.payload === 'object' ? action.payload.loyalty : null
-      const payment_method = typeof action.payload === 'object' ? action.payload.payment_method : null
-      const requestedPayments = typeof action.payload === 'object' ? action.payload.payments : null
+      const payload = buildAtomicPaymentPayload(action)
+      const { data, error } = await withAbortSignal(
+        supabase.rpc('settle_orders_payment', { payload }),
+        options.signal
+      )
+      if (error) throw error
 
-      const paidAt  = new Date().toISOString()
-      const completer = orderActorFields(state.user, 'Cashier')
-
-      // Fetch each unpaid order so we can write correct proportional values per round.
-      // Writing the combined total to every row then summing in Reports caused double-counting.
-      // Use neq('paid') instead of eq('unpaid') to also match legacy orders with payment_status = null.
-      let unpaidQuery = supabase
-        .from('orders')
-        .select('*, items:order_items(*)')
-        .neq('payment_status', 'paid')
-      unpaidQuery = orderId ? unpaidQuery.eq('id', orderId) : unpaidQuery.eq('table_id', tableId)
-      const { data: unpaidOrders } = await unpaidQuery
-
-      if (unpaidOrders?.length) {
-        let loyaltyRollback = null
-        try {
-          const orderSummaries = unpaidOrders.map(o => {
-            const stateOrder = state.orders.find(row => row.id === o.id)
-            const freshItems = mergeOrderItemsByIdentity(o.items || [], stateOrder?.items || [])
-            const serviceRatePct = isOffPremiseOrderType(o.order_type) ? 0 : Number.isFinite(Number(loyalty?.service_rate_pct))
-              ? Math.max(0, Math.min(100, Number(loyalty.service_rate_pct)))
-              : Number.isFinite(Number(o.service_rate_pct))
-                ? Math.max(0, Math.min(100, Number(o.service_rate_pct)))
-                : serviceRatePctFromSettings(state.settings)
-            const grossPaymentFields = getOrderPaymentFields(
-              { order_type: o.order_type, service_rate_pct: serviceRatePct },
-              freshItems,
-              serviceRatePct
-            )
-            return {
-              id: o.id,
-              sourceOrder: { ...o, items: freshItems, service_rate_pct: serviceRatePct },
-              serviceRatePct,
-              grossTotal: grossPaymentFields.total,
-            }
-          })
-          const settledSummaries = await applyLoyaltyWalletSettlement({ loyalty, orderSummaries, state, paidAt })
-          loyaltyRollback = settledSummaries.find(row => row.loyaltyRollback)?.loyaltyRollback || null
-          const finalSummaries = settledSummaries.map(row => {
-            const paymentFields = getOrderPaymentFields(
-              {
-                order_type: row.sourceOrder.order_type,
-                service_rate_pct: row.serviceRatePct,
-                loyalty_used_amount: row.loyaltyUsedAmount,
-                loyalty_redeem_amount: row.loyaltyUsedAmount,
-                cashback_earned: row.cashbackEarned,
-              },
-              row.sourceOrder.items || [],
-              row.serviceRatePct
-            )
-            return {
-              id: row.id,
-              paymentFields,
-              loyaltyCardNumber: row.loyaltyCardNumber || null,
-              cashbackEarned: row.cashbackEarned || 0,
-              cashbackPercent: row.cashbackPercent || 0,
-              total: paymentFields.total,
-            }
-          })
-          const totalDue = finalSummaries.reduce((sum, row) => sum + row.total, 0)
-          const normalizedPayments = normalizeSplitPayments(
-            requestedPayments || [{ method: payment_method || 'cash', amount: totalDue }],
-            totalDue
-          )
-          const finalPaymentMethod = getPaymentMethodSummary(normalizedPayments, payment_method)
-          const paymentRows = allocateSplitPaymentsToOrders(finalSummaries, normalizedPayments)
-
-          // Determine which tables to reset.
-          // For tableId-based payments: reset that table directly (original behaviour).
-          // For orderId-based payments: find the table from the paid order and only reset
-          // if no OTHER unpaid orders remain for it (re-query DB after marking paid).
-          if (!orderId && tableId) {
-            await updateRestaurantTableStatus(
-              tableId,
-              {
-                status: 'available',
-                reserved_for_name: '',
-                reserved_for_phone: '',
-                reserved_at: null,
-                reserved_until: null,
-                reservation_notes: '',
-              },
-              { status: 'available' }
-            )
-          } else if (orderId) {
-            const paidIds = new Set(finalSummaries.map(r => r.id))
-            const affectedTableIds = new Set(unpaidOrders.map(o => o.table_id).filter(Boolean))
-            for (const tid of affectedTableIds) {
-              // Re-query: any unpaid orders for this table that weren't just paid?
-              const { data: remaining } = await supabase
-                .from('orders')
-                .select('id')
-                .eq('table_id', tid)
-                .neq('payment_status', 'paid')
-                .limit(50)
-              const hasOtherUnpaid = (remaining || []).some(o => !paidIds.has(o.id))
-              if (!hasOtherUnpaid) {
-                await updateRestaurantTableStatus(
-                  tid,
-                  {
-                    status: 'available',
-                    reserved_for_name: '',
-                    reserved_for_phone: '',
-                    reserved_at: null,
-                    reserved_until: null,
-                    reservation_notes: '',
-                  },
-                  { status: 'available' }
-                )
-              }
-            }
-          }
-
-          if (paymentRows.length > 0) {
-            const { error: deletePaymentsError } = await supabase
-              .from('order_payments')
-              .delete()
-              .in('order_id', finalSummaries.map(row => row.id))
-            const paymentsTableMissing = deletePaymentsError && /order_payments|schema cache|relation/i.test(deletePaymentsError.message || '')
-            if (deletePaymentsError && !paymentsTableMissing) throw deletePaymentsError
-
-            if (!paymentsTableMissing) {
-              const { error: insertPaymentsError } = await supabase
-                .from('order_payments')
-                .insert(paymentRows)
-              if (insertPaymentsError) throw insertPaymentsError
-            } else {
-              console.warn('[db] order_payments table is missing; paid order will keep only summary payment_method')
-            }
-          }
-
-          for (const o of finalSummaries) {
-            const updateFields = {
-              status:         'paid',
-              payment_status: 'paid',
-              paid_at:        paidAt,
-              completed_by:   completer.id,
-              completed_by_name: completer.name,
-              ...o.paymentFields,
-              loyalty_card_number: o.loyaltyCardNumber,
-              cashback_earned: o.cashbackEarned,
-              cashback_percent: o.cashbackPercent,
-              payment_method: finalPaymentMethod,
-            }
-            let { data: paidRows, error: updateError } = await supabase
-              .from('orders')
-              .update(updateFields)
-              .eq('id', o.id)
-              .select('id')
-            let compatibleUpdateFields = updateFields
-            if (updateError && isMissingLoyaltyColumn(updateError)) {
-              const {
-                loyalty_used_amount,
-                loyalty_redeem_amount,
-                loyalty_card_number,
-                cashback_earned,
-                cashback_percent,
-                ...fallbackFields
-              } = compatibleUpdateFields
-              compatibleUpdateFields = fallbackFields
-              ;({ data: paidRows, error: updateError } = await supabase
-                .from('orders')
-                .update(compatibleUpdateFields)
-                .eq('id', o.id)
-                .select('id'))
-            }
-            if (updateError && isMissingOptionalOrderTypeColumn(updateError)) {
-              compatibleUpdateFields = omitOrderTrackingFields(compatibleUpdateFields)
-              ;({ data: paidRows, error: updateError } = await supabase
-                .from('orders')
-                .update(compatibleUpdateFields)
-                .eq('id', o.id)
-                .select('id'))
-            }
-            if (updateError) throw updateError
-            assertUpdatedRows(paidRows, `Order ${o.id} was not marked paid. Refresh and try again.`)
-          }
-          notifyTelegramOrderStatus(finalSummaries.map(order => order.id), 'completed')
-        } catch (error) {
-          await rollbackLoyaltyWalletSettlement(loyaltyRollback)
-          throw error
-        }
+      const paidOrderIds = Array.isArray(data?.order_ids) ? data.order_ids.filter(Boolean) : []
+      if (paidOrderIds.length === 0) {
+        throw new Error('No unpaid orders were settled. Refresh and try again.')
       }
-
+      notifyTelegramOrderStatus(paidOrderIds, 'completed')
       break
     }
 
