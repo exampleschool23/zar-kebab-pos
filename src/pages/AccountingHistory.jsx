@@ -13,6 +13,7 @@ import {
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
   expensePaymentMethodLabel,
+  getAccountingHistoryRange,
   normalizeExpenseEntryType,
   summarizeExpenses,
   summarizeIncomeEntries,
@@ -20,7 +21,9 @@ import {
 } from '../lib/expenses'
 
 const EXPENSE_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by_name, created_at'
-const HISTORY_START_DATE = '2000-01-01'
+const SALARY_PROFILE_COLUMNS = 'id, profile_id, employee_name, payment_method'
+const SALARY_PAYMENT_COLUMNS = 'id, salary_profile_id, paid_date, amount, payment_method, note, created_by_name, created_at'
+const SALARY_BONUS_COLUMNS = 'id, salary_profile_id, bonus_date, amount, payment_method, note, created_by_name, created_at'
 const EXPENSE_TONES = [
   { row: 'border-l-orange-500 bg-orange-50/30', text: 'text-[#ff5a00]', badge: 'bg-orange-100 text-orange-700' },
   { row: 'border-l-teal-500 bg-teal-50/30', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-700' },
@@ -34,7 +37,10 @@ function expenseTone(row) {
   if (normalizeExpenseEntryType(row.entry_type) === 'income') {
     return { row: 'border-l-green-500 bg-green-50/30', text: 'text-green-700', badge: 'bg-green-100 text-green-700' }
   }
-  if (row.is_salary_payment || row.is_salary_bonus || String(row.category || '').startsWith('salary_')) {
+  if (row.is_salary_payment || (String(row.category || '').startsWith('salary_') && !row.is_salary_bonus)) {
+    return { row: 'border-l-red-500 bg-red-50/30', text: 'text-red-700', badge: 'bg-red-100 text-red-700' }
+  }
+  if (row.is_salary_bonus) {
     return { row: 'border-l-blue-500 bg-blue-50/30', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' }
   }
   const key = String(row.category || 'other')
@@ -42,15 +48,13 @@ function expenseTone(row) {
   return EXPENSE_TONES[hash % EXPENSE_TONES.length]
 }
 
-function composeSalaryProfiles(profiles, rates, payments, bonuses, absences, team) {
+function composeSalaryProfiles(profiles, payments, bonuses, team) {
   const teamById = Object.fromEntries(team.map(member => [member.id, member]))
   return profiles.map(profile => ({
     ...profile,
     profile: teamById[profile.profile_id] || null,
-    rates: rates.filter(row => row.salary_profile_id === profile.id),
     payments: payments.filter(row => row.salary_profile_id === profile.id),
     bonuses: bonuses.filter(row => row.salary_profile_id === profile.id),
-    absences: absences.filter(row => row.salary_profile_id === profile.id),
   }))
 }
 
@@ -63,11 +67,13 @@ export default function AccountingHistory() {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [type, setType] = useState('all')
+  const [period, setPeriod] = useState('thisMonth')
+  const { dateFrom, dateTo } = useMemo(() => getAccountingHistoryRange(period), [period])
 
   const labels = {
-    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', date: 'Sana', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', totalExpenses: 'Jami xarajat', totalIncome: 'Jami boshqa daromad', cafeIncome: 'Kafe daromadi', investorIncome: 'Investor daromadi', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
-    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', date: 'Дата', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', totalExpenses: 'Всего расходов', totalIncome: 'Всего внешних доходов', cafeIncome: 'Доход кафе', investorIncome: 'Доход инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
-    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', date: 'Date', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', totalExpenses: 'Total expenses', totalIncome: 'Total other income', cafeIncome: 'Cafe income', investorIncome: 'Investor income', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
+    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', totalExpenses: 'Jami xarajat', totalIncome: 'Jami boshqa daromad', cafeIncome: 'Kafe daromadi', investorIncome: 'Investor daromadi', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
+    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', totalExpenses: 'Всего расходов', totalIncome: 'Всего внешних доходов', cafeIncome: 'Доход кафе', investorIncome: 'Доход инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
+    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', totalExpenses: 'Total expenses', totalIncome: 'Total other income', cafeIncome: 'Cafe income', investorIncome: 'Investor income', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
   }
   const l = labels[lang] || labels.en
 
@@ -77,12 +83,10 @@ export default function AccountingHistory() {
       setLoading(true)
       setError('')
       const results = await Promise.all([
-        supabase.from('expenses').select(EXPENSE_COLUMNS).order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
-        supabase.from('employee_salary_profiles').select('*'),
-        supabase.from('employee_salary_rates').select('*'),
-        supabase.from('employee_salary_payments').select('*'),
-        supabase.from('employee_salary_bonuses').select('*'),
-        supabase.from('employee_salary_absences').select('*'),
+        supabase.from('expenses').select(EXPENSE_COLUMNS).gte('expense_date', dateFrom).lte('expense_date', dateTo).order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
+        supabase.from('employee_salary_profiles').select(SALARY_PROFILE_COLUMNS),
+        supabase.from('employee_salary_payments').select(SALARY_PAYMENT_COLUMNS).gte('paid_date', dateFrom).lte('paid_date', dateTo),
+        supabase.from('employee_salary_bonuses').select(SALARY_BONUS_COLUMNS).gte('bonus_date', dateFrom).lte('bonus_date', dateTo),
         supabase.from('profiles').select('id, full_name, email, role, status'),
       ])
       if (!active) return
@@ -91,18 +95,18 @@ export default function AccountingHistory() {
         setError(firstError.message || l.loadFailed)
         setRows([])
       } else {
-        const [expenseResult, profileResult, rateResult, paymentResult, bonusResult, absenceResult, teamResult] = results
-        const salaryProfiles = composeSalaryProfiles(profileResult.data || [], rateResult.data || [], paymentResult.data || [], bonusResult.data || [], absenceResult.data || [], teamResult.data || [])
-        const salaryPayments = buildSalaryPaymentExpenseRows(salaryProfiles, HISTORY_START_DATE, todayExpenseDate())
+        const [expenseResult, profileResult, paymentResult, bonusResult, teamResult] = results
+        const salaryProfiles = composeSalaryProfiles(profileResult.data || [], paymentResult.data || [], bonusResult.data || [], teamResult.data || [])
+        const salaryPayments = buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
           .map(row => ({ ...row, description: row.description || l.salaryPayment }))
-        const salaryBonuses = buildSalaryBonusExpenseRows(salaryProfiles, HISTORY_START_DATE, todayExpenseDate())
+        const salaryBonuses = buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
         setRows([...(expenseResult.data || []), ...salaryPayments, ...salaryBonuses].sort((a, b) => b.expense_date.localeCompare(a.expense_date) || String(b.created_at || '').localeCompare(String(a.created_at || ''))))
       }
       setLoading(false)
     }
     load()
     return () => { active = false }
-  }, [l.loadFailed, l.salaryPayment])
+  }, [dateFrom, dateTo, l.loadFailed, l.salaryPayment])
 
   const visibleRows = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -118,8 +122,8 @@ export default function AccountingHistory() {
   const expenseSummary = useMemo(() => summarizeExpenses(rows), [rows])
   const incomeSummary = useMemo(() => summarizeIncomeEntries(rows), [rows])
   const cafeIncomeSummary = useMemo(
-    () => getCafeIncomeForRange(state.orders, HISTORY_START_DATE, todayExpenseDate()),
-    [state.orders]
+    () => getCafeIncomeForRange(state.orders, dateFrom, dateTo),
+    [state.orders, dateFrom, dateTo]
   )
   const rowsByDate = useMemo(() => {
     const groups = []
@@ -131,6 +135,7 @@ export default function AccountingHistory() {
     }
     return groups.map(group => ({
       ...group,
+      totalExpenses: summarizeExpenses(rows.filter(row => row.expense_date === group.date)).total,
       cafeIncome: state.orders
         .filter(order => isPaidOrder(order) && matchesRange(order, group.date, group.date))
         .reduce((sum, order) => sum + getOrderRevenueTotal(order), 0),
@@ -150,7 +155,10 @@ export default function AccountingHistory() {
               <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
               <p className="mt-1 text-sm font-bold text-[#9CA3AF]">{visibleRows.length} {l.all.toLowerCase()}</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-1 rounded-xl border border-blue-100 bg-blue-50 p-1">
+                {['thisMonth', 'lastMonth', 'allTime'].map(value => <button key={value} onClick={() => setPeriod(value)} className={`rounded-lg px-3 py-1.5 text-xs font-black transition-colors ${period === value ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-700 hover:bg-white'}`}>{l[value]}</button>)}
+              </div>
               {['all', 'expense', 'income'].map(value => <button key={value} onClick={() => setType(value)} className={`rounded-xl border px-3 py-2 text-xs font-black ${type === value ? 'border-[#ff5a00] bg-[#ff5a00] text-white' : 'border-[#E5E7EB] bg-white text-[#6B7280]'}`}>{l[value]}</button>)}
               <label className="flex min-w-[240px] items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
                 <Search size={15} className="text-[#9CA3AF]" />
@@ -180,6 +188,7 @@ export default function AccountingHistory() {
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-xs font-black tabular-nums">
                               <span className="rounded-full bg-green-50 px-3 py-1.5 text-green-700">{l.cafeIncome}: {formatCurrency(group.cafeIncome)}</span>
+                              <span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">{l.totalExpenses}: {formatCurrency(group.totalExpenses)}</span>
                               <span className="rounded-full bg-purple-50 px-3 py-1.5 text-purple-700">{l.investorIncome}: {formatCurrency(group.investorIncome)}</span>
                             </div>
                           </div>

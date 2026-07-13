@@ -45,6 +45,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), localApiRoutes()],
+    server: {
+      port: 5173,
+      strictPort: true,
+    },
     build: {
       rollupOptions: {
         output: {

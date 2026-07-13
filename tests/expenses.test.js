@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   DEFAULT_MONTHLY_RENT_UZS,
+  getAccountingHistoryRange,
   buildSalaryBonusExpenseRows,
   buildSalaryExpenseRows,
   buildSalaryPaymentExpenseRows,
@@ -27,6 +28,25 @@ import {
   summarizeExpenseCashflow,
   summarizeExpenses,
 } from '../src/lib/expenses.js'
+
+test('accounting history presets cover this month, last month, and all time', () => {
+  assert.deepEqual(
+    getAccountingHistoryRange('thisMonth', '2026-07-14'),
+    { dateFrom: '2026-07-01', dateTo: '2026-07-14' }
+  )
+  assert.deepEqual(
+    getAccountingHistoryRange('lastMonth', '2026-07-14'),
+    { dateFrom: '2026-06-01', dateTo: '2026-06-30' }
+  )
+  assert.deepEqual(
+    getAccountingHistoryRange('lastMonth', '2026-01-10'),
+    { dateFrom: '2025-12-01', dateTo: '2025-12-31' }
+  )
+  assert.deepEqual(
+    getAccountingHistoryRange('allTime', '2026-07-14'),
+    { dateFrom: '2000-01-01', dateTo: '2026-07-14' }
+  )
+})
 
 test('expense summary totals category and payment method spending', () => {
   const summary = summarizeExpenses([

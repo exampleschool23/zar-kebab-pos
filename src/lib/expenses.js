@@ -4,6 +4,7 @@ export const EXPENSE_PAYMENT_METHODS = ['cash', 'card', 'terminal']
 export const ACCOUNTING_CASHFLOW_METHODS = ['cash', 'card', 'terminal', 'qr', 'loyalty_card']
 export const EXPENSE_ENTRY_TYPES = ['expense', 'income']
 export const DEFAULT_MONTHLY_RENT_UZS = 0
+export const ACCOUNTING_HISTORY_START_DATE = '2000-01-01'
 
 export const EXPENSE_CATEGORIES = [
   {
@@ -71,6 +72,27 @@ export const MANUAL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.filter(category => !
 
 export function todayExpenseDate() {
   return toLocalDateStr(new Date().toISOString())
+}
+
+export function getAccountingHistoryRange(period = 'thisMonth', today = todayExpenseDate()) {
+  const normalizedToday = /^\d{4}-\d{2}-\d{2}$/.test(String(today || ''))
+    ? String(today)
+    : todayExpenseDate()
+  if (period === 'allTime') {
+    return { dateFrom: ACCOUNTING_HISTORY_START_DATE, dateTo: normalizedToday }
+  }
+
+  const thisMonthStart = `${normalizedToday.slice(0, 8)}01`
+  if (period !== 'lastMonth') {
+    return { dateFrom: thisMonthStart, dateTo: normalizedToday }
+  }
+
+  const [year, month] = normalizedToday.split('-').map(Number)
+  const previousMonthEnd = toLocalDateStr(new Date(Date.UTC(year, month - 1, 0, 12)).toISOString())
+  return {
+    dateFrom: `${previousMonthEnd.slice(0, 8)}01`,
+    dateTo: previousMonthEnd,
+  }
 }
 
 export function expenseCategoryLabel(category, lang = 'en') {
