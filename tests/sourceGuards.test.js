@@ -2120,6 +2120,10 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(expenses, /const \[activeRangeKey, setActiveRangeKey\] = useState\('month'\)/)
   assert.match(expenses, /function selectQuickRange\(key\)/)
   assert.match(expenses, /setActiveRangeKey\(key\)/)
+  assert.match(expenses, /previousMonth: 'Previous month'/)
+  assert.match(expenses, /const previousMonthEnd = addDays\(today\.slice\(0, 8\) \+ '01', -1\)/)
+  assert.match(expenses, /setDateFrom\(previousMonthEnd\.slice\(0, 8\) \+ '01'\)/)
+  assert.match(expenses, /setDateTo\(previousMonthEnd\)/)
   assert.match(expenses, /function setCustomDateFrom\(value\)/)
   assert.match(expenses, /function setCustomDateTo\(value\)/)
   assert.match(expenses, /selected\s*\?\s*'border-\[#ff5a00\] bg-\[#ff5a00\] text-white shadow-orange-100'/)
@@ -2130,6 +2134,9 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(expenses, /l\.methodBalances/)
   assert.match(expenses, /const cafeIncome = revenue/)
   assert.match(expenses, /label=\{l\.cafeIncome\} value=\{formatCurrency\(cafeIncome\)\}/)
+  assert.match(expenses, /getCafeIncomeForRange\(state\.orders, dateFrom, dateTo\)/)
+  assert.match(expenses, /\[state\.orders, dateFrom, dateTo\]/)
+  assert.match(expenses, /value=\{formatCurrency\(selectedRangeCafeIncome\.averageDaily\)\}/)
   assert.match(expenses, /cafeIncomeSub: 'Excludes investor support'/)
   assert.match(expenses, /label=\{l\.investorIncome\}[\s\S]*value=\{formatCurrency\(investorSupportTotal\)\}/)
   assert.match(expenses, /const otherIncomeTotal = Math\.max\(0, incomeSummary\.total - investorSupportTotal\)/)
@@ -2337,6 +2344,17 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(health, /checkTable\('employee_salary_absences'/)
   assert.match(health, /joined_at, ended_at, deleted_at, pay_schedule/)
   assert.match(health, /amount, rate_unit/)
+})
+
+test('all accounting summary includes paid cafe income', () => {
+  const history = readSource('src/pages/AccountingHistory.jsx')
+
+  assert.match(history, /getCafeIncomeForRange/)
+  assert.match(history, /getCafeIncomeForRange\(state\.orders, HISTORY_START_DATE, todayExpenseDate\(\)\)/)
+  assert.match(history, /\[state\.orders\]/)
+  assert.match(history, /xl:grid-cols-3/)
+  assert.match(history, /\{l\.cafeIncome\}/)
+  assert.match(history, /formatCurrency\(cafeIncomeSummary\.total\)/)
 })
 
 test('table management migration and health check include required columns', () => {

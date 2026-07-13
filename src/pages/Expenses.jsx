@@ -22,7 +22,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
-import { getMonthToDateCafeIncome, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getCafeIncomeForRange, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
@@ -225,7 +225,7 @@ export default function Expenses() {
       cafeIncome: 'Kafe daromadi',
       cafeIncomeSub: 'Investor yordamisiz',
       avgDailyCafeIncome: "Kafe o'rtacha kunlik daromadi",
-      monthCafeIncome: 'Bu oy kafe daromadi',
+      periodCafeIncome: 'Tanlangan davr kafe daromadi',
       investorIncome: 'Investor daromadi',
       investorIncomeSub: 'Investor kiritgan pul',
       otherIncomeSub: 'Boshqa daromad',
@@ -254,6 +254,7 @@ export default function Expenses() {
       today: 'Bugun',
       week: '7 kun',
       month: 'Oy',
+      previousMonth: 'O‘tgan oy',
       from: 'Dan',
       to: 'Gacha',
       methodBalances: 'To‘lov turi qoldig‘i',
@@ -288,7 +289,7 @@ export default function Expenses() {
       cafeIncome: 'Доход кафе',
       cafeIncomeSub: 'Без поддержки инвестора',
       avgDailyCafeIncome: 'Среднедневной доход кафе',
-      monthCafeIncome: 'Доход кафе за месяц',
+      periodCafeIncome: 'Доход кафе за выбранный период',
       investorIncome: 'Доход инвестора',
       investorIncomeSub: 'Внесено инвестором',
       otherIncomeSub: 'Другой доход',
@@ -317,6 +318,7 @@ export default function Expenses() {
       today: 'Сегодня',
       week: '7 дней',
       month: 'Месяц',
+      previousMonth: 'Прошлый месяц',
       from: 'С',
       to: 'По',
       methodBalances: 'Остаток по способам оплаты',
@@ -351,7 +353,7 @@ export default function Expenses() {
       cafeIncome: 'Cafe income',
       cafeIncomeSub: 'Excludes investor support',
       avgDailyCafeIncome: 'Avg daily cafe income',
-      monthCafeIncome: 'This month cafe income',
+      periodCafeIncome: 'Selected period cafe income',
       investorIncome: 'Investor income',
       investorIncomeSub: 'Investor support entries',
       otherIncomeSub: 'Other income',
@@ -380,6 +382,7 @@ export default function Expenses() {
       today: 'Today',
       week: '7 days',
       month: 'Month',
+      previousMonth: 'Previous month',
       from: 'From',
       to: 'To',
       methodBalances: 'Left by payment method',
@@ -463,9 +466,9 @@ export default function Expenses() {
 
   const revenue = paidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
   const cafeIncome = revenue
-  const monthToDateCafeIncome = useMemo(
-    () => getMonthToDateCafeIncome(state.orders),
-    [state.orders]
+  const selectedRangeCafeIncome = useMemo(
+    () => getCafeIncomeForRange(state.orders, dateFrom, dateTo),
+    [state.orders, dateFrom, dateTo]
   )
   const salaryExpenses = useMemo(() => (
     buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
@@ -518,6 +521,11 @@ export default function Expenses() {
     if (key === 'today') { setDateFrom(today); setDateTo(today) }
     if (key === 'week') { setDateFrom(addDays(today, -6)); setDateTo(today) }
     if (key === 'month') { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
+    if (key === 'previousMonth') {
+      const previousMonthEnd = addDays(today.slice(0, 8) + '01', -1)
+      setDateFrom(previousMonthEnd.slice(0, 8) + '01')
+      setDateTo(previousMonthEnd)
+    }
   }
 
   async function saveExpense(event) {
@@ -598,6 +606,7 @@ export default function Expenses() {
               { key: 'today', label: l.today },
               { key: 'week', label: l.week },
               { key: 'month', label: l.month },
+              { key: 'previousMonth', label: l.previousMonth },
             ].map(option => {
               const selected = activeRangeKey === option.key
               return (
@@ -633,8 +642,8 @@ export default function Expenses() {
             <Kpi
               icon={CalendarDays}
               label={l.avgDailyCafeIncome}
-              value={formatCurrency(monthToDateCafeIncome.averageDaily)}
-              sub={`${l.monthCafeIncome}: ${formatCurrency(monthToDateCafeIncome.total)}`}
+              value={formatCurrency(selectedRangeCafeIncome.averageDaily)}
+              sub={`${l.periodCafeIncome}: ${formatCurrency(selectedRangeCafeIncome.total)}`}
               tone="blue"
             />
             <Kpi

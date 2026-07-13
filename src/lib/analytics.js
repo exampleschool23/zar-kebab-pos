@@ -698,14 +698,12 @@ export function groupOrdersBySession(orders) {
   return Object.values(map)
 }
 
-export function getMonthToDateCafeIncome(orders = [], now = new Date()) {
-  const today = restaurantTodayStr(now)
-  const monthStart = `${today.slice(0, 8)}01`
-  const monthOrders = groupOrdersBySession(orders)
-    .filter(order => isPaidOrder(order) && matchesRange(order, monthStart, today))
-  const total = monthOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
+export function getCafeIncomeForRange(orders = [], from, to) {
+  const rangeOrders = groupOrdersBySession(orders)
+    .filter(order => isPaidOrder(order) && matchesRange(order, from, to))
+  const total = rangeOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
   const salesDayCount = new Set(
-    monthOrders
+    rangeOrders
       .map(order => toRestaurantDateStr(getOrderDate(order)))
       .filter(Boolean)
   ).size
@@ -714,7 +712,13 @@ export function getMonthToDateCafeIncome(orders = [], now = new Date()) {
     total,
     averageDaily: salesDayCount > 0 ? Math.round(total / salesDayCount) : 0,
     dayCount: salesDayCount,
-    from: monthStart,
-    to: today,
+    from,
+    to,
   }
+}
+
+export function getMonthToDateCafeIncome(orders = [], now = new Date()) {
+  const today = restaurantTodayStr(now)
+  const monthStart = `${today.slice(0, 8)}01`
+  return getCafeIncomeForRange(orders, monthStart, today)
 }

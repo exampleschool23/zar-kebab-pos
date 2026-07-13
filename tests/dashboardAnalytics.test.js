@@ -11,6 +11,7 @@ import {
   getDashboardStaffPerformance,
 } from '../src/lib/dashboardAnalytics.js'
 import {
+  getCafeIncomeForRange,
   getMonthToDateCafeIncome,
   getOrderActivityDate,
   groupOrdersBySession,
@@ -224,6 +225,18 @@ test('month-to-date cafe income average is zero when there are no paid sales day
   assert.equal(result.dayCount, 0)
   assert.equal(result.total, 0)
   assert.equal(result.averageDaily, 0)
+})
+
+test('cafe income average follows the selected accounting date range', () => {
+  const weekRange = getCafeIncomeForRange(orders, '2026-05-15', '2026-05-19')
+  const earlyMonthRange = getCafeIncomeForRange(orders, '2026-05-01', '2026-05-14')
+
+  assert.equal(weekRange.total, 158000)
+  assert.equal(weekRange.dayCount, 2)
+  assert.equal(weekRange.averageDaily, 79000)
+  assert.equal(earlyMonthRange.total, 60000)
+  assert.equal(earlyMonthRange.dayCount, 1)
+  assert.equal(earlyMonthRange.averageDaily, 60000)
 })
 
 test('dashboard period change from month to year updates all widgets to year data', () => {

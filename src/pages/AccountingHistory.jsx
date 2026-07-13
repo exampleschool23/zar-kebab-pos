@@ -7,7 +7,7 @@ import { useApp } from '../store/AppContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
-import { getOrderRevenueTotal, isPaidOrder, matchesRange } from '../lib/analytics'
+import { getCafeIncomeForRange, getOrderRevenueTotal, isPaidOrder, matchesRange } from '../lib/analytics'
 import {
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
@@ -117,6 +117,10 @@ export default function AccountingHistory() {
 
   const expenseSummary = useMemo(() => summarizeExpenses(rows), [rows])
   const incomeSummary = useMemo(() => summarizeIncomeEntries(rows), [rows])
+  const cafeIncomeSummary = useMemo(
+    () => getCafeIncomeForRange(state.orders, HISTORY_START_DATE, todayExpenseDate()),
+    [state.orders]
+  )
   const rowsByDate = useMemo(() => {
     const groups = []
     for (const row of visibleRows) {
@@ -154,9 +158,10 @@ export default function AccountingHistory() {
               </label>
             </div>
           </div>
-          <div className="mb-5 grid gap-3 sm:grid-cols-2">
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.cafeIncome}</p><p className="mt-1 text-2xl font-black text-emerald-600">{formatCurrency(cafeIncomeSummary.total)}</p></div>
             <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalExpenses}</p><p className="mt-1 text-2xl font-black text-[#ff5a00]">{formatCurrency(expenseSummary.total)}</p></div>
-            <div className="rounded-2xl border border-green-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalIncome}</p><p className="mt-1 text-2xl font-black text-green-600">{formatCurrency(incomeSummary.total)}</p></div>
+            <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalIncome}</p><p className="mt-1 text-2xl font-black text-purple-600">{formatCurrency(incomeSummary.total)}</p></div>
           </div>
           {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div>}
           <section className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
