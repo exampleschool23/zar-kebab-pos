@@ -2012,6 +2012,17 @@ test('cashier payment waits for one atomic database settlement before local succ
   assert.match(paymentMigration, /update public\.restaurant_tables/)
 })
 
+test('table payment atomically skips empty unpaid order shells', () => {
+  const migration = readSource('supabase/087_skip_empty_order_shells_on_payment.sql')
+
+  assert.match(migration, /rename to settle_orders_payment_strict/)
+  assert.match(migration, /target_table_id is not null/)
+  assert.match(migration, /not exists \([\s\S]*from public\.order_items oi[\s\S]*oi\.order_id = o\.id/)
+  assert.match(migration, /set status = 'cancelled'/)
+  assert.match(migration, /return public\.settle_orders_payment_strict\(payload\)/)
+  assert.match(migration, /revoke all on function public\.settle_orders_payment_strict\(jsonb\) from authenticated/)
+})
+
 test('paid order deletion is routed through feature-gated RPC and wired to cashier and reports', () => {
   const appContext = readSource('src/store/AppContext.jsx')
   const reducer = readSource('src/store/ordersReducer.js')
