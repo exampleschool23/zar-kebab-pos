@@ -10,6 +10,7 @@ import {
   buildSalaryExpenseRows,
   buildSalaryPaymentExpenseRows,
   buildSalaryReactivationAbsenceRows,
+  canRecordSalaryTransaction,
   convertSalaryAmountToDaily,
   expenseCategoryLabel,
   expenseMatchesRange,
@@ -276,6 +277,27 @@ test('deactivated salary profiles stop accruing after ended_at while keeping due
   assert.equal(rows.at(-1).expense_date, '2026-06-10')
   assert.equal(getSalaryDue(formerWaiter, '2026-06-16'), 2_100_000)
   assert.equal(getTotalSalaryDue([formerWaiter], '2026-06-16'), 2_100_000)
+  assert.equal(canRecordSalaryTransaction(formerWaiter, 'payment', '2026-06-16'), true)
+  assert.equal(canRecordSalaryTransaction(formerWaiter, 'bonus', '2026-06-16'), false)
+})
+
+test('inactive salary profiles remain payable only while cafe debt is outstanding', () => {
+  const inactiveEmployee = {
+    id: 'salary-inactive-payable-1',
+    joined_at: '2026-06-01',
+    ended_at: '2026-06-10',
+    is_active: false,
+    rates: [{ effective_from: '2026-06-01', amount: 100_000, rate_unit: 'daily' }],
+    payments: [],
+  }
+
+  assert.equal(canRecordSalaryTransaction(inactiveEmployee, 'payment', '2026-06-16'), true)
+  assert.equal(canRecordSalaryTransaction({
+    ...inactiveEmployee,
+    payments: [{ paid_date: '2026-06-16', amount: 1_000_000 }],
+  }, 'payment', '2026-06-16'), false)
+  assert.equal(canRecordSalaryTransaction({ ...inactiveEmployee, is_active: true }, 'bonus', '2026-06-16'), true)
+  assert.equal(canRecordSalaryTransaction({ ...inactiveEmployee, deleted_at: '2026-06-16T10:00:00Z' }, 'payment', '2026-06-16'), false)
 })
 
 test('backdated salary deactivation uses selected end date for due balance', () => {

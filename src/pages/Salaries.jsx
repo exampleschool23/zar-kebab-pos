@@ -12,6 +12,7 @@ import {
   EXPENSE_PAYMENT_METHODS,
   SALARY_RATE_UNITS,
   buildSalaryReactivationAbsenceRows,
+  canRecordSalaryTransaction,
   convertSalaryAmountToDaily,
   expensePaymentMethodLabel,
   getSalaryDue,
@@ -352,6 +353,13 @@ export default function Salaries() {
   const activeSalaryProfiles = useMemo(() => (
     sortedSalaryProfiles.filter(item => item.is_active !== false)
   ), [sortedSalaryProfiles])
+  const transactionSalaryProfiles = useMemo(() => (
+    sortedSalaryProfiles.filter(item => canRecordSalaryTransaction(
+      item,
+      transactionForm.entry_type,
+      transactionForm.paid_date || today
+    ))
+  ), [sortedSalaryProfiles, transactionForm.entry_type, transactionForm.paid_date, today])
   const totalDue = useMemo(() => getTotalSalaryDue(salaryProfiles, today), [salaryProfiles, today])
   const monthlyPayrollTotal = useMemo(() => getTotalMonthlySalaryCommitment(salaryProfiles, today), [salaryProfiles, today])
   const salaryHistoryLabels = useMemo(() => ({
@@ -445,8 +453,8 @@ export default function Salaries() {
     const paidDate = transactionForm.paid_date || today
     const due = getSalaryDue(salaryProfile, paidDate)
     const amount = normalizeExpenseAmount(transactionForm.amount || due)
-    if (!canManage || amount <= 0) return
     const isBonus = transactionForm.entry_type === 'bonus'
+    if (!canManage || amount <= 0 || !canRecordSalaryTransaction(salaryProfile, transactionForm.entry_type, paidDate)) return
     setSaving(isBonus ? 'bonus-create' : 'payment-create')
     const { error: writeError } = isBonus
       ? await supabase.from('employee_salary_bonuses').insert({
@@ -762,7 +770,19 @@ export default function Salaries() {
                         <button
                           key={entryType}
                           type="button"
-                          onClick={() => setTransactionForm(current => ({ ...current, entry_type: entryType }))}
+                          onClick={() => setTransactionForm(current => {
+                            const selectedProfile = salaryProfiles.find(item => item.id === current.salary_profile_id)
+                            const paidDate = current.paid_date || today
+                            const keepSelected = canRecordSalaryTransaction(selectedProfile, entryType, paidDate)
+                            return {
+                              ...current,
+                              entry_type: entryType,
+                              salary_profile_id: keepSelected ? current.salary_profile_id : '',
+                              amount: keepSelected && entryType === 'payment'
+                                ? String(getSalaryDue(selectedProfile, paidDate) || '')
+                                : '',
+                            }
+                          })}
                           className={`flex h-11 items-center justify-center rounded-xl border text-sm font-black ${
                             active ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'
                           }`}
@@ -793,9 +813,13 @@ export default function Salaries() {
                         disabled={!canManage}
                       >
                         <option value="">—</option>
-                        {activeSalaryProfiles.map(item => (
-                          <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
-                        ))}
+                        {transactionSalaryProfiles.map(item => {
+                          const name = item.employee_name || item.profile?.full_name || item.profile?.email
+                          const inactiveDue = item.is_active === false
+                            ? ` · ${l.inactive} · ${l.due}: ${formatCurrency(getSalaryDue(item, transactionForm.paid_date || today))}`
+                            : ''
+                          return <option key={item.id} value={item.id}>{name}{inactiveDue}</option>
+                        })}
                       </select>
                     </Field>
                     <Field label={transactionForm.entry_type === 'bonus' ? l.bonusDate : l.paidDate}>

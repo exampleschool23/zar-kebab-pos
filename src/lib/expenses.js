@@ -403,6 +403,12 @@ export function getSalaryDue(salaryProfile, dateTo = todayExpenseDate()) {
   return Math.max(0, accrued - getSalaryPaidAmount(salaryProfile, dateTo))
 }
 
+export function canRecordSalaryTransaction(salaryProfile, entryType = 'payment', asOfDate = todayExpenseDate()) {
+  if (!salaryProfile || salaryProfile.deleted_at) return false
+  if (salaryProfile.is_active !== false) return true
+  return entryType === 'payment' && getSalaryDue(salaryProfile, asOfDate) > 0
+}
+
 export function getTotalSalaryDue(salaryProfiles = [], dateTo = todayExpenseDate()) {
   return (salaryProfiles || []).reduce((sum, salaryProfile) => (
     sum + getSalaryDue(salaryProfile, dateTo)
