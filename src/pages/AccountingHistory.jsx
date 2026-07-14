@@ -1,15 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { canEditFeature } from '../lib/permissions'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
 import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 import {
   filterAccountingHistoryRows,
+  getAccountingHistoryDeleteTarget,
   getAccountingHistoryPageSummary,
   groupAccountingHistoryRows,
 } from '../lib/accounting'
@@ -57,8 +60,11 @@ function loadPagedResult(loadPage) {
 
 export default function AccountingHistory() {
   const { state } = useApp()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const lang = state.lang || 'ru'
+  const role = (profile?.role || state.user?.role || 'guest').toLowerCase()
+  const canDelete = canEditFeature(profile || { role }, 'expenses')
   const [expenseRows, setExpenseRows] = useState([])
   const [salaryRows, setSalaryRows] = useState([])
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
@@ -69,12 +75,14 @@ export default function AccountingHistory() {
   const [query, setQuery] = useState('')
   const [type, setType] = useState('all')
   const [period, setPeriod] = useState('thisMonth')
+  const [confirmDeleteId, setConfirmDeleteId] = useState('')
+  const [deletingId, setDeletingId] = useState('')
   const { dateFrom, dateTo } = useMemo(() => getAccountingHistoryRange(period), [period])
 
   const labels = {
-    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', totalExpenses: 'Jami xarajat', salaryExpenses: 'Maosh xarajatlari', productBazaarExpenses: 'Mahsulot / bozor xarajatlari', otherExpenses: 'Boshqa xarajatlar', investorSupport: 'Investor yordami', cafeIncome: 'Kafe daromadi', investorIncome: 'Investor yordami', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
-    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', totalExpenses: 'Всего расходов', salaryExpenses: 'Расходы на зарплаты', productBazaarExpenses: 'Расходы на продукты / базар', otherExpenses: 'Остальные расходы', investorSupport: 'Поддержка инвестора', cafeIncome: 'Доход кафе', investorIncome: 'Поддержка инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
-    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', totalExpenses: 'Total expenses', salaryExpenses: 'Salary expenses', productBazaarExpenses: 'Products / bazaar expenses', otherExpenses: 'Other expenses', investorSupport: 'Investor support', cafeIncome: 'Cafe income', investorIncome: 'Investor support', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
+    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', actions: 'Amallar', remove: 'O‘chirish', confirmRemove: 'Tasdiqlash', removing: 'O‘chirilmoqda...', removeFailed: 'Yozuvni o‘chirib bo‘lmadi.', totalExpenses: 'Jami xarajat', salaryExpenses: 'Maosh xarajatlari', productBazaarExpenses: 'Mahsulot / bozor xarajatlari', otherExpenses: 'Boshqa xarajatlar', investorSupport: 'Investor yordami', cafeIncome: 'Kafe daromadi', investorIncome: 'Investor yordami', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
+    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', actions: 'Действия', remove: 'Удалить', confirmRemove: 'Подтвердить', removing: 'Удаление...', removeFailed: 'Не удалось удалить запись.', totalExpenses: 'Всего расходов', salaryExpenses: 'Расходы на зарплаты', productBazaarExpenses: 'Расходы на продукты / базар', otherExpenses: 'Остальные расходы', investorSupport: 'Поддержка инвестора', cafeIncome: 'Доход кафе', investorIncome: 'Поддержка инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
+    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', actions: 'Actions', remove: 'Delete', confirmRemove: 'Confirm', removing: 'Deleting...', removeFailed: 'Could not delete the entry.', totalExpenses: 'Total expenses', salaryExpenses: 'Salary expenses', productBazaarExpenses: 'Products / bazaar expenses', otherExpenses: 'Other expenses', investorSupport: 'Investor support', cafeIncome: 'Cafe income', investorIncome: 'Investor support', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
   }
   const l = labels[lang] || labels.en
 
@@ -160,6 +168,37 @@ export default function AccountingHistory() {
     [visibleRows, rows, accountingOrders]
   )
 
+  async function removeRow(row) {
+    if (!canDelete || deletingId || !row?.id) return
+    if (confirmDeleteId !== row.id) {
+      setConfirmDeleteId(row.id)
+      return
+    }
+
+    const target = getAccountingHistoryDeleteTarget(row)
+    if (!target) return
+    setDeletingId(row.id)
+    setError('')
+    const { data, error: deleteError } = await supabase
+      .from(target.table)
+      .delete()
+      .eq('id', target.id)
+      .select('id')
+    setDeletingId('')
+
+    if (deleteError || !data?.length) {
+      setError(deleteError?.message || l.removeFailed)
+      return
+    }
+
+    setConfirmDeleteId('')
+    if (target.table === 'expenses') {
+      setExpenseRows(current => current.filter(item => item.id !== row.id))
+    } else {
+      setSalaryRows(current => current.filter(item => item.id !== row.id))
+    }
+  }
+
   return (
     <AppShell title={l.title}>
       <div className="h-full overflow-y-auto bg-[#FAF7F0]">
@@ -194,11 +233,11 @@ export default function AccountingHistory() {
             {loading ? <OperationalLoading title={l.title} description="" /> : visibleRows.length === 0 ? <div className="p-12 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div> : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1100px] border-collapse text-left">
-                  <thead className="bg-[#F9FAFB] text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]"><tr>{[l.date, l.expense, l.category, l.amount, l.method, l.vendor, l.description, l.author].map(heading => <th key={heading} className="border-b border-[#E5E7EB] px-4 py-3">{heading}</th>)}</tr></thead>
+                  <thead className="bg-[#F9FAFB] text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]"><tr>{[l.date, l.expense, l.category, l.amount, l.method, l.vendor, l.description, l.author, ...(canDelete ? [l.actions] : [])].map(heading => <th key={heading} className="border-b border-[#E5E7EB] px-4 py-3">{heading}</th>)}</tr></thead>
                   {rowsByDate.map(group => (
                     <tbody key={group.date}>
                       <tr className="bg-blue-50/70">
-                        <td colSpan={8} className="border-y border-blue-100 px-4 py-2.5">
+                        <td colSpan={canDelete ? 9 : 8} className="border-y border-blue-100 px-4 py-2.5">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-sm font-black text-blue-700">{formatLongDate(group.date, lang, group.date)}</span>
@@ -225,6 +264,19 @@ export default function AccountingHistory() {
                           <td className="max-w-[220px] px-4 py-3 text-sm font-semibold text-[#4B5563]">{row.vendor || '—'}</td>
                           <td className="max-w-[260px] break-words px-4 py-3 text-sm font-semibold text-[#4B5563]">{row.description || (row.is_salary_payment ? l.salaryPayment : row.is_salary_bonus ? l.salaryBonus : '—')}</td>
                           <td className="px-4 py-3 text-sm font-semibold text-[#6B7280]">{row.created_by_name || '—'}</td>
+                          {canDelete && <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              disabled={Boolean(deletingId)}
+                              onClick={() => removeRow(row)}
+                              className={`inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3 text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                confirmDeleteId === row.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-red-200 hover:text-red-600'
+                              }`}
+                            >
+                              <Trash2 size={14} />
+                              {deletingId === row.id ? l.removing : confirmDeleteId === row.id ? l.confirmRemove : l.remove}
+                            </button>
+                          </td>}
                         </tr>
                       })}
                     </tbody>

@@ -329,6 +329,8 @@ export function buildSalaryPaymentExpenseRows(salaryProfiles = [], dateFrom, dat
       if (amount <= 0) continue
       rows.push({
         id: `salary-payment-${payment.id}`,
+        source_id: payment.id,
+        source_table: 'employee_salary_payments',
         expense_date: expenseDate,
         category: getSalaryCategoryForRole(salaryProfile.profile?.role),
         payment_method: payment.payment_method || salaryProfile.payment_method || 'cash',
@@ -358,6 +360,8 @@ export function buildSalaryBonusExpenseRows(salaryProfiles = [], dateFrom, dateT
       if (amount <= 0) continue
       rows.push({
         id: `salary-bonus-${bonus.id}`,
+        source_id: bonus.id,
+        source_table: 'employee_salary_bonuses',
         expense_date: expenseDate,
         category: getSalaryCategoryForRole(salaryProfile.profile?.role),
         payment_method: bonus.payment_method || salaryProfile.payment_method || 'cash',

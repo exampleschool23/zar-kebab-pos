@@ -30,14 +30,14 @@ import {
   Download, X, Printer, Eye, ChevronLeft, ChevronRight,
   Search, SlidersHorizontal, CreditCard,
   Monitor, QrCode, Banknote, UtensilsCrossed,
-  BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck,
+  BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck, Pencil,
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
-import { canDeletePaidOrders, canViewPage } from '../lib/permissions'
+import { canChangeCompletedOrderPaymentMethod, canDeletePaidOrders, canViewPage } from '../lib/permissions'
 import { collectPagedRows, loadOrdersForRange, mergeOrderHistory } from '../lib/orderHistory'
 
 /** Payment method with fallback */
@@ -1211,7 +1211,7 @@ function WaiterPerformanceTab({ orders, lang }) {
 // TAB 6 — ORDER HISTORY
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRatePct, canDeleteOrder, onDeleteOrder, deletingOrderId, confirmDeleteOrderId, onCancelDeleteOrder }) {
+function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRatePct, canDeleteOrder, onDeleteOrder, deletingOrderId, confirmDeleteOrderId, onCancelDeleteOrder, canChangePaymentMethod, paymentMethodOrderId, paymentMethodDraft, onStartPaymentMethodChange, onPaymentMethodDraftChange, onSavePaymentMethod, onCancelPaymentMethod, savingPaymentOrderId }) {
   const [fetchedItems, setFetchedItems] = useState(null)
 
   useEffect(() => {
@@ -1371,11 +1371,64 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
           <Printer size={14} />
           {lang === 'uz' ? 'Bosish' : lang === 'ru' ? 'Печать' : 'Print'}
         </button>
+        {canChangePaymentMethod && (
+          <div className="col-span-2 grid gap-2">
+            {paymentMethodOrderId === order.id ? (
+              <div className="grid gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3">
+                <p className="text-[11px] font-semibold leading-relaxed text-orange-800">
+                  {lang === 'uz'
+                    ? 'Faqat to‘lov turi o‘zgaradi. Buyurtma, summa, holat va sodiqlik ma’lumotlari o‘zgarmaydi.'
+                    : lang === 'ru'
+                      ? 'Изменится только способ оплаты. Заказ, сумма, статус и данные лояльности не изменятся.'
+                      : 'Only the payment method will change. Items, totals, status, and loyalty data stay unchanged.'}
+                </p>
+                <select
+                  value={paymentMethodDraft}
+                  onChange={event => onPaymentMethodDraftChange(event.target.value)}
+                  disabled={savingPaymentOrderId === order.id}
+                  className="h-10 rounded-xl border border-orange-200 bg-white px-3 text-sm font-bold text-[#1F2937] outline-none focus:border-[#ff5a00]"
+                >
+                  <option value="cash">{lang === 'uz' ? 'Naqd' : lang === 'ru' ? 'Наличные' : 'Cash'}</option>
+                  <option value="card">{lang === 'uz' ? 'Karta' : lang === 'ru' ? 'Карта' : 'Card'}</option>
+                  <option value="terminal">Terminal</option>
+                  <option value="qr">{lang === 'uz' ? 'QR kod' : lang === 'ru' ? 'QR-код' : 'QR Code'}</option>
+                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => onSavePaymentMethod(order)}
+                    disabled={savingPaymentOrderId === order.id}
+                    className="rounded-xl bg-[#ff5a00] py-2.5 text-xs font-black text-white hover:bg-[#e65100] disabled:opacity-60"
+                  >
+                    {savingPaymentOrderId === order.id
+                      ? (lang === 'uz' ? 'Saqlanmoqda...' : lang === 'ru' ? 'Сохранение...' : 'Saving...')
+                      : (lang === 'uz' ? 'Saqlash' : lang === 'ru' ? 'Сохранить' : 'Save')}
+                  </button>
+                  <button
+                    onClick={onCancelPaymentMethod}
+                    disabled={savingPaymentOrderId === order.id}
+                    className="rounded-xl border border-[#E5E7EB] bg-white py-2.5 text-xs font-black text-[#6B7280] hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    {lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => onStartPaymentMethodChange(order)}
+                disabled={deletingOrderId === order.id}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 py-2.5 text-[12px] font-black text-[#ff5a00] transition-colors hover:bg-orange-100 disabled:opacity-60"
+              >
+                <Pencil size={14} />
+                {lang === 'uz' ? 'To‘lov turini o‘zgartirish' : lang === 'ru' ? 'Изменить способ оплаты' : 'Change payment method'}
+              </button>
+            )}
+          </div>
+        )}
         {canDeleteOrder && (
           <div className="col-span-2 grid gap-2">
             <button
               onClick={() => onDeleteOrder(order)}
-              disabled={deletingOrderId === order.id}
+              disabled={deletingOrderId === order.id || savingPaymentOrderId === order.id}
               className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-black disabled:opacity-60 transition-colors ${
                 confirmDeleteOrderId === order.id
                   ? 'bg-red-600 text-white hover:bg-red-700'
@@ -1579,6 +1632,7 @@ export default function Reports() {
   const lang         = state.lang
   const serviceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
+  const canChangePaymentMethod = canChangeCompletedOrderPaymentMethod(profile || { role: state.user?.role })
   const canViewExpenses = canViewPage(profile || { role: state.user?.role }, 'expenses')
 
   const [activeTab,     setActiveTab]     = useState('order_history')
@@ -1589,6 +1643,9 @@ export default function Reports() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [deletingOrderId, setDeletingOrderId] = useState('')
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
+  const [paymentMethodOrderId, setPaymentMethodOrderId] = useState('')
+  const [paymentMethodDraft, setPaymentMethodDraft] = useState('cash')
+  const [savingPaymentOrderId, setSavingPaymentOrderId] = useState('')
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [expensesError, setExpensesError] = useState('')
@@ -1742,6 +1799,7 @@ export default function Reports() {
   async function deleteOrder(order) {
     if (!canDeleteOrder || !order?.id || deletingOrderId) return
     if (confirmDeleteOrderId !== order.id) {
+      setPaymentMethodOrderId('')
       setConfirmDeleteOrderId(order.id)
       return
     }
@@ -1754,6 +1812,43 @@ export default function Reports() {
       }
     } finally {
       setDeletingOrderId('')
+    }
+  }
+
+  function startPaymentMethodChange(order) {
+    if (!canChangePaymentMethod || !order?.id) return
+    const currentMethod = ['cash', 'card', 'terminal', 'qr'].includes(order.payment_method)
+      ? order.payment_method
+      : 'cash'
+    setConfirmDeleteOrderId('')
+    setPaymentMethodDraft(currentMethod)
+    setPaymentMethodOrderId(order.id)
+  }
+
+  async function saveCompletedOrderPaymentMethod(order) {
+    if (!canChangePaymentMethod || !order?.id || savingPaymentOrderId || paymentMethodOrderId !== order.id) return
+    const orderIds = [...new Set((order._mergedIds?.length ? order._mergedIds : [order.id]).filter(Boolean))]
+    setSavingPaymentOrderId(order.id)
+    try {
+      const result = await dispatch({
+        type: 'CHANGE_PAID_ORDER_PAYMENT_METHOD',
+        payload: { orderIds, paymentMethod: paymentMethodDraft },
+      })
+      if (result?.error) return
+      setSelectedOrder(current => current?.id === order.id
+        ? {
+            ...current,
+            payment_method: paymentMethodDraft,
+            payments: (current.payments || []).map(payment => payment.method === 'loyalty_card'
+              ? payment
+              : { ...payment, method: paymentMethodDraft }
+            ),
+          }
+        : current
+      )
+      setPaymentMethodOrderId('')
+    } finally {
+      setSavingPaymentOrderId('')
     }
   }
 
@@ -1992,7 +2087,11 @@ export default function Reports() {
               <OrderDrawer
                 order={selectedOrder}
                 menuItemMap={menuItemMap}
-                onClose={() => setSelectedOrder(null)}
+                onClose={() => {
+                  setSelectedOrder(null)
+                  setPaymentMethodOrderId('')
+                  setConfirmDeleteOrderId('')
+                }}
                 navigate={navigate}
                 lang={lang}
                 serviceRatePct={serviceRatePct}
@@ -2001,6 +2100,14 @@ export default function Reports() {
                 deletingOrderId={deletingOrderId}
                 confirmDeleteOrderId={confirmDeleteOrderId}
                 onCancelDeleteOrder={() => setConfirmDeleteOrderId('')}
+                canChangePaymentMethod={canChangePaymentMethod}
+                paymentMethodOrderId={paymentMethodOrderId}
+                paymentMethodDraft={paymentMethodDraft}
+                onStartPaymentMethodChange={startPaymentMethodChange}
+                onPaymentMethodDraftChange={setPaymentMethodDraft}
+                onSavePaymentMethod={saveCompletedOrderPaymentMethod}
+                onCancelPaymentMethod={() => setPaymentMethodOrderId('')}
+                savingPaymentOrderId={savingPaymentOrderId}
               />
             </div>
           </>

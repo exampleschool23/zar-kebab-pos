@@ -55,6 +55,25 @@ function getOrderPayments(order) {
     .filter(row => row.method && row.amount > 0)
 }
 
+function getLoyaltyUsedAmount(order) {
+  return Math.max(0, Math.round(Number(
+    order?.loyalty_used_amount ??
+    order?.loyalty_redeem_amount ??
+    order?.loyalty_discount_amount ??
+    0
+  ) || 0))
+}
+
+function getLoyaltyOwnerNames(order) {
+  const transactions = Array.isArray(order?.loyalty_transactions)
+    ? order.loyalty_transactions
+    : []
+  return [...new Set([
+    order?.loyalty_customer_name,
+    ...transactions.map(transaction => transaction?.customer_name_at_transaction),
+  ].map(value => String(value || '').trim()).filter(Boolean))]
+}
+
 export function mergeCompletedOrders(orders = []) {
   const rows = orders.filter(Boolean)
   if (rows.length <= 1) return rows[0] || null
@@ -64,6 +83,7 @@ export function mergeCompletedOrders(orders = []) {
   const waiterNames = unique(rows.map(order => order.waiter_name))
   const completedByNames = unique(rows.map(order => order.completed_by_name))
   const priceModes = unique(rows.map(order => normalizePriceMode(order.price_mode)))
+  const loyaltyOwnerNames = unique(rows.flatMap(order => getLoyaltyOwnerNames(order)))
   const paymentsByMethod = new Map()
 
   for (const order of rows) {
@@ -81,6 +101,8 @@ export function mergeCompletedOrders(orders = []) {
     subtotal: rows.reduce((sum, order) => sum + (Number(order.subtotal) || 0), 0),
     service_fee: rows.reduce((sum, order) => sum + (Number(order.service_fee) || 0), 0),
     total: rows.reduce((sum, order) => sum + (Number(order.total) || 0), 0),
+    loyalty_used_amount: rows.reduce((sum, order) => sum + getLoyaltyUsedAmount(order), 0),
+    loyalty_customer_name: loyaltyOwnerNames.join(', '),
     items: rows.flatMap(order => getOrderItems(order)),
     payments: paymentsByMethod.size > 0
       ? [...paymentsByMethod].map(([method, amount]) => ({ method, amount }))
@@ -240,6 +262,8 @@ export function buildCompletedOrderGroupMessage(order) {
   const serviceRate = Number.isFinite(Number(order?.service_rate_pct))
     ? Number(order.service_rate_pct)
     : 0
+  const loyaltyUsed = getLoyaltyUsedAmount(order)
+  const loyaltyOwnerNames = getLoyaltyOwnerNames(order)
   const closedAt = formatTelegramDateTime(order?.paid_at || order?.updated_at || order?.created_at)
   const lines = [
     isOffPremiseOrder(order)
@@ -255,6 +279,12 @@ export function buildCompletedOrderGroupMessage(order) {
   lines.push('')
   lines.push(`Сумма заказа: ${escapeTelegramHtml(formatMoney(subtotal))}`)
   if (serviceFee > 0) lines.push(`Сервис ${escapeTelegramHtml(serviceRate)}%: ${escapeTelegramHtml(formatMoney(serviceFee))}`)
+  if (loyaltyUsed > 0) {
+    lines.push(`Лояльность: - ${escapeTelegramHtml(formatMoney(loyaltyUsed))}`)
+    if (loyaltyOwnerNames.length > 0) {
+      lines.push(`Владелец карты: ${escapeTelegramHtml(loyaltyOwnerNames.join(', '))}`)
+    }
+  }
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
   if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
     lines.push(`Доход · Сегодня: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)

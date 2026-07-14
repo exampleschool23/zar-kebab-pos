@@ -191,6 +191,57 @@ test('completed group message shows split payment methods with amounts', () => {
   assert.match(message, /Оплата: Наличные 60 000 UZS, Карта 40 000 UZS/)
 })
 
+test('completed group message shows loyalty usage and the card owner snapshot', () => {
+  const message = buildCompletedOrderGroupMessage({
+    table_name: 'Take Away',
+    waiter_name: 'Zar kebab',
+    completed_by_name: 'Диля Камолова',
+    order_type: 'take_away',
+    subtotal: 35000,
+    service_fee: 0,
+    total: 20000,
+    loyalty_used_amount: 15000,
+    payment_status: 'paid',
+    paid_at: '2026-07-14T17:17:00.000Z',
+    payments: [{ method: 'cash', amount: 20000 }],
+    loyalty_transactions: [{
+      type: 'redeemed',
+      customer_name_at_transaction: 'Shohsanam & Fransiya',
+      card_number_at_transaction: '77761225',
+    }],
+  })
+
+  assert.match(message, /Сумма заказа: 35 000 UZS/)
+  assert.match(message, /Лояльность: - 15 000 UZS/)
+  assert.match(message, /Владелец карты: Shohsanam &amp; Fransiya/)
+  assert.match(message, /Оплата: Наличные 20 000 UZS/)
+})
+
+test('merged completed rounds aggregate loyalty without changing payment amounts', () => {
+  const order = mergeCompletedOrders([
+    {
+      id: 'first',
+      subtotal: 20000,
+      total: 15000,
+      loyalty_used_amount: 5000,
+      payments: [{ method: 'cash', amount: 15000 }],
+      loyalty_transactions: [{ customer_name_at_transaction: 'Card Owner' }],
+    },
+    {
+      id: 'second',
+      subtotal: 30000,
+      total: 20000,
+      loyalty_redeem_amount: 10000,
+      payments: [{ method: 'cash', amount: 20000 }],
+      loyalty_transactions: [{ customer_name_at_transaction: 'Card Owner' }],
+    },
+  ])
+
+  assert.equal(order.loyalty_used_amount, 15000)
+  assert.equal(order.loyalty_customer_name, 'Card Owner')
+  assert.deepEqual(order.payments, [{ method: 'cash', amount: 35000 }])
+})
+
 test('customer status message escapes order labels', () => {
   const message = buildCustomerStatusMessage('completed', { order_number: 'TG<&1>' })
   assert.match(message, /Order completed\nOrder TG&lt;&amp;1&gt;/)

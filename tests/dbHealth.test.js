@@ -59,6 +59,7 @@ test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)
   assert.deepEqual(result.failed.map(check => check.name).sort(), [
+    'change_paid_order_payment_method_owner',
     'order_payments',
     'settle_loyalty_wallet_payment',
     'settle_orders_payment',
@@ -67,4 +68,5 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.equal(result.failed.find(check => check.name === 'order_payments').messageKey, 'rawError')
   assert.match(result.failed.find(check => check.name === 'settle_loyalty_wallet_payment').hint, /027_atomic_loyalty_wallet_settlement/)
   assert.match(result.failed.find(check => check.name === 'settle_orders_payment').hint, /083_atomic_order_payment_settlement/)
+  assert.match(result.failed.find(check => check.name === 'change_paid_order_payment_method_owner').hint, /090_owner_change_completed_order_payment_method/)
 })

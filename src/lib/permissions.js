@@ -124,6 +124,10 @@ export function canDeletePaidOrders(profileOrRole) {
   return canViewPage(profileOrRole, 'delete_paid_orders')
 }
 
+export function canChangeCompletedOrderPaymentMethod(profileOrRole) {
+  return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
+}
+
 export function canMoveBackToTable(profileOrRole) {
   return canViewPage(profileOrRole, 'move_back_to_table')
 }

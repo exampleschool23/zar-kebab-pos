@@ -9,6 +9,9 @@ export function appMetaReducer(state, action) {
     case 'SET_TABLE':
       return { ...state, currentTableId: action.payload }
 
+    case 'SET_LOADING':
+      return { ...state, loaded: false, loadError: null }
+
     case 'SET_LOADED':
       return { ...state, loaded: true, loadError: null }
 

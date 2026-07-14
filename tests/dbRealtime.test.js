@@ -199,3 +199,32 @@ test('idle recovery helpers refresh auth session and classify stale connection e
   assert.equal(isRecoverableIdleError(new Error('Realtime connection timed out')), true)
   assert.equal(isRecoverableIdleError(new Error('duplicate key value violates unique constraint')), false)
 })
+
+test('session refresh errors are surfaced instead of allowing anonymous POS reads', async () => {
+  const getSessionError = new Error('Session lookup failed')
+  await assert.rejects(
+    refreshSupabaseSession({
+      auth: {
+        async getSession() {
+          return { data: { session: null }, error: getSessionError }
+        },
+      },
+    }),
+    getSessionError
+  )
+
+  const refreshError = new Error('JWT refresh failed')
+  await assert.rejects(
+    refreshSupabaseSession({
+      auth: {
+        async getSession() {
+          return { data: { session: { user: { id: 'u1' } } }, error: null }
+        },
+        async refreshSession() {
+          return { data: { session: null }, error: refreshError }
+        },
+      },
+    }),
+    refreshError
+  )
+})

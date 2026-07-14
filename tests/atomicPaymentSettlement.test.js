@@ -8,10 +8,14 @@ const migration = readFileSync(
   new URL('../supabase/083_atomic_order_payment_settlement.sql', import.meta.url),
   'utf8'
 )
+const loyaltyAmbiguityFixMigration = readFileSync(
+  new URL('../supabase/088_fix_loyalty_payment_card_number_ambiguity.sql', import.meta.url),
+  'utf8'
+)
 
 function paymentCaseSource() {
   const start = dbSource.indexOf("case 'MARK_ORDER_PAID':")
-  const end = dbSource.indexOf("case 'DELETE_ORDER':", start)
+  const end = dbSource.indexOf("case 'CHANGE_PAID_ORDER_PAYMENT_METHOD':", start)
   return dbSource.slice(start, end)
 }
 
@@ -110,6 +114,10 @@ test('loyalty settlement locks the card and derives cashback from its database t
   const fn = settlementFunctionSource()
 
   assert.match(fn, /from public\.loyalty_cards c[\s\S]*for update/)
+  assert.match(fn, /loyalty_card_number_value text :=/)
+  assert.match(fn, /where c\.card_number = loyalty_card_number_value/)
+  assert.doesNotMatch(fn, /\bcard_number text :=/)
+  assert.doesNotMatch(fn, /where c\.card_number = card_number/)
   assert.match(fn, /requested_redeem > coalesce\(card_row\.balance, 0\)/)
   assert.match(fn, /card_type := lower\(coalesce\(card_row\.cashback_type, 'bronze'\)\)/)
   assert.match(fn, /when 'bronze' then 3/)
@@ -118,6 +126,13 @@ test('loyalty settlement locks the card and derives cashback from its database t
   assert.match(fn, /'redeemed', -loyalty_for_order::integer/)
   assert.match(fn, /'cashback_earned', cashback_for_order::integer/)
   assert.match(fn, /update public\.loyalty_cards/)
+})
+
+test('forward migration repairs the deployed strict settlement function card-number ambiguity', () => {
+  assert.match(loyaltyAmbiguityFixMigration, /settle_orders_payment_strict\(jsonb\)/)
+  assert.match(loyaltyAmbiguityFixMigration, /pg_get_functiondef/)
+  assert.match(loyaltyAmbiguityFixMigration, /where c\.card_number = loyalty_card_number_value/)
+  assert.match(loyaltyAmbiguityFixMigration, /Could not safely rewrite ambiguous loyalty card variable/)
 })
 
 test('order, split payment, loyalty, and table writes share one rollback boundary', () => {

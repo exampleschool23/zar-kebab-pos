@@ -45,6 +45,7 @@ const MIGRATION_HINTS = {
   submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
   settle_orders_payment: 'Run supabase/083_atomic_order_payment_settlement.sql',
+  change_paid_order_payment_method_owner: 'Run supabase/090_owner_change_completed_order_payment_method.sql',
 }
 
 function missingColumnMessage(error) {
@@ -76,8 +77,8 @@ async function checkTable(dbClient, check) {
   }
 }
 
-async function checkRpc(dbClient, name) {
-  const { error } = await dbClient.rpc(name, { payload: {} })
+async function checkRpc(dbClient, name, args = { payload: {} }) {
+  const { error } = await dbClient.rpc(name, args)
   if (!error) return { type: 'rpc', name, ok: true, messageKey: 'ok' }
   const message = `${error.code || ''} ${error.message || ''} ${error.details || ''}`.toLowerCase()
   const missing = message.includes('could not find the function') ||
@@ -99,6 +100,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'submit_order_to_kitchen'))
   checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))
   checks.push(await checkRpc(dbClient, 'settle_orders_payment'))
+  checks.push(await checkRpc(dbClient, 'change_paid_order_payment_method_owner', { p_order_ids: [], p_payment_method: 'cash' }))
   const failed = checks.filter(check => !check.ok)
   return {
     ok: failed.length === 0,

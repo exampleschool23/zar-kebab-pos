@@ -27,6 +27,8 @@ import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
 import { formatDateTime, formatElapsedSince, formatTime, parseInstantDate } from '../lib/dateFormat'
 import { canDeletePaidOrders, canEditFeature, canMoveBackToTable } from '../lib/permissions'
 import { getOrderItemOptionLines } from '../components/MenuProductCards'
+import { useAppDataStatus } from '../store/appHooks'
+import { OperationalError, OperationalLoading } from '../components/OperationalState'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -602,6 +604,7 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle, onOpenReceipt }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CashierTables() {
   const { state, dispatch } = useApp()
+  const { loaded, loadError } = useAppDataStatus()
   const { profile } = useAuth()
   const navigate            = useNavigate()
   const lang                = state.lang
@@ -836,6 +839,29 @@ export default function CashierTables() {
     } finally {
       setQuickAddBusyKey('')
     }
+  }
+
+  if (!loaded || loadError) {
+    return (
+      <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
+        <div className="hidden h-full flex-shrink-0 lg:block"><UnifiedSidebar /></div>
+        <div className="flex-1 overflow-y-auto">
+          {!loaded ? (
+            <OperationalLoading
+              title={lang === 'uz' ? 'Kassa yuklanmoqda' : lang === 'ru' ? 'Загрузка кассы' : 'Loading cashier'}
+              description={lang === 'uz' ? 'Faol hisoblar va bugungi to‘lovlar olinmoqda.' : lang === 'ru' ? 'Получаем активные счета и сегодняшние платежи.' : 'Fetching active bills and today’s payments.'}
+            />
+          ) : (
+            <OperationalError
+              title={lang === 'uz' ? 'Kassani yuklab bo‘lmadi' : lang === 'ru' ? 'Не удалось загрузить кассу' : 'Could not load cashier'}
+              description={loadError}
+              actionLabel={lang === 'uz' ? 'Qayta yuklash' : lang === 'ru' ? 'Перезагрузить' : 'Reload'}
+              onAction={() => window.location.reload()}
+            />
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (

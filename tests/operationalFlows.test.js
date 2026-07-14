@@ -54,6 +54,59 @@ test('end-to-end floor flow: waiter sends, kitchen marks ready, waiter requests 
   assert.equal(paid.orders[0].payment_method, 'cash')
 })
 
+test('owner correction changes only the completed order payment method', () => {
+  const base = {
+    ...state(),
+    tables: [{ id: 't1', name: 'Table 1', status: 'available', is_active: true }],
+    orders: [
+      {
+        id: 'o1',
+        table_id: 't1',
+        status: 'paid',
+        payment_status: 'paid',
+        paid_at: '2026-07-14T18:00:00.000Z',
+        payment_method: 'mixed',
+        payments: [
+          { method: 'cash', amount: 105000 },
+          { method: 'loyalty_card', amount: 5000 },
+        ],
+        completed_by: 'cashier-1',
+        completed_by_name: 'Cashier',
+        loyalty_card_number: '77761225',
+        loyalty_used_amount: 5000,
+        loyalty_discount_amount: 5000,
+        loyalty_redeem_amount: 5000,
+        cashback_earned: 4750,
+        cashback_percent: 5,
+        order_type: 'dine_in',
+        service_rate_pct: 15,
+        items: [{ id: 'i1', menu_item_id: 'm1', name: 'Shashlik', price: 100000, quantity: 1, status: 'served' }],
+        subtotal: 100000,
+        service_fee: 15000,
+        total: 110000,
+      },
+    ],
+    cart: [],
+  }
+
+  const before = structuredClone(base.orders[0])
+  const changed = ordersReducer(base, {
+    type: 'CHANGE_PAID_ORDER_PAYMENT_METHOD',
+    payload: { orderIds: ['o1'], paymentMethod: 'terminal' },
+  })
+
+  assert.equal(changed.orders[0].payment_method, 'terminal')
+  assert.deepEqual(changed.orders[0].payments, [
+    { method: 'terminal', amount: 105000 },
+    { method: 'loyalty_card', amount: 5000 },
+  ])
+  assert.deepEqual(
+    { ...changed.orders[0], payment_method: before.payment_method, payments: before.payments },
+    before
+  )
+  assert.deepEqual(changed.tables, base.tables)
+})
+
 test('kitchen can cancel one unavailable item without cancelling the rest of the order', () => {
   const sent = ordersReducer(state(), {
     type: 'SEND_TO_KITCHEN',

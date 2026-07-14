@@ -433,6 +433,27 @@ export function ordersReducer(state, action) {
       }
     }
 
+    case 'CHANGE_PAID_ORDER_PAYMENT_METHOD': {
+      const orderIds = new Set((action.payload?.orderIds || []).filter(Boolean))
+      const paymentMethod = String(action.payload?.paymentMethod || '').trim().toLowerCase()
+      if (orderIds.size === 0 || !['cash', 'card', 'terminal', 'qr'].includes(paymentMethod)) return state
+      return {
+        ...state,
+        orders: state.orders.map(order => orderIds.has(order.id)
+          ? {
+              ...order,
+              payment_method: paymentMethod,
+              payments: (order.payments || []).map(payment => (
+                payment.method === 'loyalty_card'
+                  ? payment
+                  : { ...payment, method: paymentMethod }
+              )),
+            }
+          : order
+        ),
+      }
+    }
+
     case 'DELETE_ORDER': {
       const orderId = typeof action.payload === 'string' ? action.payload : action.payload?.orderId
       if (!orderId) return state

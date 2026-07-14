@@ -165,15 +165,16 @@ export function isRecoverableIdleError(error) {
 export async function refreshSupabaseSession(dbClient = supabase) {
   const auth = dbClient?.auth
   if (!auth?.getSession) return null
-  try {
-    const { data } = await auth.getSession()
-    if (data?.session && auth.refreshSession) {
-      await auth.refreshSession()
-    }
-    return data?.session || null
-  } catch {
-    return null
+  const { data, error } = await auth.getSession()
+  if (error) throw error
+
+  let activeSession = data?.session || null
+  if (activeSession && auth.refreshSession) {
+    const { data: refreshedData, error: refreshError } = await auth.refreshSession()
+    if (refreshError) throw refreshError
+    activeSession = refreshedData?.session || activeSession
   }
+  return activeSession
 }
 
 async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, items, paymentFields, state, action, signal }) {
@@ -1033,6 +1034,18 @@ export async function writeToSupabase(action, state, options = {}) {
         throw new Error('No unpaid orders were settled. Refresh and try again.')
       }
       notifyTelegramOrderStatus(paidOrderIds, 'completed')
+      break
+    }
+
+    case 'CHANGE_PAID_ORDER_PAYMENT_METHOD': {
+      const orderIds = (action.payload?.orderIds || []).filter(Boolean)
+      const paymentMethod = String(action.payload?.paymentMethod || '').trim().toLowerCase()
+      if (orderIds.length === 0 || !paymentMethod) return
+      const { error } = await supabase.rpc('change_paid_order_payment_method_owner', {
+        p_order_ids: orderIds,
+        p_payment_method: paymentMethod,
+      })
+      if (error) throw error
       break
     }
 

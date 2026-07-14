@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   filterAccountingHistoryRows,
+  getAccountingHistoryDeleteTarget,
   getAccountingExpenseBreakdown,
   getAccountingHistoryPageSummary,
   getAccountingPageSummary,
@@ -119,6 +120,22 @@ test('All Accounting filters by entry type and localized searchable fields', () 
   assert.deepEqual(filterAccountingHistoryRows(rows, { query: 'Продукты', lang: 'ru' }).map(row => row.id), ['bazaar'])
   assert.deepEqual(filterAccountingHistoryRows(rows, { query: 'terminal', lang: 'en' }).map(row => row.id), ['investor'])
   assert.deepEqual(filterAccountingHistoryRows(rows, { query: 'salary payment' }).map(row => row.id), ['salary'])
+})
+
+test('All Accounting removal targets the underlying financial record', () => {
+  assert.deepEqual(
+    getAccountingHistoryDeleteTarget({ id: 'expense-1', category: 'products_bazaar' }),
+    { table: 'expenses', id: 'expense-1' }
+  )
+  assert.deepEqual(
+    getAccountingHistoryDeleteTarget({ id: 'salary-payment-payment-1', source_id: 'payment-1', is_salary_payment: true }),
+    { table: 'employee_salary_payments', id: 'payment-1' }
+  )
+  assert.deepEqual(
+    getAccountingHistoryDeleteTarget({ id: 'salary-bonus-bonus-1', source_id: 'bonus-1', is_salary_bonus: true }),
+    { table: 'employee_salary_bonuses', id: 'bonus-1' }
+  )
+  assert.equal(getAccountingHistoryDeleteTarget(null), null)
 })
 
 test('All Accounting daily headers keep full-day cafe, expense, and investor totals when rows are filtered', () => {

@@ -10,6 +10,8 @@ import { tablesReducer } from './tablesReducer'
 import { isOffPremiseOrderType } from '../lib/orderTypes'
 import { DEFAULT_PRICE_MODE, normalizePriceMode, withPriceModeFields } from '../lib/priceModes'
 import { isWriteTimeoutError, withWriteTimeout } from '../lib/writeTimeout'
+import { formatWriteError } from '../lib/writeErrorMessage'
+import { useAuth } from '../contexts/AuthContext'
 
 const AppContext = createContext(null)
 
@@ -20,6 +22,7 @@ const WRITE_BEFORE_LOCAL_ACTIONS = new Set([
   'MARK_TABLE_NEEDS_BILL',
   'RECALL_TABLE_FROM_CASHIER',
   'MARK_ORDER_PAID',
+  'CHANGE_PAID_ORDER_PAYMENT_METHOD',
   'DELETE_ORDER',
   'DELETE_MENU_ITEM',
 ])
@@ -68,6 +71,8 @@ function reducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
+  const { loading: authLoading, session } = useAuth()
+  const sessionUserId = session?.user?.id || null
 
   // Always-current state reference for async callbacks (avoids stale closures)
   const stateRef = useRef(state)
@@ -156,11 +161,7 @@ export function AppProvider({ children }) {
             type: 'SET_CONNECTION_NOTICE',
             payload: {
               tone: 'error',
-              message: stateRef.current.lang === 'ru'
-                ? 'Не удалось сохранить изменения. Проверьте подключение.'
-                : stateRef.current.lang === 'uz'
-                  ? 'O‘zgarishlarni saqlab bo‘lmadi. Internet ulanishini tekshiring.'
-                  : 'Could not save changes. Check the connection.',
+              message: formatWriteError(err, stateRef.current.lang, action.type),
             },
           })
           return { error: err }
@@ -179,11 +180,7 @@ export function AppProvider({ children }) {
           type: 'SET_CONNECTION_NOTICE',
           payload: {
             tone: 'error',
-            message: stateRef.current.lang === 'ru'
-              ? 'Не удалось сохранить изменения. Проверьте подключение.'
-              : stateRef.current.lang === 'uz'
-                ? 'O‘zgarishlarni saqlab bo‘lmadi. Internet ulanishini tekshiring.'
-                : 'Could not save changes. Check the connection.',
+            message: formatWriteError(err, stateRef.current.lang, action.type),
           },
         })
         return { error: err }
@@ -192,6 +189,8 @@ export function AppProvider({ children }) {
 
   // Load from Supabase on mount + subscribe to realtime
   useEffect(() => {
+    if (authLoading) return undefined
+
     let unsubscribe = () => {}
     let mounted = true
     let hydrateInFlight = false
@@ -203,7 +202,10 @@ export function AppProvider({ children }) {
       if (hydrateInFlight) return
       hydrateInFlight = true
       try {
-        await refreshSupabaseSession()
+        const activeSession = await refreshSupabaseSession()
+        if (sessionUserId && activeSession?.user?.id !== sessionUserId) {
+          throw new Error('The signed-in session could not be restored. Please reload and sign in again.')
+        }
         const { tables, tableZones, categories, menuItems, orders, settings } = await loadPOSData()
         if (!mounted) return
         dispatch({ type: 'SET_TABLES',     payload: tables })
@@ -263,6 +265,7 @@ export function AppProvider({ children }) {
             }, 2200)
           })
           .catch(err => {
+            if (!mounted) return
             console.error('[db] idle recovery failed:', err)
             dispatch({
               type: 'SET_CONNECTION_NOTICE',
@@ -289,11 +292,13 @@ export function AppProvider({ children }) {
 
     recoverFromIdleRef.current = () => scheduleIdleRecovery(0)
 
+    dispatch({ type: 'SET_LOADING' })
     hydratePOSData()
       .then(() => {
         if (mounted) connectRealtime()
       })
       .catch(err => {
+        if (!mounted) return
         console.error('[db] initial load failed:', err)
         dispatch({ type: 'SET_LOAD_ERROR', payload: err?.message || 'Failed to load POS data' })
       })
@@ -320,12 +325,12 @@ export function AppProvider({ children }) {
       }
       unsubscribe()
     }
-  }, [])
+  }, [authLoading, sessionUserId])
 
   return (
     <AppContext.Provider value={{ state, dispatch: dbDispatch }}>
       {state.connectionNotice && (
-        <div className={`fixed top-3 left-1/2 z-[9999] -translate-x-1/2 rounded-xl px-4 py-2 text-sm font-semibold shadow-lg ${
+        <div role="alert" className={`fixed top-3 left-1/2 z-[9999] max-w-[calc(100vw-2rem)] -translate-x-1/2 break-words rounded-xl px-4 py-2 text-center text-sm font-semibold shadow-lg ${
           state.connectionNotice.tone === 'error'
             ? 'bg-red-600 text-white'
             : state.connectionNotice.tone === 'success'

@@ -94,6 +94,19 @@ export function filterAccountingHistoryRows(rows = [], { type = 'all', query = '
   })
 }
 
+export function getAccountingHistoryDeleteTarget(row) {
+  if (!row?.id) return null
+  if (row.is_salary_payment) {
+    const id = row.source_id || String(row.id).replace(/^salary-payment-/, '')
+    return id ? { table: 'employee_salary_payments', id } : null
+  }
+  if (row.is_salary_bonus) {
+    const id = row.source_id || String(row.id).replace(/^salary-bonus-/, '')
+    return id ? { table: 'employee_salary_bonuses', id } : null
+  }
+  return { table: 'expenses', id: row.id }
+}
+
 export function getAccountingHistoryPageSummary(rows = [], orders = [], dateFrom, dateTo) {
   const incomeSummary = summarizeIncomeEntries(rows)
   return {

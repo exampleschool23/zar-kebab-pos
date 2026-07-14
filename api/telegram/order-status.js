@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin()
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, price_mode, selected_options, notes, status), payments:order_payments(method, amount)')
+      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, loyalty_card_number, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, price_mode, selected_options, notes, status), payments:order_payments(method, amount), loyalty_transactions(type, customer_name_at_transaction, card_number_at_transaction)')
       .in('id', orderIds)
     if (error) throw error
     if (!orders?.length) {

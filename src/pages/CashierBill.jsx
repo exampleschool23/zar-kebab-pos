@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Printer, CheckCircle2, Banknote, CreditCard,
   Receipt, Users, Clock, Tag, UtensilsCrossed, Menu as MenuIcon,
-  Monitor, QrCode, MoreHorizontal, Plus, Minus, Trash2,
+  Monitor, QrCode, MoreHorizontal, Plus, Minus, Trash2, ClipboardPaste,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -282,8 +282,8 @@ export default function CashierBill() {
     updatePayment(activePaymentId, { method })
   }
 
-  async function checkLoyaltyCard() {
-    const cardNumber = String(loyaltyCardNumber || '').trim()
+  async function checkLoyaltyCard(cardNumberOverride) {
+    const cardNumber = String(cardNumberOverride ?? loyaltyCardNumber ?? '').trim()
     setLoyaltyCard(null)
     setLoyaltyLookupMessage('')
     if (!/^\d{8}$/.test(cardNumber)) {
@@ -310,6 +310,24 @@ export default function CashierBill() {
       setLoyaltyLookupMessage(error?.message || lbl.loyaltyLookupFailed)
     } finally {
       setCheckingLoyalty(false)
+    }
+  }
+
+  async function pasteLoyaltyCardNumber() {
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      const cardNumber = String(clipboardText || '').replace(/\D/g, '').slice(0, 8)
+      if (!cardNumber) {
+        setLoyaltyLookupMessage(lbl.clipboardNoCardNumber)
+        return
+      }
+      setLoyaltyCardNumber(cardNumber)
+      setLoyaltyCard(null)
+      setLoyaltyRedeemAmount('')
+      setLoyaltyLookupMessage('')
+      await checkLoyaltyCard(cardNumber)
+    } catch {
+      setLoyaltyLookupMessage(lbl.clipboardUnavailable)
     }
   }
 
@@ -454,9 +472,14 @@ export default function CashierBill() {
     deletingOrder: lang === 'uz' ? 'O‘chirilmoqda...' : lang === 'ru' ? 'Удаление...' : 'Deleting...',
     cancelDelete: lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel',
     loyaltyLabel: lang === 'uz' ? 'Sodiqlik kartasi' : lang === 'ru' ? 'Карта лояльности' : 'Loyalty Card',
+    cardOwner: lang === 'uz' ? 'Karta egasi' : lang === 'ru' ? 'Владелец карты' : 'Card owner',
+    unnamedCardOwner: lang === 'uz' ? 'Ism ko‘rsatilmagan' : lang === 'ru' ? 'Имя не указано' : 'Name not provided',
     cashbackBalance: lang === 'uz' ? 'Cashback balansi' : lang === 'ru' ? 'Баланс кешбэка' : 'Cashback balance',
     useLoyalty:   lang === 'uz' ? 'Ishlatiladigan sodiqlik summasi' : lang === 'ru' ? 'Сумма лояльности к списанию' : 'Loyalty amount to use',
     cardNumber:   lang === 'uz' ? 'Karta raqami' : lang === 'ru' ? 'Номер карты' : 'Card number',
+    paste:        lang === 'uz' ? 'Qo‘yish' : lang === 'ru' ? 'Вставить' : 'Paste',
+    clipboardNoCardNumber: lang === 'uz' ? 'Buferda karta raqami yo‘q' : lang === 'ru' ? 'В буфере нет номера карты' : 'No card number found in the clipboard',
+    clipboardUnavailable: lang === 'uz' ? 'Buferni o‘qib bo‘lmadi' : lang === 'ru' ? 'Не удалось прочитать буфер обмена' : 'Could not read the clipboard',
     checkCard:    lang === 'uz' ? 'Tekshirish' : lang === 'ru' ? 'Проверить' : 'Check card',
     cashbackToBeEarned: lang === 'uz' ? 'To‘lovdan keyin cashback' : lang === 'ru' ? 'Кешбэк после оплаты' : 'Cashback to be earned',
     cashbackRewardHint: lang === 'uz' ? 'To‘lovdan keyin mukofot' : lang === 'ru' ? 'Награда после оплаты' : 'Reward after payment',
@@ -935,7 +958,15 @@ export default function CashierBill() {
                   />
                   <button
                     type="button"
-                    onClick={checkLoyaltyCard}
+                    onClick={pasteLoyaltyCardNumber}
+                    className="flex flex-shrink-0 items-center justify-center gap-2 rounded-xl border-2 border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-black text-[#1F2937] transition-colors hover:border-[#ff5a00] hover:text-[#ff5a00]"
+                  >
+                    <ClipboardPaste size={16} />
+                    <span className="hidden sm:inline">{lbl.paste}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => checkLoyaltyCard()}
                     disabled={isCheckingLoyalty}
                     className="rounded-xl bg-[#0f3b2e] px-4 py-2.5 text-sm font-black text-white disabled:bg-gray-200 disabled:text-gray-500"
                   >
@@ -947,24 +978,27 @@ export default function CashierBill() {
                 )}
                 {loyaltyCard && (
                   <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs font-bold text-[#16A34A]">{lbl.cashbackBalance}</span>
-                      <button
-                        type="button"
-                        onClick={fillMaxLoyaltyRedeem}
-                        aria-disabled={maxLoyaltyRedeemAmount <= 0}
-                        className={`text-right font-black underline-offset-2 hover:underline ${
-                          maxLoyaltyRedeemAmount > 0
-                            ? 'text-[#16A34A] md:cursor-pointer'
-                            : 'text-[#9CA3AF] md:cursor-not-allowed'
-                        }`}
-                      >
-                        {formatCurrency(loyaltyCard.balance)}
-                      </button>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-[#15803D]">{lbl.cardOwner}</p>
+                        <p className="mt-1 truncate text-sm font-black text-[#1F2937]">{loyaltyCard.customer_name || lbl.unnamedCardOwner}</p>
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        <p className="text-xs font-bold text-[#16A34A]">{lbl.cashbackBalance}</p>
+                        <button
+                          type="button"
+                          onClick={fillMaxLoyaltyRedeem}
+                          aria-disabled={maxLoyaltyRedeemAmount <= 0}
+                          className={`mt-1 font-black underline-offset-2 hover:underline ${
+                            maxLoyaltyRedeemAmount > 0
+                              ? 'text-[#16A34A] md:cursor-pointer'
+                              : 'text-[#9CA3AF] md:cursor-not-allowed'
+                          }`}
+                        >
+                          {formatCurrency(loyaltyCard.balance)}
+                        </button>
+                      </div>
                     </div>
-                    <p className={`mt-1 text-[11px] font-bold ${maxLoyaltyRedeemAmount > 0 ? 'text-[#15803D]' : 'text-[#9CA3AF]'}`}>
-                      {lbl.tapBalanceMax}
-                    </p>
                   </div>
                 )}
                 <div className="mt-3">

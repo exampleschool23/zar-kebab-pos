@@ -107,7 +107,7 @@ declare
   validated_payments jsonb := '[]'::jsonb;
   paid_order_ids text[] := array[]::text[];
   payment_methods text[] := array[]::text[];
-  card_number text := nullif(btrim(payload->>'loyalty_card_number'), '');
+  loyalty_card_number_value text := nullif(btrim(payload->>'loyalty_card_number'), '');
   card_type text;
   payment_method_value text;
   final_payment_method text;
@@ -245,15 +245,15 @@ begin
     raise exception 'No unpaid orders are available to settle' using errcode = 'P0002';
   end if;
 
-  if card_number is null and requested_redeem > 0 then
+  if loyalty_card_number_value is null and requested_redeem > 0 then
     raise exception 'An active loyalty card is required to redeem balance' using errcode = '22023';
   end if;
 
-  if card_number is not null then
+  if loyalty_card_number_value is not null then
     select c.*
       into card_row
       from public.loyalty_cards c
-     where c.card_number = card_number
+     where c.card_number = loyalty_card_number_value
      for update;
 
     if not found or card_row.is_active = false then
@@ -361,7 +361,7 @@ begin
            loyalty_discount_amount = (summary->>'loyalty_used')::integer,
            loyalty_used_amount = (summary->>'loyalty_used')::integer,
            loyalty_redeem_amount = (summary->>'loyalty_used')::integer,
-           loyalty_card_number = card_number,
+           loyalty_card_number = loyalty_card_number_value,
            cashback_earned = (summary->>'cashback')::integer,
            cashback_percent = cashback_percent_value,
            payment_method = final_payment_method
@@ -413,7 +413,7 @@ begin
     where least(orders.range_end, payments.range_end) > greatest(orders.range_start, payments.range_start);
   end if;
 
-  if card_number is not null then
+  if loyalty_card_number_value is not null then
     running_balance := card_row.balance;
 
     for summary in select value from jsonb_array_elements(final_summaries)

@@ -61,6 +61,7 @@ function actionLabel(action, lang) {
     payment_fields_changed: { uz: 'To‘lov summasi o‘zgardi', ru: 'Изменены суммы оплаты', en: 'Payment fields changed' },
     status_changed: { uz: 'Status o‘zgardi', ru: 'Статус изменён', en: 'Status changed' },
     reopen_paid_order: { uz: 'To‘langan buyurtma ochildi', ru: 'Оплаченный заказ открыт', en: 'Paid order reopened' },
+    payment_method_changed: { uz: 'To‘lov turi o‘zgardi', ru: 'Способ оплаты изменён', en: 'Payment method changed' },
     order_item_deleted: { uz: 'Taom o‘chirildi', ru: 'Блюдо удалено', en: 'Order item deleted' },
     order_cancelled: { uz: 'Buyurtma bekor qilindi', ru: 'Заказ отменён', en: 'Order cancelled' },
     settle_loyalty_wallet_payment: { uz: 'Sodiqlik to‘lovi hisoblandi', ru: 'Расчёт оплаты лояльностью', en: 'Loyalty wallet payment settled' },
