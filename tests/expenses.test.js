@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  EXPENSE_CATEGORIES,
+  MANUAL_EXPENSE_CATEGORIES,
   DEFAULT_MONTHLY_RENT_UZS,
   getAccountingHistoryRange,
   buildSalaryBonusExpenseRows,
@@ -150,9 +152,20 @@ test('expense helpers normalize values and labels for accountant entry', () => {
   assert.equal(convertSalaryAmountToDaily(8_000_000, 'monthly'), 266_667)
   assert.equal(convertSalaryAmountToDaily(350_000, 'daily'), 350_000)
   assert.equal(expenseCategoryLabel('salary_manager', 'ru'), 'Зарплата менеджера')
+  assert.equal(expenseCategoryLabel('salary_one_time', 'en'), 'One-time employee salary')
+  assert.equal(expenseCategoryLabel('charcoal', 'uz'), 'Ko‘mir')
   assert.equal(expensePaymentMethodLabel('terminal', 'uz'), 'Terminal')
   assert.equal(expenseMatchesRange({ expense_date: '2026-06-15' }, '2026-06-01', '2026-06-30'), true)
   assert.equal(expenseMatchesRange({ expense_date: '2026-07-01' }, '2026-06-01', '2026-06-30'), false)
+})
+
+test('manual expense categories offer specific tracking choices without removing legacy other labels', () => {
+  const manualKeys = MANUAL_EXPENSE_CATEGORIES.map(category => category.key)
+
+  assert.equal(EXPENSE_CATEGORIES.some(category => category.key === 'other'), true)
+  assert.equal(manualKeys.includes('other'), false)
+  assert.equal(manualKeys.includes('salary_one_time'), true)
+  assert.equal(manualKeys.includes('charcoal'), true)
 })
 
 test('employee salary ledger generates effective-dated daily expense rows and due balance', () => {

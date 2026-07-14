@@ -5,9 +5,49 @@ import {
   buildCompletedOrderGroupMessage,
   buildCustomerStatusMessage,
   getCompletedOrdersChatIds,
+  getRussianOrderItemDisplayName,
   mergeCompletedOrders,
   shouldNotifyCompletedOrderGroup,
 } from '../api/telegram/_lib/orderStatusMessages.js'
+
+test('Telegram completed order names include the selected Qurutoba portion', () => {
+  const menuItem = {
+    name_ru: 'Курутоба',
+    option_groups: [{
+      id: 'variants',
+      options: [
+        { id: 'one', label_ru: 'Курутоб (1 человек)' },
+        { id: 'two-three', label_ru: 'Курутоб (2-3 человека)' },
+      ],
+    }],
+  }
+  const item = {
+    name: 'Qurutoba',
+    selected_options: { variants: 'two-three' },
+  }
+
+  assert.equal(getRussianOrderItemDisplayName(item, menuItem), 'Курутоб (2-3 человека)')
+
+  const message = buildCompletedOrderGroupMessage({
+    table_name: 'Stol 5',
+    payment_status: 'paid',
+    subtotal: 145000,
+    total: 145000,
+    items: [{ ...item, telegram_display_name: getRussianOrderItemDisplayName(item, menuItem), quantity: 1, unit_price: 145000 }],
+  })
+  assert.match(message, /Курутоб \(2-3 человека\)/)
+  assert.doesNotMatch(message, /Курутоба \(1 человек\)/)
+})
+
+test('Telegram item names recover legacy variant labels from notes', () => {
+  assert.equal(
+    getRussianOrderItemDisplayName(
+      { name: 'Курутоба', notes: 'Варианты: Курутоб (2-3 человека)' },
+      { name_ru: 'Курутоба' },
+    ),
+    'Курутоб (2-3 человека)'
+  )
+})
 
 test('completed table rounds merge into one Telegram order summary', () => {
   const order = mergeCompletedOrders([

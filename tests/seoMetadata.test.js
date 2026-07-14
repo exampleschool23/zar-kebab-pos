@@ -5,6 +5,8 @@ import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8')
+const robots = fs.readFileSync(path.join(root, 'public/robots.txt'), 'utf8')
+const sitemap = fs.readFileSync(path.join(root, 'public/sitemap.xml'), 'utf8')
 
 test('public site metadata describes the restaurant instead of the POS', () => {
   assert.match(html, /<html lang="ru">/)
@@ -17,6 +19,7 @@ test('public site metadata describes the restaurant instead of the POS', () => {
 
 test('public site metadata uses the Zar Kebab logo and canonical domain', () => {
   assert.match(html, /rel="icon"[^>]+\/brand\/zarkebab-logo\.png/)
+  assert.match(html, /rel="icon"[^>]+sizes="512x512"/)
   assert.match(html, /rel="apple-touch-icon"[^>]+\/brand\/zarkebab-logo\.png/)
   assert.match(html, /rel="canonical" href="https:\/\/www\.zarkebab\.uz\/"/)
   assert.match(html, /property="og:title"/)
@@ -25,4 +28,13 @@ test('public site metadata uses the Zar Kebab logo and canonical domain', () => 
   assert.match(html, /type="application\/ld\+json"/)
   assert.match(html, /"@type": "Restaurant"/)
   assert.match(html, /"logo": "https:\/\/www\.zarkebab\.uz\/brand\/zarkebab-logo\.png"/)
+})
+
+test('search crawlers receive real robots and sitemap files', () => {
+  assert.match(robots, /User-agent: \*/)
+  assert.match(robots, /Allow: \//)
+  assert.match(robots, /Sitemap: https:\/\/www\.zarkebab\.uz\/sitemap\.xml/)
+  assert.match(sitemap, /<loc>https:\/\/www\.zarkebab\.uz\/<\/loc>/)
+  assert.match(sitemap, /<loc>https:\/\/www\.zarkebab\.uz\/menu<\/loc>/)
+  assert.match(sitemap, /<loc>https:\/\/www\.zarkebab\.uz\/catering<\/loc>/)
 })

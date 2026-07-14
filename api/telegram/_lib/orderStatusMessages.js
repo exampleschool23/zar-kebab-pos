@@ -133,6 +133,56 @@ function getItemAmount(item) {
   return unitPrice * quantity
 }
 
+function parseJsonObject(value, fallback) {
+  if (value && typeof value === 'object') return value
+  if (typeof value !== 'string') return fallback
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' ? parsed : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function normalizeItemName(value) {
+  return String(value || '').trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+function optionLabelIsFullItemName(label, parentName) {
+  const normalizedLabel = normalizeItemName(label)
+  const normalizedParent = normalizeItemName(parentName)
+  const sharedPrefixLength = Math.min(5, normalizedParent.length)
+  return sharedPrefixLength >= 4 && normalizedLabel.startsWith(normalizedParent.slice(0, sharedPrefixLength))
+}
+
+export function getRussianOrderItemDisplayName(item, menuItem = null) {
+  const parentName = menuItem?.name_ru || item?.menu_name_ru || item?.name_ru || item?.name || item?.menu_item_id || '-'
+  const selectedOptions = parseJsonObject(item?.selected_options || item?.selectedOptions, {})
+  const optionGroups = parseJsonObject(menuItem?.option_groups || menuItem?.optionGroups, [])
+  const selectedLabels = Array.isArray(optionGroups)
+    ? optionGroups.map(group => {
+        const selectedId = selectedOptions?.[String(group?.id || '')]
+        const option = Array.isArray(group?.options)
+          ? group.options.find(row => String(row?.id || '') === String(selectedId || ''))
+          : null
+        return String(option?.label_ru || option?.label || option?.name || '').trim()
+      }).filter(Boolean)
+    : []
+
+  if (selectedLabels.length === 1 && optionLabelIsFullItemName(selectedLabels[0], parentName)) {
+    return selectedLabels[0]
+  }
+  if (selectedLabels.length > 0) return `${parentName} · ${selectedLabels.join(', ')}`
+
+  const noteMatch = String(item?.notes || '').match(/(?:Variants|Варианты|Variantlar)\s*:\s*([^\n]+)/i)
+  if (noteMatch?.[1]) {
+    const label = noteMatch[1].trim()
+    return optionLabelIsFullItemName(label, parentName) ? label : `${parentName} · ${label}`
+  }
+
+  return parentName
+}
+
 function truncateText(value, maxLength) {
   const text = String(value || '-')
   return text.length > maxLength ? `${text.slice(0, Math.max(0, maxLength - 1))}.` : text
@@ -140,14 +190,14 @@ function truncateText(value, maxLength) {
 
 function buildItemRows(items) {
   const rows = [
-    `${'Позиция'.padEnd(21)} ${'Кол'.padStart(3)} ${'Сумма'.padStart(10)}`,
+    `${'Позиция'.padEnd(22)} ${'Кол'.padStart(3)} ${'Сумма'.padStart(10)}`,
   ]
 
   for (const item of items) {
-    const name = truncateText(item?.menu_name_ru || item?.name_ru || item?.name || item?.menu_item_id, 21)
+    const name = truncateText(item?.telegram_display_name || getRussianOrderItemDisplayName(item), 22)
     const quantity = Math.max(0, Number(item?.quantity) || 0)
     const amount = formatRowMoney(getItemAmount(item))
-    rows.push(`${name.padEnd(21)} ${String(quantity).padStart(3)} ${amount.padStart(10)}`)
+    rows.push(`${name.padEnd(22)} ${String(quantity).padStart(3)} ${amount.padStart(10)}`)
   }
 
   return rows.join('\n')

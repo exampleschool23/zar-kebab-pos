@@ -24,8 +24,16 @@ export const EXPENSE_CATEGORIES = [
     labels: { uz: 'Boshqa maosh', ru: 'Другая зарплата', en: 'Other salary' },
   },
   {
+    key: 'salary_one_time',
+    labels: { uz: 'Bir martalik xodim maoshi', ru: 'Разовая зарплата сотрудника', en: 'One-time employee salary' },
+  },
+  {
     key: 'products_bazaar',
     labels: { uz: 'Bozor mahsulotlari', ru: 'Продукты / базар', en: 'Products / bazaar' },
+  },
+  {
+    key: 'charcoal',
+    labels: { uz: 'Ko‘mir', ru: 'Уголь', en: 'Charcoal' },
   },
   {
     key: 'equipment',
@@ -68,7 +76,10 @@ export const INCOME_CATEGORIES = [
   },
 ]
 
-export const MANUAL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.filter(category => !category.key.startsWith('salary_'))
+export const MANUAL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.filter(category => (
+  (!category.key.startsWith('salary_') || category.key === 'salary_one_time') &&
+  category.key !== 'other'
+))
 
 export function todayExpenseDate() {
   return toLocalDateStr(new Date().toISOString())

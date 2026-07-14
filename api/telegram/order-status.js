@@ -5,6 +5,7 @@ import {
   buildCompletedOrderGroupMessage,
   buildCustomerStatusMessage,
   getCompletedOrdersChatIds,
+  getRussianOrderItemDisplayName,
   mergeCompletedOrders,
   shouldNotifyCompletedOrderGroup,
 } from './_lib/orderStatusMessages.js'
@@ -47,27 +48,31 @@ async function loadPaidRevenueForRestaurantDay(supabase, paidAt) {
   return (data || []).reduce((sum, row) => sum + (Number(row.total) || 0), 0)
 }
 
-async function loadRussianMenuItemNames(supabase, items = []) {
+async function loadRussianMenuItems(supabase, items = []) {
   const ids = [...new Set(items.map(item => item?.menu_item_id).filter(Boolean))]
   if (ids.length === 0) return new Map()
 
   const { data, error } = await supabase
     .from('menu_items')
-    .select('id, name_ru')
+    .select('id, name_ru, option_groups')
     .in('id', ids)
   if (error) throw error
 
-  return new Map((data || []).map(item => [item.id, item.name_ru || '']))
+  return new Map((data || []).map(item => [item.id, item]))
 }
 
 async function withRussianMenuItemNames(supabase, order) {
-  const itemNames = await loadRussianMenuItemNames(supabase, order?.items || [])
+  const menuItems = await loadRussianMenuItems(supabase, order?.items || [])
   return {
     ...order,
-    items: (order?.items || []).map(item => ({
-      ...item,
-      menu_name_ru: itemNames.get(item.menu_item_id) || '',
-    })),
+    items: (order?.items || []).map(item => {
+      const menuItem = menuItems.get(item.menu_item_id)
+      return {
+        ...item,
+        menu_name_ru: menuItem?.name_ru || '',
+        telegram_display_name: getRussianOrderItemDisplayName(item, menuItem),
+      }
+    }),
   }
 }
 
@@ -87,7 +92,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin()
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, price_mode, status), payments:order_payments(method, amount)')
+      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, price_mode, selected_options, notes, status), payments:order_payments(method, amount)')
       .in('id', orderIds)
     if (error) throw error
     if (!orders?.length) {

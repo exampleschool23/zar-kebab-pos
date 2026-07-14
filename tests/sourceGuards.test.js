@@ -1381,8 +1381,9 @@ test('local API routes receive server auth and telegram env from Vite', () => {
   assert.match(viteConfig, /import notifyTelegramOrderStatus from '\.\/api\/telegram\/order-status\.js'/)
   assert.match(viteConfig, /server\.middlewares\.use\('\/api\/telegram\/order-status'/)
   assert.match(viteConfig, /server:\s*\{[\s\S]*port: 5173,[\s\S]*strictPort: true,/)
-  assert.match(telegramOrderStatusApi, /items:order_items\(name, menu_item_id, quantity, price, unit_price, price_mode, status\)/)
-  assert.match(telegramOrderStatusApi, /\.from\('menu_items'\)[\s\S]*\.select\('id, name_ru'\)/)
+  assert.match(telegramOrderStatusApi, /items:order_items\(name, menu_item_id, quantity, price, unit_price, price_mode, selected_options, notes, status\)/)
+  assert.match(telegramOrderStatusApi, /\.from\('menu_items'\)[\s\S]*\.select\('id, name_ru, option_groups'\)/)
+  assert.match(telegramOrderStatusApi, /getRussianOrderItemDisplayName\(item, menuItem\)/)
   assert.doesNotMatch(telegramOrderStatusApi, /items:order_items\([^)]*name_ru/)
 })
 
@@ -2127,7 +2128,7 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(expenses, /getAccountingPageSummary/)
   assert.match(expenses, /INCOME_CATEGORIES/)
   assert.match(expenses, /EXPENSE_ENTRY_TYPES/)
-  assert.match(expenseLib, /export const MANUAL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES\.filter\(category => !category\.key\.startsWith\('salary_'\)\)/)
+  assert.match(expenseLib, /export const MANUAL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES\.filter\(category => \([\s\S]*category\.key === 'salary_one_time'[\s\S]*category\.key !== 'other'/)
   assert.match(expenses, /form\.entry_type === 'income' \? INCOME_CATEGORIES : MANUAL_EXPENSE_CATEGORIES/)
   assert.match(expenses, /investor_support/)
   assert.match(expenses, /formatMoneyInput\(form\.amount\)/)
@@ -2526,6 +2527,13 @@ test('starter cafe menu expansion seeds polished categories and items', () => {
   assert.match(repairMigration, /update public\.menu_items/)
   assert.match(repairMigration, /'combos'/)
   assert.match(repairMigration, /'zk_mixed_grill'/)
+})
+
+test('Qurutoba parent name stays neutral because portions are required variants', () => {
+  const migration = readSource('supabase/086_fix_qurutoba_parent_name.sql')
+
+  assert.match(migration, /external_id = 'MI-1C334BBA79'/)
+  assert.match(migration, /set[\s\S]*name_en = 'Qurutoba'\s+where/)
 })
 
 test('ImageLoadShimmer keeps slow menu images loading after timeout', () => {
