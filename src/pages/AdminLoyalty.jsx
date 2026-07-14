@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Search, BadgeDollarSign, Plus, RefreshCw, ChevronRight, ArrowLeft, Trash2, X } from 'lucide-react'
+import { Search, BadgeDollarSign, Plus, RefreshCw, ChevronLeft, ChevronRight, ArrowLeft, Trash2, X, Copy, Check } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
@@ -49,16 +49,21 @@ export default function AdminLoyalty() {
   const [supportsCashbackType, setSupportsCashbackType] = useState(true)
   const [loadingCards, setLoadingCards] = useState(false)
   const [cardPage, setCardPage] = useState(0)
-  const [hasMoreCards, setHasMoreCards] = useState(false)
+  const [totalCards, setTotalCards] = useState(0)
+  const [copiedCardNumber, setCopiedCardNumber] = useState('')
   const cardSearchRequestRef = useRef(0)
+  const copiedFeedbackTimeoutRef = useRef(null)
+  const cardListTopRef = useRef(null)
 
   const L = {
     uz: {
       title: 'Sodiqlik kartalari',
       subtitle: 'Cashback hamyon balanslari va tranzaksiya tarixi',
       refresh: 'Yangilash',
-      loadMore: 'Yana yuklash',
       loading: 'Yuklanmoqda...',
+      previousPage: 'Oldingi sahifa',
+      nextPage: 'Keyingi sahifa',
+      page: 'Sahifa',
       noCards: 'Sodiqlik kartalari topilmadi',
       detailsTitle: 'Sodiqlik kartasi tafsilotlari',
       back: 'Orqaga',
@@ -73,6 +78,9 @@ export default function AdminLoyalty() {
       cashbackType: 'Cashback turi',
       cashbackRate: 'Cashback foizi',
       searchPlaceholder: 'Karta, ism yoki telefon bo‘yicha qidirish',
+      copyCardNumber: 'Karta raqamini nusxalash',
+      cardNumberCopied: 'Karta raqami nusxalandi',
+      copyCardNumberFailed: 'Karta raqamini nusxalab bo‘lmadi.',
       unnamedCustomer: 'Nomsiz mijoz',
       active: 'Faol',
       inactive: 'Faol emas',
@@ -128,8 +136,10 @@ export default function AdminLoyalty() {
       title: 'Карты лояльности',
       subtitle: 'Балансы кешбэк-кошельков и история транзакций',
       refresh: 'Обновить',
-      loadMore: 'Загрузить ещё',
       loading: 'Загрузка...',
+      previousPage: 'Предыдущая страница',
+      nextPage: 'Следующая страница',
+      page: 'Страница',
       noCards: 'Карты лояльности не найдены',
       detailsTitle: 'Детали карты лояльности',
       back: 'Назад',
@@ -144,6 +154,9 @@ export default function AdminLoyalty() {
       cashbackType: 'Тип кешбэка',
       cashbackRate: 'Процент кешбэка',
       searchPlaceholder: 'Поиск по карте, имени или телефону',
+      copyCardNumber: 'Скопировать номер карты',
+      cardNumberCopied: 'Номер карты скопирован',
+      copyCardNumberFailed: 'Не удалось скопировать номер карты.',
       unnamedCustomer: 'Клиент без имени',
       active: 'Активна',
       inactive: 'Неактивна',
@@ -199,8 +212,10 @@ export default function AdminLoyalty() {
       title: 'Loyalty Cards',
       subtitle: 'Cashback wallet balances and transaction history',
       refresh: 'Refresh',
-      loadMore: 'Load more',
       loading: 'Loading...',
+      previousPage: 'Previous page',
+      nextPage: 'Next page',
+      page: 'Page',
       noCards: 'No loyalty cards found',
       detailsTitle: 'Loyalty card details',
       back: 'Back',
@@ -215,6 +230,9 @@ export default function AdminLoyalty() {
       cashbackType: 'Cashback type',
       cashbackRate: 'Cashback rate',
       searchPlaceholder: 'Search card, name, phone',
+      copyCardNumber: 'Copy card number',
+      cardNumberCopied: 'Card number copied',
+      copyCardNumberFailed: 'Could not copy the card number.',
       unnamedCustomer: 'Unnamed customer',
       active: 'Active',
       inactive: 'Inactive',
@@ -291,6 +309,17 @@ export default function AdminLoyalty() {
     return card?.phone_number || l.noPhoneNumber
   }
 
+  async function copyCardNumber(cardNumber) {
+    try {
+      await navigator.clipboard.writeText(String(cardNumber))
+      setCopiedCardNumber(String(cardNumber))
+      clearTimeout(copiedFeedbackTimeoutRef.current)
+      copiedFeedbackTimeoutRef.current = setTimeout(() => setCopiedCardNumber(''), 1600)
+    } catch {
+      setMessage(l.copyCardNumberFailed)
+    }
+  }
+
   function transactionAmount(tx) {
     const signedAmount = Number(tx.amount) || 0
     const amount = Math.abs(signedAmount)
@@ -323,17 +352,17 @@ export default function AdminLoyalty() {
     return `${label} ${l.cashbackMeta} ${percent}%`
   }
 
-  async function searchCards(term = query, { reset = true } = {}) {
+  async function searchCards(term = query, { page = 0 } = {}) {
     const requestId = cardSearchRequestRef.current + 1
     cardSearchRequestRef.current = requestId
     setMessage('')
     setLoadingCards(true)
-    const nextPage = reset ? 0 : cardPage + 1
+    const nextPage = Math.max(0, page)
     const from = nextPage * CARD_PAGE_SIZE
     const to = from + CARD_PAGE_SIZE - 1
     let request = supabase
       .from('loyalty_cards')
-      .select(CARD_SELECT_COLUMNS)
+      .select(CARD_SELECT_COLUMNS, { count: 'exact' })
       .order('updated_at', { ascending: false })
       .range(from, to)
     const trimmed = term.trim()
@@ -341,7 +370,7 @@ export default function AdminLoyalty() {
       const safeTerm = trimmed.replace(/[%,]/g, '')
       request = request.or(`card_number.ilike.%${safeTerm}%,customer_name.ilike.%${safeTerm}%,phone_number.ilike.%${safeTerm}%`)
     }
-    const { data, error } = await request
+    const { data, error, count } = await request
     if (requestId !== cardSearchRequestRef.current) return
     setLoadingCards(false)
     if (error) {
@@ -351,9 +380,16 @@ export default function AdminLoyalty() {
     if ((data || []).some(card => !Object.prototype.hasOwnProperty.call(card, 'cashback_type'))) {
       setSupportsCashbackType(false)
     }
-    setCards(prev => reset ? (data || []) : [...prev, ...(data || [])])
+    setCards(data || [])
     setCardPage(nextPage)
-    setHasMoreCards((data || []).length === CARD_PAGE_SIZE)
+    setTotalCards(count ?? (data || []).length)
+    return true
+  }
+
+  async function goToCardPage(page) {
+    if (loadingCards || page === cardPage || page < 0 || page >= Math.ceil(totalCards / CARD_PAGE_SIZE)) return
+    const loaded = await searchCards(query, { page })
+    if (loaded) cardListTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   async function loadTransactions(card) {
@@ -419,7 +455,7 @@ export default function AdminLoyalty() {
       return
     }
     setForm({ card_number: '', customer_name: '', phone_number: '', cashback_type: DEFAULT_CASHBACK_TYPE })
-    setCards(prev => [data, ...prev])
+    await searchCards(query, { page: 0 })
     loadTransactions(data)
   }
 
@@ -439,11 +475,12 @@ export default function AdminLoyalty() {
       setMessage(error.message || l.removeCardFailed)
       return
     }
-    setCards(prev => prev.filter(row => row.id !== card.id))
     setSelected(null)
     setTransactions([])
     setConfirmDeleteId('')
     setMessage('')
+    const nextPage = cards.length === 1 && cardPage > 0 ? cardPage - 1 : cardPage
+    await searchCards(query, { page: nextPage })
   }
 
   async function updateCustomerProfile() {
@@ -555,10 +592,19 @@ export default function AdminLoyalty() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      searchCards(query, { reset: true })
+      searchCards(query, { page: 0 })
     }, 250)
     return () => clearTimeout(timer)
   }, [query])
+
+  useEffect(() => () => clearTimeout(copiedFeedbackTimeoutRef.current), [])
+
+  const totalCardPages = Math.ceil(totalCards / CARD_PAGE_SIZE)
+  const firstVisibleCardPage = Math.max(0, Math.min(cardPage - 2, totalCardPages - 5))
+  const visibleCardPages = Array.from(
+    { length: Math.min(5, totalCardPages) },
+    (_, index) => firstVisibleCardPage + index,
+  )
 
   return (
     <AppShell title={selected ? l.detailsTitle : l.title}>
@@ -568,7 +614,7 @@ export default function AdminLoyalty() {
             <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
             <p className="text-sm font-semibold text-[#6B7280]">{l.subtitle}</p>
           </div>
-          <button onClick={() => searchCards(query, { reset: true })} disabled={loadingCards} className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-black text-[#1F2937] disabled:opacity-60">
+          <button onClick={() => searchCards(query, { page: cardPage })} disabled={loadingCards} className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-black text-[#1F2937] disabled:opacity-60">
             <RefreshCw size={15} className={loadingCards ? 'animate-spin' : ''} /> {l.refresh}
           </button>
         </div>
@@ -593,42 +639,88 @@ export default function AdminLoyalty() {
               {!canCreate && <p className="text-xs font-bold text-[#9CA3AF]">{l.ownerOnly}</p>}
             </div>
 
-            <div className="mt-5">
+            <div ref={cardListTopRef} className="mt-5 scroll-mt-4">
               <div className="mb-3 flex items-center gap-2 rounded-xl border border-[#E5E7EB] px-3 py-2">
                 <Search size={15} className="text-[#9CA3AF]" />
                 <input value={query} onChange={e => setQuery(e.target.value)} placeholder={l.searchPlaceholder} className="min-w-0 flex-1 text-sm font-semibold outline-none" />
               </div>
               <div className="space-y-2">
-                {cards.map(card => (
-                  <button key={card.id} onClick={() => loadTransactions(card)} className={`w-full rounded-xl border p-3 text-left ${selected?.id === card.id ? 'border-[#ff5a00] bg-[#fff7f2]' : 'border-[#E5E7EB] bg-white'}`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-black text-[#1F2937]">{card.card_number}</span>
-                      <span className="text-sm font-black text-[#16A34A]">{formatCurrency(card.balance || 0)}</span>
-                    </div>
-                    <div className="mt-1 flex min-w-0 items-end justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold text-[#6B7280]">{card.customer_name || l.unnamedCustomer} · {statusLabel(card)}</p>
-                        <p className="mt-1 truncate text-xs font-bold text-[#9CA3AF]">{card.phone_number || l.noPhoneNumber} · {cashbackTypeLabel(card.cashback_type)}</p>
+                {cards.map(card => {
+                  const isCopied = copiedCardNumber === String(card.card_number)
+                  return (
+                    <div key={card.id} className={`relative w-full rounded-xl border p-3 ${selected?.id === card.id ? 'border-[#ff5a00] bg-[#fff7f2]' : 'border-[#E5E7EB] bg-white'}`}>
+                      <button
+                        type="button"
+                        onClick={() => loadTransactions(card)}
+                        aria-label={`${card.card_number}, ${card.customer_name || l.unnamedCustomer}`}
+                        className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a00] focus-visible:ring-offset-1"
+                      />
+                      <div className="pointer-events-none relative flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-black text-[#1F2937]">{card.card_number}</span>
+                          <button
+                            type="button"
+                            onClick={() => copyCardNumber(card.card_number)}
+                            aria-label={isCopied ? l.cardNumberCopied : `${l.copyCardNumber} ${card.card_number}`}
+                            title={isCopied ? l.cardNumberCopied : l.copyCardNumber}
+                            className={`pointer-events-auto relative z-10 flex h-7 w-7 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a00] ${isCopied ? 'bg-emerald-50 text-emerald-600' : 'text-[#9CA3AF] hover:bg-gray-100 hover:text-[#1F2937]'}`}
+                          >
+                            {isCopied ? <Check size={15} strokeWidth={3} /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                        <span className="text-sm font-black text-[#16A34A]">{formatCurrency(card.balance || 0)}</span>
                       </div>
-                      <ChevronRight size={16} className="flex-shrink-0 text-[#9CA3AF] lg:hidden" />
+                      <div className="pointer-events-none relative mt-1 flex min-w-0 items-end justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-[#6B7280]">{card.customer_name || l.unnamedCustomer} · {statusLabel(card)}</p>
+                          <p className="mt-1 truncate text-xs font-bold text-[#9CA3AF]">{card.phone_number || l.noPhoneNumber} · {cashbackTypeLabel(card.cashback_type)}</p>
+                        </div>
+                        <ChevronRight size={16} className="flex-shrink-0 text-[#9CA3AF] lg:hidden" />
+                      </div>
                     </div>
-                  </button>
-                ))}
+                  )
+                })}
                 {!loadingCards && cards.length === 0 && (
                   <div className="rounded-2xl border border-dashed border-[#D1D5DB] bg-white p-5 text-center text-sm font-bold text-[#6B7280]">
                     {l.noCards}
                   </div>
                 )}
-                {hasMoreCards && (
-                  <button
-                    type="button"
-                    onClick={() => searchCards(query, { reset: false })}
-                    disabled={loadingCards}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 py-2.5 text-sm font-black text-[#1F2937] disabled:opacity-60"
-                  >
-                    <RefreshCw size={14} className={loadingCards ? 'animate-spin' : ''} />
-                    {loadingCards ? l.loading : l.loadMore}
-                  </button>
+                {totalCardPages > 1 && (
+                  <nav className="flex items-center justify-center gap-1 pt-2" aria-label={l.page}>
+                    <button
+                      type="button"
+                      onClick={() => goToCardPage(cardPage - 1)}
+                      disabled={loadingCards || cardPage === 0}
+                      aria-label={l.previousPage}
+                      title={l.previousPage}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#1F2937] disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <ChevronLeft size={17} />
+                    </button>
+                    {visibleCardPages.map(page => (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => goToCardPage(page)}
+                        disabled={loadingCards}
+                        aria-label={`${l.page} ${page + 1}`}
+                        aria-current={page === cardPage ? 'page' : undefined}
+                        className={`h-9 min-w-9 rounded-lg px-2 text-sm font-black transition-colors ${page === cardPage ? 'bg-[#ff5a00] text-white' : 'border border-[#E5E7EB] bg-white text-[#1F2937] hover:border-[#ff5a00] hover:text-[#ff5a00]'} disabled:opacity-50`}
+                      >
+                        {page + 1}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => goToCardPage(cardPage + 1)}
+                      disabled={loadingCards || cardPage >= totalCardPages - 1}
+                      aria-label={l.nextPage}
+                      title={l.nextPage}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#1F2937] disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <ChevronRight size={17} />
+                    </button>
+                  </nav>
                 )}
               </div>
             </div>
