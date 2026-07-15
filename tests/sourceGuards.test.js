@@ -897,6 +897,18 @@ test('AdminMenu visibility badges name the affected menu scope', () => {
   assert.doesNotMatch(adminMenu, /'Waiter hidden'/)
 })
 
+test('AdminMenu read-only category rows keep their columns aligned', () => {
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const categoryRow = functionBody(adminMenu, 'SortableCatRow')
+
+  assert.match(adminMenu, /const CAT_EDIT_GRID =/)
+  assert.match(adminMenu, /const CAT_READ_ONLY_GRID =/)
+  assert.match(categoryRow, /readOnly \? CAT_READ_ONLY_GRID : CAT_EDIT_GRID/)
+  assert.match(adminMenu, /canEditMenu \? CAT_EDIT_GRID : CAT_READ_ONLY_GRID/)
+  assert.match(categoryRow, /\{!readOnly && \(\s*<div className="flex gap-1\.5 justify-end">/)
+  assert.doesNotMatch(categoryRow, /text-gray-300">—/)
+})
+
 test('AdminMenu visibility toggles show scoped loading feedback', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const toggleButton = functionBody(source, 'VisibilityToggleButton')

@@ -659,8 +659,9 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
 
 // ── Sortable category row ─────────────────────────────────────────────────────
 
-// Shared grid template — header and every row must use the same string exactly.
-const CAT_GRID = 'grid grid-cols-[20px_52px_1fr_200px_90px_160px] items-center gap-4 px-5'
+// The read-only layout removes drag/actions columns instead of leaving empty cells.
+const CAT_EDIT_GRID = 'grid grid-cols-[20px_52px_minmax(0,1fr)_200px_90px_160px] items-center gap-4 px-5'
+const CAT_READ_ONLY_GRID = 'grid grid-cols-[52px_minmax(260px,1fr)_minmax(220px,280px)_100px] items-center gap-4 px-5'
 
 function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibility, visibilityPending, sortIndex, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id })
@@ -677,7 +678,7 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
     <div
       ref={setNodeRef}
       style={style}
-      className={`${CAT_GRID} py-4 hover:bg-gray-50/60 transition-colors border-b border-gray-100 last:border-0`}
+      className={`${readOnly ? CAT_READ_ONLY_GRID : CAT_EDIT_GRID} py-4 hover:bg-gray-50/60 transition-colors border-b border-gray-100 last:border-0`}
     >
       {/* col 1 – drag handle */}
       {!readOnly && <DragHandle listeners={listeners} attributes={attributes} />}
@@ -743,10 +744,9 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
         </span>
       </div>
 
-      {/* col 6 – actions */}
-      <div className="flex gap-1.5 justify-end">
-        {!readOnly ? (
-          <>
+      {/* edit-only actions */}
+      {!readOnly && (
+        <div className="flex gap-1.5 justify-end">
             <button
               onClick={() => onEdit(cat)}
               disabled={visibilityPending}
@@ -762,11 +762,8 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
             >
               <Trash2 size={14} />
             </button>
-          </>
-        ) : (
-          <span className="text-xs font-bold text-gray-300">—</span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2086,14 +2083,14 @@ export default function AdminMenu() {
                       strategy={verticalListSortingStrategy}
                     >
                       <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                        {/* Header — must use the same CAT_GRID template as the rows */}
-                        <div className={`${CAT_GRID} py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wide`}>
-                          <span />
+                        {/* Header uses the exact same edit/read-only grid as its rows. */}
+                        <div className={`${canEditMenu ? CAT_EDIT_GRID : CAT_READ_ONLY_GRID} py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wide`}>
+                          {canEditMenu && <span />}
                           <span />
                           <span>{lang === 'uz' ? 'Nomi' : lang === 'ru' ? 'Название' : 'Name'}</span>
                           <span>{lang === 'uz' ? 'Ommaviy menyu' : lang === 'ru' ? 'Публичное меню' : 'Public menu'}</span>
                           <span className="text-center">{lang === 'uz' ? 'Tartib' : lang === 'ru' ? 'Порядок' : 'Sort Order'}</span>
-                          <span className="text-right">{lang === 'uz' ? 'Amallar' : lang === 'ru' ? 'Действия' : 'Actions'}</span>
+                          {canEditMenu && <span className="text-right">{lang === 'uz' ? 'Amallar' : lang === 'ru' ? 'Действия' : 'Actions'}</span>}
                         </div>
 
                         {realSortedCats.map((cat, idx) => (
