@@ -6,6 +6,7 @@ import {
   assignableRoles,
   canDeleteTeamMember,
   canEditFeature,
+  canEditMenu,
   canEditTeamMember,
   canManageFeatureAccess,
   canViewPage,
@@ -34,6 +35,17 @@ test('feature access controls visibility while role controls write access', () =
   assert.deepEqual(featureAccessForProfile(adminWithAccounting), ['dashboard', 'expenses'])
   assert.equal(canViewPage(viewerWithAccounting, 'expenses'), true)
   assert.equal(canEditFeature(viewerWithAccounting, 'expenses'), false)
+})
+
+test('explicit menu-item edit access grants menu routing and writes', () => {
+  const viewerWithMenuEdit = { role: 'viewer', feature_access: ['edit_menu_items'] }
+  const viewerWithMenuView = { role: 'viewer', feature_access: ['menu'] }
+
+  assert.equal(canViewPage(viewerWithMenuEdit, 'menu'), true)
+  assert.equal(canEditMenu(viewerWithMenuEdit), true)
+  assert.equal(defaultPath(viewerWithMenuEdit), '/admin/menu')
+  assert.equal(canViewPage(viewerWithMenuView, 'menu'), true)
+  assert.equal(canEditMenu(viewerWithMenuView), false)
 })
 
 test('non-primary owner feature_access can be restricted', () => {

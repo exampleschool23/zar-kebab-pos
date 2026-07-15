@@ -90,7 +90,7 @@ export default async function handler(req, res) {
         email,
         full_name: fullName,
         role: 'guest',
-        status: 'active',
+        status: 'pending',
       }, { onConflict: 'id' })
       .select('id,email,full_name,role,status')
       .single()

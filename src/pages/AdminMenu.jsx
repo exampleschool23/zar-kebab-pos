@@ -29,7 +29,7 @@ import { useAppDataStatus } from '../store/appHooks'
 import ImageLoadShimmer from '../components/ImageLoadShimmer'
 import { supabase } from '../lib/supabase'
 import { formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput } from '../lib/moneyInput'
-import { canEditFeature } from '../lib/permissions'
+import { canEditMenu as canEditMenuForProfile } from '../lib/permissions'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -1040,7 +1040,7 @@ export default function AdminMenu() {
   const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
-  const canEditMenu = canEditFeature(profile || { role: state.user?.role }, 'menu')
+  const canEditMenu = canEditMenuForProfile(profile || { role: state.user?.role })
   const scheduleLabels = menuScheduleLabels(lang)
   const navigate = useNavigate()
   const { productId } = useParams()

@@ -345,14 +345,15 @@ test('waiter bill item quantity edits update optimistically', () => {
   assert.match(body, /dispatch\(enriched\)[\s\S]*return writeWithIdleRecovery\(enriched, stateRef\.current\)/)
 })
 
-test('new signed-up users always start as guest', () => {
+test('new signed-up users always start as pending guests with repair coverage', () => {
   const auth = readSource('src/contexts/AuthContext.jsx')
-  const migration = readSource('supabase/024_profiles_force_guest_signup.sql')
+  const migration = readSource('supabase/085_repair_missing_auth_profiles.sql')
 
   assert.match(auth, /data: \{ full_name: normalizedName, role: 'guest' \}/)
-  assert.match(migration, /alter column role set default 'guest'/)
   assert.match(migration, /public\.handle_new_user/)
-  assert.match(migration, /'guest',\s*\n\s*'active'/)
+  assert.match(migration, /'guest',\s*\n\s*'pending'/)
+  assert.match(migration, /insert into public\.profiles[\s\S]*from auth\.users as users/)
+  assert.match(migration, /where not exists \([\s\S]*profiles\.id = users\.id/)
   assert.doesNotMatch(migration, /raw_user_meta_data->>'role'/)
 })
 
@@ -366,7 +367,7 @@ test('email password signup uses server registration instead of Supabase email t
 
   assert.match(api, /supabase\.auth\.admin\.createUser\(\{[\s\S]*email_confirm: true/)
   assert.match(api, /role: 'guest'/)
-  assert.match(api, /status: 'active'/)
+  assert.match(api, /status: 'pending'/)
   assert.match(api, /\.from\('profiles'\)[\s\S]*\.upsert\(/)
   assert.match(vite, /import registerAuth from '\.\/api\/auth\/register\.js'/)
   assert.match(vite, /server\.middlewares\.use\('\/api\/auth\/register'/)
@@ -848,6 +849,29 @@ test('AdminMenu edit save stays disabled until product fields change', () => {
   assert.match(adminMenu, /if \(savingItemForm \|\| !canEditMenu \|\| !isItemFormDirty\) return/)
   assert.match(source, /disabled=\{!canSaveItemForm\}/)
   assert.match(source, /disabled:bg-gray-300 disabled:text-gray-500/)
+})
+
+test('menu editing can be granted as explicit feature access', () => {
+  const permissions = readSource('src/lib/permissions.js')
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const team = readSource('src/pages/AdminUsers.jsx')
+  const imageAuth = readSource('api/menu-image/_lib/auth.js')
+  const imageUpload = readSource('api/menu-image/upload.js')
+  const imageDelete = readSource('api/menu-image/delete.js')
+  const migration = readSource('supabase/086_edit_menu_items_feature_access.sql')
+
+  assert.match(permissions, /key: 'edit_menu_items'/)
+  assert.match(permissions, /if \(page === 'menu'\) return access\.includes\('menu'\) \|\| access\.includes\('edit_menu_items'\)/)
+  assert.match(permissions, /function canEditMenu[\s\S]*canViewPage\(profileOrRole, 'edit_menu_items'\)/)
+  assert.match(adminMenu, /canEditMenu as canEditMenuForProfile/)
+  assert.match(adminMenu, /const canEditMenu = canEditMenuForProfile\(profile \|\| \{ role: state\.user\?\.role \}\)/)
+  assert.match(team, /FEATURE_DEFINITIONS\.map\(feature =>/)
+  assert.match(imageAuth, /function requireMenuEditAccess/)
+  assert.match(imageAuth, /access\?\.includes\('edit_menu_items'\)/)
+  assert.match(imageUpload, /requireMenuEditAccess\(req\)/)
+  assert.match(imageDelete, /requireMenuEditAccess\(req\)/)
+  assert.match(migration, /profiles_feature_access_valid[\s\S]*'edit_menu_items'/)
+  assert.match(migration, /current_staff_can_write\('menu'\)[\s\S]*current_staff_can_access\('edit_menu_items'\)/)
 })
 
 test('menu and category writes surface Supabase errors', () => {

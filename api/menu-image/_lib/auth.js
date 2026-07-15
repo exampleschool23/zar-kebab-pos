@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 const ALLOWED_ROLES = new Set(['owner', 'admin'])
+const FEATURE_ACCESS_MANAGER_EMAILS = new Set(['dangerhoggish@gmail.com'])
 
 function getSupabaseAuthClient() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
@@ -32,6 +33,36 @@ export async function requireAdminRole(req) {
     .maybeSingle()
 
   if (!profile || !ALLOWED_ROLES.has(profile.role)) {
+    throw Object.assign(new Error('Forbidden'), { status: 403 })
+  }
+
+  return user
+}
+
+export async function requireMenuEditAccess(req) {
+  const header = req.headers.authorization || ''
+  const match = header.match(/^Bearer\s+(.+)$/i)
+  const token = match ? match[1] : ''
+  if (!token) throw Object.assign(new Error('Authentication required'), { status: 401 })
+
+  const supabase = getSupabaseAuthClient()
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) throw Object.assign(new Error('Invalid or expired session'), { status: 401 })
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role,status,email,feature_access')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const access = Array.isArray(profile?.feature_access) ? profile.feature_access : null
+  const isPrimaryOwner = profile?.role === 'owner'
+    && FEATURE_ACCESS_MANAGER_EMAILS.has(String(profile?.email || '').trim().toLowerCase())
+  const hasLegacyMenuWrite = ALLOWED_ROLES.has(profile?.role)
+    && ((profile.role === 'owner' && access === null) || access?.includes('menu'))
+  const hasExplicitMenuWrite = access?.includes('edit_menu_items')
+
+  if (profile?.status !== 'active' || (!isPrimaryOwner && !hasLegacyMenuWrite && !hasExplicitMenuWrite)) {
     throw Object.assign(new Error('Forbidden'), { status: 403 })
   }
 

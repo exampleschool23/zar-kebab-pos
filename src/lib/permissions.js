@@ -25,6 +25,11 @@ export const FEATURE_DEFINITIONS = [
     description: { uz: 'Kategoriya, mahsulot va narxlar', ru: 'Категории, блюда и цены', en: 'Categories, items, and prices' },
   },
   {
+    key: 'edit_menu_items',
+    labels: { uz: 'Menyu mahsulotlarini tahrirlash', ru: 'Редактирование позиций меню', en: 'Edit menu items' },
+    description: { uz: 'Mahsulotlar, narxlar, rasmlar va kategoriyalarni o‘zgartirish', ru: 'Изменение блюд, цен, изображений и категорий', en: 'Change items, prices, images, and categories' },
+  },
+  {
     key: 'cashier',
     labels: { uz: 'Kassir', ru: 'Кассир', en: 'Cashier' },
     description: { uz: 'Hisob yopish va cheklar', ru: 'Закрытие счетов и чеки', en: 'Billing, payments, and receipts' },
@@ -113,7 +118,9 @@ export function featureAccessForProfile(profileOrRole) {
 
 export function canViewPage(profileOrRole, page) {
   if (page === 'publicMenu') return (PAGE_ACCESS.publicMenu || []).includes(normalizeRole(profileOrRole?.role || profileOrRole))
-  return featureAccessForProfile(profileOrRole).includes(page)
+  const access = featureAccessForProfile(profileOrRole)
+  if (page === 'menu') return access.includes('menu') || access.includes('edit_menu_items')
+  return access.includes(page)
 }
 
 export function canManageFeatureAccess(profileOrRole) {
@@ -136,7 +143,9 @@ export function canEditFeature(profileOrRole, featureKey) {
   return EDITOR_ROLES.includes(normalizeRole(profileOrRole?.role || profileOrRole)) && canViewPage(profileOrRole, featureKey)
 }
 
-export function canEditMenu(profileOrRole)       { return canEditFeature(profileOrRole, 'menu') }
+export function canEditMenu(profileOrRole) {
+  return canEditFeature(profileOrRole, 'menu') || canViewPage(profileOrRole, 'edit_menu_items')
+}
 export function canManageSettings(profileOrRole) { return canEditFeature(profileOrRole, 'settings') }
 export function canUseCashierActions(profileOrRole) { return canEditFeature(profileOrRole, 'cashier') }
 export function isReadOnlyUser(role)             { return normalizeRole(role) === 'viewer' }
