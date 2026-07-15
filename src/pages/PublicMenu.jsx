@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Coins, Instagram, Phone, Search, Send, UtensilsCrossed, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Coins, Instagram, MapPin, Phone, Search, Send, UtensilsCrossed, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
@@ -37,6 +37,30 @@ const PUBLIC_CONTACTS = {
   instagram: {
     label: '@zarkebab',
     href: 'https://www.instagram.com/zarkebab',
+  },
+  location: {
+    label: 'Matbuotchilar 17, Tashkent',
+    href: 'https://yandex.com/maps/org/zarkebab/34684464035/',
+  },
+}
+
+const PUBLIC_SEARCH_DESCRIPTION = 'Reservation · About us · Menu · Promotions · Vacancy · Contacts. Order type. +998905095545. Every day from 08:00 to 01:00.'
+
+const PUBLIC_MENU_SEO = {
+  uz: {
+    title: 'Zar Kebab — O‘zbek, Uyg‘ur va Turk restorani',
+    heading: 'Zar Kebab — Toshkentdagi O‘zbek, Uyg‘ur va Turk restorani',
+    description: PUBLIC_SEARCH_DESCRIPTION,
+  },
+  ru: {
+    title: 'Zar Kebab — узбекская, уйгурская и турецкая кухня',
+    heading: 'Zar Kebab — ресторан узбекской, уйгурской и турецкой кухни в Ташкенте',
+    description: PUBLIC_SEARCH_DESCRIPTION,
+  },
+  en: {
+    title: 'Zar Kebab — Uzbek, Uyghur & Turkish restaurant',
+    heading: 'Zar Kebab — Uzbek, Uyghur & Turkish restaurant in Tashkent',
+    description: PUBLIC_SEARCH_DESCRIPTION,
   },
 }
 
@@ -96,6 +120,15 @@ function PublicContactButtons({ className = '' }) {
         className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100"
       >
         <Instagram size={16} />
+      </a>
+      <a
+        href={PUBLIC_CONTACTS.location.href}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={PUBLIC_CONTACTS.location.label}
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-100 bg-amber-50 text-amber-700 transition-colors hover:bg-amber-100"
+      >
+        <MapPin size={16} />
       </a>
     </div>
   )
@@ -272,10 +305,22 @@ export default function PublicMenu({ premium = false }) {
   const [visibilityNow, setVisibilityNow] = useState(() => new Date())
   const menuBasePath = premium ? '/premium-menu' : '/menu'
   const lang = premium ? premiumLang : appLang
+  const seo = PUBLIC_MENU_SEO[lang] || PUBLIC_MENU_SEO.ru
   const showDetailOverlay = Boolean(detailItem)
   const headerRef = useRef(null)
   const savedScrollRef = useRef(0)
   const menuLoadSeqRef = useRef(0)
+
+  useEffect(() => {
+    if (premium) return
+
+    document.title = seo.title
+    const description = document.querySelector('meta[name="description"]')
+    description?.setAttribute('content', seo.description)
+
+    const canonical = document.querySelector('link[rel="canonical"]')
+    canonical?.setAttribute('href', 'https://www.zarkebab.uz/')
+  }, [premium, seo.description, seo.title])
 
   const refreshPublicMenu = useCallback(async ({ showLoading = false } = {}) => {
     const seq = menuLoadSeqRef.current + 1
@@ -458,8 +503,9 @@ export default function PublicMenu({ premium = false }) {
 
   return (
     <div className="min-h-screen bg-white text-[#1F2937]" style={{ paddingTop: headerOffset }}>
-      <header ref={headerRef} className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
-        <div className="relative mx-auto grid max-w-[1280px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-2 px-4 py-2 sm:flex sm:flex-nowrap sm:gap-4 sm:py-3">
+      <div data-nosnippet="">
+        <header ref={headerRef} className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
+          <div className="relative mx-auto grid max-w-[1280px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-2 px-4 py-2 sm:flex sm:flex-nowrap sm:gap-4 sm:py-3">
           <div className="flex min-w-0 items-center gap-2 sm:flex-1 sm:gap-3 sm:pr-0 lg:pr-36">
             <div className="flex min-w-0 flex-shrink items-center gap-2 sm:gap-3">
               <img
@@ -502,25 +548,35 @@ export default function PublicMenu({ premium = false }) {
           ) : (
             <LanguageSwitcher className="col-start-3 row-start-1" />
           )}
-        </div>
-      </header>
+          </div>
+        </header>
+      </div>
 
       <main className="mx-auto max-w-[1280px] px-4 pb-5 pt-2 sm:px-6">
-        <MenuCategoryScroller
-          categories={categoryCards}
-          activeCategoryId={activeCategory}
-          onCategoryClick={setActiveCategory}
-          onActiveCategoryChange={setActiveCategory}
-          lang={lang}
-          itemCounts={itemCounts}
-          sectionPrefix="public-menu-category"
-          topOffset={headerOffset}
-          scrollOffset={64}
-          className="mb-6 mt-0 rounded-[24px] border border-[#E5E7EB] bg-white p-3 shadow-sm sm:mb-7 sm:rounded-[28px] sm:p-4"
-          collapsedPosition="fixed"
-          collapsedSurfaceClass="bg-white/95"
-          collapsedClassName="z-50 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1280px] sm:-translate-x-1/2"
-        />
+        {!premium && (
+          <section className="mb-4 rounded-2xl bg-orange-50/70 px-4 py-3 text-center sm:mb-5 sm:px-6 sm:py-4">
+            <h1 className="text-lg font-black tracking-tight text-[#1F2937] sm:text-xl">{seo.heading}</h1>
+            <p className="mx-auto mt-1 max-w-3xl text-xs leading-relaxed text-[#64748B] sm:text-sm">{seo.description}</p>
+          </section>
+        )}
+
+        <div data-nosnippet="">
+          <MenuCategoryScroller
+            categories={categoryCards}
+            activeCategoryId={activeCategory}
+            onCategoryClick={setActiveCategory}
+            onActiveCategoryChange={setActiveCategory}
+            lang={lang}
+            itemCounts={itemCounts}
+            sectionPrefix="public-menu-category"
+            topOffset={headerOffset}
+            scrollOffset={64}
+            className="mb-6 mt-0 rounded-[24px] border border-[#E5E7EB] bg-white p-3 shadow-sm sm:mb-7 sm:rounded-[28px] sm:p-4"
+            collapsedPosition="fixed"
+            collapsedSurfaceClass="bg-white/95"
+            collapsedClassName="z-50 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1280px] sm:-translate-x-1/2"
+          />
+        </div>
 
         {loading ? (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">

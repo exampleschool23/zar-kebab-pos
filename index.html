@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Zar Kebab — ресторан узбекской кухни</title>
+    <title>Zar Kebab — Uzbek, Uyghur &amp; Turkish restaurant</title>
     <meta
       name="description"
-      content="Меню · Акции · Кейтеринг · Контакты. Узбекская кухня и шашлык в Ташкенте. Заказ по телефону +998 90 509-55-45 или через Telegram."
+      content="Reservation · About us · Menu · Promotions · Vacancy · Contacts. Order type. +998905095545. Every day from 08:00 to 01:00."
     />
     <meta name="application-name" content="Zar Kebab" />
     <meta name="theme-color" content="#ff5a00" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
     <link rel="canonical" href="https://www.zarkebab.uz/" />
     <link rel="icon" type="image/png" sizes="512x512" href="/brand/zarkebab-logo.png" />
     <link rel="shortcut icon" type="image/png" href="/brand/zarkebab-logo.png" />
@@ -20,43 +20,91 @@
     <meta property="og:type" content="restaurant" />
     <meta property="og:site_name" content="Zar Kebab" />
     <meta property="og:locale" content="ru_RU" />
-    <meta property="og:title" content="Zar Kebab — ресторан узбекской кухни" />
+    <meta property="og:title" content="Zar Kebab — Uzbek, Uyghur &amp; Turkish restaurant" />
     <meta
       property="og:description"
-      content="Меню, акции и кейтеринг Zar Kebab. Узбекская кухня и шашлык в Ташкенте. Заказ по телефону или через Telegram."
+      content="Reservation · About us · Menu · Promotions · Vacancy · Contacts. Order type. +998905095545. Every day from 08:00 to 01:00."
     />
     <meta property="og:url" content="https://www.zarkebab.uz/" />
     <meta property="og:image" content="https://www.zarkebab.uz/brand/zarkebab-logo.png" />
 
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Zar Kebab — ресторан узбекской кухни" />
+    <meta name="twitter:title" content="Zar Kebab — Uzbek, Uyghur &amp; Turkish restaurant" />
     <meta
       name="twitter:description"
-      content="Меню, акции и кейтеринг Zar Kebab. Узбекская кухня и шашлык в Ташкенте. Заказ по телефону или через Telegram."
+      content="Reservation · About us · Menu · Promotions · Vacancy · Contacts. Order type. +998905095545. Every day from 08:00 to 01:00."
     />
     <meta name="twitter:image" content="https://www.zarkebab.uz/brand/zarkebab-logo.png" />
 
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "Restaurant",
-        "name": "Zar Kebab",
-        "url": "https://www.zarkebab.uz/",
-        "logo": "https://www.zarkebab.uz/brand/zarkebab-logo.png",
-        "image": "https://www.zarkebab.uz/brand/zarkebab-logo.png",
-        "telephone": "+998905095545",
-        "servesCuisine": ["Uzbek", "Kebab"],
-        "priceRange": "$$",
-        "hasMenu": "https://www.zarkebab.uz/menu",
-        "sameAs": [
-          "https://t.me/zarkebab",
-          "https://www.instagram.com/zarkebab"
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://www.zarkebab.uz/#website",
+            "url": "https://www.zarkebab.uz/",
+            "name": "Zar Kebab",
+            "alternateName": "ZarKebab"
+          },
+          {
+            "@type": "Restaurant",
+            "@id": "https://www.zarkebab.uz/#restaurant",
+            "name": "Zar Kebab",
+            "url": "https://www.zarkebab.uz/",
+            "logo": "https://www.zarkebab.uz/brand/zarkebab-logo.png",
+            "image": "https://www.zarkebab.uz/brand/zarkebab-logo.png",
+            "telephone": "+998905095545",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "Matbuotchilar ko‘chasi, 17",
+              "addressLocality": "Tashkent",
+              "addressCountry": "UZ"
+            },
+            "servesCuisine": ["Uzbek", "Uyghur", "Turkish", "Kebab"],
+            "priceRange": "$$",
+            "acceptsReservations": true,
+            "openingHoursSpecification": {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday"
+              ],
+              "opens": "08:00",
+              "closes": "01:00"
+            },
+            "hasMenu": "https://www.zarkebab.uz/menu",
+            "sameAs": [
+              "https://t.me/zarkebab",
+              "https://www.instagram.com/zarkebab",
+              "https://yandex.com/maps/org/zarkebab/34684464035/"
+            ]
+          }
         ]
       }
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main>
+        <h1>Zar Kebab — Uzbek, Uyghur &amp; Turkish restaurant in Tashkent</h1>
+        <p>
+          Reservation · About us · Menu · Promotions · Vacancy · Contacts. Order type.
+          +998905095545. Every day from 08:00 to 01:00.
+        </p>
+        <nav aria-label="Основные разделы">
+          <a href="/menu">Меню</a>
+          <a href="/catering">Кейтеринг</a>
+          <a href="https://yandex.com/maps/org/zarkebab/34684464035/">Адрес: Матбуотчилар, 17</a>
+          <a href="https://t.me/zarkebab">Telegram</a>
+        </nav>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

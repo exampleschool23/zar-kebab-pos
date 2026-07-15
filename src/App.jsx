@@ -283,7 +283,7 @@ function PublicHostAdminRedirect() {
 function PublicCustomerRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/menu" replace />} />
+      <Route path="/" element={<PublicMenu />} />
       <Route path="/menu" element={<PublicMenu />} />
       <Route path="/menu/item/:itemId" element={<PublicMenu />} />
       <Route path="/premium-menu" element={<PublicMenu premium />} />
