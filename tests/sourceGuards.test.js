@@ -405,6 +405,18 @@ test('PendingApproval redirects approved users to their workspace route', () => 
   assert.match(pending, /const nextProfile = await refreshProfile\(\)[\s\S]*navigate\(path, \{ replace: true \}\)/)
 })
 
+test('PendingApproval logout clears local auth state and returns to login', () => {
+  const auth = readSource('src/contexts/AuthContext.jsx')
+  const pending = readSource('src/pages/PendingApproval.jsx')
+  const signOut = functionBody(auth, 'signOut')
+  const handleLogout = functionBody(pending, 'handleLogout')
+
+  assert.match(signOut, /try \{[\s\S]*supabase\.auth\.signOut\(\)[\s\S]*\} finally \{[\s\S]*setSession\(null\)/)
+  assert.match(handleLogout, /await signOut\(\)/)
+  assert.match(handleLogout, /finally \{[\s\S]*navigate\('\/login', \{ replace: true \}\)/)
+  assert.equal((pending.match(/onClick=\{handleLogout\}/g) || []).length, 2)
+})
+
 test('AdminUsers exposes role and status approval controls for editable staff', () => {
   const adminUsers = readSource('src/pages/AdminUsers.jsx')
   const permissions = readSource('src/lib/permissions.js')

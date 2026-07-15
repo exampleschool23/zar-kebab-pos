@@ -188,11 +188,14 @@ export function AuthProvider({ children }) {
   }
 
   async function signOut() {
-    await supabase.auth.signOut()
-    setSession(null)
-    setProfile(null)
-    setProfileError(null)
-    setAuthError(null)
+    try {
+      return await supabase.auth.signOut()
+    } finally {
+      setSession(null)
+      setProfile(null)
+      setProfileError(null)
+      setAuthError(null)
+    }
   }
 
   async function refreshProfile() {

@@ -35,6 +35,14 @@ export default function PendingApproval() {
     setTimeout(() => setChecking(false), 1000)
   }
 
+  async function handleLogout() {
+    try {
+      await signOut()
+    } finally {
+      navigate('/login', { replace: true })
+    }
+  }
+
   if (profileError) {
     return (
       <div className="min-h-screen bg-[#faf7f0] flex items-center justify-center p-4 w-full max-w-full overflow-x-hidden">
@@ -62,7 +70,7 @@ export default function PendingApproval() {
                 {t(lang, 'checkStatus')}
               </button>
               <button
-                onClick={signOut}
+                onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2 text-gray-400 text-sm font-medium hover:text-gray-600 transition-colors"
               >
                 <LogOut size={14} />
@@ -118,7 +126,7 @@ export default function PendingApproval() {
               {t(lang, 'checkStatus')}
             </button>
             <button
-              onClick={signOut}
+              onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 text-gray-400 text-sm font-medium hover:text-gray-600 transition-colors"
             >
               <LogOut size={14} />
