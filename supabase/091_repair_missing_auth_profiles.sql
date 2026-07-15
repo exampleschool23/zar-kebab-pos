@@ -48,4 +48,13 @@ where not exists (
   select 1
   from public.profiles as profiles
   where profiles.id = users.id
+)
+and not exists (
+  -- A deleted staff account is not a new approval request. Only restore it if
+  -- the person signed in again after the owner's most recent deletion.
+  select 1
+  from public.profile_audit as audit
+  where audit.profile_id = users.id
+    and audit.action = 'profile_deleted'
+    and audit.changed_at >= coalesce(users.last_sign_in_at, '-infinity'::timestamptz)
 );

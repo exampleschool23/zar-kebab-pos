@@ -46,6 +46,8 @@ const MIGRATION_HINTS = {
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
   settle_orders_payment: 'Run supabase/083_atomic_order_payment_settlement.sql',
   change_paid_order_payment_method_owner: 'Run supabase/090_owner_change_completed_order_payment_method.sql',
+  recall_table_from_cashier: 'Run supabase/094_admin_cashier_recall_access.sql',
+  current_staff_can_view_menu_catalog: 'Run supabase/095_read_only_menu_catalog_access.sql',
 }
 
 function missingColumnMessage(error) {
@@ -101,6 +103,8 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))
   checks.push(await checkRpc(dbClient, 'settle_orders_payment'))
   checks.push(await checkRpc(dbClient, 'change_paid_order_payment_method_owner', { p_order_ids: [], p_payment_method: 'cash' }))
+  checks.push(await checkRpc(dbClient, 'recall_table_from_cashier', { p_table_id: '__db_health_check__' }))
+  checks.push(await checkRpc(dbClient, 'current_staff_can_view_menu_catalog', {}))
   const failed = checks.filter(check => !check.ok)
   return {
     ok: failed.length === 0,

@@ -43,7 +43,7 @@ test('signed-in internal roles resolve to workspace routes while guest stays pub
   assert.equal(isPublicOnlyRole('customer'), true)
   assert.equal(isPublicOnlyRole('owner'), false)
   assert.equal(defaultPath('owner'), '/admin')
-  assert.equal(defaultPath('admin'), '/menu')
+  assert.equal(defaultPath('admin'), '/admin/menu')
   assert.equal(defaultPath({ role: 'admin', feature_access: ['dashboard'] }), '/admin')
   assert.equal(defaultPath({ role: 'admin', feature_access: ['cashier'] }), '/cashier/tables')
   assert.equal(defaultPath({ role: 'admin', feature_access: ['tables'] }), '/waiter/tables')

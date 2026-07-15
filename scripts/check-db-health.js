@@ -156,6 +156,16 @@ const checks = await Promise.all([
     'cashier write access is required'
   ),
   checkRpc(
+    'recall_table_from_cashier(p_table_id)',
+    () => supabase.rpc('recall_table_from_cashier', { p_table_id: '__db_health_check__' }),
+    'cashier access is required'
+  ),
+  checkRpc(
+    'current_staff_can_view_menu_catalog()',
+    () => supabase.rpc('current_staff_can_view_menu_catalog'),
+    null
+  ),
+  checkRpc(
     'remove_loyalty_card(p_card_id)',
     () => supabase.rpc('remove_loyalty_card', { p_card_id: '00000000-0000-0000-0000-000000000000' }),
     'loyalty card not found',

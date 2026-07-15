@@ -351,21 +351,29 @@ function savingLabel(lang) {
 
 function itemVisibilityStatusLabel(lang, visible) {
   if (visible) return lang === 'uz' ? 'Mavjud' : lang === 'ru' ? 'Доступно' : 'Available'
-  return lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden'
+  return lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Недоступно' : 'Unavailable'
 }
 
 function categoryVisibilityStatusLabel(lang, visible) {
-  if (visible) return lang === 'uz' ? 'Faol' : lang === 'ru' ? 'Активно' : 'Active'
-  return lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden'
+  if (visible) return lang === 'uz' ? 'Ommaviy menyuda ko‘rinadi' : lang === 'ru' ? 'Видно в публичном меню' : 'Visible on public menu'
+  return hiddenFromPublicMenuLabel(lang)
+}
+
+function hiddenFromPublicMenuLabel(lang) {
+  return lang === 'uz' ? 'Ommaviy menyuda yashirin' : lang === 'ru' ? 'Скрыто в публичном меню' : 'Hidden from public menu'
+}
+
+function hiddenFromWaiterMenuLabel(lang) {
+  return lang === 'uz' ? 'Ofitsiant menyusida yashirin' : lang === 'ru' ? 'Скрыто в меню официанта' : 'Hidden from waiter menu'
 }
 
 function visibilityActionLabel(lang, visible, kind = 'item') {
   if (kind === 'category') {
-    if (visible) return lang === 'uz' ? 'Kategoriyani yashirish' : lang === 'ru' ? 'Скрыть категорию' : 'Hide category'
-    return lang === 'uz' ? 'Kategoriyani ko‘rsatish' : lang === 'ru' ? 'Показать категорию' : 'Show category'
+    if (visible) return lang === 'uz' ? 'Kategoriyani ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть категорию из публичного меню' : 'Hide category from public menu'
+    return lang === 'uz' ? 'Kategoriyani ommaviy menyuda ko‘rsatish' : lang === 'ru' ? 'Показать категорию в публичном меню' : 'Show category on public menu'
   }
-  if (visible) return lang === 'uz' ? 'Mahsulotni yashirish' : lang === 'ru' ? 'Скрыть позицию' : 'Hide item'
-  return lang === 'uz' ? 'Mahsulotni ko‘rsatish' : lang === 'ru' ? 'Показать позицию' : 'Show item'
+  if (visible) return lang === 'uz' ? 'Mahsulotni mavjud emas deb belgilash' : lang === 'ru' ? 'Сделать позицию недоступной' : 'Mark item unavailable'
+  return lang === 'uz' ? 'Mahsulotni mavjud deb belgilash' : lang === 'ru' ? 'Сделать позицию доступной' : 'Mark item available'
 }
 
 function saveFailedLabel(lang) {
@@ -506,12 +514,12 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
           )}
           {item.public_hidden && (
             <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-200">
-              {lang === 'uz' ? 'Ommaviyda yo‘q' : lang === 'ru' ? 'Скрыто публично' : 'Public hidden'}
+              {hiddenFromPublicMenuLabel(lang)}
             </span>
           )}
           {isWaiterHiddenMenuItem(item) && (
             <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-black text-purple-700 ring-1 ring-purple-200">
-              {lang === 'uz' ? 'Ofitsiantda yo‘q' : lang === 'ru' ? 'Скрыто у официанта' : 'Waiter hidden'}
+              {hiddenFromWaiterMenuLabel(lang)}
             </span>
           )}
           {scheduleLabel && (
@@ -598,12 +606,12 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
           <ExternalIdBadge item={item} compact />
           {item.public_hidden && (
             <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-700">
-              {lang === 'uz' ? 'Ommaviyda yo‘q' : lang === 'ru' ? 'Скрыто публично' : 'Public hidden'}
+              {hiddenFromPublicMenuLabel(lang)}
             </span>
           )}
           {isWaiterHiddenMenuItem(item) && (
             <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-black text-purple-700">
-              {lang === 'uz' ? 'Ofitsiantda yo‘q' : lang === 'ru' ? 'Скрыто у официанта' : 'Waiter hidden'}
+              {hiddenFromWaiterMenuLabel(lang)}
             </span>
           )}
           {scheduleLabel && (
@@ -652,7 +660,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
 // ── Sortable category row ─────────────────────────────────────────────────────
 
 // Shared grid template — header and every row must use the same string exactly.
-const CAT_GRID = 'grid grid-cols-[20px_52px_1fr_110px_90px_160px] items-center gap-4 px-5'
+const CAT_GRID = 'grid grid-cols-[20px_52px_1fr_200px_90px_160px] items-center gap-4 px-5'
 
 function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibility, visibilityPending, sortIndex, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id })
@@ -695,7 +703,7 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
           <div className="mt-1 flex flex-wrap gap-1.5">
             {cat.waiter_hidden && (
               <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-black text-purple-700">
-                {lang === 'uz' ? 'Ofitsiantda yo‘q' : lang === 'ru' ? 'Скрыто у официанта' : 'Waiter hidden'}
+                {hiddenFromWaiterMenuLabel(lang)}
               </span>
             )}
             {scheduleLabel && (
@@ -1640,7 +1648,7 @@ export default function AdminMenu() {
                     </label>
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
                       <input type="checkbox" checked={!!form.waiter_hidden} onChange={e => setForm(f => ({ ...f, waiter_hidden: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
-                      {lang === 'uz' ? 'Ofitsiant stol menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню столов официанта' : 'Hide from waiter table'}
+                      {lang === 'uz' ? 'Ofitsiant menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню официанта' : 'Hide from waiter menu'}
                     </label>
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
                       <input type="checkbox" checked={!!form.cashier_only} onChange={e => setForm(f => ({ ...f, cashier_only: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
@@ -1734,16 +1742,16 @@ export default function AdminMenu() {
                     {lang === 'uz' ? 'Mavjud' : lang === 'ru' ? 'Доступно' : 'Available'}
                   </option>
                   <option value="hidden">
-                    {lang === 'uz' ? 'Yashirin' : lang === 'ru' ? 'Скрыто' : 'Hidden'}
+                    {lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Недоступно' : 'Unavailable'}
                   </option>
                   <option value="cashier_only">
                     {lang === 'uz' ? 'Faqat kassirda' : lang === 'ru' ? 'Только у кассира' : 'Only cashier'}
                   </option>
                   <option value="public_hidden">
-                    {lang === 'uz' ? 'Ommaviyda yashirin' : lang === 'ru' ? 'Скрыто публично' : 'Public hidden'}
+                    {hiddenFromPublicMenuLabel(lang)}
                   </option>
                   <option value="waiter_hidden">
-                    {lang === 'uz' ? 'Ofitsiantda yashirin' : lang === 'ru' ? 'Скрыто у официанта' : 'Waiter hidden'}
+                    {hiddenFromWaiterMenuLabel(lang)}
                   </option>
                 </select>
                 <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -1879,7 +1887,7 @@ export default function AdminMenu() {
                               className="scroll-mt-24"
                             >
                               {/* Section header */}
-                              <div className="flex items-center gap-2.5 mb-3">
+                              <div className="mb-3 flex flex-wrap items-center gap-2.5">
                                 {cat.image_url && (
                                   <img src={cat.image_url} alt="" className="h-7 w-7 flex-shrink-0 rounded-lg object-cover object-center" />
                                 )}
@@ -1889,6 +1897,16 @@ export default function AdminMenu() {
                                 <span className="rounded-full bg-[#F3F4F6] px-2.5 py-0.5 text-xs font-bold text-[#6B7280]">
                                   {catItems.length}
                                 </span>
+                                {cat.hidden && (
+                                  <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700 ring-1 ring-blue-200">
+                                    {hiddenFromPublicMenuLabel(lang)}
+                                  </span>
+                                )}
+                                {cat.waiter_hidden && (
+                                  <span className="rounded-full bg-purple-50 px-2 py-1 text-[10px] font-black text-purple-700 ring-1 ring-purple-200">
+                                    {hiddenFromWaiterMenuLabel(lang)}
+                                  </span>
+                                )}
                               </div>
 
                               {gridView ? (
@@ -2073,7 +2091,7 @@ export default function AdminMenu() {
                           <span />
                           <span />
                           <span>{lang === 'uz' ? 'Nomi' : lang === 'ru' ? 'Название' : 'Name'}</span>
-                          <span>{lang === 'uz' ? 'Holat' : lang === 'ru' ? 'Статус' : 'Status'}</span>
+                          <span>{lang === 'uz' ? 'Ommaviy menyu' : lang === 'ru' ? 'Публичное меню' : 'Public menu'}</span>
                           <span className="text-center">{lang === 'uz' ? 'Tartib' : lang === 'ru' ? 'Порядок' : 'Sort Order'}</span>
                           <span className="text-right">{lang === 'uz' ? 'Amallar' : lang === 'ru' ? 'Действия' : 'Actions'}</span>
                         </div>
@@ -2348,7 +2366,7 @@ export default function AdminMenu() {
                 className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
               />
               <label htmlFor="waiterHidden" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Ofitsiant stol menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню столов официанта' : 'Hide from waiter table'}
+                {lang === 'uz' ? 'Ofitsiant menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню официанта' : 'Hide from waiter menu'}
               </label>
             </div>
             <div className="flex items-center gap-2 pt-1">
@@ -2434,7 +2452,7 @@ export default function AdminMenu() {
                 className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
               />
               <label htmlFor="categoryWaiterHidden" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Ofitsiant stol menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню столов официанта' : 'Hide from waiter table'}
+                {lang === 'uz' ? 'Ofitsiant menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню официанта' : 'Hide from waiter menu'}
               </label>
             </div>
             <div className="flex gap-2 pt-2">

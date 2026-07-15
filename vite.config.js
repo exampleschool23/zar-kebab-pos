@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import registerAuth from './api/auth/register.js'
+import deleteAuthUser from './api/auth/delete-user.js'
 import uploadMenuImage from './api/menu-image/upload.js'
 import deleteMenuImage from './api/menu-image/delete.js'
 import notifyTelegramOrderStatus from './api/telegram/order-status.js'
@@ -33,6 +34,7 @@ function localApiRoutes() {
     name: 'local-api-routes',
     configureServer(server) {
       server.middlewares.use('/api/auth/register', (req, res) => registerAuth(req, res))
+      server.middlewares.use('/api/auth/delete-user', (req, res) => deleteAuthUser(req, res))
       server.middlewares.use('/api/menu-image/upload', (req, res) => uploadMenuImage(req, res))
       server.middlewares.use('/api/menu-image/delete', (req, res) => deleteMenuImage(req, res))
       server.middlewares.use('/api/telegram/order-status', (req, res) => notifyTelegramOrderStatus(req, res))

@@ -58,11 +58,10 @@ export async function requireMenuEditAccess(req) {
   const access = Array.isArray(profile?.feature_access) ? profile.feature_access : null
   const isPrimaryOwner = profile?.role === 'owner'
     && FEATURE_ACCESS_MANAGER_EMAILS.has(String(profile?.email || '').trim().toLowerCase())
-  const hasLegacyMenuWrite = ALLOWED_ROLES.has(profile?.role)
-    && ((profile.role === 'owner' && access === null) || access?.includes('menu'))
-  const hasExplicitMenuWrite = access?.includes('edit_menu_items')
+  const hasImplicitOwnerAccess = profile?.role === 'owner' && access === null
+  const hasExplicitMenuWrite = ALLOWED_ROLES.has(profile?.role) && access?.includes('menu')
 
-  if (profile?.status !== 'active' || (!isPrimaryOwner && !hasLegacyMenuWrite && !hasExplicitMenuWrite)) {
+  if (profile?.status !== 'active' || (!isPrimaryOwner && !hasImplicitOwnerAccess && !hasExplicitMenuWrite)) {
     throw Object.assign(new Error('Forbidden'), { status: 403 })
   }
 

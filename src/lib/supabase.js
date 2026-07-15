@@ -59,12 +59,26 @@ export async function updateProfile(userId, updates) {
   return { data, error }
 }
 
-export async function deleteProfile(userId) {
-  const { error } = await supabase
-    .from('profiles')
-    .delete()
-    .eq('id', userId)
-  return { error }
+export async function deleteProfile(userId, { expectedStatus = '' } = {}) {
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) return { error: sessionError }
+    if (!session?.access_token) return { error: new Error('Authentication required.') }
+
+    const response = await fetch('/api/auth/delete-user', {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, ...(expectedStatus ? { expectedStatus } : {}) }),
+    })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) return { error: new Error(body.error || 'Could not delete user.') }
+    return { error: null }
+  } catch (error) {
+    return { error }
+  }
 }
 
 export async function getAllProfiles() {

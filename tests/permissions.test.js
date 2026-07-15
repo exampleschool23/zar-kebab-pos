@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  FEATURE_DEFINITIONS,
   FEATURE_KEYS,
   assignableRoles,
   canDeleteTeamMember,
@@ -9,10 +10,12 @@ import {
   canEditMenu,
   canEditTeamMember,
   canManageFeatureAccess,
+  canMoveBackToTable,
   canViewPage,
   defaultFeaturesForRole,
   defaultPath,
   featureAccessForProfile,
+  updateFeatureAccessSelection,
 } from '../src/lib/permissions.js'
 
 test('role defaults still cover existing app features', () => {
@@ -31,21 +34,45 @@ test('feature access controls visibility while role controls write access', () =
 
   assert.equal(canViewPage(adminWithAccounting, 'expenses'), true)
   assert.equal(canEditFeature(adminWithAccounting, 'expenses'), true)
-  assert.equal(canViewPage(adminWithAccounting, 'menu'), false)
+  assert.equal(canViewPage(adminWithAccounting, 'menu'), true)
+  assert.equal(canEditMenu(adminWithAccounting), false)
   assert.deepEqual(featureAccessForProfile(adminWithAccounting), ['dashboard', 'expenses'])
   assert.equal(canViewPage(viewerWithAccounting, 'expenses'), true)
   assert.equal(canEditFeature(viewerWithAccounting, 'expenses'), false)
 })
 
-test('explicit menu-item edit access grants menu routing and writes', () => {
-  const viewerWithMenuEdit = { role: 'viewer', feature_access: ['edit_menu_items'] }
-  const viewerWithMenuView = { role: 'viewer', feature_access: ['menu'] }
+test('menu is always viewable by staff while Manage menu controls editing', () => {
+  const viewerWithMenu = { role: 'viewer', feature_access: ['menu'] }
+  const viewerWithoutMenu = { role: 'viewer', feature_access: [] }
+  const adminWithMenu = { role: 'admin', feature_access: ['menu'] }
+  const adminWithoutMenu = { role: 'admin', feature_access: [] }
+  const guestWithMenu = { role: 'guest', feature_access: ['menu'] }
 
-  assert.equal(canViewPage(viewerWithMenuEdit, 'menu'), true)
-  assert.equal(canEditMenu(viewerWithMenuEdit), true)
-  assert.equal(defaultPath(viewerWithMenuEdit), '/admin/menu')
-  assert.equal(canViewPage(viewerWithMenuView, 'menu'), true)
-  assert.equal(canEditMenu(viewerWithMenuView), false)
+  assert.equal(canViewPage(viewerWithMenu, 'menu'), true)
+  assert.equal(canViewPage(viewerWithoutMenu, 'menu'), true)
+  assert.equal(canEditMenu(viewerWithMenu), false)
+  assert.equal(canViewPage(adminWithoutMenu, 'menu'), true)
+  assert.equal(canEditMenu(adminWithoutMenu), false)
+  assert.equal(canEditMenu(adminWithMenu), true)
+  assert.equal(canViewPage(guestWithMenu, 'menu'), false)
+  assert.equal(defaultPath(viewerWithoutMenu), '/admin/menu')
+  assert.equal(FEATURE_DEFINITIONS.find(feature => feature.key === 'menu')?.kind, 'action')
+  assert.equal(FEATURE_KEYS.includes('edit_menu_items'), false)
+})
+
+test('feature selection keeps sensitive actions attached to relevant pages', () => {
+  assert.deepEqual(
+    updateFeatureAccessSelection([], 'delete_paid_orders', true),
+    ['dashboard', 'delete_paid_orders']
+  )
+})
+
+test('cashier access lets owners and admins move bills back without an extra permission', () => {
+  assert.equal(canMoveBackToTable({ role: 'admin', feature_access: ['cashier'] }), true)
+  assert.equal(canMoveBackToTable({ role: 'owner', feature_access: ['cashier'] }), true)
+  assert.equal(canMoveBackToTable({ role: 'admin', feature_access: ['dashboard'] }), false)
+  assert.equal(canMoveBackToTable({ role: 'viewer', feature_access: ['cashier'] }), false)
+  assert.equal(FEATURE_KEYS.includes('move_back_to_table'), false)
 })
 
 test('non-primary owner feature_access can be restricted', () => {
@@ -54,14 +81,15 @@ test('non-primary owner feature_access can be restricted', () => {
 
   assert.deepEqual(featureAccessForProfile(primaryOwner), FEATURE_KEYS)
   assert.deepEqual(featureAccessForProfile(otherOwner), ['dashboard', 'tables'])
-  assert.equal(canViewPage(otherOwner, 'menu'), false)
+  assert.equal(canViewPage(otherOwner, 'menu'), true)
+  assert.equal(canEditMenu(otherOwner), false)
 })
 
 test('null feature_access keeps role defaults and default path follows enabled features', () => {
-  assert.equal(canViewPage({ role: 'admin', feature_access: null }, 'menu'), false)
+  assert.equal(canViewPage({ role: 'admin', feature_access: null }, 'menu'), true)
   assert.equal(defaultPath({ role: 'admin', feature_access: ['expenses'] }), '/admin/accounting')
   assert.equal(defaultPath({ role: 'viewer', feature_access: ['cashier'] }), '/cashier/tables')
-  assert.equal(defaultPath({ role: 'waiter', feature_access: [] }), '/menu')
+  assert.equal(defaultPath({ role: 'waiter', feature_access: [] }), '/admin/menu')
 })
 
 test('owners can manage feature access', () => {

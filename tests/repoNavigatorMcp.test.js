@@ -279,8 +279,8 @@ test('indexes complete large components, PL/pgSQL bodies, and multiline protecte
   const menuOutline = await navigator.run({ op: 'outline', path: 'src/pages/AdminMenu.jsx', limit: 50, max_chars: 16_000 })
   assert.equal(menuOutline.rows.find((row) => row[4] === 'ImageUploadField')?.[3], 'L229-281')
   assert.equal(menuOutline.rows.find((row) => row[4] === 'OrangeBtn')?.[3], 'L283-295')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'VisibilityToggleButton')?.[3], 'L406-428')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'SortableItemRow')?.[3], 'L567-650')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'VisibilityToggleButton')?.[3], 'L414-436')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'SortableItemRow')?.[3], 'L575-658')
 
   const settlement = await navigator.run({ op: 'find', q: 'settle_orders_payment', limit: 5 })
   const sqlFunction = settlement.rows.find((row) => row[1] === 'sql-function')

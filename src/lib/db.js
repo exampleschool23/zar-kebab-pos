@@ -753,29 +753,8 @@ export async function writeToSupabase(action, state, options = {}) {
 
     case 'RECALL_TABLE_FROM_CASHIER': {
       const tableId = action.payload
-      const { data: recalledOrders, error: ordersError } = await supabase
-        .from('orders')
-        .update({ status: 'sent_to_kitchen' })
-        .eq('table_id', tableId)
-        .neq('payment_status', 'paid')
-        .neq('status', 'cancelled')
-        .select('id')
-      if (ordersError) throw ordersError
-
-      const { data: legacyOrders, error: legacyError } = await supabase
-        .from('orders')
-        .update({ status: 'sent_to_kitchen' })
-        .eq('table_id', tableId)
-        .is('payment_status', null)
-        .neq('status', 'cancelled')
-        .select('id')
-      if (legacyError) throw legacyError
-
-      if (!recalledOrders?.length && !legacyOrders?.length) {
-        throw new Error('Order was not moved back to table. Refresh and try again.')
-      }
-
-      await updateRestaurantTableStatus(tableId, { status: 'occupied' }, { status: 'occupied' })
+      const { error } = await supabase.rpc('recall_table_from_cashier', { p_table_id: tableId })
+      if (error) throw error
       break
     }
 

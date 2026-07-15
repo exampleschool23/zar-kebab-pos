@@ -11,67 +11,69 @@ export const EDITOR_ROLES = ['owner', 'admin']
 export const FEATURE_DEFINITIONS = [
   {
     key: 'dashboard',
+    kind: 'page',
     labels: { uz: 'Boshqaruv paneli', ru: 'Панель управления', en: 'Dashboard' },
     description: { uz: 'Savdo va bugungi holat', ru: 'Продажи и текущая ситуация', en: 'Sales overview and live status' },
   },
   {
     key: 'tables',
+    kind: 'page',
     labels: { uz: 'Stollar va buyurtmalar', ru: 'Столы и заказы', en: 'Tables and orders' },
     description: { uz: 'Ofitsiant stol va buyurtma oqimi', ru: 'Столы официанта и отправка заказов', en: 'Waiter table and order flow' },
   },
   {
     key: 'menu',
-    labels: { uz: 'Menyu boshqaruvi', ru: 'Управление меню', en: 'Menu management' },
-    description: { uz: 'Kategoriya, mahsulot va narxlar', ru: 'Категории, блюда и цены', en: 'Categories, items, and prices' },
-  },
-  {
-    key: 'edit_menu_items',
-    labels: { uz: 'Menyu mahsulotlarini tahrirlash', ru: 'Редактирование позиций меню', en: 'Edit menu items' },
-    description: { uz: 'Mahsulotlar, narxlar, rasmlar va kategoriyalarni o‘zgartirish', ru: 'Изменение блюд, цен, изображений и категорий', en: 'Change items, prices, images, and categories' },
+    kind: 'action',
+    labels: { uz: 'Menyuni boshqarish', ru: 'Управление меню', en: 'Manage menu' },
+    description: { uz: 'Tahrirlashga ruxsat; belgilanmasa faqat ko‘rish', ru: 'Разрешить редактирование; без отметки только просмотр', en: 'Allow editing; unchecked users remain read-only' },
   },
   {
     key: 'cashier',
+    kind: 'page',
     labels: { uz: 'Kassir', ru: 'Кассир', en: 'Cashier' },
     description: { uz: 'Hisob yopish va cheklar', ru: 'Закрытие счетов и чеки', en: 'Billing, payments, and receipts' },
   },
   {
     key: 'loyalty',
+    kind: 'page',
     labels: { uz: 'Sodiqlik kartalari', ru: 'Карты лояльности', en: 'Loyalty cards' },
     description: { uz: 'Mijoz kartalari va bonuslar', ru: 'Карты клиентов и бонусы', en: 'Customer cards and rewards' },
   },
   {
     key: 'expenses',
+    kind: 'page',
     labels: { uz: 'Buxgalteriya', ru: 'Бухгалтерия', en: 'Accounting' },
     description: { uz: 'Daromad, xarajat va maoshlar', ru: 'Доходы, расходы и зарплаты', en: 'Income, expenses, and salaries' },
   },
   {
     key: 'team',
+    kind: 'page',
     labels: { uz: 'Jamoa', ru: 'Команда', en: 'Team' },
     description: { uz: 'Xodimlar roli va kirish huquqlari', ru: 'Роли сотрудников и доступы', en: 'Employee roles and feature access' },
   },
   {
     key: 'reports',
+    kind: 'page',
     labels: { uz: 'Hisobotlar', ru: 'Отчёты', en: 'Reports' },
     description: { uz: 'Savdo va operatsion hisobotlar', ru: 'Продажи и операционные отчёты', en: 'Sales and operational reports' },
   },
   {
     key: 'audit',
+    kind: 'page',
     labels: { uz: 'Audit', ru: 'Аудит', en: 'Audit' },
     description: { uz: 'Rol, to‘lov va o‘zgarish tarixi', ru: 'История ролей, оплат и изменений', en: 'Role, payment, and change history' },
   },
   {
     key: 'settings',
+    kind: 'page',
     labels: { uz: 'Sozlamalar', ru: 'Настройки', en: 'Settings' },
     description: { uz: 'Restoran sozlamalari va stollar', ru: 'Настройки ресторана и столы', en: 'Restaurant settings and table management' },
   },
   {
-    key: 'move_back_to_table',
-    labels: { uz: 'Stolga qaytarish', ru: 'Вернуть к столу', en: 'Move back to table' },
-    description: { uz: 'Hisob so‘ralgan buyurtmani ofitsiant oqimiga qaytarish', ru: 'Вернуть заказ из кассы обратно официанту', en: 'Return a needs-bill order from cashier back to waiter flow' },
-  },
-  {
     key: 'delete_paid_orders',
-    labels: { uz: 'Buyurtmalarni o‘chirish', ru: 'Удаление заказов', en: 'Delete orders' },
+    kind: 'action',
+    requiresAny: ['dashboard', 'cashier', 'reports'],
+    labels: { uz: 'Yakunlangan buyurtmalarni o‘chirish', ru: 'Удаление завершённых заказов', en: 'Delete completed orders' },
     description: { uz: 'To‘langan yoki test buyurtmalarni olib tashlash', ru: 'Удаление оплаченных или тестовых заказов', en: 'Remove paid or test orders' },
   },
 ]
@@ -100,6 +102,32 @@ export function normalizeFeatureAccess(featureAccess) {
   return [...new Set(featureAccess.map(key => String(key || '').trim()).filter(key => FEATURE_KEYS.includes(key)))]
 }
 
+export function updateFeatureAccessSelection(featureAccess, featureKey, enabled) {
+  const current = normalizeFeatureAccess(featureAccess) || []
+  const definition = FEATURE_DEFINITIONS.find(feature => feature.key === featureKey)
+  if (!definition) return current
+
+  const next = new Set(current)
+  if (enabled) {
+    next.add(featureKey)
+    for (const requiredKey of definition.requires || []) next.add(requiredKey)
+    if (definition.requiresAny?.length && !definition.requiresAny.some(key => next.has(key))) {
+      next.add(definition.requiresAny[0])
+    }
+  } else {
+    next.delete(featureKey)
+  }
+
+  for (const feature of FEATURE_DEFINITIONS) {
+    if (feature.kind !== 'action' || !next.has(feature.key)) continue
+    const hasRequired = (feature.requires || []).every(key => next.has(key))
+    const hasRequiredAny = !feature.requiresAny?.length || feature.requiresAny.some(key => next.has(key))
+    if (!hasRequired || !hasRequiredAny) next.delete(feature.key)
+  }
+
+  return FEATURE_KEYS.filter(key => next.has(key))
+}
+
 export function defaultFeaturesForRole(role) {
   const rawRole = String(role || 'guest').toLowerCase()
   if (rawRole === 'waiter') return ['tables', 'team']
@@ -117,10 +145,10 @@ export function featureAccessForProfile(profileOrRole) {
 }
 
 export function canViewPage(profileOrRole, page) {
-  if (page === 'publicMenu') return (PAGE_ACCESS.publicMenu || []).includes(normalizeRole(profileOrRole?.role || profileOrRole))
-  const access = featureAccessForProfile(profileOrRole)
-  if (page === 'menu') return access.includes('menu') || access.includes('edit_menu_items')
-  return access.includes(page)
+  const role = normalizeRole(profileOrRole?.role || profileOrRole)
+  if (page === 'publicMenu') return (PAGE_ACCESS.publicMenu || []).includes(role)
+  if (page === 'menu') return EDITOR_ROLES.includes(role) || role === 'viewer'
+  return featureAccessForProfile(profileOrRole).includes(page)
 }
 
 export function canManageFeatureAccess(profileOrRole) {
@@ -128,7 +156,7 @@ export function canManageFeatureAccess(profileOrRole) {
 }
 
 export function canDeletePaidOrders(profileOrRole) {
-  return canViewPage(profileOrRole, 'delete_paid_orders')
+  return canEditFeature(profileOrRole, 'delete_paid_orders')
 }
 
 export function canChangeCompletedOrderPaymentMethod(profileOrRole) {
@@ -136,15 +164,16 @@ export function canChangeCompletedOrderPaymentMethod(profileOrRole) {
 }
 
 export function canMoveBackToTable(profileOrRole) {
-  return canViewPage(profileOrRole, 'move_back_to_table')
+  return canEditFeature(profileOrRole, 'cashier')
 }
 
 export function canEditFeature(profileOrRole, featureKey) {
-  return EDITOR_ROLES.includes(normalizeRole(profileOrRole?.role || profileOrRole)) && canViewPage(profileOrRole, featureKey)
+  return EDITOR_ROLES.includes(normalizeRole(profileOrRole?.role || profileOrRole))
+    && featureAccessForProfile(profileOrRole).includes(featureKey)
 }
 
 export function canEditMenu(profileOrRole) {
-  return canEditFeature(profileOrRole, 'menu') || canViewPage(profileOrRole, 'edit_menu_items')
+  return canEditFeature(profileOrRole, 'menu')
 }
 export function canManageSettings(profileOrRole) { return canEditFeature(profileOrRole, 'settings') }
 export function canUseCashierActions(profileOrRole) { return canEditFeature(profileOrRole, 'cashier') }
@@ -197,12 +226,12 @@ export function defaultPath(role) {
   if (canViewPage(profile, 'dashboard')) return '/admin'
   if (canViewPage(profile, 'cashier')) return '/cashier/tables'
   if (canViewPage(profile, 'tables')) return '/waiter/tables'
-  if (canViewPage(profile, 'menu')) return '/admin/menu'
   if (canViewPage(profile, 'loyalty')) return '/admin/loyalty'
   if (canViewPage(profile, 'expenses')) return '/admin/accounting'
   if (canViewPage(profile, 'team')) return '/admin/users'
   if (canViewPage(profile, 'reports')) return '/admin/reports'
   if (canViewPage(profile, 'audit')) return '/admin/audit'
   if (canViewPage(profile, 'settings')) return '/admin/settings'
+  if (canViewPage(profile, 'menu')) return '/admin/menu'
   return '/menu'
 }

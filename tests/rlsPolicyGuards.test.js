@@ -13,6 +13,10 @@ const primaryOwnerFeatureAccessSql = fs.readFileSync(new URL('../supabase/068_pr
 const manageNonPrimaryOwnersSql = fs.readFileSync(new URL('../supabase/069_manage_non_primary_owner_profiles.sql', import.meta.url), 'utf8')
 const featureAccessPosPoliciesSql = fs.readFileSync(new URL('../supabase/073_feature_access_pos_policies.sql', import.meta.url), 'utf8')
 const fourRoleFeatureAccessSql = fs.readFileSync(new URL('../supabase/077_four_role_feature_access.sql', import.meta.url), 'utf8')
+const logicalFeatureAccessSql = fs.readFileSync(new URL('../supabase/092_logical_feature_access.sql', import.meta.url), 'utf8')
+const pendingRequestLifecycleSql = fs.readFileSync(new URL('../supabase/093_team_pending_request_lifecycle.sql', import.meta.url), 'utf8')
+const adminCashierRecallSql = fs.readFileSync(new URL('../supabase/094_admin_cashier_recall_access.sql', import.meta.url), 'utf8')
+const readOnlyMenuCatalogSql = fs.readFileSync(new URL('../supabase/095_read_only_menu_catalog_access.sql', import.meta.url), 'utf8')
 
 test('role-aware write migration removes broad menu and zone writes', () => {
   assert.match(sql, /drop policy if exists "staff_all_categories"/)
@@ -132,6 +136,56 @@ test('move back to table can be granted as explicit feature access', () => {
   assert.match(moveBackToTableFeatureSql, /when feature_key = 'delete_paid_orders' then false/)
 })
 
+test('logical feature access removes duplicate menu edit access and orphaned actions', () => {
+  assert.match(logicalFeatureAccessSql, /array_append\(feature_access, 'menu'\)/)
+  assert.match(logicalFeatureAccessSql, /array_remove\(feature_access, 'edit_menu_items'\)/)
+  assert.match(logicalFeatureAccessSql, /when 'move_back_to_table' then 'cashier' = any\(profile\.feature_access\)/)
+  assert.match(logicalFeatureAccessSql, /when 'delete_paid_orders' then profile\.feature_access && array\['dashboard','cashier','reports'\]/)
+  assert.match(logicalFeatureAccessSql, /not \('move_back_to_table' = any\(feature_access\)\)[\s\S]*'cashier' = any\(feature_access\)/)
+  assert.match(logicalFeatureAccessSql, /not \('delete_paid_orders' = any\(feature_access\)\)[\s\S]*feature_access && array\['dashboard','cashier','reports'\]/)
+  assert.doesNotMatch(logicalFeatureAccessSql, /'edit_menu_items',\s*\n\s*'cashier'/)
+})
+
+test('final order policies remove authenticated catch-alls and role-gate writes', () => {
+  assert.match(logicalFeatureAccessSql, /drop policy if exists staff_all_orders on public\.orders/)
+  assert.match(logicalFeatureAccessSql, /drop policy if exists staff_all_order_items on public\.order_items/)
+  assert.match(logicalFeatureAccessSql, /feature_access_read_orders/)
+  assert.match(logicalFeatureAccessSql, /feature_access_update_orders/)
+  assert.match(logicalFeatureAccessSql, /feature_access_read_order_items/)
+  assert.match(logicalFeatureAccessSql, /feature_access_update_order_items/)
+  assert.match(logicalFeatureAccessSql, /public\.current_staff_can_write\('tables'\)/)
+  assert.match(logicalFeatureAccessSql, /public\.current_staff_can_write\('cashier'\)/)
+})
+
+test('move back to table is checked atomically and guarded against direct updates', () => {
+  assert.match(logicalFeatureAccessSql, /recall_table_from_cashier\(p_table_id text\)/)
+  assert.match(logicalFeatureAccessSql, /current_staff_can_write\('cashier'\)[\s\S]*current_staff_can_access\('move_back_to_table'\)/)
+  assert.match(logicalFeatureAccessSql, /guard_recall_from_cashier_permission/)
+  assert.match(logicalFeatureAccessSql, /payment_status is distinct from 'paid'/)
+  assert.match(logicalFeatureAccessSql, /status = 'needs_bill'/)
+})
+
+test('final recall access is automatic for owner and admin cashier editors', () => {
+  assert.match(adminCashierRecallSql, /auth\.uid\(\) is not null[\s\S]*not public\.is_owner\(\)/)
+  assert.match(adminCashierRecallSql, /Only owners can change feature access/)
+  assert.match(adminCashierRecallSql, /array_remove\(feature_access, 'move_back_to_table'\)/)
+  assert.match(adminCashierRecallSql, /public\.current_staff_can_write\('cashier'\)/)
+  assert.match(adminCashierRecallSql, /guard_recall_from_cashier_permission/)
+  assert.match(adminCashierRecallSql, /recall_table_from_cashier\(p_table_id text\)/)
+  assert.doesNotMatch(adminCashierRecallSql, /current_staff_can_access\('move_back_to_table'\)/)
+  assert.match(adminCashierRecallSql, /'settings',\s*\n\s*'delete_paid_orders'/)
+})
+
+test('deleted auth accounts are not resurrected as pending approval requests', () => {
+  assert.match(pendingRequestLifecycleSql, /public\.profile_audit as audit/)
+  assert.match(pendingRequestLifecycleSql, /audit\.action = 'profile_deleted'/)
+  assert.match(pendingRequestLifecycleSql, /profiles\.role = 'guest'/)
+  assert.match(pendingRequestLifecycleSql, /profiles\.status = 'pending'/)
+  assert.match(pendingRequestLifecycleSql, /users\.last_sign_in_at/)
+  assert.match(pendingRequestLifecycleSql, /delete from auth\.users as users/)
+  assert.match(pendingRequestLifecycleSql, /old\.status <> 'pending' and new\.status = 'pending'/)
+})
+
 test('POS RLS policies honor explicit feature access instead of role-only checks', () => {
   assert.match(featureAccessPosPoliciesSql, /current_staff_can_access_any\(feature_keys text\[\]\)/)
   assert.match(featureAccessPosPoliciesSql, /feature_access_read_restaurant_tables/)
@@ -155,4 +209,15 @@ test('final POS write policies require feature write access, not viewer-only acc
   assert.match(fourRoleFeatureAccessSql, /public\.current_staff_can_write\('cashier'\)/)
   assert.match(fourRoleFeatureAccessSql, /feature_access_insert_order_item_cancellations/)
   assert.doesNotMatch(fourRoleFeatureAccessSql, /array\['owner','admin','waiter','cashier','stakeholder'\]/)
+})
+
+test('read-only staff can inspect the full menu without receiving menu write access', () => {
+  assert.match(readOnlyMenuCatalogSql, /current_staff_can_view_menu_catalog\(\)/)
+  assert.match(readOnlyMenuCatalogSql, /profile\.status = 'active'/)
+  assert.match(readOnlyMenuCatalogSql, /profile\.role in \('owner', 'admin', 'viewer'\)/)
+  assert.match(readOnlyMenuCatalogSql, /feature_access_read_menu_categories/)
+  assert.match(readOnlyMenuCatalogSql, /feature_access_read_menu_items/)
+  assert.match(readOnlyMenuCatalogSql, /using \(public\.current_staff_can_view_menu_catalog\(\)\)/)
+  assert.doesNotMatch(readOnlyMenuCatalogSql, /feature_access_write_menu/)
+  assert.doesNotMatch(readOnlyMenuCatalogSql, /current_staff_can_write\('menu'\)/)
 })
