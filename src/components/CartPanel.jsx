@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { X, ShoppingCart, Minus, Plus, Trash2, UtensilsCrossed, Loader2 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { t, getItemDesc, getItemName } from '../lib/i18n'
@@ -31,6 +31,20 @@ function submitErrorMessage(lang, error) {
 // ── Cart item row ──────────────────────────────────────────────────────────────
 function getCartItemKey(item) {
   return item?.cart_item_key || item?.cartItemKey || item?.menu_item_id
+}
+
+function cartSubmissionFingerprint(cart, orderType, priceMode) {
+  const items = cart.map(item => ({
+    key: getCartItemKey(item),
+    menuItemId: item.menu_item_id,
+    quantity: Number(item.quantity) || 0,
+    notes: item.notes || '',
+    price: Number(item.price) || 0,
+    basePrice: Number(item.base_price) || 0,
+    unitPrice: Number(item.unit_price) || 0,
+    selectedOptions: item.selected_options || item.selectedOptions || {},
+  })).sort((a, b) => String(a.key).localeCompare(String(b.key)))
+  return JSON.stringify({ orderType, priceMode, items })
 }
 
 function CartItemRow({ item, lang, dispatch, menuItem }) {
@@ -161,6 +175,7 @@ export default function CartPanel({
   const cart    = state.cart
   const normalizedPriceMode = normalizePriceMode(priceMode)
   const [message, setMessage] = useState(null)
+  const retrySubmissionRef = useRef(null)
 
   const menuItemMap = useMemo(() => {
     const map = {}
@@ -180,22 +195,33 @@ export default function CartPanel({
     if (cart.length === 0 || isSending) return
     setMessage(null)
     onSendingChange?.(true)
-    const submittedAt = new Date().toISOString()
-    const kitchenRoundId = `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
+    const fingerprint = cartSubmissionFingerprint(cart, orderType, normalizedPriceMode)
+    const retainedAttempt = retrySubmissionRef.current?.fingerprint === fingerprint
+      ? retrySubmissionRef.current.action
+      : null
+    if (!retainedAttempt) retrySubmissionRef.current = null
+    const submittedAt = retainedAttempt?._submittedAt || new Date().toISOString()
+    const kitchenRoundId = retainedAttempt?._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
+    const submitAction = retainedAttempt || {
+      type: 'SEND_TO_KITCHEN',
+      payload: { orderType, priceMode: normalizedPriceMode },
+      _kitchenRoundId: kitchenRoundId,
+      _submittedAt: submittedAt,
+    }
     try {
-      const result = await dispatch({
-        type: 'SEND_TO_KITCHEN',
-        payload: { orderType, priceMode: normalizedPriceMode },
-        _kitchenRoundId: kitchenRoundId,
-        _submittedAt: submittedAt,
-      })
+      const result = await dispatch(submitAction)
       if (result?.error) {
+        if (result.action) {
+          retrySubmissionRef.current = { fingerprint, action: result.action }
+        }
         setMessage({
           tone: 'error',
           text: submitErrorMessage(lang, result.error),
         })
         return
       }
+      retrySubmissionRef.current = null
+      const completedAction = result?.action || submitAction
       setMessage({
         tone: 'success',
         text: lang === 'uz'
@@ -205,9 +231,9 @@ export default function CartPanel({
             : 'Order submitted.',
       })
       onSubmitSuccess?.({
-        orderId: result?.action?._orderId,
-        kitchenRoundId,
-        submittedAt,
+        orderId: completedAction._orderId,
+        kitchenRoundId: completedAction._kitchenRoundId || kitchenRoundId,
+        submittedAt: completedAction._submittedAt || submittedAt,
         orderType,
       })
       onClose?.()

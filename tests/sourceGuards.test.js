@@ -1279,7 +1279,9 @@ test('CartPanel exposes in-flight send state from its parent', () => {
 
 test('submit order writes have a finite timeout before the cart can stay loading forever', () => {
   const appContext = readSource('src/store/AppContext.jsx')
+  const cartPanel = readSource('src/components/CartPanel.jsx')
   const db = readSource('src/lib/db.js')
+  const idempotencyMigration = readSource('supabase/096_idempotent_kitchen_submissions.sql')
   const timeout = readSource('src/lib/writeTimeout.js')
 
   assert.match(timeout, /export const POS_WRITE_TIMEOUT_MS = \d+/)
@@ -1291,6 +1293,15 @@ test('submit order writes have a finite timeout before the cart can stay loading
   assert.match(db, /function withAbortSignal\(query, signal\)/)
   assert.match(db, /withAbortSignal\(supabase\.rpc\('submit_order_to_kitchen'/)
   assert.match(db, /signal: options\.signal/)
+  assert.match(cartPanel, /retrySubmissionRef/)
+  assert.match(cartPanel, /retainedAttempt\?\._kitchenRoundId/)
+  assert.match(appContext, /_items: action\._items \|\| stateRef\.current\.cart\.map/)
+  assert.match(appContext, /return \{ error: err, action: enriched \}/)
+  assert.match(db, /kitchen_round_id: action\._kitchenRoundId/)
+  assert.match(idempotencyMigration, /target_kitchen_round_id/)
+  assert.match(idempotencyMigration, /pg_advisory_xact_lock/)
+  assert.match(idempotencyMigration, /kitchen_round_id = target_kitchen_round_id/)
+  assert.match(idempotencyMigration, /then\s+return;/)
 })
 
 test('WaiterOrder locks menu mutations while order send is pending', () => {
@@ -1306,6 +1317,8 @@ test('orders reducer clears only the sent cart snapshot after kitchen submit', (
   const source = readSource('src/store/ordersReducer.js')
 
   assert.match(source, /removeSentCartItems\(state\.cart,\s*cartItems\)/)
+  assert.match(source, /const existingItemIds = new Set/)
+  assert.match(source, /items: \[\.\.\.\(o\.items \|\| \[\]\), \.\.\.newCartItems\]/)
   assert.doesNotMatch(source, /orders: nextOrders,\s*cart: \[\]/)
 })
 
@@ -1334,6 +1347,18 @@ test('WaiterTables keeps urgent status sections before available tables', () => 
 
   assert.match(source, /const SECTION_ORDER = \['ready', 'preparing', 'waiting_kitchen', 'needs_bill', 'reserved', 'occupied', 'available'\]/)
   assert.match(source, /SECTION_ORDER\s*\n\s*\.map\(status =>/)
+})
+
+test('WaiterTables refreshes operational data whenever the waiter returns', () => {
+  const appContext = readSource('src/store/AppContext.jsx')
+  const waiterTables = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(appContext, /const refreshPOSData = useCallback\(function refreshPOSData\(\)/)
+  assert.match(appContext, /refreshPOSDataRef\.current = \(\) => hydratePOSData\(\{ afterCurrent: true \}\)/)
+  assert.match(appContext, /value=\{\{ state, dispatch: dbDispatch, refreshPOSData \}\}/)
+  assert.match(waiterTables, /const \{ state, dispatch, refreshPOSData \} = useApp\(\)/)
+  assert.match(waiterTables, /useEffect\(\(\) => \{\s*refreshPOSData\(\)/)
+  assert.match(waiterTables, /event\.persisted\) refreshPOSData\(\)/)
 })
 
 test('WaiterTables ready-card total uses shared payment math instead of stale stored totals', () => {
@@ -1759,7 +1784,10 @@ test('WaiterOrder prints cook checks by submitted order round', () => {
   assert.match(kitchenCheckReceipt, /function handlePrintKitchenCheck\(delay = 300\)/)
   assert.match(kitchenCheckReceipt, /window\.setTimeout\(\(\) => window\.print\(\), delay\)/)
   assert.match(kitchenCheckReceipt, /const autoPrint = params\.get\('print'\) === '1'/)
-  assert.match(kitchenCheckReceipt, /getKitchenCheckGroups\(order\)/)
+  assert.match(kitchenCheckReceipt, /getKitchenCheckGroup\(order, roundId\)/)
+  assert.match(kitchenCheckReceipt, /loadKitchenCheckOrder\(orderId/)
+  assert.match(kitchenCheckReceipt, /printedRoundRef/)
+  assert.doesNotMatch(kitchenCheckReceipt, /groups\.find\([^\n]+\) \|\| groups\[0\]/)
   assert.match(kitchenCheckReceipt, /getItemName\(menuItem, lang\)/)
   assert.match(kitchenCheckReceipt, /getOrderItemOptionLines\(item, menuItem, lang\)/)
   assert.match(kitchenCheckReceipt, /getManualOrderNotes\(item, menuItem, lang\)/)
@@ -2898,6 +2926,9 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(productCards, /selectedOptionPriceDelta/)
   assert.match(productCards, /optionNoteLine/)
   assert.match(waiterOrder, /menuItemRequiresOptions\(item\)/)
+  assert.match(waiterOrder, /getMenuItemOptionGroups\(item, lang\)\.length > 0/)
+  assert.match(waiterOrder, /quantity: Math\.max\(1, Number\(qty\) \|\| 1\)/)
+  assert.match(waiterOrder, /currentQty=\{getMenuItemOptionGroups\(detailItem, lang\)\.length > 0 \? 0/)
   assert.match(waiterOrder, /map\[i\.menu_item_id\] = \(map\[i\.menu_item_id\] \|\| 0\) \+ \(Number\(i\.quantity\) \|\| 0\)/)
   assert.match(waiterOrder, /if \(menuItemRequiresOptions\(item\)\) \{\s*openDetail\(item\)/)
   assert.match(functionBody(waiterOrder, 'handleDecrement'), /if \(menuItemRequiresOptions\(item\)\) \{\s*openDetail\(item\)[\s\S]*return/)
@@ -2908,6 +2939,7 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(waiterOrder, /const displayName = menuItem \? getItemName\(menuItem, lang\) : item\.name/)
   assert.match(waiterOrder, /<p className="truncate text-\[12px\] font-black text-\[#1F2937\]">\{displayName\}<\/p>/)
   assert.match(cartReducer, /function getCartItemKey/)
+  assert.match(cartReducer, /const addQuantity = Math\.max\(1, Number\(action\.payload\?\.quantity\) \|\| 1\)/)
   assert.match(cartReducer, /case 'UPDATE_CART_ITEM_FIELDS'/)
   assert.match(cartPanel, /function getCartItemKey/)
   assert.match(cartPanel, /const displayName = menuItem \? getItemName\(menuItem, lang\) : item\.name/)

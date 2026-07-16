@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildKitchenCheckHtml,
+  getKitchenCheckGroup,
   getKitchenCheckGroups,
 } from '../src/lib/kitchenCheck.js'
 
@@ -32,6 +33,20 @@ test('cook checks stay split by submitted order round', () => {
   assert.deepEqual(groups.map(group => group.orderId), ['same-order', 'same-order'])
   assert.deepEqual(groups[0].items.map(row => row.name), ['Chicken', 'Tea'])
   assert.deepEqual(groups[1].items.map(row => row.name), ['Bread'])
+})
+
+test('cook check selection never substitutes another round for a requested round', () => {
+  const order = {
+    id: 'same-order',
+    items: [
+      item({ id: 'a', kitchen_round_id: 'round-one', name: 'First round', quantity: 1 }),
+      item({ id: 'b', kitchen_round_id: 'round-two', name: 'Second round', quantity: 2 }),
+    ],
+  }
+
+  assert.equal(getKitchenCheckGroup(order, 'round-two').items[0].quantity, 2)
+  assert.equal(getKitchenCheckGroup(order, 'round-missing'), null)
+  assert.equal(getKitchenCheckGroup(order).roundId, 'round-one')
 })
 
 test('cook checks fall back to persisted item created_at after reload', () => {

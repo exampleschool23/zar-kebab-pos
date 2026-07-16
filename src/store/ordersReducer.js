@@ -62,11 +62,15 @@ export function ordersReducer(state, action) {
         submitted_at: i.submitted_at || submittedAt,
         created_at: i.created_at || submittedAt,
       }))
-      const addedSubtotal = cartItems.reduce((s, i) => s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1), 0)
       const activeOrder = state.orders.find(o =>
         o.id === orderId ||
         (!isOffPremise && o.table_id === state.currentTableId && o.payment_status !== 'paid')
       )
+      const existingItemIds = new Set((activeOrder?.items || []).map(item => item.id).filter(Boolean))
+      const newCartItems = activeOrder
+        ? cartItems.filter(item => !item.id || !existingItemIds.has(item.id))
+        : cartItems
+      const addedSubtotal = newCartItems.reduce((s, i) => s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1), 0)
       const subtotal = (Number(activeOrder?.subtotal) || 0) + addedSubtotal
       const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(activeOrder?.service_rate_pct))
         ? Number(activeOrder.service_rate_pct)
@@ -82,7 +86,7 @@ export function ordersReducer(state, action) {
                 ...o,
                 status: 'sent_to_kitchen',
                 price_mode: priceMode,
-                items: [...(o.items || []), ...cartItems],
+                items: [...(o.items || []), ...newCartItems],
                 ...paymentFields,
               }
             : o

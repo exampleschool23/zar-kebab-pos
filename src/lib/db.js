@@ -214,6 +214,7 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, ite
       kitchen_round_id: i.kitchen_round_id || i.kitchenRoundId || '',
       submitted_at: null,
     })),
+    kitchen_round_id: action._kitchenRoundId || items[0]?.kitchen_round_id || '',
     table_status: isOffPremise ? null : 'occupied',
   }
 
@@ -323,6 +324,17 @@ async function loadCurrentOrderState() {
 
 export async function loadOrders() {
   return loadCurrentOrderState()
+}
+
+export async function loadKitchenCheckOrder(orderId, options = {}) {
+  const dbClient = options.dbClient || supabase
+  const { data, error } = await withAbortSignal(dbClient
+    .from('orders')
+    .select('*, items:order_items(*)')
+    .eq('id', orderId)
+    .maybeSingle(), options.signal)
+  if (error) throw error
+  return data || null
 }
 
 export async function loadPOSData() {

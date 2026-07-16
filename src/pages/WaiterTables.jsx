@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -551,11 +551,22 @@ const FILTER_ORDER = ['all', 'available', 'reserved', 'waiting_kitchen', 'prepar
 const SECTION_ORDER = ['ready', 'preparing', 'waiting_kitchen', 'needs_bill', 'reserved', 'occupied', 'available']
 
 export default function WaiterTables() {
-  const { state, dispatch } = useApp()
+  const { state, dispatch, refreshPOSData } = useApp()
   const { profile } = useAuth()
   const navigate = useNavigate()
   const lang = state.lang || 'en'
   const [activeFilter, setActiveFilter] = useState('all')
+
+  useEffect(() => {
+    refreshPOSData()
+
+    function handlePageShow(event) {
+      if (event.persisted) refreshPOSData()
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [refreshPOSData])
 
   const waiterName = profile?.full_name || state.user?.name || 'Waiter'
   const role = (profile?.role || state.user?.role || '').toLowerCase()

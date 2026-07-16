@@ -13,17 +13,30 @@ export function cartReducer(state, action) {
     case 'ADD_TO_CART': {
       const payloadKey = getCartItemKey(action.payload)
       const existing = state.cart.find(i => getCartItemKey(i) === payloadKey)
+      const addQuantity = Math.max(1, Number(action.payload?.quantity) || 1)
       if (existing) {
         return {
           ...state,
           cart: state.cart.map(i =>
             getCartItemKey(i) === payloadKey
-              ? { ...i, quantity: i.quantity + 1 }
+              ? {
+                  ...i,
+                  ...action.payload,
+                  quantity: (Number(i.quantity) || 0) + addQuantity,
+                  notes: action.payload?.notes ?? i.notes ?? '',
+                }
               : i
           ),
         }
       }
-      return { ...state, cart: [...state.cart, { ...action.payload, quantity: 1, notes: '' }] }
+      return {
+        ...state,
+        cart: [...state.cart, {
+          ...action.payload,
+          quantity: addQuantity,
+          notes: action.payload?.notes ?? '',
+        }],
+      }
     }
 
     case 'REMOVE_FROM_CART':

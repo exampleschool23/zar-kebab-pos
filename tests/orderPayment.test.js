@@ -242,6 +242,43 @@ test('selected option cart rows keep the parent product id but do not overwrite 
   assert.equal(afterSendingFirst[0].selected_options.variants, 'cherry')
 })
 
+test('selected option additions increment only the chosen variant by the requested quantity', () => {
+  const initial = { cart: [] }
+  const pomegranate = {
+    cart_item_key: 'juice::variants:pomegranate',
+    menu_item_id: 'juice',
+    name: 'Juice',
+    price: 18000,
+    selected_options: { variants: 'pomegranate' },
+  }
+  const cherry = {
+    cart_item_key: 'juice::variants:cherry',
+    menu_item_id: 'juice',
+    name: 'Juice',
+    price: 18000,
+    selected_options: { variants: 'cherry' },
+  }
+
+  const first = cartReducer(initial, {
+    type: 'ADD_TO_CART',
+    payload: { ...pomegranate, quantity: 1 },
+  })
+  const sameVariantAgain = cartReducer(first, {
+    type: 'ADD_TO_CART',
+    payload: { ...pomegranate, quantity: 1 },
+  })
+  const newVariantOnce = cartReducer(sameVariantAgain, {
+    type: 'ADD_TO_CART',
+    payload: { ...cherry, quantity: 1 },
+  })
+
+  assert.equal(sameVariantAgain.cart[0].quantity, 2)
+  assert.deepEqual(
+    newVariantOnce.cart.map(row => [row.selected_options.variants, row.quantity]),
+    [['pomegranate', 2], ['cherry', 1]]
+  )
+})
+
 test('receipt total equals order details total', () => {
   const order = { subtotal: 465000, total: 544800, service_rate_pct: 17 }
 

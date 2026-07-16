@@ -85,6 +85,12 @@ export function getKitchenCheckGroups(order) {
   })
 }
 
+export function getKitchenCheckGroup(order, roundId = '') {
+  const groups = getKitchenCheckGroups(order)
+  if (!roundId) return groups[0] || null
+  return groups.find(group => String(group.roundId) === String(roundId)) || null
+}
+
 export function kitchenCheckLabels(lang = 'en') {
   const labels = {
     uz: {

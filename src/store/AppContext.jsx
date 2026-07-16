@@ -79,6 +79,27 @@ export function AppProvider({ children }) {
   useEffect(() => { stateRef.current = state }, [state])
 
   const recoverFromIdleRef = useRef(() => {})
+  const refreshPOSDataRef = useRef(() => Promise.resolve())
+
+  const refreshPOSData = useCallback(function refreshPOSData() {
+    return Promise.resolve()
+      .then(() => refreshPOSDataRef.current())
+      .catch(err => {
+        console.error('[db] POS data refresh failed:', err)
+        dispatch({
+          type: 'SET_CONNECTION_NOTICE',
+          payload: {
+            tone: 'error',
+            message: stateRef.current.lang === 'ru'
+              ? 'Не удалось обновить столы. Проверьте соединение и попробуйте ещё раз.'
+              : stateRef.current.lang === 'uz'
+                ? 'Stollarni yangilab bo‘lmadi. Ulanishni tekshirib, qayta urinib ko‘ring.'
+                : 'Could not refresh tables. Check the connection and try again.',
+          },
+        })
+        return { error: err }
+      })
+  }, [])
 
   async function writeWithIdleRecovery(action, stateSnapshot) {
     try {
@@ -109,15 +130,15 @@ export function AppProvider({ children }) {
         _priceMode: priceMode,
         _submittedAt: submittedAt,
         _kitchenRoundId: kitchenRoundId,
-        _orderId: isOffPremise
+        _orderId: action._orderId || (isOffPremise
           ? `${orderType === 'delivery' ? 'dl' : 'ta'}-${Date.now()}`
           : stateRef.current.orders.find(o =>
             o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
-          )?.id || 'o' + Date.now(),
-        _orderNumber: isOffPremise
+          )?.id || 'o' + Date.now()),
+        _orderNumber: action._orderNumber || (isOffPremise
           ? makeOrderNumber(Date.now(), orderType)
-          : undefined,
-        _items: stateRef.current.cart.map(i => ({
+          : undefined),
+        _items: action._items || stateRef.current.cart.map(i => ({
           ...withPriceModeFields(i, i.price_mode || priceMode),
           id: makeLocalId('oi'),
           status: 'new',
@@ -164,7 +185,7 @@ export function AppProvider({ children }) {
               message: formatWriteError(err, stateRef.current.lang, action.type),
             },
           })
-          return { error: err }
+          return { error: err, action: enriched }
         })
     }
 
@@ -183,7 +204,7 @@ export function AppProvider({ children }) {
             message: formatWriteError(err, stateRef.current.lang, action.type),
           },
         })
-        return { error: err }
+        return { error: err, action: enriched }
       })
   }, [])
 
@@ -193,32 +214,45 @@ export function AppProvider({ children }) {
 
     let unsubscribe = () => {}
     let mounted = true
-    let hydrateInFlight = false
+    let hydratePromise = null
     let reconnectTimer = null
     let backOnlineTimer = null
     let lastResumeAt = 0
 
-    async function hydratePOSData() {
-      if (hydrateInFlight) return
-      hydrateInFlight = true
-      try {
-        const activeSession = await refreshSupabaseSession()
-        if (sessionUserId && activeSession?.user?.id !== sessionUserId) {
-          throw new Error('The signed-in session could not be restored. Please reload and sign in again.')
-        }
-        const { tables, tableZones, categories, menuItems, orders, settings } = await loadPOSData()
-        if (!mounted) return
-        dispatch({ type: 'SET_TABLES',     payload: tables })
-        dispatch({ type: 'SET_TABLE_ZONES', payload: tableZones || [] })
-        dispatch({ type: 'SET_CATEGORIES', payload: categories })
-        dispatch({ type: 'SET_MENU_ITEMS', payload: menuItems })
-        dispatch({ type: 'SET_ORDERS',     payload: orders })
-        if (settings) dispatch({ type: 'SET_SETTINGS', payload: settings })
-        dispatch({ type: 'SET_LOADED' })
-        dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
-      } finally {
-        hydrateInFlight = false
+    async function performHydration() {
+      const activeSession = await refreshSupabaseSession()
+      if (sessionUserId && activeSession?.user?.id !== sessionUserId) {
+        throw new Error('The signed-in session could not be restored. Please reload and sign in again.')
       }
+      const { tables, tableZones, categories, menuItems, orders, settings } = await loadPOSData()
+      if (!mounted) return
+      dispatch({ type: 'SET_TABLES',     payload: tables })
+      dispatch({ type: 'SET_TABLE_ZONES', payload: tableZones || [] })
+      dispatch({ type: 'SET_CATEGORIES', payload: categories })
+      dispatch({ type: 'SET_MENU_ITEMS', payload: menuItems })
+      dispatch({ type: 'SET_ORDERS',     payload: orders })
+      if (settings) dispatch({ type: 'SET_SETTINGS', payload: settings })
+      dispatch({ type: 'SET_LOADED' })
+      dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
+    }
+
+    function hydratePOSData({ afterCurrent = false } = {}) {
+      if (!mounted) return Promise.resolve()
+      if (hydratePromise) {
+        if (afterCurrent) {
+          return hydratePromise
+            .catch(() => undefined)
+            .then(() => hydratePOSData())
+        }
+        return hydratePromise
+      }
+
+      const request = performHydration()
+      const trackedRequest = request.finally(() => {
+        if (hydratePromise === trackedRequest) hydratePromise = null
+      })
+      hydratePromise = trackedRequest
+      return trackedRequest
     }
 
     function connectRealtime() {
@@ -291,6 +325,10 @@ export function AppProvider({ children }) {
     }
 
     recoverFromIdleRef.current = () => scheduleIdleRecovery(0)
+    refreshPOSDataRef.current = () => hydratePOSData({ afterCurrent: true })
+      .then(() => {
+        if (mounted) connectRealtime()
+      })
 
     dispatch({ type: 'SET_LOADING' })
     hydratePOSData()
@@ -314,6 +352,7 @@ export function AppProvider({ children }) {
     return () => {
       mounted = false
       recoverFromIdleRef.current = () => {}
+      refreshPOSDataRef.current = () => Promise.resolve()
       if (reconnectTimer) clearTimeout(reconnectTimer)
       if (backOnlineTimer) clearTimeout(backOnlineTimer)
       if (typeof window !== 'undefined') {
@@ -328,7 +367,7 @@ export function AppProvider({ children }) {
   }, [authLoading, sessionUserId])
 
   return (
-    <AppContext.Provider value={{ state, dispatch: dbDispatch }}>
+    <AppContext.Provider value={{ state, dispatch: dbDispatch, refreshPOSData }}>
       {state.connectionNotice && (
         <div role="alert" className={`fixed top-3 left-1/2 z-[9999] max-w-[calc(100vw-2rem)] -translate-x-1/2 break-words rounded-xl px-4 py-2 text-center text-sm font-semibold shadow-lg ${
           state.connectionNotice.tone === 'error'

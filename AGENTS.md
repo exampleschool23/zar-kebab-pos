@@ -115,6 +115,19 @@ These bugs were recently fixed and are now protected by tests:
    - Upload error rendering belongs inside `ImageUploadField`.
    - `SortableItemCard` must not reference the upload `error` state.
 
+7. Configured product variants could inherit or overwrite another variant's quantity.
+   - Option-product detail submissions are additive and start at one.
+   - `ADD_TO_CART` accepts an explicit quantity and increments only the matching `cart_item_key`.
+
+8. Auto-printed kitchen checks could substitute an older round while the new round was loading.
+   - Requested kitchen rounds must match exactly; never fall back to another round.
+   - Missing local rounds are refreshed directly before printing, and each round auto-prints only once.
+   - Failed retries retain the same round and item ids; migration `096` makes that retry idempotent.
+
+9. Returning to the waiter table grid could show stale order/table status until a full browser reload.
+   - `WaiterTables` requests a fresh POS hydration whenever the route mounts or is restored from the browser back-forward cache.
+   - The stable `refreshPOSData` context callback keeps current cards visible while reloading and renews the realtime subscription.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -133,6 +146,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/020_table_reservations.sql`
   Adds reserved table state and reservation details: `reserved_for_name`, `reserved_for_phone`, `reserved_at`, `reserved_until`, and `reservation_notes`. Seating/sending an order for a reserved table clears reservation details and moves the table to `occupied`.
+
+- `supabase/096_idempotent_kitchen_submissions.sql`
+  Makes repeated submissions of the same `kitchen_round_id` a no-op after acquiring the same advisory lock used by payment settlement. This prevents uncertain network retries from duplicating items or totals.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
@@ -218,6 +234,10 @@ npm run build
 - Disabled tables stay out of the waiter table grid.
 - Admin table management blocks hard delete when a table has active orders or order history.
 - Reserved tables show on the waiter grid with reservation details and convert to occupied when seated.
+- Option variants increment only their own configured cart row.
+- Requested kitchen rounds never fall back to an older print group.
+- Kitchen retries preserve their attempt ids and the RPC is idempotent by order/round.
+- Returning to `WaiterTables` refreshes orders/tables and renews realtime without clearing the visible grid.
 
 If these tests fail, understand why before changing the guard. They exist because these exact failures reached the user.
 

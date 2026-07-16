@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Loader2, Printer } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -7,9 +7,10 @@ import { formatTime } from '../lib/dateFormat'
 import {
   formatKitchenOrderNumber,
   formatKitchenTableName,
-  getKitchenCheckGroups,
+  getKitchenCheckGroup,
   kitchenItemName,
 } from '../lib/kitchenCheck'
+import { loadKitchenCheckOrder } from '../lib/db'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 import { useAppDataStatus } from '../store/appHooks'
 
@@ -180,6 +181,9 @@ export default function KitchenCheckReceipt() {
   const autoPrint = params.get('print') === '1'
   const backPath = sanitizeBackPath(params.get('back')) || '/waiter/tables'
   const lang = state.lang || 'ru'
+  const [fetchedGroup, setFetchedGroup] = useState(null)
+  const [roundLookupState, setRoundLookupState] = useState('idle')
+  const printedRoundRef = useRef('')
 
   const menuItemMap = useMemo(() => {
     const map = {}
@@ -187,20 +191,61 @@ export default function KitchenCheckReceipt() {
     return map
   }, [state.menuItems])
 
-  const group = useMemo(() => {
+  const stateGroup = useMemo(() => {
     const order = state.orders.find(item => item.id === orderId)
-    const groups = getKitchenCheckGroups(order)
-    const selected = groups.find(item => String(item.roundId) === roundId) || groups[0]
+    const selected = getKitchenCheckGroup(order, roundId)
     return selected ? localizeKitchenGroup(selected, menuItemMap, 'ru') : null
   }, [menuItemMap, orderId, roundId, state.orders])
 
+  const group = stateGroup || fetchedGroup
+
+  useEffect(() => {
+    setFetchedGroup(null)
+    if (!loaded || loadError || !roundId || stateGroup) {
+      setRoundLookupState('idle')
+      return undefined
+    }
+
+    let cancelled = false
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 6000)
+    setRoundLookupState('loading')
+
+    loadKitchenCheckOrder(orderId, { signal: controller.signal })
+      .then(order => {
+        if (cancelled) return
+        const selected = getKitchenCheckGroup(order, roundId)
+        setFetchedGroup(selected ? localizeKitchenGroup(selected, menuItemMap, 'ru') : null)
+        setRoundLookupState(selected ? 'found' : 'missing')
+      })
+      .catch(() => {
+        if (!cancelled) setRoundLookupState('error')
+      })
+      .finally(() => clearTimeout(timeout))
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [loaded, loadError, menuItemMap, orderId, roundId, stateGroup])
+
   useEffect(() => {
     if (!autoPrint || !group) return
-    const timer = setTimeout(() => handlePrintKitchenCheck(0), 600)
+    const printKey = `${orderId}:${group.roundId}`
+    if (printedRoundRef.current === printKey) return
+    const timer = setTimeout(() => {
+      printedRoundRef.current = printKey
+      handlePrintKitchenCheck(0)
+    }, 600)
     return () => clearTimeout(timer)
-  }, [autoPrint, group])
+  }, [autoPrint, group, orderId])
 
-  if (!loaded) {
+  const isLookingUpRound = loaded && !loadError && !!roundId && !group && (
+    roundLookupState === 'idle' || roundLookupState === 'loading'
+  )
+
+  if (!loaded || isLookingUpRound) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-100">
         <Loader2 size={28} className="animate-spin text-[#ff5a00]" />

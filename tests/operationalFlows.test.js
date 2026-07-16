@@ -54,6 +54,38 @@ test('end-to-end floor flow: waiter sends, kitchen marks ready, waiter requests 
   assert.equal(paid.orders[0].payment_method, 'cash')
 })
 
+test('replaying an already-loaded kitchen attempt clears the cart without duplicating items or totals', () => {
+  const base = {
+    ...state(),
+    tables: [{ id: 't1', name: 'Table 1', status: 'occupied', is_active: true }],
+    orders: [{
+      id: 'o1',
+      table_id: 't1',
+      table_name: 'Table 1',
+      status: 'sent_to_kitchen',
+      payment_status: 'unpaid',
+      service_rate_pct: 15,
+      subtotal: 100000,
+      service_fee: 15000,
+      total: 115000,
+      items: [{ id: 'i1', menu_item_id: 'm1', name: 'Shashlik', price: 100000, quantity: 1, status: 'new' }],
+    }],
+    cart: [{ menu_item_id: 'm1', name: 'Shashlik', price: 100000, quantity: 1 }],
+  }
+
+  const replayed = ordersReducer(base, {
+    type: 'SEND_TO_KITCHEN',
+    _orderId: 'o1',
+    _items: [{ id: 'i1', menu_item_id: 'm1', name: 'Shashlik', price: 100000, quantity: 1, status: 'new' }],
+    payload: { orderType: 'dine_in' },
+  })
+
+  assert.equal(replayed.orders[0].items.length, 1)
+  assert.equal(replayed.orders[0].subtotal, 100000)
+  assert.equal(replayed.orders[0].total, 115000)
+  assert.equal(replayed.cart.length, 0)
+})
+
 test('owner correction changes only the completed order payment method', () => {
   const base = {
     ...state(),

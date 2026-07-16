@@ -14,7 +14,7 @@ import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import AnimatedSearch from '../components/AnimatedSearch'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
-import { ProductCard, ProductDetailPage, getOrderItemOptionLines, menuItemRequiresOptions } from '../components/MenuProductCards'
+import { ProductCard, ProductDetailPage, getMenuItemOptionGroups, getOrderItemOptionLines, menuItemRequiresOptions } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { getKitchenCheckGroups } from '../lib/kitchenCheck'
@@ -852,6 +852,19 @@ export default function WaiterOrder() {
   function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionPriceDelta = 0) {
     if (isSendingOrder || !canEditTables) return
     const payload = makeCartPayload(item, { selectedOptions, selectedOptionPriceDelta })
+    const isOptionProduct = getMenuItemOptionGroups(item, lang).length > 0
+    if (isOptionProduct) {
+      dispatch({
+        type: 'ADD_TO_CART',
+        payload: {
+          ...payload,
+          quantity: Math.max(1, Number(qty) || 1),
+          notes: notes || '',
+        },
+      })
+      setDetailItem(null)
+      return
+    }
     const cartItemKey = payload.cart_item_key || payload.menu_item_id
     const alreadyInCart = state.cart.some(row => (row.cart_item_key || row.menu_item_id) === cartItemKey)
     if (!alreadyInCart) {
@@ -1027,7 +1040,7 @@ export default function WaiterOrder() {
           <ProductDetailPage
             item={detailItem}
             category={categoryMap[detailItem.category_id]}
-            currentQty={cartQtyMap[detailItem.id] || 0}
+            currentQty={getMenuItemOptionGroups(detailItem, lang).length > 0 ? 0 : (cartQtyMap[detailItem.id] || 0)}
             currentNotes={cartNotesMap[detailItem.id] || ''}
             lang={lang}
             onBack={() => setDetailItem(null)}
