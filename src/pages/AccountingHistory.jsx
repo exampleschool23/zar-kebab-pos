@@ -6,11 +6,12 @@ import { OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { canEditFeature } from '../lib/permissions'
+import { canEditFeature, canViewPage } from '../lib/permissions'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
 import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 import {
+  collapseDailyBazaarExpenseRows,
   filterAccountingHistoryRows,
   getAccountingHistoryDeleteTarget,
   getAccountingHistoryPageSummary,
@@ -65,6 +66,7 @@ export default function AccountingHistory() {
   const lang = state.lang || 'ru'
   const role = (profile?.role || state.user?.role || 'guest').toLowerCase()
   const canDelete = canEditFeature(profile || { role }, 'expenses')
+  const canAccessBazaar = canViewPage(profile || { role }, 'bazaar')
   const [expenseRows, setExpenseRows] = useState([])
   const [salaryRows, setSalaryRows] = useState([])
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
@@ -80,9 +82,9 @@ export default function AccountingHistory() {
   const { dateFrom, dateTo } = useMemo(() => getAccountingHistoryRange(period), [period])
 
   const labels = {
-    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', actions: 'Amallar', remove: 'O‘chirish', confirmRemove: 'Tasdiqlash', removing: 'O‘chirilmoqda...', removeFailed: 'Yozuvni o‘chirib bo‘lmadi.', totalExpenses: 'Jami xarajat', salaryExpenses: 'Maosh xarajatlari', productBazaarExpenses: 'Mahsulot / bozor xarajatlari', otherExpenses: 'Boshqa xarajatlar', investorSupport: 'Investor yordami', cafeIncome: 'Kafe daromadi', investorIncome: 'Investor yordami', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
-    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', actions: 'Действия', remove: 'Удалить', confirmRemove: 'Подтвердить', removing: 'Удаление...', removeFailed: 'Не удалось удалить запись.', totalExpenses: 'Всего расходов', salaryExpenses: 'Расходы на зарплаты', productBazaarExpenses: 'Расходы на продукты / базар', otherExpenses: 'Остальные расходы', investorSupport: 'Поддержка инвестора', cafeIncome: 'Доход кафе', investorIncome: 'Поддержка инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
-    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', actions: 'Actions', remove: 'Delete', confirmRemove: 'Confirm', removing: 'Deleting...', removeFailed: 'Could not delete the entry.', totalExpenses: 'Total expenses', salaryExpenses: 'Salary expenses', productBazaarExpenses: 'Products / bazaar expenses', otherExpenses: 'Other expenses', investorSupport: 'Investor support', cafeIncome: 'Cafe income', investorIncome: 'Investor support', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
+    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', actions: 'Amallar', remove: 'O‘chirish', confirmRemove: 'Tasdiqlash', removing: 'O‘chirilmoqda...', removeFailed: 'Yozuvni o‘chirib bo‘lmadi.', manageBazaar: 'Kunlik bozorda boshqarish', bazaarManaged: 'Kunlik bozorda boshqariladi', totalExpenses: 'Jami xarajat', salaryExpenses: 'Maosh xarajatlari', productBazaarExpenses: 'Mahsulot / bozor xarajatlari', otherExpenses: 'Boshqa xarajatlar', investorSupport: 'Investor yordami', cafeIncome: 'Kafe daromadi', investorIncome: 'Investor yordami', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
+    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', actions: 'Действия', remove: 'Удалить', confirmRemove: 'Подтвердить', removing: 'Удаление...', removeFailed: 'Не удалось удалить запись.', manageBazaar: 'Управлять в Ежедневном базаре', bazaarManaged: 'Управляется в Ежедневном базаре', totalExpenses: 'Всего расходов', salaryExpenses: 'Расходы на зарплаты', productBazaarExpenses: 'Расходы на продукты / базар', otherExpenses: 'Остальные расходы', investorSupport: 'Поддержка инвестора', cafeIncome: 'Доход кафе', investorIncome: 'Поддержка инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
+    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', actions: 'Actions', remove: 'Delete', confirmRemove: 'Confirm', removing: 'Deleting...', removeFailed: 'Could not delete the entry.', manageBazaar: 'Manage in Daily Bazaar', bazaarManaged: 'Managed in Daily Bazaar', totalExpenses: 'Total expenses', salaryExpenses: 'Salary expenses', productBazaarExpenses: 'Products / bazaar expenses', otherExpenses: 'Other expenses', investorSupport: 'Investor support', cafeIncome: 'Cafe income', investorIncome: 'Investor support', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
   }
   const l = labels[lang] || labels.en
 
@@ -143,9 +145,11 @@ export default function AccountingHistory() {
       .sort((a, b) => b.expense_date.localeCompare(a.expense_date) || String(b.created_at || '').localeCompare(String(a.created_at || '')))
   ), [expenseRows, salaryRows])
 
+  const displayRows = useMemo(() => collapseDailyBazaarExpenseRows(rows), [rows])
+
   const visibleRows = useMemo(() => {
-    return filterAccountingHistoryRows(rows, { type, query, lang })
-  }, [rows, query, type, lang])
+    return filterAccountingHistoryRows(displayRows, { type, query, lang })
+  }, [displayRows, query, type, lang])
 
   const accountingOrders = useMemo(
     () => mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo),
@@ -255,6 +259,7 @@ export default function AccountingHistory() {
                         const isIncome = normalizeExpenseEntryType(row.entry_type) === 'income'
                         const category = row.is_salary_payment ? l.salaryPayment : row.is_salary_bonus ? l.salaryBonus : expenseCategoryLabel(row.category, lang)
                         const tone = expenseTone(row)
+                        const dailyBazaarTotal = row.is_bazaar_daily_total
                         return <tr key={`${row.id}-${row.expense_date}`} className={`border-b border-l-4 border-[#F3F4F6] last:border-b-0 ${tone.row}`}>
                           <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-[#4B5563]">{formatLongDate(row.expense_date, lang, row.expense_date)}</td>
                           <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-black ${tone.badge}`}>{isIncome ? l.income : l.expense}</span></td>
@@ -265,7 +270,15 @@ export default function AccountingHistory() {
                           <td className="max-w-[260px] break-words px-4 py-3 text-sm font-semibold text-[#4B5563]">{row.description || (row.is_salary_payment ? l.salaryPayment : row.is_salary_bonus ? l.salaryBonus : '—')}</td>
                           <td className="px-4 py-3 text-sm font-semibold text-[#6B7280]">{row.created_by_name || '—'}</td>
                           {canDelete && <td className="px-4 py-3">
-                            <button
+                            {dailyBazaarTotal ? (
+                              canAccessBazaar ? (
+                                <button type="button" onClick={() => navigate('/admin/bazaar')} className="inline-flex h-9 items-center whitespace-nowrap rounded-xl border border-purple-200 bg-white px-3 text-xs font-black text-purple-700 hover:bg-purple-50">
+                                  {l.manageBazaar}
+                                </button>
+                              ) : (
+                                <span className="text-xs font-bold text-[#9CA3AF]">{l.manageBazaar}</span>
+                              )
+                            ) : <button
                               type="button"
                               disabled={Boolean(deletingId)}
                               onClick={() => removeRow(row)}
@@ -275,7 +288,7 @@ export default function AccountingHistory() {
                             >
                               <Trash2 size={14} />
                               {deletingId === row.id ? l.removing : confirmDeleteId === row.id ? l.confirmRemove : l.remove}
-                            </button>
+                            </button>}
                           </td>}
                         </tr>
                       })}

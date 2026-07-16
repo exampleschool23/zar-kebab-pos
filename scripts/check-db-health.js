@@ -121,7 +121,7 @@ async function checkRpc(name, invoke, expectedError, required = true) {
 }
 
 const checks = await Promise.all([
-  checkTable('profiles', 'id, role, status, full_name, email'),
+  checkTable('profiles', 'id, role, status, full_name, email, feature_access'),
   checkTable('employee_salary_profiles', 'id, profile_id, employee_name, joined_at, ended_at, deleted_at, pay_schedule, payment_method, is_active', false),
   checkTable('employee_salary_rates', 'id, salary_profile_id, effective_from, amount, rate_unit', false),
   checkTable('employee_salary_payments', 'id, salary_profile_id, paid_date, amount, payment_method', false),
@@ -139,6 +139,10 @@ const checks = await Promise.all([
   checkTable('loyalty_cards', 'id, card_number, public_token, customer_name, phone_number, cashback_type, balance, total_earned, total_redeemed, is_active, created_at, updated_at'),
   checkTable('loyalty_transactions', 'id, loyalty_card_id, order_id, type, amount, balance_before, balance_after, reason, created_by, cashback_percent_used, card_type_at_transaction, card_number_at_transaction, customer_name_at_transaction, phone_number_at_transaction, created_at'),
   checkTable('expenses', 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at', false),
+  checkTable('bazaar_purchases', 'id, request_key, expense_id, purchase_date, payment_method, buyer_profile_id, buyer_name, notes, total_amount, entry_source, created_by, created_by_name, created_at, updated_at'),
+  checkTable('bazaar_purchase_items', 'id, purchase_id, product_name, product_key, category, quantity, unit, line_total, sort_order, notes, created_at'),
+  checkTable('bazaar_product_catalog', 'product_key, product_name, category, unit, last_purchase_date, created_at, updated_at'),
+  checkTable('bazaar_purchase_audit', 'id, purchase_id, action, old_snapshot, new_snapshot, changed_by, changed_by_name, changed_at'),
   checkRpc(
     'get_public_menu_data()',
     () => supabase.rpc('get_public_menu_data'),
@@ -164,6 +168,26 @@ const checks = await Promise.all([
     'current_staff_can_view_menu_catalog()',
     () => supabase.rpc('current_staff_can_view_menu_catalog'),
     null
+  ),
+  checkRpc(
+    'current_staff_can_access(feature_key)',
+    () => supabase.rpc('current_staff_can_access', { feature_key: 'bazaar' }),
+    null
+  ),
+  checkRpc(
+    'current_staff_can_write(feature_key)',
+    () => supabase.rpc('current_staff_can_write', { feature_key: 'bazaar' }),
+    null
+  ),
+  checkRpc(
+    'save_bazaar_purchase(payload)',
+    () => supabase.rpc('save_bazaar_purchase', { payload: {} }),
+    'bazaar write access is required'
+  ),
+  checkRpc(
+    'delete_bazaar_purchase(p_purchase_id)',
+    () => supabase.rpc('delete_bazaar_purchase', { p_purchase_id: '00000000-0000-0000-0000-000000000000' }),
+    'bazaar write access is required'
   ),
   checkRpc(
     'remove_loyalty_card(p_card_id)',

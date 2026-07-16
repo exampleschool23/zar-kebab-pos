@@ -52,6 +52,7 @@ Protected:
 - Kitchen: `/kitchen`
 - Cashier: `/cashier/tables`, `/cashier/bill/:tableId`, `/cashier/bill/order/:orderId`, receipt routes
 - Admin/reporting: `/admin`, `/admin/menu`, `/admin/tables`, `/admin/users`, `/admin/reports`, `/admin/audit`, `/admin/settings`
+- Daily bazaar: `/admin/bazaar` (receipt-level purchases, product quantities, spend analytics)
 
 Role access rules are centralized in `src/lib/permissions.js`.
 
@@ -157,6 +158,9 @@ Run migrations in order. Important recent files:
 - `supabase/096_idempotent_kitchen_submissions.sql`
   Makes repeated submissions of the same `kitchen_round_id` a no-op after acquiring the same advisory lock used by payment settlement. This prevents uncertain network retries from duplicating items or totals.
 
+- `supabase/097_daily_bazaar.sql`
+  Adds structured daily bazaar purchases/items, an enduring product suggestion catalog, the separate `bazaar` feature permission, historical `products_bazaar` expense backfill, immutable audit snapshots, and idempotent atomic save/delete RPCs that keep exactly one Accounting expense in sync.
+
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
 ## Supabase Notes
@@ -199,6 +203,27 @@ Expected behavior:
 - New cart items added after the submitted snapshot must survive.
 - Paid orders must not receive late kitchen inserts.
 
+## Daily Bazaar Flow
+
+Main files:
+- `src/pages/DailyBazaar.jsx`
+- `src/lib/bazaar.js`
+- `supabase/097_daily_bazaar.sql`
+
+Expected behavior:
+- One bazaar receipt contains one or more product lines with product, category, quantity, unit, and exact paid amount.
+- The buyer is selected from active staff profiles and stored by profile id plus a historical name snapshot.
+- New structured entries use only cash or card. Historical Accounting backfills can retain an older terminal payment value for accurate reporting.
+- Supplier and market are legacy database fields only; they are not part of the Daily Bazaar entry, history, or analytics UI.
+- Product suggestions come from `bazaar_product_catalog`, not only the currently selected history range.
+- Date controls keep ISO dates internally and display them with the shared `dateFormat.js` helpers.
+- The server calculates the receipt total from its line amounts.
+- Create retries reuse a request UUID so a committed response lost over the network cannot duplicate the receipt or its Accounting expense.
+- Saving, editing, or deleting a receipt atomically creates, updates, or removes exactly one linked `expenses` row with category `products_bazaar`.
+- Do not ask users to record the same purchase again in Accounting; the manual Accounting form intentionally excludes `products_bazaar`.
+- Never combine incompatible units in analytics. Grams may normalize to kilograms and millilitres to litres; counts remain separate.
+- Bazaar history loads only on `/admin/bazaar`, never in initial POS hydration.
+
 ## Tests
 
 Tests use Node's built-in test runner. Current files:
@@ -214,6 +239,9 @@ Tests use Node's built-in test runner. Current files:
 
 - `tests/sourceGuards.test.js`
   Source-level regression guards for the recent failures. These are intentional guardrails, not broad lint rules.
+
+- `tests/bazaar.test.js`
+  Daily bazaar quantity, exact-money, filtering, and analytics behavior.
 
 Always run:
 

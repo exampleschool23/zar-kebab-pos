@@ -41,6 +41,18 @@ test('feature access controls visibility while role controls write access', () =
   assert.equal(canEditFeature(viewerWithAccounting, 'expenses'), false)
 })
 
+test('daily bazaar access is independent from salaries and full accounting', () => {
+  const bazaarEditor = { role: 'admin', feature_access: ['bazaar'] }
+  const bazaarViewer = { role: 'viewer', feature_access: ['bazaar'] }
+
+  assert.equal(canViewPage(bazaarEditor, 'bazaar'), true)
+  assert.equal(canEditFeature(bazaarEditor, 'bazaar'), true)
+  assert.equal(canViewPage(bazaarEditor, 'expenses'), false)
+  assert.equal(canEditFeature(bazaarViewer, 'bazaar'), false)
+  assert.equal(defaultPath(bazaarEditor), '/admin/bazaar')
+  assert.equal(FEATURE_DEFINITIONS.find(feature => feature.key === 'bazaar')?.kind, 'page')
+})
+
 test('menu is always viewable by staff while Manage menu controls editing', () => {
   const viewerWithMenu = { role: 'viewer', feature_access: ['menu'] }
   const viewerWithoutMenu = { role: 'viewer', feature_access: [] }

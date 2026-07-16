@@ -14,6 +14,7 @@ import {
   Terminal,
   Trash2,
   WalletCards,
+  ShoppingBasket,
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
@@ -21,7 +22,7 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
-import { getAccountingPageSummary, getAccountingQuickRange } from '../lib/accounting'
+import { collapseDailyBazaarExpenseRows, getAccountingPageSummary, getAccountingQuickRange } from '../lib/accounting'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
@@ -189,7 +190,7 @@ export default function Expenses() {
   const [form, setForm] = useState({
     entry_type: 'expense',
     expense_date: todayExpenseDate(),
-    category: 'products_bazaar',
+    category: 'charcoal',
     payment_method: 'cash',
     amount: '',
     vendor: '',
@@ -229,6 +230,7 @@ export default function Expenses() {
       salaries: 'Maoshlar',
       salaryDue: 'Maosh qarzi',
       estimate: 'Taxmin',
+      dailyBazaar: 'Kunlik bozor',
       today: 'Bugun',
       week: '7 kun',
       month: 'Oy',
@@ -292,6 +294,7 @@ export default function Expenses() {
       salaries: 'Зарплаты',
       salaryDue: 'Долг по зарплате',
       estimate: 'Прогноз',
+      dailyBazaar: 'Ежедневный базар',
       today: 'Сегодня',
       week: '7 дней',
       month: 'Месяц',
@@ -355,6 +358,7 @@ export default function Expenses() {
       salaries: 'Salaries',
       salaryDue: 'Salary due',
       estimate: 'Estimate',
+      dailyBazaar: 'Daily bazaar',
       today: 'Today',
       week: '7 days',
       month: 'Month',
@@ -485,7 +489,9 @@ export default function Expenses() {
     ))
   ), [filteredExpenses])
   const filteredExpenseRows = useMemo(() => (
-    filteredExpenses.filter(expense => normalizeExpenseEntryType(expense.entry_type) !== 'income')
+    collapseDailyBazaarExpenseRows(
+      filteredExpenses.filter(expense => normalizeExpenseEntryType(expense.entry_type) !== 'income')
+    )
   ), [filteredExpenses])
   const accountingOrders = useMemo(
     () => mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo),
@@ -631,6 +637,9 @@ export default function Expenses() {
             <button onClick={() => navigate('/admin/accounting/estimate')} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-600 shadow-sm">
               <ReceiptText size={14} />{l.estimate}
             </button>
+            <button onClick={() => navigate('/admin/bazaar')} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-black text-teal-700 shadow-sm">
+              <ShoppingBasket size={14} />{l.dailyBazaar}
+            </button>
           </div>
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -729,7 +738,7 @@ export default function Expenses() {
                               onClick={() => setForm(current => ({
                                 ...current,
                                 entry_type: entryType,
-                                category: entryType === 'income' ? 'investor_support' : 'products_bazaar',
+                                category: entryType === 'income' ? 'investor_support' : 'charcoal',
                               }))}
                               className={`flex h-11 items-center justify-center rounded-xl border text-xs font-black transition-colors ${
                                 active ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'
@@ -918,7 +927,7 @@ function ExpenseHistorySection({
                 </div>
                 <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
                   <p className={`text-lg font-black ${tone.amount}`}>{formatCurrency(expense.amount)}</p>
-                  {canDelete && !isGeneratedSalaryExpense(expense) && (
+                  {canDelete && !isGeneratedSalaryExpense(expense) && !expense.is_bazaar_daily_total && (
                     <button onClick={() => onDelete(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
                       confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
                     }`}>

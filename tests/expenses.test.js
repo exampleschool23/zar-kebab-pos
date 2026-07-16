@@ -165,6 +165,7 @@ test('manual expense categories offer specific tracking choices without removing
 
   assert.equal(EXPENSE_CATEGORIES.some(category => category.key === 'other'), true)
   assert.equal(manualKeys.includes('other'), false)
+  assert.equal(manualKeys.includes('products_bazaar'), false)
   assert.equal(manualKeys.includes('salary_one_time'), true)
   assert.equal(manualKeys.includes('charcoal'), true)
 })

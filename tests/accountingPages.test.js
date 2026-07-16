@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  collapseDailyBazaarExpenseRows,
   filterAccountingHistoryRows,
   getAccountingHistoryDeleteTarget,
   getAccountingExpenseBreakdown,
@@ -136,6 +137,27 @@ test('All Accounting removal targets the underlying financial record', () => {
     { table: 'employee_salary_bonuses', id: 'bonus-1' }
   )
   assert.equal(getAccountingHistoryDeleteTarget(null), null)
+  assert.equal(getAccountingHistoryDeleteTarget({ id: 'bazaar-day:2026-07-12', is_bazaar_daily_total: true }), null)
+})
+
+test('Accounting presents one Bazaar total per day without changing ledger rows', () => {
+  const rows = [
+    { id: 'morning', expense_date: '2026-07-12', category: 'products_bazaar', payment_method: 'cash', amount: 200, created_at: '2026-07-12T08:00:00Z' },
+    { id: 'evening', expense_date: '2026-07-12', category: 'products_bazaar', payment_method: 'card', amount: 350, created_at: '2026-07-12T18:00:00Z' },
+    { id: 'next-day', expense_date: '2026-07-11', category: 'products_bazaar', payment_method: 'cash', amount: 100 },
+    { id: 'rent', expense_date: '2026-07-12', category: 'rent', payment_method: 'card', amount: 1_000 },
+  ]
+
+  const displayRows = collapseDailyBazaarExpenseRows(rows)
+  const dayTotal = displayRows.find(row => row.id === 'bazaar-day:2026-07-12')
+
+  assert.equal(rows.length, 4)
+  assert.equal(displayRows.length, 3)
+  assert.equal(dayTotal.amount, 550)
+  assert.equal(dayTotal.payment_method, 'mixed')
+  assert.equal(dayTotal.entry_count, 2)
+  assert.deepEqual(dayTotal.source_ids, ['morning', 'evening'])
+  assert.equal(dayTotal.is_bazaar_daily_total, true)
 })
 
 test('All Accounting daily headers keep full-day cafe, expense, and investor totals when rows are filtered', () => {

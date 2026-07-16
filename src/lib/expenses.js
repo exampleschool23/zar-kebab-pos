@@ -78,6 +78,7 @@ export const INCOME_CATEGORIES = [
 
 export const MANUAL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.filter(category => (
   (!category.key.startsWith('salary_') || category.key === 'salary_one_time') &&
+  category.key !== 'products_bazaar' &&
   category.key !== 'other'
 ))
 
@@ -121,6 +122,7 @@ export function expensePaymentMethodLabel(method, lang = 'en') {
     cash: { uz: 'Naqd', ru: 'Наличные', en: 'Cash' },
     card: { uz: 'Karta', ru: 'Карта', en: 'Card' },
     terminal: { uz: 'Terminal', ru: 'Терминал', en: 'Terminal' },
+    mixed: { uz: 'Aralash', ru: 'Смешанный', en: 'Mixed' },
     qr: { uz: 'QR Code', ru: 'QR Code', en: 'QR Code' },
     loyalty_card: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' },
   }

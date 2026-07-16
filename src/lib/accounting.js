@@ -78,6 +78,63 @@ export function getAccountingExpenseBreakdown(rows = []) {
   }
 }
 
+// Accounting keeps every linked Bazaar expense for auditability, but presents
+// one concise Bazaar total per calendar day. Daily Bazaar remains the place for
+// individual purchases and product lines.
+export function collapseDailyBazaarExpenseRows(rows = []) {
+  const otherRows = []
+  const bazaarByDate = new Map()
+
+  for (const row of rows || []) {
+    const isBazaarExpense = (
+      normalizeExpenseEntryType(row?.entry_type) === 'expense'
+      && row?.category === 'products_bazaar'
+    )
+    if (!isBazaarExpense) {
+      otherRows.push(row)
+      continue
+    }
+
+    const date = row?.expense_date || ''
+    const aggregate = bazaarByDate.get(date) || {
+      ...row,
+      id: `bazaar-day:${date}`,
+      amount: 0,
+      vendor: '',
+      description: '',
+      created_by_name: '',
+      source_ids: [],
+      entry_count: 0,
+      is_bazaar_daily_total: true,
+      _paymentMethods: new Set(),
+    }
+
+    aggregate.amount += Math.max(0, Number(row?.amount) || 0)
+    aggregate.entry_count += 1
+    if (row?.id) aggregate.source_ids.push(row.id)
+    if (row?.payment_method) aggregate._paymentMethods.add(row.payment_method)
+    if (String(row?.created_at || '') > String(aggregate.created_at || '')) {
+      aggregate.created_at = row.created_at
+    }
+    bazaarByDate.set(date, aggregate)
+  }
+
+  const bazaarRows = [...bazaarByDate.values()].map(row => {
+    const paymentMethods = [...row._paymentMethods]
+    const { _paymentMethods, ...aggregate } = row
+    return {
+      ...aggregate,
+      payment_method: paymentMethods.length === 1 ? paymentMethods[0] : 'mixed',
+    }
+  })
+
+  return [...otherRows, ...bazaarRows].sort((a, b) => (
+    String(b?.expense_date || '').localeCompare(String(a?.expense_date || ''))
+    || String(b?.created_at || '').localeCompare(String(a?.created_at || ''))
+    || String(a?.id || '').localeCompare(String(b?.id || ''))
+  ))
+}
+
 export function filterAccountingHistoryRows(rows = [], { type = 'all', query = '', lang = 'en' } = {}) {
   const needle = String(query || '').trim().toLowerCase()
   return (rows || []).filter(row => {
@@ -96,6 +153,7 @@ export function filterAccountingHistoryRows(rows = [], { type = 'all', query = '
 
 export function getAccountingHistoryDeleteTarget(row) {
   if (!row?.id) return null
+  if (row.is_bazaar_daily_total) return null
   if (row.is_salary_payment) {
     const id = row.source_id || String(row.id).replace(/^salary-payment-/, '')
     return id ? { table: 'employee_salary_payments', id } : null

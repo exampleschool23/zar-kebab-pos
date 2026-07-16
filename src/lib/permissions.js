@@ -46,6 +46,12 @@ export const FEATURE_DEFINITIONS = [
     description: { uz: 'Daromad, xarajat va maoshlar', ru: 'Доходы, расходы и зарплаты', en: 'Income, expenses, and salaries' },
   },
   {
+    key: 'bazaar',
+    kind: 'page',
+    labels: { uz: 'Kunlik bozor', ru: 'Ежедневный базар', en: 'Daily Bazaar' },
+    description: { uz: 'Kunlik bozor xaridlari va tahlil', ru: 'Ежедневные закупки и аналитика базара', en: 'Daily bazaar purchases and analytics' },
+  },
+  {
     key: 'team',
     kind: 'page',
     labels: { uz: 'Jamoa', ru: 'Команда', en: 'Team' },
@@ -228,6 +234,7 @@ export function defaultPath(role) {
   if (canViewPage(profile, 'tables')) return '/waiter/tables'
   if (canViewPage(profile, 'loyalty')) return '/admin/loyalty'
   if (canViewPage(profile, 'expenses')) return '/admin/accounting'
+  if (canViewPage(profile, 'bazaar')) return '/admin/bazaar'
   if (canViewPage(profile, 'team')) return '/admin/users'
   if (canViewPage(profile, 'reports')) return '/admin/reports'
   if (canViewPage(profile, 'audit')) return '/admin/audit'

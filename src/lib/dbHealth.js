@@ -10,9 +10,13 @@ const TABLE_CHECKS = [
   { name: 'loyalty_cards', columns: ['id', 'card_number', 'cashback_type', 'balance', 'total_earned', 'total_redeemed', 'is_active'] },
   { name: 'loyalty_transactions', columns: ['id', 'loyalty_card_id', 'type', 'amount', 'balance_before', 'balance_after', 'cashback_percent_used', 'card_type_at_transaction', 'card_number_at_transaction', 'customer_name_at_transaction', 'phone_number_at_transaction'] },
   { name: 'expenses', columns: ['id', 'entry_type', 'expense_date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by_name'] },
+  { name: 'bazaar_purchases', columns: ['id', 'request_key', 'expense_id', 'purchase_date', 'payment_method', 'buyer_profile_id', 'buyer_name', 'notes', 'total_amount', 'entry_source', 'created_by_name', 'created_at', 'updated_at'] },
+  { name: 'bazaar_purchase_items', columns: ['id', 'purchase_id', 'product_name', 'product_key', 'category', 'quantity', 'unit', 'line_total', 'sort_order', 'notes'] },
+  { name: 'bazaar_product_catalog', columns: ['product_key', 'product_name', 'category', 'unit', 'last_purchase_date', 'created_at', 'updated_at'] },
+  { name: 'bazaar_purchase_audit', columns: ['id', 'purchase_id', 'action', 'old_snapshot', 'new_snapshot', 'changed_by', 'changed_by_name', 'changed_at'] },
   { name: 'menu_items', columns: ['id', 'external_id', 'name_uz', 'name_ru', 'name_en', 'price', 'old_price', 'grams', 'millilitres', 'kcal', 'stock_count', 'option_groups', 'cashier_only', 'public_hidden', 'waiter_hidden', 'visible_from_time', 'visible_until_time', 'sort_order', 'deleted_at'] },
   { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'hidden', 'waiter_hidden', 'visible_from_time', 'visible_until_time', 'sort_order'] },
-  { name: 'profiles', columns: ['id', 'role', 'full_name'] },
+  { name: 'profiles', columns: ['id', 'role', 'full_name', 'feature_access'] },
   { name: 'employee_salary_profiles', columns: ['id', 'profile_id', 'employee_name', 'joined_at', 'ended_at', 'deleted_at', 'pay_schedule', 'payment_method', 'is_active'] },
   { name: 'employee_salary_rates', columns: ['id', 'salary_profile_id', 'effective_from', 'amount', 'rate_unit'] },
   { name: 'employee_salary_payments', columns: ['id', 'salary_profile_id', 'paid_date', 'amount', 'payment_method'] },
@@ -30,6 +34,11 @@ const MIGRATION_HINTS = {
   loyalty_cards: 'Run supabase/022_loyalty_cashback_wallet.sql and supabase/061_loyalty_special_card.sql',
   loyalty_transactions: 'Run supabase/022_loyalty_cashback_wallet.sql, supabase/051_remove_loyalty_cards_preserve_history.sql, and supabase/061_loyalty_special_card.sql',
   expenses: 'Run supabase/048_expenses.sql and supabase/059_expense_income_entries.sql',
+  profiles: 'Run supabase/064_profile_feature_access.sql or the latest supabase/097_daily_bazaar.sql',
+  bazaar_purchases: 'Run supabase/097_daily_bazaar.sql',
+  bazaar_purchase_items: 'Run supabase/097_daily_bazaar.sql',
+  bazaar_product_catalog: 'Run supabase/097_daily_bazaar.sql',
+  bazaar_purchase_audit: 'Run supabase/097_daily_bazaar.sql',
   order_items: 'Run supabase/070_price_modes.sql and supabase/072_order_item_selected_options.sql',
   order_payment_audit: 'Run supabase/010_order_payment_audit_and_guards.sql',
   orders: 'Run supabase/075_order_actor_tracking.sql',
@@ -48,6 +57,10 @@ const MIGRATION_HINTS = {
   change_paid_order_payment_method_owner: 'Run supabase/090_owner_change_completed_order_payment_method.sql',
   recall_table_from_cashier: 'Run supabase/094_admin_cashier_recall_access.sql',
   current_staff_can_view_menu_catalog: 'Run supabase/095_read_only_menu_catalog_access.sql',
+  current_staff_can_access: 'Run the latest supabase/097_daily_bazaar.sql',
+  current_staff_can_write: 'Run the latest supabase/097_daily_bazaar.sql',
+  save_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
+  delete_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
 }
 
 function missingColumnMessage(error) {
@@ -105,6 +118,10 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'change_paid_order_payment_method_owner', { p_order_ids: [], p_payment_method: 'cash' }))
   checks.push(await checkRpc(dbClient, 'recall_table_from_cashier', { p_table_id: '__db_health_check__' }))
   checks.push(await checkRpc(dbClient, 'current_staff_can_view_menu_catalog', {}))
+  checks.push(await checkRpc(dbClient, 'current_staff_can_access', { feature_key: 'bazaar' }))
+  checks.push(await checkRpc(dbClient, 'current_staff_can_write', { feature_key: 'bazaar' }))
+  checks.push(await checkRpc(dbClient, 'save_bazaar_purchase'))
+  checks.push(await checkRpc(dbClient, 'delete_bazaar_purchase', { p_purchase_id: '00000000-0000-0000-0000-000000000000' }))
   const failed = checks.filter(check => !check.ok)
   return {
     ok: failed.length === 0,
