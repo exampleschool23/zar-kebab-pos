@@ -77,6 +77,23 @@ test('Daily Bazaar native date controls display through the shared date formatte
   assert.match(page, /<FormattedDateInput value=\{dateTo\}/)
 })
 
+test('Daily Bazaar history defaults to today and shows only structured entries in a compact paginated ledger', () => {
+  const page = readSource('src/pages/DailyBazaar.jsx')
+
+  assert.match(page, /getBazaarRange\('today'\)/)
+  assert.match(page, /useState\('today'\)/)
+  assert.match(page, /purchases\.filter\(purchase => purchase\.entry_source === 'daily_bazaar'\)/)
+  assert.match(page, /const HISTORY_PAGE_SIZE = 10/)
+  assert.match(page, /historyRows\.slice\(start, start \+ HISTORY_PAGE_SIZE\)/)
+  assert.match(page, /<th[^>]*>\{l\.productName\}<\/th>/)
+  assert.match(page, /<th[^>]*>\{l\.quantity\}<\/th>/)
+  assert.match(page, /<th[^>]*>\{l\.category\}<\/th>/)
+  assert.match(page, /<th[^>]*>\{l\.addedBy\}<\/th>/)
+  assert.match(page, /purchase\.created_by_name \|\| '—'/)
+  assert.match(page, /pageCount > 1/)
+  assert.doesNotMatch(page, /function PurchaseCard/)
+})
+
 test('Accounting shows one daily Bazaar total and manages its details in Daily Bazaar', () => {
   const accounting = readSource('src/pages/AccountingHistory.jsx')
   const accountingLib = readSource('src/lib/accounting.js')

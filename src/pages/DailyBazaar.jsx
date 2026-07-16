@@ -3,7 +3,6 @@ import {
   Banknote,
   BarChart2,
   CalendarDays,
-  ChevronDown,
   CreditCard,
   Edit3,
   FileText,
@@ -89,7 +88,8 @@ const PURCHASE_COLUMNS = `
 
 const INPUT = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none transition-all placeholder:text-[#C3C8D0] focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]'
 const SELECT = `${INPUT} pr-8`
-const PAGE_SIZE = 500
+const LOAD_PAGE_SIZE = 500
+const HISTORY_PAGE_SIZE = 10
 
 const EN = {
   title: 'Daily Bazaar',
@@ -151,6 +151,12 @@ const EN = {
   results: 'entries',
   noHistory: 'No bazaar entries match this period and filters.',
   noAnalytics: 'No bazaar spend is recorded for this period.',
+  productName: 'Product name',
+  actions: 'Actions',
+  previous: 'Previous',
+  next: 'Next',
+  page: 'Page',
+  of: 'of',
   details: 'Details',
   hideDetails: 'Hide details',
   edit: 'Edit',
@@ -217,6 +223,7 @@ const LABELS = {
     dateRange: 'Sana oralig‘i', today: 'Bugun', week: '7 kun', month: 'Joriy oy', previousMonth: 'O‘tgan oy', from: 'Dan', to: 'Gacha',
     search: 'Mahsulot, xaridor yoki izoh…', searchLabel: 'Bozor tarixidan qidirish', clearSearch: 'Qidiruvni tozalash', closeSearch: 'Qidiruvni yopish',
     allCategories: 'Barcha kategoriyalar', allPayments: 'Barcha to‘lovlar', results: 'yozuv', noHistory: 'Bu davr va filtrlarga mos bozor yozuvi yo‘q.',
+    productName: 'Mahsulot nomi', actions: 'Amallar', previous: 'Oldingi', next: 'Keyingi', page: 'Sahifa', of: '/',
     noAnalytics: 'Bu davr uchun bozor xarajati yozilmagan.', details: 'Tafsilotlar', hideDetails: 'Yopish', edit: 'Tahrirlash', delete: 'O‘chirish',
     confirmDelete: 'O‘chirishni tasdiqlash', deleting: 'O‘chirilmoqda…', addedBy: 'Kiritgan',
     unspecifiedSupplier: 'Ko‘rsatilmagan', unspecifiedBuyer: 'Ko‘rsatilmagan', legacy: 'Tarixiy yozuv', legacyReadOnly: 'Oldingi xarajatlardan ko‘chirilgan yozuvni bu yerda tahrirlab bo‘lmaydi.',
@@ -252,6 +259,7 @@ const LABELS = {
     dateRange: 'Период', today: 'Сегодня', week: '7 дней', month: 'Текущий месяц', previousMonth: 'Прошлый месяц', from: 'С', to: 'По',
     search: 'Продукт, закупщик или примечание…', searchLabel: 'Поиск по истории базара', clearSearch: 'Очистить поиск', closeSearch: 'Закрыть поиск',
     allCategories: 'Все категории', allPayments: 'Все способы оплаты', results: 'записей', noHistory: 'Нет записей базара для этого периода и фильтров.',
+    productName: 'Название продукта', actions: 'Действия', previous: 'Назад', next: 'Далее', page: 'Страница', of: 'из',
     noAnalytics: 'За этот период расходов базара нет.', details: 'Детали', hideDetails: 'Скрыть', edit: 'Изменить', delete: 'Удалить',
     confirmDelete: 'Подтвердить удаление', deleting: 'Удаляется…', addedBy: 'Добавил',
     unspecifiedSupplier: 'Не указано', unspecifiedBuyer: 'Не указано', legacy: 'Историческая запись', legacyReadOnly: 'Запись, перенесённую из старых расходов, нельзя изменить здесь.',
@@ -376,9 +384,9 @@ export default function DailyBazaar() {
   const defaultBuyer = profile?.full_name || profile?.email || state.user?.name || ''
   const defaultBuyerProfileId = profile?.id || state.user?.id || ''
 
-  const initialRange = useMemo(() => getBazaarRange('month'), [])
+  const initialRange = useMemo(() => getBazaarRange('today'), [])
   const [tab, setTab] = useState(canManage ? 'entry' : 'history')
-  const [rangeKey, setRangeKey] = useState('month')
+  const [rangeKey, setRangeKey] = useState('today')
   const [dateFrom, setDateFrom] = useState(initialRange.dateFrom)
   const [dateTo, setDateTo] = useState(initialRange.dateTo)
   const [purchases, setPurchases] = useState([])
@@ -386,7 +394,7 @@ export default function DailyBazaar() {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState('')
-  const [expandedId, setExpandedId] = useState('')
+  const [historyPage, setHistoryPage] = useState(1)
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [paymentFilter, setPaymentFilter] = useState('all')
@@ -463,15 +471,15 @@ export default function DailyBazaar() {
           .order('purchase_date', { ascending: false })
           .order('created_at', { ascending: false })
           .order('id', { ascending: false })
-          .range(from, from + PAGE_SIZE - 1)
+          .range(from, from + LOAD_PAGE_SIZE - 1)
 
         if (requestId !== requestRef.current) return
         if (loadError) throw loadError
 
         const page = data || []
         rows.push(...page)
-        if (page.length < PAGE_SIZE) break
-        from += PAGE_SIZE
+        if (page.length < LOAD_PAGE_SIZE) break
+        from += LOAD_PAGE_SIZE
       }
 
       if (requestId !== requestRef.current) return
@@ -523,27 +531,30 @@ export default function DailyBazaar() {
     return [...options.values()].sort((a, b) => a.name.localeCompare(b.name))
   }, [employees, defaultBuyerProfileId, defaultBuyer, form.buyer_profile_id, form.buyer_name])
 
-  const historyRows = useMemo(() => filterBazaarPurchases(purchases, {
-    dateFrom,
-    dateTo,
-    query,
-    category: categoryFilter,
-    paymentMethod: paymentFilter,
-  }), [purchases, dateFrom, dateTo, query, categoryFilter, paymentFilter])
+  const historyRows = useMemo(() => filterBazaarPurchases(
+    purchases.filter(purchase => purchase.entry_source === 'daily_bazaar'),
+    {
+      dateFrom,
+      dateTo,
+      query,
+      category: categoryFilter,
+      paymentMethod: paymentFilter,
+    },
+  ), [purchases, dateFrom, dateTo, query, categoryFilter, paymentFilter])
 
-  const historyGroups = useMemo(() => {
-    const groups = []
-    for (const purchase of historyRows) {
-      let group = groups[groups.length - 1]
-      if (!group || group.date !== purchase.purchase_date) {
-        group = { date: purchase.purchase_date, rows: [], total: 0 }
-        groups.push(group)
-      }
-      group.rows.push(purchase)
-      group.total += getBazaarPurchaseScopedTotal(purchase, categoryFilter)
-    }
-    return groups
-  }, [historyRows, categoryFilter])
+  const historyPageCount = Math.max(1, Math.ceil(historyRows.length / HISTORY_PAGE_SIZE))
+  const pagedHistoryRows = useMemo(() => {
+    const start = (historyPage - 1) * HISTORY_PAGE_SIZE
+    return historyRows.slice(start, start + HISTORY_PAGE_SIZE)
+  }, [historyRows, historyPage])
+
+  useEffect(() => {
+    setHistoryPage(1)
+  }, [dateFrom, dateTo, query, categoryFilter, paymentFilter])
+
+  useEffect(() => {
+    setHistoryPage(current => Math.min(current, historyPageCount))
+  }, [historyPageCount])
 
   const analytics = useMemo(() => summarizeBazaarPurchases(purchases, {
     dateFrom,
@@ -740,7 +751,6 @@ export default function DailyBazaar() {
       if (deleteError) throw deleteError
 
       setConfirmDeleteId('')
-      setExpandedId('')
       setNotice(l.deleted)
       await loadPurchases()
     } catch (deleteError) {
@@ -875,14 +885,15 @@ export default function DailyBazaar() {
                 <BazaarHistory
                   l={l}
                   lang={lang}
-                  groups={historyGroups}
+                  purchases={pagedHistoryRows}
                   resultCount={historyRows.length}
+                  page={historyPage}
+                  pageCount={historyPageCount}
                   canManage={canManage}
-                  expandedId={expandedId}
                   confirmDeleteId={confirmDeleteId}
                   deletingId={deletingId}
                   categoryFilter={categoryFilter}
-                  onToggle={id => setExpandedId(current => current === id ? '' : id)}
+                  onPage={setHistoryPage}
                   onEdit={beginEdit}
                   onDelete={deletePurchase}
                 />
@@ -1173,136 +1184,116 @@ function BazaarEntryForm({
 function BazaarHistory({
   l,
   lang,
-  groups,
+  purchases,
   resultCount,
+  page,
+  pageCount,
   canManage,
-  expandedId,
   confirmDeleteId,
   deletingId,
   categoryFilter,
-  onToggle,
+  onPage,
   onEdit,
   onDelete,
 }) {
-  if (groups.length === 0) {
+  if (purchases.length === 0) {
     return <EmptyState icon={ShoppingBasket} title={l.noHistory} />
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
         <p className="text-xs font-black uppercase tracking-wide text-[#9CA3AF]">{resultCount} {l.results}</p>
+        {pageCount > 1 && <p className="text-xs font-bold text-[#9CA3AF]">{l.page} {page} {l.of} {pageCount}</p>}
       </div>
-      {groups.map(group => (
-        <section key={group.date}>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
-            <div className="flex items-center gap-2">
-              <CalendarDays size={14} className="text-blue-500" />
-              <h2 className="text-sm font-black text-[#1F2937]">{formatLongDate(group.date, lang, group.date)}</h2>
-              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black text-blue-600">{group.rows.length}</span>
-            </div>
-            <span className="text-sm font-black text-[#1F2937] tabular-nums">{formatCurrency(group.total)}</span>
-          </div>
-          <div className="space-y-3">
-            {group.rows.map(purchase => (
-              <PurchaseCard
-                key={purchase.id}
-                purchase={purchase}
-                l={l}
-                lang={lang}
-                expanded={expandedId === purchase.id}
-                canManage={canManage}
-                confirmingDelete={confirmDeleteId === purchase.id}
-                deleting={deletingId === purchase.id}
-                categoryFilter={categoryFilter}
-                onToggle={() => onToggle(purchase.id)}
-                onEdit={() => onEdit(purchase)}
-                onDelete={() => onDelete(purchase)}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  )
-}
+      <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] border-collapse text-left">
+            <thead className="bg-[#F8F9FB] text-[10px] font-black uppercase tracking-wide text-[#8B95A5]">
+              <tr>
+                <th className="w-[150px] px-3 py-2.5">{l.purchaseDate}</th>
+                <th className="min-w-[220px] px-3 py-2.5">{l.productName}</th>
+                <th className="w-[140px] px-3 py-2.5">{l.quantity}</th>
+                <th className="w-[150px] px-3 py-2.5">{l.category}</th>
+                <th className="w-[170px] px-3 py-2.5">{l.addedBy}</th>
+                <th className="w-[150px] px-3 py-2.5 text-right">{l.totalPaid}</th>
+                {canManage && <th className="w-[120px] px-3 py-2.5 text-right">{l.actions}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {purchases.flatMap(purchase => {
+                const items = getBazaarPurchaseScopedItems(purchase, categoryFilter)
+                const total = getBazaarPurchaseScopedTotal(purchase, categoryFilter)
+                const MethodIcon = methodIcon(purchase.payment_method)
+                return items.map((item, index) => {
+                  const first = index === 0
+                  const rowSpan = items.length
+                  return (
+                    <tr key={`${purchase.id}-${item.id || index}`} className={`${first ? 'border-t border-[#E5E7EB]' : 'border-t border-[#F3F4F6]'} text-xs text-[#4B5563] first:border-t-0`}>
+                      {first && (
+                        <td rowSpan={rowSpan} className="align-middle whitespace-nowrap px-3 py-2.5 font-black text-[#1F2937]">
+                          {formatLongDate(purchase.purchase_date, lang, purchase.purchase_date)}
+                        </td>
+                      )}
+                      <td className="px-3 py-2.5" title={item.notes || undefined}>
+                        <p className="truncate font-black text-[#1F2937]">{item.product_name}</p>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 font-black text-[#1F2937]">
+                        {formatBazaarQuantity(item.quantity)} {bazaarUnitLabel(item.unit, lang)}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-[11px] font-black text-[#6B7280]">{bazaarCategoryLabel(item.category, lang)}</span>
+                      </td>
+                      {first && (
+                        <td rowSpan={rowSpan} className="align-middle px-3 py-2.5" title={purchase.notes || undefined}>
+                          <p className="truncate font-black text-[#1F2937]">{purchase.created_by_name || '—'}</p>
+                        </td>
+                      )}
+                      {first && (
+                        <td rowSpan={rowSpan} className="align-middle px-3 py-2.5">
+                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                            <p className="text-sm font-black text-[#1F2937] tabular-nums">{formatCurrency(total)}</p>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-[#ff5a00]">
+                            <MethodIcon size={10} />{bazaarPaymentMethodLabel(purchase.payment_method, lang)}
+                            </span>
+                          </div>
+                        </td>
+                      )}
+                      {canManage && first && (
+                        <td rowSpan={rowSpan} className="align-middle px-3 py-2.5">
+                          <div className="flex justify-end gap-1.5">
+                            <button type="button" onClick={() => onEdit(purchase)} aria-label={l.edit} title={l.edit} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">
+                              <Edit3 size={13} />
+                            </button>
+                            <button type="button" disabled={deletingId === purchase.id} onClick={() => onDelete(purchase)} aria-label={confirmDeleteId === purchase.id ? l.confirmDelete : l.delete} title={confirmDeleteId === purchase.id ? l.confirmDelete : l.delete} className={`inline-flex h-8 items-center justify-center rounded-lg border px-2 text-[10px] font-black transition-colors disabled:opacity-60 ${
+                              confirmDeleteId === purchase.id ? 'border-red-200 bg-red-50 text-red-600' : 'w-8 border-[#E5E7EB] text-[#6B7280] hover:border-red-200 hover:text-red-600'
+                            }`}>
+                              {deletingId === purchase.id ? <Loader2 size={13} className="animate-spin" /> : confirmDeleteId === purchase.id ? l.confirmDelete : <Trash2 size={13} />}
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-function PurchaseCard({ purchase, l, lang, expanded, canManage, confirmingDelete, deleting, categoryFilter, onToggle, onEdit, onDelete }) {
-  const Icon = methodIcon(purchase.payment_method)
-  const legacy = isLegacyPurchase(purchase)
-  const scopedItems = getBazaarPurchaseScopedItems(purchase, categoryFilter)
-  const total = getBazaarPurchaseScopedTotal(purchase, categoryFilter)
-  const buyerLabel = purchase.buyer_name || purchase.created_by_name || l.unspecifiedBuyer
-  return (
-    <article className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
-      <div className="p-4 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <button type="button" onClick={onToggle} aria-expanded={expanded} className="min-w-0 flex-1 text-left">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base font-black text-[#1F2937]">{buyerLabel}</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[11px] font-black text-[#ff5a00]">
-                <Icon size={11} />{bazaarPaymentMethodLabel(purchase.payment_method, lang)}
-              </span>
-              {legacy && <span className="rounded-full bg-gray-100 px-2 py-1 text-[11px] font-black text-[#6B7280]">{l.legacy}</span>}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-[#9CA3AF]">
-              <span>{scopedItems.length} {l.itemCount.toLowerCase()}</span>
-              <span>{l.addedBy}: {purchase.created_by_name || '—'}</span>
-            </div>
-            {purchase.notes && <p className="mt-2 line-clamp-2 text-sm font-medium text-[#6B7280]">{purchase.notes}</p>}
+      {pageCount > 1 && (
+        <nav aria-label={l.history} className="flex items-center justify-center gap-2 pt-1">
+          <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)} className="h-9 rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280] disabled:cursor-not-allowed disabled:opacity-40">
+            {l.previous}
           </button>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 lg:justify-end">
-            <p className="mr-1 text-xl font-black text-[#1F2937] tabular-nums">{formatCurrency(total)}</p>
-            <button type="button" onClick={onToggle} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#E5E7EB] px-3 text-xs font-black text-[#6B7280] hover:border-orange-200 hover:text-[#ff5a00]">
-              <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
-              {expanded ? l.hideDetails : l.details}
-            </button>
-            {canManage && !legacy && (
-              <button type="button" onClick={onEdit} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-black text-blue-600 hover:bg-blue-100">
-                <Edit3 size={14} />{l.edit}
-              </button>
-            )}
-            {canManage && !legacy && (
-              <button type="button" disabled={deleting} onClick={onDelete} className={`inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 text-xs font-black transition-colors disabled:opacity-60 ${
-                confirmingDelete ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280] hover:border-red-200 hover:text-red-600'
-              }`}>
-                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                {deleting ? l.deleting : confirmingDelete ? l.confirmDelete : l.delete}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="border-t border-[#F3F4F6] bg-[#FBFCFD] p-3 sm:p-4">
-          <div className="space-y-2">
-            {scopedItems.map((item, index) => {
-              const base = normalizeBazaarQuantityToBase(item.quantity, item.unit)
-              const cost = getBazaarUnitCost(item)
-              return (
-                <div key={item.id || `${item.product_key}-${index}`} className="grid gap-3 rounded-xl border border-[#E5E7EB] bg-white p-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,150px)_minmax(0,130px)_minmax(0,170px)] lg:items-center">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-[#1F2937]">{item.product_name}</p>
-                    {item.notes && <p className="mt-0.5 break-words text-xs font-medium text-[#9CA3AF]">{item.notes}</p>}
-                  </div>
-                  <span className="w-fit rounded-full bg-gray-100 px-2.5 py-1 text-xs font-black text-[#6B7280]">{bazaarCategoryLabel(item.category, lang)}</span>
-                  <div>
-                    <p className="text-[10px] font-black uppercase text-[#9CA3AF]">{l.quantity}</p>
-                    <p className="text-sm font-black text-[#1F2937]">{formatBazaarQuantity(item.quantity)} {bazaarUnitLabel(item.unit, lang)}</p>
-                  </div>
-                  <div className="lg:text-right">
-                    <p className="text-sm font-black text-[#1F2937]">{formatCurrency(item.line_total)}</p>
-                    <p className="text-[11px] font-bold text-[#9CA3AF]">{cost > 0 ? `${formatCurrency(Math.round(cost))} / ${bazaarUnitLabel(base.unit, lang)}` : '—'}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+          <span className="min-w-[100px] text-center text-xs font-black text-[#6B7280]">{l.page} {page} {l.of} {pageCount}</span>
+          <button type="button" disabled={page >= pageCount} onClick={() => onPage(page + 1)} className="h-9 rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280] disabled:cursor-not-allowed disabled:opacity-40">
+            {l.next}
+          </button>
+        </nav>
       )}
-    </article>
+    </div>
   )
 }
 
