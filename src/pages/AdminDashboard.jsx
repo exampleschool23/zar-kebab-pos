@@ -944,7 +944,10 @@ export default function AdminDashboard() {
 
   // ── Recent orders: action-needed bills first, paid history second ─────────
   const recentOrderGroups = useMemo(() => {
-    const grouped = groupOrdersBySession(state.orders)
+    const grouped = groupOrdersBySession([
+      ...dashboardOrders,
+      ...state.orders.filter(order => !isPaidOrder(order)),
+    ])
       .filter(o => {
         if (isPaidOrder(o)) return true
         return isActiveNeedsBillOrder(o, state.tables)
@@ -966,7 +969,7 @@ export default function AdminDashboard() {
       paidDateGroups: groupPaidRecentOrders(visiblePaid, lang),
       needsBillTotal: needsBill.length,
     }
-  }, [state.orders, state.tables, lang])
+  }, [dashboardOrders, state.orders, state.tables, lang])
 
   const recentOrdersCount = recentOrderGroups.needsBill.length + recentOrderGroups.paid.length
 

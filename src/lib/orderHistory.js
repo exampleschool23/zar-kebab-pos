@@ -43,30 +43,31 @@ function isMissingPaymentsRelation(error) {
 }
 
 async function queryPaidOrderPages(dbClient, select, bounds, pageSize) {
-  const withPaidTimestamp = await collectPagedRows(
-    (from, to) => dbClient
-      .from('orders')
-      .select(select)
-      .not('paid_at', 'is', null)
-      .gte('paid_at', bounds.instantFrom)
-      .lt('paid_at', bounds.instantToExclusive)
-      .order('paid_at', { ascending: false })
-      .range(from, to),
-    pageSize
-  )
-
-  const legacyPaid = await collectPagedRows(
-    (from, to) => dbClient
-      .from('orders')
-      .select(select)
-      .is('paid_at', null)
-      .or('payment_status.eq.paid,status.eq.paid,status.eq.completed')
-      .gte('created_at', bounds.instantFrom)
-      .lt('created_at', bounds.instantToExclusive)
-      .order('created_at', { ascending: false })
-      .range(from, to),
-    pageSize
-  )
+  const [withPaidTimestamp, legacyPaid] = await Promise.all([
+    collectPagedRows(
+      (from, to) => dbClient
+        .from('orders')
+        .select(select)
+        .not('paid_at', 'is', null)
+        .gte('paid_at', bounds.instantFrom)
+        .lt('paid_at', bounds.instantToExclusive)
+        .order('paid_at', { ascending: false })
+        .range(from, to),
+      pageSize
+    ),
+    collectPagedRows(
+      (from, to) => dbClient
+        .from('orders')
+        .select(select)
+        .is('paid_at', null)
+        .or('payment_status.eq.paid,status.eq.paid,status.eq.completed')
+        .gte('created_at', bounds.instantFrom)
+        .lt('created_at', bounds.instantToExclusive)
+        .order('created_at', { ascending: false })
+        .range(from, to),
+      pageSize
+    ),
+  ])
 
   return [...withPaidTimestamp, ...legacyPaid]
 }

@@ -19,7 +19,7 @@ import {
   orderTypeLabel,
   orderTypePrefix,
 } from './orderTypes.js'
-import { loadActiveOrders, loadOrdersForRange } from './orderHistory.js'
+import { collectPagedRows, loadActiveOrders, loadPaidOrdersForRange } from './orderHistory.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -310,20 +310,86 @@ export async function loadMenuCatalog(dbClient = supabase) {
   }
 }
 
-async function loadCurrentOrderState() {
-  const today = restaurantTodayStr()
-  const yearStart = `${today.slice(0, 4)}-01-01`
-  const [activeOrders, currentYearOrders] = await Promise.all([
-    loadActiveOrders(),
-    loadOrdersForRange(yearStart, today),
-  ])
-  const byId = new Map(currentYearOrders.map(order => [order.id, order]))
+export function mergeOperationalOrders(activeOrders = [], paidTodayOrders = []) {
+  const byId = new Map(paidTodayOrders.map(order => [order.id, order]))
   activeOrders.forEach(order => byId.set(order.id, order))
   return [...byId.values()]
 }
 
+async function loadCurrentOrderState() {
+  const today = restaurantTodayStr()
+  const [activeOrders, paidTodayOrders] = await Promise.all([
+    loadActiveOrders(),
+    loadPaidOrdersForRange(today, today),
+  ])
+  return mergeOperationalOrders(activeOrders, paidTodayOrders)
+}
+
 export async function loadOrders() {
   return loadCurrentOrderState()
+}
+
+export async function loadOperationalTableData() {
+  const [tables, orders] = await Promise.all([
+    loadRestaurantTables(),
+    loadCurrentOrderState(),
+  ])
+  return { tables, orders }
+}
+
+export async function loadTableOrderHistoryIds(dbClient = supabase) {
+  const rows = await collectPagedRows((from, to) => dbClient
+    .from('orders')
+    .select('table_id')
+    .not('table_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .range(from, to))
+  return [...new Set(rows.map(row => row.table_id).filter(Boolean))]
+}
+
+export async function loadEarliestOrderDate(dbClient = supabase) {
+  const { data, error } = await dbClient
+    .from('orders')
+    .select('created_at')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data?.created_at || ''
+}
+
+export async function loadReceiptOrderGroup(orderId, options = {}) {
+  const dbClient = options.dbClient || supabase
+  const select = '*, items:order_items(*), payments:order_payments(*)'
+  const { data: order, error } = await withAbortSignal(dbClient
+    .from('orders')
+    .select(select)
+    .eq('id', orderId)
+    .maybeSingle(), options.signal)
+  if (error) throw error
+  if (!order) return []
+
+  const paidAtMs = Date.parse(order.paid_at || '')
+  const isGroupedPaidTableOrder = (
+    order.table_id &&
+    order.payment_status === 'paid' &&
+    Number.isFinite(paidAtMs) &&
+    !isOffPremiseOrderType(normalizeOrderType(order.order_type))
+  )
+  if (!isGroupedPaidTableOrder) return [order]
+
+  const minuteStart = new Date(Math.floor(paidAtMs / 60000) * 60000).toISOString()
+  const minuteEnd = new Date(Math.floor(paidAtMs / 60000) * 60000 + 60000).toISOString()
+  const { data: siblings, error: siblingsError } = await withAbortSignal(dbClient
+    .from('orders')
+    .select(select)
+    .eq('table_id', order.table_id)
+    .eq('payment_status', 'paid')
+    .gte('paid_at', minuteStart)
+    .lt('paid_at', minuteEnd)
+    .order('created_at', { ascending: true }), options.signal)
+  if (siblingsError) throw siblingsError
+  return siblings?.length ? siblings : [order]
 }
 
 export async function loadKitchenCheckOrder(orderId, options = {}) {
@@ -1082,6 +1148,15 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'DELETE_TABLE': {
+      const { data: history, error: historyError } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('table_id', action.payload)
+        .limit(1)
+      if (historyError) throw historyError
+      if (history?.length) {
+        throw new Error('This table has order history. Disable it instead of deleting it.')
+      }
       const { error } = await supabase.from('restaurant_tables').delete().eq('id', action.payload)
       if (error) throw error
       break

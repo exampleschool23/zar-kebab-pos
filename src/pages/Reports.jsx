@@ -1807,6 +1807,7 @@ export default function Reports() {
     try {
       const result = await dispatch({ type: 'DELETE_ORDER', payload: { orderId: order.id } })
       if (!result?.error) {
+        setHistoryOrders(current => current.filter(row => row.id !== order.id))
         setSelectedOrder(null)
         setConfirmDeleteOrderId('')
       }
@@ -1835,6 +1836,17 @@ export default function Reports() {
         payload: { orderIds, paymentMethod: paymentMethodDraft },
       })
       if (result?.error) return
+      setHistoryOrders(current => current.map(row => orderIds.includes(row.id)
+        ? {
+            ...row,
+            payment_method: paymentMethodDraft,
+            payments: (row.payments || []).map(payment => payment.method === 'loyalty_card'
+              ? payment
+              : { ...payment, method: paymentMethodDraft }
+            ),
+          }
+        : row
+      ))
       setSelectedOrder(current => current?.id === order.id
         ? {
             ...current,

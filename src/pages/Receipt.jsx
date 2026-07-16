@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react'
+import React, { useMemo, useEffect, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { getItemName, t } from '../lib/i18n'
@@ -13,6 +13,8 @@ import { getOrderItemUnitPrice, normalizePriceMode } from '../lib/priceModes'
 import { isCashierQuickItem } from '../lib/menuItems'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatDateTime } from '../lib/dateFormat'
+import { loadReceiptOrderGroup } from '../lib/db'
+import { OperationalError, OperationalLoading } from '../components/OperationalState'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -631,6 +633,35 @@ export default function Receipt() {
   const lang     = state.lang
   const labels   = L[lang] || L.en
   const settings = state.settings
+  const localOrder = state.orders.find(order => order.id === orderId)
+  const [historicalOrders, setHistoricalOrders] = useState([])
+  const [lookupState, setLookupState] = useState({ loading: !localOrder, error: '' })
+  const [lookupVersion, setLookupVersion] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    if (localOrder) {
+      setHistoricalOrders([])
+      setLookupState({ loading: false, error: '' })
+      return () => { cancelled = true }
+    }
+
+    setLookupState({ loading: true, error: '' })
+    loadReceiptOrderGroup(orderId)
+      .then(orders => {
+        if (cancelled) return
+        setHistoricalOrders(orders)
+        setLookupState({ loading: false, error: '' })
+      })
+      .catch(error => {
+        if (cancelled) return
+        setHistoricalOrders([])
+        setLookupState({ loading: false, error: error?.message || 'Could not load receipt' })
+      })
+    return () => { cancelled = true }
+  }, [localOrder, lookupVersion, orderId])
+
+  const receiptOrders = localOrder ? state.orders : historicalOrders
 
   const menuItemMap = useMemo(() => {
     const m = {}
@@ -639,7 +670,7 @@ export default function Receipt() {
   }, [state.menuItems])
 
   const data = useMemo(() => {
-    const order = state.orders.find(o => o.id === orderId)
+    const order = receiptOrders.find(o => o.id === orderId)
     if (!order) return null
 
     const isOffPremise = isOffPremiseOrderType(inferOrderType(order))
@@ -649,13 +680,13 @@ export default function Receipt() {
     const allOrders = isOffPremise
       ? [order]
       : order.payment_status === 'paid' && order.paid_at
-        ? state.orders.filter(
+        ? receiptOrders.filter(
             o => o.table_id === order.table_id &&
                  o.payment_status === 'paid' &&
                  o.paid_at?.slice(0, 16) === order.paid_at.slice(0, 16)
           )
         : (() => {
-            const siblings = state.orders.filter(
+            const siblings = receiptOrders.filter(
               o => o.table_id === order.table_id && o.payment_status !== 'paid'
             )
             return siblings.length > 0 ? siblings : [order]
@@ -685,7 +716,22 @@ export default function Receipt() {
       total: summary.total,
       payments: getOrderPaymentBreakdown(combineReceiptOrders(allOrders)),
     }
-  }, [state.orders, state.tables, orderId, settings.serviceRate, menuItemMap, lang])
+  }, [receiptOrders, state.tables, orderId, settings.serviceRate, menuItemMap, lang])
+
+  if (!localOrder && lookupState.loading) {
+    return <OperationalLoading title={t(lang, 'loading')} description="" />
+  }
+
+  if (!localOrder && lookupState.error) {
+    return (
+      <OperationalError
+        title={lang === 'ru' ? 'Не удалось загрузить чек' : lang === 'uz' ? 'Chekni yuklab bo‘lmadi' : 'Could not load receipt'}
+        description={lookupState.error}
+        actionLabel={lang === 'ru' ? 'Повторить' : lang === 'uz' ? 'Qayta urinish' : 'Retry'}
+        onAction={() => setLookupVersion(version => version + 1)}
+      />
+    )
+  }
 
   if (!data) return <NotFound onBack={() => navigate(-1)} />
 

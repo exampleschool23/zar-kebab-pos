@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react'
-import { isRecoverableIdleError, loadPOSData, refreshSupabaseSession, writeToSupabase, subscribeToRealtime } from '../lib/db'
+import { isRecoverableIdleError, loadOperationalTableData, loadPOSData, refreshSupabaseSession, writeToSupabase, subscribeToRealtime } from '../lib/db'
 import { appMetaReducer } from './appMetaReducer'
 import { cartReducer } from './cartReducer'
 import { menuReducer } from './menuReducer'
@@ -24,6 +24,7 @@ const WRITE_BEFORE_LOCAL_ACTIONS = new Set([
   'MARK_ORDER_PAID',
   'CHANGE_PAID_ORDER_PAYMENT_METHOD',
   'DELETE_ORDER',
+  'DELETE_TABLE',
   'DELETE_MENU_ITEM',
 ])
 
@@ -215,15 +216,19 @@ export function AppProvider({ children }) {
     let unsubscribe = () => {}
     let mounted = true
     let hydratePromise = null
+    let tableRefreshPromise = null
     let reconnectTimer = null
     let backOnlineTimer = null
     let lastResumeAt = 0
 
-    async function performHydration() {
+    async function restoreSession() {
       const activeSession = await refreshSupabaseSession()
       if (sessionUserId && activeSession?.user?.id !== sessionUserId) {
         throw new Error('The signed-in session could not be restored. Please reload and sign in again.')
       }
+    }
+
+    async function performHydration() {
       const { tables, tableZones, categories, menuItems, orders, settings } = await loadPOSData()
       if (!mounted) return
       dispatch({ type: 'SET_TABLES',     payload: tables })
@@ -277,7 +282,8 @@ export function AppProvider({ children }) {
                 : 'Reconnecting...',
           },
         })
-        hydratePOSData()
+        restoreSession()
+          .then(() => hydratePOSData({ afterCurrent: true }))
           .then(() => {
             if (mounted) connectRealtime()
             if (!mounted) return
@@ -325,10 +331,24 @@ export function AppProvider({ children }) {
     }
 
     recoverFromIdleRef.current = () => scheduleIdleRecovery(0)
-    refreshPOSDataRef.current = () => hydratePOSData({ afterCurrent: true })
-      .then(() => {
-        if (mounted) connectRealtime()
+    refreshPOSDataRef.current = () => {
+      if (tableRefreshPromise) return tableRefreshPromise
+      const request = (async () => {
+        if (hydratePromise) await hydratePromise.catch(() => undefined)
+        if (!mounted) return
+        const { tables, orders } = await loadOperationalTableData()
+        if (!mounted) return
+        dispatch({ type: 'SET_TABLES', payload: tables })
+        dispatch({ type: 'SET_ORDERS', payload: orders })
+        dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
+        connectRealtime()
+      })()
+      const trackedRequest = request.finally(() => {
+        if (tableRefreshPromise === trackedRequest) tableRefreshPromise = null
       })
+      tableRefreshPromise = trackedRequest
+      return trackedRequest
+    }
 
     dispatch({ type: 'SET_LOADING' })
     hydratePOSData()

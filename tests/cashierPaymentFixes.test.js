@@ -619,7 +619,7 @@ test('DB guard – CONFIRM_ORDER_DELIVERED uses neq(payment_status, paid) not eq
 
 test('DB guard – MARK_ORDER_PAID delegates legacy/null matching to the atomic RPC', () => {
   const caseStart = dbSource.indexOf("case 'MARK_ORDER_PAID':")
-  const caseEnd = dbSource.lastIndexOf('break\n    }') + 10
+  const caseEnd = dbSource.indexOf("case 'CHANGE_PAID_ORDER_PAYMENT_METHOD':", caseStart)
   const caseSource = dbSource.slice(caseStart, caseEnd)
   const migrationSource = readFileSync(
     new URL('../supabase/083_atomic_order_payment_settlement.sql', import.meta.url),

@@ -51,9 +51,14 @@ test('order history pagination reads every page without truncating at one respon
 
 test('active order query explicitly includes legacy null payment and status values', () => {
   const source = readFileSync(new URL('../src/lib/orderHistory.js', import.meta.url), 'utf8')
+  const activeQuery = source.slice(
+    source.indexOf('async function queryActiveOrderPages'),
+    source.indexOf('export async function loadPaidOrdersForRange'),
+  )
   assert.match(source, /payment_status\.neq\.paid,payment_status\.is\.null/)
   assert.match(source, /status\.not\.in\.\(paid,completed,cancelled\),status\.is\.null/)
   assert.match(source, /export async function loadActiveOrders/)
+  assert.doesNotMatch(activeQuery, /\.gte\(|\.lt\(/)
 })
 
 test('live paid orders replace fetched history without admitting unpaid or out-of-range rows', () => {

@@ -125,8 +125,15 @@ These bugs were recently fixed and are now protected by tests:
    - Failed retries retain the same round and item ids; migration `096` makes that retry idempotent.
 
 9. Returning to the waiter table grid could show stale order/table status until a full browser reload.
-   - `WaiterTables` requests a fresh POS hydration whenever the route mounts or is restored from the browser back-forward cache.
+   - `WaiterTables` requests a fresh operational table/order refresh whenever the route mounts or is restored from the browser back-forward cache.
    - The stable `refreshPOSData` context callback keeps current cards visible while reloading and renews the realtime subscription.
+
+10. Loading the waiter table grid became slower as completed-order history grew.
+   - Operational order state contains every active order regardless of age, plus only today’s paid orders for cashier/recent activity.
+   - Full historical ranges belong to Dashboard, Reports, and Accounting loaders, never initial POS hydration or realtime refreshes.
+   - Returning to `WaiterTables` refreshes only restaurant tables and operational orders; it does not reload the menu or reporting history.
+   - Admin table deletion verifies full history on demand and again before the database delete; older report receipts load their order/session directly by id.
+   - Monthly estimates query only the earliest order date needed for the business-activity boundary instead of relying on global order history.
 
 ## Database Migrations
 
@@ -238,6 +245,7 @@ npm run build
 - Requested kitchen rounds never fall back to an older print group.
 - Kitchen retries preserve their attempt ids and the RPC is idempotent by order/round.
 - Returning to `WaiterTables` refreshes orders/tables and renews realtime without clearing the visible grid.
+- Initial/realtime operational loading never downloads current-year paid history and still includes all active orders.
 
 If these tests fail, understand why before changing the guard. They exist because these exact failures reached the user.
 

@@ -641,6 +641,7 @@ test('owner can change only the completed-order payment method', () => {
   assert.match(reports, /Change payment method/)
   assert.match(reports, /Only the payment method will change\. Items, totals, status, and loyalty data stay unchanged\./)
   assert.match(reports, /type: 'CHANGE_PAID_ORDER_PAYMENT_METHOD'/)
+  assert.match(reports, /setHistoryOrders\(current => current\.map\(row => orderIds\.includes\(row\.id\)/)
   assert.doesNotMatch(reports, /Edit completed order/)
   assert.match(appContext, /'CHANGE_PAID_ORDER_PAYMENT_METHOD'/)
   assert.doesNotMatch(appContext, /'REOPEN_PAID_ORDERS'/)
@@ -1351,11 +1352,17 @@ test('WaiterTables keeps urgent status sections before available tables', () => 
 
 test('WaiterTables refreshes operational data whenever the waiter returns', () => {
   const appContext = readSource('src/store/AppContext.jsx')
+  const db = readSource('src/lib/db.js')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
+  const performHydration = functionBody(appContext, 'performHydration')
 
   assert.match(appContext, /const refreshPOSData = useCallback\(function refreshPOSData\(\)/)
-  assert.match(appContext, /refreshPOSDataRef\.current = \(\) => hydratePOSData\(\{ afterCurrent: true \}\)/)
+  assert.match(appContext, /refreshPOSDataRef\.current = \(\) =>/)
+  assert.match(appContext, /loadOperationalTableData\(\)/)
+  assert.match(appContext, /if \(tableRefreshPromise\) return tableRefreshPromise/)
   assert.match(appContext, /value=\{\{ state, dispatch: dbDispatch, refreshPOSData \}\}/)
+  assert.match(db, /export async function loadOperationalTableData\(\)/)
+  assert.doesNotMatch(performHydration, /refreshSupabaseSession\(\)/)
   assert.match(waiterTables, /const \{ state, dispatch, refreshPOSData \} = useApp\(\)/)
   assert.match(waiterTables, /useEffect\(\(\) => \{\s*refreshPOSData\(\)/)
   assert.match(waiterTables, /event\.persisted\) refreshPOSData\(\)/)
@@ -1394,6 +1401,7 @@ test('AdminDashboard recent order date label uses status activity time', () => {
   assert.match(source, /_recentActivityAt: getOrderActivityDate\(order, state\.tables\)/)
   assert.match(source, /function recentOrderActivityAt\(order\)/)
   assert.match(source, /groupPaidRecentOrders\(visiblePaid, lang\)/)
+  assert.match(source, /groupOrdersBySession\(\[\s*\.\.\.dashboardOrders,\s*\.\.\.state\.orders\.filter\(order => !isPaidOrder\(order\)\)/)
   assert.match(source, /toRestaurantDateStr\(paidAt\)/)
   assert.match(row, /const activityAt = recentOrderActivityAt\(order\)/)
   assert.match(row, /showDate \? recentDateTimeLabel\(activityAt, lang\) : recentTimeLabel\(activityAt\)/)
@@ -1891,14 +1899,20 @@ test('expenses date range text opens the native calendar picker', () => {
 
 test('AdminTables protects table history and manages zones', () => {
   const source = readSource('src/pages/AdminTables.jsx')
+  const appContext = readSource('src/store/AppContext.jsx')
+  const db = readSource('src/lib/db.js')
 
   assert.match(source, /This table has order history\. You can disable it instead\./)
   assert.match(source, /Do not delete a table while it has active orders\./)
   assert.match(source, /ADD_TABLE_ZONE/)
   assert.match(source, /zone_id/)
   assert.match(source, /is_active/)
-  assert.match(source, /const canHardDelete = !activeOrders && !hasHistory/)
+  assert.match(source, /loadTableOrderHistoryIds\(\)/)
+  assert.match(source, /const canHardDelete = historicalTableIds !== null && !activeOrders && !hasHistory/)
   assert.match(source, /disabled=\{!canHardDelete\}/)
+  assert.match(db, /case 'DELETE_TABLE':[\s\S]*\.from\('orders'\)[\s\S]*\.eq\('table_id', action\.payload\)[\s\S]*\.limit\(1\)/)
+  assert.match(db, /Disable it instead of deleting it/)
+  assert.match(appContext, /'DELETE_TABLE'/)
 })
 
 test('CashierBill uses loyalty wallet controls instead of percent card discounts', () => {
@@ -2196,6 +2210,7 @@ test('AdminSettings does not expose receipt footer editing', () => {
 
 test('Receipt hides payment method rows and uses paid timestamp when available', () => {
   const receipt = readSource('src/pages/Receipt.jsx')
+  const db = readSource('src/lib/db.js')
   const receiptPaper = functionBody(receipt, 'ReceiptPaper')
   const tableReceiptRoute = functionBody(receipt, 'TableReceipt')
 
@@ -2211,6 +2226,12 @@ test('Receipt hides payment method rows and uses paid timestamp when available',
   assert.match(tableReceiptRoute, /receiptAt:\s+orders\[0\]\?\.paid_at \|\| orders\[0\]\?\.created_at/)
   assert.match(receipt, /import \{ formatDateTime \} from '\.\.\/lib\/dateFormat'/)
   assert.match(receipt, /dateStr=\{formatDateTime\(data\.receiptAt\)\}/)
+  assert.match(receipt, /loadReceiptOrderGroup\(orderId\)/)
+  assert.match(receipt, /const receiptOrders = localOrder \? state\.orders : historicalOrders/)
+  assert.match(db, /export async function loadReceiptOrderGroup\(orderId, options = \{\}\)/)
+  assert.match(db, /payments:order_payments\(\*\)/)
+  assert.match(db, /\.gte\('paid_at', minuteStart\)/)
+  assert.match(db, /\.lt\('paid_at', minuteEnd\)/)
   assert.doesNotMatch(receipt, /function formatDate\(/)
 })
 
@@ -2321,6 +2342,7 @@ test('paid order deletion is routed through feature-gated RPC and wired to cashi
   assert.match(reports, /canDeleteOrder/)
   assert.match(reports, /canDeletePaidOrders/)
   assert.match(reports, /type: 'DELETE_ORDER'/)
+  assert.match(reports, /setHistoryOrders\(current => current\.filter\(row => row\.id !== order\.id\)\)/)
 })
 
 test('owner and admin Cashier access includes moving bills back to tables', () => {
@@ -2715,14 +2737,17 @@ test('accounting pages load complete paid history by settlement date with pagina
   assert.match(allAccounting, /collectPagedRows/)
   assert.match(accounting, /if \(requestId !== loadRequestRef\.current\) return/)
   assert.match(estimate, /loadPaidOrdersForRange\(monthStart, monthEnd\)/)
+  assert.match(estimate, /loadEarliestOrderDate\(\)/)
   assert.match(estimate, /mergePaidOrderHistory\(paidHistoryOrders, state\.orders, monthStart, cutoffEnd\)/)
   assert.match(estimate, /if \(requestId !== loadRequestRef\.current\) return/)
   assert.match(reports, /loadOrdersForRange\(dateFrom, dateTo\)/)
   assert.match(reports, /mergeOrderHistory\(historyOrders, state\.orders, dateFrom, dateTo\)/)
   assert.match(dashboard, /loadPaidOrdersForRange\(dashboardHistoryRange\.dateFrom, dashboardHistoryRange\.dateTo\)/)
   assert.match(dashboard, /dateFrom: `\$\{Number\(today\.slice\(0, 4\)\) - 1\}-01-01`/)
-  assert.match(db, /loadOrdersForRange\(yearStart, today\)/)
+  assert.match(db, /loadPaidOrdersForRange\(today, today\)/)
   assert.match(db, /loadActiveOrders\(\)/)
+  assert.doesNotMatch(db, /loadOrdersForRange\(yearStart, today\)/)
+  assert.doesNotMatch(db, /const yearStart =/)
   assert.doesNotMatch(db, /\.gte\('created_at', startOfYear\(\)\)/)
 })
 

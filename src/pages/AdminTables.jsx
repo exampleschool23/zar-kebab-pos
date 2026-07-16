@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, Edit2, Trash2, X, Table2, MapPin, Users, Hash, Power, PowerOff,
@@ -11,6 +11,7 @@ import { canDeleteTable, canDisableTable } from '../lib/tableManagement'
 import { clearReservationPatch, compactTimelineLabels, getTodaysReservations } from '../lib/tableActivity'
 import { formatDateTime, formatTime } from '../lib/dateFormat'
 import { canEditFeature } from '../lib/permissions'
+import { loadTableOrderHistoryIds } from '../lib/db'
 
 const DEFAULT_ZONES = ['Main Hall', 'VIP', 'Outdoor', 'Second Floor']
 
@@ -74,6 +75,7 @@ const L = {
     disabledNotice: name => `${name} disabled`,
     activeOrdersDeleteBlock: 'Do not delete a table while it has active orders.',
     historyDeleteBlock: 'This table has order history. You can disable it instead.',
+    historyCheckFailed: 'Could not verify table history. Reload this page before deleting a table.',
     deleteTitle: name => `Delete ${name}?`,
     deleteMessage: 'This permanently removes the table. This is only allowed because it has no order history.',
     deleteTable: 'Delete table',
@@ -159,6 +161,7 @@ const L = {
     disabledNotice: name => `${name} отключён`,
     activeOrdersDeleteBlock: 'Нельзя удалять стол с активными заказами.',
     historyDeleteBlock: 'У этого стола есть история заказов. Вместо удаления его можно отключить.',
+    historyCheckFailed: 'Не удалось проверить историю стола. Обновите страницу перед удалением.',
     deleteTitle: name => `Удалить ${name}?`,
     deleteMessage: 'Стол будет удалён навсегда. Это разрешено только если у него нет истории заказов.',
     deleteTable: 'Удалить стол',
@@ -244,6 +247,7 @@ const L = {
     disabledNotice: name => `${name} o‘chirildi`,
     activeOrdersDeleteBlock: 'Faol buyurtmalari bor stolni o‘chirib tashlamang.',
     historyDeleteBlock: 'Bu stolda buyurtma tarixi bor. Uni o‘chirib tashlash o‘rniga o‘chirib qo‘yishingiz mumkin.',
+    historyCheckFailed: 'Stol tarixini tekshirib bo‘lmadi. Stolni o‘chirishdan oldin sahifani yangilang.',
     deleteTitle: name => `${name} o‘chirib tashlansinmi?`,
     deleteMessage: 'Bu stol butunlay o‘chiriladi. Bu faqat buyurtma tarixi bo‘lmasa mumkin.',
     deleteTable: 'Stolni o‘chirib tashlash',
@@ -478,6 +482,21 @@ export default function AdminTables() {
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkZoneId, setBulkZoneId] = useState('')
   const [bulkCapacity, setBulkCapacity] = useState('')
+  const [historicalTableIds, setHistoricalTableIds] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    loadTableOrderHistoryIds()
+      .then(ids => {
+        if (!cancelled) setHistoricalTableIds(new Set(ids))
+      })
+      .catch(error => {
+        if (cancelled) return
+        setHistoricalTableIds(null)
+        setNotice({ tone: 'error', message: error?.message || l.historyCheckFailed })
+      })
+    return () => { cancelled = true }
+  }, [l.historyCheckFailed])
 
   const tableZones = useMemo(() => {
     const stored = state.tableZones || []
@@ -520,14 +539,14 @@ export default function AdminTables() {
 
   const orderStats = useMemo(() => {
     const active = new Set()
-    const history = new Set()
+    const history = new Set(historicalTableIds || [])
     state.orders.forEach(order => {
       if (!order.table_id) return
       history.add(order.table_id)
       if (order.payment_status !== 'paid' && order.status !== 'cancelled') active.add(order.table_id)
     })
     return { active, history }
-  }, [state.orders])
+  }, [historicalTableIds, state.orders])
 
   const activeCount = state.tables.filter(table => table.is_active !== false).length
   const disabledCount = state.tables.length - activeCount
@@ -699,12 +718,20 @@ export default function AdminTables() {
 
   function requestDelete(table) {
     if (!canManageTables) return
+    if (!historicalTableIds) {
+      setNotice({ tone: 'error', message: l.historyCheckFailed })
+      return
+    }
     const check = canDeleteTable(table, state.orders)
     if (!check.ok && check.reason === 'active_orders') {
       setNotice({ tone: 'error', message: l.activeOrdersDeleteBlock })
       return
     }
     if (!check.ok && check.reason === 'order_history') {
+      setNotice({ tone: 'error', message: l.historyDeleteBlock })
+      return
+    }
+    if (orderStats.history.has(table.id)) {
       setNotice({ tone: 'error', message: l.historyDeleteBlock })
       return
     }
@@ -922,8 +949,10 @@ export default function AdminTables() {
             {sortedTables.map(table => {
               const activeOrders = orderStats.active.has(table.id)
               const hasHistory = orderStats.history.has(table.id)
-              const canHardDelete = !activeOrders && !hasHistory
-              const deleteTitle = activeOrders
+              const canHardDelete = historicalTableIds !== null && !activeOrders && !hasHistory
+              const deleteTitle = historicalTableIds === null
+                ? l.historyCheckFailed
+                : activeOrders
                 ? l.activeOrdersDeleteBlock
                 : hasHistory
                   ? l.historyDeleteBlock

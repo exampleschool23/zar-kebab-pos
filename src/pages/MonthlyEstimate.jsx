@@ -35,6 +35,7 @@ import { getMonthlyEstimateMethodRows } from '../lib/monthlyEstimate'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
+import { loadEarliestOrderDate } from '../lib/db'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 
@@ -129,6 +130,7 @@ export default function MonthlyEstimate() {
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
+  const [firstOrderDate, setFirstOrderDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const loadRequestRef = useRef(0)
@@ -256,7 +258,7 @@ export default function MonthlyEstimate() {
     loadRequestRef.current = requestId
     setLoading(true)
     setError('')
-    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult, orderHistoryResult] = await Promise.all([
+    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult, orderHistoryResult, firstOrderResult] = await Promise.all([
       loadPagedResult((from, to) => supabase
         .from('expenses')
         .select(SELECT_COLUMNS)
@@ -274,6 +276,9 @@ export default function MonthlyEstimate() {
       loadPaidOrdersForRange(monthStart, monthEnd)
         .then(data => ({ data, error: null }))
         .catch(error => ({ data: [], error })),
+      loadEarliestOrderDate()
+        .then(data => ({ data, error: null }))
+        .catch(error => ({ data: '', error })),
     ])
     if (requestId !== loadRequestRef.current) return
 
@@ -289,6 +294,7 @@ export default function MonthlyEstimate() {
     } else {
       setPaidHistoryOrders(orderHistoryResult.data || [])
     }
+    setFirstOrderDate(firstOrderResult.data || '')
 
     const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
     if (salaryError) {
@@ -336,8 +342,12 @@ export default function MonthlyEstimate() {
     buildSalaryBonusExpenseRows(salaryProfiles, monthStart, cutoffEnd)
   ), [salaryProfiles, monthStart, cutoffEnd])
   const firstFinancialActivityDate = useMemo(() => (
-    getFirstFinancialActivityDate([...state.orders, ...accountingOrders], expenses, salaryProfiles)
-  ), [state.orders, accountingOrders, expenses, salaryProfiles])
+    getFirstFinancialActivityDate([
+      ...(firstOrderDate ? [{ created_at: firstOrderDate }] : []),
+      ...state.orders,
+      ...accountingOrders,
+    ], expenses, salaryProfiles)
+  ), [firstOrderDate, state.orders, accountingOrders, expenses, salaryProfiles])
   const monthlyEstimate = useMemo(() => (
     getEstimatedMonthlyExpenseSummary(salaryProfiles, cutoffEnd, {
       activeFromDate: firstFinancialActivityDate,
