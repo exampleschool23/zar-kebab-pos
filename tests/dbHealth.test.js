@@ -70,6 +70,19 @@ test('database health catches a profiles table missing feature access', async ()
   assert.match(failed.hint, /097_daily_bazaar/)
 })
 
+test('database health requires private menu costs and order cost snapshots', async () => {
+  const missingCosts = await runDbHealthChecks(makeClient({ missingTable: 'menu_item_costs' }))
+  assert.equal(missingCosts.ok, false)
+  assert.match(missingCosts.failed.find(check => check.name === 'menu_item_costs').hint, /098_menu_item_costs_and_profit/)
+
+  const missingSnapshot = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'order_items',
+    missingColumn: 'cost_price',
+  }))
+  assert.equal(missingSnapshot.ok, false)
+  assert.equal(missingSnapshot.failed.find(check => check.name === 'order_items').detail, 'cost_price')
+})
+
 test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)

@@ -289,6 +289,9 @@ export function buildCompletedOrderGroupMessage(order) {
   if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
     lines.push(`Доход · Сегодня: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
   }
+  if (order?.dailyNetProfitTotal != null && Number.isFinite(Number(order.dailyNetProfitTotal))) {
+    lines.push(`Чистая прибыль · Сегодня: ${escapeTelegramHtml(formatMoney(order.dailyNetProfitTotal))}`)
+  }
 
   return lines.join('\n')
 }

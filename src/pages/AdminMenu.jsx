@@ -22,7 +22,7 @@ import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem, isWaiterHi
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
-  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff,
+  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock,
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -171,6 +171,64 @@ function MoneyField({ label, value, onChange, placeholder, className = '', label
         {...inputProps}
         className={className || 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all'}
       />
+    </div>
+  )
+}
+
+function PricingFields({ form, setF, lang, compact = false }) {
+  const labels = lang === 'uz'
+    ? {
+        title: 'Narx va foyda',
+        private: 'Ichki ma’lumot',
+        current: 'Hozirgi narx',
+        old: 'Eski narx',
+        cost: 'Haqiqiy tannarx',
+        hint: 'Tannarx faqat sof foydani hisoblash uchun ishlatiladi. Menyu, buyurtma va cheklarda ko‘rsatilmaydi.',
+      }
+    : lang === 'ru'
+      ? {
+          title: 'Цена и прибыль',
+          private: 'Внутренние данные',
+          current: 'Текущая цена',
+          old: 'Старая цена',
+          cost: 'Реальная себестоимость',
+          hint: 'Себестоимость используется только для расчёта чистой прибыли. Она не показывается в меню, заказах и чеках.',
+        }
+      : {
+          title: 'Pricing and profit',
+          private: 'Internal data',
+          current: 'Current price',
+          old: 'Old price',
+          cost: 'Real cost',
+          hint: 'Cost is used only to calculate net profit. It is never shown in menus, orders, or receipts.',
+        }
+
+  return (
+    <div className={`rounded-2xl border border-emerald-200 bg-emerald-50/50 ${compact ? 'p-3' : 'p-4'}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-sm">
+            <Lock size={15} />
+          </span>
+          <p className="text-sm font-black text-gray-800">{labels.title}</p>
+        </div>
+        <span className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">
+          {labels.private}
+        </span>
+      </div>
+      <div className={`grid gap-3 ${compact ? 'sm:grid-cols-1' : 'sm:grid-cols-3'}`}>
+        <MoneyField label={`${labels.current} (UZS)`} value={form.price} onChange={setF('price')} placeholder="35000" />
+        <MoneyField label={`${labels.old} (UZS)`} value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
+        <MoneyField
+          label={`${labels.cost} (UZS)`}
+          value={form.cost_price}
+          onChange={setF('cost_price')}
+          placeholder="18000"
+          className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm font-semibold tabular-nums outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+          labelClassName="mb-1.5 block text-xs font-bold text-emerald-800"
+        />
+      </div>
+      <p className="mt-3 text-[11px] font-semibold leading-5 text-emerald-800/75">{labels.hint}</p>
     </div>
   )
 }
@@ -774,7 +832,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  external_id: '', price: '', old_price: '', grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', available: true, sort_order: '',
+  external_id: '', price: '', old_price: '', cost_price: '', grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', available: true, sort_order: '',
   option_groups: [],
   option_groups_editor: [],
   show_in_cashier_quick_items: false,
@@ -993,6 +1051,7 @@ function menuItemToProductForm(i) {
   return {
     ...blankItem,
     ...i,
+    cost_price: i.cost_price ?? i.costPrice ?? '',
     millilitres: i.millilitres ?? i.milliliters ?? (Number(i.litres ?? i.liters) > 0 ? Math.round(Number(i.litres ?? i.liters) * 1000) : ''),
     stock_count: i.stock_count ?? i.stockCount ?? 0,
     sort_order: i.sort_order ?? 0,
@@ -1020,6 +1079,7 @@ function getItemFormFingerprint(form = {}) {
     image_url: String(form.image_url || ''),
     price: numberFromMoneyInput(form.price),
     old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
+    cost_price: Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
     grams: Math.max(0, Math.round(Number(form.grams) || 0)),
     millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
     kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
@@ -1287,6 +1347,7 @@ export default function AdminMenu() {
           external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
           price: numberFromMoneyInput(form.price),
           old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
+          cost_price: Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
           grams: Math.max(0, Math.round(Number(form.grams) || 0)),
           millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
           kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
@@ -1549,7 +1610,7 @@ export default function AdminMenu() {
             ) : (
               <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-xs text-gray-500 font-semibold mb-1.5">{t(lang, 'category')}</label>
                       <select
@@ -1563,7 +1624,6 @@ export default function AdminMenu() {
                         ))}
                       </select>
                     </div>
-                    <MoneyField label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} value={form.price} onChange={setF('price')} placeholder="35000" />
                     <Field
                       label={lang === 'uz' ? 'Tokchadagi soni' : lang === 'ru' ? 'Количество на полке' : 'Shelf count'}
                       type="number"
@@ -1572,6 +1632,8 @@ export default function AdminMenu() {
                       placeholder="24"
                     />
                   </div>
+
+                  <PricingFields form={form} setF={setF} lang={lang} />
 
                   <div className="grid gap-4 sm:grid-cols-3">
                     <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} />
@@ -1610,7 +1672,6 @@ export default function AdminMenu() {
                       entityId={form.id}
                     />
                     <div className="grid grid-cols-2 gap-3">
-                      <MoneyField label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
                       <Field label={t(lang, 'sortOrder')} type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
                       <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
                       <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
@@ -2279,8 +2340,7 @@ export default function AdminMenu() {
               onChange={optionGroups => setForm(current => ({ ...current, option_groups_editor: optionGroups }))}
               lang={lang}
             />
-            <MoneyField label={`${lang === 'uz' ? 'Hozirgi narx' : lang === 'ru' ? 'Текущая цена' : 'Current price'} (UZS)`} value={form.price} onChange={setF('price')} placeholder="35000" />
-            <MoneyField label={`${lang === 'uz' ? 'Eski narx' : lang === 'ru' ? 'Старая цена' : 'Old price'} (UZS)`} value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
+            <PricingFields form={form} setF={setF} lang={lang} compact />
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
             <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
             <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />

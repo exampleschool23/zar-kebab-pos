@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingBag, Package, Receipt,
   Clock, CalendarDays, ArrowUpRight, ArrowDownRight, Users, Loader2,
-  Printer, CreditCard, Trash2, Wallet, Monitor, QrCode,
+  Printer, CreditCard, Trash2, Wallet, Monitor, QrCode, BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -40,6 +40,7 @@ import AppShell from '../components/AppShell'
 import { inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
 import { loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
+import { getOrdersNetProfit } from '../lib/profit'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 const L = {
@@ -48,6 +49,7 @@ const L = {
     greeting:       n => `Xush kelibsiz, ${n}! 👋`,
     subtitle:       "Bugun Zar Kebab'da nima bo'layotganini ko'rishingiz mumkin.",
     todayRevenue:   'Bugungi daromad',
+    netProfit:      'Sof foyda',
     ordersToday:    'Bugungi buyurtmalar',
     avgOrder:       "O'rtacha buyurtma",
     itemsSold:      'Sotilgan taomlar',
@@ -112,6 +114,7 @@ const L = {
     greeting:       n => `Добро пожаловать, ${n}! 👋`,
     subtitle:       'Вот что сегодня происходит в Zar Kebab.',
     todayRevenue:   'Доход сегодня',
+    netProfit:      'Чистая прибыль',
     ordersToday:    'Заказы сегодня',
     avgOrder:       'Средний заказ',
     itemsSold:      'Продано блюд',
@@ -176,6 +179,7 @@ const L = {
     greeting:       n => `Welcome back, ${n}! 👋`,
     subtitle:       "Here's what's happening at Zar Kebab today.",
     todayRevenue:   "Today's Revenue",
+    netProfit:      'Net Profit',
     ordersToday:    'Orders Today',
     avgOrder:       'Avg Order Value',
     itemsSold:      'Items Sold',
@@ -370,12 +374,25 @@ function getDashboardHistoryRange(period, today = todayStr()) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight }) {
+function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight, tone = 'default' }) {
+  const isProfit = tone === 'profit' && !highlight
+  const cardClass = highlight
+    ? 'border-red-200 bg-white'
+    : isProfit
+      ? 'border-emerald-200 bg-gradient-to-br from-white to-emerald-50/70'
+      : 'border-[#E5E7EB] bg-white'
+  const iconClass = highlight
+    ? 'bg-red-50 text-[#DC2626]'
+    : isProfit
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'bg-gray-50 text-[#6B7280]'
+  const valueClass = highlight ? 'text-[#DC2626]' : isProfit ? 'text-emerald-700' : 'text-[#1F2937]'
+
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm p-4 flex flex-col gap-2 min-w-0 h-full ${highlight ? 'border-red-200' : 'border-[#E5E7EB]'}`}>
+    <div className={`rounded-2xl border shadow-sm p-4 flex flex-col gap-2 min-w-0 h-full ${cardClass}`}>
       <div className="flex items-start justify-between gap-2">
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${highlight ? 'bg-red-50' : 'bg-gray-50'}`}>
-          <Icon size={17} className={highlight ? 'text-[#DC2626]' : 'text-[#6B7280]'} />
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${iconClass}`}>
+          <Icon size={17} />
         </div>
         {badge && (
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 ${badge.cls}`}>
@@ -385,7 +402,7 @@ function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight }) 
         )}
       </div>
       <div>
-        <p className={`font-black text-xl leading-tight break-words tabular-nums mb-1 ${highlight ? 'text-[#DC2626]' : 'text-[#1F2937]'}`}>{value}</p>
+        <p className={`font-black text-xl leading-tight break-words tabular-nums mb-1 ${valueClass}`}>{value}</p>
         <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider leading-snug">{label}</p>
         {sub && <p className={`text-xs mt-0.5 leading-snug ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
       </div>
@@ -776,11 +793,14 @@ export default function AdminDashboard() {
 
   const {
     periodRevenue, previousKpiRevenue, revenueChange,
+    periodNetProfit, previousKpiNetProfit, netProfitChange,
     periodOrderCount, previousOrderCount, orderChange,
     periodItemsSold,
   } = useMemo(() => {
     const currentRevenue = periodPaidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
     const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
+    const currentNetProfit = getOrdersNetProfit(periodPaidOrders, menuItemMap)
+    const previousNetProfit = getOrdersNetProfit(previousPeriodOrders, menuItemMap)
     const currentOrderCount = periodPaidOrders.length
     const previousCount = previousPeriodOrders.length
     const itemsSold = periodPaidOrders
@@ -793,6 +813,11 @@ export default function AdminDashboard() {
       revenueChange: previousRevenue > 0
         ? Math.round(((currentRevenue - previousRevenue) / previousRevenue) * 100)
         : null,
+      periodNetProfit: currentNetProfit,
+      previousKpiNetProfit: previousNetProfit,
+      netProfitChange: previousNetProfit > 0
+        ? Math.round(((currentNetProfit - previousNetProfit) / previousNetProfit) * 100)
+        : null,
       periodOrderCount: currentOrderCount,
       previousOrderCount: previousCount,
       orderChange: previousCount > 0
@@ -800,7 +825,7 @@ export default function AdminDashboard() {
         : null,
       periodItemsSold: itemsSold,
     }
-  }, [periodPaidOrders, previousPeriodOrders])
+  }, [periodPaidOrders, previousPeriodOrders, menuItemMap])
 
   const activeBills = useMemo(
     () => state.tables.filter(t => t.status === 'needs_bill').length,
@@ -1067,13 +1092,21 @@ export default function AdminDashboard() {
         )}
 
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
             label={`${l.revenue} · ${currentKpiPeriodLabel}`}
             value={formatCurrency(periodRevenue)}
             sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousKpiRevenue)}`}
             badge={pctBadge(revenueChange)}
+          />
+          <KpiCard
+            icon={BadgeDollarSign}
+            label={`${l.netProfit} · ${currentKpiPeriodLabel}`}
+            value={formatCurrency(periodNetProfit)}
+            sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousKpiNetProfit)}`}
+            badge={pctBadge(netProfitChange)}
+            tone="profit"
           />
           <KpiCard
             icon={CalendarDays}

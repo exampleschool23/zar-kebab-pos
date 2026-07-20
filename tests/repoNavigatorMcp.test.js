@@ -277,10 +277,10 @@ test('indexes complete large components, PL/pgSQL bodies, and multiline protecte
   assert.ok(Number(menuFunction[3].split('-')[1]) > 2_400)
 
   const menuOutline = await navigator.run({ op: 'outline', path: 'src/pages/AdminMenu.jsx', limit: 50, max_chars: 16_000 })
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'ImageUploadField')?.[3], 'L229-281')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'OrangeBtn')?.[3], 'L283-295')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'VisibilityToggleButton')?.[3], 'L414-436')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'SortableItemRow')?.[3], 'L575-658')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'ImageUploadField')?.[3], 'L287-339')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'OrangeBtn')?.[3], 'L341-353')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'VisibilityToggleButton')?.[3], 'L472-494')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'SortableItemRow')?.[3], 'L633-716')
 
   const settlement = await navigator.run({ op: 'find', q: 'settle_orders_payment', limit: 5 })
   const sqlFunction = settlement.rows.find((row) => row[1] === 'sql-function')

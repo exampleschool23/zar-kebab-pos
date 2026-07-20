@@ -154,6 +154,28 @@ test('menu item realtime changes refresh menu prices in active sessions', async 
   unsubscribe()
 })
 
+test('menu cost changes refresh dashboard profit inputs without exposing a new UI surface', async () => {
+  const dbClient = makeRealtimeClient()
+  const actions = []
+  const unsubscribe = subscribeToRealtime(action => actions.push(action), {
+    dbClient,
+    debounceMs: 0,
+    settingsLoader: async () => null,
+    menuCatalogLoader: async () => ({
+      categories: [{ id: 'shashlik', name_en: 'Shashlik' }],
+      menuItems: [{ id: 'beef', name_en: 'Beef Shashlik', price: 35000, cost_price: 18000 }],
+    }),
+  })
+
+  assert.equal(typeof dbClient.handlers.get('menu_item_costs'), 'function')
+  dbClient.handlers.get('menu_item_costs')({ eventType: 'UPDATE' })
+  await new Promise(resolve => setTimeout(resolve, 5))
+
+  assert.equal(actions.at(-1).type, 'SET_MENU_ITEMS')
+  assert.equal(actions.at(-1).payload[0].cost_price, 18000)
+  unsubscribe()
+})
+
 test('realtime channel errors surface a connection notice', () => {
   const dbClient = makeRealtimeClient()
   const actions = []

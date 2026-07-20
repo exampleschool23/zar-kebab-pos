@@ -79,6 +79,13 @@ create table if not exists public.menu_items (
   created_at       timestamptz not null default now()
 );
 
+create table if not exists public.menu_item_costs (
+  menu_item_id text primary key references public.menu_items(id) on delete cascade,
+  cost_price integer not null default 0,
+  updated_at timestamptz not null default now(),
+  constraint menu_item_costs_cost_price_nonnegative check (cost_price >= 0)
+);
+
 -- 4. Orders
 create table if not exists public.orders (
   id                      text        primary key,
@@ -107,6 +114,7 @@ create table if not exists public.order_items (
   menu_item_id text        not null,
   name         text        not null default '',
   price        integer     not null default 0,
+  cost_price   integer,
   quantity     integer     not null default 1,
   notes        text        default '',
   selected_options jsonb   not null default '{}'::jsonb,

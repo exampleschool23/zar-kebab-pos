@@ -72,12 +72,17 @@ test('completed table rounds merge into one Telegram order summary', () => {
   assert.equal(order.waiter_name, 'Ali, Bek')
   assert.deepEqual(order.payments, [{ method: 'cash', amount: 103500 }])
 
-  const message = buildCompletedOrderGroupMessage({ ...order, dailyRevenueTotal: 500000 })
+  const message = buildCompletedOrderGroupMessage({
+    ...order,
+    dailyRevenueTotal: 500000,
+    dailyNetProfitTotal: 310000,
+  })
   assert.match(message, /Tea/)
   assert.match(message, /Kebab/)
   assert.match(message, /Сумма заказа: 90 000 UZS/)
   assert.match(message, /Сервис 15%: 13 500 UZS/)
   assert.match(message, /Оплата: Наличные 103 500 UZS/)
+  assert.match(message, /Чистая прибыль · Сегодня: 310 000 UZS/)
   assert.equal((message.match(/Стол: Table 3/g) || []).length, 1)
 })
 
@@ -124,6 +129,7 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
     service_rate_pct: 15,
     total: 163300,
     dailyRevenueTotal: 525300,
+    dailyNetProfitTotal: 337800,
     payment_method: 'terminal',
     completed_by_name: 'Ali & Bob',
     paid_at: '2026-07-08T19:09:00.000Z',
@@ -151,6 +157,7 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
   assert.match(message, /Оплата: Терминал/)
   assert.doesNotMatch(message, /К оплате: 163 300 UZS/)
   assert.match(message, /Доход · Сегодня: 525 300 UZS/)
+  assert.match(message, /Чистая прибыль · Сегодня: 337 800 UZS/)
 })
 
 test('completed dine-in group message starts with table and hides separate type line', () => {

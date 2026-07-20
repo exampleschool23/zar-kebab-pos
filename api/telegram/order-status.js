@@ -1,6 +1,7 @@
 import { json, methodNotAllowed, readJson } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { sendTelegramMessage, TELEGRAM_STATUS_MESSAGES } from './_lib/telegram.js'
+import { getOrdersCostTotal } from '../../src/lib/profit.js'
 import {
   buildCompletedOrderGroupMessage,
   buildCustomerStatusMessage,
@@ -36,16 +37,54 @@ function getRestaurantDayUtcRange(value = new Date()) {
   }
 }
 
-async function loadPaidRevenueForRestaurantDay(supabase, paidAt) {
+function isMissingProfitSchema(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('cost_price') || message.includes('menu_item_costs') || message.includes('schema cache')
+}
+
+async function loadPaidTotalsForRestaurantDay(supabase, paidAt) {
   const { start, end } = getRestaurantDayUtcRange(paidAt)
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('orders')
-    .select('total')
+    .select('total, items:order_items(menu_item_id, quantity, cost_price, status)')
     .eq('payment_status', 'paid')
     .gte('paid_at', start)
     .lt('paid_at', end)
+  if (error && isMissingProfitSchema(error)) {
+    ;({ data, error } = await supabase
+      .from('orders')
+      .select('total, items:order_items(menu_item_id, quantity, status)')
+      .eq('payment_status', 'paid')
+      .gte('paid_at', start)
+      .lt('paid_at', end))
+  }
   if (error) throw error
-  return (data || []).reduce((sum, row) => sum + (Number(row.total) || 0), 0)
+
+  const orders = data || []
+  const revenueTotal = orders.reduce((sum, row) => sum + (Number(row.total) || 0), 0)
+  const menuItemIds = [...new Set(orders
+    .flatMap(order => order.items || [])
+    .filter(item => item.cost_price == null)
+    .map(item => item.menu_item_id)
+    .filter(Boolean))]
+  let menuItemMap = new Map()
+
+  if (menuItemIds.length > 0) {
+    const { data: costs, error: costsError } = await supabase
+      .from('menu_item_costs')
+      .select('menu_item_id, cost_price')
+      .in('menu_item_id', menuItemIds)
+    if (costsError) {
+      if (isMissingProfitSchema(costsError)) return { revenueTotal, netProfitTotal: null }
+      throw costsError
+    }
+    menuItemMap = new Map((costs || []).map(row => [row.menu_item_id, row]))
+  }
+
+  return {
+    revenueTotal,
+    netProfitTotal: Math.round(revenueTotal - getOrdersCostTotal(orders, menuItemMap)),
+  }
 }
 
 async function loadRussianMenuItems(supabase, items = []) {
@@ -121,8 +160,11 @@ export default async function handler(req, res) {
     if (completedOrders.length > 0) {
       const combinedOrder = mergeCompletedOrders(completedOrders)
       const localizedOrder = await withRussianMenuItemNames(supabase, combinedOrder)
-      const dailyRevenueTotal = await loadPaidRevenueForRestaurantDay(supabase, combinedOrder.paid_at || combinedOrder.updated_at || new Date())
-      const text = buildCompletedOrderGroupMessage({ ...localizedOrder, dailyRevenueTotal })
+      const { revenueTotal: dailyRevenueTotal, netProfitTotal: dailyNetProfitTotal } = await loadPaidTotalsForRestaurantDay(
+        supabase,
+        combinedOrder.paid_at || combinedOrder.updated_at || new Date()
+      )
+      const text = buildCompletedOrderGroupMessage({ ...localizedOrder, dailyRevenueTotal, dailyNetProfitTotal })
       for (const chatId of getCompletedOrdersChatIds()) {
         sends.push(
           sendTelegramMessage(chatId, text)

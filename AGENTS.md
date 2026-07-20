@@ -136,6 +136,12 @@ These bugs were recently fixed and are now protected by tests:
    - Admin table deletion verifies full history on demand and again before the database delete; older report receipts load their order/session directly by id.
    - Monthly estimates query only the earliest order date needed for the business-activity boundary instead of relying on global order history.
 
+11. Menu-item cost and profit reporting must preserve historical accuracy without exposing costs publicly.
+   - Protected current costs live in `menu_item_costs`, not in public `menu_items` rows.
+   - `order_items.cost_price` is filled by a database trigger when an item is sold.
+   - Profit is paid revenue minus non-cancelled sold-item cost via `src/lib/profit.js`.
+   - Legacy order items with no snapshot may fall back to the current protected menu cost; explicit zero snapshots remain zero.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -160,6 +166,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/097_daily_bazaar.sql`
   Adds structured daily bazaar purchases/items, an enduring product suggestion catalog, the separate `bazaar` feature permission, historical `products_bazaar` expense backfill, immutable audit snapshots, and idempotent atomic save/delete RPCs that keep exactly one Accounting expense in sync.
+
+- `supabase/098_menu_item_costs_and_profit.sql`
+  Adds protected per-item cost values, immutable order-item cost snapshots, and access policies that keep costs out of public, Telegram-menu, waiter, and cashier catalog reads.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
@@ -242,6 +251,9 @@ Tests use Node's built-in test runner. Current files:
 
 - `tests/bazaar.test.js`
   Daily bazaar quantity, exact-money, filtering, and analytics behavior.
+
+- `tests/profit.test.js`
+  Menu cost snapshots, legacy fallback, cancelled-item exclusion, and net-profit behavior.
 
 Always run:
 

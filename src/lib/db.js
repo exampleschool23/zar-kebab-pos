@@ -297,16 +297,24 @@ async function loadTableZones(dbClient = supabase) {
 }
 
 export async function loadMenuCatalog(dbClient = supabase) {
-  const [categoriesRes, menuItemsRes] = await Promise.all([
+  const [categoriesRes, menuItemsRes, menuItemCostsRes] = await Promise.all([
     dbClient.from('menu_categories').select('*').order('sort_order'),
     dbClient.from('menu_items').select('*').order('sort_order'),
+    dbClient.from('menu_item_costs').select('menu_item_id, cost_price'),
   ])
   if (categoriesRes.error) throw categoriesRes.error
   if (menuItemsRes.error) throw menuItemsRes.error
 
+  const costsByMenuItemId = menuItemCostsRes.error
+    ? new Map()
+    : new Map((menuItemCostsRes.data || []).map(row => [row.menu_item_id, row.cost_price]))
+
   return {
     categories: categoriesRes.data || [],
-    menuItems: menuItemsRes.data || [],
+    menuItems: (menuItemsRes.data || []).map(item => ({
+      ...item,
+      cost_price: costsByMenuItemId.has(item.id) ? costsByMenuItemId.get(item.id) : null,
+    })),
   }
 }
 
@@ -517,6 +525,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_payments' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, scheduleReloadMenu)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_costs' }, scheduleReloadMenu)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, scheduleReloadMenu)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, reloadTables)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'table_zones' }, reloadTableZones)
@@ -1176,17 +1185,30 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'ADD_MENU_ITEM': {
-      const { error } = await supabase.from('menu_items').insert(action.payload)
+      const { cost_price: costPrice, costPrice: _costPriceAlias, ...fields } = action.payload
+      const { error } = await supabase.from('menu_items').insert(fields)
       if (error) throw error
+      const { error: costError } = await supabase.from('menu_item_costs').upsert({
+        menu_item_id: fields.id,
+        cost_price: Math.max(0, Math.round(Number(costPrice ?? _costPriceAlias) || 0)),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'menu_item_id' })
+      if (costError) throw costError
       break
     }
 
     case 'UPDATE_MENU_ITEM': {
-      const { id, ...fields } = action.payload
+      const { id, cost_price: costPrice, costPrice: _costPriceAlias, ...fields } = action.payload
       delete fields.external_id
       delete fields.externalId
       const { error } = await supabase.from('menu_items').update(fields).eq('id', id)
       if (error) throw error
+      const { error: costError } = await supabase.from('menu_item_costs').upsert({
+        menu_item_id: id,
+        cost_price: Math.max(0, Math.round(Number(costPrice ?? _costPriceAlias) || 0)),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'menu_item_id' })
+      if (costError) throw costError
       break
     }
 
