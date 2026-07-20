@@ -138,9 +138,24 @@ These bugs were recently fixed and are now protected by tests:
 
 11. Menu-item cost and profit reporting must preserve historical accuracy without exposing costs publicly.
    - Protected current costs live in `menu_item_costs`, not in public `menu_items` rows.
+   - Protected per-variant costs live in `menu_item_costs.variant_costs`; public `option_groups` contain names and prices only.
    - `order_items.cost_price` is filled by a database trigger when an item is sold.
+   - The trigger snapshots the selected variant cost when configured, otherwise the parent item cost.
    - Profit is paid revenue minus non-cancelled sold-item cost via `src/lib/profit.js`.
-   - Legacy order items with no snapshot may fall back to the current protected menu cost; explicit zero snapshots remain zero.
+   - Product-editor profit margin is `(selling price - real cost) / selling price`; it is a live preview and is not persisted.
+   - Legacy order items with no snapshot may fall back to the selected current protected variant cost, then the parent cost; explicit zero snapshots remain zero.
+
+12. Employee fines must reduce payroll liability without becoming cash expenses.
+   - Fine records live in `employee_salary_fines` and require a non-empty reason.
+   - `getSalaryFineAmount()` and `getSalaryDue()` apply fines from their recorded date and carry excess deductions forward.
+   - Fines appear in employee salary history, but never in Accounting cashflow or expense totals because no money leaves the cafe.
+   - Fine inserts, updates, and deletes are retained in `accounting_record_audit` as `salary_fine` events.
+   - Combined payment, bonus, and fine history sorts by effective date, then by `created_at` newest-first for same-day entries.
+
+13. Accounting summaries must stay readable instead of becoming one dense strip.
+   - The seven top KPIs use four columns on large screens, producing a four-card row followed by a three-card row.
+   - Payment-method balances live in the left Accounting column behind the collapsed `MethodBalancesDisclosure` control.
+   - Do not restore the full-width always-open payment-method balance grid above the Accounting content.
 
 ## Database Migrations
 
@@ -169,6 +184,12 @@ Run migrations in order. Important recent files:
 
 - `supabase/098_menu_item_costs_and_profit.sql`
   Adds protected per-item cost values, immutable order-item cost snapshots, and access policies that keep costs out of public, Telegram-menu, waiter, and cashier catalog reads.
+
+- `supabase/099_employee_salary_fines.sql`
+  Adds reasoned employee salary fines, expenses-feature read/write policies, and immutable accounting audit coverage. Apply it before using the Jarima / Штраф / Fine payroll action.
+
+- `supabase/100_menu_variant_costs_and_accounting_profit.sql`
+  Adds protected per-variant real costs, snapshots selected variant costs on future sales, and lets Accounting-authorized staff read protected costs for net-profit reporting.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
@@ -233,6 +254,22 @@ Expected behavior:
 - Never combine incompatible units in analytics. Grams may normalize to kilograms and millilitres to litres; counts remain separate.
 - Bazaar history loads only on `/admin/bazaar`, never in initial POS hydration.
 
+## Employee Fine Flow
+
+Main files:
+- `src/pages/Salaries.jsx`
+- `src/pages/Employees.jsx`
+- `src/lib/expenses.js`
+- `supabase/099_employee_salary_fines.sql`
+
+Expected behavior:
+- Payment, bonus, and fine remain distinct salary transaction types.
+- A fine requires employee, date, positive amount, and reason.
+- A fine reduces salary due from its recorded date and may carry forward against later accrual.
+- A fine is a payroll deduction, not a payment or Accounting expense.
+- Employee history shows fines as negative red entries with their reason.
+- Only staff with Accounting write access can create or delete fines, and every mutation is audited.
+
 ## Tests
 
 Tests use Node's built-in test runner. Current files:
@@ -254,6 +291,9 @@ Tests use Node's built-in test runner. Current files:
 
 - `tests/profit.test.js`
   Menu cost snapshots, legacy fallback, cancelled-item exclusion, and net-profit behavior.
+
+- `tests/salaryTransactions.test.js`
+  Deterministic newest-first ordering for combined salary payments, bonuses, and fines.
 
 Always run:
 

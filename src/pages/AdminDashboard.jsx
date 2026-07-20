@@ -7,7 +7,6 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
-import { getAllProfiles } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatDateOnly, formatLongDate, formatTime, normalizeDateLang, parseInstantDate } from '../lib/dateFormat'
 import {
@@ -33,7 +32,6 @@ import {
   getDashboardPeriodCafeIncome,
   getDashboardPeriodOrders,
   getDashboardSalesByCategory,
-  getDashboardStaffPerformance,
   isOrderInDashboardPeriod,
 } from '../lib/dashboardAnalytics'
 import AppShell from '../components/AppShell'
@@ -77,8 +75,6 @@ const L = {
     topOrderType:    'Eng yaxshisi',
     bestSelling:    "Eng ko'p sotilgan taomlar",
     noSales:        "Savdo ma'lumotlari yo'q",
-    staffPerf:      'Xodimlar faolligi',
-    noStaff:        "Xodimlar ma'lumoti yo'q",
     recentOrders:   "So'nggi buyurtmalar",
     recentOrdersSub:'Hisoblarni tez chop eting va to‘langan buyurtmalarni ko‘ring',
     needBillCount:  n => `${n} hisob kerak`,
@@ -142,8 +138,6 @@ const L = {
     topOrderType:    'Лучший',
     bestSelling:    'Самые продаваемые',
     noSales:        'Данных о продажах нет',
-    staffPerf:      'Активность персонала',
-    noStaff:        'Данных о персонале нет',
     recentOrders:   'Последние заказы',
     recentOrdersSub:'Быстро печатайте счета и проверяйте оплаченные заказы',
     needBillCount:  n => `${n} требуют счёт`,
@@ -207,8 +201,6 @@ const L = {
     topOrderType:    'Best',
     bestSelling:    'Best-Selling Dishes',
     noSales:        'No sales data yet',
-    staffPerf:      'Staff Performance',
-    noStaff:        'No staff data yet',
     recentOrders:   'Recent Orders',
     recentOrdersSub:'Quickly print bills and review paid orders',
     needBillCount:  n => `${n} Need Bill`,
@@ -615,16 +607,6 @@ const ORDER_TYPE_PERFORMANCE_STYLE = {
   },
 }
 
-const ROLE_BADGE = {
-  owner:       'bg-orange-100 text-[#ff5a00] border-orange-200',
-  admin:       'bg-blue-100 text-blue-700 border-blue-200',
-  viewer:      'bg-indigo-100 text-indigo-700 border-indigo-200',
-}
-
-const ROLE_LABEL = {
-  owner: 'Owner', admin: 'Admin', viewer: 'Viewer',
-}
-
 function DonutChart({ slices }) {
   const total = slices.reduce((s, x) => s + x.value, 0)
   if (total === 0) return (
@@ -724,19 +706,12 @@ export default function AdminDashboard() {
   const displayName = profile?.full_name || state.user?.name || 'Admin'
 
   const [period, setPeriod]           = useState('today')
-  const [staffProfiles, setStaffProfiles] = useState(null)
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
   const [deletingOrderId, setDeletingOrderId] = useState('')
   const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
   const [historyError, setHistoryError] = useState('')
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
-
-  useEffect(() => {
-    getAllProfiles()
-      .then(({ data }) => setStaffProfiles(data || []))
-      .catch(() => setStaffProfiles([]))
-  }, [])
 
   const dashboardHistoryRange = useMemo(() => getDashboardHistoryRange(period), [period])
 
@@ -961,11 +936,6 @@ export default function AdminDashboard() {
   const bestSelling = useMemo(() => {
     return getDashboardBestSelling(periodPaidOrders, menuItemMap)
   }, [periodPaidOrders, menuItemMap])
-
-  // ── Staff performance ─────────────────────────────────────────────────────
-  const staffPerformance = useMemo(() => {
-    return getDashboardStaffPerformance(periodPaidOrders, staffProfiles || [])
-  }, [periodPaidOrders, staffProfiles])
 
   // ── Recent orders: action-needed bills first, paid history second ─────────
   const recentOrderGroups = useMemo(() => {
@@ -1382,73 +1352,6 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Row 4: Staff Performance ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-
-          {/* Staff Performance */}
-          <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-4">
-            <h3 className="font-black text-[#1F2937] text-base mb-3">{l.staffPerf}</h3>
-            {staffPerformance.length === 0 ? (
-              <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noStaff}</p>
-            ) : (
-              <div className="max-h-[310px] divide-y divide-[#F9FAFB] overflow-y-auto pr-1">
-                {staffPerformance.map((s, idx) => {
-                  const maxRev = staffPerformance[0]?.revenue || 1
-                  const pct    = Math.round((s.revenue / maxRev) * 100)
-                  return (
-                    <div key={s.name} className="py-2.5 first:pt-0 last:pb-0">
-                      {/* Avatar + name + role */}
-                      <div className="flex items-center gap-2.5 mb-2">
-                        <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
-                          <span className="text-[#ff5a00] text-sm font-black">{(s.name || '?')[0].toUpperCase()}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-bold text-[#1F2937]">{s.name}</p>
-                            {s.role && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border leading-none ${ROLE_BADGE[s.role] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                                {ROLE_LABEL[s.role] || s.role}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {idx === 0 && (
-                          <span className="text-base flex-shrink-0">🥇</span>
-                        )}
-                      </div>
-                      {/* Stats row */}
-                      <div className="grid grid-cols-3 gap-2 mb-2 ml-9">
-                        <div>
-                          <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase mb-0.5">{l.orders}</p>
-                          <p className="text-sm font-bold text-[#1F2937]">{s.orders}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase mb-0.5">{l.avgOrderShort}</p>
-                          <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatCurrency(s.avgOrder)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase mb-0.5">{l.items}</p>
-                          <p className="text-sm font-bold text-[#1F2937]">{s.items}</p>
-                        </div>
-                      </div>
-                      {/* Revenue + progress */}
-                      <div className="ml-9">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-[10px] text-[#9CA3AF] font-semibold uppercase">{l.revenue}</p>
-                          <p className="text-xs font-black text-[#ff5a00] tabular-nums">{formatCurrency(s.revenue)}</p>
-                        </div>
-                        <div className="h-1.5 bg-[#F3F4F6] rounded-full overflow-hidden">
-                          <div className="h-full bg-[#ff5a00] rounded-full" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
               </div>
             )}
           </div>

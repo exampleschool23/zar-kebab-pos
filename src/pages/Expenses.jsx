@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Banknote,
+  BadgeDollarSign,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   CreditCard,
   HandCoins,
   Plus,
@@ -148,7 +151,7 @@ function isMissingSalaryMigration(error) {
   )
 }
 
-function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], absences = [], profiles = []) {
+function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], fines = [], absences = [], profiles = []) {
   const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
   return rows.map(row => ({
     ...row,
@@ -156,6 +159,7 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
     rates: rates.filter(rate => rate.salary_profile_id === row.id),
     payments: payments.filter(payment => payment.salary_profile_id === row.id),
     bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
+    fines: fines.filter(fine => fine.salary_profile_id === row.id),
     absences: absences.filter(absence => absence.salary_profile_id === row.id),
   }))
 }
@@ -204,6 +208,8 @@ export default function Expenses() {
       income: 'Daromad',
       cafeIncome: 'Kafe daromadi',
       cafeIncomeSub: 'Investor yordamisiz',
+      netProfit: 'Sof foyda',
+      netProfitSub: 'Kafe daromadi minus sotilgan mahsulot tannarxi',
       avgDailyCafeIncome: "Kafe o'rtacha kunlik daromadi",
       periodCafeIncome: 'Tanlangan davr kafe daromadi',
       investorIncome: 'Investor daromadi',
@@ -246,6 +252,7 @@ export default function Expenses() {
       remaining: 'Qoldi',
       investorHistory: 'Investor yordami',
       history: 'Xarajatlar tarixi',
+      more: 'Batafsil',
       seeAll: 'Barchasini ko‘rish',
       showLess: 'Kamroq ko‘rsatish',
       empty: 'Bu davrda xarajat yozilmagan',
@@ -255,7 +262,7 @@ export default function Expenses() {
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
       loadFailed: 'Xarajatlarni yuklab bo‘lmadi.',
       migrationMissing: 'Xarajatlar jadvali hali bazada tayyor emas. Supabase SQL editorida supabase/048_expenses.sql va supabase/059_expense_income_entries.sql migratsiyalarini ishga tushiring.',
-      salaryMigrationMissing: 'Maosh jadvallari yangilanmagan. Supabase SQL editorida supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql va supabase/063_employee_salary_absences.sql migratsiyalarini ishga tushiring.',
+      salaryMigrationMissing: 'Maosh jadvallari yangilanmagan. Supabase SQL editorida employee_salary migratsiyalarini va supabase/099_employee_salary_fines.sql ni ishga tushiring.',
       automaticSalary: 'Maosh to‘lovi',
       delete: 'O‘chirish',
       confirmDelete: 'Tasdiqlash',
@@ -268,6 +275,8 @@ export default function Expenses() {
       income: 'Доход',
       cafeIncome: 'Доход кафе',
       cafeIncomeSub: 'Без поддержки инвестора',
+      netProfit: 'Чистая прибыль',
+      netProfitSub: 'Доход кафе минус себестоимость проданных товаров',
       avgDailyCafeIncome: 'Среднедневной доход кафе',
       periodCafeIncome: 'Доход кафе за выбранный период',
       investorIncome: 'Доход инвестора',
@@ -310,6 +319,7 @@ export default function Expenses() {
       remaining: 'Остаток',
       investorHistory: 'Поддержка инвестора',
       history: 'История расходов',
+      more: 'Подробнее',
       seeAll: 'Показать все',
       showLess: 'Свернуть',
       empty: 'За этот период расходов нет',
@@ -319,7 +329,7 @@ export default function Expenses() {
       saveFailed: 'Не удалось сохранить расход.',
       loadFailed: 'Не удалось загрузить расходы.',
       migrationMissing: 'Таблица расходов ещё не готова в базе. Запустите supabase/048_expenses.sql и supabase/059_expense_income_entries.sql в Supabase SQL Editor.',
-      salaryMigrationMissing: 'Таблицы зарплат не обновлены. Запустите supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql и supabase/063_employee_salary_absences.sql в Supabase SQL Editor.',
+      salaryMigrationMissing: 'Таблицы зарплат не обновлены. Запустите миграции employee_salary и supabase/099_employee_salary_fines.sql в Supabase SQL Editor.',
       automaticSalary: 'Выплата зарплаты',
       delete: 'Удалить',
       confirmDelete: 'Подтвердить',
@@ -332,6 +342,8 @@ export default function Expenses() {
       income: 'Income',
       cafeIncome: 'Cafe income',
       cafeIncomeSub: 'Excludes investor support',
+      netProfit: 'Net Profit',
+      netProfitSub: 'Cafe income minus cost of sold items',
       avgDailyCafeIncome: 'Avg daily cafe income',
       periodCafeIncome: 'Selected period cafe income',
       investorIncome: 'Investor income',
@@ -374,6 +386,7 @@ export default function Expenses() {
       remaining: 'Left',
       investorHistory: 'Investor support',
       history: 'Expense history',
+      more: 'More',
       seeAll: 'See all',
       showLess: 'Show less',
       empty: 'No expenses in this period',
@@ -383,7 +396,7 @@ export default function Expenses() {
       saveFailed: 'Could not save expense.',
       loadFailed: 'Could not load expenses.',
       migrationMissing: 'Expenses table is not ready yet. Run supabase/048_expenses.sql and supabase/059_expense_income_entries.sql in Supabase SQL Editor.',
-      salaryMigrationMissing: 'Salary tables are not up to date. Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql, and supabase/063_employee_salary_absences.sql in Supabase SQL Editor.',
+      salaryMigrationMissing: 'Salary tables are not up to date. Run the employee_salary migrations and supabase/099_employee_salary_fines.sql in Supabase SQL Editor.',
       automaticSalary: 'Salary payment',
       delete: 'Delete',
       confirmDelete: 'Confirm',
@@ -413,6 +426,7 @@ export default function Expenses() {
       loadPagedResult((from, to) => supabase.from('employee_salary_rates').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('employee_salary_payments').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_fines').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
     ])
@@ -440,7 +454,7 @@ export default function Expenses() {
           setPaidHistoryOrders(orderHistoryResult.data || [])
         }
       }),
-      salaryPromise.then(([salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult]) => {
+      salaryPromise.then(([salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult]) => {
         if (requestId !== loadRequestRef.current) return
         const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
         if (salaryError) {
@@ -448,11 +462,13 @@ export default function Expenses() {
           if (isMissingSalaryMigration(salaryError)) setError(l.salaryMigrationMissing)
           return
         }
+        if (salaryFineResult.error) setError(isMissingSalaryMigration(salaryFineResult.error) ? l.salaryMigrationMissing : salaryFineResult.error.message || l.loadFailed)
         setSalaryProfiles(composeSalaryProfiles(
           salaryProfileResult.data || [],
           salaryRateResult.data || [],
           salaryPaymentResult.data || [],
           salaryBonusResult.data || [],
+          salaryFineResult.error ? [] : salaryFineResult.data || [],
           salaryAbsenceResult.data || [],
           teamResult.data || [],
         ))
@@ -497,9 +513,13 @@ export default function Expenses() {
     () => mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo),
     [paidHistoryOrders, state.orders, dateFrom, dateTo]
   )
+  const menuItemMap = useMemo(
+    () => Object.fromEntries(state.menuItems.map(item => [item.id, item])),
+    [state.menuItems]
+  )
   const accountingSummary = useMemo(
-    () => getAccountingPageSummary(accountingOrders, filteredExpenses, dateFrom, dateTo),
-    [accountingOrders, filteredExpenses, dateFrom, dateTo]
+    () => getAccountingPageSummary(accountingOrders, filteredExpenses, dateFrom, dateTo, menuItemMap),
+    [accountingOrders, filteredExpenses, dateFrom, dateTo, menuItemMap]
   )
   const {
     cafeIncome,
@@ -507,6 +527,7 @@ export default function Expenses() {
     expenseSummary: summary,
     cashflow,
     netIncome,
+    netProfit,
     investorSupportTotal,
     otherIncomeTotal,
   } = accountingSummary
@@ -642,8 +663,9 @@ export default function Expenses() {
             </button>
           </div>
 
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi icon={WalletCards} label={l.cafeIncome} value={formatCurrency(cafeIncome)} sub={l.cafeIncomeSub} tone="green" />
+            <Kpi icon={BadgeDollarSign} label={l.netProfit} value={formatCurrency(netProfit)} sub={l.netProfitSub} tone={netProfit >= 0 ? 'green' : 'red'} />
             <Kpi
               icon={CalendarDays}
               label={l.avgDailyCafeIncome}
@@ -663,48 +685,6 @@ export default function Expenses() {
             <Kpi icon={Users} label={l.salaryDue} value={formatCurrency(totalSalaryDue)} tone={totalSalaryDue > 0 ? 'orange' : 'green'} />
           </div>
 
-          <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-black text-[#1F2937]">{l.methodBalances}</h2>
-                <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-[#9CA3AF]">{l.methodBalancesHint}</p>
-              </div>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {cashflow.rows.map(row => {
-                const Icon = methodIcon(row.method)
-                return (
-                  <div key={row.method} className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-3.5">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-orange-50 text-[#ff5a00]">
-                        <Icon size={15} />
-                      </span>
-                      <span className="min-w-0 truncate text-sm font-black text-[#1F2937]">{expensePaymentMethodLabel(row.method, lang)}</span>
-                    </div>
-                    <div className="mt-3 rounded-xl border border-[#EEF0F3] bg-white px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.remaining}</span>
-                        <span className={`text-right text-xl font-black leading-tight tabular-nums ${row.left >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(row.left)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <div className="min-w-0 rounded-lg bg-green-50 px-2.5 py-2 text-green-700">
-                        <span className="block text-[10px] font-black uppercase tracking-wide text-green-500">{l.incomeIn}</span>
-                        <span className="mt-1 block break-words text-sm font-black leading-tight tabular-nums">{formatCurrency(row.income)}</span>
-                      </div>
-                      <div className="min-w-0 rounded-lg bg-orange-50 px-2.5 py-2 text-[#ff5a00]">
-                        <span className="block text-[10px] font-black uppercase tracking-wide text-orange-400">{l.spentOut}</span>
-                        <span className="mt-1 block break-words text-sm font-black leading-tight tabular-nums">{formatCurrency(row.expenses)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
-
           {error && (
             <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
               {error}
@@ -718,6 +698,7 @@ export default function Expenses() {
 
           <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
             <div className="space-y-5">
+              <MethodBalancesDisclosure rows={cashflow.rows} lang={lang} labels={l} />
               <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <h2 className="text-base font-black text-[#1F2937]">{form.entry_type === 'income' ? l.addIncome : l.add}</h2>
@@ -969,6 +950,67 @@ function ExpenseCategoryChart({ title, rows, total, lang }) {
                   </div>
                 </div>
                 <span className="text-sm font-black text-[#1F2937] sm:text-right">{formatCurrency(amount)}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function MethodBalancesDisclosure({ rows, lang, labels }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-black text-[#1F2937]">{labels.methodBalances}</h2>
+          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF]">{labels.methodBalancesHint}</p>
+        </div>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="accounting-method-balances"
+          onClick={() => setOpen(current => !current)}
+          className="inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-3 text-xs font-black text-[#ff5a00] transition-colors hover:bg-orange-100"
+        >
+          {open ? labels.showLess : labels.more}
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+      </div>
+
+      {open && (
+        <div id="accounting-method-balances" className="mt-4 space-y-3">
+          {rows.map(row => {
+            const Icon = methodIcon(row.method)
+            return (
+              <div key={row.method} className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-orange-50 text-[#ff5a00]">
+                      <Icon size={15} />
+                    </span>
+                    <span className="truncate text-sm font-black text-[#1F2937]">{expensePaymentMethodLabel(row.method, lang)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-[9px] font-black uppercase tracking-wide text-[#9CA3AF]">{labels.remaining}</span>
+                    <span className={`mt-0.5 block text-base font-black leading-tight tabular-nums ${row.left >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(row.left)}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className="min-w-0 rounded-lg bg-green-50 px-2.5 py-2 text-green-700">
+                    <span className="block text-[9px] font-black uppercase tracking-wide text-green-500">{labels.incomeIn}</span>
+                    <span className="mt-1 block break-words text-xs font-black leading-tight tabular-nums">{formatCurrency(row.income)}</span>
+                  </div>
+                  <div className="min-w-0 rounded-lg bg-orange-50 px-2.5 py-2 text-[#ff5a00]">
+                    <span className="block text-[9px] font-black uppercase tracking-wide text-orange-400">{labels.spentOut}</span>
+                    <span className="mt-1 block break-words text-xs font-black leading-tight tabular-nums">{formatCurrency(row.expenses)}</span>
+                  </div>
+                </div>
               </div>
             )
           })}

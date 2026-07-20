@@ -17,6 +17,7 @@ const logicalFeatureAccessSql = fs.readFileSync(new URL('../supabase/092_logical
 const pendingRequestLifecycleSql = fs.readFileSync(new URL('../supabase/093_team_pending_request_lifecycle.sql', import.meta.url), 'utf8')
 const adminCashierRecallSql = fs.readFileSync(new URL('../supabase/094_admin_cashier_recall_access.sql', import.meta.url), 'utf8')
 const readOnlyMenuCatalogSql = fs.readFileSync(new URL('../supabase/095_read_only_menu_catalog_access.sql', import.meta.url), 'utf8')
+const salaryFinesSql = fs.readFileSync(new URL('../supabase/099_employee_salary_fines.sql', import.meta.url), 'utf8')
 
 test('role-aware write migration removes broad menu and zone writes', () => {
   assert.match(sql, /drop policy if exists "staff_all_categories"/)
@@ -117,6 +118,10 @@ test('accounting write policies require editor role plus expenses feature access
   assert.match(fourRoleFeatureAccessSql, /feature_access_write_employee_salary_payments/)
   assert.match(fourRoleFeatureAccessSql, /feature_access_write_employee_salary_bonuses/)
   assert.match(fourRoleFeatureAccessSql, /feature_access_write_employee_salary_absences/)
+  assert.match(salaryFinesSql, /feature_access_read_employee_salary_fines/)
+  assert.match(salaryFinesSql, /feature_access_write_employee_salary_fines/)
+  assert.match(salaryFinesSql, /public\.current_staff_can_access\('expenses'\)/)
+  assert.match(salaryFinesSql, /public\.current_staff_can_write\('expenses'\)/)
 })
 
 test('paid order deletion can be granted as explicit feature access', () => {

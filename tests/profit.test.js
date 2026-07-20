@@ -7,7 +7,20 @@ import {
   getOrderNetProfit,
   getOrdersCostTotal,
   getOrdersNetProfit,
+  getSaleProfitSummary,
 } from '../src/lib/profit.js'
+
+test('sale profit summary reports unit gain and selling-price margin percentage', () => {
+  assert.deepEqual(getSaleProfitSummary(25_000, 10_000), {
+    profit: 15_000,
+    marginPct: 60,
+  })
+  assert.deepEqual(getSaleProfitSummary(10_000, 12_500), {
+    profit: -2_500,
+    marginPct: -25,
+  })
+  assert.equal(getSaleProfitSummary(0, 0), null)
+})
 
 test('net profit subtracts immutable sold-item cost snapshots from paid revenue', () => {
   const order = {
@@ -35,6 +48,45 @@ test('legacy order items fall back to the protected current menu cost', () => {
   assert.equal(getOrderItemCostPrice(legacyItem, menuItemMap), 21_000)
   assert.equal(getOrderCostTotal(order, menuItemMap), 63_000)
   assert.equal(getOrderNetProfit(order, menuItemMap), 36_999)
+})
+
+test('legacy variant sales use the selected protected variant cost before the parent cost', () => {
+  const menuItemMap = {
+    qurutoba: {
+      id: 'qurutoba',
+      cost_price: 40_000,
+      variant_costs: {
+        one_person: 38_000,
+        two_three_people: 72_000,
+      },
+    },
+  }
+  const selectedVariant = {
+    menu_item_id: 'qurutoba',
+    selected_options: { variants: 'two_three_people' },
+    cost_price: null,
+  }
+  const unknownVariant = {
+    menu_item_id: 'qurutoba',
+    selected_options: { variants: 'four_five_people' },
+    cost_price: null,
+  }
+
+  assert.equal(getOrderItemCostPrice(selectedVariant, menuItemMap), 72_000)
+  assert.equal(getOrderItemCostPrice(unknownVariant, menuItemMap), 40_000)
+})
+
+test('immutable sale snapshots still win after a variant cost changes', () => {
+  const item = {
+    menu_item_id: 'qurutoba',
+    selected_options: { variants: 'two_three_people' },
+    cost_price: 65_000,
+  }
+  const menuItemMap = {
+    qurutoba: { cost_price: 40_000, variant_costs: { two_three_people: 72_000 } },
+  }
+
+  assert.equal(getOrderItemCostPrice(item, menuItemMap), 65_000)
 })
 
 test('explicit zero snapshots stay historical and cancelled items do not reduce profit', () => {

@@ -83,6 +83,25 @@ function isMissingTableReservationColumn(error) {
   )
 }
 
+function isMissingVariantCostsColumn(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('variant_costs') && (
+    message.includes('schema cache') ||
+    message.includes('column') ||
+    message.includes('42703')
+  )
+}
+
+function normalizeVariantCosts(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(Object.entries(value).flatMap(([variantId, rawCost]) => {
+    const id = String(variantId || '').trim()
+    const cost = Number(rawCost)
+    if (!id || !Number.isFinite(cost)) return []
+    return [[id, Math.max(0, Math.round(cost))]]
+  }))
+}
+
 async function updateRestaurantTableStatus(tableId, fields, fallbackFields = null) {
   let { data, error } = await supabase
     .from('restaurant_tables')
@@ -297,24 +316,33 @@ async function loadTableZones(dbClient = supabase) {
 }
 
 export async function loadMenuCatalog(dbClient = supabase) {
-  const [categoriesRes, menuItemsRes, menuItemCostsRes] = await Promise.all([
+  const [categoriesRes, menuItemsRes, initialMenuItemCostsRes] = await Promise.all([
     dbClient.from('menu_categories').select('*').order('sort_order'),
     dbClient.from('menu_items').select('*').order('sort_order'),
-    dbClient.from('menu_item_costs').select('menu_item_id, cost_price'),
+    dbClient.from('menu_item_costs').select('menu_item_id, cost_price, variant_costs'),
   ])
   if (categoriesRes.error) throw categoriesRes.error
   if (menuItemsRes.error) throw menuItemsRes.error
 
+  let menuItemCostsRes = initialMenuItemCostsRes
+  if (isMissingVariantCostsColumn(menuItemCostsRes.error)) {
+    menuItemCostsRes = await dbClient.from('menu_item_costs').select('menu_item_id, cost_price')
+  }
+
   const costsByMenuItemId = menuItemCostsRes.error
     ? new Map()
-    : new Map((menuItemCostsRes.data || []).map(row => [row.menu_item_id, row.cost_price]))
+    : new Map((menuItemCostsRes.data || []).map(row => [row.menu_item_id, row]))
 
   return {
     categories: categoriesRes.data || [],
-    menuItems: (menuItemsRes.data || []).map(item => ({
-      ...item,
-      cost_price: costsByMenuItemId.has(item.id) ? costsByMenuItemId.get(item.id) : null,
-    })),
+    menuItems: (menuItemsRes.data || []).map(item => {
+      const protectedCosts = costsByMenuItemId.get(item.id)
+      return {
+        ...item,
+        cost_price: protectedCosts ? protectedCosts.cost_price : null,
+        variant_costs: normalizeVariantCosts(protectedCosts?.variant_costs),
+      }
+    }),
   }
 }
 
@@ -1185,12 +1213,19 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'ADD_MENU_ITEM': {
-      const { cost_price: costPrice, costPrice: _costPriceAlias, ...fields } = action.payload
+      const {
+        cost_price: costPrice,
+        costPrice: _costPriceAlias,
+        variant_costs: variantCosts,
+        variantCosts: _variantCostsAlias,
+        ...fields
+      } = action.payload
       const { error } = await supabase.from('menu_items').insert(fields)
       if (error) throw error
       const { error: costError } = await supabase.from('menu_item_costs').upsert({
         menu_item_id: fields.id,
         cost_price: Math.max(0, Math.round(Number(costPrice ?? _costPriceAlias) || 0)),
+        variant_costs: normalizeVariantCosts(variantCosts ?? _variantCostsAlias),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'menu_item_id' })
       if (costError) throw costError
@@ -1198,7 +1233,14 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'UPDATE_MENU_ITEM': {
-      const { id, cost_price: costPrice, costPrice: _costPriceAlias, ...fields } = action.payload
+      const {
+        id,
+        cost_price: costPrice,
+        costPrice: _costPriceAlias,
+        variant_costs: variantCosts,
+        variantCosts: _variantCostsAlias,
+        ...fields
+      } = action.payload
       delete fields.external_id
       delete fields.externalId
       const { error } = await supabase.from('menu_items').update(fields).eq('id', id)
@@ -1206,6 +1248,7 @@ export async function writeToSupabase(action, state, options = {}) {
       const { error: costError } = await supabase.from('menu_item_costs').upsert({
         menu_item_id: id,
         cost_price: Math.max(0, Math.round(Number(costPrice ?? _costPriceAlias) || 0)),
+        variant_costs: normalizeVariantCosts(variantCosts ?? _variantCostsAlias),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'menu_item_id' })
       if (costError) throw costError

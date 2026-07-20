@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarX2, Loader2, Plus, Save, Users, WalletCards } from 'lucide-react'
+import { ArrowLeft, BadgeMinus, CalendarX2, Loader2, Plus, Save, Users, WalletCards } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -21,6 +21,7 @@ import {
   normalizeExpenseAmount,
 } from '../lib/expenses'
 import { todayExpenseDate } from '../lib/expenses'
+import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
 
 const FIELD = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none focus:border-[#ff5a00]'
 const PAGE_SIZE = 12
@@ -37,7 +38,7 @@ function isMissingSalaryMigration(error) {
   )
 }
 
-function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], absences = [], profiles = []) {
+function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], fines = [], absences = [], profiles = []) {
   const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
   return rows.map(row => ({
     ...row,
@@ -51,6 +52,9 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
     bonuses: bonuses
       .filter(bonus => bonus.salary_profile_id === row.id)
       .sort((a, b) => b.bonus_date.localeCompare(a.bonus_date)),
+    fines: fines
+      .filter(fine => fine.salary_profile_id === row.id)
+      .sort((a, b) => b.fine_date.localeCompare(a.fine_date)),
     absences: absences
       .filter(absence => absence.salary_profile_id === row.id)
       .sort((a, b) => b.absence_date.localeCompare(a.absence_date)),
@@ -93,6 +97,7 @@ function buildTransactionHistoryForSourceGuard(salaryProfile, lang) {
       id: payment.id,
       entryType: 'payment',
       date: payment.paid_date,
+      createdAt: payment.created_at,
       amount: payment.amount,
       detail: payment.note || expensePaymentMethodLabel(payment.payment_method, lang),
       row: payment,
@@ -101,12 +106,22 @@ function buildTransactionHistoryForSourceGuard(salaryProfile, lang) {
       id: bonus.id,
       entryType: 'bonus',
       date: bonus.bonus_date,
+      createdAt: bonus.created_at,
       amount: bonus.amount,
       detail: bonus.note || expensePaymentMethodLabel(bonus.payment_method, lang),
       row: bonus,
     })),
+    ...(salaryProfile?.fines || []).map(fine => ({
+      id: fine.id,
+      entryType: 'fine',
+      date: fine.fine_date,
+      createdAt: fine.created_at,
+      amount: fine.amount,
+      detail: fine.reason,
+      row: fine,
+    })),
   ]
-  return transactionHistory.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+  return transactionHistory.sort(compareSalaryTransactionsNewestFirst)
 }
 
 export default function Salaries() {
@@ -138,13 +153,17 @@ export default function Salaries() {
       changeSalary: 'Maoshni o‘zgartirish',
       selectEmployee: 'Xodimni tanlang',
       recordPayment: 'To‘lovni yozish',
-      paymentBonus: 'To‘lov / bonus yozish',
+      paymentBonus: 'To‘lov / bonus / jarima yozish',
       paymentEntry: 'To‘lov',
       bonusEntry: 'Bonus',
+      fineEntry: 'Jarima',
       bonus: 'Bonus',
       addBonus: 'Bonus qo‘shish',
+      addFine: 'Jarima yozish',
       paidDate: 'To‘lov sanasi',
       bonusDate: 'Bonus sanasi',
+      fineDate: 'Jarima sanasi',
+      fineReason: 'Jarima sababi',
       absence: 'Kelmagan kun',
       markAbsence: 'Kelmagan kunni belgilash',
       absenceDate: 'Kelmagan sana',
@@ -159,16 +178,17 @@ export default function Salaries() {
       history: 'Maosh tarixi',
       historyBtn: 'Tarix',
       payments: 'To‘lovlar',
-      paymentHistory: 'To‘lovlar / bonuslar',
+      paymentHistory: 'To‘lovlar / bonuslar / jarimalar',
       paymentLabel: 'To‘lov',
       bonusLabel: 'Bonus',
+      fineLabel: 'Jarima',
       active: 'Faol',
       inactive: 'Nofaol',
       deactivate: 'Faolsizlantirish',
       reactivate: 'Qayta yoqish',
       page: 'Sahifa',
       empty: 'Maosh sozlamalari yo‘q',
-      migration: 'Maosh jadvallari yangilanmagan. supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql, supabase/060_employee_salary_manual_names.sql va supabase/063_employee_salary_absences.sql migratsiyalarini ishga tushiring.',
+      migration: 'Maosh jadvallari yangilanmagan. supabase/054_employee_salary_profiles.sql dan supabase/063_employee_salary_absences.sql gacha va supabase/099_employee_salary_fines.sql migratsiyalarini ishga tushiring.',
       readOnly: 'Bu sahifa faqat egasi uchun.',
     },
     ru: {
@@ -190,13 +210,17 @@ export default function Salaries() {
       changeSalary: 'Изменить зарплату',
       selectEmployee: 'Выберите сотрудника',
       recordPayment: 'Записать выплату',
-      paymentBonus: 'Записать выплату / бонус',
+      paymentBonus: 'Записать выплату / бонус / штраф',
       paymentEntry: 'Выплата',
       bonusEntry: 'Бонус',
+      fineEntry: 'Штраф',
       bonus: 'Бонус',
       addBonus: 'Добавить бонус',
+      addFine: 'Записать штраф',
       paidDate: 'Дата выплаты',
       bonusDate: 'Дата бонуса',
+      fineDate: 'Дата штрафа',
+      fineReason: 'Причина штрафа',
       absence: 'Отсутствие',
       markAbsence: 'Отметить отсутствие',
       absenceDate: 'Дата отсутствия',
@@ -211,16 +235,17 @@ export default function Salaries() {
       history: 'История зарплаты',
       historyBtn: 'История',
       payments: 'Выплаты',
-      paymentHistory: 'Выплаты / бонусы',
+      paymentHistory: 'Выплаты / бонусы / штрафы',
       paymentLabel: 'Выплата',
       bonusLabel: 'Бонус',
+      fineLabel: 'Штраф',
       active: 'Активен',
       inactive: 'Неактивен',
       deactivate: 'Деактивировать',
       reactivate: 'Включить снова',
       page: 'Страница',
       empty: 'Настроек зарплаты пока нет',
-      migration: 'Таблицы зарплат не обновлены. Запустите supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql, supabase/060_employee_salary_manual_names.sql и supabase/063_employee_salary_absences.sql.',
+      migration: 'Таблицы зарплат не обновлены. Запустите миграции с supabase/054_employee_salary_profiles.sql по supabase/063_employee_salary_absences.sql и supabase/099_employee_salary_fines.sql.',
       readOnly: 'Эта страница доступна только владельцу.',
     },
     en: {
@@ -242,13 +267,17 @@ export default function Salaries() {
       changeSalary: 'Change salary',
       selectEmployee: 'Select employee',
       recordPayment: 'Record payment',
-      paymentBonus: 'Record payment / bonus',
+      paymentBonus: 'Record payment / bonus / fine',
       paymentEntry: 'Payment',
       bonusEntry: 'Bonus',
+      fineEntry: 'Fine',
       bonus: 'Bonus',
       addBonus: 'Add bonus',
+      addFine: 'Record fine',
       paidDate: 'Paid date',
       bonusDate: 'Bonus date',
+      fineDate: 'Fine date',
+      fineReason: 'Reason for fine',
       absence: 'Absence',
       markAbsence: 'Mark absence',
       absenceDate: 'Absent date',
@@ -263,16 +292,17 @@ export default function Salaries() {
       history: 'Salary history',
       historyBtn: 'History',
       payments: 'Payments',
-      paymentHistory: 'Payments / bonuses',
+      paymentHistory: 'Payments / bonuses / fines',
       paymentLabel: 'Payment',
       bonusLabel: 'Bonus',
+      fineLabel: 'Fine',
       active: 'Active',
       inactive: 'Inactive',
       deactivate: 'Deactivate',
       reactivate: 'Reactivate',
       page: 'Page',
       empty: 'No salary settings yet',
-      migration: 'Salary tables are not up to date. Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/056_employee_salary_profile_end_date.sql, supabase/060_employee_salary_manual_names.sql, and supabase/063_employee_salary_absences.sql.',
+      migration: 'Salary tables are not up to date. Run migrations from supabase/054_employee_salary_profiles.sql through supabase/063_employee_salary_absences.sql, plus supabase/099_employee_salary_fines.sql.',
       readOnly: 'Only the owner can manage this page.',
     },
   }
@@ -316,12 +346,13 @@ export default function Salaries() {
   async function loadData() {
     setLoading(true)
     setError('')
-    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, absenceRes] = await Promise.all([
+    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
       supabase.from('employee_salary_profiles').select('*').order('employee_name'),
       supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
       supabase.from('employee_salary_payments').select('*').order('paid_date', { ascending: false }),
       supabase.from('employee_salary_bonuses').select('*').order('bonus_date', { ascending: false }),
+      supabase.from('employee_salary_fines').select('*').order('fine_date', { ascending: false }),
       supabase.from('employee_salary_absences').select('*').order('absence_date', { ascending: false }),
     ])
     if (profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error) {
@@ -329,8 +360,9 @@ export default function Salaries() {
       setError(isMissingSalaryMigration(err) ? l.migration : err.message)
       setSalaryProfiles([])
     } else {
+      if (fineRes.error) setError(isMissingSalaryMigration(fineRes.error) ? l.migration : fineRes.error.message)
       const teamRows = teamRes.data || []
-      setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], absenceRes.data || [], teamRows)
+      setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], fineRes.error ? [] : fineRes.data || [], absenceRes.data || [], teamRows)
         .filter(salaryProfile => !salaryProfile.deleted_at))
     }
     setLoading(false)
@@ -453,29 +485,45 @@ export default function Salaries() {
     const paidDate = transactionForm.paid_date || today
     const due = getSalaryDue(salaryProfile, paidDate)
     const amount = normalizeExpenseAmount(transactionForm.amount || due)
-    const isBonus = transactionForm.entry_type === 'bonus'
-    if (!canManage || amount <= 0 || !canRecordSalaryTransaction(salaryProfile, transactionForm.entry_type, paidDate)) return
-    setSaving(isBonus ? 'bonus-create' : 'payment-create')
-    const { error: writeError } = isBonus
-      ? await supabase.from('employee_salary_bonuses').insert({
-          salary_profile_id: salaryProfile.id,
-          bonus_date: paidDate,
-          amount,
-          payment_method: transactionForm.payment_method || salaryProfile.payment_method || 'cash',
-          note: transactionForm.note || '',
-          created_by: profile?.id || null,
-          created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
-        })
-      : await supabase.from('employee_salary_payments').insert({
-          salary_profile_id: salaryProfile.id,
-          paid_date: paidDate,
-          amount,
-          payment_method: transactionForm.payment_method || salaryProfile.payment_method || 'cash',
-          note: transactionForm.note || '',
-          created_by: profile?.id || null,
-          created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
-        })
+    const entryType = transactionForm.entry_type
+    const isBonus = entryType === 'bonus'
+    const isFine = entryType === 'fine'
+    const reason = String(transactionForm.note || '').trim()
+    if (!canManage || amount <= 0 || (isFine && !reason) || !canRecordSalaryTransaction(salaryProfile, entryType, paidDate)) return
+    setSaving(`${entryType}-create`)
+    let writeResult
+    if (isFine) {
+      writeResult = await supabase.from('employee_salary_fines').insert({
+        salary_profile_id: salaryProfile.id,
+        fine_date: paidDate,
+        amount,
+        reason,
+        created_by: profile?.id || null,
+        created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
+      })
+    } else if (isBonus) {
+      writeResult = await supabase.from('employee_salary_bonuses').insert({
+        salary_profile_id: salaryProfile.id,
+        bonus_date: paidDate,
+        amount,
+        payment_method: transactionForm.payment_method || salaryProfile.payment_method || 'cash',
+        note: transactionForm.note || '',
+        created_by: profile?.id || null,
+        created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
+      })
+    } else {
+      writeResult = await supabase.from('employee_salary_payments').insert({
+        salary_profile_id: salaryProfile.id,
+        paid_date: paidDate,
+        amount,
+        payment_method: transactionForm.payment_method || salaryProfile.payment_method || 'cash',
+        note: transactionForm.note || '',
+        created_by: profile?.id || null,
+        created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
+      })
+    }
     setSaving('')
+    const { error: writeError } = writeResult
     if (writeError) {
       setError(writeError.message)
       return
@@ -557,6 +605,24 @@ export default function Salaries() {
     }
     setSaving(key)
     const { error: deleteError } = await supabase.from('employee_salary_bonuses').delete().eq('id', bonus.id)
+    setSaving('')
+    setConfirmActionKey('')
+    if (deleteError) {
+      setError(deleteError.message)
+      return
+    }
+    await loadData()
+  }
+
+  async function deleteFine(fine) {
+    if (!canManage || !fine?.id) return
+    const key = `fine-delete-${fine.id}`
+    if (confirmActionKey !== key) {
+      setConfirmActionKey(key)
+      return
+    }
+    setSaving(key)
+    const { error: deleteError } = await supabase.from('employee_salary_fines').delete().eq('id', fine.id)
     setSaving('')
     setConfirmActionKey('')
     if (deleteError) {
@@ -763,9 +829,10 @@ export default function Salaries() {
               <div className="space-y-4">
                 <div className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-4">
                   <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.paymentBonus}</h2>
-                  <div className="mb-3 grid grid-cols-2 gap-2">
-                    {['payment', 'bonus'].map(entryType => {
+                  <div className="mb-3 grid grid-cols-3 gap-2">
+                    {['payment', 'bonus', 'fine'].map(entryType => {
                       const active = transactionForm.entry_type === entryType
+                      const isFine = entryType === 'fine'
                       return (
                         <button
                           key={entryType}
@@ -781,13 +848,18 @@ export default function Salaries() {
                               amount: keepSelected && entryType === 'payment'
                                 ? String(getSalaryDue(selectedProfile, paidDate) || '')
                                 : '',
+                              note: '',
                             }
                           })}
-                          className={`flex h-11 items-center justify-center rounded-xl border text-sm font-black ${
-                            active ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'
+                          className={`flex h-11 items-center justify-center rounded-xl border text-xs font-black sm:text-sm ${
+                            active && isFine
+                              ? 'border-red-500 bg-red-50 text-red-600'
+                              : active
+                                ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]'
+                                : 'border-[#E5E7EB] bg-white text-[#6B7280]'
                           }`}
                         >
-                          {entryType === 'bonus' ? l.bonusEntry : l.paymentEntry}
+                          {isFine ? l.fineEntry : entryType === 'bonus' ? l.bonusEntry : l.paymentEntry}
                         </button>
                       )
                     })}
@@ -822,7 +894,7 @@ export default function Salaries() {
                         })}
                       </select>
                     </Field>
-                    <Field label={transactionForm.entry_type === 'bonus' ? l.bonusDate : l.paidDate}>
+                    <Field label={transactionForm.entry_type === 'fine' ? l.fineDate : transactionForm.entry_type === 'bonus' ? l.bonusDate : l.paidDate}>
                       <DateInput
                         value={transactionForm.paid_date}
                         lang={lang}
@@ -851,24 +923,44 @@ export default function Salaries() {
                         disabled={!canManage}
                       />
                     </Field>
-                    <Field label={l.method}>
-                      <select
-                        value={transactionForm.payment_method}
-                        onChange={event => setTransactionForm(current => ({ ...current, payment_method: event.target.value }))}
-                        className={FIELD}
-                        disabled={!canManage}
-                      >
-                        {EXPENSE_PAYMENT_METHODS.map(method => <option key={method} value={method}>{expensePaymentMethodLabel(method, lang)}</option>)}
-                      </select>
-                    </Field>
+                    {transactionForm.entry_type !== 'fine' && (
+                      <Field label={l.method}>
+                        <select
+                          value={transactionForm.payment_method}
+                          onChange={event => setTransactionForm(current => ({ ...current, payment_method: event.target.value }))}
+                          className={FIELD}
+                          disabled={!canManage}
+                        >
+                          {EXPENSE_PAYMENT_METHODS.map(method => <option key={method} value={method}>{expensePaymentMethodLabel(method, lang)}</option>)}
+                        </select>
+                      </Field>
+                    )}
+                    {transactionForm.entry_type === 'fine' && (
+                      <Field label={l.fineReason}>
+                        <input
+                          type="text"
+                          value={transactionForm.note}
+                          onChange={event => setTransactionForm(current => ({ ...current, note: event.target.value }))}
+                          className={FIELD}
+                          disabled={!canManage}
+                          required
+                        />
+                      </Field>
+                    )}
                     <button
                       type="button"
                       onClick={addTransaction}
-                      disabled={!canManage || !transactionForm.salary_profile_id || (saving !== '' && (saving === 'payment-create' || saving === 'bonus-create'))}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white disabled:bg-gray-200"
+                      disabled={!canManage || !transactionForm.salary_profile_id || normalizeExpenseAmount(transactionForm.amount) <= 0 || (transactionForm.entry_type === 'fine' && !transactionForm.note.trim()) || (saving !== '' && ['payment-create', 'bonus-create', 'fine-create'].includes(saving))}
+                      className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-black text-white disabled:bg-gray-200 ${transactionForm.entry_type === 'fine' ? 'bg-red-600' : 'bg-[#ff5a00]'}`}
                     >
-                      {(saving === 'payment-create' || saving === 'bonus-create') ? <Loader2 size={16} className="animate-spin" /> : transactionForm.entry_type === 'bonus' ? <Plus size={15} /> : <WalletCards size={15} />}
-                      {transactionForm.entry_type === 'bonus' ? l.addBonus : l.recordPayment}
+                      {['payment-create', 'bonus-create', 'fine-create'].includes(saving)
+                        ? <Loader2 size={16} className="animate-spin" />
+                        : transactionForm.entry_type === 'fine'
+                          ? <BadgeMinus size={15} />
+                          : transactionForm.entry_type === 'bonus'
+                            ? <Plus size={15} />
+                            : <WalletCards size={15} />}
+                      {transactionForm.entry_type === 'fine' ? l.addFine : transactionForm.entry_type === 'bonus' ? l.addBonus : l.recordPayment}
                     </button>
                   </div>
                 </div>

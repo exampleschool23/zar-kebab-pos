@@ -82,8 +82,10 @@ create table if not exists public.menu_items (
 create table if not exists public.menu_item_costs (
   menu_item_id text primary key references public.menu_items(id) on delete cascade,
   cost_price integer not null default 0,
+  variant_costs jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now(),
-  constraint menu_item_costs_cost_price_nonnegative check (cost_price >= 0)
+  constraint menu_item_costs_cost_price_nonnegative check (cost_price >= 0),
+  constraint menu_item_costs_variant_costs_object check (jsonb_typeof(variant_costs) = 'object')
 );
 
 -- 4. Orders

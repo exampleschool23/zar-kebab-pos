@@ -51,8 +51,12 @@ test('Accounting quick ranges cover today, seven days, month, previous month, an
 
 test('Accounting page composes cafe income, daily average, external income, expenses, net income, and cashflow', () => {
   const orders = [
-    paidOrder('paid-cash', '2026-07-10', 1_000, 'cash'),
-    paidOrder('paid-card', '2026-07-11', 500, 'card'),
+    paidOrder('paid-cash', '2026-07-10', 1_000, 'cash', {
+      items: [{ menu_item_id: 'kebab', quantity: 1, price: 1_000, cost_price: 300, status: 'served' }],
+    }),
+    paidOrder('paid-card', '2026-07-11', 500, 'card', {
+      items: [{ menu_item_id: 'tea', quantity: 1, price: 500, cost_price: 100, status: 'served' }],
+    }),
     paidOrder('outside', '2026-06-30', 9_000, 'cash'),
     paidOrder('unpaid', '2026-07-10', 7_000, 'cash', { payment_status: 'unpaid', status: 'needs_bill', paid_at: null, created_at: '2026-07-10T12:00:00+05:00' }),
   ]
@@ -68,6 +72,7 @@ test('Accounting page composes cafe income, daily average, external income, expe
   const summary = getAccountingPageSummary(orders, entries, '2026-07-01', '2026-07-14')
 
   assert.equal(summary.cafeIncome, 1_500)
+  assert.equal(summary.netProfit, 1_100)
   assert.equal(summary.cafeIncomeSummary.dayCount, 14)
   assert.equal(summary.cafeIncomeSummary.salesDayCount, 2)
   assert.equal(summary.cafeIncomeSummary.averageDaily, 107)

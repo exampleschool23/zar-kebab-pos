@@ -398,17 +398,25 @@ export function getSalaryPaidAmount(salaryProfile, dateTo = todayExpenseDate()) 
   }, 0)
 }
 
+export function getSalaryFineAmount(salaryProfile, dateTo = todayExpenseDate()) {
+  return (salaryProfile?.fines || []).reduce((sum, fine) => {
+    const fineDate = String(fine?.fine_date || '').slice(0, 10)
+    if (fineDate && fineDate > dateTo) return sum
+    return sum + normalizeExpenseAmount(fine?.amount)
+  }, 0)
+}
+
 export function getSalaryDue(salaryProfile, dateTo = todayExpenseDate()) {
   const joinedAt = String(salaryProfile?.joined_at || dateTo).slice(0, 10)
   const activeUntil = getSalaryActiveUntil(salaryProfile, dateTo)
   const accrued = getSalaryAccruedAmount(salaryProfile, joinedAt, activeUntil)
-  return Math.max(0, accrued - getSalaryPaidAmount(salaryProfile, dateTo))
+  return Math.max(0, accrued - getSalaryPaidAmount(salaryProfile, dateTo) - getSalaryFineAmount(salaryProfile, dateTo))
 }
 
 export function canRecordSalaryTransaction(salaryProfile, entryType = 'payment', asOfDate = todayExpenseDate()) {
   if (!salaryProfile || salaryProfile.deleted_at) return false
   if (salaryProfile.is_active !== false) return true
-  return entryType === 'payment' && getSalaryDue(salaryProfile, asOfDate) > 0
+  return ['payment', 'fine'].includes(entryType) && getSalaryDue(salaryProfile, asOfDate) > 0
 }
 
 export function getTotalSalaryDue(salaryProfiles = [], dateTo = todayExpenseDate()) {
@@ -434,6 +442,7 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
   const isBeforeActiveMonth = activeFromDate && monthEnd < activeFromDate
   const monthlyRentUzs = isBeforeActiveMonth ? 0 : Math.max(0, Math.round(Number(options.monthlyRentUzs ?? DEFAULT_MONTHLY_RENT_UZS) || 0))
   let employeePaidToDate = 0
+  let employeeFineToDate = 0
   let employeeProjectedMonth = 0
   let employeeOpeningArrears = 0
   let employeePaidTowardArrears = 0
@@ -460,14 +469,30 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
           ? sum + normalizeExpenseAmount(payment.amount)
           : sum
       }, 0)
-      const openingArrears = Math.max(0, accruedBeforeMonth - paidBeforeMonth)
-      const paidTowardArrears = Math.min(openingArrears, paidThisMonth)
+      const finedBeforeMonth = (salaryProfile.fines || []).reduce((sum, fine) => {
+        const fineDate = String(fine?.fine_date || '').slice(0, 10)
+        return fineDate && fineDate < monthStart
+          ? sum + normalizeExpenseAmount(fine.amount)
+          : sum
+      }, 0)
+      const finedThisMonth = (salaryProfile.fines || []).reduce((sum, fine) => {
+        const fineDate = String(fine?.fine_date || '').slice(0, 10)
+        return fineDate >= monthStart && fineDate <= paidThroughDate
+          ? sum + normalizeExpenseAmount(fine.amount)
+          : sum
+      }, 0)
+      const settledBeforeMonth = paidBeforeMonth + finedBeforeMonth
+      const openingArrears = Math.max(0, accruedBeforeMonth - settledBeforeMonth)
+      const priorSettlementCredit = Math.max(0, settledBeforeMonth - accruedBeforeMonth)
+      const settledThisMonth = priorSettlementCredit + paidThisMonth + finedThisMonth
+      const paidTowardArrears = Math.min(openingArrears, settledThisMonth)
       const appliedToCurrentMonth = Math.min(
         projectedThisMonth,
-        Math.max(0, paidThisMonth - paidTowardArrears),
+        Math.max(0, settledThisMonth - paidTowardArrears),
       )
 
       employeePaidToDate += paidThisMonth
+      employeeFineToDate += finedThisMonth
       employeeProjectedMonth += projectedThisMonth
       employeeOpeningArrears += openingArrears
       employeePaidTowardArrears += paidTowardArrears
@@ -484,6 +509,7 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
     isBeforeActiveMonth: Boolean(isBeforeActiveMonth),
     monthlyRentUzs,
     employeePaidToDate,
+    employeeFineToDate,
     employeeProjectedMonth,
     employeeOpeningArrears,
     employeePaidTowardArrears,

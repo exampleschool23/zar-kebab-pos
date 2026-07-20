@@ -5,9 +5,10 @@ import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
-import { formatLongDate } from '../lib/dateFormat'
+import { formatLongDate, formatTime } from '../lib/dateFormat'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
+import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
 import {
   expensePaymentMethodLabel,
   getDailySalaryAmount,
@@ -29,7 +30,7 @@ function isMissingSalaryMigration(error) {
   )
 }
 
-function composeEmployees(rows = [], rates = [], payments = [], bonuses = [], absences = [], profiles = []) {
+function composeEmployees(rows = [], rates = [], payments = [], bonuses = [], fines = [], absences = [], profiles = []) {
   const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
   return rows.map(row => ({
     ...row,
@@ -39,6 +40,7 @@ function composeEmployees(rows = [], rates = [], payments = [], bonuses = [], ab
       .sort((a, b) => String(b.effective_from || '').localeCompare(String(a.effective_from || ''))),
     payments: payments.filter(payment => payment.salary_profile_id === row.id),
     bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
+    fines: fines.filter(fine => fine.salary_profile_id === row.id),
     absences: absences.filter(absence => absence.salary_profile_id === row.id),
   }))
 }
@@ -72,9 +74,10 @@ export default function Employees() {
       status: 'Holat',
       history: 'Maosh tarixi',
       historyBtn: 'Tarix',
-      paymentHistory: 'To‘lovlar / bonuslar',
+      paymentHistory: 'To‘lovlar / bonuslar / jarimalar',
       paymentLabel: 'To‘lov',
       bonusLabel: 'Bonus',
+      fineLabel: 'Jarima',
       absenceHistory: 'Kelmagan kunlar',
       absentLabel: 'Kelmagan',
       deactivate: 'Faolsizlantirish',
@@ -100,9 +103,10 @@ export default function Employees() {
       status: 'Статус',
       history: 'История зарплаты',
       historyBtn: 'История',
-      paymentHistory: 'Выплаты / бонусы',
+      paymentHistory: 'Выплаты / бонусы / штрафы',
       paymentLabel: 'Выплата',
       bonusLabel: 'Бонус',
+      fineLabel: 'Штраф',
       absenceHistory: 'Дни отсутствия',
       absentLabel: 'Отсутствовал',
       deactivate: 'Деактивировать',
@@ -128,9 +132,10 @@ export default function Employees() {
       status: 'Status',
       history: 'Salary history',
       historyBtn: 'History',
-      paymentHistory: 'Payments / bonuses',
+      paymentHistory: 'Payments / bonuses / fines',
       paymentLabel: 'Payment',
       bonusLabel: 'Bonus',
+      fineLabel: 'Fine',
       absenceHistory: 'Absent dates',
       absentLabel: 'Absent',
       deactivate: 'Deactivate',
@@ -154,12 +159,13 @@ export default function Employees() {
   async function loadEmployees() {
     setLoading(true)
     setError('')
-    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, absenceRes] = await Promise.all([
+    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
       supabase.from('employee_salary_profiles').select('*').order('employee_name'),
       supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
       supabase.from('employee_salary_payments').select('*'),
       supabase.from('employee_salary_bonuses').select('*'),
+      supabase.from('employee_salary_fines').select('*'),
       supabase.from('employee_salary_absences').select('*'),
     ])
 
@@ -168,11 +174,13 @@ export default function Employees() {
       setError(isMissingSalaryMigration(salaryError) ? l.migration : salaryError.message)
       setEmployees([])
     } else {
+      if (fineRes.error) setError(isMissingSalaryMigration(fineRes.error) ? l.migration : fineRes.error.message)
       setEmployees(composeEmployees(
         profileRes.data || [],
         rateRes.data || [],
         paymentRes.data || [],
         bonusRes.data || [],
+        fineRes.error ? [] : fineRes.data || [],
         absenceRes.data || [],
         teamRes.data || [],
       ).filter(employee => !employee.deleted_at))
@@ -399,6 +407,7 @@ export default function Employees() {
             id: payment.id,
             entryType: 'payment',
             date: payment.paid_date,
+            createdAt: payment.created_at,
             amount: payment.amount,
             detail: payment.note || expensePaymentMethodLabel(payment.payment_method, lang),
           })),
@@ -406,10 +415,19 @@ export default function Employees() {
             id: bonus.id,
             entryType: 'bonus',
             date: bonus.bonus_date,
+            createdAt: bonus.created_at,
             amount: bonus.amount,
             detail: bonus.note || expensePaymentMethodLabel(bonus.payment_method, lang),
           })),
-        ].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+          ...drawerEmployee.fines.map(fine => ({
+            id: fine.id,
+            entryType: 'fine',
+            date: fine.fine_date,
+            createdAt: fine.created_at,
+            amount: fine.amount,
+            detail: fine.reason,
+          })),
+        ].sort(compareSalaryTransactionsNewestFirst)
 
         return (
           <>
@@ -436,12 +454,13 @@ export default function Employees() {
                       <div key={`${entry.entryType}-${entry.id}`} className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-xs font-bold ${drawerInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-[#F9FAFB] text-[#6B7280]'}`}>
                         <div className="flex flex-wrap items-center gap-2">
                           <span>{formatLongDate(entry.date, lang, entry.date)}</span>
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${entry.entryType === 'bonus' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-[#ff5a00]'}`}>
-                            {entry.entryType === 'bonus' ? l.bonusLabel : l.paymentLabel}
+                          {entry.createdAt && <span className="text-[10px] tabular-nums text-[#9CA3AF]">{formatTime(entry.createdAt)}</span>}
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${entry.entryType === 'fine' ? 'bg-red-50 text-red-700' : entry.entryType === 'bonus' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-[#ff5a00]'}`}>
+                            {entry.entryType === 'fine' ? l.fineLabel : entry.entryType === 'bonus' ? l.bonusLabel : l.paymentLabel}
                           </span>
                           {entry.detail && <span className="text-[#9CA3AF]">{entry.detail}</span>}
                         </div>
-                        <span className="font-black text-[#1F2937]">{formatCurrency(entry.amount)}</span>
+                        <span className={`font-black ${entry.entryType === 'fine' ? 'text-red-600' : 'text-[#1F2937]'}`}>{entry.entryType === 'fine' ? '− ' : ''}{formatCurrency(entry.amount)}</span>
                       </div>
                     ))}
                     {transactionHistory.length === 0 && (

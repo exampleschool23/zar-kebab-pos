@@ -74,6 +74,7 @@ test('completed table rounds merge into one Telegram order summary', () => {
 
   const message = buildCompletedOrderGroupMessage({
     ...order,
+    orderNetProfit: 72500,
     dailyRevenueTotal: 500000,
     dailyNetProfitTotal: 310000,
   })
@@ -82,6 +83,7 @@ test('completed table rounds merge into one Telegram order summary', () => {
   assert.match(message, /Сумма заказа: 90 000 UZS/)
   assert.match(message, /Сервис 15%: 13 500 UZS/)
   assert.match(message, /Оплата: Наличные 103 500 UZS/)
+  assert.match(message, /Чистая прибыль · Заказ: 72 500 UZS/)
   assert.match(message, /Чистая прибыль · Сегодня: 310 000 UZS/)
   assert.equal((message.match(/Стол: Table 3/g) || []).length, 1)
 })
@@ -128,6 +130,7 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
     service_fee: 21300,
     service_rate_pct: 15,
     total: 163300,
+    orderNetProfit: 101300,
     dailyRevenueTotal: 525300,
     dailyNetProfitTotal: 337800,
     payment_method: 'terminal',
@@ -143,8 +146,8 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
   assert.doesNotMatch(message, /Заказ: A&amp;B&lt;2&gt;/)
   assert.equal(message.startsWith('Тип: Заказ с собой'), true)
   assert.doesNotMatch(message, /Стол: Table &lt;1&gt;/)
-  assert.match(message, /Официант: Jasurbek &amp; Team/)
-  assert.match(message, /Закрыл: Ali &amp; Bob/)
+  assert.doesNotMatch(message, /Официант:/)
+  assert.doesNotMatch(message, /Закрыл:/)
   assert.match(message, /Дата: 09\.07\.2026, 00:09/)
   assert.match(message, /Тип меню: 🧳 Турист/)
   assert.doesNotMatch(message, /Итого: 163 300 UZS/)
@@ -156,6 +159,7 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
   assert.match(message, /Сервис 15%: 21 300 UZS/)
   assert.match(message, /Оплата: Терминал/)
   assert.doesNotMatch(message, /К оплате: 163 300 UZS/)
+  assert.match(message, /Чистая прибыль · Заказ: 101 300 UZS/)
   assert.match(message, /Доход · Сегодня: 525 300 UZS/)
   assert.match(message, /Чистая прибыль · Сегодня: 337 800 UZS/)
 })

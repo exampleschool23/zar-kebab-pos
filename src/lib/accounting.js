@@ -14,6 +14,7 @@ import {
   summarizeIncomeEntries,
   todayExpenseDate,
 } from './expenses.js'
+import { getOrdersNetProfit } from './profit.js'
 
 function normalizeIsoDate(value, fallback = todayExpenseDate()) {
   const date = String(value || '').slice(0, 10)
@@ -36,7 +37,7 @@ export function getAccountingQuickRange(key = 'month', today = todayExpenseDate(
   return { dateFrom: `${normalizedToday.slice(0, 8)}01`, dateTo: normalizedToday }
 }
 
-export function getAccountingPageSummary(orders = [], entries = [], dateFrom, dateTo) {
+export function getAccountingPageSummary(orders = [], entries = [], dateFrom, dateTo, menuItemMap = null) {
   const rangeEntries = (entries || []).filter(entry => expenseMatchesRange(entry, dateFrom, dateTo))
   const paidOrders = groupOrdersBySession(orders || [])
     .filter(order => isPaidOrder(order) && matchesRange(order, dateFrom, dateTo))
@@ -49,6 +50,7 @@ export function getAccountingPageSummary(orders = [], entries = [], dateFrom, da
   return {
     paidOrders,
     cafeIncome: cafeIncomeSummary.total,
+    netProfit: getOrdersNetProfit(paidOrders, menuItemMap),
     cafeIncomeSummary,
     expenseSummary,
     ...expenseBreakdown,

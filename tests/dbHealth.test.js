@@ -74,6 +74,7 @@ test('database health requires private menu costs and order cost snapshots', asy
   const missingCosts = await runDbHealthChecks(makeClient({ missingTable: 'menu_item_costs' }))
   assert.equal(missingCosts.ok, false)
   assert.match(missingCosts.failed.find(check => check.name === 'menu_item_costs').hint, /098_menu_item_costs_and_profit/)
+  assert.match(missingCosts.failed.find(check => check.name === 'menu_item_costs').hint, /100_menu_variant_costs_and_accounting_profit/)
 
   const missingSnapshot = await runDbHealthChecks(makeClient({
     missingColumnTable: 'order_items',
@@ -81,6 +82,14 @@ test('database health requires private menu costs and order cost snapshots', asy
   }))
   assert.equal(missingSnapshot.ok, false)
   assert.equal(missingSnapshot.failed.find(check => check.name === 'order_items').detail, 'cost_price')
+})
+
+test('database health requires the employee salary fines migration', async () => {
+  const result = await runDbHealthChecks(makeClient({ missingTable: 'employee_salary_fines' }))
+
+  assert.equal(result.ok, false)
+  assert.match(result.failed.find(check => check.name === 'employee_salary_fines').hint, /099_employee_salary_fines/)
+  assert.match(cliHealthSource, /checkTable\('employee_salary_fines'/)
 })
 
 test('database health reports missing tables and missing RPC', async () => {

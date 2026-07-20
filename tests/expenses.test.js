@@ -20,6 +20,7 @@ import {
   getNetIncome,
   getSalaryActiveUntil,
   getSalaryDue,
+  getSalaryFineAmount,
   getSalaryCategoryForRole,
   getTotalMonthlySalaryCommitment,
   getTotalSalaryDue,
@@ -723,6 +724,46 @@ test('salary bonuses do not reduce salary due or mutate payment history balances
   assert.equal(getSalaryDue(waiterProfile, '2026-06-10'), 2_100_000)
   assert.equal(summarizeExpenses(paymentRows).total, 900_000)
   assert.equal(summarizeExpenses(bonusRows).total, 2_000_000)
+})
+
+test('salary fines reduce the amount due from their recorded date and carry forward', () => {
+  const waiterProfile = {
+    id: 'salary-fine-due-1',
+    joined_at: '2026-06-01',
+    rates: [{ effective_from: '2026-06-01', amount: 100_000, rate_unit: 'daily' }],
+    payments: [{ id: 'payment-1', paid_date: '2026-06-02', amount: 100_000 }],
+    fines: [
+      { id: 'fine-1', fine_date: '2026-06-03', amount: 500_000, reason: 'Repeated lateness' },
+      { id: 'fine-2', fine_date: '2026-06-10', amount: 200_000, reason: 'Damaged equipment' },
+    ],
+  }
+
+  assert.equal(getSalaryFineAmount(waiterProfile, '2026-06-02'), 0)
+  assert.equal(getSalaryFineAmount(waiterProfile, '2026-06-03'), 500_000)
+  assert.equal(getSalaryDue(waiterProfile, '2026-06-03'), 0)
+  assert.equal(getSalaryDue(waiterProfile, '2026-06-08'), 200_000)
+  assert.equal(getSalaryDue(waiterProfile, '2026-06-10'), 200_000)
+  assert.equal(canRecordSalaryTransaction({ ...waiterProfile, is_active: false }, 'fine', '2026-06-10'), true)
+  assert.equal(canRecordSalaryTransaction({ ...waiterProfile, deleted_at: '2026-06-10T12:00:00Z' }, 'fine', '2026-06-10'), false)
+})
+
+test('salary fines reduce projected payroll but never become cash expenses', () => {
+  const salaryProfile = {
+    id: 'salary-fine-estimate-1',
+    joined_at: '2026-06-01',
+    rates: [{ effective_from: '2026-06-01', amount: 100_000, rate_unit: 'daily' }],
+    payments: [{ id: 'payment-1', paid_date: '2026-06-05', amount: 200_000 }],
+    fines: [{ id: 'fine-1', fine_date: '2026-06-10', amount: 500_000, reason: 'Repeated lateness' }],
+    absences: [],
+  }
+
+  const summary = getEstimatedMonthlyExpenseSummary([salaryProfile], '2026-06-16')
+
+  assert.equal(summary.employeePaidToDate, 200_000)
+  assert.equal(summary.employeeFineToDate, 500_000)
+  assert.equal(summary.employeeProjectedMonth, 3_000_000)
+  assert.equal(summary.employeeRemainingThisMonth, 2_300_000)
+  assert.equal(summarizeExpenses(buildSalaryPaymentExpenseRows([salaryProfile], '2026-06-01', '2026-06-30')).total, 200_000)
 })
 
 test('salary expenses participate in expense cashflow by recorded payment method', () => {

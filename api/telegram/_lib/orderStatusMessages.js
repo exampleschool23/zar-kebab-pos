@@ -269,8 +269,6 @@ export function buildCompletedOrderGroupMessage(order) {
     isOffPremiseOrder(order)
       ? `Тип: ${escapeTelegramHtml(orderTypeLabel(order?.order_type, 'ru'))}`
       : `Стол: ${escapeTelegramHtml(order?.table_name || '-')}`,
-    `Официант: ${escapeTelegramHtml(order?.waiter_name || '-')}`,
-    `Закрыл: ${escapeTelegramHtml(order?.completed_by_name || '-')}`,
     `Дата: ${escapeTelegramHtml(closedAt)}`,
     escapeTelegramHtml(formatPriceModeLine(order)),
   ]
@@ -286,6 +284,9 @@ export function buildCompletedOrderGroupMessage(order) {
     }
   }
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
+  if (order?.orderNetProfit != null && Number.isFinite(Number(order.orderNetProfit))) {
+    lines.push(`Чистая прибыль · Заказ: ${escapeTelegramHtml(formatMoney(order.orderNetProfit))}`)
+  }
   if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
     lines.push(`Доход · Сегодня: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
   }

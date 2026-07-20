@@ -30,6 +30,7 @@ import ImageLoadShimmer from '../components/ImageLoadShimmer'
 import { supabase } from '../lib/supabase'
 import { formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput } from '../lib/moneyInput'
 import { canEditMenu as canEditMenuForProfile } from '../lib/permissions'
+import { getSaleProfitSummary } from '../lib/profit'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -175,6 +176,34 @@ function MoneyField({ label, value, onChange, placeholder, className = '', label
   )
 }
 
+function ProfitMarginPreview({ price, cost, lang, inheritedCost = false }) {
+  if (String(price ?? '').trim() === '' || String(cost ?? '').trim() === '') return null
+  const summary = getSaleProfitSummary(numberFromMoneyInput(price), numberFromMoneyInput(cost))
+  if (!summary) return null
+
+  const labels = lang === 'uz'
+    ? { profit: 'Sotuv foydasi', margin: 'Foyda marjasi', inherited: 'Asosiy tannarx' }
+    : lang === 'ru'
+      ? { profit: 'Прибыль с продажи', margin: 'Маржа', inherited: 'Себестоимость товара' }
+      : { profit: 'Profit per sale', margin: 'Profit margin', inherited: 'Parent cost' }
+  const locale = lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ'
+  const margin = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(summary.marginPct)
+  const positive = summary.profit >= 0
+
+  return (
+    <div className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 ${positive ? 'border-emerald-200 bg-white/80' : 'border-red-200 bg-red-50'}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`text-[10px] font-black uppercase tracking-wide ${positive ? 'text-emerald-700' : 'text-red-700'}`}>{labels.profit}</span>
+        {inheritedCost && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-gray-500">{labels.inherited}</span>}
+      </div>
+      <div className={`flex items-center gap-2 text-xs font-black tabular-nums ${positive ? 'text-emerald-700' : 'text-red-700'}`}>
+        <span>{formatCurrency(summary.profit)}</span>
+        <span className={`rounded-full px-2 py-0.5 ${positive ? 'bg-emerald-100' : 'bg-red-100'}`}>{labels.margin}: {margin}%</span>
+      </div>
+    </div>
+  )
+}
+
 function PricingFields({ form, setF, lang, compact = false }) {
   const labels = lang === 'uz'
     ? {
@@ -227,6 +256,9 @@ function PricingFields({ form, setF, lang, compact = false }) {
           className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm font-semibold tabular-nums outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
           labelClassName="mb-1.5 block text-xs font-bold text-emerald-800"
         />
+      </div>
+      <div className="mt-3">
+        <ProfitMarginPreview price={form.price} cost={form.cost_price} lang={lang} />
       </div>
       <p className="mt-3 text-[11px] font-semibold leading-5 text-emerald-800/75">{labels.hint}</p>
     </div>
@@ -832,7 +864,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  external_id: '', price: '', old_price: '', cost_price: '', grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', available: true, sort_order: '',
+  external_id: '', price: '', old_price: '', cost_price: '', variant_costs: {}, grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', available: true, sort_order: '',
   option_groups: [],
   option_groups_editor: [],
   show_in_cashier_quick_items: false,
@@ -870,17 +902,24 @@ function parseOptionGroupsValue(value) {
   }
 }
 
-function optionGroupsToEditor(value) {
+function optionGroupsToEditor(value, variantCosts = {}) {
+  const protectedVariantCosts = variantCosts && typeof variantCosts === 'object' && !Array.isArray(variantCosts)
+    ? variantCosts
+    : {}
   return parseOptionGroupsValue(value).flatMap((group, groupIndex) => {
     const options = Array.isArray(group.options) ? group.options : []
-    return options.map((option, optionIndex) => ({
-      id: String(option.id || `option-${groupIndex + 1}-${optionIndex + 1}`),
-      name_uz: option.label_uz || option.label || option.name || '',
-      name_ru: option.label_ru || option.label || option.name || '',
-      name_en: option.label_en || option.label || option.name || '',
-      price: option.price ?? option.variant_price ?? '',
-      stock_count: option.stock_count ?? option.stockCount ?? '',
-    }))
+    return options.map((option, optionIndex) => {
+      const id = String(option.id || `option-${groupIndex + 1}-${optionIndex + 1}`)
+      return {
+        id,
+        name_uz: option.label_uz || option.label || option.name || '',
+        name_ru: option.label_ru || option.label || option.name || '',
+        name_en: option.label_en || option.label || option.name || '',
+        price: option.price ?? option.variant_price ?? '',
+        cost_price: Object.prototype.hasOwnProperty.call(protectedVariantCosts, id) ? protectedVariantCosts[id] : '',
+        stock_count: option.stock_count ?? option.stockCount ?? '',
+      }
+    })
   })
 }
 
@@ -923,7 +962,16 @@ function editorToOptionGroups(options, basePrice = 0) {
   }]
 }
 
-function OptionGroupsEditor({ value = [], onChange, lang }) {
+function editorToVariantCosts(options) {
+  return Object.fromEntries((options || []).flatMap((option, optionIndex) => {
+    if (String(option?.cost_price ?? '').trim() === '') return []
+    const id = safeOptionId(option?.id, `option_${optionIndex + 1}`)
+    const cost = Math.max(0, Math.round(numberFromMoneyInput(option.cost_price)))
+    return [[id, cost]]
+  }))
+}
+
+function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
   function updateOption(optionIndex, patch) {
     onChange(value.map((option, index) => index === optionIndex ? { ...option, ...patch } : option))
   }
@@ -937,6 +985,7 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
         name_ru: '',
         name_en: '',
         price: '',
+        cost_price: '',
         stock_count: '',
       },
     ])
@@ -953,6 +1002,7 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
     nameRu: lang === 'uz' ? 'Nomi (RU)' : lang === 'ru' ? 'Название (RU)' : 'Name (RU)',
     nameEn: lang === 'uz' ? 'Nomi (EN)' : lang === 'ru' ? 'Название (EN)' : 'Name (EN)',
     price: lang === 'uz' ? 'Narx' : lang === 'ru' ? 'Цена' : 'Price',
+    cost: lang === 'uz' ? 'Haqiqiy tannarx' : lang === 'ru' ? 'Реальная себестоимость' : 'Real cost',
     stock: lang === 'uz' ? 'Qoldiq' : lang === 'ru' ? 'Остаток' : 'Stock',
     empty: lang === 'uz' ? 'Mahsulotda variantlar bo‘lsa qo‘shing.' : lang === 'ru' ? 'Добавьте варианты, если они есть у товара.' : 'Add variants when this item has choices.',
   }
@@ -975,7 +1025,10 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
         <p className="rounded-lg border border-dashed border-gray-200 bg-white px-3 py-3 text-xs font-semibold text-gray-400">{labels.empty}</p>
       ) : (
         <div className="space-y-3">
-          {value.map((option, optionIndex) => (
+          {value.map((option, optionIndex) => {
+            const hasOwnCost = String(option.cost_price ?? '').trim() !== ''
+            const effectiveCost = hasOwnCost ? option.cost_price : parentCost
+            return (
             <div key={option.id || optionIndex} className="min-w-0 rounded-xl border border-gray-200 bg-white p-3">
               <div className="grid min-w-0 gap-2 md:grid-cols-3">
                 <label className="min-w-0">
@@ -1009,7 +1062,7 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
                   />
                 </label>
               </div>
-              <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_40px]">
+              <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_40px]">
                 <div className="min-w-0">
                   <MoneyField
                     label={labels.price}
@@ -1018,6 +1071,16 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
                     placeholder={labels.price}
                     labelClassName="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400"
                     className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm tabular-nums focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <MoneyField
+                    label={labels.cost}
+                    value={option.cost_price}
+                    onChange={event => updateOption(optionIndex, { cost_price: event.target.value })}
+                    placeholder={String(parentCost || '').trim() || labels.cost}
+                    labelClassName="mb-1 block text-[10px] font-black uppercase tracking-wide text-emerald-600"
+                    className="min-w-0 w-full rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-2.5 text-sm font-bold tabular-nums focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
                   />
                 </div>
                 <label className="min-w-0">
@@ -1034,13 +1097,17 @@ function OptionGroupsEditor({ value = [], onChange, lang }) {
                 <button
                   type="button"
                   onClick={() => removeOption(optionIndex)}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 sm:self-end"
+                  className="flex h-10 w-10 self-end items-center justify-center rounded-xl border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600"
                 >
                   <Trash2 size={15} />
                 </button>
               </div>
+              <div className="mt-2">
+                <ProfitMarginPreview price={option.price} cost={effectiveCost} lang={lang} inheritedCost={!hasOwnCost} />
+              </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -1063,7 +1130,11 @@ function menuItemToProductForm(i) {
     visible_until_time: String(i.visible_until_time || i.visibleUntilTime || '').slice(0, 5),
     send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
     quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
-    option_groups_editor: optionGroupsToEditor(i.option_groups ?? i.optionGroups),
+    variant_costs: i.variant_costs ?? i.variantCosts ?? {},
+    option_groups_editor: optionGroupsToEditor(
+      i.option_groups ?? i.optionGroups,
+      i.variant_costs ?? i.variantCosts,
+    ),
   }
 }
 
@@ -1080,6 +1151,7 @@ function getItemFormFingerprint(form = {}) {
     price: numberFromMoneyInput(form.price),
     old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
     cost_price: Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
+    variant_costs: editorToVariantCosts(form.option_groups_editor),
     grams: Math.max(0, Math.round(Number(form.grams) || 0)),
     millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
     kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
@@ -1348,6 +1420,7 @@ export default function AdminMenu() {
           price: numberFromMoneyInput(form.price),
           old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
           cost_price: Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
+          variant_costs: editorToVariantCosts(form.option_groups_editor),
           grams: Math.max(0, Math.round(Number(form.grams) || 0)),
           millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
           kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
@@ -1651,6 +1724,7 @@ export default function AdminMenu() {
                     value={form.option_groups_editor}
                     onChange={optionGroups => setForm(current => ({ ...current, option_groups_editor: optionGroups }))}
                     lang={lang}
+                    parentCost={form.cost_price}
                   />
                 </section>
 
@@ -2339,6 +2413,7 @@ export default function AdminMenu() {
               value={form.option_groups_editor}
               onChange={optionGroups => setForm(current => ({ ...current, option_groups_editor: optionGroups }))}
               lang={lang}
+              parentCost={form.cost_price}
             />
             <PricingFields form={form} setF={setF} lang={lang} compact />
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />

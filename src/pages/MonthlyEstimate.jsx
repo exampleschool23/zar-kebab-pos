@@ -60,7 +60,7 @@ function isMissingSalaryMigration(error) {
   )
 }
 
-function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], absences = [], profiles = []) {
+function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], fines = [], absences = [], profiles = []) {
   const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
   return rows.map(row => ({
     ...row,
@@ -68,6 +68,7 @@ function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [
     rates: rates.filter(rate => rate.salary_profile_id === row.id),
     payments: payments.filter(payment => payment.salary_profile_id === row.id),
     bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
+    fines: fines.filter(fine => fine.salary_profile_id === row.id),
     absences: absences.filter(absence => absence.salary_profile_id === row.id),
   }))
 }
@@ -258,7 +259,7 @@ export default function MonthlyEstimate() {
     loadRequestRef.current = requestId
     setLoading(true)
     setError('')
-    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult, orderHistoryResult, firstOrderResult] = await Promise.all([
+    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult, orderHistoryResult, firstOrderResult] = await Promise.all([
       loadPagedResult((from, to) => supabase
         .from('expenses')
         .select(SELECT_COLUMNS)
@@ -271,6 +272,7 @@ export default function MonthlyEstimate() {
       loadPagedResult((from, to) => supabase.from('employee_salary_rates').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('employee_salary_payments').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select('*').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_salary_fines').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
       loadPaidOrdersForRange(monthStart, monthEnd)
@@ -303,11 +305,15 @@ export default function MonthlyEstimate() {
         setError(isMissingSalaryMigration(salaryError) ? l.migrationMissing : salaryError.message || l.loadFailed)
       }
     } else {
+      if (salaryFineResult.error && !expenseResult.error) {
+        setError(isMissingSalaryMigration(salaryFineResult.error) ? l.migrationMissing : salaryFineResult.error.message || l.loadFailed)
+      }
       setSalaryProfiles(composeSalaryProfiles(
         salaryProfileResult.data || [],
         salaryRateResult.data || [],
         salaryPaymentResult.data || [],
         salaryBonusResult.data || [],
+        salaryFineResult.error ? [] : salaryFineResult.data || [],
         salaryAbsenceResult.data || [],
         teamResult.data || [],
       ))
