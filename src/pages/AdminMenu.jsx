@@ -35,6 +35,7 @@ import { getSaleProfitSummary } from '../lib/profit'
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
 const ADMIN_MENU_SCROLL_KEY = 'zar-admin-menu-scroll-top'
+const MENU_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 
 function saveAdminMenuScrollPosition(scrollTop) {
   if (typeof sessionStorage === 'undefined') return
@@ -60,7 +61,9 @@ function clearSavedAdminMenuScrollPosition() {
 }
 
 function validateMenuImage(file) {
-  if (!file.type.startsWith('image/')) throw new Error('Only image uploads are allowed')
+  if (!MENU_IMAGE_TYPES.has(String(file?.type || '').toLowerCase())) {
+    throw new Error('Only JPEG, PNG, WebP, GIF, or AVIF images are allowed')
+  }
   return file
 }
 
@@ -360,7 +363,7 @@ function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type
           placeholder="https://..."
           className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
         />
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleFile} />
       </div>
       {value && (
         <img src={value} alt={t(lang, 'imagePreview')} className="mt-2 h-20 w-20 rounded-xl border border-gray-200 object-cover object-center" />

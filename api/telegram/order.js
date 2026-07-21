@@ -43,8 +43,12 @@ export default async function handler(req, res) {
         menu_item_id: menuItem.id,
         name: getItemDisplayName(menuItem),
         price: Math.round(Number(menuItem.price) || 0),
+        base_price: Math.round(Number(menuItem.price) || 0),
+        unit_price: Math.round(Number(menuItem.price) || 0),
+        price_mode: 'regular',
         quantity,
         notes: String(item.notes || '').slice(0, 500),
+        selected_options: {},
         status: 'new',
         order_type: normalizeOrderType(body.orderType),
       }
@@ -74,13 +78,13 @@ export default async function handler(req, res) {
 
       const { data: loyaltyCard, error: loyaltyError } = await supabase
         .from('loyalty_cards')
-        .select('*')
+        .select('card_number, balance, cashback_type, is_active')
         .eq('card_number', loyaltyCardNumber)
         .maybeSingle()
 
       if (loyaltyError) throw loyaltyError
       const balance = Math.max(0, Math.round(Number(loyaltyCard?.balance || loyaltyCard?.balance_amount || 0)))
-      if (!loyaltyCard || balance <= 0) {
+      if (!loyaltyCard || loyaltyCard.is_active === false) {
         return json(res, 400, { error: 'Loyalty card is not valid' })
       }
       if (requestedRedeemAmount > balance) {
@@ -123,17 +127,13 @@ export default async function handler(req, res) {
       ...paymentFields,
     }
 
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert(orderInsert)
-      .select('*')
-      .single()
+    const { data: order, error: orderError } = await supabase.rpc('create_telegram_order', {
+      payload: {
+        order: orderInsert,
+        items: rows,
+      },
+    })
     if (orderError) throw orderError
-
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(rows.map(row => ({ ...row, order_id: orderId })))
-    if (itemsError) throw itemsError
 
     sendTelegramMessage(session.chatId || session.telegramUserId, `✅ Order accepted\nOrder ${order.order_number || order.id}`)
       .catch(error => console.warn('[telegram/order] notification failed:', error.message))

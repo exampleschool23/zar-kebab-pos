@@ -97,6 +97,7 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.equal(result.ok, false)
   assert.deepEqual(result.failed.map(check => check.name).sort(), [
     'change_paid_order_payment_method_owner',
+    'create_telegram_order',
     'current_staff_can_access',
     'current_staff_can_view_menu_catalog',
     'current_staff_can_write',
@@ -112,6 +113,7 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.match(result.failed.find(check => check.name === 'settle_loyalty_wallet_payment').hint, /027_atomic_loyalty_wallet_settlement/)
   assert.match(result.failed.find(check => check.name === 'settle_orders_payment').hint, /083_atomic_order_payment_settlement/)
   assert.match(result.failed.find(check => check.name === 'change_paid_order_payment_method_owner').hint, /090_owner_change_completed_order_payment_method/)
+  assert.match(result.failed.find(check => check.name === 'create_telegram_order').hint, /101_atomic_telegram_orders/)
   assert.match(result.failed.find(check => check.name === 'recall_table_from_cashier').hint, /094_admin_cashier_recall_access/)
   assert.match(result.failed.find(check => check.name === 'current_staff_can_view_menu_catalog').hint, /095_read_only_menu_catalog_access/)
   assert.match(result.failed.find(check => check.name === 'current_staff_can_access').hint, /097_daily_bazaar/)

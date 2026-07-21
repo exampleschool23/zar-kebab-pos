@@ -15,17 +15,18 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin()
     const { data, error } = await supabase
       .from('loyalty_cards')
-      .select('*')
+      .select('balance, cashback_type, is_active')
       .eq('card_number', cardNumber)
       .maybeSingle()
 
     if (error && !/relation|schema cache/i.test(error.message || '')) throw error
 
+    const valid = !!data && data.is_active !== false
     return json(res, 200, {
       cardNumber,
-      valid: !!data,
-      balance: Math.max(0, Math.round(Number(data?.balance || data?.balance_amount || 0))),
-      card: data || null,
+      valid,
+      balance: valid ? Math.max(0, Math.round(Number(data?.balance) || 0)) : 0,
+      cashbackType: valid ? String(data?.cashback_type || '') : '',
     })
   } catch (error) {
     console.error('[telegram/loyalty]', error)

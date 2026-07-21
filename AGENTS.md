@@ -191,6 +191,9 @@ Run migrations in order. Important recent files:
 - `supabase/100_menu_variant_costs_and_accounting_profit.sql`
   Adds protected per-variant real costs, snapshots selected variant costs on future sales, and lets Accounting-authorized staff read protected costs for net-profit reporting.
 
+- `supabase/101_atomic_telegram_orders.sql`
+  Adds the service-role-only `create_telegram_order(payload jsonb)` RPC so Telegram order and item inserts commit or roll back together.
+
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
 ## Supabase Notes

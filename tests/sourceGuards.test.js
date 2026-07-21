@@ -50,12 +50,13 @@ test('AdminMenu keeps upload error rendering inside ImageUploadField', () => {
   assert.match(body, /\{error && <p[^}]+>\{error\}<\/p>\}/)
 })
 
-test('AdminMenu uploads selected menu image files without resizing or byte-limit constraints', () => {
+test('AdminMenu accepts only supported raster menu image types without client recompression', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const validator = functionBody(source, 'validateMenuImage')
   const uploadField = functionBody(source, 'ImageUploadField')
 
-  assert.match(validator, /file\.type\.startsWith\('image\/'\)/)
+  assert.match(validator, /MENU_IMAGE_TYPES\.has/)
+  assert.doesNotMatch(validator, /image\/svg\+xml/)
   assert.match(validator, /return file/)
   assert.match(uploadField, /uploadMenuImageToR2\(\{ file: validateMenuImage\(file\), type, entityId \}\)/)
   assert.doesNotMatch(source, /compressMenuImage/)
@@ -71,11 +72,14 @@ test('R2 menu image uploads use long-lived immutable browser caching', () => {
   assert.match(r2, /CacheControl: 'public, max-age=31536000, immutable'/)
 })
 
-test('R2 menu image uploads accept image files without WebP, dimension, or byte-limit constraints', () => {
+test('R2 menu image uploads verify supported raster signatures without recompression', () => {
   const r2 = readSource('api/menu-image/_lib/r2.js')
   const upload = readSource('api/menu-image/upload.js')
 
-  assert.match(r2, /startsWith\('image\/'\)/)
+  assert.match(r2, /ALLOWED_IMAGE_TYPES\.has/)
+  assert.match(r2, /matchesImageSignature/)
+  assert.match(r2, /Image contents do not match the declared file type/)
+  assert.doesNotMatch(r2, /image\/svg\+xml/)
   assert.match(r2, /extensionForContentType\(contentType\)/)
   assert.match(upload, /await assertImageFile\(file\)/)
   assert.match(upload, /contentType: file\.contentType/)
@@ -85,6 +89,15 @@ test('R2 menu image uploads accept image files without WebP, dimension, or byte-
   assert.doesNotMatch(r2, /contentType !== 'image\/webp'/)
   assert.doesNotMatch(r2, /file\.buffer\.length >/)
   assert.doesNotMatch(r2, /metadata\(\)/)
+})
+
+test('R2 deletion and upload stay inside flat menu image prefixes', () => {
+  const r2 = readSource('api/menu-image/_lib/r2.js')
+
+  assert.match(r2, /MENU_OBJECT_KEY_PATTERN/)
+  assert.match(r2, /normalizeMenuObjectKey\(key\)/)
+  assert.match(r2, /return normalizeMenuObjectKey\(value\)/)
+  assert.match(r2, /return normalizeMenuObjectKey\(url\.pathname\.slice\(basePath\.length\)\)/)
 })
 
 test('AdminMenu cleans up replaced or cancelled uploaded menu images', () => {

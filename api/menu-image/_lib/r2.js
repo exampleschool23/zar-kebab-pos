@@ -7,9 +7,10 @@ const IMAGE_EXTENSIONS = {
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
   'image/png': 'png',
-  'image/svg+xml': 'svg',
   'image/webp': 'webp',
 }
+const ALLOWED_IMAGE_TYPES = new Set(Object.keys(IMAGE_EXTENSIONS))
+const MENU_OBJECT_KEY_PATTERN = /^menu\/(?:products|categories)\/[a-z0-9][a-z0-9._-]{0,220}$/i
 
 function requiredEnv(name) {
   const value = process.env[name]
@@ -43,7 +44,36 @@ export function getR2Client() {
 export async function assertImageFile(file) {
   if (!file?.buffer?.length) throw new Error('Image file is required')
   const contentType = String(file.contentType || '').toLowerCase()
-  if (!contentType.startsWith('image/')) throw new Error('Only image uploads are allowed')
+  if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+    throw new Error('Only JPEG, PNG, WebP, GIF, or AVIF images are allowed')
+  }
+  if (!matchesImageSignature(file.buffer, contentType)) {
+    throw new Error('Image contents do not match the declared file type')
+  }
+}
+
+function matchesImageSignature(buffer, contentType) {
+  if (contentType === 'image/jpeg' || contentType === 'image/jpg') {
+    return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+  }
+  if (contentType === 'image/png') {
+    return buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  }
+  if (contentType === 'image/gif') {
+    const signature = buffer.subarray(0, 6).toString('ascii')
+    return signature === 'GIF87a' || signature === 'GIF89a'
+  }
+  if (contentType === 'image/webp') {
+    return buffer.length >= 12
+      && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+      && buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  }
+  if (contentType === 'image/avif') {
+    return buffer.length >= 16
+      && buffer.subarray(4, 8).toString('ascii') === 'ftyp'
+      && /avif|avis/.test(buffer.subarray(8, Math.min(buffer.length, 40)).toString('ascii'))
+  }
+  return false
 }
 
 function extensionForContentType(contentType) {
@@ -67,24 +97,37 @@ export function makeObjectKey({ type, entityId, contentType }) {
 }
 
 export async function uploadToR2({ key, file }) {
+  const safeKey = normalizeMenuObjectKey(key)
+  if (!safeKey) throw new Error('Invalid menu image object key')
+  await assertImageFile(file)
   const config = getR2Config()
   await getR2Client().send(new PutObjectCommand({
     Bucket: config.bucket,
-    Key: key,
+    Key: safeKey,
     Body: file.buffer,
     ContentType: file.contentType || 'image/webp',
     CacheControl: 'public, max-age=31536000, immutable',
   }))
   return {
-    key,
-    url: `${config.publicBaseUrl}/${key}`,
+    key: safeKey,
+    url: `${config.publicBaseUrl}/${safeKey}`,
+  }
+}
+
+export function normalizeMenuObjectKey(value) {
+  try {
+    const decoded = decodeURIComponent(String(value || '').trim().replace(/^\/+/, ''))
+    if (!MENU_OBJECT_KEY_PATTERN.test(decoded) || decoded.includes('..')) return ''
+    return decoded
+  } catch {
+    return ''
   }
 }
 
 export function keyFromR2Url(urlOrKey) {
   const value = String(urlOrKey || '').trim()
   if (!value) return ''
-  if (!/^https?:\/\//i.test(value)) return value.replace(/^\/+/, '')
+  if (!/^https?:\/\//i.test(value)) return normalizeMenuObjectKey(value)
 
   const { publicBaseUrl } = getR2Config()
   const base = new URL(publicBaseUrl)
@@ -93,7 +136,7 @@ export function keyFromR2Url(urlOrKey) {
 
   const basePath = base.pathname.replace(/\/+$/, '')
   if (basePath && !url.pathname.startsWith(`${basePath}/`)) return ''
-  return decodeURIComponent(url.pathname.slice(basePath.length).replace(/^\/+/, ''))
+  return normalizeMenuObjectKey(url.pathname.slice(basePath.length))
 }
 
 export async function deleteFromR2(urlOrKey) {
