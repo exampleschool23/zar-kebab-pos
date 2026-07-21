@@ -15,7 +15,7 @@ import {
   featureAccessForProfile,
   updateFeatureAccessSelection,
 } from '../lib/permissions'
-import { Search, RefreshCw, UserCircle2, Loader2, Eye, Trash2, X, Check, ShieldCheck, ChevronDown } from 'lucide-react'
+import { Search, RefreshCw, UserCircle2, Loader2, Eye, Trash2, X, Check, ShieldCheck, ChevronDown, Pencil } from 'lucide-react'
 
 const STATUSES = ['pending', 'active', 'disabled']
 const ROLES = APP_ROLES
@@ -69,6 +69,11 @@ const L = {
     removePendingPartial: (removed, failed) => `${removed} ta hisob o‘chirildi, ${failed} tasini o‘chirib bo‘lmadi`,
     you:         '(siz)',
     members:     n => `${n} ta a'zo`,
+    editName:    'Ismni o‘zgartirish',
+    saveName:    'Ismni saqlash',
+    nameRequired: 'Ism bo‘sh bo‘lishi mumkin emas',
+    nameSaved:   'Xodim ismi saqlandi',
+    nameError:   'Xodim ismini saqlab bo‘lmadi',
   },
   ru: {
     title:       'Команда',
@@ -105,6 +110,11 @@ const L = {
     removePendingPartial: (removed, failed) => `Удалено: ${removed}; не удалось удалить: ${failed}`,
     you:         '(вы)',
     members:     n => `${n} участников`,
+    editName:    'Изменить имя',
+    saveName:    'Сохранить имя',
+    nameRequired: 'Имя не может быть пустым',
+    nameSaved:   'Имя сотрудника сохранено',
+    nameError:   'Не удалось сохранить имя сотрудника',
   },
   en: {
     title:       'Team Members',
@@ -141,6 +151,11 @@ const L = {
     removePendingPartial: (removed, failed) => `${removed} removed; ${failed} could not be removed`,
     you:         '(you)',
     members:     n => `${n} member${n !== 1 ? 's' : ''}`,
+    editName:    'Edit name',
+    saveName:    'Save name',
+    nameRequired: 'Name cannot be empty',
+    nameSaved:   'Employee name saved',
+    nameError:   'Could not save employee name',
   },
 }
 
@@ -163,6 +178,8 @@ export default function AdminUsers() {
   const [removingAllPending, setRemovingAllPending] = useState(false)
   const [notice, setNotice]             = useState(null)
   const [expandedAccessId, setExpandedAccessId] = useState(null)
+  const [editingNameId, setEditingNameId] = useState(null)
+  const [nameDraft, setNameDraft] = useState('')
 
   async function loadUsers() {
     setLoading(true)
@@ -222,6 +239,44 @@ export default function AdminUsers() {
     setUsers(list => list.map(row => row.id === user.id ? { ...row, feature_access: nextAccess } : row))
     setSaving(null)
     setNotice({ tone: 'success', message: l.accessSaved })
+  }
+
+  function startNameEdit(user) {
+    if (myRole !== 'owner' || removingAllPending || !user?.id) return
+    setEditingNameId(user.id)
+    setNameDraft(user.full_name || '')
+    setNotice(null)
+  }
+
+  function cancelNameEdit() {
+    setEditingNameId(null)
+    setNameDraft('')
+  }
+
+  async function saveName(user) {
+    if (myRole !== 'owner' || removingAllPending || !user?.id) return
+    const fullName = nameDraft.trim().replace(/\s+/g, ' ')
+    if (!fullName) {
+      setNotice({ tone: 'error', message: l.nameRequired })
+      return
+    }
+    if (fullName === String(user.full_name || '').trim()) {
+      cancelNameEdit()
+      return
+    }
+
+    setSaving(user.id)
+    setNotice(null)
+    const { error } = await updateProfile(user.id, { full_name: fullName })
+    if (error) {
+      setNotice({ tone: 'error', message: error.message || l.nameError })
+      setSaving(null)
+      return
+    }
+    setUsers(list => list.map(row => row.id === user.id ? { ...row, full_name: fullName } : row))
+    setSaving(null)
+    cancelNameEdit()
+    setNotice({ tone: 'success', message: l.nameSaved })
   }
 
   async function handleDelete(user) {
@@ -375,6 +430,7 @@ export default function AdminUsers() {
                 const isDeleting = deleting === user.id
                 const isConfirmingDelete = confirmDeleteId === user.id
                 const isAccessExpanded = expandedAccessId === user.id
+                const isEditingName = editingNameId === user.id
                 const statusLabel = (STATUS_LABELS[user.status]?.[lang] || STATUS_LABELS[user.status]?.en) ?? user.status
                 const statusOptions = user.status === 'pending' ? STATUSES : ['active', 'disabled']
                 const roleLabel = (ROLE_LABELS[user.role]?.[lang] || ROLE_LABELS[user.role]?.en) ?? user.role
@@ -465,12 +521,61 @@ export default function AdminUsers() {
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="font-bold text-sm text-gray-900 truncate">
-                            {user.full_name || '—'}
-                          </p>
-                          {isMe && <span className="text-[10px] text-[#ff5a00] font-bold">{l.you}</span>}
-                        </div>
+                        {isEditingName ? (
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={nameDraft}
+                              onChange={event => setNameDraft(event.target.value)}
+                              onKeyDown={event => {
+                                if (event.key === 'Enter') saveName(user)
+                                if (event.key === 'Escape') cancelNameEdit()
+                              }}
+                              autoFocus
+                              autoComplete="off"
+                              className="h-8 min-w-0 flex-1 rounded-lg border border-orange-300 bg-white px-2 text-sm font-bold text-gray-900 outline-none ring-2 ring-orange-100"
+                              aria-label={l.editName}
+                              disabled={isSaving}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => saveName(user)}
+                              disabled={isSaving || !nameDraft.trim()}
+                              title={l.saveName}
+                              className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#ff5a00] text-white disabled:opacity-50"
+                            >
+                              {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelNameEdit}
+                              disabled={isSaving}
+                              title={l.cancel}
+                              className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 disabled:opacity-50"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-bold text-sm text-gray-900 truncate">
+                              {user.full_name || '—'}
+                            </p>
+                            {isMe && <span className="text-[10px] text-[#ff5a00] font-bold">{l.you}</span>}
+                            {myRole === 'owner' && (
+                              <button
+                                type="button"
+                                onClick={() => startNameEdit(user)}
+                                disabled={isSaving || removingAllPending}
+                                title={l.editName}
+                                aria-label={`${l.editName}: ${user.full_name || user.email}`}
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-orange-50 hover:text-[#ff5a00] disabled:opacity-50"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <p className="text-xs text-gray-400 truncate">{user.email}</p>
                         <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-400">{roleLabel}</p>
                       </div>

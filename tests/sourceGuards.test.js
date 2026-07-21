@@ -447,6 +447,17 @@ test('AdminUsers exposes role and status approval controls for editable staff', 
   assert.match(permissions, /if \(role === 'admin'\) return \['viewer', 'guest'\]/)
 })
 
+test('AdminUsers lets owners rename employees without changing historical order names', () => {
+  const adminUsers = readSource('src/pages/AdminUsers.jsx')
+  const saveNameBody = functionBody(adminUsers, 'saveName')
+
+  assert.match(adminUsers, /const \[editingNameId, setEditingNameId\] = useState\(null\)/)
+  assert.match(adminUsers, /myRole === 'owner'/)
+  assert.match(adminUsers, /onClick=\{\(\) => startNameEdit\(user\)\}/)
+  assert.match(saveNameBody, /updateProfile\(user\.id, \{ full_name: fullName \}\)/)
+  assert.doesNotMatch(saveNameBody, /orders/)
+})
+
 test('AdminUsers team table keeps action controls inside the page layout', () => {
   const adminUsers = readSource('src/pages/AdminUsers.jsx')
 
