@@ -6,8 +6,10 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronUp,
+  Clock3,
   CreditCard,
   HandCoins,
+  Loader2,
   Plus,
   ReceiptText,
   RefreshCw,
@@ -20,14 +22,14 @@ import {
   ShoppingBasket,
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
-import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { OperationalLoading } from '../components/OperationalState'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
 import { collapseDailyBazaarExpenseRows, getAccountingPageSummary, getAccountingQuickRange } from '../lib/accounting'
 import { formatCurrency } from '../lib/formatCurrency'
-import { formatLongDate } from '../lib/dateFormat'
+import { formatLongDate, formatTime } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import {
   EXPENSE_CATEGORIES,
@@ -39,6 +41,7 @@ import {
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
   expensePaymentMethodLabel,
+  getSalaryMonthEndDate,
   getTotalSalaryDue,
   isGeneratedSalaryExpense,
   normalizeExpenseAmount,
@@ -48,9 +51,11 @@ import {
 import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
-const FIELD_INPUT_CLASS = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00]'
+const FIELD_INPUT_CLASS = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
 const DATE_INPUT_CLASS = `${FIELD_INPUT_CLASS} text-transparent caret-transparent`
-const RANGE_DATE_INPUT_CLASS = 'h-6 w-[138px] bg-transparent text-sm text-transparent caret-transparent outline-none'
+const RANGE_DATE_INPUT_CLASS = 'h-6 w-full min-w-0 bg-transparent text-sm text-transparent caret-transparent outline-none'
+const ACCOUNTING_SECTION_GRID = 'grid items-start gap-5 lg:grid-cols-2'
+const HISTORY_SECTION_GRID = 'grid items-stretch gap-5 lg:grid-cols-2'
 
 function methodIcon(method) {
   if (method === 'card') return CreditCard
@@ -94,10 +99,11 @@ function expenseTone(expense) {
   }
 }
 
-function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS }) {
+function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS, disabled = false }) {
   const inputRef = useRef(null)
 
   function openPicker(event) {
+    if (disabled) return
     if (event?.button && event.button !== 0) return
     const input = inputRef.current
     if (!input) return
@@ -114,8 +120,8 @@ function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS }) {
   }
 
   return (
-    <div className="relative cursor-pointer" onPointerDown={openPicker}>
-      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center whitespace-nowrap text-sm font-semibold text-[#1F2937]">
+    <div className={`relative ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`} onPointerDown={openPicker}>
+      <span className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[#1F2937]">
         {formatLongDate(value, lang, value)}
       </span>
       <input
@@ -125,6 +131,7 @@ function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS }) {
         aria-label={formatLongDate(value, lang, value)}
         onChange={event => onChange(event.target.value)}
         className={`native-date-input cursor-pointer ${className}`}
+        disabled={disabled}
       />
     </div>
   )
@@ -212,8 +219,7 @@ export default function Expenses() {
       netProfitSub: 'Kafe daromadi minus sotilgan mahsulot tannarxi',
       avgDailyCafeIncome: "Kafe o'rtacha kunlik daromadi",
       periodCafeIncome: 'Tanlangan davr kafe daromadi',
-      investorIncome: 'Investor daromadi',
-      investorIncomeSub: 'Investor kiritgan pul',
+      investorSupportSub: 'Investor kiritgan yordam',
       otherIncomeSub: 'Boshqa daromad',
       investorSupport: 'Investor yordami',
       expenses: 'Xarajatlar',
@@ -234,9 +240,24 @@ export default function Expenses() {
       saving: 'Saqlanmoqda...',
       refresh: 'Yangilash',
       salaries: 'Maoshlar',
-      salaryDue: 'Maosh qarzi',
+      salaryDue: 'Hozirgi maosh qarzi',
+      salaryDueAsOf: 'Hisoblangan sana',
+      salaryDueMonthEnd: 'Oy oxirigacha maosh qarzi',
+      salaryDueProjection: 'Prognoz sanasi',
       estimate: 'Taxmin',
       dailyBazaar: 'Kunlik bozor',
+      period: 'Hisobot davri',
+      periodHelp: 'Quyidagi barcha ko‘rsatkichlar va tarix tanlangan davrga tegishli.',
+      overview: 'Moliyaviy ko‘rinish',
+      overviewHelp: 'Kafe daromadi, xarajatlar va qolgan mablag‘ bir joyda.',
+      operations: 'Yozuv va tahlil',
+      operationsHelp: 'Yangi operatsiyani yozing va pul qayerga ketayotganini ko‘ring.',
+      recentActivity: 'So‘nggi operatsiyalar',
+      recentActivityHelp: 'Investor yordami va xarajatlar yonma-yon ko‘rsatiladi.',
+      recordExpenseHelp: 'Kafedan chiqqan pulni yozing.',
+      recordIncomeHelp: 'Investor yoki boshqa tashqi manbadan kirgan pulni yozing.',
+      expenseSaved: 'Xarajat saqlandi',
+      incomeSaved: 'Daromad saqlandi',
       today: 'Bugun',
       week: '7 kun',
       month: 'Oy',
@@ -279,8 +300,7 @@ export default function Expenses() {
       netProfitSub: 'Доход кафе минус себестоимость проданных товаров',
       avgDailyCafeIncome: 'Среднедневной доход кафе',
       periodCafeIncome: 'Доход кафе за выбранный период',
-      investorIncome: 'Доход инвестора',
-      investorIncomeSub: 'Внесено инвестором',
+      investorSupportSub: 'Помощь, внесённая инвестором',
       otherIncomeSub: 'Другой доход',
       investorSupport: 'Поддержка инвестора',
       expenses: 'Расходы',
@@ -301,9 +321,24 @@ export default function Expenses() {
       saving: 'Сохраняется...',
       refresh: 'Обновить',
       salaries: 'Зарплаты',
-      salaryDue: 'Долг по зарплате',
+      salaryDue: 'Долг по зарплате сейчас',
+      salaryDueAsOf: 'На дату',
+      salaryDueMonthEnd: 'Долг по зарплате к концу месяца',
+      salaryDueProjection: 'Прогноз на',
       estimate: 'Прогноз',
       dailyBazaar: 'Ежедневный базар',
+      period: 'Отчётный период',
+      periodHelp: 'Все показатели и история ниже относятся к выбранному периоду.',
+      overview: 'Финансовый обзор',
+      overviewHelp: 'Доход кафе, расходы и остаток собраны в одном месте.',
+      operations: 'Запись и анализ',
+      operationsHelp: 'Запишите новую операцию и посмотрите, куда уходят деньги.',
+      recentActivity: 'Последние операции',
+      recentActivityHelp: 'Поддержка инвестора и расходы показаны рядом.',
+      recordExpenseHelp: 'Запишите деньги, которые были потрачены из кассы кафе.',
+      recordIncomeHelp: 'Запишите деньги от инвестора или другого внешнего источника.',
+      expenseSaved: 'Расход сохранён',
+      incomeSaved: 'Доход сохранён',
       today: 'Сегодня',
       week: '7 дней',
       month: 'Месяц',
@@ -346,8 +381,7 @@ export default function Expenses() {
       netProfitSub: 'Cafe income minus cost of sold items',
       avgDailyCafeIncome: 'Avg daily cafe income',
       periodCafeIncome: 'Selected period cafe income',
-      investorIncome: 'Investor income',
-      investorIncomeSub: 'Investor support entries',
+      investorSupportSub: 'Investor support entries',
       otherIncomeSub: 'Other income',
       investorSupport: 'Investor support',
       expenses: 'Expenses',
@@ -368,9 +402,24 @@ export default function Expenses() {
       saving: 'Saving...',
       refresh: 'Refresh',
       salaries: 'Salaries',
-      salaryDue: 'Salary due',
+      salaryDue: 'Salary due now',
+      salaryDueAsOf: 'As of',
+      salaryDueMonthEnd: 'Salary due by month end',
+      salaryDueProjection: 'Projected for',
       estimate: 'Estimate',
       dailyBazaar: 'Daily bazaar',
+      period: 'Reporting period',
+      periodHelp: 'All totals and history below use the selected period.',
+      overview: 'Financial overview',
+      overviewHelp: 'Cafe income, expenses, and remaining money in one place.',
+      operations: 'Record and analyse',
+      operationsHelp: 'Record a new transaction and see where the money is going.',
+      recentActivity: 'Recent activity',
+      recentActivityHelp: 'Investor support and expenses are shown side by side.',
+      recordExpenseHelp: 'Record money spent from the cafe.',
+      recordIncomeHelp: 'Record money received from an investor or another external source.',
+      expenseSaved: 'Expense saved',
+      incomeSaved: 'Income saved',
       today: 'Today',
       week: '7 days',
       month: 'Month',
@@ -406,6 +455,13 @@ export default function Expenses() {
   }
   const l = L[lang] || L.en
   const categoryOptions = form.entry_type === 'income' ? INCOME_CATEGORIES : MANUAL_EXPENSE_CATEGORIES
+  const formGuidance = form.entry_type === 'income' ? l.recordIncomeHelp : l.recordExpenseHelp
+  const canSubmitExpense = canAdd && !saving && Boolean(
+    form.expense_date &&
+    form.category &&
+    form.payment_method &&
+    normalizeExpenseAmount(form.amount) > 0
+  )
 
   async function loadExpenses() {
     const requestId = loadRequestRef.current + 1
@@ -493,7 +549,10 @@ export default function Expenses() {
 
   const allExpenses = useMemo(() => (
     [...salaryExpenses, ...salaryBonusExpenses, ...expenses]
-      .sort((a, b) => b.expense_date.localeCompare(a.expense_date))
+      .sort((a, b) => (
+        b.expense_date.localeCompare(a.expense_date) ||
+        String(b.created_at || '').localeCompare(String(a.created_at || ''))
+      ))
   ), [salaryExpenses, salaryBonusExpenses, expenses])
 
   const filteredExpenses = allExpenses
@@ -534,6 +593,11 @@ export default function Expenses() {
   const currentAccountingDate = todayExpenseDate()
   const salaryDueDate = dateTo < currentAccountingDate ? dateTo : currentAccountingDate
   const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
+  const salaryMonthEndDate = getSalaryMonthEndDate(salaryDueDate)
+  const totalSalaryDueByMonthEnd = useMemo(
+    () => getTotalSalaryDue(salaryProfiles, salaryMonthEndDate),
+    [salaryProfiles, salaryMonthEndDate]
+  )
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])
 
@@ -589,7 +653,7 @@ export default function Expenses() {
       vendor: '',
       description: '',
     }))
-    setMessage(l.save)
+    setMessage(entryType === 'income' ? l.incomeSaved : l.expenseSaved)
     await loadExpenses()
   }
 
@@ -613,57 +677,87 @@ export default function Expenses() {
     <AppShell title={l.title}>
       <div className="h-full overflow-y-auto bg-[#FAF7F0]">
         <div className="mx-auto max-w-[1200px] px-4 py-5 sm:px-5 sm:py-6">
-          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <header className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
+              <h1 className="text-2xl font-black text-[#1F2937] sm:text-3xl">{l.title}</h1>
               <p className="mt-1 text-sm font-medium text-[#6B7280]">{l.sub}</p>
             </div>
-          </div>
+            <nav aria-label={l.title} className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto">
+              <AccountingShortcut icon={Users} label={l.salaries} tone="orange" onClick={() => navigate('/admin/accounting/salaries')} />
+              <AccountingShortcut icon={ReceiptText} label={l.estimate} tone="blue" onClick={() => navigate('/admin/accounting/estimate')} />
+              <AccountingShortcut icon={ShoppingBasket} label={l.dailyBazaar} tone="teal" onClick={() => navigate('/admin/bazaar')} />
+            </nav>
+          </header>
 
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 shadow-sm">
-              <span className="text-[11px] font-bold text-[#9CA3AF]">{l.from}</span>
-              <DateInput value={dateFrom} lang={lang} onChange={setCustomDateFrom} className={RANGE_DATE_INPUT_CLASS} />
-              <span className="text-[#9CA3AF]">—</span>
-              <span className="text-[11px] font-bold text-[#9CA3AF]">{l.to}</span>
-              <DateInput value={dateTo} lang={lang} onChange={setCustomDateTo} className={RANGE_DATE_INPUT_CLASS} />
+          <section className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm" aria-labelledby="accounting-period-heading">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <CalendarDays size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h2 id="accounting-period-heading" className="text-base font-black text-[#1F2937]">{l.period}</h2>
+                  <p className="mt-0.5 text-xs font-medium text-[#6B7280]">{l.periodHelp}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={loadExpenses}
+                disabled={loading}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280] transition-colors hover:border-blue-200 hover:text-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}{l.refresh}
+              </button>
             </div>
-            {[
-              { key: 'today', label: l.today },
-              { key: 'week', label: l.week },
-              { key: 'month', label: l.month },
-              { key: 'previousMonth', label: l.previousMonth },
-            ].map(option => {
-              const selected = activeRangeKey === option.key
-              return (
-                <button
-                  key={option.key}
-                  onClick={() => selectQuickRange(option.key)}
-                  className={`rounded-xl border px-3 py-2 text-xs font-black shadow-sm ${
-                    selected
-                      ? 'border-[#ff5a00] bg-[#ff5a00] text-white shadow-orange-100'
-                      : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-orange-200 hover:text-[#ff5a00]'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              )
-            })}
-            <button onClick={loadExpenses} className="inline-flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
-              <RefreshCw size={14} />{l.refresh}
-            </button>
-            <button onClick={() => navigate('/admin/accounting/salaries')} className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-black text-[#ff5a00] shadow-sm">
-              <Users size={14} />{l.salaries}
-            </button>
-            <button onClick={() => navigate('/admin/accounting/estimate')} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-600 shadow-sm">
-              <ReceiptText size={14} />{l.estimate}
-            </button>
-            <button onClick={() => navigate('/admin/bazaar')} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-black text-teal-700 shadow-sm">
-              <ShoppingBasket size={14} />{l.dailyBazaar}
-            </button>
-          </div>
+            <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                {[
+                  { key: 'today', label: l.today },
+                  { key: 'week', label: l.week },
+                  { key: 'month', label: l.month },
+                  { key: 'previousMonth', label: l.previousMonth },
+                ].map(option => {
+                  const selected = activeRangeKey === option.key
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => selectQuickRange(option.key)}
+                      aria-pressed={selected}
+                      className={`h-10 rounded-xl border px-3 text-xs font-black transition-colors ${
+                        selected
+                          ? 'border-[#ff5a00] bg-[#ff5a00] text-white shadow-sm shadow-orange-100'
+                          : 'border-[#E5E7EB] bg-[#FBFCFD] text-[#6B7280] hover:border-orange-200 hover:text-[#ff5a00]'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-[460px]">
+                <div className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#FBFCFD] px-3">
+                  <span className="flex-shrink-0 text-[11px] font-bold text-[#9CA3AF]">{l.from}</span>
+                  <div className="min-w-0 flex-1"><DateInput value={dateFrom} lang={lang} onChange={setCustomDateFrom} className={RANGE_DATE_INPUT_CLASS} /></div>
+                </div>
+                <div className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#FBFCFD] px-3">
+                  <span className="flex-shrink-0 text-[11px] font-bold text-[#9CA3AF]">{l.to}</span>
+                  <div className="min-w-0 flex-1"><DateInput value={dateTo} lang={lang} onChange={setCustomDateTo} className={RANGE_DATE_INPUT_CLASS} /></div>
+                </div>
+              </div>
+            </div>
+          </section>
 
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div>}
+          {message && !error && <div role="status" aria-live="polite" className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">{message}</div>}
+
+          <section className="mb-7" aria-labelledby="accounting-overview-heading">
+            <SectionHeading
+              id="accounting-overview-heading"
+              title={l.overview}
+              description={`${l.overviewHelp} · ${formatLongDate(dateFrom, lang, dateFrom)} — ${formatLongDate(dateTo, lang, dateTo)}`}
+            />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi icon={WalletCards} label={l.cafeIncome} value={formatCurrency(cafeIncome)} sub={l.cafeIncomeSub} tone="green" />
             <Kpi icon={BadgeDollarSign} label={l.netProfit} value={formatCurrency(netProfit)} sub={l.netProfitSub} tone={netProfit >= 0 ? 'green' : 'red'} />
             <Kpi
@@ -675,54 +769,68 @@ export default function Expenses() {
             />
             <Kpi
               icon={HandCoins}
-              label={l.investorIncome}
+              label={l.investorSupport}
               value={loading ? '—' : formatCurrency(investorSupportTotal)}
-              sub={otherIncomeTotal > 0 ? `${l.otherIncomeSub}: ${formatCurrency(otherIncomeTotal)}` : l.investorIncomeSub}
+              sub={otherIncomeTotal > 0 ? `${l.otherIncomeSub}: ${formatCurrency(otherIncomeTotal)}` : l.investorSupportSub}
               tone="purple"
             />
             <Kpi icon={ReceiptText} label={l.expenses} value={formatCurrency(summary.total)} sub={`${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" />
             <Kpi icon={Banknote} label={l.left} value={formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
-            <Kpi icon={Users} label={l.salaryDue} value={formatCurrency(totalSalaryDue)} tone={totalSalaryDue > 0 ? 'orange' : 'green'} />
-          </div>
-
-          {error && (
-            <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-              {error}
+            <Kpi
+              icon={Users}
+              label={l.salaryDue}
+              value={formatCurrency(totalSalaryDue)}
+              sub={`${l.salaryDueAsOf}: ${formatLongDate(salaryDueDate, lang, salaryDueDate)}`}
+              tone={totalSalaryDue > 0 ? 'orange' : 'green'}
+            />
+            <Kpi
+              icon={CalendarDays}
+              label={l.salaryDueMonthEnd}
+              value={formatCurrency(totalSalaryDueByMonthEnd)}
+              sub={`${l.salaryDueProjection}: ${formatLongDate(salaryMonthEndDate, lang, salaryMonthEndDate)}`}
+              tone={totalSalaryDueByMonthEnd > 0 ? 'red' : 'green'}
+            />
             </div>
-          )}
-          {message && !error && (
-            <div className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">
-              {message}
-            </div>
-          )}
+          </section>
 
-          <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
-            <div className="space-y-5">
-              <MethodBalancesDisclosure rows={cashflow.rows} lang={lang} labels={l} />
-              <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h2 className="text-base font-black text-[#1F2937]">{form.entry_type === 'income' ? l.addIncome : l.add}</h2>
-                  <Plus size={18} className="text-[#ff5a00]" />
-                </div>
+          <section className="mb-7" aria-labelledby="accounting-operations-heading">
+            <SectionHeading id="accounting-operations-heading" title={l.operations} description={l.operationsHelp} />
+            <div className={ACCOUNTING_SECTION_GRID}>
+              <div className="space-y-5">
+                <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+                  <CardHeading
+                    icon={form.entry_type === 'income' ? HandCoins : ReceiptText}
+                    title={form.entry_type === 'income' ? l.addIncome : l.add}
+                    description={formGuidance}
+                    tone={form.entry_type === 'income' ? 'green' : 'orange'}
+                  />
                 {!canAdd ? (
                   <p className="rounded-xl bg-gray-50 px-3 py-3 text-sm font-bold text-[#6B7280]">{l.readOnly}</p>
                 ) : (
-                  <form onSubmit={saveExpense} className="space-y-3">
-                    <Field label={l.entryType}>
+                  <form onSubmit={saveExpense} className="grid gap-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <Field label={l.entryType}>
                       <div className="grid grid-cols-2 gap-2">
                         {EXPENSE_ENTRY_TYPES.map(entryType => {
                           const active = form.entry_type === entryType
+                          const incomeEntry = entryType === 'income'
                           return (
                             <button
                               key={entryType}
                               type="button"
+                              disabled={saving}
+                              aria-pressed={active}
                               onClick={() => setForm(current => ({
                                 ...current,
                                 entry_type: entryType,
                                 category: entryType === 'income' ? 'investor_support' : 'charcoal',
                               }))}
                               className={`flex h-11 items-center justify-center rounded-xl border text-xs font-black transition-colors ${
-                                active ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'
+                                active && incomeEntry
+                                  ? 'border-green-400 bg-green-50 text-green-700 ring-2 ring-green-100'
+                                  : active
+                                    ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00] ring-2 ring-orange-100'
+                                    : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100'
                               }`}
                             >
                               {entryType === 'income' ? l.incomeType : l.expenseType}
@@ -730,40 +838,15 @@ export default function Expenses() {
                           )
                         })}
                       </div>
-                    </Field>
+                      </Field>
+                    </div>
                     <Field label={l.date}>
                       <DateInput
                         value={form.expense_date}
                         lang={lang}
                         onChange={value => setForm(current => ({ ...current, expense_date: value }))}
+                        disabled={saving}
                       />
-                    </Field>
-                    <Field label={l.category}>
-                      <select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} className={FIELD_INPUT_CLASS}>
-                        {categoryOptions.map(category => (
-                          <option key={category.key} value={category.key}>{expenseCategoryLabel(category.key, lang)}</option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label={l.method}>
-                      <div className="grid grid-cols-3 gap-2">
-                        {EXPENSE_PAYMENT_METHODS.map(method => {
-                          const Icon = methodIcon(method)
-                          const active = form.payment_method === method
-                          return (
-                            <button
-                              key={method}
-                              type="button"
-                              onClick={() => setForm(current => ({ ...current, payment_method: method }))}
-                              className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-xs font-black transition-colors ${
-                                active ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]' : 'border-[#E5E7EB] bg-white text-[#6B7280]'
-                              }`}
-                            >
-                              <Icon size={14} />{expensePaymentMethodLabel(method, lang)}
-                            </button>
-                          )
-                        })}
-                      </div>
                     </Field>
                     <Field label={l.amount}>
                       <input
@@ -772,22 +855,75 @@ export default function Expenses() {
                         value={formatMoneyInput(form.amount)}
                         onChange={event => setForm(current => ({ ...current, amount: normalizeMoneyInput(event.target.value) }))}
                         className={`${FIELD_INPUT_CLASS} text-lg font-black tabular-nums`}
-                        placeholder="0"
+                        placeholder="0 UZS"
+                        disabled={saving}
                       />
                     </Field>
-                    <Field label={form.entry_type === 'income' ? l.source : l.vendor}>
-                      <input value={form.vendor} onChange={event => setForm(current => ({ ...current, vendor: event.target.value }))} className={FIELD_INPUT_CLASS} />
-                    </Field>
-                    <Field label={l.description}>
-                      <textarea value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} rows={3} className={`${FIELD_INPUT_CLASS} min-h-[92px] resize-y`} />
-                    </Field>
-                    <button disabled={saving} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#ff5a00] text-sm font-black text-white shadow-sm shadow-orange-200 disabled:cursor-not-allowed disabled:bg-gray-200">
-                      <Plus size={16} />{saving ? l.saving : l.save}
+                    <div className="sm:col-span-2">
+                      <Field label={l.category}>
+                      <select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} className={FIELD_INPUT_CLASS} disabled={saving}>
+                        {categoryOptions.map(category => (
+                          <option key={category.key} value={category.key}>{expenseCategoryLabel(category.key, lang)}</option>
+                        ))}
+                      </select>
+                      </Field>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Field label={l.method}>
+                      <div className="grid grid-cols-3 gap-2">
+                        {EXPENSE_PAYMENT_METHODS.map(method => {
+                          const Icon = methodIcon(method)
+                          const active = form.payment_method === method
+                          return (
+                            <button
+                              key={method}
+                              type="button"
+                              disabled={saving}
+                              aria-pressed={active}
+                              onClick={() => setForm(current => ({ ...current, payment_method: method }))}
+                              className={`flex h-11 items-center justify-center gap-1.5 rounded-xl border text-xs font-black transition-colors ${
+                                active && form.entry_type === 'income'
+                                  ? 'border-green-400 bg-green-50 text-green-700 ring-2 ring-green-100'
+                                  : active
+                                    ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00] ring-2 ring-orange-100'
+                                    : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100'
+                              }`}
+                            >
+                              <Icon size={14} />{expensePaymentMethodLabel(method, lang)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      </Field>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Field label={form.entry_type === 'income' ? l.source : l.vendor}>
+                        <input value={form.vendor} onChange={event => setForm(current => ({ ...current, vendor: event.target.value }))} className={FIELD_INPUT_CLASS} disabled={saving} />
+                      </Field>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Field label={l.description}>
+                        <textarea value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} rows={3} className={`${FIELD_INPUT_CLASS} min-h-[88px] resize-y py-3`} disabled={saving} />
+                      </Field>
+                    </div>
+                    <button
+                      disabled={!canSubmitExpense}
+                      className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-black text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none sm:col-span-2 ${form.entry_type === 'income' ? 'bg-green-600 shadow-green-100 hover:bg-green-700' : 'bg-[#ff5a00] shadow-orange-200 hover:bg-[#e85100]'}`}
+                    >
+                      {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}{saving ? l.saving : l.save}
                     </button>
                   </form>
                 )}
-              </section>
+                </section>
+                <MethodBalancesDisclosure rows={cashflow.rows} lang={lang} labels={l} />
+              </div>
+              <ExpenseCategoryChart title={l.moneyFlow} rows={categoryRows} total={summary.total} lang={lang} />
+            </div>
+          </section>
 
+          <section className="mb-5" aria-labelledby="accounting-activity-heading">
+            <SectionHeading id="accounting-activity-heading" title={l.recentActivity} description={l.recentActivityHelp} />
+            <div className={HISTORY_SECTION_GRID}>
               <ExpenseHistorySection
                 title={l.investorHistory}
                 titleAmount={investorSupportTotal}
@@ -806,10 +942,6 @@ export default function Expenses() {
                 seeAllLabel={l.seeAll}
                 onSeeAll={() => navigate('/admin/accounting/history')}
               />
-            </div>
-
-            <div className="min-w-0 space-y-5">
-              <ExpenseCategoryChart title={l.moneyFlow} rows={categoryRows} total={summary.total} lang={lang} />
               <ExpenseHistorySection
                 title={l.history}
                 rows={filteredExpenseRows}
@@ -828,10 +960,51 @@ export default function Expenses() {
                 onSeeAll={() => navigate('/admin/accounting/history')}
               />
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </AppShell>
+  )
+}
+
+function AccountingShortcut({ icon: Icon, label, tone = 'orange', onClick }) {
+  const tones = {
+    orange: 'border-orange-200 bg-orange-50 text-[#ff5a00] hover:bg-orange-100',
+    blue: 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100',
+    teal: 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100',
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-black shadow-sm transition-colors ${tones[tone] || tones.orange}`}
+    >
+      <Icon size={17} />{label}
+    </button>
+  )
+}
+
+function SectionHeading({ id, title, description }) {
+  return (
+    <div className="mb-3">
+      <h2 id={id} className="text-lg font-black text-[#1F2937]">{title}</h2>
+      <p className="mt-0.5 text-sm font-medium text-[#6B7280]">{description}</p>
+    </div>
+  )
+}
+
+function CardHeading({ icon: Icon, title, description, tone = 'orange' }) {
+  const iconTone = tone === 'green' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-[#ff5a00]'
+  return (
+    <div className="mb-5 flex min-h-[56px] items-start gap-3">
+      <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${iconTone}`}>
+        <Icon size={17} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-base font-black text-[#1F2937]">{title}</span>
+        <span className="mt-0.5 block text-xs font-medium leading-relaxed text-[#6B7280]">{description}</span>
+      </span>
+    </div>
   )
 }
 
@@ -854,7 +1027,7 @@ function ExpenseHistorySection({
   onSeeAll,
 }) {
   return (
-    <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
+    <section className="h-full rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
       <div className="border-b border-[#F3F4F6] px-4 py-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-black text-[#1F2937]">{title}</h2>
@@ -899,7 +1072,13 @@ function ExpenseHistorySection({
                       <Icon size={11} />{expensePaymentMethodLabel(expense.payment_method, lang)}
                     </span>
                   </div>
-                  <p className="text-xs font-bold text-[#9CA3AF]">{formatLongDate(expense.expense_date, lang, expense.expense_date)} · {expense.created_by_name || '—'}</p>
+                  <p className="flex flex-wrap items-center gap-1.5 text-xs font-bold text-[#9CA3AF]">
+                    <span>{formatLongDate(expense.expense_date, lang, expense.expense_date)}</span>
+                    <span>·</span>
+                    <span className="inline-flex items-center gap-1"><Clock3 size={12} />{formatTime(expense.created_at, '—')}</span>
+                    <span>·</span>
+                    <span>{expense.created_by_name || '—'}</span>
+                  </p>
                   {(expense.vendor || expense.description) && (
                     <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">
                       {[expense.vendor, expense.description].filter(Boolean).join(' · ')}
@@ -1023,7 +1202,7 @@ function MethodBalancesDisclosure({ rows, lang, labels }) {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-[#6B7280]">{label}</span>
+      <span className="mb-1.5 block text-xs font-bold text-[#596170]">{label}</span>
       {children}
     </label>
   )
@@ -1038,13 +1217,17 @@ function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange' }) {
     purple: 'bg-purple-50 text-purple-600',
   }
   return (
-    <div className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-      <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl ${tones[tone] || tones.orange}`}>
-        <Icon size={20} />
+    <div className="h-full min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-[#6B7280]">{label}</p>
+          <p className="mt-1 break-words text-xl font-black leading-tight text-[#1F2937] tabular-nums">{value}</p>
+        </div>
+        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${tones[tone] || tones.orange}`}>
+          <Icon size={18} />
+        </div>
       </div>
-      <p className="text-xs font-black uppercase tracking-wide text-[#9CA3AF]">{label}</p>
-      <p className="mt-1 break-words text-2xl font-black text-[#1F2937]">{value}</p>
-      {sub && <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{sub}</p>}
+      {sub && <p className="mt-3 min-h-[30px] text-xs font-medium leading-relaxed text-[#9CA3AF]">{sub}</p>}
     </div>
   )
 }

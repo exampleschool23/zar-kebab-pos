@@ -340,6 +340,7 @@ export function buildSalaryPaymentExpenseRows(salaryProfiles = [], dateFrom, dat
         vendor: name,
         description: payment.note || 'Salary payment',
         created_by_name: payment.created_by_name || name,
+        created_at: payment.created_at,
         is_salary_payment: true,
         salary_profile_id: salaryProfile.id,
         employee_id: salaryProfile.profile_id,
@@ -371,6 +372,7 @@ export function buildSalaryBonusExpenseRows(salaryProfiles = [], dateFrom, dateT
         vendor: name,
         description: bonus.note || 'Employee bonus',
         created_by_name: bonus.created_by_name || name,
+        created_at: bonus.created_at,
         is_salary_bonus: true,
         salary_profile_id: salaryProfile.id,
         employee_id: salaryProfile.profile_id,
@@ -425,7 +427,7 @@ export function getTotalSalaryDue(salaryProfiles = [], dateTo = todayExpenseDate
   ), 0)
 }
 
-function getMonthEndDate(asOfDate = todayExpenseDate()) {
+export function getSalaryMonthEndDate(asOfDate = todayExpenseDate()) {
   const date = String(asOfDate || todayExpenseDate()).slice(0, 10)
   const [year, month] = date.split('-').map(Number)
   if (!year || !month) return date
@@ -436,7 +438,7 @@ function getMonthEndDate(asOfDate = todayExpenseDate()) {
 export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate = todayExpenseDate(), options = {}) {
   const date = String(asOfDate || todayExpenseDate()).slice(0, 10)
   const monthStart = `${date.slice(0, 8)}01`
-  const monthEnd = getMonthEndDate(date)
+  const monthEnd = getSalaryMonthEndDate(date)
   const paidThroughDate = date > monthEnd ? monthEnd : date
   const activeFromDate = String(options.activeFromDate || '').slice(0, 10)
   const isBeforeActiveMonth = activeFromDate && monthEnd < activeFromDate

@@ -24,7 +24,8 @@ import { todayExpenseDate } from '../lib/expenses'
 import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
 import { notifyTelegramEmployeeFine } from '../lib/telegramNotifications'
 
-const FIELD = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none focus:border-[#ff5a00]'
+const FIELD = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
+const SECTION_GRID = 'grid items-stretch gap-4 lg:grid-cols-2'
 const PAGE_SIZE = 12
 
 function isMissingSalaryMigration(error) {
@@ -175,6 +176,22 @@ export default function Salaries() {
       totalDue: 'Jami qarzdorlik',
       monthlyPayroll: 'Oylik maoshlar',
       employees: 'Xodimlar',
+      openEmployees: 'Xodimlar ro‘yxatini ochish',
+      quickActions: 'Kundalik operatsiyalar',
+      quickActionsHelp: 'To‘lov, bonus, jarima yoki kelmagan kunni bir joyda yozing.',
+      salarySettings: 'Maosh sozlamalari',
+      salarySettingsHelp: 'Yangi xodim uchun maosh belgilang yoki amaldagi stavkani o‘zgartiring.',
+      addHelp: 'Yangi xodim va uning boshlang‘ich maoshini kiriting.',
+      changeHelp: 'Yangi stavka va u amal qiladigan sanani belgilang.',
+      transactionHelp: 'Operatsiya turini tanlang, keyin xodim va summani kiriting.',
+      paymentHelp: 'To‘lov xodimga bo‘lgan qarzni kamaytiradi.',
+      bonusHelp: 'Bonus — maoshdan tashqari qo‘shimcha to‘lov.',
+      fineHelp: 'Jarima maosh qarzini kamaytiradi, lekin kassa xarajati hisoblanmaydi.',
+      absenceHelp: 'Tanlangan sana uchun ishga kelmagan xodimni belgilang.',
+      createdMessage: 'Xodim maoshi qo‘shildi',
+      rateSavedMessage: 'Yangi maosh stavkasi saqlandi',
+      transactionSavedMessage: 'Operatsiya saqlandi',
+      absenceSavedMessage: 'Kelmagan kun saqlandi',
       accruedToday: 'Bugungi xarajat',
       history: 'Maosh tarixi',
       historyBtn: 'Tarix',
@@ -232,6 +249,22 @@ export default function Salaries() {
       totalDue: 'Общий долг',
       monthlyPayroll: 'Зарплаты в месяц',
       employees: 'Сотрудники',
+      openEmployees: 'Открыть список сотрудников',
+      quickActions: 'Ежедневные операции',
+      quickActionsHelp: 'Записывайте выплаты, бонусы, штрафы и отсутствия в одном месте.',
+      salarySettings: 'Настройка зарплат',
+      salarySettingsHelp: 'Назначьте зарплату новому сотруднику или измените действующую ставку.',
+      addHelp: 'Укажите нового сотрудника и его первоначальную зарплату.',
+      changeHelp: 'Укажите новую ставку и дату, с которой она действует.',
+      transactionHelp: 'Сначала выберите тип операции, затем сотрудника и сумму.',
+      paymentHelp: 'Выплата уменьшает долг перед сотрудником.',
+      bonusHelp: 'Бонус — дополнительная выплата сверх зарплаты.',
+      fineHelp: 'Штраф уменьшает долг по зарплате, но не считается расходом кассы.',
+      absenceHelp: 'Отметьте сотрудника, который отсутствовал в выбранную дату.',
+      createdMessage: 'Зарплата сотрудника добавлена',
+      rateSavedMessage: 'Новая ставка зарплаты сохранена',
+      transactionSavedMessage: 'Операция сохранена',
+      absenceSavedMessage: 'Отсутствие сохранено',
       accruedToday: 'Расход за день',
       history: 'История зарплаты',
       historyBtn: 'История',
@@ -289,6 +322,22 @@ export default function Salaries() {
       totalDue: 'Total due',
       monthlyPayroll: 'Monthly salaries',
       employees: 'Employees',
+      openEmployees: 'Open employee list',
+      quickActions: 'Daily operations',
+      quickActionsHelp: 'Record payments, bonuses, fines, and absences in one place.',
+      salarySettings: 'Salary setup',
+      salarySettingsHelp: 'Set a salary for a new employee or change an active rate.',
+      addHelp: 'Enter a new employee and their starting salary.',
+      changeHelp: 'Set the new rate and the date it takes effect.',
+      transactionHelp: 'Choose an operation first, then select the employee and amount.',
+      paymentHelp: 'A payment reduces the amount owed to the employee.',
+      bonusHelp: 'A bonus is an additional payment outside regular salary.',
+      fineHelp: 'A fine reduces payroll liability but is not a cash expense.',
+      absenceHelp: 'Mark the employee who was absent on the selected date.',
+      createdMessage: 'Employee salary added',
+      rateSavedMessage: 'New salary rate saved',
+      transactionSavedMessage: 'Transaction saved',
+      absenceSavedMessage: 'Absence saved',
       accruedToday: 'Daily expense',
       history: 'Salary history',
       historyBtn: 'History',
@@ -395,6 +444,12 @@ export default function Salaries() {
   ), [sortedSalaryProfiles, transactionForm.entry_type, transactionForm.paid_date, today])
   const totalDue = useMemo(() => getTotalSalaryDue(salaryProfiles, today), [salaryProfiles, today])
   const monthlyPayrollTotal = useMemo(() => getTotalMonthlySalaryCommitment(salaryProfiles, today), [salaryProfiles, today])
+  const selectedTransactionProfile = salaryProfiles.find(item => item.id === transactionForm.salary_profile_id)
+  const transactionGuidance = transactionForm.entry_type === 'fine'
+    ? l.fineHelp
+    : transactionForm.entry_type === 'bonus'
+      ? l.bonusHelp
+      : l.paymentHelp
   const salaryHistoryLabels = useMemo(() => ({
     absence: l.absenceHistory,
     payment: l.paymentHistory,
@@ -445,7 +500,7 @@ export default function Salaries() {
       setError(rateError.message)
       return
     }
-    setMessage(l.save)
+    setMessage(l.createdMessage)
     setForm(current => ({ ...current, employee_name: '', salary_amount: '' }))
     await loadData()
   }
@@ -456,6 +511,8 @@ export default function Salaries() {
     const amount = normalizeExpenseAmount(changeForm.salary_amount)
     const effectiveFrom = changeForm.effective_from || today
     if (!canManage || amount <= 0) return
+    setError('')
+    setMessage('')
     setSaving('rate-create')
     const { error: rateError } = await supabase.from('employee_salary_rates').insert(buildSalaryRatePayload({
       salaryProfileId: selectedProfile.id,
@@ -477,6 +534,7 @@ export default function Salaries() {
       salary_unit: 'daily',
       note: '',
     })
+    setMessage(l.rateSavedMessage)
     await loadData()
   }
 
@@ -491,6 +549,8 @@ export default function Salaries() {
     const isFine = entryType === 'fine'
     const reason = String(transactionForm.note || '').trim()
     if (!canManage || amount <= 0 || (isFine && !reason) || !canRecordSalaryTransaction(salaryProfile, entryType, paidDate)) return
+    setError('')
+    setMessage('')
     setSaving(`${entryType}-create`)
     let writeResult
     if (isFine) {
@@ -538,6 +598,7 @@ export default function Salaries() {
       payment_method: 'cash',
       note: '',
     })
+    setMessage(l.transactionSavedMessage)
     await loadData()
   }
 
@@ -545,6 +606,8 @@ export default function Salaries() {
     const salaryProfile = salaryProfiles.find(item => item.id === absenceForm.salary_profile_id)
     const absenceDate = absenceForm.absence_date || today
     if (!canManage || !salaryProfile || !absenceDate) return
+    setError('')
+    setMessage('')
     setSaving('absence-create')
     const { error: writeError } = await supabase.from('employee_salary_absences').insert({
       salary_profile_id: salaryProfile.id,
@@ -559,6 +622,7 @@ export default function Salaries() {
       return
     }
     setAbsenceForm({ salary_profile_id: '', absence_date: today, note: '' })
+    setMessage(l.absenceSavedMessage)
     await loadData()
   }
 
@@ -720,121 +784,63 @@ export default function Salaries() {
     <AppShell title={l.title}>
       <div className="h-full overflow-y-auto bg-[#FAF7F0]">
         <div className="mx-auto max-w-[1200px] px-4 py-5 sm:px-5 sm:py-6">
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <button onClick={() => navigate('/admin/accounting')} className="mb-3 inline-flex items-center gap-2 text-xs font-black text-[#6B7280] hover:text-[#ff5a00]">
-                <ArrowLeft size={14} />{l.back}
-              </button>
-              <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
+          <header className="mb-6">
+            <button onClick={() => navigate('/admin/accounting')} className="mb-3 inline-flex items-center gap-2 text-xs font-black text-[#6B7280] transition-colors hover:text-[#ff5a00]">
+              <ArrowLeft size={14} />{l.back}
+            </button>
+            <div className="mb-5">
+              <h1 className="text-2xl font-black text-[#1F2937] sm:text-3xl">{l.title}</h1>
               <p className="mt-1 text-sm font-medium text-[#6B7280]">{l.sub}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex h-[70px] flex-col justify-center rounded-xl border border-orange-200 bg-orange-50 px-4">
-                <p className="text-[11px] font-black uppercase tracking-wide text-[#ff5a00]">{l.totalDue}</p>
-                <p className="text-sm font-black text-[#1F2937]">{formatCurrency(totalDue)}</p>
-              </div>
-              <div className="flex h-[70px] flex-col justify-center rounded-xl border border-blue-200 bg-blue-50 px-4">
-                <p className="text-[11px] font-black uppercase tracking-wide text-blue-700">{l.monthlyPayroll}</p>
-                <p className="text-sm font-black text-[#1F2937]">{formatCurrency(monthlyPayrollTotal)}</p>
-              </div>
-              <button onClick={() => navigate('/admin/accounting/employees')} className="inline-flex h-[70px] items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 text-xs font-black text-[#ff5a00] shadow-sm">
-                <Users size={14} />{l.employees}
+            <div className="grid gap-3 md:grid-cols-3">
+              <MetricCard
+                icon={BadgeMinus}
+                label={l.totalDue}
+                value={loading ? '—' : formatCurrency(totalDue)}
+                tone="orange"
+              />
+              <MetricCard
+                icon={WalletCards}
+                label={l.monthlyPayroll}
+                value={loading ? '—' : formatCurrency(monthlyPayrollTotal)}
+                tone="blue"
+              />
+              <button
+                type="button"
+                onClick={() => navigate('/admin/accounting/employees')}
+                className="group flex min-h-[88px] items-center gap-3 rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
+              >
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#ff5a00]">
+                  <Users size={19} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[11px] font-black uppercase tracking-wide text-[#6B7280]">{l.employees}</span>
+                  <span className="mt-0.5 block text-lg font-black text-[#1F2937]">{loading ? '—' : activeSalaryProfiles.length}</span>
+                  <span className="block text-[11px] font-bold text-[#ff5a00] group-hover:underline">{l.openEmployees}</span>
+                </span>
               </button>
             </div>
-          </div>
+          </header>
 
           {!canManage && <div className="mb-5 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-bold text-[#ff5a00]">{l.readOnly}</div>}
-          {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div>}
-          {message && !error && <div className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">{message}</div>}
+          {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div>}
+          {message && !error && <div role="status" aria-live="polite" className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">{message}</div>}
 
-          <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_382px]">
-              <div className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-4">
-                <div className="grid gap-5">
-                  <div>
-                    <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.add}</h2>
-                    <form onSubmit={createSalaryProfile} className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 lg:items-end">
-                      <Field label={l.employeeName}>
-                        <input
-                          type="text"
-                          value={form.employee_name}
-                          onChange={event => setForm(current => ({ ...current, employee_name: event.target.value }))}
-                          className={FIELD}
-                          disabled={!canManage}
-                        />
-                      </Field>
-                      <Field label={l.effectiveDate}>
-                        <DateInput value={form.joined_at} lang={lang} onChange={value => setForm(current => ({ ...current, joined_at: value }))} disabled={!canManage} />
-                      </Field>
-                      <Field label={l.salaryAmount}><input type="text" inputMode="numeric" value={formatAmountInput(form.salary_amount)} onChange={event => setForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))} className={FIELD} disabled={!canManage} /></Field>
-                      <Field label={l.salaryUnit}>
-                        <select value={form.salary_unit} onChange={event => setForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage}>
-                          {SALARY_RATE_UNITS.map(item => <option key={item} value={item}>{salaryRateUnitLabel(item, lang)}</option>)}
-                        </select>
-                      </Field>
-                      <button disabled={!canManage || saving === 'create'} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white disabled:bg-gray-200">
-                        {saving === 'create' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}{l.save}
-                      </button>
-                    </form>
-                  </div>
-
-                  <div className="border-t border-[#E5E7EB] pt-5">
-                    <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.changeSalary}</h2>
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 lg:items-end">
-                      <Field label={l.selectEmployee}>
-                        <select
-                          value={changeForm.salary_profile_id}
-                          onChange={event => {
-                            const selectedProfile = salaryProfiles.find(item => item.id === event.target.value)
-                            setChangeForm(current => ({
-                              ...current,
-                              salary_profile_id: event.target.value,
-                              effective_from: selectedProfile?.joined_at || current.effective_from,
-                              salary_unit: selectedProfile?.rates?.[0]?.rate_unit || current.salary_unit,
-                            }))
-                          }}
-                          className={FIELD}
-                          disabled={!canManage}
-                        >
-                          <option value="">—</option>
-                          {activeSalaryProfiles.map(item => (
-                            <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label={l.effectiveDate}>
-                        <DateInput value={changeForm.effective_from} lang={lang} onChange={value => setChangeForm(current => ({ ...current, effective_from: value }))} disabled={!canManage} />
-                      </Field>
-                      <Field label={l.salaryAmount}>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={formatAmountInput(changeForm.salary_amount)}
-                          onChange={event => setChangeForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))}
-                          className={FIELD}
-                          disabled={!canManage}
-                        />
-                      </Field>
-                      <Field label={l.salaryUnit}>
-                        <select value={changeForm.salary_unit} onChange={event => setChangeForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage}>
-                          {SALARY_RATE_UNITS.map(item => <option key={item} value={item}>{salaryRateUnitLabel(item, lang)}</option>)}
-                        </select>
-                      </Field>
-                      <button type="button" onClick={() => addRate()} disabled={!canManage || !changeForm.salary_profile_id || saving === 'rate-create'} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-4 text-sm font-black text-white disabled:bg-gray-200">
-                        {saving === 'rate-create' ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}{l.save}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-4">
-                  <h2 className="mb-4 text-base font-black text-[#1F2937]">{l.paymentBonus}</h2>
-                  <div className="mb-3 grid grid-cols-3 gap-2">
+          <section className="mb-7" aria-labelledby="salary-operations-heading">
+            <SectionHeading
+              id="salary-operations-heading"
+              title={l.quickActions}
+              description={l.quickActionsHelp}
+            />
+            <div className={SECTION_GRID}>
+              <div className="flex h-full flex-col rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+                <CardHeading icon={WalletCards} title={l.paymentBonus} description={l.transactionHelp} tone="orange" />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-3 gap-2 sm:col-span-2" role="group" aria-label={l.paymentBonus}>
                     {['payment', 'bonus', 'fine'].map(entryType => {
                       const active = transactionForm.entry_type === entryType
                       const isFine = entryType === 'fine'
+                      const isBonus = entryType === 'bonus'
                       return (
                         <button
                           key={entryType}
@@ -853,12 +859,16 @@ export default function Salaries() {
                               note: '',
                             }
                           })}
-                          className={`flex h-11 items-center justify-center rounded-xl border text-xs font-black sm:text-sm ${
+                          disabled={!canManage || loading}
+                          aria-pressed={active}
+                          className={`flex h-11 items-center justify-center rounded-xl border text-xs font-black transition-colors sm:text-sm ${
                             active && isFine
-                              ? 'border-red-500 bg-red-50 text-red-600'
+                              ? 'border-red-400 bg-red-50 text-red-700 ring-2 ring-red-100'
+                              : active && isBonus
+                                ? 'border-blue-400 bg-blue-50 text-blue-700 ring-2 ring-blue-100'
                               : active
-                                ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00]'
-                                : 'border-[#E5E7EB] bg-white text-[#6B7280]'
+                                ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00] ring-2 ring-orange-100'
+                                : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100'
                           }`}
                         >
                           {isFine ? l.fineEntry : entryType === 'bonus' ? l.bonusEntry : l.paymentEntry}
@@ -866,8 +876,14 @@ export default function Salaries() {
                       )
                     })}
                   </div>
-                  <div className="grid gap-3">
-                    <Field label={l.employee}>
+                  <p className={`rounded-xl px-3 py-2 text-xs font-semibold sm:col-span-2 ${transactionForm.entry_type === 'fine' ? 'bg-red-50 text-red-700' : transactionForm.entry_type === 'bonus' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-[#9a4300]'}`}>
+                    {transactionGuidance}
+                  </p>
+                  <div className="sm:col-span-2">
+                    <Field
+                      label={l.employee}
+                      hint={selectedTransactionProfile ? `${l.due}: ${formatCurrency(getSalaryDue(selectedTransactionProfile, transactionForm.paid_date || today))}` : ''}
+                    >
                       <select
                         value={transactionForm.salary_profile_id}
                         onChange={event => {
@@ -884,9 +900,9 @@ export default function Salaries() {
                           }))
                         }}
                         className={FIELD}
-                        disabled={!canManage}
+                        disabled={!canManage || loading}
                       >
-                        <option value="">—</option>
+                        <option value="">{l.selectEmployee}</option>
                         {transactionSalaryProfiles.map(item => {
                           const name = item.employee_name || item.profile?.full_name || item.profile?.email
                           const inactiveDue = item.is_active === false
@@ -896,48 +912,51 @@ export default function Salaries() {
                         })}
                       </select>
                     </Field>
-                    <Field label={transactionForm.entry_type === 'fine' ? l.fineDate : transactionForm.entry_type === 'bonus' ? l.bonusDate : l.paidDate}>
-                      <DateInput
-                        value={transactionForm.paid_date}
-                        lang={lang}
-                        onChange={value => {
-                          const nextPaidDate = value
-                          const selectedProfile = salaryProfiles.find(item => item.id === transactionForm.salary_profile_id)
-                          const due = selectedProfile && transactionForm.entry_type === 'payment'
-                            ? getSalaryDue(selectedProfile, nextPaidDate)
-                            : ''
-                          setTransactionForm(current => ({
-                            ...current,
-                            paid_date: nextPaidDate,
-                            amount: due ? String(due) : current.amount,
-                          }))
-                        }}
-                        disabled={!canManage}
-                      />
-                    </Field>
-                    <Field label={l.amount}>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={formatAmountInput(transactionForm.amount)}
-                        onChange={event => setTransactionForm(current => ({ ...current, amount: parseAmountInput(event.target.value) }))}
+                  </div>
+                  <Field label={transactionForm.entry_type === 'fine' ? l.fineDate : transactionForm.entry_type === 'bonus' ? l.bonusDate : l.paidDate}>
+                    <DateInput
+                      value={transactionForm.paid_date}
+                      lang={lang}
+                      onChange={value => {
+                        const nextPaidDate = value
+                        const selectedProfile = salaryProfiles.find(item => item.id === transactionForm.salary_profile_id)
+                        const due = selectedProfile && transactionForm.entry_type === 'payment'
+                          ? getSalaryDue(selectedProfile, nextPaidDate)
+                          : ''
+                        setTransactionForm(current => ({
+                          ...current,
+                          paid_date: nextPaidDate,
+                          amount: due ? String(due) : current.amount,
+                        }))
+                      }}
+                      disabled={!canManage || loading}
+                    />
+                  </Field>
+                  <Field label={l.amount}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formatAmountInput(transactionForm.amount)}
+                      onChange={event => setTransactionForm(current => ({ ...current, amount: parseAmountInput(event.target.value) }))}
+                      placeholder="0 UZS"
+                      className={FIELD}
+                      disabled={!canManage || loading}
+                    />
+                  </Field>
+                  {transactionForm.entry_type !== 'fine' && (
+                    <Field label={l.method}>
+                      <select
+                        value={transactionForm.payment_method}
+                        onChange={event => setTransactionForm(current => ({ ...current, payment_method: event.target.value }))}
                         className={FIELD}
-                        disabled={!canManage}
-                      />
+                        disabled={!canManage || loading}
+                      >
+                        {EXPENSE_PAYMENT_METHODS.map(method => <option key={method} value={method}>{expensePaymentMethodLabel(method, lang)}</option>)}
+                      </select>
                     </Field>
-                    {transactionForm.entry_type !== 'fine' && (
-                      <Field label={l.method}>
-                        <select
-                          value={transactionForm.payment_method}
-                          onChange={event => setTransactionForm(current => ({ ...current, payment_method: event.target.value }))}
-                          className={FIELD}
-                          disabled={!canManage}
-                        >
-                          {EXPENSE_PAYMENT_METHODS.map(method => <option key={method} value={method}>{expensePaymentMethodLabel(method, lang)}</option>)}
-                        </select>
-                      </Field>
-                    )}
-                    {transactionForm.entry_type === 'fine' && (
+                  )}
+                  {transactionForm.entry_type === 'fine' && (
+                    <div className="sm:col-span-2">
                       <Field label={l.fineReason}>
                         <input
                           type="text"
@@ -950,57 +969,156 @@ export default function Salaries() {
                           data-gramm="false"
                           data-gramm_editor="false"
                           className={FIELD}
-                          disabled={!canManage}
+                          disabled={!canManage || loading}
                           required
                         />
                       </Field>
-                    )}
-                    <button
-                      type="button"
-                      onClick={addTransaction}
-                      disabled={!canManage || !transactionForm.salary_profile_id || normalizeExpenseAmount(transactionForm.amount) <= 0 || (transactionForm.entry_type === 'fine' && !transactionForm.note.trim()) || (saving !== '' && ['payment-create', 'bonus-create', 'fine-create'].includes(saving))}
-                      className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-black text-white disabled:bg-gray-200 ${transactionForm.entry_type === 'fine' ? 'bg-red-600' : 'bg-[#ff5a00]'}`}
-                    >
-                      {['payment-create', 'bonus-create', 'fine-create'].includes(saving)
-                        ? <Loader2 size={16} className="animate-spin" />
-                        : transactionForm.entry_type === 'fine'
-                          ? <BadgeMinus size={15} />
-                          : transactionForm.entry_type === 'bonus'
-                            ? <Plus size={15} />
-                            : <WalletCards size={15} />}
-                      {transactionForm.entry_type === 'fine' ? l.addFine : transactionForm.entry_type === 'bonus' ? l.addBonus : l.recordPayment}
-                    </button>
-                  </div>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={addTransaction}
+                    disabled={!canManage || loading || !transactionForm.salary_profile_id || normalizeExpenseAmount(transactionForm.amount) <= 0 || (transactionForm.entry_type === 'fine' && !transactionForm.note.trim()) || (saving !== '' && ['payment-create', 'bonus-create', 'fine-create'].includes(saving))}
+                    className={`inline-flex h-11 self-end items-center justify-center gap-2 rounded-xl px-4 text-sm font-black text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none ${transactionForm.entry_type === 'fine' ? 'bg-red-600 hover:bg-red-700 sm:col-span-2' : transactionForm.entry_type === 'bonus' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[#ff5a00] hover:bg-[#e85100]'}`}
+                  >
+                    {['payment-create', 'bonus-create', 'fine-create'].includes(saving)
+                      ? <Loader2 size={16} className="animate-spin" />
+                      : transactionForm.entry_type === 'fine'
+                        ? <BadgeMinus size={15} />
+                        : transactionForm.entry_type === 'bonus'
+                          ? <Plus size={15} />
+                          : <WalletCards size={15} />}
+                    {transactionForm.entry_type === 'fine' ? l.addFine : transactionForm.entry_type === 'bonus' ? l.addBonus : l.recordPayment}
+                  </button>
                 </div>
-                <div className="rounded-xl border border-red-100 bg-red-50/40 p-4">
-                  <h2 className="mb-4 flex items-center gap-2 text-base font-black text-[#1F2937]"><CalendarX2 size={18} className="text-red-500" />{l.markAbsence}</h2>
-                  <div className="grid gap-3">
+              </div>
+              <div className="flex h-full flex-col rounded-2xl border border-red-100 bg-white p-4 shadow-sm sm:p-5">
+                  <CardHeading icon={CalendarX2} title={l.markAbsence} description={l.absenceHelp} tone="red" />
+                  <div className="flex flex-1 flex-col gap-4">
                     <Field label={l.employee}>
                       <select
                         value={absenceForm.salary_profile_id}
                         onChange={event => setAbsenceForm(current => ({ ...current, salary_profile_id: event.target.value }))}
                         className={FIELD}
-                        disabled={!canManage}
+                        disabled={!canManage || loading}
                       >
-                        <option value="">—</option>
+                        <option value="">{l.selectEmployee}</option>
                         {activeSalaryProfiles.map(item => (
                           <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
                         ))}
                       </select>
                     </Field>
                     <Field label={l.absenceDate}>
-                      <DateInput value={absenceForm.absence_date} lang={lang} onChange={value => setAbsenceForm(current => ({ ...current, absence_date: value }))} disabled={!canManage} />
+                      <DateInput value={absenceForm.absence_date} lang={lang} onChange={value => setAbsenceForm(current => ({ ...current, absence_date: value }))} disabled={!canManage || loading} />
                     </Field>
                     <button
                       type="button"
                       onClick={addAbsence}
-                      disabled={!canManage || !absenceForm.salary_profile_id || saving === 'absence-create'}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white disabled:bg-gray-200"
+                      disabled={!canManage || loading || !absenceForm.salary_profile_id || saving === 'absence-create'}
+                      className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
                     >
                       {saving === 'absence-create' ? <Loader2 size={16} className="animate-spin" /> : <CalendarX2 size={15} />}
                       {l.absence}
                     </button>
                   </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="mb-5" aria-labelledby="salary-settings-heading">
+            <SectionHeading
+              id="salary-settings-heading"
+              title={l.salarySettings}
+              description={l.salarySettingsHelp}
+            />
+            <div className={SECTION_GRID}>
+              <div className="h-full rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+                <CardHeading icon={Plus} title={l.add} description={l.addHelp} tone="orange" />
+                <form onSubmit={createSalaryProfile} className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Field label={l.employeeName}>
+                      <input
+                        type="text"
+                        value={form.employee_name}
+                        onChange={event => setForm(current => ({ ...current, employee_name: event.target.value }))}
+                        className={FIELD}
+                        disabled={!canManage || loading}
+                      />
+                    </Field>
+                  </div>
+                  <Field label={l.effectiveDate}>
+                    <DateInput value={form.joined_at} lang={lang} onChange={value => setForm(current => ({ ...current, joined_at: value }))} disabled={!canManage || loading} />
+                  </Field>
+                  <Field label={l.salaryAmount}>
+                    <input type="text" inputMode="numeric" value={formatAmountInput(form.salary_amount)} onChange={event => setForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))} placeholder="0 UZS" className={FIELD} disabled={!canManage || loading} />
+                  </Field>
+                  <Field label={l.salaryUnit}>
+                    <select value={form.salary_unit} onChange={event => setForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage || loading}>
+                      {SALARY_RATE_UNITS.map(item => <option key={item} value={item}>{salaryRateUnitLabel(item, lang)}</option>)}
+                    </select>
+                  </Field>
+                  <button
+                    disabled={!canManage || loading || !form.employee_name.trim() || normalizeExpenseAmount(form.salary_amount) <= 0 || saving === 'create'}
+                    className="flex h-11 self-end items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-[#e85100] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
+                  >
+                    {saving === 'create' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}{l.save}
+                  </button>
+                </form>
+              </div>
+
+              <div className="h-full rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+                <CardHeading icon={Save} title={l.changeSalary} description={l.changeHelp} tone="dark" />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Field label={l.selectEmployee}>
+                      <select
+                        value={changeForm.salary_profile_id}
+                        onChange={event => {
+                          const selectedProfile = salaryProfiles.find(item => item.id === event.target.value)
+                          setChangeForm(current => ({
+                            ...current,
+                            salary_profile_id: event.target.value,
+                            effective_from: selectedProfile?.joined_at || current.effective_from,
+                            salary_unit: selectedProfile?.rates?.[0]?.rate_unit || current.salary_unit,
+                          }))
+                        }}
+                        className={FIELD}
+                        disabled={!canManage || loading}
+                      >
+                        <option value="">{l.selectEmployee}</option>
+                        {activeSalaryProfiles.map(item => (
+                          <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                  <Field label={l.effectiveDate}>
+                    <DateInput value={changeForm.effective_from} lang={lang} onChange={value => setChangeForm(current => ({ ...current, effective_from: value }))} disabled={!canManage || loading} />
+                  </Field>
+                  <Field label={l.salaryAmount}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formatAmountInput(changeForm.salary_amount)}
+                      onChange={event => setChangeForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))}
+                      placeholder="0 UZS"
+                      className={FIELD}
+                      disabled={!canManage || loading}
+                    />
+                  </Field>
+                  <Field label={l.salaryUnit}>
+                    <select value={changeForm.salary_unit} onChange={event => setChangeForm(current => ({ ...current, salary_unit: event.target.value }))} className={FIELD} disabled={!canManage || loading}>
+                      {SALARY_RATE_UNITS.map(item => <option key={item} value={item}>{salaryRateUnitLabel(item, lang)}</option>)}
+                    </select>
+                  </Field>
+                  <button
+                    type="button"
+                    onClick={() => addRate()}
+                    disabled={!canManage || loading || !changeForm.salary_profile_id || normalizeExpenseAmount(changeForm.salary_amount) <= 0 || saving === 'rate-create'}
+                    className="inline-flex h-11 self-end items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
+                  >
+                    {saving === 'rate-create' ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}{l.save}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1011,11 +1129,67 @@ export default function Salaries() {
   )
 }
 
-function Field({ label, children }) {
+function MetricCard({ icon: Icon, label, value, tone = 'orange' }) {
+  const tones = {
+    orange: {
+      card: 'border-orange-200 bg-orange-50/70',
+      icon: 'bg-white text-[#ff5a00]',
+      label: 'text-[#c94b00]',
+    },
+    blue: {
+      card: 'border-blue-200 bg-blue-50/70',
+      icon: 'bg-white text-blue-700',
+      label: 'text-blue-700',
+    },
+  }
+  const colors = tones[tone] || tones.orange
+  return (
+    <div className={`flex min-h-[88px] items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm ${colors.card}`}>
+      <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl shadow-sm ${colors.icon}`}>
+        <Icon size={19} />
+      </span>
+      <span className="min-w-0">
+        <span className={`block text-[11px] font-black uppercase tracking-wide ${colors.label}`}>{label}</span>
+        <span className="mt-1 block text-base font-black leading-tight text-[#1F2937] lg:text-lg">{value}</span>
+      </span>
+    </div>
+  )
+}
+
+function SectionHeading({ id, title, description }) {
+  return (
+    <div className="mb-3">
+      <h2 id={id} className="text-lg font-black text-[#1F2937]">{title}</h2>
+      <p className="mt-0.5 text-sm font-medium text-[#6B7280]">{description}</p>
+    </div>
+  )
+}
+
+function CardHeading({ icon: Icon, title, description, tone = 'orange' }) {
+  const iconTone = tone === 'red'
+    ? 'bg-red-50 text-red-600'
+    : tone === 'dark'
+      ? 'bg-gray-100 text-[#1F2937]'
+      : 'bg-orange-50 text-[#ff5a00]'
+  return (
+    <div className="mb-5 flex items-start gap-3 sm:min-h-[56px]">
+      <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${iconTone}`}>
+        <Icon size={17} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-base font-black text-[#1F2937]">{title}</span>
+        <span className="mt-0.5 block text-xs font-medium leading-relaxed text-[#6B7280]">{description}</span>
+      </span>
+    </div>
+  )
+}
+
+function Field({ label, hint = '', children }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-[#6B7280]">{label}</span>
+      <span className="mb-1.5 block text-xs font-bold text-[#596170]">{label}</span>
       {children}
+      {hint && <span className="mt-1.5 block text-[11px] font-semibold text-[#6B7280]">{hint}</span>}
     </label>
   )
 }

@@ -162,6 +162,7 @@ test('Accounting presents one Bazaar total per day without changing ledger rows'
   assert.equal(dayTotal.payment_method, 'mixed')
   assert.equal(dayTotal.entry_count, 2)
   assert.deepEqual(dayTotal.source_ids, ['morning', 'evening'])
+  assert.equal(dayTotal.created_at, '2026-07-12T18:00:00Z')
   assert.equal(dayTotal.is_bazaar_daily_total, true)
 })
 

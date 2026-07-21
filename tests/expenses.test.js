@@ -22,6 +22,7 @@ import {
   getSalaryDue,
   getSalaryFineAmount,
   getSalaryCategoryForRole,
+  getSalaryMonthEndDate,
   getTotalMonthlySalaryCommitment,
   getTotalSalaryDue,
   isGeneratedSalaryExpense,
@@ -443,7 +444,7 @@ test('salary bonuses create separate expense rows without changing salary due', 
     rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
     payments: [],
     bonuses: [
-      { id: 'bonus-1', bonus_date: '2026-06-16', amount: 500_000, payment_method: 'card', note: 'Great service' },
+      { id: 'bonus-1', bonus_date: '2026-06-16', amount: 500_000, payment_method: 'card', note: 'Great service', created_at: '2026-06-16T09:24:00Z' },
     ],
   }
 
@@ -452,6 +453,7 @@ test('salary bonuses create separate expense rows without changing salary due', 
   assert.equal(bonusRows.length, 1)
   assert.equal(bonusRows[0].amount, 500_000)
   assert.equal(bonusRows[0].payment_method, 'card')
+  assert.equal(bonusRows[0].created_at, '2026-06-16T09:24:00Z')
   assert.equal(getSalaryDue(waiterProfile, '2026-06-16'), 4_800_000)
 })
 
@@ -465,7 +467,7 @@ test('salary expense history uses recorded salary payments, not daily accrual ro
     profile: { role: 'waiter' },
     rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
     payments: [
-      { id: 'payment-1', paid_date: '2026-06-16', amount: 900_000, payment_method: 'card', note: 'Week payout' },
+      { id: 'payment-1', paid_date: '2026-06-16', amount: 900_000, payment_method: 'card', note: 'Week payout', created_at: '2026-06-16T11:42:00Z' },
     ],
   }
 
@@ -475,6 +477,7 @@ test('salary expense history uses recorded salary payments, not daily accrual ro
   assert.equal(paymentRows.length, 1)
   assert.equal(paymentRows[0].amount, 900_000)
   assert.equal(paymentRows[0].payment_method, 'card')
+  assert.equal(paymentRows[0].created_at, '2026-06-16T11:42:00Z')
   assert.equal(accrualRows.length, 16)
 })
 
@@ -879,6 +882,28 @@ test('monthly expense estimate tracks employee paid amount remaining salary and 
   assert.equal(summary.employeeProjectedMonth, 8_400_000)
   assert.equal(summary.employeeRemainingThisMonth, 7_200_000)
   assert.equal(summary.estimatedMonthlyExpenseUzs, 8_400_000)
+})
+
+test('salary month-end debt projects the full remaining liability', () => {
+  const profile = {
+    id: 'salary-month-end-debt',
+    profile_id: 'salary-month-end-employee',
+    employee_name: 'Monthly Employee',
+    joined_at: '2026-07-01',
+    is_active: true,
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-07-01', amount: 3_100_000, rate_unit: 'monthly' }],
+    payments: [{ paid_date: '2026-07-10', amount: 1_000_000 }],
+    fines: [],
+    absences: [],
+  }
+
+  const monthEnd = getSalaryMonthEndDate('2026-07-22')
+
+  assert.equal(monthEnd, '2026-07-31')
+  assert.equal(getTotalSalaryDue([profile], '2026-07-22'), 1_200_000)
+  assert.equal(getTotalSalaryDue([profile], monthEnd), 2_100_000)
 })
 
 test('monthly expense estimate does not project salary or rent before POS activity starts', () => {
