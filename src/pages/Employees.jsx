@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate, formatTime } from '../lib/dateFormat'
 import { useAuth } from '../contexts/AuthContext'
-import { canEditFeature } from '../lib/permissions'
+import { canEditFeature, normalizeRole } from '../lib/permissions'
 import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
 import {
   expensePaymentMethodLabel,
@@ -56,6 +56,7 @@ export default function Employees() {
   const lang = state.lang || 'ru'
   const today = todayExpenseDate()
   const canManage = canEditFeature(profile || { role: state.user?.role }, 'expenses')
+  const canDeleteHistory = canManage && normalizeRole(profile?.role || state.user?.role) === 'owner'
 
   const L = {
     uz: {
@@ -281,6 +282,35 @@ export default function Employees() {
     await loadEmployees()
   }
 
+  async function deleteHistoryEntry(entry) {
+    if (!canDeleteHistory || !entry?.id) return
+    const tableByType = {
+      payment: 'employee_salary_payments',
+      bonus: 'employee_salary_bonuses',
+      fine: 'employee_salary_fines',
+      absence: 'employee_salary_absences',
+    }
+    const table = tableByType[entry.entryType]
+    if (!table) return
+
+    const key = `${entry.entryType}-history-delete-${entry.id}`
+    if (confirmActionKey !== key) {
+      setConfirmActionKey(key)
+      return
+    }
+
+    setSaving(key)
+    setError('')
+    const { error: deleteError } = await supabase.from(table).delete().eq('id', entry.id)
+    setSaving('')
+    setConfirmActionKey('')
+    if (deleteError) {
+      setError(deleteError.message)
+      return
+    }
+    await loadEmployees()
+  }
+
   return (
     <AppShell title={l.title}>
       <div className="h-full overflow-y-auto bg-[#FAF7F0]">
@@ -460,7 +490,25 @@ export default function Employees() {
                           </span>
                           {entry.detail && <span className="text-[#9CA3AF]">{entry.detail}</span>}
                         </div>
-                        <span className={`font-black ${entry.entryType === 'fine' ? 'text-red-600' : 'text-[#1F2937]'}`}>{entry.entryType === 'fine' ? '− ' : ''}{formatCurrency(entry.amount)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-black ${entry.entryType === 'fine' ? 'text-red-600' : 'text-[#1F2937]'}`}>{entry.entryType === 'fine' ? '− ' : ''}{formatCurrency(entry.amount)}</span>
+                          {canDeleteHistory && (() => {
+                            const deleteKey = `${entry.entryType}-history-delete-${entry.id}`
+                            const confirming = confirmActionKey === deleteKey
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => deleteHistoryEntry(entry)}
+                                disabled={saving === deleteKey}
+                                aria-label={`${l.delete}: ${entry.detail || entry.entryType}`}
+                                className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg border border-red-200 bg-white text-[10px] font-black text-red-600 ${confirming ? 'px-2' : 'w-7'}`}
+                              >
+                                {saving === deleteKey ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                {confirming && l.confirm}
+                              </button>
+                            )
+                          })()}
+                        </div>
                       </div>
                     ))}
                     {transactionHistory.length === 0 && (
@@ -471,14 +519,33 @@ export default function Employees() {
                 <div>
                   <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#6B7280]">{l.absenceHistory}</p>
                   <div className="space-y-1">
-                    {drawerEmployee.absences.map(absence => (
-                      <div key={absence.id} className={`flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold ${drawerInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-red-50 text-red-700'}`}>
-                        <CalendarX2 size={13} />
-                        <span>{formatLongDate(absence.absence_date, lang, absence.absence_date)}</span>
-                        <span className="inline-flex rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-black">{l.absentLabel}</span>
-                        {absence.note && <span className="text-[#9CA3AF]">{absence.note}</span>}
-                      </div>
-                    ))}
+                    {drawerEmployee.absences.map(absence => {
+                      const entry = { ...absence, entryType: 'absence' }
+                      const deleteKey = `absence-history-delete-${absence.id}`
+                      const confirming = confirmActionKey === deleteKey
+                      return (
+                        <div key={absence.id} className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-xs font-bold ${drawerInactive ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-red-50 text-red-700'}`}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CalendarX2 size={13} />
+                            <span>{formatLongDate(absence.absence_date, lang, absence.absence_date)}</span>
+                            <span className="inline-flex rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-black">{l.absentLabel}</span>
+                            {absence.note && <span className="text-[#9CA3AF]">{absence.note}</span>}
+                          </div>
+                          {canDeleteHistory && (
+                            <button
+                              type="button"
+                              onClick={() => deleteHistoryEntry(entry)}
+                              disabled={saving === deleteKey}
+                              aria-label={`${l.delete}: ${l.absentLabel}`}
+                              className={`inline-flex h-7 items-center justify-center gap-1 rounded-lg border border-red-200 bg-white text-[10px] font-black text-red-600 ${confirming ? 'px-2' : 'w-7'}`}
+                            >
+                              {saving === deleteKey ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                              {confirming && l.confirm}
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
                     {drawerEmployee.absences.length === 0 && (
                       <p className="py-4 text-center text-xs font-bold text-[#9CA3AF]">—</p>
                     )}
