@@ -1,3 +1,5 @@
+import { supabase } from './supabase.js'
+
 const NOTIFIABLE_STATUSES = new Set(['accepted', 'preparing', 'ready', 'completed', 'cancelled', 'served'])
 
 export async function notifyTelegramOrderStatus(orderIdOrIds, status) {
@@ -15,5 +17,28 @@ export async function notifyTelegramOrderStatus(orderIdOrIds, status) {
     if (!response.ok) throw new Error(`Telegram notification failed with ${response.status}`)
   } catch (error) {
     console.warn('[telegram] order status notification failed:', error)
+  }
+}
+
+export async function notifyTelegramEmployeeFine(fineId) {
+  if (!fineId) return false
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) throw sessionError
+    if (!session?.access_token) throw new Error('Authentication required')
+
+    const response = await fetch('/api/telegram/fine-notification', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ fineId }),
+    })
+    if (!response.ok) throw new Error(`Telegram fine notification failed with ${response.status}`)
+    return true
+  } catch (error) {
+    console.warn('[telegram] employee fine notification failed:', error)
+    return false
   }
 }

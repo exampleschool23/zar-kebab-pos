@@ -22,6 +22,7 @@ import {
 } from '../lib/expenses'
 import { todayExpenseDate } from '../lib/expenses'
 import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
+import { notifyTelegramEmployeeFine } from '../lib/telegramNotifications'
 
 const FIELD = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none focus:border-[#ff5a00]'
 const PAGE_SIZE = 12
@@ -500,7 +501,7 @@ export default function Salaries() {
         reason,
         created_by: profile?.id || null,
         created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
-      })
+      }).select('id').single()
     } else if (isBonus) {
       writeResult = await supabase.from('employee_salary_bonuses').insert({
         salary_profile_id: salaryProfile.id,
@@ -528,6 +529,7 @@ export default function Salaries() {
       setError(writeError.message)
       return
     }
+    if (isFine) await notifyTelegramEmployeeFine(writeResult.data?.id)
     setTransactionForm({
       salary_profile_id: '',
       entry_type: 'payment',
@@ -941,6 +943,12 @@ export default function Salaries() {
                           type="text"
                           value={transactionForm.note}
                           onChange={event => setTransactionForm(current => ({ ...current, note: event.target.value }))}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          data-gramm="false"
+                          data-gramm_editor="false"
                           className={FIELD}
                           disabled={!canManage}
                           required
