@@ -102,9 +102,9 @@ test('completed table rounds merge into one Telegram order summary', () => {
   assert.match(message, /Сумма заказа: 90 000 UZS/)
   assert.match(message, /Сервис 15%: 13 500 UZS/)
   assert.match(message, /Оплата: Наличные 103 500 UZS/)
-  assert.match(message, /Чистая прибыль · Заказ: 72 500 UZS/)
-  assert.match(message, /Маржа прибыли · Заказ: 70%/)
-  assert.match(message, /Чистая прибыль · Сегодня: 310 000 UZS/)
+  assert.match(message, /Чистая прибыль: 72 500 UZS · 70%/)
+  assert.match(message, /Чистая прибыль: 310 000 UZS/)
+  assert.doesNotMatch(message, /· Заказ|· Сегодня|Маржа прибыли/)
   assert.equal((message.match(/Стол: Table 3/g) || []).length, 1)
 })
 
@@ -180,10 +180,10 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
   assert.match(message, /Сервис 15%: 21 300 UZS/)
   assert.match(message, /Оплата: Терминал/)
   assert.doesNotMatch(message, /К оплате: 163 300 UZS/)
-  assert.match(message, /Чистая прибыль · Заказ: 101 300 UZS/)
-  assert.match(message, /Маржа прибыли · Заказ: 62%/)
-  assert.match(message, /Доход · Сегодня: 525 300 UZS/)
-  assert.match(message, /Чистая прибыль · Сегодня: 337 800 UZS/)
+  assert.match(message, /Чистая прибыль: 101 300 UZS · 62%/)
+  assert.match(message, /Доход: 525 300 UZS/)
+  assert.match(message, /Чистая прибыль: 337 800 UZS/)
+  assert.doesNotMatch(message, /· Заказ|· Сегодня|Маржа прибыли/)
 })
 
 test('completed group message omits profit margin when protected costs are unavailable', () => {
@@ -197,8 +197,8 @@ test('completed group message omits profit margin when protected costs are unava
     items: [{ name: 'Kebab', quantity: 1, unit_price: 50_000, status: 'served' }],
   })
 
-  assert.doesNotMatch(message, /Чистая прибыль · Заказ/)
-  assert.doesNotMatch(message, /Маржа прибыли · Заказ/)
+  assert.doesNotMatch(message, /Чистая прибыль:/)
+  assert.doesNotMatch(message, /Маржа прибыли/)
 })
 
 test('completed dine-in group message starts with table and hides separate type line', () => {

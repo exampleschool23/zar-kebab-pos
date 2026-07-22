@@ -291,16 +291,16 @@ export function buildCompletedOrderGroupMessage(order) {
   }
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
   if (order?.orderNetProfit != null && Number.isFinite(Number(order.orderNetProfit))) {
-    lines.push(`Чистая прибыль · Заказ: ${escapeTelegramHtml(formatMoney(order.orderNetProfit))}`)
-  }
-  if (order?.orderProfitMarginPct != null && Number.isFinite(Number(order.orderProfitMarginPct))) {
-    lines.push(`Маржа прибыли · Заказ: ${escapeTelegramHtml(formatPercent(order.orderProfitMarginPct))}`)
+    const margin = order?.orderProfitMarginPct != null && Number.isFinite(Number(order.orderProfitMarginPct))
+      ? ` · ${formatPercent(order.orderProfitMarginPct)}`
+      : ''
+    lines.push(`Чистая прибыль: ${escapeTelegramHtml(`${formatMoney(order.orderNetProfit)}${margin}`)}`)
   }
   if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
-    lines.push(`Доход · Сегодня: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
+    lines.push(`Доход: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
   }
   if (order?.dailyNetProfitTotal != null && Number.isFinite(Number(order.dailyNetProfitTotal))) {
-    lines.push(`Чистая прибыль · Сегодня: ${escapeTelegramHtml(formatMoney(order.dailyNetProfitTotal))}`)
+    lines.push(`Чистая прибыль: ${escapeTelegramHtml(formatMoney(order.dailyNetProfitTotal))}`)
   }
 
   return lines.join('\n')
