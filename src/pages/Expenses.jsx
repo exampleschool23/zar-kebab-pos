@@ -592,11 +592,18 @@ export default function Expenses() {
   } = accountingSummary
   const currentAccountingDate = todayExpenseDate()
   const salaryDueDate = dateTo < currentAccountingDate ? dateTo : currentAccountingDate
-  const totalSalaryDue = useMemo(() => getTotalSalaryDue(salaryProfiles, salaryDueDate), [salaryProfiles, salaryDueDate])
+  const payableSalaryProfiles = useMemo(
+    () => salaryProfiles.filter(salaryProfile => !salaryProfile.deleted_at),
+    [salaryProfiles]
+  )
+  const totalSalaryDue = useMemo(
+    () => getTotalSalaryDue(payableSalaryProfiles, salaryDueDate),
+    [payableSalaryProfiles, salaryDueDate]
+  )
   const salaryMonthEndDate = getSalaryMonthEndDate(salaryDueDate)
   const totalSalaryDueByMonthEnd = useMemo(
-    () => getTotalSalaryDue(salaryProfiles, salaryMonthEndDate),
-    [salaryProfiles, salaryMonthEndDate]
+    () => getTotalSalaryDue(payableSalaryProfiles, salaryMonthEndDate),
+    [payableSalaryProfiles, salaryMonthEndDate]
   )
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])

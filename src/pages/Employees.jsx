@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CalendarDays, CalendarX2, History, Loader2, Power, RefreshCw, Trash2, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CalendarX2, ChevronDown, ChevronUp, History, Loader2, Power, RefreshCw, Trash2, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -66,6 +66,8 @@ export default function Employees() {
       refresh: 'Yangilash',
       active: 'Faol',
       inactive: 'Nofaol',
+      inactiveSection: 'Faolsizlantirilgan xodimlar',
+      inactiveNewestFirst: 'Eng oxirgi faolsizlantirilgan xodim birinchi',
       joined: 'Ishga kirgan',
       ended: 'Tugagan',
       daily: 'Kunlik',
@@ -95,6 +97,8 @@ export default function Employees() {
       refresh: 'Обновить',
       active: 'Активен',
       inactive: 'Неактивен',
+      inactiveSection: 'Деактивированные сотрудники',
+      inactiveNewestFirst: 'Сначала недавно деактивированные',
       joined: 'Дата выхода',
       ended: 'Дата окончания',
       daily: 'За день',
@@ -124,6 +128,8 @@ export default function Employees() {
       refresh: 'Refresh',
       active: 'Active',
       inactive: 'Inactive',
+      inactiveSection: 'Deactivated employees',
+      inactiveNewestFirst: 'Most recently deactivated first',
       joined: 'Joined',
       ended: 'Ended',
       daily: 'Daily',
@@ -154,6 +160,7 @@ export default function Employees() {
   const [saving, setSaving] = useState('')
   const [confirmActionKey, setConfirmActionKey] = useState('')
   const [deactivateDates, setDeactivateDates] = useState({})
+  const [inactiveExpanded, setInactiveExpanded] = useState(false)
   const [historyOpenId, setHistoryOpenId] = useState(null)
   const [error, setError] = useState('')
 
@@ -191,14 +198,23 @@ export default function Employees() {
 
   useEffect(() => { loadEmployees() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sortedEmployees = useMemo(() => (
-    [...employees].sort((a, b) => {
-      if (Boolean(a.is_active) !== Boolean(b.is_active)) return a.is_active ? -1 : 1
-      return employeeName(a).localeCompare(employeeName(b))
-    })
-  ), [employees])
-
   const activeEmployees = useMemo(() => employees.filter(item => item.is_active !== false), [employees])
+  const sortedActiveEmployees = useMemo(() => (
+    [...activeEmployees].sort((a, b) => employeeName(a).localeCompare(employeeName(b)))
+  ), [activeEmployees])
+  const inactiveEmployees = useMemo(() => (
+    employees
+      .filter(item => item.is_active === false)
+      .sort((a, b) => (
+        String(b.ended_at || '').localeCompare(String(a.ended_at || '')) ||
+        employeeName(a).localeCompare(employeeName(b))
+      ))
+  ), [employees])
+  const employeeGridEntries = [
+    ...sortedActiveEmployees.map(employee => ({ type: 'employee', employee })),
+    ...(inactiveEmployees.length > 0 ? [{ type: 'inactive-toggle', id: 'inactive-toggle' }] : []),
+    ...(inactiveExpanded ? inactiveEmployees.map(employee => ({ type: 'employee', employee })) : []),
+  ]
   const activeCount = activeEmployees.length
   const activeDailySalary = useMemo(() => (
     activeEmployees.reduce((sum, item) => sum + getDailySalaryAmount(item, today), 0)
@@ -337,11 +353,37 @@ export default function Employees() {
 
           {loading ? (
             <div className="flex justify-center py-20"><Loader2 size={30} className="animate-spin text-gray-300" /></div>
-          ) : sortedEmployees.length === 0 ? (
+          ) : employees.length === 0 ? (
             <div className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-16 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {sortedEmployees.map(employee => {
+              {employeeGridEntries.map(entry => {
+                if (entry.type === 'inactive-toggle') {
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => setInactiveExpanded(current => !current)}
+                      aria-expanded={inactiveExpanded}
+                      className="flex min-h-20 items-center justify-between gap-4 rounded-2xl border border-[#E5E7EB] bg-[#F3F4F6] px-4 py-3 text-left shadow-sm transition-colors hover:border-gray-300 md:col-span-2 xl:col-span-3"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-200 text-[#6B7280]">
+                          <Users size={18} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-black text-[#1F2937]">{l.inactiveSection}</span>
+                          <span className="mt-0.5 block text-xs font-semibold text-[#9CA3AF]">{l.inactiveNewestFirst}</span>
+                        </span>
+                      </span>
+                      <span className="flex flex-shrink-0 items-center gap-2">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-[#6B7280]">{inactiveEmployees.length}</span>
+                        {inactiveExpanded ? <ChevronUp size={18} className="text-[#6B7280]" /> : <ChevronDown size={18} className="text-[#6B7280]" />}
+                      </span>
+                    </button>
+                  )
+                }
+                const employee = entry.employee
                 const inactive = employee.is_active === false
                 const activeUntil = getSalaryActiveUntil(employee, today)
                 const toggleKey = `employee-toggle-${employee.id}`
