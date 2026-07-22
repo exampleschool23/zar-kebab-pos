@@ -130,6 +130,7 @@ export default function MenuCategoryScroller({
   scrollOffset = 84,
 }) {
   const [collapsed, setCollapsed] = useState(false)
+  const [fixedInsets, setFixedInsets] = useState(null)
   const sentinelRef = useRef(null)
   const activeRef = useRef(activeCategoryId)
 
@@ -190,7 +191,30 @@ export default function MenuCategoryScroller({
     const root = getScrollRoot()
     const scroller = getScrollElement()
 
+    function updateFixedInsets() {
+      if (collapsedPosition !== 'fixed' || root === window) {
+        setFixedInsets(current => current === null ? current : null)
+        return
+      }
+
+      const rootRect = scroller.getBoundingClientRect()
+      const nextInsets = {
+        top: Math.max(0, rootRect.top),
+        left: Math.max(0, rootRect.left),
+        right: Math.max(0, window.innerWidth - rootRect.right),
+      }
+      setFixedInsets(current => (
+        current
+        && current.top === nextInsets.top
+        && current.left === nextInsets.left
+        && current.right === nextInsets.right
+          ? current
+          : nextInsets
+      ))
+    }
+
     function handleScroll() {
+      updateFixedInsets()
       const sentinel = sentinelRef.current
       if (sentinel) {
         const rect = sentinel.getBoundingClientRect()
@@ -224,11 +248,18 @@ export default function MenuCategoryScroller({
     handleScroll()
     root.addEventListener('scroll', handleScroll, { passive: true })
     window.addEventListener('resize', handleScroll)
+    const resizeObserver = collapsedPosition === 'fixed'
+      && root !== window
+      && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(handleScroll)
+        : null
+    resizeObserver?.observe(scroller)
     return () => {
       root.removeEventListener('scroll', handleScroll)
       window.removeEventListener('resize', handleScroll)
+      resizeObserver?.disconnect()
     }
-  }, [cards, onActiveCategoryChange, scrollContainerRef, scrollOffset, sectionPrefix, topOffset])
+  }, [cards, collapsedPosition, onActiveCategoryChange, scrollContainerRef, scrollOffset, sectionPrefix, topOffset])
 
   return (
     <>
@@ -254,7 +285,8 @@ export default function MenuCategoryScroller({
           collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
         } ${collapsedClassName}`}
         style={{
-          top: topOffset,
+          top: fixedInsets?.top ?? topOffset,
+          ...(fixedInsets ? { left: fixedInsets.left, right: fixedInsets.right } : {}),
           maxHeight: collapsedPosition === 'fixed' || collapsed ? COLLAPSED_BAR_HEIGHT : 0,
         }}
       >

@@ -1149,6 +1149,18 @@ test('MenuCategoryScroller scrolls inside the nearest app content scroller', () 
   assert.match(source, /scrollContainerRef\?\.current \|\| findScrollContainer\(sentinelRef\.current\) \|\| document\.documentElement/)
 })
 
+test('Admin menu pins collapsed categories to its AppShell scroll area', () => {
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const scroller = readSource('src/components/MenuCategoryScroller.jsx')
+
+  assert.match(adminMenu, /sectionPrefix="admin-menu-category"[\s\S]*scrollContainerRef=\{shellScrollRef\}/)
+  assert.match(adminMenu, /sectionPrefix="admin-menu-category"[\s\S]*collapsedPosition="fixed"/)
+  assert.match(scroller, /const \[fixedInsets, setFixedInsets\] = useState\(null\)/)
+  assert.match(scroller, /const rootRect = scroller\.getBoundingClientRect\(\)/)
+  assert.match(scroller, /top: fixedInsets\?\.top \?\? topOffset/)
+  assert.match(scroller, /left: fixedInsets\.left, right: fixedInsets\.right/)
+})
+
 test('PublicMenu enables tappable fixed collapsed categories', () => {
   const source = readSource('src/pages/PublicMenu.jsx')
 

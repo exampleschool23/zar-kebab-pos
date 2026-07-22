@@ -1918,8 +1918,12 @@ export default function AdminMenu() {
                 lang={lang}
                 itemCounts={itemCountByCat}
                 sectionPrefix="admin-menu-category"
+                scrollContainerRef={shellScrollRef}
                 topOffset={0}
                 className="mb-2"
+                collapsedPosition="fixed"
+                collapsedSurfaceClass="bg-white/95"
+                collapsedClassName="px-4 shadow-sm"
               />
               </div>
 
