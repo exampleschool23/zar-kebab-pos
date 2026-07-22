@@ -1,7 +1,7 @@
 import { json, methodNotAllowed, readJson } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { sendTelegramMessage, TELEGRAM_STATUS_MESSAGES } from './_lib/telegram.js'
-import { getOrderNetProfit, getOrdersCostTotal } from '../../src/lib/profit.js'
+import { getOrderNetProfit, getOrderProfitMarginPct, getOrdersCostTotal } from '../../src/lib/profit.js'
 import {
   buildCompletedOrderGroupMessage,
   buildCustomerStatusMessage,
@@ -42,12 +42,21 @@ function isMissingProfitSchema(error) {
   return message.includes('cost_price') || message.includes('menu_item_costs') || message.includes('schema cache')
 }
 
+export function hasCompleteOrderItemCostCoverage(items = [], menuItemMap = new Map()) {
+  return items
+    .filter(item => item?.cost_price == null)
+    .every(item => item?.menu_item_id && menuItemMap.has(item.menu_item_id))
+}
+
 async function loadCurrentMenuItemCosts(supabase, items = []) {
   const menuItemIds = [...new Set(items
     .filter(item => item?.cost_price == null)
     .map(item => item?.menu_item_id)
     .filter(Boolean))]
-  if (menuItemIds.length === 0) return { available: true, menuItemMap: new Map() }
+  if (menuItemIds.length === 0) {
+    const menuItemMap = new Map()
+    return { available: hasCompleteOrderItemCostCoverage(items, menuItemMap), menuItemMap }
+  }
 
   let { data, error } = await supabase
     .from('menu_item_costs')
@@ -64,15 +73,20 @@ async function loadCurrentMenuItemCosts(supabase, items = []) {
     throw error
   }
 
+  const menuItemMap = new Map((data || []).map(row => [row.menu_item_id, row]))
   return {
-    available: true,
-    menuItemMap: new Map((data || []).map(row => [row.menu_item_id, row])),
+    available: hasCompleteOrderItemCostCoverage(items, menuItemMap),
+    menuItemMap,
   }
 }
 
-async function loadCompletedOrderNetProfit(supabase, order) {
+async function loadCompletedOrderProfit(supabase, order) {
   const { available, menuItemMap } = await loadCurrentMenuItemCosts(supabase, order?.items || [])
-  return available ? getOrderNetProfit(order, menuItemMap) : null
+  if (!available) return { netProfit: null, marginPct: null }
+  return {
+    netProfit: getOrderNetProfit(order, menuItemMap),
+    marginPct: getOrderProfitMarginPct(order, menuItemMap),
+  }
 }
 
 async function loadPaidTotalsForRestaurantDay(supabase, paidAt) {
@@ -186,7 +200,10 @@ export default async function handler(req, res) {
     if (completedOrders.length > 0) {
       const combinedOrder = mergeCompletedOrders(completedOrders)
       const localizedOrder = await withRussianMenuItemNames(supabase, combinedOrder)
-      const orderNetProfit = await loadCompletedOrderNetProfit(supabase, localizedOrder)
+      const { netProfit: orderNetProfit, marginPct: orderProfitMarginPct } = await loadCompletedOrderProfit(
+        supabase,
+        localizedOrder
+      )
       const { revenueTotal: dailyRevenueTotal, netProfitTotal: dailyNetProfitTotal } = await loadPaidTotalsForRestaurantDay(
         supabase,
         combinedOrder.paid_at || combinedOrder.updated_at || new Date()
@@ -194,6 +211,7 @@ export default async function handler(req, res) {
       const text = buildCompletedOrderGroupMessage({
         ...localizedOrder,
         orderNetProfit,
+        orderProfitMarginPct,
         dailyRevenueTotal,
         dailyNetProfitTotal,
       })

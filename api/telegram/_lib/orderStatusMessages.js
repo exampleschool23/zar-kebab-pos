@@ -31,6 +31,12 @@ function formatRowMoney(amount) {
   return new Intl.NumberFormat('ru-RU').format(rounded).replace(/\s/g, ' ')
 }
 
+function formatPercent(value) {
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return '-'
+  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(amount)}%`
+}
+
 function paymentMethodLabel(value) {
   const key = String(value || '').toLowerCase()
   if (PAYMENT_METHOD_LABELS_RU[key]) return PAYMENT_METHOD_LABELS_RU[key]
@@ -286,6 +292,9 @@ export function buildCompletedOrderGroupMessage(order) {
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
   if (order?.orderNetProfit != null && Number.isFinite(Number(order.orderNetProfit))) {
     lines.push(`Чистая прибыль · Заказ: ${escapeTelegramHtml(formatMoney(order.orderNetProfit))}`)
+  }
+  if (order?.orderProfitMarginPct != null && Number.isFinite(Number(order.orderProfitMarginPct))) {
+    lines.push(`Маржа прибыли · Заказ: ${escapeTelegramHtml(formatPercent(order.orderProfitMarginPct))}`)
   }
   if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
     lines.push(`Доход · Сегодня: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)

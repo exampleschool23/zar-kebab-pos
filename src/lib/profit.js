@@ -64,6 +64,11 @@ export function getOrderNetProfit(order, menuItemMap = null) {
   return Math.round(getOrderRevenueTotal(order) - getOrderCostTotal(order, menuItemMap))
 }
 
+export function getOrderProfitMarginPct(order, menuItemMap = null) {
+  const revenue = getOrderRevenueTotal(order)
+  return getSaleProfitSummary(revenue, getOrderCostTotal(order, menuItemMap))?.marginPct ?? null
+}
+
 export function getOrdersCostTotal(orders, menuItemMap = null) {
   return Math.round((orders || []).reduce(
     (sum, order) => sum + getOrderCostTotal(order, menuItemMap),

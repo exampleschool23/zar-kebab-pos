@@ -9,6 +9,24 @@ import {
   mergeCompletedOrders,
   shouldNotifyCompletedOrderGroup,
 } from '../api/telegram/_lib/orderStatusMessages.js'
+import { hasCompleteOrderItemCostCoverage } from '../api/telegram/order-status.js'
+
+test('completed order profit requires cost coverage for every legacy item', () => {
+  const currentCosts = new Map([
+    ['legacy-covered', { menu_item_id: 'legacy-covered', cost_price: 20_000 }],
+  ])
+
+  assert.equal(hasCompleteOrderItemCostCoverage([
+    { menu_item_id: 'snapshotted', cost_price: 0 },
+    { menu_item_id: 'legacy-covered', cost_price: null },
+  ], currentCosts), true)
+  assert.equal(hasCompleteOrderItemCostCoverage([
+    { menu_item_id: 'legacy-missing', cost_price: null },
+  ], currentCosts), false)
+  assert.equal(hasCompleteOrderItemCostCoverage([
+    { name: 'Unknown legacy item', cost_price: null },
+  ], currentCosts), false)
+})
 
 test('Telegram completed order names include the selected Qurutoba portion', () => {
   const menuItem = {
@@ -75,6 +93,7 @@ test('completed table rounds merge into one Telegram order summary', () => {
   const message = buildCompletedOrderGroupMessage({
     ...order,
     orderNetProfit: 72500,
+    orderProfitMarginPct: 70,
     dailyRevenueTotal: 500000,
     dailyNetProfitTotal: 310000,
   })
@@ -84,6 +103,7 @@ test('completed table rounds merge into one Telegram order summary', () => {
   assert.match(message, /Сервис 15%: 13 500 UZS/)
   assert.match(message, /Оплата: Наличные 103 500 UZS/)
   assert.match(message, /Чистая прибыль · Заказ: 72 500 UZS/)
+  assert.match(message, /Маржа прибыли · Заказ: 70%/)
   assert.match(message, /Чистая прибыль · Сегодня: 310 000 UZS/)
   assert.equal((message.match(/Стол: Table 3/g) || []).length, 1)
 })
@@ -131,6 +151,7 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
     service_rate_pct: 15,
     total: 163300,
     orderNetProfit: 101300,
+    orderProfitMarginPct: 62.03,
     dailyRevenueTotal: 525300,
     dailyNetProfitTotal: 337800,
     payment_method: 'terminal',
@@ -160,8 +181,24 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
   assert.match(message, /Оплата: Терминал/)
   assert.doesNotMatch(message, /К оплате: 163 300 UZS/)
   assert.match(message, /Чистая прибыль · Заказ: 101 300 UZS/)
+  assert.match(message, /Маржа прибыли · Заказ: 62%/)
   assert.match(message, /Доход · Сегодня: 525 300 UZS/)
   assert.match(message, /Чистая прибыль · Сегодня: 337 800 UZS/)
+})
+
+test('completed group message omits profit margin when protected costs are unavailable', () => {
+  const message = buildCompletedOrderGroupMessage({
+    table_name: 'Table 1',
+    payment_status: 'paid',
+    subtotal: 50_000,
+    total: 50_000,
+    orderNetProfit: null,
+    orderProfitMarginPct: null,
+    items: [{ name: 'Kebab', quantity: 1, unit_price: 50_000, status: 'served' }],
+  })
+
+  assert.doesNotMatch(message, /Чистая прибыль · Заказ/)
+  assert.doesNotMatch(message, /Маржа прибыли · Заказ/)
 })
 
 test('completed dine-in group message starts with table and hides separate type line', () => {

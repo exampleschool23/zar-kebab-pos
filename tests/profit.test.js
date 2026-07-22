@@ -5,6 +5,7 @@ import {
   getOrderCostTotal,
   getOrderItemCostPrice,
   getOrderNetProfit,
+  getOrderProfitMarginPct,
   getOrdersCostTotal,
   getOrdersNetProfit,
   getSaleProfitSummary,
@@ -36,6 +37,35 @@ test('net profit subtracts immutable sold-item cost snapshots from paid revenue'
   assert.equal(getOrderCostTotal(order), 40_000)
   assert.equal(getOrdersCostTotal([order]), 40_000)
   assert.equal(getOrderNetProfit(order), 85_000)
+  assert.equal(getOrderProfitMarginPct(order), 68)
+})
+
+test('order profit margin uses recognized revenue with service loyalty and cancellations', () => {
+  const loyaltyOrder = {
+    payment_status: 'paid',
+    service_rate_pct: 15,
+    total: 100_000,
+    loyalty_used_amount: 15_000,
+    items: [
+      { menu_item_id: 'meal', quantity: 1, price: 100_000, cost_price: 40_000, status: 'served' },
+      { menu_item_id: 'cancelled', quantity: 1, price: 90_000, cost_price: 80_000, status: 'cancelled' },
+    ],
+  }
+  const discountedOrder = {
+    payment_status: 'paid',
+    service_rate_pct: 15,
+    loyalty_discount_pct: 10,
+    total: 103_500,
+    items: [
+      { menu_item_id: 'meal', quantity: 1, price: 100_000, cost_price: 40_000, status: 'served' },
+    ],
+  }
+
+  assert.equal(getOrderNetProfit(loyaltyOrder), 75_000)
+  assert.equal(getOrderProfitMarginPct(loyaltyOrder), 65.2)
+  assert.equal(getOrderNetProfit(discountedOrder), 63_500)
+  assert.equal(getOrderProfitMarginPct(discountedOrder), 61.4)
+  assert.equal(getOrderProfitMarginPct({ payment_status: 'paid', total: 0, items: [] }), null)
 })
 
 test('legacy order items fall back to the protected current menu cost', () => {
@@ -74,6 +104,12 @@ test('legacy variant sales use the selected protected variant cost before the pa
 
   assert.equal(getOrderItemCostPrice(selectedVariant, menuItemMap), 72_000)
   assert.equal(getOrderItemCostPrice(unknownVariant, menuItemMap), 40_000)
+  assert.equal(getOrderProfitMarginPct({
+    payment_status: 'paid',
+    service_rate_pct: 0,
+    total: 145_000,
+    items: [{ ...selectedVariant, quantity: 1, price: 145_000, status: 'served' }],
+  }, menuItemMap), 50.3)
 })
 
 test('immutable sale snapshots still win after a variant cost changes', () => {
