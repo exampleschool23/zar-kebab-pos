@@ -1,3 +1,5 @@
+import { firstMenuItemText } from './menuItemText.js'
+
 const translations = {
   uz: {
     appName: 'Zar Kebab',
@@ -596,11 +598,16 @@ export function tf(lang, key, ...args) {
 }
 
 export function getItemName(item, lang) {
-  return item[`name_${lang}`] || item.name_en || item.name_uz || ''
+  return firstMenuItemText(item?.[`name_${lang}`], item?.name_en, item?.name_uz, item?.name_ru)
 }
 
 export function getItemDesc(item, lang) {
-  return item[`description_${lang}`] || item.description_en || item.description_uz || ''
+  return firstMenuItemText(
+    item?.[`description_${lang}`],
+    item?.description_en,
+    item?.description_uz,
+    item?.description_ru,
+  )
 }
 
 export function getCategoryName(cat, lang) {

@@ -192,6 +192,7 @@ export default function Expenses() {
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
+  const [paidHistoryReady, setPaidHistoryReady] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -467,6 +468,7 @@ export default function Expenses() {
     const requestId = loadRequestRef.current + 1
     loadRequestRef.current = requestId
     setLoading(true)
+    setPaidHistoryReady(false)
     setError('')
     const expensePromise = loadPagedResult((from, to) => supabase
         .from('expenses')
@@ -490,46 +492,60 @@ export default function Expenses() {
       .then(data => ({ data, error: null }))
       .catch(error => ({ data: [], error }))
 
-    await Promise.all([
-      expensePromise.then(expenseResult => {
-        if (requestId !== loadRequestRef.current) return
-        if (expenseResult.error) {
-          setError(isMissingExpensesMigration(expenseResult.error) ? l.migrationMissing : expenseResult.error.message || l.loadFailed)
-          setExpenses([])
-        } else {
-          setExpenses(expenseResult.data || [])
-        }
-        setLoading(false)
-      }),
-      orderPromise.then(orderHistoryResult => {
-        if (requestId !== loadRequestRef.current) return
-        if (orderHistoryResult.error) {
-          setPaidHistoryOrders([])
-          setError(orderHistoryResult.error.message || l.loadFailed)
-        } else {
-          setPaidHistoryOrders(orderHistoryResult.data || [])
-        }
-      }),
-      salaryPromise.then(([salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult]) => {
-        if (requestId !== loadRequestRef.current) return
-        const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
-        if (salaryError) {
-          setSalaryProfiles([])
-          if (isMissingSalaryMigration(salaryError)) setError(l.salaryMigrationMissing)
-          return
-        }
-        if (salaryFineResult.error) setError(isMissingSalaryMigration(salaryFineResult.error) ? l.salaryMigrationMissing : salaryFineResult.error.message || l.loadFailed)
-        setSalaryProfiles(composeSalaryProfiles(
-          salaryProfileResult.data || [],
-          salaryRateResult.data || [],
-          salaryPaymentResult.data || [],
-          salaryBonusResult.data || [],
-          salaryFineResult.error ? [] : salaryFineResult.data || [],
-          salaryAbsenceResult.data || [],
-          teamResult.data || [],
-        ))
-      }),
-    ])
+    const [
+      expenseResult,
+      orderHistoryResult,
+      [salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult],
+    ] = await Promise.all([expensePromise, orderPromise, salaryPromise])
+    if (requestId !== loadRequestRef.current) return
+
+    let loadError = ''
+    if (expenseResult.error) {
+      loadError = isMissingExpensesMigration(expenseResult.error)
+        ? l.migrationMissing
+        : expenseResult.error.message || l.loadFailed
+      setExpenses([])
+    } else {
+      setExpenses(expenseResult.data || [])
+    }
+
+    if (orderHistoryResult.error) {
+      setPaidHistoryOrders([])
+      loadError ||= orderHistoryResult.error.message || l.loadFailed
+    } else {
+      setPaidHistoryOrders(orderHistoryResult.data || [])
+      setPaidHistoryReady(true)
+    }
+
+    const salaryError = salaryProfileResult.error
+      || salaryRateResult.error
+      || salaryPaymentResult.error
+      || salaryBonusResult.error
+      || salaryAbsenceResult.error
+    if (salaryError) {
+      setSalaryProfiles([])
+      loadError ||= isMissingSalaryMigration(salaryError)
+        ? l.salaryMigrationMissing
+        : salaryError.message || l.loadFailed
+    } else {
+      if (salaryFineResult.error) {
+        loadError ||= isMissingSalaryMigration(salaryFineResult.error)
+          ? l.salaryMigrationMissing
+          : salaryFineResult.error.message || l.loadFailed
+      }
+      setSalaryProfiles(composeSalaryProfiles(
+        salaryProfileResult.data || [],
+        salaryRateResult.data || [],
+        salaryPaymentResult.data || [],
+        salaryBonusResult.data || [],
+        salaryFineResult.error ? [] : salaryFineResult.data || [],
+        salaryAbsenceResult.data || [],
+        teamResult.data || [],
+      ))
+    }
+
+    setError(loadError)
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -569,8 +585,10 @@ export default function Expenses() {
     )
   ), [filteredExpenses])
   const accountingOrders = useMemo(
-    () => mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo),
-    [paidHistoryOrders, state.orders, dateFrom, dateTo]
+    () => paidHistoryReady
+      ? mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo)
+      : [],
+    [paidHistoryReady, paidHistoryOrders, state.orders, dateFrom, dateTo]
   )
   const menuItemMap = useMemo(
     () => Object.fromEntries(state.menuItems.map(item => [item.id, item])),
@@ -766,11 +784,11 @@ export default function Expenses() {
               description={`${l.overviewHelp} · ${formatLongDate(dateFrom, lang, dateFrom)} — ${formatLongDate(dateTo, lang, dateTo)}`}
             />
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi icon={WalletCards} label={l.cafeIncome} value={formatCurrency(cafeIncome)} sub={l.cafeIncomeSub} tone="green" />
+            <Kpi icon={WalletCards} label={l.cafeIncome} value={loading ? '—' : formatCurrency(cafeIncome)} sub={l.cafeIncomeSub} tone="green" />
             <Kpi
               icon={BadgeDollarSign}
               label={l.netProfit}
-              value={formatCurrencyWithPercentage(netProfit, profitMarginPct, lang)}
+              value={loading ? '—' : formatCurrencyWithPercentage(netProfit, profitMarginPct, lang)}
               sub={l.netProfitSub}
               tone={netProfit >= 0 ? 'green' : 'red'}
               emphasizeValue
@@ -778,30 +796,30 @@ export default function Expenses() {
             <Kpi
               icon={CalendarDays}
               label={l.avgDailyCafeIncome}
-              value={formatCurrency(selectedRangeCafeIncome.averageDaily)}
-              sub={`${l.periodCafeIncome}: ${formatCurrency(selectedRangeCafeIncome.total)}`}
+              value={loading ? '—' : formatCurrency(selectedRangeCafeIncome.averageDaily)}
+              sub={loading ? l.periodHelp : `${l.periodCafeIncome}: ${formatCurrency(selectedRangeCafeIncome.total)}`}
               tone="blue"
             />
             <Kpi
               icon={HandCoins}
               label={l.investorSupport}
               value={loading ? '—' : formatCurrency(investorSupportTotal)}
-              sub={otherIncomeTotal > 0 ? `${l.otherIncomeSub}: ${formatCurrency(otherIncomeTotal)}` : l.investorSupportSub}
+              sub={loading ? l.periodHelp : otherIncomeTotal > 0 ? `${l.otherIncomeSub}: ${formatCurrency(otherIncomeTotal)}` : l.investorSupportSub}
               tone="purple"
             />
-            <Kpi icon={ReceiptText} label={l.expenses} value={formatCurrency(summary.total)} sub={`${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" />
-            <Kpi icon={Banknote} label={l.left} value={formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
+            <Kpi icon={ReceiptText} label={l.expenses} value={loading ? '—' : formatCurrency(summary.total)} sub={loading ? l.periodHelp : `${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" />
+            <Kpi icon={Banknote} label={l.left} value={loading ? '—' : formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
             <Kpi
               icon={Users}
               label={l.salaryDue}
-              value={formatCurrency(totalSalaryDue)}
+              value={loading ? '—' : formatCurrency(totalSalaryDue)}
               sub={`${l.salaryDueAsOf}: ${formatLongDate(salaryDueDate, lang, salaryDueDate)}`}
               tone={totalSalaryDue > 0 ? 'orange' : 'green'}
             />
             <Kpi
               icon={CalendarDays}
               label={l.salaryDueMonthEnd}
-              value={formatCurrency(totalSalaryDueByMonthEnd)}
+              value={loading ? '—' : formatCurrency(totalSalaryDueByMonthEnd)}
               sub={`${l.salaryDueProjection}: ${formatLongDate(salaryMonthEndDate, lang, salaryMonthEndDate)}`}
               tone={totalSalaryDueByMonthEnd > 0 ? 'red' : 'green'}
             />

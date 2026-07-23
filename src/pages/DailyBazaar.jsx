@@ -152,6 +152,7 @@ const EN = {
   noHistory: 'No bazaar entries match this period and filters.',
   noAnalytics: 'No bazaar spend is recorded for this period.',
   productName: 'Product name',
+  itemPrice: 'Item total',
   actions: 'Actions',
   previous: 'Previous',
   next: 'Next',
@@ -223,7 +224,7 @@ const LABELS = {
     dateRange: 'Sana oralig‘i', today: 'Bugun', week: '7 kun', month: 'Joriy oy', previousMonth: 'O‘tgan oy', from: 'Dan', to: 'Gacha',
     search: 'Mahsulot, xaridor yoki izoh…', searchLabel: 'Bozor tarixidan qidirish', clearSearch: 'Qidiruvni tozalash', closeSearch: 'Qidiruvni yopish',
     allCategories: 'Barcha kategoriyalar', allPayments: 'Barcha to‘lovlar', results: 'yozuv', noHistory: 'Bu davr va filtrlarga mos bozor yozuvi yo‘q.',
-    productName: 'Mahsulot nomi', actions: 'Amallar', previous: 'Oldingi', next: 'Keyingi', page: 'Sahifa', of: '/',
+    productName: 'Mahsulot nomi', itemPrice: 'Mahsulot summasi', actions: 'Amallar', previous: 'Oldingi', next: 'Keyingi', page: 'Sahifa', of: '/',
     noAnalytics: 'Bu davr uchun bozor xarajati yozilmagan.', details: 'Tafsilotlar', hideDetails: 'Yopish', edit: 'Tahrirlash', delete: 'O‘chirish',
     confirmDelete: 'O‘chirishni tasdiqlash', deleting: 'O‘chirilmoqda…', addedBy: 'Kiritgan',
     unspecifiedSupplier: 'Ko‘rsatilmagan', unspecifiedBuyer: 'Ko‘rsatilmagan', legacy: 'Tarixiy yozuv', legacyReadOnly: 'Oldingi xarajatlardan ko‘chirilgan yozuvni bu yerda tahrirlab bo‘lmaydi.',
@@ -259,7 +260,7 @@ const LABELS = {
     dateRange: 'Период', today: 'Сегодня', week: '7 дней', month: 'Текущий месяц', previousMonth: 'Прошлый месяц', from: 'С', to: 'По',
     search: 'Продукт, закупщик или примечание…', searchLabel: 'Поиск по истории базара', clearSearch: 'Очистить поиск', closeSearch: 'Закрыть поиск',
     allCategories: 'Все категории', allPayments: 'Все способы оплаты', results: 'записей', noHistory: 'Нет записей базара для этого периода и фильтров.',
-    productName: 'Название продукта', actions: 'Действия', previous: 'Назад', next: 'Далее', page: 'Страница', of: 'из',
+    productName: 'Название продукта', itemPrice: 'Сумма товара', actions: 'Действия', previous: 'Назад', next: 'Далее', page: 'Страница', of: 'из',
     noAnalytics: 'За этот период расходов базара нет.', details: 'Детали', hideDetails: 'Скрыть', edit: 'Изменить', delete: 'Удалить',
     confirmDelete: 'Подтвердить удаление', deleting: 'Удаляется…', addedBy: 'Добавил',
     unspecifiedSupplier: 'Не указано', unspecifiedBuyer: 'Не указано', legacy: 'Историческая запись', legacyReadOnly: 'Запись, перенесённую из старых расходов, нельзя изменить здесь.',
@@ -1208,12 +1209,13 @@ function BazaarHistory({
       </div>
       <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] border-collapse text-left">
+          <table className="w-full min-w-[1120px] border-collapse text-left">
             <thead className="bg-[#F8F9FB] text-[10px] font-black uppercase tracking-wide text-[#8B95A5]">
               <tr>
                 <th className="w-[150px] px-3 py-2.5">{l.purchaseDate}</th>
                 <th className="min-w-[220px] px-3 py-2.5">{l.productName}</th>
                 <th className="w-[140px] px-3 py-2.5">{l.quantity}</th>
+                <th className="w-[150px] px-3 py-2.5 text-right">{l.itemPrice}</th>
                 <th className="w-[150px] px-3 py-2.5">{l.category}</th>
                 <th className="w-[170px] px-3 py-2.5">{l.addedBy}</th>
                 <th className="w-[150px] px-3 py-2.5 text-right">{l.totalPaid}</th>
@@ -1240,6 +1242,9 @@ function BazaarHistory({
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 font-black text-[#1F2937]">
                         {formatBazaarQuantity(item.quantity)} {bazaarUnitLabel(item.unit, lang)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-black text-[#1F2937] tabular-nums">
+                        {formatCurrency(item.line_total)}
                       </td>
                       <td className="px-3 py-2.5">
                         <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-[11px] font-black text-[#6B7280]">{bazaarCategoryLabel(item.category, lang)}</span>

@@ -21,6 +21,7 @@ import {
 } from './orderTypes.js'
 import { collectPagedRows, loadActiveOrders, loadPaidOrdersForRange } from './orderHistory.js'
 import { getRequiredMenuItemCost } from './menuItemCosts.js'
+import { trimMenuItemTextFields } from './menuItemText.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -1226,9 +1227,10 @@ export async function writeToSupabase(action, state, options = {}) {
         throw new Error('Real cost must be greater than zero for every new product.')
       }
       const normalizedVariantCosts = normalizeVariantCosts(variantCosts ?? _variantCostsAlias)
+      const normalizedFields = trimMenuItemTextFields(fields)
       const rpcResult = await supabase.rpc('create_menu_item_with_media_and_cost', {
         payload: {
-          ...fields,
+          ...normalizedFields,
           cost_price: requiredCost,
           variant_costs: normalizedVariantCosts,
         },
@@ -1251,7 +1253,8 @@ export async function writeToSupabase(action, state, options = {}) {
       } = action.payload
       delete fields.external_id
       delete fields.externalId
-      const { error } = await supabase.from('menu_items').update(fields).eq('id', id)
+      const normalizedFields = trimMenuItemTextFields(fields)
+      const { error } = await supabase.from('menu_items').update(normalizedFields).eq('id', id)
       if (error) throw error
       const { error: costError } = await supabase.from('menu_item_costs').upsert({
         menu_item_id: id,

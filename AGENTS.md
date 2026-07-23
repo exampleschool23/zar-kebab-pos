@@ -157,6 +157,11 @@ These bugs were recently fixed and are now protected by tests:
    - Payment-method balances live in the left Accounting column behind the collapsed `MethodBalancesDisclosure` control.
    - Do not restore the full-width always-open payment-method balance grid above the Accounting content.
 
+14. Accounting must not render today-only operational orders while the selected monthly/history range is still loading.
+   - Initial POS hydration intentionally includes active orders plus today’s paid orders, but that partial operational set is not an Accounting history result.
+   - `Expenses` waits for expenses, paid-order history, and salary data before ending the loading state.
+   - `paidHistoryReady` prevents the page from merging globally hydrated today orders until the selected paid-history request succeeds.
+
 14. New menu products must never be created without a real cost.
    - The Admin Menu requires a positive protected cost for normal and cashier-quick products.
    - Creation uses the atomic `create_menu_item_with_cost(payload jsonb)` RPC so the public product and private cost row commit or roll back together.
@@ -204,6 +209,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/103_menu_item_media_gallery.sql`
   Adds `menu_items.media_urls` and `create_menu_item_with_media_and_cost(payload jsonb)` so a new product's cover/gallery and protected cost are created atomically.
+
+- `supabase/104_trim_menu_item_text.sql`
+  Backfills and continuously trims leading/trailing whitespace from all localized menu-item names and descriptions.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
@@ -301,6 +309,7 @@ Expected behavior:
 - Existing R2 media removed in the editor is deleted only after the product save succeeds.
 - Newly uploaded media is cleaned up when the editor is cancelled or when it is removed before a successful save.
 - Product cards and Telegram use the cover; the public/waiter product detail page exposes the full gallery.
+- Localized product names and descriptions are trimmed on editor blur, app writes, public display, and database insert/update; internal spaces and description line breaks remain unchanged.
 
 ## Tests
 

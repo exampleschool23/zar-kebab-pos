@@ -41,6 +41,7 @@ import {
   MENU_VIDEO_MIME_TYPES,
   normalizeMenuMediaUrls,
 } from '../lib/menuMedia'
+import { trimMenuItemTextFields, trimMenuItemTextValue } from '../lib/menuItemText'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -300,7 +301,7 @@ function PricingFields({ form, setF, lang, compact = false, costRequired = false
   )
 }
 
-function DescriptionField({ label, value, onChange, lang }) {
+function DescriptionField({ label, value, onChange, onBlur, lang }) {
   const textareaRef = useRef(null)
   const boldLabel = lang === 'uz' ? 'Qalin' : lang === 'ru' ? 'Жирный' : 'Bold'
 
@@ -344,6 +345,7 @@ function DescriptionField({ label, value, onChange, lang }) {
         ref={textareaRef}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
         rows={4}
         className="min-h-[112px] w-full resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-6 transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
       />
@@ -526,7 +528,7 @@ function MediaGalleryField({ label, values, onChange, onUploadComplete, lang, en
         <div className="mt-3 grid grid-cols-2 gap-2">
           {mediaUrls.map((url, index) => (
             <div key={url} className={`overflow-hidden rounded-xl border bg-white ${index === 0 ? 'border-orange-300 ring-2 ring-orange-100' : 'border-gray-200'}`}>
-              <div className="relative aspect-video overflow-hidden bg-orange-50">
+              <div className="relative aspect-square overflow-hidden bg-orange-50">
                 <MenuMedia
                   src={url}
                   alt={`${t(lang, 'mediaPreview')} ${index + 1}`}
@@ -1323,9 +1325,11 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
 
 function menuItemToProductForm(i) {
   const mediaUrls = getMenuItemMediaUrls(i)
+  const normalizedText = trimMenuItemTextFields(i)
   return {
     ...blankItem,
     ...i,
+    ...normalizedText,
     cost_price: i.cost_price ?? i.costPrice ?? '',
     millilitres: i.millilitres ?? i.milliliters ?? (Number(i.litres ?? i.liters) > 0 ? Math.round(Number(i.litres ?? i.liters) * 1000) : ''),
     stock_count: i.stock_count ?? i.stockCount ?? 0,
@@ -1349,14 +1353,15 @@ function menuItemToProductForm(i) {
 }
 
 function getItemFormFingerprint(form = {}) {
+  const normalizedText = trimMenuItemTextFields(form)
   return JSON.stringify({
     category_id: String(form.category_id || ''),
-    name_uz: String(form.name_uz || ''),
-    name_ru: String(form.name_ru || ''),
-    name_en: String(form.name_en || ''),
-    description_uz: String(form.description_uz || ''),
-    description_ru: String(form.description_ru || ''),
-    description_en: String(form.description_en || ''),
+    name_uz: normalizedText.name_uz || '',
+    name_ru: normalizedText.name_ru || '',
+    name_en: normalizedText.name_en || '',
+    description_uz: normalizedText.description_uz || '',
+    description_ru: normalizedText.description_ru || '',
+    description_en: normalizedText.description_en || '',
     image_url: String(form.image_url || ''),
     media_urls: normalizeMenuMediaUrls(form.media_urls),
     price: numberFromMoneyInput(form.price),
@@ -1421,7 +1426,7 @@ export default function AdminMenu() {
   const hasValidNewItemCost = itemModal !== 'new' || hasRequiredMenuItemCost(form.cost_price)
   const canSaveItemForm = !savingItemForm
     && canEditMenu
-    && !!form.name_uz
+    && !!trimMenuItemTextValue(form.name_uz)
     && !!form.price
     && !!form.category_id
     && hasValidNewItemCost
@@ -1615,7 +1620,7 @@ export default function AdminMenu() {
   }
   async function saveItem() {
     if (savingItemForm || !canEditMenu || !isItemFormDirty) return
-    if (!form.name_uz || !form.price || !form.category_id) return
+    if (!trimMenuItemTextValue(form.name_uz) || !form.price || !form.category_id) return
     const requiredCost = itemModal === 'new' ? getRequiredMenuItemCost(form.cost_price) : null
     if (itemModal === 'new' && requiredCost === null) {
       setMenuNotice({
@@ -1802,6 +1807,7 @@ export default function AdminMenu() {
   }
 
   function setF(key)  { return e => setForm(f => ({ ...f, [key]: e.target.value })) }
+  function trimF(key) { return () => setForm(f => ({ ...f, [key]: trimMenuItemTextValue(f[key]) })) }
   function setCF(key) { return e => setCatForm(f => ({ ...f, [key]: e.target.value })) }
 
   // ── DnD handlers ──────────────────────────────────────────────────────────
@@ -1943,15 +1949,15 @@ export default function AdminMenu() {
                   <PricingFields form={form} setF={setF} lang={lang} costRequired={itemModal === 'new'} />
 
                   <div className="grid gap-4 sm:grid-cols-3">
-                    <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} />
-                    <Field label={t(lang, 'nameRu')} value={form.name_ru} onChange={setF('name_ru')} />
-                    <Field label={t(lang, 'nameEn')} value={form.name_en} onChange={setF('name_en')} />
+                    <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} onBlur={trimF('name_uz')} />
+                    <Field label={t(lang, 'nameRu')} value={form.name_ru} onChange={setF('name_ru')} onBlur={trimF('name_ru')} />
+                    <Field label={t(lang, 'nameEn')} value={form.name_en} onChange={setF('name_en')} onBlur={trimF('name_en')} />
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-3">
-                    <DescriptionField label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} lang={lang} />
-                    <DescriptionField label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} lang={lang} />
-                    <DescriptionField label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} lang={lang} />
+                    <DescriptionField label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} onBlur={trimF('description_uz')} lang={lang} />
+                    <DescriptionField label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} onBlur={trimF('description_ru')} lang={lang} />
+                    <DescriptionField label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} onBlur={trimF('description_en')} lang={lang} />
                   </div>
 
                   <OptionGroupsEditor
@@ -2638,18 +2644,18 @@ export default function AdminMenu() {
                 ))}
               </select>
             </div>
-            <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} />
-            <Field label={t(lang, 'nameRu')} value={form.name_ru} onChange={setF('name_ru')} />
-            <Field label={t(lang, 'nameEn')} value={form.name_en} onChange={setF('name_en')} />
+            <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} onBlur={trimF('name_uz')} />
+            <Field label={t(lang, 'nameRu')} value={form.name_ru} onChange={setF('name_ru')} onBlur={trimF('name_ru')} />
+            <Field label={t(lang, 'nameEn')} value={form.name_en} onChange={setF('name_en')} onBlur={trimF('name_en')} />
             <div className="rounded-xl border border-[#C7D2FE] bg-[#EEF2FF] px-3 py-2.5">
               <p className="mb-1 text-[11px] font-black uppercase tracking-wide text-[#818CF8]">
                 {lang === 'uz' ? 'Tashqi ID' : lang === 'ru' ? 'Внешний ID' : 'External ID'}
               </p>
               <p className="font-black text-[#4F46E5]">{form.external_id || '—'}</p>
             </div>
-            <DescriptionField label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} lang={lang} />
-            <DescriptionField label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} lang={lang} />
-            <DescriptionField label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} lang={lang} />
+            <DescriptionField label={t(lang, 'descUz')} value={form.description_uz} onChange={setF('description_uz')} onBlur={trimF('description_uz')} lang={lang} />
+            <DescriptionField label={t(lang, 'descRu')} value={form.description_ru} onChange={setF('description_ru')} onBlur={trimF('description_ru')} lang={lang} />
+            <DescriptionField label={t(lang, 'descEn')} value={form.description_en} onChange={setF('description_en')} onBlur={trimF('description_en')} lang={lang} />
             <OptionGroupsEditor
               value={form.option_groups_editor}
               onChange={optionGroups => setForm(current => ({ ...current, option_groups_editor: optionGroups }))}
