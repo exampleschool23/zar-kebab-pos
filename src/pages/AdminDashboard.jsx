@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
-import { formatCurrency } from '../lib/formatCurrency'
+import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
 import { formatDateOnly, formatLongDate, formatTime, normalizeDateLang, parseInstantDate } from '../lib/dateFormat'
 import {
   addRestaurantDays,
@@ -38,7 +38,7 @@ import AppShell from '../components/AppShell'
 import { inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
 import { loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
-import { getOrdersNetProfit } from '../lib/profit'
+import { getOrdersNetProfit, getSaleProfitSummary } from '../lib/profit'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 const L = {
@@ -768,7 +768,7 @@ export default function AdminDashboard() {
 
   const {
     periodRevenue, previousKpiRevenue, revenueChange,
-    periodNetProfit, previousKpiNetProfit, netProfitChange,
+    periodNetProfit, periodProfitMargin, previousKpiNetProfit, netProfitChange,
     periodOrderCount, previousOrderCount, orderChange,
     periodItemsSold,
   } = useMemo(() => {
@@ -789,6 +789,10 @@ export default function AdminDashboard() {
         ? Math.round(((currentRevenue - previousRevenue) / previousRevenue) * 100)
         : null,
       periodNetProfit: currentNetProfit,
+      periodProfitMargin: getSaleProfitSummary(
+        currentRevenue,
+        currentRevenue - currentNetProfit
+      )?.marginPct ?? null,
       previousKpiNetProfit: previousNetProfit,
       netProfitChange: previousNetProfit > 0
         ? Math.round(((currentNetProfit - previousNetProfit) / previousNetProfit) * 100)
@@ -1073,7 +1077,7 @@ export default function AdminDashboard() {
           <KpiCard
             icon={BadgeDollarSign}
             label={`${l.netProfit} · ${currentKpiPeriodLabel}`}
-            value={formatCurrency(periodNetProfit)}
+            value={formatCurrencyWithPercentage(periodNetProfit, periodProfitMargin, lang)}
             sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousKpiNetProfit)}`}
             badge={pctBadge(netProfitChange)}
             tone="profit"

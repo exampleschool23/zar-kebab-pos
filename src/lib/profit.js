@@ -53,6 +53,22 @@ export function getOrderItemCostPrice(item, menuItemMap = null) {
   ) || 0
 }
 
+export function hasOrdersCostCoverage(orders, menuItemMap = null) {
+  return (orders || []).every(order => getSoldOrderItems(order).every(item => {
+    const snapshotCost = normalizedCost(
+      item?.cost_price ?? item?.costPrice ?? item?.real_cost ?? item?.realCost
+    )
+    if (snapshotCost != null) return true
+
+    const menuItem = menuItemFor(menuItemMap, item?.menu_item_id ?? item?.menuItemId)
+    if (!menuItem) return false
+    if (getSelectedVariantCost(item, menuItem) != null) return true
+    return normalizedCost(
+      menuItem?.cost_price ?? menuItem?.costPrice ?? menuItem?.real_cost ?? menuItem?.realCost
+    ) != null
+  }))
+}
+
 export function getOrderCostTotal(order, menuItemMap = null) {
   return Math.round(getSoldOrderItems(order).reduce((sum, item) => {
     const quantity = Math.max(0, Number(item?.quantity) || 1)

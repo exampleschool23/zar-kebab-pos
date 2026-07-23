@@ -14,7 +14,7 @@ import {
   summarizeIncomeEntries,
   todayExpenseDate,
 } from './expenses.js'
-import { getOrdersNetProfit } from './profit.js'
+import { getOrdersNetProfit, getSaleProfitSummary } from './profit.js'
 
 function normalizeIsoDate(value, fallback = todayExpenseDate()) {
   const date = String(value || '').slice(0, 10)
@@ -46,11 +46,17 @@ export function getAccountingPageSummary(orders = [], entries = [], dateFrom, da
   const expenseBreakdown = getAccountingExpenseBreakdown(rangeEntries)
   const incomeSummary = summarizeIncomeEntries(rangeEntries)
   const investorSupportTotal = incomeSummary.byCategory.investor_support || 0
+  const netProfit = getOrdersNetProfit(paidOrders, menuItemMap)
+  const profitMarginPct = getSaleProfitSummary(
+    cafeIncomeSummary.total,
+    cafeIncomeSummary.total - netProfit
+  )?.marginPct ?? null
 
   return {
     paidOrders,
     cafeIncome: cafeIncomeSummary.total,
-    netProfit: getOrdersNetProfit(paidOrders, menuItemMap),
+    netProfit,
+    profitMarginPct,
     cafeIncomeSummary,
     expenseSummary,
     ...expenseBreakdown,

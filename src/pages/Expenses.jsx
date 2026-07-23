@@ -28,7 +28,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
 import { collapseDailyBazaarExpenseRows, getAccountingPageSummary, getAccountingQuickRange } from '../lib/accounting'
-import { formatCurrency } from '../lib/formatCurrency'
+import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
 import { formatLongDate, formatTime } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import {
@@ -587,6 +587,7 @@ export default function Expenses() {
     cashflow,
     netIncome,
     netProfit,
+    profitMarginPct,
     investorSupportTotal,
     otherIncomeTotal,
   } = accountingSummary
@@ -766,7 +767,14 @@ export default function Expenses() {
             />
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi icon={WalletCards} label={l.cafeIncome} value={formatCurrency(cafeIncome)} sub={l.cafeIncomeSub} tone="green" />
-            <Kpi icon={BadgeDollarSign} label={l.netProfit} value={formatCurrency(netProfit)} sub={l.netProfitSub} tone={netProfit >= 0 ? 'green' : 'red'} />
+            <Kpi
+              icon={BadgeDollarSign}
+              label={l.netProfit}
+              value={formatCurrencyWithPercentage(netProfit, profitMarginPct, lang)}
+              sub={l.netProfitSub}
+              tone={netProfit >= 0 ? 'green' : 'red'}
+              emphasizeValue
+            />
             <Kpi
               icon={CalendarDays}
               label={l.avgDailyCafeIncome}
@@ -1215,7 +1223,7 @@ function Field({ label, children }) {
   )
 }
 
-function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange' }) {
+function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange', emphasizeValue = false }) {
   const tones = {
     green: 'bg-green-50 text-green-600',
     orange: 'bg-orange-50 text-[#ff5a00]',
@@ -1223,12 +1231,20 @@ function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange' }) {
     red: 'bg-red-50 text-red-600',
     purple: 'bg-purple-50 text-purple-600',
   }
+  const valueTones = {
+    green: 'text-emerald-700',
+    orange: 'text-[#ff5a00]',
+    blue: 'text-blue-700',
+    red: 'text-red-600',
+    purple: 'text-purple-700',
+  }
+  const valueTone = emphasizeValue ? valueTones[tone] || valueTones.orange : 'text-[#1F2937]'
   return (
     <div className="h-full min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-bold text-[#6B7280]">{label}</p>
-          <p className="mt-1 break-words text-xl font-black leading-tight text-[#1F2937] tabular-nums">{value}</p>
+          <p className={`mt-1 break-words text-xl font-black leading-tight tabular-nums ${valueTone}`}>{value}</p>
         </div>
         <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${tones[tone] || tones.orange}`}>
           <Icon size={18} />

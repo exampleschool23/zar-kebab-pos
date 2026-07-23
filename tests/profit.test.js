@@ -9,6 +9,7 @@ import {
   getOrdersCostTotal,
   getOrdersNetProfit,
   getSaleProfitSummary,
+  hasOrdersCostCoverage,
 } from '../src/lib/profit.js'
 
 test('sale profit summary reports unit gain and selling-price margin percentage', () => {
@@ -142,4 +143,20 @@ test('explicit zero snapshots stay historical and cancelled items do not reduce 
 
   assert.equal(getOrderCostTotal(order, menuItemMap), 0)
   assert.equal(getOrdersNetProfit([order], menuItemMap), 50_000)
+  assert.equal(hasOrdersCostCoverage([order], menuItemMap), true)
+})
+
+test('profit coverage rejects unknown sold-item costs without rejecting cancelled rows', () => {
+  const soldItem = { menu_item_id: 'legacy', quantity: 1, cost_price: null, status: 'served' }
+  const cancelledItem = { menu_item_id: 'cancelled', quantity: 1, cost_price: null, status: 'cancelled' }
+  const order = { payment_status: 'paid', total: 50_000, items: [soldItem, cancelledItem] }
+
+  assert.equal(hasOrdersCostCoverage([order]), false)
+  assert.equal(hasOrdersCostCoverage([order], {
+    legacy: { cost_price: 20_000 },
+  }), true)
+  assert.equal(hasOrdersCostCoverage([{
+    ...order,
+    items: [{ ...soldItem, cost_price: 0 }, cancelledItem],
+  }]), true)
 })

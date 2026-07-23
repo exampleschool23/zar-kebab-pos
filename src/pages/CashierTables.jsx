@@ -4,10 +4,11 @@ import {
   Receipt, CreditCard, Menu as MenuIcon, Clock, Users, Search,
   ChevronDown, Table2, Banknote, Monitor, QrCode,
   UtensilsCrossed, ArrowUpDown, X, HelpCircle, Trash2, RotateCcw, Plus,
+  BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
-import { formatCurrency } from '../lib/formatCurrency'
+import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
 import {
   getGroupedOrderItems,
   getOrderDate,
@@ -29,6 +30,7 @@ import { canDeletePaidOrders, canEditFeature, canMoveBackToTable } from '../lib/
 import { getOrderItemOptionLines } from '../components/MenuProductCards'
 import { useAppDataStatus } from '../store/appHooks'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { getOrdersNetProfit, getSaleProfitSummary, hasOrdersCostCoverage } from '../lib/profit'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -42,6 +44,11 @@ function timeLabel(iso) {
 
 function dateTimeLabel(iso) {
   return formatDateTime(iso)
+}
+
+function formatProfitKpiValue(summary, lang) {
+  if (!summary?.available) return '—'
+  return formatCurrencyWithPercentage(summary.value, summary.marginPct, lang)
 }
 
 function countLabel(count, lang) {
@@ -64,6 +71,9 @@ const L = {
     needsBill:       'Hisob kerak',
     paidToday:       "Bugun to'langan",
     todayRevenue:    'Bugungi daromad',
+    todayNetProfit:  'Bugungi sof foyda',
+    netProfitSub:    'Daromad minus sotilgan mahsulot tannarxi',
+    netProfitUnavailable: 'Tannarx maʼlumoti toʻliq emas',
     payMethods:      "Bugungi to'lov usullari",
     tables:          'stol',
     waitingPay:      "To'lovni kutmoqda",
@@ -117,6 +127,9 @@ const L = {
     needsBill:       'Нужен счёт',
     paidToday:       'Оплачено сегодня',
     todayRevenue:    'Доход за день',
+    todayNetProfit:  'Чистая прибыль за день',
+    netProfitSub:    'Доход минус себестоимость проданных товаров',
+    netProfitUnavailable: 'Не все данные о себестоимости доступны',
     payMethods:      'Способы оплаты сегодня',
     tables:          'столов',
     waitingPay:      'Ожидают оплаты',
@@ -169,6 +182,9 @@ const L = {
     needsBill:       'Needs Bill',
     paidToday:       'Paid Today',
     todayRevenue:    'Today Revenue',
+    todayNetProfit:  'Net Profit Today',
+    netProfitSub:    'Revenue minus cost of sold items',
+    netProfitUnavailable: 'Some cost data is unavailable',
     payMethods:      'Payment Methods Today',
     tables:          'tables',
     waitingPay:      'Waiting for payment',
@@ -680,6 +696,19 @@ export default function CashierTables() {
     return paidTodayOrders.length
   }, [paidTodayOrders])
   const todayRevenue   = paidTodayOrders.reduce((s, o) => s + getOrderRevenueTotal(o), 0)
+  const todayProfitSummary = useMemo(() => {
+    if (!hasOrdersCostCoverage(paidTodayOrders, menuItemMap)) {
+      return { value: null, marginPct: null, available: false }
+    }
+    const value = getOrdersNetProfit(paidTodayOrders, menuItemMap)
+    return {
+      value,
+      marginPct: getSaleProfitSummary(todayRevenue, todayRevenue - value)?.marginPct ?? null,
+      available: true,
+    }
+  },
+    [paidTodayOrders, menuItemMap, todayRevenue]
+  )
 
   // Payment method breakdown — tracks { amount, count } per method
   const payMethodTotals = useMemo(() => {
@@ -917,8 +946,8 @@ export default function CashierTables() {
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-5">
 
-          {/* ── KPI cards — 4 columns ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          {/* ── KPI cards ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3 mb-4">
             <KpiCard
               label={l.activeBills}
               value={activeBills.length}
@@ -954,6 +983,15 @@ export default function CashierTables() {
               icon={Table2}
               iconBg="bg-blue-50"
               iconColor="text-blue-600"
+            />
+            <KpiCard
+              label={l.todayNetProfit}
+              value={formatProfitKpiValue(todayProfitSummary, lang)}
+              sub={todayProfitSummary.available ? l.netProfitSub : l.netProfitUnavailable}
+              accent="text-[#059669]"
+              icon={BadgeDollarSign}
+              iconBg="bg-emerald-50"
+              iconColor="text-emerald-600"
             />
           </div>
 

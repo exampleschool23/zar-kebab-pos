@@ -73,6 +73,7 @@ test('Accounting page composes cafe income, daily average, external income, expe
 
   assert.equal(summary.cafeIncome, 1_500)
   assert.equal(summary.netProfit, 1_100)
+  assert.equal(summary.profitMarginPct, 73.3)
   assert.equal(summary.cafeIncomeSummary.dayCount, 14)
   assert.equal(summary.cafeIncomeSummary.salesDayCount, 2)
   assert.equal(summary.cafeIncomeSummary.averageDaily, 107)
