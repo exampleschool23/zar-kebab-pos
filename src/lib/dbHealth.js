@@ -14,7 +14,7 @@ const TABLE_CHECKS = [
   { name: 'bazaar_purchase_items', columns: ['id', 'purchase_id', 'product_name', 'product_key', 'category', 'quantity', 'unit', 'line_total', 'sort_order', 'notes'] },
   { name: 'bazaar_product_catalog', columns: ['product_key', 'product_name', 'category', 'unit', 'last_purchase_date', 'created_at', 'updated_at'] },
   { name: 'bazaar_purchase_audit', columns: ['id', 'purchase_id', 'action', 'old_snapshot', 'new_snapshot', 'changed_by', 'changed_by_name', 'changed_at'] },
-  { name: 'menu_items', columns: ['id', 'external_id', 'name_uz', 'name_ru', 'name_en', 'price', 'old_price', 'grams', 'millilitres', 'kcal', 'stock_count', 'option_groups', 'cashier_only', 'public_hidden', 'waiter_hidden', 'visible_from_time', 'visible_until_time', 'sort_order', 'deleted_at'] },
+  { name: 'menu_items', columns: ['id', 'external_id', 'name_uz', 'name_ru', 'name_en', 'price', 'old_price', 'grams', 'millilitres', 'kcal', 'stock_count', 'image_url', 'media_urls', 'option_groups', 'cashier_only', 'public_hidden', 'waiter_hidden', 'visible_from_time', 'visible_until_time', 'sort_order', 'deleted_at'] },
   { name: 'menu_item_costs', columns: ['menu_item_id', 'cost_price', 'variant_costs', 'updated_at'] },
   { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'hidden', 'waiter_hidden', 'visible_from_time', 'visible_until_time', 'sort_order'] },
   { name: 'profiles', columns: ['id', 'role', 'full_name', 'feature_access'] },
@@ -45,7 +45,7 @@ const MIGRATION_HINTS = {
   order_payment_audit: 'Run supabase/010_order_payment_audit_and_guards.sql',
   orders: 'Run supabase/075_order_actor_tracking.sql',
   profile_audit: 'Run supabase/028_profile_role_audit.sql',
-  menu_items: 'Run supabase/033_menu_item_grams.sql, supabase/034_menu_item_millilitres.sql, supabase/036_menu_item_old_price.sql, supabase/037_menu_item_external_id.sql, supabase/038_generate_immutable_menu_item_external_ids.sql, supabase/050_menu_item_stock_count.sql, supabase/052_cashier_only_menu_items.sql, supabase/071_menu_item_option_groups.sql, supabase/078_menu_item_safe_delete.sql, supabase/079_menu_item_public_hidden.sql, and supabase/082_menu_visibility_windows.sql',
+  menu_items: 'Run the menu migrations through supabase/103_menu_item_media_gallery.sql',
   menu_item_costs: 'Run supabase/098_menu_item_costs_and_profit.sql and supabase/100_menu_variant_costs_and_accounting_profit.sql',
   menu_categories: 'Run supabase/053_hidden_menu_categories.sql, supabase/080_menu_category_waiter_hidden.sql, and supabase/082_menu_visibility_windows.sql',
   employee_salary_profiles: 'Run supabase/054_employee_salary_profiles.sql, supabase/056_employee_salary_profile_end_date.sql, supabase/060_employee_salary_manual_names.sql, and supabase/076_employee_salary_safe_delete.sql',
@@ -67,6 +67,7 @@ const MIGRATION_HINTS = {
   delete_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
   create_telegram_order: 'Run supabase/101_atomic_telegram_orders.sql',
   create_menu_item_with_cost: 'Run supabase/102_atomic_menu_item_cost_creation.sql',
+  create_menu_item_with_media_and_cost: 'Run supabase/103_menu_item_media_gallery.sql',
 }
 
 function missingColumnMessage(error) {
@@ -121,6 +122,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'submit_order_to_kitchen'))
   checks.push(await checkRpc(dbClient, 'create_telegram_order'))
   checks.push(await checkRpc(dbClient, 'create_menu_item_with_cost'))
+  checks.push(await checkRpc(dbClient, 'create_menu_item_with_media_and_cost'))
   checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))
   checks.push(await checkRpc(dbClient, 'settle_orders_payment'))
   checks.push(await checkRpc(dbClient, 'change_paid_order_payment_method_owner', { p_order_ids: [], p_payment_method: 'cash' }))

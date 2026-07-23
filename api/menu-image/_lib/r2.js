@@ -9,7 +9,13 @@ const IMAGE_EXTENSIONS = {
   'image/png': 'png',
   'image/webp': 'webp',
 }
+const VIDEO_EXTENSIONS = {
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+}
 const ALLOWED_IMAGE_TYPES = new Set(Object.keys(IMAGE_EXTENSIONS))
+const ALLOWED_VIDEO_TYPES = new Set(Object.keys(VIDEO_EXTENSIONS))
+const MEDIA_EXTENSIONS = { ...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS }
 const MENU_OBJECT_KEY_PATTERN = /^menu\/(?:products|categories)\/[a-z0-9][a-z0-9._-]{0,220}$/i
 
 function requiredEnv(name) {
@@ -52,6 +58,23 @@ export async function assertImageFile(file) {
   }
 }
 
+export async function assertMenuMediaFile(file, { allowVideo = true } = {}) {
+  if (!file?.buffer?.length) throw new Error('Menu media file is required')
+  const contentType = String(file.contentType || '').toLowerCase()
+
+  if (ALLOWED_IMAGE_TYPES.has(contentType)) {
+    return assertImageFile(file)
+  }
+  if (!allowVideo || !ALLOWED_VIDEO_TYPES.has(contentType)) {
+    throw new Error(allowVideo
+      ? 'Only JPEG, PNG, WebP, GIF, AVIF, MP4, or WebM menu media is allowed'
+      : 'Only JPEG, PNG, WebP, GIF, or AVIF images are allowed')
+  }
+  if (!matchesVideoSignature(file.buffer, contentType)) {
+    throw new Error('Video contents do not match the declared file type')
+  }
+}
+
 function matchesImageSignature(buffer, contentType) {
   if (contentType === 'image/jpeg' || contentType === 'image/jpg') {
     return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
@@ -76,8 +99,22 @@ function matchesImageSignature(buffer, contentType) {
   return false
 }
 
+function matchesVideoSignature(buffer, contentType) {
+  if (contentType === 'video/mp4') {
+    return buffer.length >= 12 && buffer.subarray(4, 8).toString('ascii') === 'ftyp'
+  }
+  if (contentType === 'video/webm') {
+    return buffer.length >= 4
+      && buffer[0] === 0x1a
+      && buffer[1] === 0x45
+      && buffer[2] === 0xdf
+      && buffer[3] === 0xa3
+  }
+  return false
+}
+
 function extensionForContentType(contentType) {
-  return IMAGE_EXTENSIONS[String(contentType || '').toLowerCase()] || 'img'
+  return MEDIA_EXTENSIONS[String(contentType || '').toLowerCase()] || 'bin'
 }
 
 function safeSlug(value) {
@@ -89,7 +126,7 @@ function safeSlug(value) {
 }
 
 export function makeObjectKey({ type, entityId, contentType }) {
-  if (!VALID_TYPES.has(type)) throw new Error('Image type must be product or category')
+  if (!VALID_TYPES.has(type)) throw new Error('Menu media type must be product or category')
   const folder = type === 'category' ? 'categories' : 'products'
   const timestamp = Date.now()
   const random = Math.random().toString(36).slice(2, 10)
@@ -98,8 +135,8 @@ export function makeObjectKey({ type, entityId, contentType }) {
 
 export async function uploadToR2({ key, file }) {
   const safeKey = normalizeMenuObjectKey(key)
-  if (!safeKey) throw new Error('Invalid menu image object key')
-  await assertImageFile(file)
+  if (!safeKey) throw new Error('Invalid menu media object key')
+  await assertMenuMediaFile(file)
   const config = getR2Config()
   await getR2Client().send(new PutObjectCommand({
     Bucket: config.bucket,

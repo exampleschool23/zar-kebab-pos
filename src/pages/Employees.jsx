@@ -12,6 +12,7 @@ import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
 import {
   expensePaymentMethodLabel,
   getDailySalaryAmount,
+  getSalaryAbsenceDates,
   getSalaryActiveUntil,
   getSalaryDue,
   buildSalaryReactivationAbsenceRows,
@@ -72,6 +73,7 @@ export default function Employees() {
       ended: 'Tugagan',
       daily: 'Kunlik',
       activeDaily: 'Kunlik faol',
+      absentToday: 'Bugun kelmagan',
       due: 'Qarz',
       endDate: 'Tugash sanasi',
       status: 'Holat',
@@ -103,6 +105,7 @@ export default function Employees() {
       ended: 'Дата окончания',
       daily: 'За день',
       activeDaily: 'Активные за день',
+      absentToday: 'Сегодня отсутствует',
       due: 'Долг',
       endDate: 'Дата окончания',
       status: 'Статус',
@@ -134,6 +137,7 @@ export default function Employees() {
       ended: 'Ended',
       daily: 'Daily',
       activeDaily: 'Active daily',
+      absentToday: 'Absent today',
       due: 'Due',
       endDate: 'End date',
       status: 'Status',
@@ -199,9 +203,17 @@ export default function Employees() {
   useEffect(() => { loadEmployees() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeEmployees = useMemo(() => employees.filter(item => item.is_active !== false), [employees])
+  const absentTodayEmployeeIds = useMemo(() => new Set(
+    activeEmployees
+      .filter(employee => getSalaryAbsenceDates(employee).has(today))
+      .map(employee => employee.id)
+  ), [activeEmployees, today])
   const sortedActiveEmployees = useMemo(() => (
-    [...activeEmployees].sort((a, b) => employeeName(a).localeCompare(employeeName(b)))
-  ), [activeEmployees])
+    [...activeEmployees].sort((a, b) => (
+      Number(absentTodayEmployeeIds.has(b.id)) - Number(absentTodayEmployeeIds.has(a.id)) ||
+      employeeName(a).localeCompare(employeeName(b))
+    ))
+  ), [activeEmployees, absentTodayEmployeeIds])
   const inactiveEmployees = useMemo(() => (
     employees
       .filter(item => item.is_active === false)
@@ -216,6 +228,7 @@ export default function Employees() {
     ...(inactiveExpanded ? inactiveEmployees.map(employee => ({ type: 'employee', employee })) : []),
   ]
   const activeCount = activeEmployees.length
+  const absentTodayCount = absentTodayEmployeeIds.size
   const activeDailySalary = useMemo(() => (
     activeEmployees.reduce((sum, item) => sum + getDailySalaryAmount(item, today), 0)
   ), [activeEmployees, today])
@@ -341,6 +354,7 @@ export default function Employees() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Kpi icon={Users} label={l.active} value={activeCount} />
+              <Kpi icon={CalendarX2} label={l.absentToday} value={absentTodayCount} danger={absentTodayCount > 0} />
               <Kpi icon={CalendarDays} label={l.activeDaily} value={formatCurrency(activeDailySalary)} />
               <Kpi icon={WalletCards} label={l.due} value={formatCurrency(totalDue)} hot={totalDue > 0} />
               <button onClick={loadEmployees} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
@@ -385,25 +399,44 @@ export default function Employees() {
                 }
                 const employee = entry.employee
                 const inactive = employee.is_active === false
+                const absentToday = !inactive && absentTodayEmployeeIds.has(employee.id)
                 const activeUntil = getSalaryActiveUntil(employee, today)
                 const toggleKey = `employee-toggle-${employee.id}`
                 const confirmToggle = confirmActionKey === toggleKey
                 const joinedDate = String(employee.joined_at || '').slice(0, 10)
                 const deactivateDate = normalizeSalaryEndDate(employee, deactivateDates[employee.id], today)
                 return (
-                  <section key={employee.id} className={`rounded-2xl border p-4 shadow-sm ${inactive ? 'border-[#E5E7EB] bg-[#F3F4F6]' : 'border-[#E5E7EB] bg-white'}`}>
+                  <section key={employee.id} className={`rounded-2xl border p-4 shadow-sm ${
+                    inactive
+                      ? 'border-[#E5E7EB] bg-[#F3F4F6]'
+                      : absentToday
+                        ? 'border-red-300 bg-red-50/80 ring-2 ring-red-100'
+                        : 'border-[#E5E7EB] bg-white'
+                  }`}>
                     <div className="mb-4 flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
-                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${inactive ? 'bg-gray-200 text-[#6B7280]' : 'bg-orange-50 text-[#ff5a00]'}`}>
-                          <UserRound size={19} />
+                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
+                          inactive
+                            ? 'bg-gray-200 text-[#6B7280]'
+                            : absentToday
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-orange-50 text-[#ff5a00]'
+                        }`}>
+                          {absentToday ? <CalendarX2 size={19} /> : <UserRound size={19} />}
                         </div>
                         <div className="min-w-0">
                           <h2 className={`truncate text-base font-black ${inactive ? 'text-[#6B7280]' : 'text-[#1F2937]'}`}>{employeeName(employee)}</h2>
                           <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{employee.profile?.role || l.status}</p>
                         </div>
                       </div>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-black ${inactive ? 'bg-gray-100 text-[#6B7280]' : 'bg-green-50 text-green-700'}`}>
-                        {inactive ? l.inactive : l.active}
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-black ${
+                        inactive
+                          ? 'bg-gray-100 text-[#6B7280]'
+                          : absentToday
+                            ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
+                            : 'bg-green-50 text-green-700'
+                      }`}>
+                        {inactive ? l.inactive : absentToday ? l.absentToday : l.active}
                       </span>
                     </div>
 
@@ -602,13 +635,14 @@ export default function Employees() {
   )
 }
 
-function Kpi({ icon: Icon, label, value, hot = false }) {
+function Kpi({ icon: Icon, label, value, hot = false, danger = false }) {
+  const highlighted = hot || danger
   return (
-    <div className={`rounded-xl border px-3 py-2 shadow-sm ${hot ? 'border-orange-200 bg-orange-50' : 'border-[#E5E7EB] bg-white'}`}>
-      <p className={`flex items-center gap-1 text-[11px] font-black uppercase tracking-wide ${hot ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'}`}>
+    <div className={`rounded-xl border px-3 py-2 shadow-sm ${danger ? 'border-red-200 bg-red-50' : hot ? 'border-orange-200 bg-orange-50' : 'border-[#E5E7EB] bg-white'}`}>
+      <p className={`flex items-center gap-1 text-[11px] font-black uppercase tracking-wide ${danger ? 'text-red-600' : hot ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'}`}>
         <Icon size={13} />{label}
       </p>
-      <p className="text-sm font-black text-[#1F2937]">{value}</p>
+      <p className={`text-sm font-black ${highlighted && danger ? 'text-red-700' : 'text-[#1F2937]'}`}>{value}</p>
     </div>
   )
 }

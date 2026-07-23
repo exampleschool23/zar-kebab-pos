@@ -21,7 +21,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
-import ImageLoadShimmer from '../components/ImageLoadShimmer'
+import MenuMedia from '../components/MenuMedia'
 import {
   getStoredTelegramSession,
   initTelegramWebApp,
@@ -194,7 +194,7 @@ function tr(lang) {
 
 function SafeImage({ src, alt }) {
   return (
-    <ImageLoadShimmer
+    <MenuMedia
       src={src}
       alt={alt}
       className="h-full w-full object-cover object-center"

@@ -15,6 +15,7 @@ import {
   canRecordSalaryTransaction,
   convertSalaryAmountToDaily,
   expensePaymentMethodLabel,
+  getSalaryAbsenceDates,
   getSalaryDue,
   getTotalSalaryDue,
   getTotalMonthlySalaryCommitment,
@@ -188,6 +189,7 @@ export default function Salaries() {
       bonusHelp: 'Bonus — maoshdan tashqari qo‘shimcha to‘lov.',
       fineHelp: 'Jarima maosh qarzini kamaytiradi, lekin kassa xarajati hisoblanmaydi.',
       absenceHelp: 'Tanlangan sana uchun ishga kelmagan xodimni belgilang.',
+      absenceDuplicate: 'Bu xodimning tanlangan sanadagi yo‘qligi allaqachon belgilangan.',
       createdMessage: 'Xodim maoshi qo‘shildi',
       rateSavedMessage: 'Yangi maosh stavkasi saqlandi',
       transactionSavedMessage: 'Operatsiya saqlandi',
@@ -261,6 +263,7 @@ export default function Salaries() {
       bonusHelp: 'Бонус — дополнительная выплата сверх зарплаты.',
       fineHelp: 'Штраф уменьшает долг по зарплате, но не считается расходом кассы.',
       absenceHelp: 'Отметьте сотрудника, который отсутствовал в выбранную дату.',
+      absenceDuplicate: 'Отсутствие этого сотрудника на выбранную дату уже отмечено.',
       createdMessage: 'Зарплата сотрудника добавлена',
       rateSavedMessage: 'Новая ставка зарплаты сохранена',
       transactionSavedMessage: 'Операция сохранена',
@@ -334,6 +337,7 @@ export default function Salaries() {
       bonusHelp: 'A bonus is an additional payment outside regular salary.',
       fineHelp: 'A fine reduces payroll liability but is not a cash expense.',
       absenceHelp: 'Mark the employee who was absent on the selected date.',
+      absenceDuplicate: 'This employee is already marked absent on the selected date.',
       createdMessage: 'Employee salary added',
       rateSavedMessage: 'New salary rate saved',
       transactionSavedMessage: 'Transaction saved',
@@ -445,6 +449,13 @@ export default function Salaries() {
   const totalDue = useMemo(() => getTotalSalaryDue(salaryProfiles, today), [salaryProfiles, today])
   const monthlyPayrollTotal = useMemo(() => getTotalMonthlySalaryCommitment(salaryProfiles, today), [salaryProfiles, today])
   const selectedTransactionProfile = salaryProfiles.find(item => item.id === transactionForm.salary_profile_id)
+  const selectedAbsenceProfile = salaryProfiles.find(item => item.id === absenceForm.salary_profile_id)
+  const selectedAbsenceDate = String(absenceForm.absence_date || today).slice(0, 10)
+  const absenceAlreadyRecorded = Boolean(
+    selectedAbsenceProfile &&
+    selectedAbsenceDate &&
+    getSalaryAbsenceDates(selectedAbsenceProfile).has(selectedAbsenceDate)
+  )
   const transactionGuidance = transactionForm.entry_type === 'fine'
     ? l.fineHelp
     : transactionForm.entry_type === 'bonus'
@@ -604,10 +615,14 @@ export default function Salaries() {
 
   async function addAbsence() {
     const salaryProfile = salaryProfiles.find(item => item.id === absenceForm.salary_profile_id)
-    const absenceDate = absenceForm.absence_date || today
+    const absenceDate = String(absenceForm.absence_date || today).slice(0, 10)
     if (!canManage || !salaryProfile || !absenceDate) return
     setError('')
     setMessage('')
+    if (getSalaryAbsenceDates(salaryProfile).has(absenceDate)) {
+      setError(l.absenceDuplicate)
+      return
+    }
     setSaving('absence-create')
     const { error: writeError } = await supabase.from('employee_salary_absences').insert({
       salary_profile_id: salaryProfile.id,
@@ -618,7 +633,7 @@ export default function Salaries() {
     })
     setSaving('')
     if (writeError) {
-      setError(writeError.message)
+      setError(writeError.code === '23505' ? l.absenceDuplicate : writeError.message)
       return
     }
     setAbsenceForm({ salary_profile_id: '', absence_date: today, note: '' })
@@ -1011,10 +1026,15 @@ export default function Salaries() {
                     <Field label={l.absenceDate}>
                       <DateInput value={absenceForm.absence_date} lang={lang} onChange={value => setAbsenceForm(current => ({ ...current, absence_date: value }))} disabled={!canManage || loading} />
                     </Field>
+                    {absenceAlreadyRecorded && (
+                      <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+                        {l.absenceDuplicate}
+                      </p>
+                    )}
                     <button
                       type="button"
                       onClick={addAbsence}
-                      disabled={!canManage || loading || !absenceForm.salary_profile_id || saving === 'absence-create'}
+                      disabled={!canManage || loading || !absenceForm.salary_profile_id || !absenceForm.absence_date || absenceAlreadyRecorded || saving === 'absence-create'}
                       className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
                     >
                       {saving === 'absence-create' ? <Loader2 size={16} className="animate-spin" /> : <CalendarX2 size={15} />}

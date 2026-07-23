@@ -26,17 +26,28 @@ import {
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
-import ImageLoadShimmer from '../components/ImageLoadShimmer'
+import MenuMedia from '../components/MenuMedia'
 import { supabase } from '../lib/supabase'
 import { formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput } from '../lib/moneyInput'
 import { canEditMenu as canEditMenuForProfile } from '../lib/permissions'
 import { getSaleProfitSummary } from '../lib/profit'
 import { getRequiredMenuItemCost, hasRequiredMenuItemCost } from '../lib/menuItemCosts'
+import {
+  getMenuItemMediaUrls,
+  isMenuVideoUrl,
+  MENU_IMAGE_ACCEPT,
+  MENU_IMAGE_MIME_TYPES,
+  MENU_PRODUCT_MEDIA_ACCEPT,
+  MENU_VIDEO_MIME_TYPES,
+  normalizeMenuMediaUrls,
+} from '../lib/menuMedia'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
 const ADMIN_MENU_SCROLL_KEY = 'zar-admin-menu-scroll-top'
-const MENU_IMAGE_TYPES = new Set(['image/avif', 'image/gif', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const MENU_IMAGE_TYPES = new Set(MENU_IMAGE_MIME_TYPES)
+const MENU_PRODUCT_MEDIA_TYPES = new Set([...MENU_IMAGE_MIME_TYPES, ...MENU_VIDEO_MIME_TYPES])
+const MAX_MENU_MEDIA_BYTES = 4 * 1024 * 1024
 
 function saveAdminMenuScrollPosition(scrollTop) {
   if (typeof sessionStorage === 'undefined') return
@@ -61,10 +72,14 @@ function clearSavedAdminMenuScrollPosition() {
   sessionStorage.removeItem(ADMIN_MENU_SCROLL_KEY)
 }
 
-function validateMenuImage(file) {
-  if (!MENU_IMAGE_TYPES.has(String(file?.type || '').toLowerCase())) {
-    throw new Error('Only JPEG, PNG, WebP, GIF, or AVIF images are allowed')
+function validateMenuImage(file, allowVideo = false) {
+  const allowedTypes = allowVideo ? MENU_PRODUCT_MEDIA_TYPES : MENU_IMAGE_TYPES
+  if (!allowedTypes.has(String(file?.type || '').toLowerCase())) {
+    throw new Error(allowVideo
+      ? 'Only JPEG, PNG, WebP, GIF, AVIF, MP4, or WebM menu media is allowed'
+      : 'Only JPEG, PNG, WebP, GIF, or AVIF images are allowed')
   }
+  if (Number(file?.size || 0) > MAX_MENU_MEDIA_BYTES) throw new Error('File must be 4 MB or smaller')
   return file
 }
 
@@ -110,7 +125,7 @@ async function deleteMenuImageFromR2(imageUrl) {
 
 function SafeMenuImage({ src, alt = '', className = '', fallbackClassName = '', iconSize = 28 }) {
   return (
-    <ImageLoadShimmer
+    <MenuMedia
       src={src}
       alt={alt}
       className={className}
@@ -336,7 +351,7 @@ function DescriptionField({ label, value, onChange, lang }) {
   )
 }
 
-function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type, entityId }) {
+function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type, entityId, allowVideo = false }) {
   const fileRef = useRef(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -349,7 +364,7 @@ function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type
     setError('')
     try {
       const previousUrl = value
-      const data = await uploadMenuImageToR2({ file: validateMenuImage(file), type, entityId })
+      const data = await uploadMenuImageToR2({ file: validateMenuImage(file, allowVideo), type, entityId })
       onChange({ target: { value: data.url } })
       await onUploadComplete?.({ newUrl: data.url, previousUrl })
     } catch (err) {
@@ -380,11 +395,183 @@ function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type
           placeholder="https://..."
           className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
         />
-        <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" className="hidden" onChange={handleFile} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept={allowVideo ? MENU_PRODUCT_MEDIA_ACCEPT : MENU_IMAGE_ACCEPT}
+          className="hidden"
+          onChange={handleFile}
+        />
       </div>
       {value && (
-        <img src={value} alt={t(lang, 'imagePreview')} className="mt-2 h-20 w-20 rounded-xl border border-gray-200 object-cover object-center" />
+        <MenuMedia
+          src={value}
+          alt={t(lang, allowVideo ? 'mediaPreview' : 'imagePreview')}
+          controls={allowVideo}
+          autoPlay={false}
+          className={`mt-2 rounded-xl border border-gray-200 object-cover object-center ${allowVideo ? 'h-24 w-36' : 'h-20 w-20'}`}
+        />
       )}
+      {allowVideo && <p className="mt-1.5 text-[11px] font-semibold text-gray-400">{t(lang, 'mediaHelp')}</p>}
+      {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
+    </div>
+  )
+}
+
+function MediaGalleryField({ label, values, onChange, onUploadComplete, lang, entityId }) {
+  const fileRef = useRef(null)
+  const [urlDraft, setUrlDraft] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const mediaUrls = normalizeMenuMediaUrls(values)
+
+  async function handleFiles(event) {
+    const input = event.target
+    const files = [...(input.files || [])]
+    if (files.length === 0) return
+
+    setUploading(true)
+    setError('')
+    const nextUrls = [...mediaUrls]
+    const failed = []
+    for (const file of files) {
+      try {
+        const data = await uploadMenuImageToR2({
+          file: validateMenuImage(file, true),
+          type: 'product',
+          entityId,
+        })
+        nextUrls.push(data.url)
+        await onUploadComplete?.({ newUrl: data.url, previousUrl: '' })
+      } catch (uploadError) {
+        failed.push(uploadError.message)
+      }
+    }
+    onChange(normalizeMenuMediaUrls(nextUrls))
+    if (failed.length > 0) {
+      setError(`${t(lang, 'uploadError')}: ${formatMenuImageUploadError(lang, failed[0])}`)
+    }
+    setUploading(false)
+    input.value = ''
+  }
+
+  function addUrl() {
+    const value = urlDraft.trim()
+    if (!/^https?:\/\//i.test(value)) {
+      setError(t(lang, 'invalidMediaUrl'))
+      return
+    }
+    onChange(normalizeMenuMediaUrls([...mediaUrls, value]))
+    setUrlDraft('')
+    setError('')
+  }
+
+  function removeUrl(url) {
+    onChange(mediaUrls.filter(value => value !== url))
+    setError('')
+  }
+
+  function makeCover(url) {
+    onChange([url, ...mediaUrls.filter(value => value !== url)])
+  }
+
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-semibold text-gray-500">{label}</label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="inline-flex h-11 flex-shrink-0 items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-gray-300 px-3 text-sm font-semibold text-gray-500 transition-colors hover:border-[#ff5a00] hover:text-[#ff5a00] disabled:opacity-50"
+        >
+          {uploading ? <Loader2 size={15} className="animate-spin" /> : <ImagePlus size={15} />}
+          {uploading ? t(lang, 'uploading') : t(lang, 'upload')}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept={MENU_PRODUCT_MEDIA_ACCEPT}
+          multiple
+          className="hidden"
+          onChange={handleFiles}
+        />
+        <div className="flex min-w-0 flex-1 gap-2">
+          <input
+            type="url"
+            value={urlDraft}
+            onChange={event => setUrlDraft(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                addUrl()
+              }
+            }}
+            placeholder="https://..."
+            className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+          />
+          <button
+            type="button"
+            onClick={addUrl}
+            disabled={!urlDraft.trim()}
+            className="inline-flex h-11 items-center justify-center gap-1 rounded-xl border border-orange-200 bg-orange-50 px-3 text-xs font-black text-[#ff5a00] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Plus size={14} />
+            {t(lang, 'addMediaUrl')}
+          </button>
+        </div>
+      </div>
+
+      {mediaUrls.length > 0 ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {mediaUrls.map((url, index) => (
+            <div key={url} className={`overflow-hidden rounded-xl border bg-white ${index === 0 ? 'border-orange-300 ring-2 ring-orange-100' : 'border-gray-200'}`}>
+              <div className="relative aspect-video overflow-hidden bg-orange-50">
+                <MenuMedia
+                  src={url}
+                  alt={`${t(lang, 'mediaPreview')} ${index + 1}`}
+                  controls={isMenuVideoUrl(url)}
+                  autoPlay={false}
+                  className="h-full w-full object-cover object-center"
+                  fallback={
+                    <div className="flex h-full w-full items-center justify-center bg-orange-50">
+                      <UtensilsCrossed size={22} className="text-orange-200" />
+                    </div>
+                  }
+                />
+                {index === 0 && (
+                  <span className="absolute left-2 top-2 rounded-full bg-[#ff5a00] px-2 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow">
+                    {t(lang, 'mediaCover')}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeUrl(url)}
+                  title={t(lang, 'deleteMedia')}
+                  aria-label={`${t(lang, 'deleteMedia')} ${index + 1}`}
+                  className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-red-100 bg-white/95 text-red-600 shadow-sm transition-colors hover:bg-red-50"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              {index > 0 && (
+                <button
+                  type="button"
+                  onClick={() => makeCover(url)}
+                  className="flex h-9 w-full items-center justify-center gap-1 border-t border-gray-100 text-[11px] font-black text-gray-500 hover:bg-orange-50 hover:text-[#ff5a00]"
+                >
+                  {t(lang, 'makeMediaCover')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-3 py-5 text-center text-xs font-semibold text-gray-400">
+          {t(lang, 'mediaEmpty')}
+        </div>
+      )}
+      <p className="mt-1.5 text-[11px] font-semibold text-gray-400">{t(lang, 'mediaHelp')}</p>
       {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   )
@@ -702,13 +889,13 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
       className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
     >
       {!readOnly && <DragHandle listeners={listeners} attributes={attributes} />}
-      {item.image_url ? (
-        <img src={item.image_url} alt="" className="h-12 w-12 flex-shrink-0 rounded-xl object-cover object-center" />
-      ) : (
-        <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-          <UtensilsCrossed size={18} className="text-orange-200" />
-        </div>
-      )}
+      <SafeMenuImage
+        src={item.image_url}
+        alt={getItemName(item, lang)}
+        className="h-12 w-12 flex-shrink-0 rounded-xl object-cover object-center"
+        fallbackClassName="h-12 w-12 flex-shrink-0 rounded-xl"
+        iconSize={18}
+      />
       <div className="flex-1 min-w-0">
         <p className="font-bold text-gray-900 text-sm truncate">{getItemName(item, lang)}</p>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -884,7 +1071,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  external_id: '', price: '', old_price: '', cost_price: '', variant_costs: {}, grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', available: true, sort_order: '',
+  external_id: '', price: '', old_price: '', cost_price: '', variant_costs: {}, grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', media_urls: [], available: true, sort_order: '',
   option_groups: [],
   option_groups_editor: [],
   show_in_cashier_quick_items: false,
@@ -1135,6 +1322,7 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
 }
 
 function menuItemToProductForm(i) {
+  const mediaUrls = getMenuItemMediaUrls(i)
   return {
     ...blankItem,
     ...i,
@@ -1151,6 +1339,8 @@ function menuItemToProductForm(i) {
     send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
     quick_item_sort_order: i.quick_item_sort_order ?? i.quickItemSortOrder ?? '',
     variant_costs: i.variant_costs ?? i.variantCosts ?? {},
+    image_url: mediaUrls[0] || '',
+    media_urls: mediaUrls,
     option_groups_editor: optionGroupsToEditor(
       i.option_groups ?? i.optionGroups,
       i.variant_costs ?? i.variantCosts,
@@ -1168,6 +1358,7 @@ function getItemFormFingerprint(form = {}) {
     description_ru: String(form.description_ru || ''),
     description_en: String(form.description_en || ''),
     image_url: String(form.image_url || ''),
+    media_urls: normalizeMenuMediaUrls(form.media_urls),
     price: numberFromMoneyInput(form.price),
     old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
     cost_price: Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
@@ -1441,14 +1632,18 @@ export default function AdminMenu() {
     setMenuNotice(null)
     try {
       const optionGroups = editorToOptionGroups(form.option_groups_editor, form.price)
-      const oldImageUrl = itemModal === 'edit'
-        ? state.menuItems.find(item => item.id === form.id)?.image_url
-        : ''
+      const existingItem = itemModal === 'edit'
+        ? state.menuItems.find(item => item.id === form.id)
+        : null
+      const oldMediaUrls = getMenuItemMediaUrls(existingItem)
+      const mediaUrls = normalizeMenuMediaUrls(form.media_urls)
       const { option_groups_editor: _optionGroupsEditor, option_groups: _optionGroups, ...formFields } = form
       const result = await dispatch({
         type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
         payload: {
           ...formFields,
+          image_url: mediaUrls[0] || '',
+          media_urls: mediaUrls,
           option_groups: optionGroups,
           external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
           price: numberFromMoneyInput(form.price),
@@ -1476,10 +1671,13 @@ export default function AdminMenu() {
         setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
         return
       }
-      await cleanupTrackedUploads(uploadedItemImageUrlsRef, [form.image_url])
-      if (oldImageUrl && oldImageUrl !== form.image_url) {
-        await deleteMenuImageFromR2(oldImageUrl)
-      }
+      await cleanupTrackedUploads(uploadedItemImageUrlsRef, mediaUrls)
+      const keptMediaUrls = new Set(mediaUrls)
+      await Promise.allSettled(
+        oldMediaUrls
+          .filter(url => !keptMediaUrls.has(url))
+          .map(url => deleteMenuImageFromR2(url))
+      )
       setItemModal(null)
       if (isProductEditorPage) {
         productEditorInitializedRef.current = ''
@@ -1772,13 +1970,16 @@ export default function AdminMenu() {
                       </p>
                       <p className="font-black text-[#4F46E5]">{form.external_id || '—'}</p>
                     </div>
-                    <ImageUploadField
-                      label={t(lang, 'imageUrl')}
-                      value={form.image_url}
-                      onChange={setF('image_url')}
+                    <MediaGalleryField
+                      label={t(lang, 'mediaUrl')}
+                      values={form.media_urls}
+                      onChange={mediaUrls => setForm(current => ({
+                        ...current,
+                        image_url: mediaUrls[0] || '',
+                        media_urls: mediaUrls,
+                      }))}
                       onUploadComplete={upload => handleTrackedUpload(uploadedItemImageUrlsRef, upload)}
                       lang={lang}
-                      type="product"
                       entityId={form.id}
                     />
                     <div className="grid grid-cols-2 gap-3">
@@ -2466,13 +2667,16 @@ export default function AdminMenu() {
               onChange={setF('stock_count')}
               placeholder="24"
             />
-            <ImageUploadField
-              label={t(lang, 'imageUrl')}
-              value={form.image_url}
-              onChange={setF('image_url')}
+            <MediaGalleryField
+              label={t(lang, 'mediaUrl')}
+              values={form.media_urls}
+              onChange={mediaUrls => setForm(current => ({
+                ...current,
+                image_url: mediaUrls[0] || '',
+                media_urls: mediaUrls,
+              }))}
               onUploadComplete={upload => handleTrackedUpload(uploadedItemImageUrlsRef, upload)}
               lang={lang}
-              type="product"
               entityId={form.id}
             />
             <Field label={t(lang, 'sortOrder')} type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />

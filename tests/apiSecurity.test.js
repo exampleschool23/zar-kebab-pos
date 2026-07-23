@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   assertImageFile,
+  assertMenuMediaFile,
   keyFromR2Url,
+  makeObjectKey,
   normalizeMenuObjectKey,
 } from '../api/menu-image/_lib/r2.js'
 
@@ -21,6 +23,23 @@ test('menu image validation checks raster file signatures and rejects SVG or dis
     assertImageFile({ buffer: Buffer.from('not a png'), contentType: 'image/png' }),
     /do not match/,
   )
+})
+
+test('menu product media accepts verified MP4 and WebM while categories remain image-only', async () => {
+  const mp4 = Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d])
+  const webm = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x00, 0x00, 0x00, 0x00])
+
+  await assert.doesNotReject(assertMenuMediaFile({ buffer: mp4, contentType: 'video/mp4' }))
+  await assert.doesNotReject(assertMenuMediaFile({ buffer: webm, contentType: 'video/webm' }))
+  await assert.rejects(
+    assertMenuMediaFile({ buffer: mp4, contentType: 'video/mp4' }, { allowVideo: false }),
+    /Only JPEG, PNG, WebP, GIF, or AVIF images/,
+  )
+  await assert.rejects(
+    assertMenuMediaFile({ buffer: Buffer.from('not an mp4'), contentType: 'video/mp4' }),
+    /do not match/,
+  )
+  assert.match(makeObjectKey({ type: 'product', entityId: 'kebab', contentType: 'video/mp4' }), /^menu\/products\/kebab-.+\.mp4$/)
 })
 
 test('R2 object keys are limited to flat product and category menu paths', () => {

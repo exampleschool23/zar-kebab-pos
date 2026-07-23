@@ -1226,7 +1226,7 @@ export async function writeToSupabase(action, state, options = {}) {
         throw new Error('Real cost must be greater than zero for every new product.')
       }
       const normalizedVariantCosts = normalizeVariantCosts(variantCosts ?? _variantCostsAlias)
-      const rpcResult = await supabase.rpc('create_menu_item_with_cost', {
+      const rpcResult = await supabase.rpc('create_menu_item_with_media_and_cost', {
         payload: {
           ...fields,
           cost_price: requiredCost,
@@ -1234,8 +1234,8 @@ export async function writeToSupabase(action, state, options = {}) {
         },
       })
       if (!rpcResult.error) break
-      if (isMissingRpc(rpcResult.error, 'create_menu_item_with_cost')) {
-        throw new Error('Database migration 102 is required before creating menu products.')
+      if (isMissingRpc(rpcResult.error, 'create_menu_item_with_media_and_cost')) {
+        throw new Error('Database migration 103 is required before creating menu products with media.')
       }
       throw rpcResult.error
     }

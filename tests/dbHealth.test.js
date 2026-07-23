@@ -98,6 +98,7 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.deepEqual(result.failed.map(check => check.name).sort(), [
     'change_paid_order_payment_method_owner',
     'create_menu_item_with_cost',
+    'create_menu_item_with_media_and_cost',
     'create_telegram_order',
     'current_staff_can_access',
     'current_staff_can_view_menu_catalog',
@@ -116,6 +117,7 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.match(result.failed.find(check => check.name === 'change_paid_order_payment_method_owner').hint, /090_owner_change_completed_order_payment_method/)
   assert.match(result.failed.find(check => check.name === 'create_telegram_order').hint, /101_atomic_telegram_orders/)
   assert.match(result.failed.find(check => check.name === 'create_menu_item_with_cost').hint, /102_atomic_menu_item_cost_creation/)
+  assert.match(result.failed.find(check => check.name === 'create_menu_item_with_media_and_cost').hint, /103_menu_item_media_gallery/)
   assert.match(result.failed.find(check => check.name === 'recall_table_from_cashier').hint, /094_admin_cashier_recall_access/)
   assert.match(result.failed.find(check => check.name === 'current_staff_can_view_menu_catalog').hint, /095_read_only_menu_catalog_access/)
   assert.match(result.failed.find(check => check.name === 'current_staff_can_access').hint, /097_daily_bazaar/)
@@ -139,11 +141,27 @@ test('daily Bazaar schema and RPC checks are required in the CLI health command'
   assert.doesNotMatch(cliHealthSource, /delete_bazaar_purchase[\s\S]{0,240}'bazaar write access is required',\s*false/)
 })
 
-test('atomic menu creation RPC is required by both health checks', async () => {
+test('atomic menu creation and media gallery RPCs are required by both health checks', async () => {
   const result = await runDbHealthChecks(makeClient({ missingRpc: true }))
 
   assert.equal(result.ok, false)
   assert.match(result.failed.find(check => check.name === 'create_menu_item_with_cost').hint, /102_atomic_menu_item_cost_creation/)
+  assert.match(result.failed.find(check => check.name === 'create_menu_item_with_media_and_cost').hint, /103_menu_item_media_gallery/)
   assert.match(cliHealthSource, /create_menu_item_with_cost\(payload\)/)
   assert.match(cliHealthSource, /supabase\.rpc\('create_menu_item_with_cost', \{ payload: \{\} \}\)/)
+  assert.match(cliHealthSource, /create_menu_item_with_media_and_cost\(payload\)/)
+  assert.match(cliHealthSource, /supabase\.rpc\('create_menu_item_with_media_and_cost', \{ payload: \{\} \}\)/)
+})
+
+test('database health requires the menu media gallery column', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'menu_items',
+    missingColumn: 'media_urls',
+  }))
+
+  assert.equal(result.ok, false)
+  const failed = result.failed.find(check => check.name === 'menu_items')
+  assert.equal(failed.detail, 'media_urls')
+  assert.match(failed.hint, /103_menu_item_media_gallery/)
+  assert.match(cliHealthSource, /menu_items', '[^']*media_urls/)
 })

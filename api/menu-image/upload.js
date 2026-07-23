@@ -1,6 +1,6 @@
 import { json, methodNotAllowed } from '../telegram/_lib/http.js'
 import { readMultipart } from './_lib/multipart.js'
-import { assertImageFile, makeObjectKey, uploadToR2 } from './_lib/r2.js'
+import { assertMenuMediaFile, makeObjectKey, uploadToR2 } from './_lib/r2.js'
 import { requireMenuEditAccess } from './_lib/auth.js'
 
 export default async function handler(req, res) {
@@ -10,12 +10,12 @@ export default async function handler(req, res) {
     await requireMenuEditAccess(req)
     const { fields, file } = await readMultipart(req)
     const type = String(fields.type || '')
-    await assertImageFile(file)
     const key = makeObjectKey({
       type,
       entityId: fields.entityId,
-      contentType: file.contentType,
+      contentType: file?.contentType,
     })
+    await assertMenuMediaFile(file, { allowVideo: type === 'product' })
     const result = await uploadToR2({
       key,
       file: {
@@ -25,6 +25,6 @@ export default async function handler(req, res) {
     })
     return json(res, 200, result)
   } catch (error) {
-    return json(res, error.status || 400, { error: error.message || 'Could not upload menu image' })
+    return json(res, error.status || 400, { error: error.message || 'Could not upload menu media' })
   }
 }

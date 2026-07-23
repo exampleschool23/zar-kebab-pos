@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowLeft, Check, Copy, LayoutGrid, Minus, Plus, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, Check, Copy, LayoutGrid, Minus, Play, Plus, UtensilsCrossed } from 'lucide-react'
 import { getCategoryName, getItemDesc, getItemName, t } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
 import { getMenuItemPublicUrl } from '../lib/menuLinks'
+import { getMenuItemMediaUrls, isMenuVideoUrl } from '../lib/menuMedia'
 import { calculateUnitPrice, normalizePriceMode } from '../lib/priceModes'
-import ImageLoadShimmer from './ImageLoadShimmer'
+import MenuMedia from './MenuMedia'
 
 function MenuImageFallback({ iconSize = 32, active = false }) {
   return (
@@ -16,14 +17,26 @@ function MenuImageFallback({ iconSize = 32, active = false }) {
   )
 }
 
-function SafeMenuImage({ src, alt, className = '', fallbackIconSize = 32, active = false, loading = 'lazy', fetchPriority }) {
+function SafeMenuImage({
+  src,
+  alt,
+  className = '',
+  fallbackIconSize = 32,
+  active = false,
+  loading = 'lazy',
+  fetchPriority,
+  controls = false,
+  autoPlay = true,
+}) {
   return (
-    <ImageLoadShimmer
+    <MenuMedia
       src={src}
       alt={alt}
       className={className}
       loading={loading}
       fetchPriority={fetchPriority}
+      controls={controls}
+      autoPlay={autoPlay}
       fallback={<MenuImageFallback iconSize={fallbackIconSize} active={active} />}
     />
   )
@@ -235,6 +248,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const hasVideo = isMenuVideoUrl(item.image_url)
   const showCompactPublicCard = readOnly
   const dense = !readOnly && density === 'compact'
   const labels = {
@@ -260,7 +274,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         width: rect.width,
         height: rect.height,
       },
-      imageUrl: item.image_url || '',
+      imageUrl: hasVideo ? '' : item.image_url || '',
       name: getItemName(item, lang),
     }
   }
@@ -289,6 +303,12 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           loading={eager ? 'eager' : 'lazy'}
           fetchPriority={eager ? 'high' : undefined}
         />
+        {hasVideo && (
+          <span className="pointer-events-none absolute left-2 top-2 inline-flex h-8 items-center gap-1 rounded-full border border-white/80 bg-black/55 px-2.5 text-[10px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur">
+            <Play size={12} fill="currentColor" />
+            Video
+          </span>
+        )}
         {inCart && (
           <div className="absolute top-2 right-2 bg-[#ff5a00] text-white text-[11px] font-black rounded-full w-6 h-6 flex items-center justify-center shadow">
             {qty}
@@ -386,12 +406,14 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const [notes, setNotes] = useState(currentNotes || '')
   const [selectedOptions, setSelectedOptions] = useState({})
   const [copied, setCopied] = useState(false)
+  const [activeMediaUrl, setActiveMediaUrl] = useState('')
 
   useEffect(() => {
     setQty(Math.max(1, currentQty))
     setNotes(currentNotes || '')
     setSelectedOptions({})
-  }, [item?.id, currentQty, currentNotes])
+    setActiveMediaUrl(getMenuItemMediaUrls(item)[0] || '')
+  }, [item?.id, item?.image_url, item?.media_urls, currentQty, currentNotes])
 
   if (!item) return null
 
@@ -401,6 +423,8 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const mediaUrls = getMenuItemMediaUrls(item)
+  const displayedMediaUrl = mediaUrls.includes(activeMediaUrl) ? activeMediaUrl : mediaUrls[0] || ''
   const optionGroups = getMenuItemOptionGroups(item, lang)
   const missingRequiredOptions = optionGroups.some(group => group.required && !selectedOptions[group.id])
   const selectedOptionPriceDelta = optionGroups.reduce((sum, group) => {
@@ -505,13 +529,51 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
       <div className={`flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 ${readOnly ? 'pb-6' : 'pb-28'}`}>
         <div className="mx-auto w-full max-w-[1120px]">
           <section className="grid gap-5 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm md:grid-cols-[minmax(320px,0.9fr)_minmax(360px,1.1fr)] md:p-5 lg:gap-6">
-            <div className="relative aspect-square w-full overflow-hidden rounded-[22px] bg-orange-50 md:max-h-[520px]">
-              <SafeMenuImage
-                src={item.image_url}
-                alt={name}
-                className="h-full w-full object-cover object-center"
-                fallbackIconSize={64}
-              />
+            <div className="min-w-0">
+              <div className="relative aspect-square w-full overflow-hidden rounded-[22px] bg-orange-50 md:max-h-[520px]">
+                <SafeMenuImage
+                  src={displayedMediaUrl}
+                  alt={name}
+                  className="h-full w-full object-cover object-center"
+                  fallbackIconSize={64}
+                  controls={isMenuVideoUrl(displayedMediaUrl)}
+                />
+              </div>
+              {mediaUrls.length > 1 && (
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="list" aria-label={name}>
+                  {mediaUrls.map((url, index) => {
+                    const active = url === displayedMediaUrl
+                    return (
+                      <button
+                        key={url}
+                        type="button"
+                        role="listitem"
+                        onClick={() => setActiveMediaUrl(url)}
+                        aria-label={`${name} ${index + 1}`}
+                        aria-pressed={active}
+                        className={`relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 bg-orange-50 transition-colors ${
+                          active ? 'border-[#ff5a00] ring-2 ring-orange-100' : 'border-[#E5E7EB] hover:border-orange-200'
+                        }`}
+                      >
+                        <SafeMenuImage
+                          src={url}
+                          alt=""
+                          className="h-full w-full object-cover object-center"
+                          fallbackIconSize={22}
+                          autoPlay={false}
+                        />
+                        {isMenuVideoUrl(url) && (
+                          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/15">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white">
+                              <Play size={12} fill="currentColor" />
+                            </span>
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
             <div className="min-w-0 space-y-5">
               <div>

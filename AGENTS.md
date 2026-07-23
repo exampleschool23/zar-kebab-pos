@@ -202,6 +202,9 @@ Run migrations in order. Important recent files:
 - `supabase/102_atomic_menu_item_cost_creation.sql`
   Requires a positive real cost for new products and atomically inserts `menu_items` plus `menu_item_costs`. Authenticated direct menu-item inserts are disabled so product creation cannot bypass the protected cost.
 
+- `supabase/103_menu_item_media_gallery.sql`
+  Adds `menu_items.media_urls` and `create_menu_item_with_media_and_cost(payload jsonb)` so a new product's cover/gallery and protected cost are created atomically.
+
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
 ## Supabase Notes
@@ -280,6 +283,24 @@ Expected behavior:
 - A fine is a payroll deduction, not a payment or Accounting expense.
 - Employee history shows fines as negative red entries with their reason.
 - Only staff with Accounting write access can create or delete fines, and every mutation is audited.
+
+## Menu Media Gallery Flow
+
+Main files:
+- `src/pages/AdminMenu.jsx`
+- `src/components/MenuProductCards.jsx`
+- `src/components/MenuMedia.jsx`
+- `src/lib/menuMedia.js`
+- `api/menu-image/`
+- `supabase/103_menu_item_media_gallery.sql`
+
+Expected behavior:
+- A menu product can contain several images, animated GIFs, MP4 videos, or WebM videos.
+- `media_urls[0]` is the cover and must stay synchronized with the backward-compatible `image_url`.
+- The product editor supports multi-file upload, adding a direct media URL, changing the cover, and deleting individual media.
+- Existing R2 media removed in the editor is deleted only after the product save succeeds.
+- Newly uploaded media is cleaned up when the editor is cancelled or when it is removed before a successful save.
+- Product cards and Telegram use the cover; the public/waiter product detail page exposes the full gallery.
 
 ## Tests
 

@@ -19,6 +19,7 @@ import {
   getEstimatedMonthlyExpenseSummary,
   getNetIncome,
   getSalaryActiveUntil,
+  getSalaryAbsenceDates,
   getSalaryDue,
   getSalaryFineAmount,
   getSalaryCategoryForRole,
@@ -431,6 +432,20 @@ test('salary absences skip daily accrual and reduce salary due for those dates',
   assert.deepEqual(rows.map(row => row.expense_date), ['2026-06-01', '2026-06-03', '2026-06-05'])
   assert.equal(summarizeExpenses(rows).total, 600_000)
   assert.equal(getSalaryDue(waiterProfile, '2026-06-05'), 600_000)
+})
+
+test('salary absence dates collapse duplicate rows into one employee day', () => {
+  const absenceDates = getSalaryAbsenceDates({
+    absences: [
+      { id: 'absence-1', absence_date: '2026-07-23' },
+      { id: 'absence-duplicate', absence_date: '2026-07-23' },
+      { id: 'absence-2', absence_date: '2026-07-24' },
+    ],
+  })
+
+  assert.deepEqual([...absenceDates], ['2026-07-23', '2026-07-24'])
+  assert.equal(absenceDates.has('2026-07-23'), true)
+  assert.equal(absenceDates.has('2026-07-25'), false)
 })
 
 test('salary bonuses create separate expense rows without changing salary due', () => {

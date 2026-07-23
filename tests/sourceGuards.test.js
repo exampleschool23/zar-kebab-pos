@@ -43,22 +43,30 @@ function functionBody(source, functionName) {
   assert.fail(`${functionName} body should close`)
 }
 
-test('AdminMenu keeps upload error rendering inside ImageUploadField', () => {
+test('AdminMenu keeps upload errors inside the matching media fields', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
-  const body = functionBody(source, 'ImageUploadField')
+  const imageField = functionBody(source, 'ImageUploadField')
+  const galleryField = functionBody(source, 'MediaGalleryField')
 
-  assert.match(body, /\{error && <p[^}]+>\{error\}<\/p>\}/)
+  assert.match(imageField, /\{error && <p[^}]+>\{error\}<\/p>\}/)
+  assert.match(galleryField, /\{error && <p[^}]+>\{error\}<\/p>\}/)
 })
 
-test('AdminMenu accepts only supported raster menu image types without client recompression', () => {
+test('AdminMenu accepts verified images and product video without client recompression', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const validator = functionBody(source, 'validateMenuImage')
-  const uploadField = functionBody(source, 'ImageUploadField')
+  const uploadField = functionBody(source, 'MediaGalleryField')
 
-  assert.match(validator, /MENU_IMAGE_TYPES\.has/)
+  assert.match(validator, /allowVideo \? MENU_PRODUCT_MEDIA_TYPES : MENU_IMAGE_TYPES/)
+  assert.match(validator, /allowedTypes\.has/)
+  assert.match(validator, /MENU_PRODUCT_MEDIA_TYPES/)
+  assert.match(validator, /MAX_MENU_MEDIA_BYTES/)
   assert.doesNotMatch(validator, /image\/svg\+xml/)
   assert.match(validator, /return file/)
-  assert.match(uploadField, /uploadMenuImageToR2\(\{ file: validateMenuImage\(file\), type, entityId \}\)/)
+  assert.match(uploadField, /file: validateMenuImage\(file, true\)/)
+  assert.match(uploadField, /accept=\{MENU_PRODUCT_MEDIA_ACCEPT\}/)
+  assert.match(uploadField, /multiple/)
+  assert.match(uploadField, /controls=\{isMenuVideoUrl\(url\)\}/)
   assert.doesNotMatch(source, /compressMenuImage/)
   assert.doesNotMatch(source, /MENU_IMAGE_TARGET_SIZE/)
   assert.doesNotMatch(source, /MAX_MENU_IMAGE_BYTES/)
@@ -72,16 +80,19 @@ test('R2 menu image uploads use long-lived immutable browser caching', () => {
   assert.match(r2, /CacheControl: 'public, max-age=31536000, immutable'/)
 })
 
-test('R2 menu image uploads verify supported raster signatures without recompression', () => {
+test('R2 menu media uploads verify supported image and video signatures without recompression', () => {
   const r2 = readSource('api/menu-image/_lib/r2.js')
   const upload = readSource('api/menu-image/upload.js')
 
   assert.match(r2, /ALLOWED_IMAGE_TYPES\.has/)
+  assert.match(r2, /ALLOWED_VIDEO_TYPES\.has/)
   assert.match(r2, /matchesImageSignature/)
+  assert.match(r2, /matchesVideoSignature/)
   assert.match(r2, /Image contents do not match the declared file type/)
+  assert.match(r2, /Video contents do not match the declared file type/)
   assert.doesNotMatch(r2, /image\/svg\+xml/)
   assert.match(r2, /extensionForContentType\(contentType\)/)
-  assert.match(upload, /await assertImageFile\(file\)/)
+  assert.match(upload, /await assertMenuMediaFile\(file, \{ allowVideo: type === 'product' \}\)/)
   assert.match(upload, /contentType: file\.contentType/)
   assert.doesNotMatch(r2, /import sharp from 'sharp'/)
   assert.doesNotMatch(r2, /MENU_IMAGE_TARGET_SIZE/)
@@ -89,6 +100,28 @@ test('R2 menu image uploads verify supported raster signatures without recompres
   assert.doesNotMatch(r2, /contentType !== 'image\/webp'/)
   assert.doesNotMatch(r2, /file\.buffer\.length >/)
   assert.doesNotMatch(r2, /metadata\(\)/)
+})
+
+test('customer menu surfaces render uploaded video and animated image media safely', () => {
+  const menuMedia = readSource('src/components/MenuMedia.jsx')
+  const mediaHelpers = readSource('src/lib/menuMedia.js')
+  const productCards = readSource('src/components/MenuProductCards.jsx')
+  const telegramMenu = readSource('src/pages/TelegramMiniApp.jsx')
+
+  assert.match(mediaHelpers, /MENU_VIDEO_MIME_TYPES/)
+  assert.match(mediaHelpers, /video\/mp4/)
+  assert.match(mediaHelpers, /video\/webm/)
+  assert.match(mediaHelpers, /export function isMenuVideoUrl/)
+  assert.match(menuMedia, /if \(!isMenuVideoUrl\(src\)\)/)
+  assert.match(menuMedia, /<video/)
+  assert.match(menuMedia, /playsInline/)
+  assert.match(menuMedia, /controls=\{controls\}/)
+  assert.match(menuMedia, /onError=\{\(\) => setVideoFailed\(true\)\}/)
+  assert.match(productCards, /controls=\{isMenuVideoUrl\(displayedMediaUrl\)\}/)
+  assert.match(productCards, /getMenuItemMediaUrls\(item\)/)
+  assert.match(productCards, /setActiveMediaUrl\(url\)/)
+  assert.match(productCards, /hasVideo/)
+  assert.match(telegramMenu, /<MenuMedia/)
 })
 
 test('R2 deletion and upload stay inside flat menu image prefixes', () => {
@@ -103,14 +136,21 @@ test('R2 deletion and upload stay inside flat menu image prefixes', () => {
 test('AdminMenu cleans up replaced or cancelled uploaded menu images', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const uploadField = functionBody(source, 'ImageUploadField')
+  const galleryField = functionBody(source, 'MediaGalleryField')
   const adminMenu = functionBody(source, 'AdminMenu')
 
   assert.match(uploadField, /const previousUrl = value/)
   assert.match(uploadField, /onUploadComplete\?\.\(\{ newUrl: data\.url, previousUrl \}\)/)
+  assert.match(galleryField, /onUploadComplete\?\.\(\{ newUrl: data\.url, previousUrl: '' \}\)/)
+  assert.match(galleryField, /function removeUrl\(url\)/)
+  assert.match(galleryField, /function makeCover\(url\)/)
+  assert.match(galleryField, /aria-label=\{`\$\{t\(lang, 'deleteMedia'\)\} \$\{index \+ 1\}`\}/)
   assert.match(adminMenu, /uploadedItemImageUrlsRef = useRef\(new Set\(\)\)/)
   assert.match(adminMenu, /uploadedCatImageUrlsRef = useRef\(new Set\(\)\)/)
   assert.match(adminMenu, /async function cleanupTrackedUploads/)
   assert.match(adminMenu, /async function handleTrackedUpload/)
+  assert.match(adminMenu, /cleanupTrackedUploads\(uploadedItemImageUrlsRef, mediaUrls\)/)
+  assert.match(adminMenu, /oldMediaUrls[\s\S]*\.filter\(url => !keptMediaUrls\.has\(url\)\)[\s\S]*deleteMenuImageFromR2\(url\)/)
   assert.match(adminMenu, /onClose=\{closeItemModal\}/)
   assert.match(adminMenu, /onClose=\{closeCatModal\}/)
   assert.match(adminMenu, /onUploadComplete=\{upload => handleTrackedUpload\(uploadedItemImageUrlsRef, upload\)\}/)
@@ -191,11 +231,11 @@ test('AdminMenu sortable item card does not reference upload error state', () =>
   assert.doesNotMatch(body, /\berror\b/)
 })
 
-test('AdminMenu has exactly one upload error render', () => {
+test('AdminMenu has one upload error render per media field', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const matches = source.match(/\{error && <p/g) || []
 
-  assert.equal(matches.length, 1)
+  assert.equal(matches.length, 2)
 })
 
 test('AdminMenu preserves menu scroll when returning from product editor', () => {
@@ -1018,10 +1058,11 @@ test('menu management uses one logical feature access without a duplicate edit t
 test('menu and category writes surface Supabase errors', () => {
   const db = readSource('src/lib/db.js')
   const atomicMenuCreation = readSource('supabase/102_atomic_menu_item_cost_creation.sql')
+  const mediaGalleryMigration = readSource('supabase/103_menu_item_media_gallery.sql')
 
   assert.match(db, /case 'ADD_MENU_ITEM': \{[\s\S]*getRequiredMenuItemCost\(costPrice \?\? _costPriceAlias\)/)
-  assert.match(db, /case 'ADD_MENU_ITEM': \{[\s\S]*supabase\.rpc\('create_menu_item_with_cost'/)
-  assert.match(db, /case 'ADD_MENU_ITEM': \{[\s\S]*Database migration 102 is required before creating menu products\./)
+  assert.match(db, /case 'ADD_MENU_ITEM': \{[\s\S]*supabase\.rpc\('create_menu_item_with_media_and_cost'/)
+  assert.match(db, /case 'ADD_MENU_ITEM': \{[\s\S]*Database migration 103 is required before creating menu products with media\./)
   assert.doesNotMatch(db, /case 'ADD_MENU_ITEM': \{[\s\S]*supabase\.from\('menu_items'\)\.insert\(fields\)/)
   assert.match(db, /case 'UPDATE_MENU_ITEM': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_items'\)\.update\(fields\)\.eq\('id', id\)[\s\S]*if \(error\) throw error/)
   assert.match(db, /case 'UPDATE_MENU_ITEM': \{[\s\S]*\.from\('menu_item_costs'\)\.upsert\([\s\S]*if \(costError\) throw costError/)
@@ -1030,6 +1071,11 @@ test('menu and category writes surface Supabase errors', () => {
   assert.match(atomicMenuCreation, /insert into public\.menu_items[\s\S]*insert into public\.menu_item_costs/)
   assert.match(atomicMenuCreation, /drop policy if exists "feature_access_write_menu_items"/)
   assert.doesNotMatch(atomicMenuCreation, /create policy "feature_access_insert_menu_items"/)
+  assert.match(mediaGalleryMigration, /add column if not exists media_urls text\[\]/)
+  assert.match(mediaGalleryMigration, /create or replace function public\.create_menu_item_with_media_and_cost\(payload jsonb\)/)
+  assert.match(mediaGalleryMigration, /public\.create_menu_item_with_cost\(/)
+  assert.match(mediaGalleryMigration, /image_url = coalesce\(normalized_media_urls\[1\], ''\)/)
+  assert.match(mediaGalleryMigration, /media_urls = normalized_media_urls/)
   assert.match(db, /case 'ADD_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.insert\(action\.payload\)[\s\S]*if \(error\) throw error/)
   assert.match(db, /case 'UPDATE_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.update\(fields\)\.eq\('id', id\)[\s\S]*if \(error\) throw error/)
   assert.match(db, /const results = await Promise\.all\(updates\.map\(update =>[\s\S]*supabase\.from\('menu_items'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
@@ -1244,6 +1290,7 @@ test('menu costs stay private, snapshot onto sold items, and drive profit output
   const migration = readSource('supabase/098_menu_item_costs_and_profit.sql')
   const variantMigration = readSource('supabase/100_menu_variant_costs_and_accounting_profit.sql')
   const atomicCreationMigration = readSource('supabase/102_atomic_menu_item_cost_creation.sql')
+  const mediaGalleryMigration = readSource('supabase/103_menu_item_media_gallery.sql')
   const dbHealth = readSource('src/lib/dbHealth.js')
   const cliHealth = readSource('scripts/check-db-health.js')
 
@@ -1265,6 +1312,12 @@ test('menu costs stay private, snapshot onto sold items, and drive profit output
   assert.match(atomicCreationMigration, /create or replace function public\.create_menu_item_with_cost\(payload jsonb\)/)
   assert.match(atomicCreationMigration, /real_cost <= 0/)
   assert.match(atomicCreationMigration, /insert into public\.menu_item_costs/)
+  assert.match(mediaGalleryMigration, /create_menu_item_with_media_and_cost/)
+  assert.match(mediaGalleryMigration, /public\.create_menu_item_with_cost\(/)
+  assert.match(dbHealth, /media_urls/)
+  assert.match(dbHealth, /create_menu_item_with_media_and_cost/)
+  assert.match(cliHealth, /media_urls/)
+  assert.match(cliHealth, /create_menu_item_with_media_and_cost/)
   assert.match(db, /select\('menu_item_id, cost_price, variant_costs'\)/)
   assert.match(db, /variant_costs: normalizeVariantCosts\(variantCosts \?\? _variantCostsAlias\)/)
   assert.match(adminMenu, /cost: lang === 'uz' \? 'Haqiqiy tannarx'/)
@@ -2701,6 +2754,12 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(expenses, /const allExpenses = useMemo\(\(\) => \(\s*\[\.\.\.salaryExpenses, \.\.\.salaryBonusExpenses, \.\.\.expenses\]\s*\.sort\(/)
   assert.match(expenses, /b\.expense_date\.localeCompare\(a\.expense_date\)[\s\S]*String\(b\.created_at \|\| ''\)\.localeCompare\(String\(a\.created_at \|\| ''\)\)/)
   assert.match(employees, /const activeEmployees = useMemo\(\(\) => employees\.filter\(item => item\.is_active !== false\), \[employees\]\)/)
+  assert.match(employees, /const absentTodayEmployeeIds = useMemo\(\(\) => new Set\(/)
+  assert.match(employees, /getSalaryAbsenceDates\(employee\)\.has\(today\)/)
+  assert.match(employees, /Number\(absentTodayEmployeeIds\.has\(b\.id\)\) - Number\(absentTodayEmployeeIds\.has\(a\.id\)\)/)
+  assert.match(employees, /label=\{l\.absentToday\} value=\{absentTodayCount\} danger=\{absentTodayCount > 0\}/)
+  assert.match(employees, /absentToday\s*\?\s*'border-red-300 bg-red-50\/80 ring-2 ring-red-100'/)
+  assert.match(employees, /absentToday \? l\.absentToday : l\.active/)
   assert.match(employees, /const \[inactiveExpanded, setInactiveExpanded\] = useState\(false\)/)
   assert.match(employees, /employees[\s\S]*\.filter\(item => item\.is_active === false\)[\s\S]*String\(b\.ended_at \|\| ''\)\.localeCompare\(String\(a\.ended_at \|\| ''\)\)/)
   assert.match(employees, /aria-expanded=\{inactiveExpanded\}/)
@@ -2727,6 +2786,11 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(salaries, /const \[absenceForm, setAbsenceForm\]/)
   assert.match(salaries, /async function addAbsence/)
   assert.match(salaries, /async function deleteAbsence/)
+  assert.match(salaries, /const absenceAlreadyRecorded = Boolean\(/)
+  assert.match(salaries, /absenceAlreadyRecorded && \([\s\S]*role="alert"[\s\S]*\{l\.absenceDuplicate\}/)
+  assert.match(salaries, /disabled=\{[^}]*absenceAlreadyRecorded[^}]*\}/)
+  assert.match(functionBody(salaries, 'addAbsence'), /getSalaryAbsenceDates\(salaryProfile\)\.has\(absenceDate\)/)
+  assert.match(functionBody(salaries, 'addAbsence'), /writeError\.code === '23505' \? l\.absenceDuplicate : writeError\.message/)
   assert.match(salaries, /l\.markAbsence/)
   assert.match(salaries, /l\.absenceHistory/)
   assert.match(salaries, /absence_date/)
