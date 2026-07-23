@@ -162,6 +162,11 @@ const checks = await Promise.all([
     'telegram order id is required'
   ),
   checkRpc(
+    'create_menu_item_with_cost(payload)',
+    () => supabase.rpc('create_menu_item_with_cost', { payload: {} }),
+    'menu write access is required'
+  ),
+  checkRpc(
     'settle_orders_payment(payload)',
     () => supabase.rpc('settle_orders_payment', { payload: {} }),
     'cashier write access is required'

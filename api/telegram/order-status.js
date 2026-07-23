@@ -1,7 +1,12 @@
 import { json, methodNotAllowed, readJson } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { sendTelegramMessage, TELEGRAM_STATUS_MESSAGES } from './_lib/telegram.js'
-import { getOrderNetProfit, getOrderProfitMarginPct, getOrdersCostTotal } from '../../src/lib/profit.js'
+import {
+  getOrderNetProfit,
+  getOrderProfitMarginPct,
+  getOrdersCostTotal,
+  getSaleProfitSummary,
+} from '../../src/lib/profit.js'
 import {
   buildCompletedOrderGroupMessage,
   buildCustomerStatusMessage,
@@ -113,11 +118,14 @@ async function loadPaidTotalsForRestaurantDay(supabase, paidAt) {
     supabase,
     orders.flatMap(order => order.items || [])
   )
-  if (!available) return { revenueTotal, netProfitTotal: null }
+  if (!available) return { revenueTotal, netProfitTotal: null, profitMarginPct: null }
 
+  const costTotal = getOrdersCostTotal(orders, menuItemMap)
+  const profitSummary = getSaleProfitSummary(revenueTotal, costTotal)
   return {
     revenueTotal,
-    netProfitTotal: Math.round(revenueTotal - getOrdersCostTotal(orders, menuItemMap)),
+    netProfitTotal: profitSummary?.profit ?? Math.round(revenueTotal - costTotal),
+    profitMarginPct: profitSummary?.marginPct ?? null,
   }
 }
 
@@ -204,7 +212,11 @@ export default async function handler(req, res) {
         supabase,
         localizedOrder
       )
-      const { revenueTotal: dailyRevenueTotal, netProfitTotal: dailyNetProfitTotal } = await loadPaidTotalsForRestaurantDay(
+      const {
+        revenueTotal: dailyRevenueTotal,
+        netProfitTotal: dailyNetProfitTotal,
+        profitMarginPct: dailyProfitMarginPct,
+      } = await loadPaidTotalsForRestaurantDay(
         supabase,
         combinedOrder.paid_at || combinedOrder.updated_at || new Date()
       )
@@ -214,6 +226,7 @@ export default async function handler(req, res) {
         orderProfitMarginPct,
         dailyRevenueTotal,
         dailyNetProfitTotal,
+        dailyProfitMarginPct,
       })
       for (const chatId of getCompletedOrdersChatIds()) {
         sends.push(

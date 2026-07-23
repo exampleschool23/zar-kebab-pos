@@ -20,6 +20,7 @@ import {
   orderTypePrefix,
 } from './orderTypes.js'
 import { collectPagedRows, loadActiveOrders, loadPaidOrdersForRange } from './orderHistory.js'
+import { getRequiredMenuItemCost } from './menuItemCosts.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -1220,16 +1221,23 @@ export async function writeToSupabase(action, state, options = {}) {
         variantCosts: _variantCostsAlias,
         ...fields
       } = action.payload
-      const { error } = await supabase.from('menu_items').insert(fields)
-      if (error) throw error
-      const { error: costError } = await supabase.from('menu_item_costs').upsert({
-        menu_item_id: fields.id,
-        cost_price: Math.max(0, Math.round(Number(costPrice ?? _costPriceAlias) || 0)),
-        variant_costs: normalizeVariantCosts(variantCosts ?? _variantCostsAlias),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'menu_item_id' })
-      if (costError) throw costError
-      break
+      const requiredCost = getRequiredMenuItemCost(costPrice ?? _costPriceAlias)
+      if (requiredCost === null) {
+        throw new Error('Real cost must be greater than zero for every new product.')
+      }
+      const normalizedVariantCosts = normalizeVariantCosts(variantCosts ?? _variantCostsAlias)
+      const rpcResult = await supabase.rpc('create_menu_item_with_cost', {
+        payload: {
+          ...fields,
+          cost_price: requiredCost,
+          variant_costs: normalizedVariantCosts,
+        },
+      })
+      if (!rpcResult.error) break
+      if (isMissingRpc(rpcResult.error, 'create_menu_item_with_cost')) {
+        throw new Error('Database migration 102 is required before creating menu products.')
+      }
+      throw rpcResult.error
     }
 
     case 'UPDATE_MENU_ITEM': {

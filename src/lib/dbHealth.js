@@ -66,6 +66,7 @@ const MIGRATION_HINTS = {
   save_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
   delete_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
   create_telegram_order: 'Run supabase/101_atomic_telegram_orders.sql',
+  create_menu_item_with_cost: 'Run supabase/102_atomic_menu_item_cost_creation.sql',
 }
 
 function missingColumnMessage(error) {
@@ -119,6 +120,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
   const checks = await Promise.all(TABLE_CHECKS.map(check => checkTable(dbClient, check)))
   checks.push(await checkRpc(dbClient, 'submit_order_to_kitchen'))
   checks.push(await checkRpc(dbClient, 'create_telegram_order'))
+  checks.push(await checkRpc(dbClient, 'create_menu_item_with_cost'))
   checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))
   checks.push(await checkRpc(dbClient, 'settle_orders_payment'))
   checks.push(await checkRpc(dbClient, 'change_paid_order_payment_method_owner', { p_order_ids: [], p_payment_method: 'cash' }))

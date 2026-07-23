@@ -297,10 +297,13 @@ export function buildCompletedOrderGroupMessage(order) {
     lines.push(`Чистая прибыль: ${escapeTelegramHtml(`${formatMoney(order.orderNetProfit)}${margin}`)}`)
   }
   if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
-    lines.push(`Доход: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
+    lines.push('', `Доход: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
   }
   if (order?.dailyNetProfitTotal != null && Number.isFinite(Number(order.dailyNetProfitTotal))) {
-    lines.push(`Чистая прибыль: ${escapeTelegramHtml(formatMoney(order.dailyNetProfitTotal))}`)
+    const margin = order?.dailyProfitMarginPct != null && Number.isFinite(Number(order.dailyProfitMarginPct))
+      ? ` · ${formatPercent(order.dailyProfitMarginPct)}`
+      : ''
+    lines.push(`Чистая прибыль: ${escapeTelegramHtml(`${formatMoney(order.dailyNetProfitTotal)}${margin}`)}`)
   }
 
   return lines.join('\n')

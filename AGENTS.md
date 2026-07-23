@@ -157,6 +157,11 @@ These bugs were recently fixed and are now protected by tests:
    - Payment-method balances live in the left Accounting column behind the collapsed `MethodBalancesDisclosure` control.
    - Do not restore the full-width always-open payment-method balance grid above the Accounting content.
 
+14. New menu products must never be created without a real cost.
+   - The Admin Menu requires a positive protected cost for normal and cashier-quick products.
+   - Creation uses the atomic `create_menu_item_with_cost(payload jsonb)` RPC so the public product and private cost row commit or roll back together.
+   - Per-variant costs remain optional and fall back to the required parent product cost.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -193,6 +198,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/101_atomic_telegram_orders.sql`
   Adds the service-role-only `create_telegram_order(payload jsonb)` RPC so Telegram order and item inserts commit or roll back together.
+
+- `supabase/102_atomic_menu_item_cost_creation.sql`
+  Requires a positive real cost for new products and atomically inserts `menu_items` plus `menu_item_costs`. Authenticated direct menu-item inserts are disabled so product creation cannot bypass the protected cost.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

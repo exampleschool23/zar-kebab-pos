@@ -31,6 +31,7 @@ import { supabase } from '../lib/supabase'
 import { formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput } from '../lib/moneyInput'
 import { canEditMenu as canEditMenuForProfile } from '../lib/permissions'
 import { getSaleProfitSummary } from '../lib/profit'
+import { getRequiredMenuItemCost, hasRequiredMenuItemCost } from '../lib/menuItemCosts'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -207,7 +208,7 @@ function ProfitMarginPreview({ price, cost, lang, inheritedCost = false }) {
   )
 }
 
-function PricingFields({ form, setF, lang, compact = false }) {
+function PricingFields({ form, setF, lang, compact = false, costRequired = false }) {
   const labels = lang === 'uz'
     ? {
         title: 'Narx va foyda',
@@ -216,6 +217,7 @@ function PricingFields({ form, setF, lang, compact = false }) {
         old: 'Eski narx',
         cost: 'Haqiqiy tannarx',
         hint: 'Tannarx faqat sof foydani hisoblash uchun ishlatiladi. Menyu, buyurtma va cheklarda ko‘rsatilmaydi.',
+        required: 'Yangi mahsulot uchun haqiqiy tannarx majburiy.',
       }
     : lang === 'ru'
       ? {
@@ -225,6 +227,7 @@ function PricingFields({ form, setF, lang, compact = false }) {
           old: 'Старая цена',
           cost: 'Реальная себестоимость',
           hint: 'Себестоимость используется только для расчёта чистой прибыли. Она не показывается в меню, заказах и чеках.',
+          required: 'Для нового товара реальная себестоимость обязательна.',
         }
       : {
           title: 'Pricing and profit',
@@ -233,7 +236,9 @@ function PricingFields({ form, setF, lang, compact = false }) {
           old: 'Old price',
           cost: 'Real cost',
           hint: 'Cost is used only to calculate net profit. It is never shown in menus, orders, or receipts.',
+          required: 'Real cost is required for every new product.',
         }
+  const missingRequiredCost = costRequired && !hasRequiredMenuItemCost(form.cost_price)
 
   return (
     <div className={`rounded-2xl border border-emerald-200 bg-emerald-50/50 ${compact ? 'p-3' : 'p-4'}`}>
@@ -252,14 +257,26 @@ function PricingFields({ form, setF, lang, compact = false }) {
         <MoneyField label={`${labels.current} (UZS)`} value={form.price} onChange={setF('price')} placeholder="35000" />
         <MoneyField label={`${labels.old} (UZS)`} value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
         <MoneyField
-          label={`${labels.cost} (UZS)`}
+          label={`${labels.cost} (UZS)${costRequired ? ' *' : ''}`}
           value={form.cost_price}
           onChange={setF('cost_price')}
           placeholder="18000"
-          className="w-full rounded-xl border border-emerald-300 bg-white px-3 py-2.5 text-sm font-semibold tabular-nums outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-          labelClassName="mb-1.5 block text-xs font-bold text-emerald-800"
+          required={costRequired}
+          aria-required={costRequired}
+          aria-invalid={missingRequiredCost}
+          className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm font-semibold tabular-nums outline-none transition-all ${
+            missingRequiredCost
+              ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+              : 'border-emerald-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+          }`}
+          labelClassName={`mb-1.5 block text-xs font-bold ${missingRequiredCost ? 'text-red-700' : 'text-emerald-800'}`}
         />
       </div>
+      {costRequired && (
+        <p className={`mt-2 text-[11px] font-bold ${missingRequiredCost ? 'text-red-600' : 'text-emerald-700'}`}>
+          * {labels.required}
+        </p>
+      )}
       <div className="mt-3">
         <ProfitMarginPreview price={form.price} cost={form.cost_price} lang={lang} />
       </div>
@@ -1210,11 +1227,13 @@ export default function AdminMenu() {
   const currentItemFormFingerprint = useMemo(() => getItemFormFingerprint(form), [form])
   const isItemFormDirty = itemModal === 'new'
     || (itemModal === 'edit' && !!originalItemFormFingerprint && currentItemFormFingerprint !== originalItemFormFingerprint)
+  const hasValidNewItemCost = itemModal !== 'new' || hasRequiredMenuItemCost(form.cost_price)
   const canSaveItemForm = !savingItemForm
     && canEditMenu
     && !!form.name_uz
     && !!form.price
     && !!form.category_id
+    && hasValidNewItemCost
     && isItemFormDirty
 
   // Sensors: pointer (mouse/trackpad) + touch
@@ -1406,6 +1425,18 @@ export default function AdminMenu() {
   async function saveItem() {
     if (savingItemForm || !canEditMenu || !isItemFormDirty) return
     if (!form.name_uz || !form.price || !form.category_id) return
+    const requiredCost = itemModal === 'new' ? getRequiredMenuItemCost(form.cost_price) : null
+    if (itemModal === 'new' && requiredCost === null) {
+      setMenuNotice({
+        tone: 'error',
+        message: lang === 'uz'
+          ? 'Yangi mahsulot uchun haqiqiy tannarxni kiriting.'
+          : lang === 'ru'
+            ? 'Укажите реальную себестоимость нового товара.'
+            : 'Enter the real cost for the new product.',
+      })
+      return
+    }
     setSavingItemForm(true)
     setMenuNotice(null)
     try {
@@ -1422,7 +1453,9 @@ export default function AdminMenu() {
           external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
           price: numberFromMoneyInput(form.price),
           old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
-          cost_price: Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
+          cost_price: itemModal === 'new'
+            ? requiredCost
+            : Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
           variant_costs: editorToVariantCosts(form.option_groups_editor),
           grams: Math.max(0, Math.round(Number(form.grams) || 0)),
           millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
@@ -1709,7 +1742,7 @@ export default function AdminMenu() {
                     />
                   </div>
 
-                  <PricingFields form={form} setF={setF} lang={lang} />
+                  <PricingFields form={form} setF={setF} lang={lang} costRequired={itemModal === 'new'} />
 
                   <div className="grid gap-4 sm:grid-cols-3">
                     <Field label={t(lang, 'nameUz')} value={form.name_uz} onChange={setF('name_uz')} />
@@ -2422,7 +2455,7 @@ export default function AdminMenu() {
               lang={lang}
               parentCost={form.cost_price}
             />
-            <PricingFields form={form} setF={setF} lang={lang} compact />
+            <PricingFields form={form} setF={setF} lang={lang} compact costRequired={itemModal === 'new'} />
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
             <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
             <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />
