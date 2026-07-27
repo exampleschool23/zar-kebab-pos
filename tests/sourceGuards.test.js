@@ -154,7 +154,7 @@ test('AdminMenu cleans up replaced or cancelled uploaded menu images', () => {
   assert.match(adminMenu, /cleanupTrackedUploads\(uploadedItemImageUrlsRef, mediaUrls\)/)
   assert.match(adminMenu, /oldMediaUrls[\s\S]*\.filter\(url => !keptMediaUrls\.has\(url\)\)[\s\S]*deleteMenuImageFromR2\(url\)/)
   assert.match(adminMenu, /onClose=\{closeItemModal\}/)
-  assert.match(adminMenu, /onClose=\{closeCatModal\}/)
+  assert.match(adminMenu, /onClick=\{closeCatModal\}/)
   assert.match(adminMenu, /onUploadComplete=\{upload => handleTrackedUpload\(uploadedItemImageUrlsRef, upload\)\}/)
   assert.match(adminMenu, /onUploadComplete=\{upload => handleTrackedUpload\(uploadedCatImageUrlsRef, upload\)\}/)
 })
@@ -258,6 +258,22 @@ test('AdminMenu preserves menu scroll when returning from product editor', () =>
   assert.match(adminMenu, /clearSavedAdminMenuScrollPosition\(\)/)
   assert.match(adminMenu, /window\.requestAnimationFrame\(\(\) => restore\(\)\)/)
   assert.match(adminMenu, /<AppShell title=\{t\(lang, 'menu'\)\} contentRef=\{shellScrollRef\}>/)
+})
+
+test('AdminMenu categories use a dedicated responsive editor page', () => {
+  const app = readSource('src/App.jsx')
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+
+  assert.match(app, /path="\/admin\/menu\/category\/:categoryId"/)
+  assert.match(adminMenu, /const isCategoryEditorPage = !!categoryId/)
+  assert.match(adminMenu, /navigate\('\/admin\/menu\/category\/new'\)/)
+  assert.match(adminMenu, /navigate\(`\/admin\/menu\/category\/\$\{encodeURIComponent\(c\.id\)\}`\)/)
+  assert.match(adminMenu, /if \(isCategoryEditorPage\) \{[\s\S]*Manage category names, image, and menu visibility/)
+  assert.match(adminMenu, /Live preview/)
+  assert.match(adminMenu, /Choose where this category appears/)
+  assert.match(adminMenu, /disabled=\{!canSaveCatForm\}/)
+  assert.match(adminMenu, /navigate\('\/admin\/menu\?tab=categories'\)/)
+  assert.doesNotMatch(adminMenu, /\{catModal && \(\s*<Modal/)
 })
 
 test('App ProfileSync depends on stable profile fields and dispatch', () => {
@@ -869,9 +885,11 @@ test('hidden menu categories are hidden from customer-facing menus only', () => 
 
   assert.match(menuItems, /function isHiddenMenuCategory/)
   assert.match(menuItems, /function isCustomerMenuCategory/)
-  assert.match(adminMenu, /id="categoryHidden"/)
-  assert.match(adminMenu, /id="categoryWaiterHidden"/)
-  assert.match(adminMenu, /Hide from waiter menu/)
+  assert.match(adminMenu, /checked=\{publicVisible\}/)
+  assert.match(adminMenu, /hidden: !event\.target\.checked/)
+  assert.match(adminMenu, /checked=\{waiterVisible\}/)
+  assert.match(adminMenu, /waiter_hidden: !event\.target\.checked/)
+  assert.match(adminMenu, /Waiter menu/)
   assert.match(adminMenu, /Hidden from public menu/)
   assert.match(adminMenu, /cat\.hidden \? 'bg-red-50 text-red-500'/)
   assert.match(publicMenu, /isCustomerMenuCategory\(category, now\)/)
@@ -901,8 +919,9 @@ test('waiter-hidden menu categories are hidden from waiter table ordering only',
   assert.match(menuItems, /function isWaiterHiddenMenuCategory/)
   assert.match(menuItems, /function isWaiterMenuCategory/)
   assert.match(adminMenu, /waiter_hidden/)
-  assert.match(adminMenu, /id="categoryWaiterHidden"/)
-  assert.match(adminMenu, /Hide from waiter menu/)
+  assert.match(adminMenu, /checked=\{waiterVisible\}/)
+  assert.match(adminMenu, /waiter_hidden: !event\.target\.checked/)
+  assert.match(adminMenu, /Waiter menu/)
   assert.match(adminMenu, /Hidden from waiter menu/)
   assert.match(waiterOrder, /isWaiterMenuCategory/)
   assert.match(waiterOrder, /isWaiterMenuCategory\(category, visibilityNow\)/)
@@ -994,7 +1013,7 @@ test('AdminMenu visibility toggles show scoped loading feedback', () => {
   assert.match(source, /visibilityPending=\{savingCatId === cat\.id\}/)
   assert.match(adminMenu, /return \(matchAvail \|\| savingItemId === item\.id\) && matchSearch/)
   assert.match(source, /closeDisabled=\{savingItemForm\}/)
-  assert.match(source, /closeDisabled=\{savingCatForm\}/)
+  assert.match(source, /onClick=\{closeCatModal\}[\s\S]*disabled=\{savingCatForm\}/)
 })
 
 test('AdminMenu edit save stays disabled until product fields change', () => {

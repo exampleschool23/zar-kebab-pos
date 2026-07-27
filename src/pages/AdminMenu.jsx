@@ -1129,6 +1129,21 @@ const blankCat = {
   visible_until_time: '',
 }
 
+function getCategoryFormFingerprint(value = {}) {
+  return JSON.stringify({
+    id: String(value.id || ''),
+    name_uz: trimMenuItemTextValue(value.name_uz),
+    name_ru: trimMenuItemTextValue(value.name_ru),
+    name_en: trimMenuItemTextValue(value.name_en),
+    image_url: String(value.image_url || '').trim(),
+    sort_order: Number(value.sort_order) || 0,
+    hidden: !!value.hidden,
+    waiter_hidden: !!value.waiter_hidden,
+    visible_from_time: nullableMenuTime(value.visible_from_time),
+    visible_until_time: nullableMenuTime(value.visible_until_time),
+  })
+}
+
 function parseOptionGroupsValue(value) {
   if (!value) return []
   if (Array.isArray(value)) return value
@@ -1428,11 +1443,13 @@ export default function AdminMenu() {
   const canEditMenu = canEditMenuForProfile(profile || { role: state.user?.role })
   const scheduleLabels = menuScheduleLabels(lang)
   const navigate = useNavigate()
-  const { productId } = useParams()
+  const { productId, categoryId } = useParams()
   const [searchParams] = useSearchParams()
   const isProductEditorPage = !!productId
+  const isCategoryEditorPage = !!categoryId
+  const isMenuEditorPage = isProductEditorPage || isCategoryEditorPage
 
-  const [tab,        setTab]        = useState('items')
+  const [tab,        setTab]        = useState(searchParams.get('tab') === 'categories' ? 'categories' : 'items')
   const [itemModal,  setItemModal]  = useState(null)
   const [catModal,   setCatModal]   = useState(null)
   const [form,       setForm]       = useState(blankItem)
@@ -1447,10 +1464,12 @@ export default function AdminMenu() {
   const [savingItemForm, setSavingItemForm] = useState(false)
   const [savingCatForm, setSavingCatForm] = useState(false)
   const [originalItemFormFingerprint, setOriginalItemFormFingerprint] = useState('')
+  const [originalCatFormFingerprint, setOriginalCatFormFingerprint] = useState('')
   const [menuNotice, setMenuNotice] = useState(null)
   const uploadedItemImageUrlsRef = useRef(new Set())
   const uploadedCatImageUrlsRef = useRef(new Set())
   const productEditorInitializedRef = useRef('')
+  const categoryEditorInitializedRef = useRef('')
   const shellScrollRef = useRef(null)
   const currentItemFormFingerprint = useMemo(() => getItemFormFingerprint(form), [form])
   const isItemFormDirty = itemModal === 'new'
@@ -1463,6 +1482,13 @@ export default function AdminMenu() {
     && !!form.category_id
     && hasValidNewItemCost
     && isItemFormDirty
+  const currentCatFormFingerprint = useMemo(() => getCategoryFormFingerprint(catForm), [catForm])
+  const isCatFormDirty = catModal === 'new'
+    || (catModal === 'edit' && !!originalCatFormFingerprint && currentCatFormFingerprint !== originalCatFormFingerprint)
+  const canSaveCatForm = !savingCatForm
+    && canEditMenu
+    && !!trimMenuItemTextValue(catForm.name_uz)
+    && isCatFormDirty
 
   // Sensors: pointer (mouse/trackpad) + touch
   const sensors = useSensors(
@@ -1594,7 +1620,52 @@ export default function AdminMenu() {
   }, [loaded, isProductEditorPage, productId, quickItems, searchParams, sortedItems, navigate, canEditMenu])
 
   useEffect(() => {
-    if (!loaded || isProductEditorPage) return undefined
+    if (!loaded || !isCategoryEditorPage) return
+    if (categoryEditorInitializedRef.current === categoryId) return
+    categoryEditorInitializedRef.current = categoryId
+    uploadedCatImageUrlsRef.current.clear()
+
+    if (!canEditMenu) {
+      navigate('/admin/menu?tab=categories', { replace: true })
+      return
+    }
+
+    if (categoryId === 'new') {
+      const maxOrder = realSortedCats.length > 0
+        ? Math.max(...realSortedCats.map(category => category.sort_order ?? 0))
+        : 0
+      const nextForm = {
+        ...blankCat,
+        id: 'c' + Date.now(),
+        sort_order: maxOrder + 1,
+      }
+      setCatForm(nextForm)
+      setOriginalCatFormFingerprint(getCategoryFormFingerprint(nextForm))
+      setCatModal('new')
+      return
+    }
+
+    const category = realSortedCats.find(row => row.id === categoryId)
+    if (!category) {
+      navigate('/admin/menu?tab=categories', { replace: true })
+      return
+    }
+    const nextForm = {
+      ...blankCat,
+      ...category,
+      sort_order: category.sort_order ?? 0,
+      hidden: !!category.hidden,
+      waiter_hidden: !!(category.waiter_hidden || category.waiterHidden || category.hide_from_waiter || category.hideFromWaiter),
+      visible_from_time: String(category.visible_from_time || category.visibleFromTime || '').slice(0, 5),
+      visible_until_time: String(category.visible_until_time || category.visibleUntilTime || '').slice(0, 5),
+    }
+    setCatForm(nextForm)
+    setOriginalCatFormFingerprint(getCategoryFormFingerprint(nextForm))
+    setCatModal('edit')
+  }, [loaded, isCategoryEditorPage, categoryId, realSortedCats, navigate, canEditMenu])
+
+  useEffect(() => {
+    if (!loaded || isMenuEditorPage) return undefined
     const savedScrollTop = takeSavedAdminMenuScrollPosition()
     if (savedScrollTop == null) return undefined
 
@@ -1619,7 +1690,7 @@ export default function AdminMenu() {
       cancelled = true
       if (frameId) window.cancelAnimationFrame(frameId)
     }
-  }, [loaded, isProductEditorPage, tab, filteredItems.length])
+  }, [loaded, isMenuEditorPage, tab, filteredItems.length])
 
   // ── Item CRUD ──────────────────────────────────────────────────────────────
   function saveMenuListScrollBeforeProductNavigation() {
@@ -1759,34 +1830,28 @@ export default function AdminMenu() {
   // ── Category CRUD ──────────────────────────────────────────────────────────
   function openNewCat() {
     if (!canEditMenu) return
-    uploadedCatImageUrlsRef.current.clear()
-    const maxOrder = realSortedCats.length > 0
-      ? Math.max(...realSortedCats.map(c => c.sort_order ?? 0)) : 0
-    setCatForm({ ...blankCat, id: 'c' + Date.now(), sort_order: maxOrder + 1 })
-    setCatModal('new')
+    saveMenuListScrollBeforeProductNavigation()
+    navigate('/admin/menu/category/new')
   }
   function openEditCat(c) {
     if (!canEditMenu) return
-    uploadedCatImageUrlsRef.current.clear()
-    setCatForm({
-      ...blankCat,
-      ...c,
-      sort_order: c.sort_order ?? 0,
-      hidden: !!c.hidden,
-      waiter_hidden: !!(c.waiter_hidden || c.waiterHidden || c.hide_from_waiter || c.hideFromWaiter),
-      visible_from_time: String(c.visible_from_time || c.visibleFromTime || '').slice(0, 5),
-      visible_until_time: String(c.visible_until_time || c.visibleUntilTime || '').slice(0, 5),
-    })
-    setCatModal('edit')
+    saveMenuListScrollBeforeProductNavigation()
+    navigate(`/admin/menu/category/${encodeURIComponent(c.id)}`)
   }
   async function closeCatModal() {
     if (savingCatForm) return
     await cleanupTrackedUploads(uploadedCatImageUrlsRef)
     setCatModal(null)
+    setOriginalCatFormFingerprint('')
+    if (isCategoryEditorPage) {
+      categoryEditorInitializedRef.current = ''
+      setTab('categories')
+      navigate('/admin/menu?tab=categories')
+    }
   }
   async function saveCat() {
-    if (savingCatForm || !canEditMenu) return
-    if (!catForm.name_uz) return
+    if (savingCatForm || !canEditMenu || !isCatFormDirty) return
+    if (!trimMenuItemTextValue(catForm.name_uz)) return
     setSavingCatForm(true)
     setMenuNotice(null)
     try {
@@ -1797,6 +1862,9 @@ export default function AdminMenu() {
         type: catModal === 'new' ? 'ADD_CATEGORY' : 'UPDATE_CATEGORY',
         payload: {
           ...catForm,
+          name_uz: trimMenuItemTextValue(catForm.name_uz),
+          name_ru: trimMenuItemTextValue(catForm.name_ru),
+          name_en: trimMenuItemTextValue(catForm.name_en),
           sort_order: Number(catForm.sort_order) || 0,
           hidden: !!catForm.hidden,
           waiter_hidden: !!catForm.waiter_hidden,
@@ -1813,6 +1881,12 @@ export default function AdminMenu() {
         await deleteMenuImageFromR2(oldImageUrl)
       }
       setCatModal(null)
+      setOriginalCatFormFingerprint('')
+      if (isCategoryEditorPage) {
+        categoryEditorInitializedRef.current = ''
+        setTab('categories')
+        navigate('/admin/menu?tab=categories')
+      }
     } finally {
       setSavingCatForm(false)
     }
@@ -1842,6 +1916,7 @@ export default function AdminMenu() {
   function setF(key)  { return e => setForm(f => ({ ...f, [key]: e.target.value })) }
   function trimF(key) { return () => setForm(f => ({ ...f, [key]: trimMenuItemTextValue(f[key]) })) }
   function setCF(key) { return e => setCatForm(f => ({ ...f, [key]: e.target.value })) }
+  function trimCF(key) { return () => setCatForm(f => ({ ...f, [key]: trimMenuItemTextValue(f[key]) })) }
 
   // ── DnD handlers ──────────────────────────────────────────────────────────
 
@@ -1911,6 +1986,233 @@ export default function AdminMenu() {
               onAction={() => window.location.reload()}
             />
           )}
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (isCategoryEditorPage) {
+    const editorTitle = catModal === 'new'
+      ? t(lang, 'addCategory')
+      : (lang === 'uz' ? 'Kategoriyani tahrirlash' : lang === 'ru' ? 'Редактировать категорию' : 'Edit Category')
+    const categoryItemCount = catModal === 'edit' ? (itemCountByCat[catForm.id] || 0) : 0
+    const publicVisible = !catForm.hidden
+    const waiterVisible = !catForm.waiter_hidden
+
+    return (
+      <AppShell title={editorTitle}>
+        <div className="min-h-screen bg-[#FAF6EE]">
+          <div className="border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
+            <div className="mx-auto flex w-full max-w-[1080px] items-center gap-3">
+              <button
+                type="button"
+                onClick={closeCatModal}
+                disabled={savingCatForm}
+                aria-label={t(lang, 'cancel')}
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 disabled:cursor-wait disabled:opacity-50"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div className="min-w-0">
+                <h1 className="truncate text-2xl font-black text-gray-900">{editorTitle}</h1>
+                <p className="mt-0.5 text-sm text-gray-400">
+                  {lang === 'uz' ? 'Kategoriya nomlari, rasmi va menyudagi ko‘rinishini boshqaring' :
+                   lang === 'ru' ? 'Управляйте названиями, изображением и показом категории' :
+                   'Manage category names, image, and menu visibility'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mx-auto w-full max-w-[1080px] px-4 py-5">
+            {menuNotice && (
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                {menuNotice.message}
+              </div>
+            )}
+            {!catModal ? (
+              <OperationalLoading
+                title={lang === 'uz' ? 'Kategoriya ochilmoqda' : lang === 'ru' ? 'Открываем категорию' : 'Opening category'}
+                description={lang === 'uz' ? 'Ma’lumotlar tayyorlanmoqda.' : lang === 'ru' ? 'Подготавливаем данные.' : 'Preparing the editor.'}
+              />
+            ) : (
+              <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+                <section className="min-w-0 space-y-5 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="flex items-start gap-3 border-b border-gray-100 pb-4">
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#ff5a00]">
+                      <FolderOpen size={18} />
+                    </span>
+                    <div>
+                      <h2 className="font-black text-gray-900">
+                        {lang === 'uz' ? 'Kategoriya ma’lumotlari' : lang === 'ru' ? 'Данные категории' : 'Category details'}
+                      </h2>
+                      <p className="mt-0.5 text-xs font-semibold text-gray-400">
+                        {lang === 'uz' ? 'Har bir menyu tili uchun aniq nom kiriting.' :
+                         lang === 'ru' ? 'Укажите понятное название для каждого языка меню.' :
+                         'Add a clear name for every menu language.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <Field label={t(lang, 'nameUz')} value={catForm.name_uz} onChange={setCF('name_uz')} onBlur={trimCF('name_uz')} autoFocus />
+                    <Field label={t(lang, 'nameRu')} value={catForm.name_ru} onChange={setCF('name_ru')} onBlur={trimCF('name_ru')} />
+                    <Field label={t(lang, 'nameEn')} value={catForm.name_en} onChange={setCF('name_en')} onBlur={trimCF('name_en')} />
+                  </div>
+
+                  <div className="rounded-2xl border border-orange-100 bg-[#FFF9F4] p-4">
+                    <p className="mb-3 text-[11px] font-black uppercase tracking-wide text-[#ff5a00]">
+                      {lang === 'uz' ? 'Jonli ko‘rinish' : lang === 'ru' ? 'Предпросмотр' : 'Live preview'}
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm">
+                        <SafeMenuImage
+                          src={catForm.image_url}
+                          alt={trimMenuItemTextValue(catForm[`name_${lang}`]) || trimMenuItemTextValue(catForm.name_uz)}
+                          className="h-full w-full object-cover object-center"
+                          fallbackClassName="h-full w-full"
+                          iconSize={22}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-lg font-black text-gray-900">
+                          {trimMenuItemTextValue(catForm[`name_${lang}`]) || trimMenuItemTextValue(catForm.name_uz) || (lang === 'uz' ? 'Nomsiz kategoriya' : lang === 'ru' ? 'Категория без названия' : 'Untitled category')}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-gray-400">
+                          {catModal === 'new'
+                            ? (lang === 'uz' ? 'Yangi kategoriya' : lang === 'ru' ? 'Новая категория' : 'New category')
+                            : (lang === 'uz' ? `${categoryItemCount} ta mahsulot` : lang === 'ru' ? `${categoryItemCount} позиций` : `${categoryItemCount} menu items`)}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-black ${publicVisible ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {publicVisible
+                              ? (lang === 'uz' ? 'Ommaviy menyuda' : lang === 'ru' ? 'В публичном меню' : 'Public menu')
+                              : (lang === 'uz' ? 'Ommaviy menyuda yashirin' : lang === 'ru' ? 'Скрыто публично' : 'Hidden publicly')}
+                          </span>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-black ${waiterVisible ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {waiterVisible
+                              ? (lang === 'uz' ? 'Ofitsiant menyusida' : lang === 'ru' ? 'В меню официанта' : 'Waiter menu')
+                              : (lang === 'uz' ? 'Ofitsiantdan yashirin' : lang === 'ru' ? 'Скрыто от официанта' : 'Hidden from waiter')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <aside className="min-w-0 space-y-4">
+                  <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="rounded-xl border border-[#C7D2FE] bg-[#EEF2FF] px-3 py-2.5">
+                      <p className="mb-1 text-[11px] font-black uppercase tracking-wide text-[#818CF8]">
+                        {lang === 'uz' ? 'Kategoriya ID' : lang === 'ru' ? 'ID категории' : 'Category ID'}
+                      </p>
+                      <p className="truncate font-black text-[#4F46E5]">{catForm.id || '—'}</p>
+                    </div>
+
+                    <ImageUploadField
+                      label={t(lang, 'imageUrl')}
+                      value={catForm.image_url}
+                      onChange={setCF('image_url')}
+                      onUploadComplete={upload => handleTrackedUpload(uploadedCatImageUrlsRef, upload)}
+                      lang={lang}
+                      type="category"
+                      entityId={catForm.id}
+                    />
+
+                    <Field label={t(lang, 'sortOrder')} type="number" min="0" value={catForm.sort_order} onChange={setCF('sort_order')} placeholder="1" />
+
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-gray-500">{scheduleLabels.section}</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label={scheduleLabels.from} type="time" value={catForm.visible_from_time || ''} onChange={setCF('visible_from_time')} />
+                        <Field label={scheduleLabels.until} type="time" value={catForm.visible_until_time || ''} onChange={setCF('visible_until_time')} />
+                      </div>
+                      <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
+                    </div>
+                  </section>
+
+                  <section className="space-y-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3">
+                      <h2 className="font-black text-gray-900">
+                        {lang === 'uz' ? 'Ko‘rinish' : lang === 'ru' ? 'Видимость' : 'Visibility'}
+                      </h2>
+                      <p className="mt-0.5 text-xs font-semibold text-gray-400">
+                        {lang === 'uz' ? 'Kategoriya qayerda ko‘rinishini tanlang.' :
+                         lang === 'ru' ? 'Выберите, где показывать категорию.' :
+                         'Choose where this category appears.'}
+                      </p>
+                    </div>
+
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${publicVisible ? 'border-emerald-200 bg-emerald-50/60' : 'border-gray-200 bg-gray-50'}`}>
+                      <input
+                        type="checkbox"
+                        checked={publicVisible}
+                        onChange={event => setCatForm(current => ({ ...current, hidden: !event.target.checked }))}
+                        disabled={savingCatForm}
+                        className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait"
+                      />
+                      <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${publicVisible ? 'bg-white text-emerald-600' : 'bg-white text-gray-400'}`}>
+                        {publicVisible ? <Eye size={15} /> : <EyeOff size={15} />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black text-gray-800">
+                          {lang === 'uz' ? 'Ommaviy menyu' : lang === 'ru' ? 'Публичное меню' : 'Public menu'}
+                        </span>
+                        <span className="block text-[11px] font-semibold text-gray-400">
+                          {publicVisible
+                            ? (lang === 'uz' ? 'Mijozlarga ko‘rinadi' : lang === 'ru' ? 'Видно гостям' : 'Visible to guests')
+                            : (lang === 'uz' ? 'Mijozlardan yashirin' : lang === 'ru' ? 'Скрыто от гостей' : 'Hidden from guests')}
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${waiterVisible ? 'border-purple-200 bg-purple-50/60' : 'border-gray-200 bg-gray-50'}`}>
+                      <input
+                        type="checkbox"
+                        checked={waiterVisible}
+                        onChange={event => setCatForm(current => ({ ...current, waiter_hidden: !event.target.checked }))}
+                        disabled={savingCatForm}
+                        className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait"
+                      />
+                      <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${waiterVisible ? 'bg-white text-purple-600' : 'bg-white text-gray-400'}`}>
+                        {waiterVisible ? <Eye size={15} /> : <EyeOff size={15} />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black text-gray-800">
+                          {lang === 'uz' ? 'Ofitsiant menyusi' : lang === 'ru' ? 'Меню официанта' : 'Waiter menu'}
+                        </span>
+                        <span className="block text-[11px] font-semibold text-gray-400">
+                          {waiterVisible
+                            ? (lang === 'uz' ? 'Ofitsiantlarga ko‘rinadi' : lang === 'ru' ? 'Видно официантам' : 'Visible to waiters')
+                            : (lang === 'uz' ? 'Ofitsiantlardan yashirin' : lang === 'ru' ? 'Скрыто от официантов' : 'Hidden from waiters')}
+                        </span>
+                      </span>
+                    </label>
+                  </section>
+
+                  <div className="flex gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={closeCatModal}
+                      disabled={savingCatForm}
+                      className="flex-1 rounded-xl border-2 border-gray-200 py-2.5 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50"
+                    >
+                      {t(lang, 'cancel')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveCat}
+                      disabled={!canSaveCatForm}
+                      className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#ff5a00] py-2.5 text-sm font-bold text-white shadow-md shadow-orange-200 transition-colors hover:bg-[#cc4800] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none"
+                    >
+                      {savingCatForm && <Loader2 size={15} className="animate-spin" />}
+                      {savingCatForm ? savingLabel(lang) : t(lang, 'save')}
+                    </button>
+                  </div>
+                </aside>
+              </div>
+            )}
+          </div>
         </div>
       </AppShell>
     )
@@ -2812,78 +3114,6 @@ export default function AdminMenu() {
         </Modal>
       )}
 
-      {/* ── Category modal ──────────────────────────────────────────────────── */}
-      {catModal && (
-        <Modal
-          title={catModal === 'new' ? t(lang, 'addCategory') : (lang === 'uz' ? 'Kategoriyani tahrirlash' : lang === 'ru' ? 'Редактировать категорию' : 'Edit Category')}
-          onClose={closeCatModal}
-          closeDisabled={savingCatForm}
-        >
-          <div className="space-y-3">
-            {menuNotice && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                {menuNotice.message}
-              </div>
-            )}
-            <Field label={t(lang, 'nameUz')} value={catForm.name_uz} onChange={setCF('name_uz')} />
-            <Field label={t(lang, 'nameRu')} value={catForm.name_ru} onChange={setCF('name_ru')} />
-            <Field label={t(lang, 'nameEn')} value={catForm.name_en} onChange={setCF('name_en')} />
-            <ImageUploadField
-              label={t(lang, 'imageUrl')}
-              value={catForm.image_url}
-              onChange={setCF('image_url')}
-              onUploadComplete={upload => handleTrackedUpload(uploadedCatImageUrlsRef, upload)}
-              lang={lang}
-              type="category"
-              entityId={catForm.id}
-            />
-            <Field label={t(lang, 'sortOrder')} type="number" value={catForm.sort_order} onChange={setCF('sort_order')} placeholder="1" />
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-gray-500">{scheduleLabels.section}</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={scheduleLabels.from} type="time" value={catForm.visible_from_time || ''} onChange={setCF('visible_from_time')} />
-                <Field label={scheduleLabels.until} type="time" value={catForm.visible_until_time || ''} onChange={setCF('visible_until_time')} />
-              </div>
-              <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="categoryHidden"
-                type="checkbox"
-                checked={!!catForm.hidden}
-                onChange={e => setCatForm(f => ({ ...f, hidden: e.target.checked }))}
-                disabled={savingCatForm}
-                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
-              />
-              <label htmlFor="categoryHidden" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
-              </label>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="categoryWaiterHidden"
-                type="checkbox"
-                checked={!!catForm.waiter_hidden}
-                onChange={e => setCatForm(f => ({ ...f, waiter_hidden: e.target.checked }))}
-                disabled={savingCatForm}
-                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
-              />
-              <label htmlFor="categoryWaiterHidden" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Ofitsiant menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню официанта' : 'Hide from waiter menu'}
-              </label>
-            </div>
-            <div className="flex gap-2 pt-2">
-              <button onClick={closeCatModal} disabled={savingCatForm} className="flex-1 border-2 border-gray-200 rounded-xl py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-50">
-                {t(lang, 'cancel')}
-              </button>
-              <button onClick={saveCat} disabled={savingCatForm} className="flex-1 inline-flex items-center justify-center gap-2 bg-[#ff5a00] text-white rounded-xl py-2.5 text-sm font-bold hover:bg-[#cc4800] transition-colors shadow-md shadow-orange-200 disabled:cursor-wait disabled:bg-gray-300 disabled:shadow-none">
-                {savingCatForm && <Loader2 size={15} className="animate-spin" />}
-                {savingCatForm ? savingLabel(lang) : t(lang, 'save')}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </AppShell>
   )
 }
