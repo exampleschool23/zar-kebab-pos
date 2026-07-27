@@ -300,14 +300,18 @@ export function buildCompletedOrderGroupMessage(order) {
       : ''
     lines.push(`Чистая прибыль: ${escapeTelegramHtml(`${formatMoney(order.orderNetProfit)}${margin}`)}`)
   }
-  if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
-    lines.push('', `Доход: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}`)
-  }
+  const dailySummaryLines = []
   if (order?.dailyNetProfitTotal != null && Number.isFinite(Number(order.dailyNetProfitTotal))) {
     const margin = order?.dailyProfitMarginPct != null && Number.isFinite(Number(order.dailyProfitMarginPct))
       ? ` · ${formatPercent(order.dailyProfitMarginPct)}`
       : ''
-    lines.push(`Чистая прибыль: ${escapeTelegramHtml(`${formatMoney(order.dailyNetProfitTotal)}${margin}`)}`)
+    dailySummaryLines.push(`Чистая прибыль: ${escapeTelegramHtml(`${formatMoney(order.dailyNetProfitTotal)}${margin}`)}`)
+  }
+  if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
+    dailySummaryLines.push(`<b>Доход: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}</b>`)
+  }
+  if (dailySummaryLines.length > 0) {
+    lines.push('', ...dailySummaryLines)
   }
 
   return lines.join('\n')
