@@ -1,4 +1,5 @@
 import { withPriceModeFields } from '../lib/priceModes.js'
+import { normalizeMenuQuantity } from '../lib/menuSaleUnits.js'
 
 function getCartItemKey(item) {
   return item?.cart_item_key || item?.cartItemKey || item?.menu_item_id
@@ -13,7 +14,7 @@ export function cartReducer(state, action) {
     case 'ADD_TO_CART': {
       const payloadKey = getCartItemKey(action.payload)
       const existing = state.cart.find(i => getCartItemKey(i) === payloadKey)
-      const addQuantity = Math.max(1, Number(action.payload?.quantity) || 1)
+      const addQuantity = normalizeMenuQuantity(action.payload?.quantity, action.payload)
       if (existing) {
         return {
           ...state,
@@ -22,7 +23,7 @@ export function cartReducer(state, action) {
               ? {
                   ...i,
                   ...action.payload,
-                  quantity: (Number(i.quantity) || 0) + addQuantity,
+                  quantity: normalizeMenuQuantity((Number(i.quantity) || 0) + addQuantity, i),
                   notes: action.payload?.notes ?? i.notes ?? '',
                 }
               : i
@@ -45,10 +46,10 @@ export function cartReducer(state, action) {
     case 'UPDATE_CART_QTY': {
       const { qty } = action.payload
       const key = actionCartItemKey(action.payload)
-      if (qty <= 0) return { ...state, cart: state.cart.filter(i => getCartItemKey(i) !== key) }
+      if (Number(qty) <= 0) return { ...state, cart: state.cart.filter(i => getCartItemKey(i) !== key) }
       return {
         ...state,
-        cart: state.cart.map(i => getCartItemKey(i) === key ? { ...i, quantity: qty } : i),
+        cart: state.cart.map(i => getCartItemKey(i) === key ? { ...i, quantity: normalizeMenuQuantity(qty, i) } : i),
       }
     }
 

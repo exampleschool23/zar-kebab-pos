@@ -22,6 +22,12 @@ import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../li
 import { isWaiterMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
 import { DEFAULT_PRICE_MODE, getMenuItemForPriceMode, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { canEditFeature } from '../lib/permissions'
+import {
+  changeMenuQuantity,
+  formatMenuQuantity,
+  isMenuItemSoldByWeight,
+  normalizeMenuQuantity,
+} from '../lib/menuSaleUnits'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
 function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, canEditOrder, onPrintKitchenCheck }) {
@@ -162,6 +168,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
         menuItemId: item.menu_item_id,
         sourceItemIds: item.source_item_ids || item.sourceItemIds || [],
         qty,
+        sale_unit: item.sale_unit || menuItemMap?.[item.menu_item_id]?.sale_unit || 'piece',
       },
     })
     if (result?.error) {
@@ -179,6 +186,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     const missing = !menuItem || menuItem.available === false
     const updating = updatingItemId === itemKey
     const quantity = Number(item.quantity) || 1
+    const quantitySource = { ...menuItem, sale_unit: item.sale_unit || menuItem?.sale_unit }
     return (
       <div className="flex items-center gap-2 rounded-xl bg-white/75 px-3 py-2">
         <div className="min-w-0 flex-1">
@@ -187,24 +195,24 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
             <p key={`${itemKey}-option-${index}`} className="truncate text-[11px] font-black text-[#111827]">{line}</p>
           ))}
           <p className="text-[10px] font-bold text-[#9CA3AF]">
-            ×{quantity}
+            {isMenuItemSoldByWeight(quantitySource) ? formatMenuQuantity(quantity, quantitySource) : `×${formatMenuQuantity(quantity, quantitySource)}`}
             {missing ? ` · ${l.missingItem}` : ''}
           </p>
         </div>
         <div className="flex h-9 flex-shrink-0 items-center gap-1 rounded-lg border border-orange-100 bg-white p-1">
           <button
             type="button"
-            onClick={() => handleUpdateItemQty(item, quantity - 1)}
+            onClick={() => handleUpdateItemQty(item, changeMenuQuantity(quantity, quantitySource, -1))}
             disabled={!!updatingItemId}
             title={l.decreaseItem}
             className="flex h-7 w-7 items-center justify-center rounded-md border border-red-100 bg-red-50 text-red-600 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
           >
             {updating ? <Loader2 size={12} className="animate-spin" /> : <Minus size={12} />}
           </button>
-          <span className="min-w-6 text-center text-[12px] font-black tabular-nums text-[#1F2937]">{quantity}</span>
+          <span className="min-w-6 text-center text-[12px] font-black tabular-nums text-[#1F2937]">{formatMenuQuantity(quantity, quantitySource)}</span>
           <button
             type="button"
-            onClick={() => handleUpdateItemQty(item, quantity + 1)}
+            onClick={() => handleUpdateItemQty(item, changeMenuQuantity(quantity, quantitySource, 1))}
             disabled={!!updatingItemId}
             title={l.increaseItem}
             className="flex h-7 w-7 items-center justify-center rounded-md bg-[#ff5a00] text-white transition-colors hover:bg-[#cc4800] disabled:cursor-wait disabled:opacity-50"
@@ -791,7 +799,7 @@ export default function WaiterOrder() {
 
   function handleAdd(item, animation) {
     if (isSendingOrder || !canEditTables) return
-    if (menuItemRequiresOptions(item)) {
+    if (menuItemRequiresOptions(item) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -801,7 +809,7 @@ export default function WaiterOrder() {
 
   function handleIncrement(item, animation) {
     if (isSendingOrder || !canEditTables) return
-    if (menuItemRequiresOptions(item)) {
+    if (menuItemRequiresOptions(item) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -811,7 +819,7 @@ export default function WaiterOrder() {
 
   function handleDecrement(item) {
     if (isSendingOrder || !canEditTables) return
-    if (menuItemRequiresOptions(item)) {
+    if (menuItemRequiresOptions(item) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -858,7 +866,7 @@ export default function WaiterOrder() {
         type: 'ADD_TO_CART',
         payload: {
           ...payload,
-          quantity: Math.max(1, Number(qty) || 1),
+          quantity: normalizeMenuQuantity(qty, item),
           notes: notes || '',
         },
       })
@@ -883,7 +891,7 @@ export default function WaiterOrder() {
         },
       })
     }
-    dispatch({ type: 'UPDATE_CART_QTY', payload: { cart_item_key: cartItemKey, qty } })
+    dispatch({ type: 'UPDATE_CART_QTY', payload: { cart_item_key: cartItemKey, qty: normalizeMenuQuantity(qty, item) } })
     dispatch({ type: 'UPDATE_CART_NOTES', payload: { cart_item_key: cartItemKey, notes: notes || '' } })
     setDetailItem(null)
   }
@@ -915,6 +923,7 @@ export default function WaiterOrder() {
       base_price: basePrice,
       unit_price: unitPrice,
       price_mode: pricedItem.price_mode,
+      sale_unit: pricedItem.sale_unit || pricedItem.saleUnit || 'piece',
       selected_options: hasSelectedOptions ? selectedOptions : {},
     }
   }

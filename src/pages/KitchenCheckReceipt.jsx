@@ -13,6 +13,7 @@ import {
 import { loadKitchenCheckOrder } from '../lib/db'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 import { useAppDataStatus } from '../store/appHooks'
+import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 
 const PRINT_CSS = `
 @page {
@@ -155,7 +156,10 @@ function KitchenCheckPaper({ group }) {
       <div>
         {(group?.items || []).map(item => (
           <div key={item.id || `${item.menu_item_id}-${item.name}`} style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 900 }}>
-            {Number(item.quantity) || 1} × {kitchenItemName(item)}
+            {isMenuItemSoldByWeight(item)
+              ? `${formatMenuQuantity(item.quantity, item)} · `
+              : `${formatMenuQuantity(item.quantity, item)} × `}
+            {kitchenItemName(item)}
             {item.notes && (
               <div style={{ margin: '3px 0 0 28px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase' }}>
                 {item.notes}

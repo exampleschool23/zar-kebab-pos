@@ -139,6 +139,29 @@ test('daily bazaar filters history by inclusive dates, product search, category,
   assert.deepEqual(filterBazaarPurchases(rows, { paymentMethod: 'card' }).map(row => row.id), ['two'])
 })
 
+test('daily bazaar product search shows only matching lines and their subtotal', () => {
+  const mixedReceipt = purchase('mixed', '2026-07-10', 'cash', 'Mavtuna', [
+    { product_name: 'Frozen meat', category: 'meat', quantity: 10, unit: 'kg', line_total: 900_000 },
+    { product_name: 'Charvi', category: 'meat', quantity: 5, unit: 'kg', line_total: 150_000 },
+    { product_name: 'Oil', category: 'grocery', quantity: 2, unit: 'l', line_total: 60_000 },
+  ], {
+    buyer_name: 'Ali',
+    created_by_name: 'Dilja',
+    notes: 'Morning bazaar',
+  })
+
+  assert.deepEqual(
+    getBazaarPurchaseScopedItems(mixedReceipt, 'all', 'charvi').map(item => item.product_name),
+    ['Charvi'],
+  )
+  assert.equal(getBazaarPurchaseScopedTotal(mixedReceipt, 'all', 'charvi'), 150_000)
+  assert.deepEqual(
+    getBazaarPurchaseScopedItems(mixedReceipt, 'meat', 'ali').map(item => item.product_name),
+    ['Frozen meat', 'Charvi'],
+  )
+  assert.deepEqual(filterBazaarPurchases([mixedReceipt], { category: 'grocery', query: 'charvi' }), [])
+})
+
 test('daily bazaar analytics reconcile spend and normalize grams/millilitres without mixing units', () => {
   const rows = [
     purchase('one', '2026-07-10', 'cash', 'Mavtuna', [

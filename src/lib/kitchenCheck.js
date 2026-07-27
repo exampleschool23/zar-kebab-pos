@@ -1,4 +1,5 @@
 import { formatTime } from './dateFormat.js'
+import { formatMenuQuantity, isMenuItemSoldByWeight } from './menuSaleUnits.js'
 
 const CANCELLED_STATUS = 'cancelled'
 const DEFAULT_TITLE = 'ЧЕК ДЛЯ КУХНИ'
@@ -133,7 +134,7 @@ export function buildKitchenCheckHtml({ group, lang = 'en', restaurantName = 'Za
 
   const rows = (group?.items || []).map(item => `
     <div class="item">
-      ${escapeHtml(item.quantity || 1)} × ${escapeHtml(kitchenItemName(item))}
+      ${escapeHtml(formatMenuQuantity(item.quantity, item))}${isMenuItemSoldByWeight(item) ? ' ·' : ' ×'} ${escapeHtml(kitchenItemName(item))}
       ${item.notes ? `<div class="notes">${escapeHtml(item.notes)}</div>` : ''}
     </div>
   `).join('')

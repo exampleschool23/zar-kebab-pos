@@ -11,3 +11,18 @@ export function compareSalaryTransactionsNewestFirst(a, b) {
 
   return String(b?.id || '').localeCompare(String(a?.id || ''))
 }
+
+export function compareSalaryAbsencesNewestFirst(a, b) {
+  return compareSalaryTransactionsNewestFirst(
+    {
+      id: a?.id,
+      date: a?.absence_date,
+      createdAt: a?.created_at,
+    },
+    {
+      id: b?.id,
+      date: b?.absence_date,
+      createdAt: b?.created_at,
+    }
+  )
+}

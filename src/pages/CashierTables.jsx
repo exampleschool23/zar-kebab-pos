@@ -31,6 +31,7 @@ import { getOrderItemOptionLines } from '../components/MenuProductCards'
 import { useAppDataStatus } from '../store/appHooks'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { getOrdersNetProfit, getSaleProfitSummary, hasOrdersCostCoverage } from '../lib/profit'
+import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -381,6 +382,10 @@ function BillCard({
             const displayName = getCashierItemName(item, mi, lang)
             const optionLines = getOrderItemOptionLines(item, mi, lang)
             const lineTotal = getOrderItemUnitPrice(item) * (Number(item.quantity) || 1)
+            const quantitySource = { ...mi, sale_unit: item.sale_unit || mi?.sale_unit }
+            const quantityLabel = isMenuItemSoldByWeight(quantitySource)
+              ? formatMenuQuantity(item.quantity, quantitySource)
+              : `×${formatMenuQuantity(item.quantity, quantitySource)}`
             return (
               <div key={i} className="flex items-center gap-3">
                 {mi?.image_url ? (
@@ -400,7 +405,7 @@ function BillCard({
                     <p key={`${item.id || i}-option-${index}`} className="truncate text-[11px] font-black text-[#111827]">{line}</p>
                   ))}
                 </div>
-                <span className="text-[12px] text-[#9CA3AF] flex-shrink-0 w-8 text-center">×{item.quantity}</span>
+                <span className="min-w-8 flex-shrink-0 text-center text-[12px] text-[#9CA3AF]">{quantityLabel}</span>
                 <span className="text-[13px] font-semibold text-[#1F2937] flex-shrink-0 w-24 text-right">
                   {formatCurrency(lineTotal)}
                 </span>

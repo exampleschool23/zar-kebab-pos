@@ -9,6 +9,13 @@ import { ORDER_TYPE_LABELS, isOffPremiseOrderType, orderTypeLabel } from '../lib
 import { DEFAULT_PRICE_MODE, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { isWriteTimeoutError } from '../lib/writeTimeout'
 import { getManualOrderNotes, getOrderItemOptionLines } from './MenuProductCards'
+import {
+  changeMenuQuantity,
+  formatMenuQuantity,
+  isMenuItemSoldByWeight,
+  menuQuantityStep,
+  normalizeMenuQuantity,
+} from '../lib/menuSaleUnits'
 
 const ORDER_TYPES = [
   { key: 'dine_in', ...ORDER_TYPE_LABELS.dine_in },
@@ -43,6 +50,7 @@ function cartSubmissionFingerprint(cart, orderType, priceMode) {
     basePrice: Number(item.base_price) || 0,
     unitPrice: Number(item.unit_price) || 0,
     selectedOptions: item.selected_options || item.selectedOptions || {},
+    saleUnit: item.sale_unit || item.saleUnit || 'piece',
   })).sort((a, b) => String(a.key).localeCompare(String(b.key)))
   return JSON.stringify({ orderType, priceMode, items })
 }
@@ -56,15 +64,17 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
   const optionLines = getOrderItemOptionLines(item, menuItem, lang)
   const notesValue = getManualOrderNotes(item, menuItem, lang)
   const displayName = menuItem ? getItemName(menuItem, lang) : item.name
+  const quantitySource = { ...menuItem, sale_unit: item.sale_unit || menuItem?.sale_unit }
+  const soldByWeight = isMenuItemSoldByWeight(quantitySource)
 
   function decrement() {
-    const qty = item.quantity - 1
+    const qty = changeMenuQuantity(item.quantity, quantitySource, -1)
     if (qty <= 0) dispatch({ type: 'REMOVE_FROM_CART', payload: cartItemKey })
     else dispatch({ type: 'UPDATE_CART_QTY', payload: { cart_item_key: cartItemKey, qty } })
   }
 
   function increment() {
-    dispatch({ type: 'UPDATE_CART_QTY', payload: { cart_item_key: cartItemKey, qty: item.quantity + 1 } })
+    dispatch({ type: 'UPDATE_CART_QTY', payload: { cart_item_key: cartItemKey, qty: changeMenuQuantity(item.quantity, quantitySource, 1) } })
   }
 
   return (
@@ -130,9 +140,27 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
             >
               <Minus size={13} className="text-[#6B7280]" />
             </button>
-            <span className="font-black text-[17px] text-[#1F2937] min-w-[22px] text-center leading-none">
-              {item.quantity}
-            </span>
+            {soldByWeight ? (
+              <label className="flex min-w-[84px] items-center justify-center gap-1">
+                <input
+                  type="number"
+                  min={menuQuantityStep(quantitySource)}
+                  step={menuQuantityStep(quantitySource)}
+                  value={item.quantity}
+                  onChange={event => dispatch({
+                    type: 'UPDATE_CART_QTY',
+                    payload: { cart_item_key: cartItemKey, qty: normalizeMenuQuantity(event.target.value, quantitySource) },
+                  })}
+                  className="w-14 bg-transparent text-center text-[17px] font-black leading-none text-[#1F2937] tabular-nums outline-none"
+                  aria-label={lang === 'ru' ? 'Вес (кг)' : lang === 'uz' ? 'Og‘irligi (kg)' : 'Weight (kg)'}
+                />
+                <span className="text-[11px] font-black text-[#64748B]">kg</span>
+              </label>
+            ) : (
+              <span className="min-w-[22px] text-center text-[17px] font-black leading-none text-[#1F2937]">
+                {formatMenuQuantity(item.quantity, quantitySource)}
+              </span>
+            )}
             <button
               onClick={increment}
               className="w-9 h-9 rounded-lg bg-[#ff5a00] flex items-center justify-center hover:bg-[#cc4800] active:scale-90 transition-all shadow-sm"
@@ -189,7 +217,7 @@ export default function CartPanel({
   const subtotal  = payment.subtotal
   const service   = payment.serviceFee
   const total     = payment.total
-  const itemCount = cart.reduce((s, i) => s + i.quantity, 0)
+  const itemCount = cart.length
 
   async function handleSend() {
     if (cart.length === 0 || isSending) return

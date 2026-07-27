@@ -22,6 +22,7 @@ import {
 import { collectPagedRows, loadActiveOrders, loadPaidOrdersForRange } from './orderHistory.js'
 import { getRequiredMenuItemCost } from './menuItemCosts.js'
 import { trimMenuItemTextFields } from './menuItemText.js'
+import { normalizeMenuQuantity, normalizeMenuSaleUnit } from './menuSaleUnits.js'
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ function isMissingOptionalOrderTypeColumn(error) {
       message.includes('price_mode') ||
       message.includes('base_price') ||
       message.includes('unit_price') ||
+      message.includes('sale_unit') ||
       message.includes('selected_options') ||
       message.includes('opened_by') ||
       message.includes('opened_by_name') ||
@@ -225,7 +227,8 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, ite
       base_price: getOrderItemBasePrice(i),
       unit_price: getOrderItemUnitPrice(i),
       price_mode: normalizePriceMode(i.price_mode || priceMode),
-      quantity: Number(i.quantity) || 1,
+      quantity: normalizeMenuQuantity(i.quantity, i),
+      sale_unit: normalizeMenuSaleUnit(i.sale_unit || i.saleUnit),
       notes: i.notes || '',
       selected_options: i.selected_options || i.selectedOptions || {},
       status: 'new',
@@ -700,7 +703,8 @@ export async function writeToSupabase(action, state, options = {}) {
         base_price:   getOrderItemBasePrice(i),
         unit_price:   getOrderItemUnitPrice(i),
         price_mode:   normalizePriceMode(i.price_mode || priceMode),
-        quantity:     i.quantity,
+        quantity:     normalizeMenuQuantity(i.quantity, i),
+        sale_unit:    normalizeMenuSaleUnit(i.sale_unit || i.saleUnit),
         notes:        i.notes || '',
         selected_options: i.selected_options || i.selectedOptions || {},
         status:       'new',
@@ -713,7 +717,7 @@ export async function writeToSupabase(action, state, options = {}) {
         .insert(rows)
         .select('*'), options.signal)
       if (itemInsertError && isMissingOptionalOrderTypeColumn(itemInsertError)) {
-        const fallbackRows = rows.map(({ order_type, kitchen_round_id, submitted_at, base_price, unit_price, price_mode, selected_options, ...row }) => row)
+        const fallbackRows = rows.map(({ order_type, kitchen_round_id, submitted_at, base_price, unit_price, price_mode, selected_options, sale_unit, ...row }) => row)
         ;({ data: insertedItems, error: itemInsertError } = await withAbortSignal(supabase
           .from('order_items')
           .insert(fallbackRows)
@@ -1056,7 +1060,8 @@ export async function writeToSupabase(action, state, options = {}) {
     case 'UPDATE_BILL_ITEM_QTY': {
       const { tableId, orderId, orderItemId, menuItemId, qty } = action.payload
       const sourceItemIds = new Set(action.payload.sourceItemIds || [])
-      const nextQty = Math.max(0, Number(qty) || 0)
+      const rawQty = Number(qty) || 0
+      const nextQty = rawQty <= 0 ? 0 : normalizeMenuQuantity(rawQty, action.payload)
       if ((!tableId && !orderId) || (!orderItemId && !menuItemId)) return
 
       let query = supabase

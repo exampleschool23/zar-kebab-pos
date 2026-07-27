@@ -8,7 +8,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate, formatTime } from '../lib/dateFormat'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
-import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
+import { compareSalaryAbsencesNewestFirst, compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
 import {
   expensePaymentMethodLabel,
   getDailySalaryAmount,
@@ -42,7 +42,9 @@ function composeEmployees(rows = [], rates = [], payments = [], bonuses = [], fi
     payments: payments.filter(payment => payment.salary_profile_id === row.id),
     bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
     fines: fines.filter(fine => fine.salary_profile_id === row.id),
-    absences: absences.filter(absence => absence.salary_profile_id === row.id),
+    absences: absences
+      .filter(absence => absence.salary_profile_id === row.id)
+      .sort(compareSalaryAbsencesNewestFirst),
   }))
 }
 

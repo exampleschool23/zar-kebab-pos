@@ -894,6 +894,7 @@ export default function DailyBazaar() {
                   confirmDeleteId={confirmDeleteId}
                   deletingId={deletingId}
                   categoryFilter={categoryFilter}
+                  query={query}
                   onPage={setHistoryPage}
                   onEdit={beginEdit}
                   onDelete={deletePurchase}
@@ -1193,6 +1194,7 @@ function BazaarHistory({
   confirmDeleteId,
   deletingId,
   categoryFilter,
+  query,
   onPage,
   onEdit,
   onDelete,
@@ -1224,8 +1226,8 @@ function BazaarHistory({
             </thead>
             <tbody>
               {purchases.flatMap(purchase => {
-                const items = getBazaarPurchaseScopedItems(purchase, categoryFilter)
-                const total = getBazaarPurchaseScopedTotal(purchase, categoryFilter)
+                const items = getBazaarPurchaseScopedItems(purchase, categoryFilter, query)
+                const total = getBazaarPurchaseScopedTotal(purchase, categoryFilter, query)
                 const MethodIcon = methodIcon(purchase.payment_method)
                 return items.map((item, index) => {
                   const first = index === 0

@@ -181,16 +181,39 @@ export function getBazaarPurchaseTotal(purchase = {}) {
   return itemTotal > 0 ? itemTotal : normalizeBazaarMoney(purchase.total_amount)
 }
 
-export function getBazaarPurchaseScopedItems(purchase = {}, category = 'all') {
-  const items = normalizeBazaarPurchase(purchase).items
-  return category && category !== 'all'
-    ? items.filter(item => item.category === category)
-    : items
+function bazaarPurchaseHeaderSearchText(purchase) {
+  return [
+    purchase.buyer_name,
+    purchase.notes,
+    purchase.created_by_name,
+  ].join(' ').toLocaleLowerCase()
 }
 
-export function getBazaarPurchaseScopedTotal(purchase = {}, category = 'all') {
-  if (!category || category === 'all') return getBazaarPurchaseTotal(purchase)
-  return calculateBazaarTotal(getBazaarPurchaseScopedItems(purchase, category))
+function bazaarItemSearchText(item) {
+  return [
+    item.product_name,
+    item.product_key,
+    item.notes,
+  ].join(' ').toLocaleLowerCase()
+}
+
+export function getBazaarPurchaseScopedItems(purchase = {}, category = 'all', query = '') {
+  const normalized = normalizeBazaarPurchase(purchase)
+  const categoryItems = category && category !== 'all'
+    ? normalized.items.filter(item => item.category === category)
+    : normalized.items
+  const normalizedQuery = normalizeBazaarText(query).toLocaleLowerCase()
+
+  if (!normalizedQuery || bazaarPurchaseHeaderSearchText(normalized).includes(normalizedQuery)) {
+    return categoryItems
+  }
+
+  return categoryItems.filter(item => bazaarItemSearchText(item).includes(normalizedQuery))
+}
+
+export function getBazaarPurchaseScopedTotal(purchase = {}, category = 'all', query = '') {
+  if ((!category || category === 'all') && !normalizeBazaarText(query)) return getBazaarPurchaseTotal(purchase)
+  return calculateBazaarTotal(getBazaarPurchaseScopedItems(purchase, category, query))
 }
 
 export function getBazaarSubmissionAttempt(previousAttempt, payload, createRequestKey) {
@@ -315,16 +338,6 @@ export function bazaarRangeDayCount(dateFrom, dateTo) {
   return end - start + 1
 }
 
-function purchaseSearchText(purchase) {
-  const normalized = normalizeBazaarPurchase(purchase)
-  return [
-    normalized.buyer_name,
-    normalized.notes,
-    normalized.created_by_name,
-    ...normalized.items.flatMap(item => [item.product_name, item.product_key, item.notes]),
-  ].join(' ').toLocaleLowerCase()
-}
-
 export function filterBazaarPurchases(purchases = [], filters = {}) {
   const query = normalizeBazaarText(filters.query).toLocaleLowerCase()
   const dateFrom = normalizeBazaarDate(filters.dateFrom)
@@ -335,9 +348,11 @@ export function filterBazaarPurchases(purchases = [], filters = {}) {
       if (dateFrom && purchase.purchase_date < dateFrom) return false
       if (dateTo && purchase.purchase_date > dateTo) return false
       if (filters.paymentMethod && filters.paymentMethod !== 'all' && purchase.payment_method !== filters.paymentMethod) return false
-      if (filters.category && filters.category !== 'all' && !purchase.items.some(item => item.category === filters.category)) return false
       if (filters.buyer && !normalizeBazaarText(purchase.buyer_name).toLocaleLowerCase().includes(normalizeBazaarText(filters.buyer).toLocaleLowerCase())) return false
-      return !query || purchaseSearchText(purchase).includes(query)
+      if ((filters.category && filters.category !== 'all') || query) {
+        return getBazaarPurchaseScopedItems(purchase, filters.category, query).length > 0
+      }
+      return true
     })
     .sort((a, b) => b.purchase_date.localeCompare(a.purchase_date) || String(b.created_at || '').localeCompare(String(a.created_at || '')))
 }

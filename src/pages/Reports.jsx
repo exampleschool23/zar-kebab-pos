@@ -35,6 +35,7 @@ import {
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
 import { canChangeCompletedOrderPaymentMethod, canDeletePaidOrders, canViewPage } from '../lib/permissions'
@@ -1325,7 +1326,9 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
                     )}
                     {item.notes && <p className="text-[11px] text-[#9CA3AF]">{item.notes}</p>}
                     <p className="text-[11px] text-[#6B7280] mt-0.5">
-                      {lang === 'uz' ? 'Dona' : lang === 'ru' ? 'Кол' : 'Qty'} {item.quantity} × {formatCurrency(getOrderItemUnitPrice(item))}
+                      {isMenuItemSoldByWeight(item)
+                        ? `${formatMenuQuantity(item.quantity, item)} · ${formatCurrency(getOrderItemUnitPrice(item))} / kg`
+                        : `${lang === 'uz' ? 'Dona' : lang === 'ru' ? 'Кол' : 'Qty'} ${formatMenuQuantity(item.quantity, item)} × ${formatCurrency(getOrderItemUnitPrice(item))}`}
                     </p>
                   </div>
                   <p className="font-bold text-sm text-[#1F2937] flex-shrink-0">

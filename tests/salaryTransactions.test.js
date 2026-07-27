@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { compareSalaryTransactionsNewestFirst } from '../src/lib/salaryTransactions.js'
+import {
+  compareSalaryAbsencesNewestFirst,
+  compareSalaryTransactionsNewestFirst,
+} from '../src/lib/salaryTransactions.js'
 
 test('salary payments bonuses and fines sort by date then newest recorded time', () => {
   const rows = [
@@ -26,5 +29,20 @@ test('salary transaction ordering remains deterministic when timestamps are miss
   assert.deepEqual(
     rows.sort(compareSalaryTransactionsNewestFirst).map(row => row.id),
     ['b', 'c', 'a']
+  )
+})
+
+test('salary absences sort by newest absence date regardless of database row order', () => {
+  const rows = [
+    { id: 'june-20', absence_date: '2026-06-20' },
+    { id: 'june-28', absence_date: '2026-06-28' },
+    { id: 'july-24', absence_date: '2026-07-24' },
+    { id: 'july-25', absence_date: '2026-07-25' },
+    { id: 'july-26', absence_date: '2026-07-26' },
+  ]
+
+  assert.deepEqual(
+    rows.sort(compareSalaryAbsencesNewestFirst).map(row => row.id),
+    ['july-26', 'july-25', 'july-24', 'june-28', 'june-20']
   )
 })

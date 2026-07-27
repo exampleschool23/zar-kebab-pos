@@ -21,6 +21,12 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
+import {
+  changeMenuQuantity,
+  formatMenuQuantity,
+  isMenuItemSoldByWeight,
+  menuPriceUnitSuffix,
+} from '../lib/menuSaleUnits'
 import MenuMedia from '../components/MenuMedia'
 import {
   getStoredTelegramSession,
@@ -248,6 +254,7 @@ function ProductCard({ item, lang, quantity, onAdd, onIncrement, onDecrement }) 
   const millilitres = millilitresLabel(item, lang)
   const kcal = kcalLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const quantityLabel = formatMenuQuantity(quantity, item)
   return (
     <article className="overflow-hidden rounded-[8px] border border-[#E8DED2] bg-white shadow-sm">
       <div className="aspect-square">
@@ -280,7 +287,7 @@ function ProductCard({ item, lang, quantity, onAdd, onIncrement, onDecrement }) 
             <p className="text-[12px] font-bold text-[#8B9388] line-through">{formatCurrency(pricing.oldPrice)}</p>
           )}
           <p className={`${pricing.discounted ? 'text-red-600' : 'text-[#FF5A00]'} text-[16px] font-black`}>
-            {formatCurrency(pricing.price)}
+            {formatCurrency(pricing.price)}{menuPriceUnitSuffix(item, lang)}
           </p>
         </div>
         {quantity > 0 ? (
@@ -288,7 +295,7 @@ function ProductCard({ item, lang, quantity, onAdd, onIncrement, onDecrement }) 
             <button onClick={() => onDecrement(item)} className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-white text-[#6F766D] shadow-sm">
               <Minus size={16} />
             </button>
-            <span className="text-lg font-black text-[#FF5A00]">{quantity}</span>
+            <span className="text-lg font-black text-[#FF5A00]">{quantityLabel}</span>
             <button onClick={() => onIncrement(item)} className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#FF5A00] text-white">
               <Plus size={16} />
             </button>
@@ -339,7 +346,7 @@ function MenuView({ categories, items, cart, lang, onAdd, onIncrement, onDecreme
     return categoryOk && searchOk
   })
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const count = cart.reduce((sum, item) => sum + item.quantity, 0)
+  const count = cart.length
 
   return (
     <>
@@ -411,7 +418,11 @@ function CheckoutView({ cart, onBack, onSubmit, submitting, loyalty, onLoyaltyCh
           <div key={item.menuItemId} className="flex items-center justify-between rounded-[8px] border border-[#E8DED2] bg-white p-3">
             <div>
               <p className="font-black text-[#1E2B24]">{item.name}</p>
-              <p className="text-sm font-semibold text-[#8B9388]">{item.quantity} x {formatCurrency(item.price)}</p>
+              <p className="text-sm font-semibold text-[#8B9388]">
+                {isMenuItemSoldByWeight(item)
+                  ? `${formatMenuQuantity(item.quantity, item)} · ${formatCurrency(item.price)}${menuPriceUnitSuffix(item, lang)}`
+                  : `${formatMenuQuantity(item.quantity, item)} x ${formatCurrency(item.price)}`}
+              </p>
             </div>
             <p className="font-black text-[#FF5A00]">{formatCurrency(item.quantity * item.price)}</p>
           </div>
@@ -628,15 +639,25 @@ export default function TelegramMiniApp() {
     const name = getItemName(item, lang)
     setCart(prev => {
       const existing = prev.find(row => row.menuItemId === item.id)
-      if (existing) return prev.map(row => row.menuItemId === item.id ? { ...row, quantity: row.quantity + 1 } : row)
-      return [...prev, { menuItemId: item.id, name, price: Number(item.price) || 0, quantity: 1, notes: '' }]
+      if (existing) return prev.map(row => row.menuItemId === item.id
+        ? { ...row, quantity: changeMenuQuantity(row.quantity, row, 1) }
+        : row)
+      return [...prev, {
+        menuItemId: item.id,
+        name,
+        price: Number(item.price) || 0,
+        quantity: 1,
+        sale_unit: item.sale_unit || 'piece',
+        notes: '',
+      }]
     })
   }
 
   function decrementItem(item) {
     setCart(prev => prev.flatMap(row => {
       if (row.menuItemId !== item.id) return [row]
-      return row.quantity <= 1 ? [] : [{ ...row, quantity: row.quantity - 1 }]
+      const nextQuantity = changeMenuQuantity(row.quantity, row, -1)
+      return nextQuantity <= 0 ? [] : [{ ...row, quantity: nextQuantity }]
     }))
   }
 
@@ -703,7 +724,7 @@ export default function TelegramMiniApp() {
     )
   }
 
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+  const cartCount = cart.length
 
   return (
     <div className="min-h-screen bg-[#FBF6EE] text-[#1E2B24]">

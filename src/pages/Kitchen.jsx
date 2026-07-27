@@ -15,6 +15,7 @@ import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { ORDER_TYPE_LABELS, inferOrderType, isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 import { formatElapsedSince, parseInstantDate } from '../lib/dateFormat'
+import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_BADGE = {
@@ -228,6 +229,10 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
   const title = menuItem
     ? (menuItem[`name_${lang}`] || menuItem.name_en || menuItem.name_uz || item.name)
     : item.name
+  const quantitySource = { ...menuItem, sale_unit: item.sale_unit || menuItem?.sale_unit }
+  const quantityLabel = isMenuItemSoldByWeight(quantitySource)
+    ? formatMenuQuantity(item.quantity, quantitySource)
+    : `×${formatMenuQuantity(item.quantity, quantitySource)}`
 
   const desc = menuItem
     ? (menuItem[`description_${lang}`] || menuItem.description_en || menuItem.description_uz || '')
@@ -263,7 +268,7 @@ function KitchenItem({ item, orderId, menuItem, lang, onMark, pending, error }) 
       <div className="flex-1 min-w-0">
         {/* Qty + status badge row */}
         <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="font-black text-sm text-[#ff5a00]">×{item.quantity}</span>
+          <span className="font-black text-sm text-[#ff5a00]">{quantityLabel}</span>
           <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-300 ${STATUS_BADGE[item.status] || STATUS_BADGE.new}`}>
             {statusLabel(item.status, lang)}
           </span>

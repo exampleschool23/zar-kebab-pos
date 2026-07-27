@@ -42,6 +42,13 @@ import {
   normalizeMenuMediaUrls,
 } from '../lib/menuMedia'
 import { trimMenuItemTextFields, trimMenuItemTextValue } from '../lib/menuItemText'
+import {
+  MENU_SALE_UNIT_KG,
+  MENU_SALE_UNIT_PIECE,
+  menuPriceUnitSuffix,
+  menuSaleUnitLabel,
+  normalizeMenuSaleUnit,
+} from '../lib/menuSaleUnits'
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -225,6 +232,7 @@ function ProfitMarginPreview({ price, cost, lang, inheritedCost = false }) {
 }
 
 function PricingFields({ form, setF, lang, compact = false, costRequired = false }) {
+  const priceUnit = menuPriceUnitSuffix(form.sale_unit, lang)
   const labels = lang === 'uz'
     ? {
         title: 'Narx va foyda',
@@ -270,10 +278,10 @@ function PricingFields({ form, setF, lang, compact = false, costRequired = false
         </span>
       </div>
       <div className={`grid gap-3 ${compact ? 'sm:grid-cols-1' : 'sm:grid-cols-3'}`}>
-        <MoneyField label={`${labels.current} (UZS)`} value={form.price} onChange={setF('price')} placeholder="35000" />
+        <MoneyField label={`${labels.current} (UZS${priceUnit})`} value={form.price} onChange={setF('price')} placeholder="35000" />
         <MoneyField label={`${labels.old} (UZS)`} value={form.old_price} onChange={setF('old_price')} placeholder="40000" />
         <MoneyField
-          label={`${labels.cost} (UZS)${costRequired ? ' *' : ''}`}
+          label={`${labels.cost} (UZS${priceUnit})${costRequired ? ' *' : ''}`}
           value={form.cost_price}
           onChange={setF('cost_price')}
           placeholder="18000"
@@ -298,6 +306,28 @@ function PricingFields({ form, setF, lang, compact = false, costRequired = false
       </div>
       <p className="mt-3 text-[11px] font-semibold leading-5 text-emerald-800/75">{labels.hint}</p>
     </div>
+  )
+}
+
+function SaleUnitField({ value, onChange, lang }) {
+  const label = lang === 'uz' ? 'Sotish birligi' : lang === 'ru' ? 'Единица продажи' : 'Sold by'
+  const hint = normalizeMenuSaleUnit(value) === MENU_SALE_UNIT_KG
+    ? (lang === 'uz' ? 'Narx va tannarx 1 kg uchun. Ofitsiant vaznni o‘nlik son bilan kiritadi.' : lang === 'ru' ? 'Цена и себестоимость указаны за 1 кг. Официант вводит вес дробным числом.' : 'Price and real cost are per 1 kg. The waiter enters a decimal weight.')
+    : (lang === 'uz' ? 'Miqdor faqat butun dona bilan kiritiladi.' : lang === 'ru' ? 'Количество вводится только целыми штуками.' : 'Quantity is entered in whole items.')
+
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-semibold text-gray-500">{label}</span>
+      <select
+        value={normalizeMenuSaleUnit(value)}
+        onChange={onChange}
+        className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm font-semibold outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/20"
+      >
+        <option value={MENU_SALE_UNIT_PIECE}>{menuSaleUnitLabel(MENU_SALE_UNIT_PIECE, lang)}</option>
+        <option value={MENU_SALE_UNIT_KG}>{menuSaleUnitLabel(MENU_SALE_UNIT_KG, lang)}</option>
+      </select>
+      <span className="mt-1.5 block text-[11px] font-semibold leading-4 text-gray-400">{hint}</span>
+    </label>
   )
 }
 
@@ -624,7 +654,7 @@ function MenuPrice({ item, size = 'base', align = 'left' }) {
         <span className={`${oldSize} font-bold text-[#9CA3AF] line-through`}>{formatCurrency(pricing.oldPrice)}</span>
       )}
       <span className={`${currentSize} font-black ${pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'}`}>
-        {formatCurrency(pricing.price)}
+        {formatCurrency(pricing.price)}{menuPriceUnitSuffix(item)}
       </span>
     </div>
   )
@@ -1073,7 +1103,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  external_id: '', price: '', old_price: '', cost_price: '', variant_costs: {}, grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', media_urls: [], available: true, sort_order: '',
+  external_id: '', price: '', old_price: '', cost_price: '', variant_costs: {}, sale_unit: MENU_SALE_UNIT_PIECE, grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', media_urls: [], available: true, sort_order: '',
   option_groups: [],
   option_groups_editor: [],
   show_in_cashier_quick_items: false,
@@ -1331,6 +1361,7 @@ function menuItemToProductForm(i) {
     ...i,
     ...normalizedText,
     cost_price: i.cost_price ?? i.costPrice ?? '',
+    sale_unit: normalizeMenuSaleUnit(i.sale_unit ?? i.saleUnit),
     millilitres: i.millilitres ?? i.milliliters ?? (Number(i.litres ?? i.liters) > 0 ? Math.round(Number(i.litres ?? i.liters) * 1000) : ''),
     stock_count: i.stock_count ?? i.stockCount ?? 0,
     sort_order: i.sort_order ?? 0,
@@ -1368,6 +1399,7 @@ function getItemFormFingerprint(form = {}) {
     old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
     cost_price: Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
     variant_costs: editorToVariantCosts(form.option_groups_editor),
+    sale_unit: normalizeMenuSaleUnit(form.sale_unit),
     grams: Math.max(0, Math.round(Number(form.grams) || 0)),
     millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
     kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
@@ -1657,6 +1689,7 @@ export default function AdminMenu() {
             ? requiredCost
             : Math.max(0, Math.round(numberFromMoneyInput(form.cost_price))),
           variant_costs: editorToVariantCosts(form.option_groups_editor),
+          sale_unit: normalizeMenuSaleUnit(form.sale_unit),
           grams: Math.max(0, Math.round(Number(form.grams) || 0)),
           millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
           kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
@@ -1988,6 +2021,7 @@ export default function AdminMenu() {
                       lang={lang}
                       entityId={form.id}
                     />
+                    <SaleUnitField value={form.sale_unit} onChange={setF('sale_unit')} lang={lang} />
                     <div className="grid grid-cols-2 gap-3">
                       <Field label={t(lang, 'sortOrder')} type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
                       <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
@@ -2663,6 +2697,7 @@ export default function AdminMenu() {
               parentCost={form.cost_price}
             />
             <PricingFields form={form} setF={setF} lang={lang} compact costRequired={itemModal === 'new'} />
+            <SaleUnitField value={form.sale_unit} onChange={setF('sale_unit')} lang={lang} />
             <Field label={`${t(lang, 'gramsLabel')} (${t(lang, 'grams')})`} type="number" value={form.grams} onChange={setF('grams')} placeholder="250" />
             <Field label={`${t(lang, 'millilitresLabel')} (${t(lang, 'millilitres')})`} type="number" value={form.millilitres} onChange={setF('millilitres')} placeholder="500" />
             <Field label={`${t(lang, 'kcalLabel')} (${t(lang, 'kcal')})`} type="number" value={form.kcal} onChange={setF('kcal')} placeholder="420" />

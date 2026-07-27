@@ -7,6 +7,14 @@ import { getMenuPricing } from '../lib/menuPricing'
 import { getMenuItemPublicUrl } from '../lib/menuLinks'
 import { getMenuItemMediaUrls, isMenuVideoUrl } from '../lib/menuMedia'
 import { calculateUnitPrice, normalizePriceMode } from '../lib/priceModes'
+import {
+  changeMenuQuantity,
+  formatMenuQuantity,
+  isMenuItemSoldByWeight,
+  menuPriceUnitSuffix,
+  menuQuantityStep,
+  normalizeMenuQuantity,
+} from '../lib/menuSaleUnits'
 import MenuMedia from './MenuMedia'
 
 function MenuImageFallback({ iconSize = 32, active = false }) {
@@ -248,6 +256,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const priceUnit = menuPriceUnitSuffix(item, lang)
   const hasVideo = isMenuVideoUrl(item.image_url)
   const showCompactPublicCard = readOnly
   const dense = !readOnly && density === 'compact'
@@ -311,7 +320,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         )}
         {inCart && (
           <div className="absolute top-2 right-2 bg-[#ff5a00] text-white text-[11px] font-black rounded-full w-6 h-6 flex items-center justify-center shadow">
-            {qty}
+            {formatMenuQuantity(qty, item)}
           </div>
         )}
         {readOnly && (
@@ -343,7 +352,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
               <p className={`${showCompactPublicCard ? 'text-[13px]' : 'text-[12px]'} font-bold text-[#9CA3AF] line-through`}>{formatPrice(pricing.oldPrice)}</p>
             )}
             <p className={`${pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[16px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
-              {formatPrice(pricing.price)}
+              {formatPrice(pricing.price)}{priceUnit}
             </p>
           </div>
           {!showCompactPublicCard && (grams || millilitres || kcal) && (
@@ -378,7 +387,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             >
               <Minus size={14} className="text-[#6B7280]" />
             </button>
-            <span className="font-black text-[18px] text-[#ff5a00] min-w-[24px] text-center">{qty}</span>
+            <span className="font-black text-[18px] text-[#ff5a00] min-w-[24px] text-center">{formatMenuQuantity(qty, item)}</span>
             <button
               onClick={e => { e.stopPropagation(); onIncrement(item, cartAnimationPayload(e)) }}
               className="w-9 h-9 rounded-xl bg-[#ff5a00] flex items-center justify-center hover:bg-[#cc4800] active:scale-90 transition-all shadow-sm"
@@ -402,14 +411,14 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
 }
 
 export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false, formatPrice = formatCurrency, linkBasePath = '/menu', languageControl = null }) {
-  const [qty, setQty] = useState(Math.max(1, currentQty))
+  const [qty, setQty] = useState(normalizeMenuQuantity(currentQty, item))
   const [notes, setNotes] = useState(currentNotes || '')
   const [selectedOptions, setSelectedOptions] = useState({})
   const [copied, setCopied] = useState(false)
   const [activeMediaUrl, setActiveMediaUrl] = useState('')
 
   useEffect(() => {
-    setQty(Math.max(1, currentQty))
+    setQty(normalizeMenuQuantity(currentQty, item))
     setNotes(currentNotes || '')
     setSelectedOptions({})
     setActiveMediaUrl(getMenuItemMediaUrls(item)[0] || '')
@@ -423,6 +432,8 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const soldByWeight = isMenuItemSoldByWeight(item)
+  const priceUnit = menuPriceUnitSuffix(item, lang)
   const mediaUrls = getMenuItemMediaUrls(item)
   const displayedMediaUrl = mediaUrls.includes(activeMediaUrl) ? activeMediaUrl : mediaUrls[0] || ''
   const optionGroups = getMenuItemOptionGroups(item, lang)
@@ -442,8 +453,10 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     back: lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Назад в меню' : 'Back to menu',
     description: lang === 'uz' ? 'Tavsif' : lang === 'ru' ? 'Описание' : 'Description',
     noDescription: lang === 'uz' ? 'Tavsif qo‘shilmagan.' : lang === 'ru' ? 'Описание не добавлено.' : 'No description added.',
-    quantity: lang === 'uz' ? 'Miqdor' : lang === 'ru' ? 'Количество' : 'Quantity',
-    quantitySub: lang === 'uz' ? 'Porsiyalar sonini tanlang' : lang === 'ru' ? 'Выберите количество порций' : 'Choose how many portions',
+    quantity: soldByWeight ? (lang === 'uz' ? 'Og‘irligi (kg)' : lang === 'ru' ? 'Вес (кг)' : 'Weight (kg)') : (lang === 'uz' ? 'Miqdor' : lang === 'ru' ? 'Количество' : 'Quantity'),
+    quantitySub: soldByWeight
+      ? (lang === 'uz' ? 'Kerakli vaznni kiriting' : lang === 'ru' ? 'Укажите нужный вес' : 'Enter the required weight')
+      : (lang === 'uz' ? 'Porsiyalar sonini tanlang' : lang === 'ru' ? 'Выберите количество порций' : 'Choose how many portions'),
     notes: lang === 'uz' ? 'Maxsus izohlar' : lang === 'ru' ? 'Особые заметки' : 'Special notes',
     notesSub: lang === 'uz' ? 'Buyurtma uchun ixtiyoriy ko‘rsatma' : lang === 'ru' ? 'Дополнительная инструкция к заказу' : 'Optional order instruction',
     notesPlaceholder: lang === 'uz' ? 'Masalan: piyozsiz, yaxshi pishiring...' : lang === 'ru' ? 'Например: без лука, хорошо прожарить...' : 'For example: no onion, well done...',
@@ -502,7 +515,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
             </p>
           )}
           <p className={`whitespace-nowrap text-xl sm:text-2xl font-black tabular-nums ${pricing.discounted ? 'text-red-600' : 'text-[#FF4D00]'}`}>
-            {formatPrice(pricing.price)}
+            {formatPrice(pricing.price)}{priceUnit}
           </p>
           {(grams || millilitres || kcal) && (
             <div className="flex flex-wrap justify-end gap-1">
@@ -588,7 +601,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                     <p className="text-sm font-bold text-[#9CA3AF] line-through">{formatPrice(pricing.oldPrice)}</p>
                   )}
                   <p className={`${pricing.discounted ? 'text-xl text-red-600' : 'text-lg text-[#FF4D00]'} font-black`}>
-                    {formatPrice(pricing.price)}
+                    {formatPrice(pricing.price)}{priceUnit}
                   </p>
                   {grams && (
                     <span className="rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00] ring-1 ring-[#FFD8BF]">
@@ -679,14 +692,29 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                   </div>
                   <div className="flex w-full items-center justify-between gap-4 rounded-[18px] border border-[#E5E7EB] bg-white p-1.5 sm:w-auto">
                     <button
-                      onClick={() => setQty(q => Math.max(1, q - 1))}
+                      onClick={() => setQty(q => Math.max(menuQuantityStep(item), changeMenuQuantity(q, item, -1)))}
                       className="w-12 h-12 rounded-2xl bg-white border border-[#E5E7EB] flex items-center justify-center text-[#64748B] hover:text-[#0F3B2E] active:scale-95 transition-all shadow-sm"
                     >
                       <Minus size={18} />
                     </button>
-                    <span className="min-w-[44px] text-center text-2xl font-black leading-none text-[#111827] tabular-nums">{qty}</span>
+                    {soldByWeight ? (
+                      <label className="flex min-w-[112px] items-center justify-center gap-1">
+                        <input
+                          type="number"
+                          min={menuQuantityStep(item)}
+                          step={menuQuantityStep(item)}
+                          value={qty}
+                          onChange={event => setQty(normalizeMenuQuantity(event.target.value, item))}
+                          className="w-20 bg-transparent text-center text-2xl font-black leading-none text-[#111827] tabular-nums outline-none"
+                          aria-label={labels.quantity}
+                        />
+                        <span className="text-sm font-black text-[#64748B]">kg</span>
+                      </label>
+                    ) : (
+                      <span className="min-w-[44px] text-center text-2xl font-black leading-none text-[#111827] tabular-nums">{qty}</span>
+                    )}
                     <button
-                      onClick={() => setQty(q => q + 1)}
+                      onClick={() => setQty(q => changeMenuQuantity(q, item, 1))}
                       className="w-12 h-12 rounded-2xl bg-[#0F3B2E] flex items-center justify-center text-white hover:bg-[#0A2A20] active:scale-95 transition-all shadow-sm"
                     >
                       <Plus size={20} />

@@ -98,14 +98,14 @@ async function loadPaidTotalsForRestaurantDay(supabase, paidAt) {
   const { start, end } = getRestaurantDayUtcRange(paidAt)
   let { data, error } = await supabase
     .from('orders')
-    .select('total, items:order_items(menu_item_id, quantity, cost_price, selected_options, status)')
+    .select('total, items:order_items(menu_item_id, quantity, sale_unit, cost_price, selected_options, status)')
     .eq('payment_status', 'paid')
     .gte('paid_at', start)
     .lt('paid_at', end)
   if (error && isMissingProfitSchema(error)) {
     ;({ data, error } = await supabase
       .from('orders')
-      .select('total, items:order_items(menu_item_id, quantity, selected_options, status)')
+      .select('total, items:order_items(menu_item_id, quantity, sale_unit, selected_options, status)')
       .eq('payment_status', 'paid')
       .gte('paid_at', start)
       .lt('paid_at', end))
@@ -173,12 +173,12 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin()
     let { data: orders, error } = await supabase
       .from('orders')
-      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, loyalty_card_number, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, cost_price, price_mode, selected_options, notes, status), payments:order_payments(method, amount), loyalty_transactions(type, customer_name_at_transaction, card_number_at_transaction)')
+      .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, loyalty_card_number, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, sale_unit, price, unit_price, cost_price, price_mode, selected_options, notes, status), payments:order_payments(method, amount), loyalty_transactions(type, customer_name_at_transaction, card_number_at_transaction)')
       .in('id', orderIds)
     if (error && isMissingProfitSchema(error)) {
       ;({ data: orders, error } = await supabase
         .from('orders')
-        .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, loyalty_card_number, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, price, unit_price, price_mode, selected_options, notes, status), payments:order_payments(method, amount), loyalty_transactions(type, customer_name_at_transaction, card_number_at_transaction)')
+        .select('id, source, telegram_user_id, customer_id, order_number, table_name, waiter_name, order_type, price_mode, status, payment_status, payment_method, subtotal, service_fee, service_rate_pct, total, loyalty_card_number, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, completed_by_name, paid_at, created_at, updated_at, items:order_items(name, menu_item_id, quantity, sale_unit, price, unit_price, price_mode, selected_options, notes, status), payments:order_payments(method, amount), loyalty_transactions(type, customer_name_at_transaction, card_number_at_transaction)')
         .in('id', orderIds))
     }
     if (error) throw error

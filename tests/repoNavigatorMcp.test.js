@@ -277,11 +277,11 @@ test('indexes complete large components, PL/pgSQL bodies, and multiline protecte
   assert.ok(Number(menuFunction[3].split('-')[1]) > 2_400)
 
   const menuOutline = await navigator.run({ op: 'outline', path: 'src/pages/AdminMenu.jsx', limit: 50, max_chars: 16_000 })
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'ImageUploadField')?.[3], 'L356-421')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'MediaGalleryField')?.[3], 'L423-580')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'OrangeBtn')?.[3], 'L582-594')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'VisibilityToggleButton')?.[3], 'L713-735')
-  assert.equal(menuOutline.rows.find((row) => row[4] === 'SortableItemRow')?.[3], 'L874-957')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'ImageUploadField')?.[3], 'L386-451')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'MediaGalleryField')?.[3], 'L453-610')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'OrangeBtn')?.[3], 'L612-624')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'VisibilityToggleButton')?.[3], 'L743-765')
+  assert.equal(menuOutline.rows.find((row) => row[4] === 'SortableItemRow')?.[3], 'L904-987')
 
   const settlement = await navigator.run({ op: 'find', q: 'settle_orders_payment', limit: 5 })
   const sqlFunction = settlement.rows.find((row) => row[1] === 'sql-function')

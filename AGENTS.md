@@ -167,6 +167,13 @@ These bugs were recently fixed and are now protected by tests:
    - Creation uses the atomic `create_menu_item_with_cost(payload jsonb)` RPC so the public product and private cost row commit or roll back together.
    - Per-variant costs remain optional and fall back to the required parent product cost.
 
+15. Shelf stock must decrease exactly once when an order is paid.
+   - Migration `106` attaches stock deduction to the atomic unpaid-to-paid database transition.
+   - Only non-cancelled piece quantities are deducted; weight-based inventory needs a separate decimal stock model.
+   - Parent and selected variant stock values are clamped at zero.
+   - `orders.stock_deducted_at` prevents payment retries or later payment-method corrections from deducting twice.
+   - Existing paid orders are marked as already processed when the migration is applied, so historical sales never rewrite manually maintained stock.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -204,6 +211,9 @@ Run migrations in order. Important recent files:
 - `supabase/101_atomic_telegram_orders.sql`
   Adds the service-role-only `create_telegram_order(payload jsonb)` RPC so Telegram order and item inserts commit or roll back together.
 
+- `supabase/105_menu_items_sold_by_weight.sql`
+  Adds per-item or per-kilogram menu sale units, decimal order quantities, historical unit snapshots, and decimal-safe kitchen, Telegram, payment, and owner-reopen calculations.
+
 - `supabase/102_atomic_menu_item_cost_creation.sql`
   Requires a positive real cost for new products and atomically inserts `menu_items` plus `menu_item_costs`. Authenticated direct menu-item inserts are disabled so product creation cannot bypass the protected cost.
 
@@ -212,6 +222,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/104_trim_menu_item_text.sql`
   Backfills and continuously trims leading/trailing whitespace from all localized menu-item names and descriptions.
+
+- `supabase/106_atomic_paid_order_stock_deduction.sql`
+  Deducts non-cancelled piece and selected-variant shelf stock in the same transaction that marks an order paid, with an order-level marker that makes payment retries idempotent.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

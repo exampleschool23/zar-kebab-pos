@@ -1,6 +1,7 @@
 import { orderTypeLabel } from '../../../src/lib/orderTypes.js'
 import { formatDateTime } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml, TELEGRAM_STATUS_MESSAGES } from './telegram.js'
+import { formatMenuQuantity, isMenuItemSoldByWeight } from '../../../src/lib/menuSaleUnits.js'
 
 const COMPLETED_ORDER_GROUP_CHAT_ID_ENV_KEYS = [
   'TELEGRAM_COMPLETED_ORDERS_CHAT_ID',
@@ -224,8 +225,11 @@ function buildItemRows(items) {
   for (const item of items) {
     const name = truncateText(item?.telegram_display_name || getRussianOrderItemDisplayName(item), 22)
     const quantity = Math.max(0, Number(item?.quantity) || 0)
+    const quantityText = isMenuItemSoldByWeight(item)
+      ? formatMenuQuantity(quantity, item)
+      : String(quantity)
     const amount = formatRowMoney(getItemAmount(item))
-    rows.push(`${name.padEnd(22)} ${String(quantity).padStart(3)} ${amount.padStart(10)}`)
+    rows.push(`${name.padEnd(22)} ${quantityText.padStart(6)} ${amount.padStart(10)}`)
   }
 
   return rows.join('\n')

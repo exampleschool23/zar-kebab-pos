@@ -105,6 +105,7 @@ create table if not exists public.orders (
   loyalty_discount_amount integer     default 0,
   discounted_subtotal     integer     default 0,
   paid_at                 timestamptz,
+  stock_deducted_at        timestamptz,
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now()
 );

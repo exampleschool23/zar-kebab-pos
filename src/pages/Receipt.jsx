@@ -15,6 +15,7 @@ import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/or
 import { formatDateTime } from '../lib/dateFormat'
 import { loadReceiptOrderGroup } from '../lib/db'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { formatMenuQuantity } from '../lib/menuSaleUnits'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -111,8 +112,8 @@ function normalizeReceiptItems(rawItems, menuItemMap) {
     const productId = getOrderItemProductId(item)
     const menuItem = productId != null ? menuItemMap[productId] : null
     return isCashierQuickItem(menuItem)
-      ? { ...item, item_type: item.item_type || item.itemType || 'counter', is_counter_item: true }
-      : item
+      ? { ...item, sale_unit: item.sale_unit || menuItem?.sale_unit, item_type: item.item_type || item.itemType || 'counter', is_counter_item: true }
+      : { ...item, sale_unit: item.sale_unit || menuItem?.sale_unit }
   })
 }
 
@@ -421,7 +422,7 @@ function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, 
             fontWeight: 400,
           }}>
             <span style={{ paddingRight: '6px', lineHeight: 1.25, color: '#111', fontStyle: 'italic' }}>{item.name}</span>
-            <span style={{ textAlign: 'center', fontWeight: 500, color: '#333' }}>{item.quantity}</span>
+            <span style={{ textAlign: 'center', fontWeight: 500, color: '#333' }}>{formatMenuQuantity(item.quantity, item)}</span>
             <span style={{ textAlign: 'right', fontWeight: 600, color: '#111' }}>
               {fmtNum(getOrderItemUnitPrice(item) * (Number(item.quantity) || 1))}
             </span>

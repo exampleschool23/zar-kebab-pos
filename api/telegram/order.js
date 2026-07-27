@@ -4,6 +4,7 @@ import { normalizeOrderType, orderTypeLabel } from '../../src/lib/orderTypes.js'
 import { getBearerToken, json, methodNotAllowed, readJson } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { sendTelegramMessage, verifyTelegramSession } from './_lib/telegram.js'
+import { normalizeMenuQuantity, normalizeMenuSaleUnit } from '../../src/lib/menuSaleUnits.js'
 
 function makeOrderNumber(orderId) {
   const suffix = String(orderId).replace(/\D/g, '').slice(-4).padStart(4, '0')
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
     const ids = [...new Set(requestedItems.map(item => String(item.menuItemId || item.menu_item_id || item.id || '')).filter(Boolean))]
     const { data: menuItems, error: menuError } = await supabase
       .from('menu_items')
-      .select('id, name_uz, name_ru, name_en, price, available')
+      .select('id, name_uz, name_ru, name_en, price, sale_unit, available')
       .in('id', ids)
       .eq('available', true)
     if (menuError) throw menuError
@@ -37,7 +38,8 @@ export default async function handler(req, res) {
       const menuItemId = String(item.menuItemId || item.menu_item_id || item.id || '')
       const menuItem = byId.get(menuItemId)
       if (!menuItem) throw new Error(`Menu item is not available: ${menuItemId}`)
-      const quantity = Math.max(1, Math.min(99, Math.round(Number(item.quantity) || 1)))
+      const saleUnit = normalizeMenuSaleUnit(menuItem.sale_unit)
+      const quantity = Math.min(99, normalizeMenuQuantity(item.quantity, saleUnit))
       return {
         id: randomUUID(),
         menu_item_id: menuItem.id,
@@ -47,6 +49,7 @@ export default async function handler(req, res) {
         unit_price: Math.round(Number(menuItem.price) || 0),
         price_mode: 'regular',
         quantity,
+        sale_unit: saleUnit,
         notes: String(item.notes || '').slice(0, 500),
         selected_options: {},
         status: 'new',

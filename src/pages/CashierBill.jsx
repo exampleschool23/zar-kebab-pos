@@ -36,6 +36,7 @@ import { canDeletePaidOrders, canEditFeature } from '../lib/permissions'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 import { formatElapsedSince } from '../lib/dateFormat'
+import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -433,6 +434,7 @@ export default function CashierBill() {
         sourceItemIds,
         menuItemId: item.menu_item_id,
         qty,
+        sale_unit: item.sale_unit || menuItemMap?.[item.menu_item_id]?.sale_unit || 'piece',
       },
     })
   }
@@ -692,6 +694,10 @@ export default function CashierBill() {
                     const isCounter = isCashierQuickItem(mi)
                     const unitPrice = getOrderItemUnitPrice(item)
                     const lineTotal = unitPrice * (Number(item.quantity) || 1)
+                    const quantitySource = { ...mi, sale_unit: item.sale_unit || mi?.sale_unit }
+                    const quantityLabel = isMenuItemSoldByWeight(quantitySource)
+                      ? formatMenuQuantity(item.quantity, quantitySource)
+                      : `×${formatMenuQuantity(item.quantity, quantitySource)}`
                     return (
                       <div
                         key={i}
@@ -748,7 +754,7 @@ export default function CashierBill() {
                             {/* Mobile: qty + price */}
                             <div className="flex items-center gap-3 mt-1.5 sm:hidden">
                               <span className="inline-flex items-center justify-center bg-[#fff1e8] text-[#ff5a00] font-black text-[11px] rounded-lg px-2 py-0.5">
-                                ×{item.quantity}
+                                {quantityLabel}
                               </span>
                               <span className="text-xs text-[#6B7280]">{formatCurrency(unitPrice)}</span>
                               <span className="text-sm font-black text-[#1F2937]">{formatCurrency(lineTotal)}</span>
@@ -804,7 +810,7 @@ export default function CashierBill() {
                             </div>
                           ) : (
                             <span className="inline-flex items-center justify-center bg-[#fff1e8] text-[#ff5a00] font-black text-xs rounded-lg w-9 h-7">
-                              ×{item.quantity}
+                              {quantityLabel}
                             </span>
                           )}
                         </div>

@@ -23,6 +23,7 @@ import {
   recalcOrderTotals,
   serviceRatePctFromSettings,
 } from './reducerHelpers.js'
+import { normalizeMenuQuantity } from '../lib/menuSaleUnits.js'
 import { getLoyaltyCardCashbackPercent } from '../lib/loyalty.js'
 import { isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes.js'
 
@@ -279,7 +280,8 @@ export function ordersReducer(state, action) {
     case 'UPDATE_BILL_ITEM_QTY': {
       const { tableId, orderId, orderItemId, menuItemId, qty } = action.payload
       const sourceItemIds = new Set(action.payload.sourceItemIds || [])
-      const nextQty = Math.max(0, Number(qty) || 0)
+      const rawQty = Number(qty) || 0
+      const nextQty = rawQty <= 0 ? 0 : normalizeMenuQuantity(rawQty, action.payload)
       let removedOrder = null
 
       return {
