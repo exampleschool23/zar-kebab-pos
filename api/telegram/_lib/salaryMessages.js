@@ -1,32 +1,40 @@
 import {
+  expensePaymentMethodLabel,
   getSalaryAccruedAmount,
   getSalaryDue,
   normalizeExpenseAmount,
 } from '../../../src/lib/expenses.js'
+import { formatDateOnly } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml } from './telegram.js'
 
 const COPY = {
   uz: {
     title: 'Kunlik maosh hisoboti',
     earned: 'Bugun hisoblangan',
+    bonuses: 'Bugungi bonuslar',
     fines: 'Bugungi jarimalar',
-    noFines: 'Yo‘q',
+    payments: 'Bugun to‘langan',
+    none: 'Yo‘q',
     due: 'To‘lanishi kerak',
     currency: 'UZS',
   },
   ru: {
     title: 'Ежедневный отчёт по зарплате',
-    earned: 'Начислено сегодня',
-    fines: 'Штрафы сегодня',
-    noFines: 'Нет',
+    earned: 'Начислено за день',
+    bonuses: 'Бонусы за день',
+    fines: 'Штрафы за день',
+    payments: 'Выплачено за день',
+    none: 'Нет',
     due: 'К выплате',
     currency: 'UZS',
   },
   en: {
     title: 'Daily salary summary',
     earned: 'Earned today',
+    bonuses: 'Bonuses today',
     fines: 'Fines today',
-    noFines: 'None',
+    payments: 'Paid today',
+    none: 'None',
     due: 'Current salary due',
     currency: 'UZS',
   },
@@ -44,6 +52,15 @@ export function formatSalaryNotificationAmount(value) {
 }
 
 export function getDailySalaryNotificationSummary(salaryProfile, date) {
+  const bonuses = (salaryProfile?.bonuses || [])
+    .filter(bonus => String(bonus?.bonus_date || '').slice(0, 10) === date)
+    .map(bonus => ({
+      amount: normalizeExpenseAmount(bonus?.amount),
+      detail: String(bonus?.note || '').trim(),
+      paymentMethod: String(bonus?.payment_method || salaryProfile?.payment_method || 'cash'),
+    }))
+    .filter(bonus => bonus.amount > 0)
+
   const fines = (salaryProfile?.fines || [])
     .filter(fine => String(fine?.fine_date || '').slice(0, 10) === date)
     .map(fine => ({
@@ -52,11 +69,24 @@ export function getDailySalaryNotificationSummary(salaryProfile, date) {
     }))
     .filter(fine => fine.amount > 0)
 
+  const payments = (salaryProfile?.payments || [])
+    .filter(payment => String(payment?.paid_date || '').slice(0, 10) === date)
+    .map(payment => ({
+      amount: normalizeExpenseAmount(payment?.amount),
+      detail: String(payment?.note || '').trim(),
+      paymentMethod: String(payment?.payment_method || salaryProfile?.payment_method || 'cash'),
+    }))
+    .filter(payment => payment.amount > 0)
+
   return {
     date,
     earned: getSalaryAccruedAmount(salaryProfile, date, date),
+    bonuses,
+    bonusTotal: bonuses.reduce((sum, bonus) => sum + bonus.amount, 0),
     fines,
     fineTotal: fines.reduce((sum, fine) => sum + fine.amount, 0),
+    payments,
+    paymentTotal: payments.reduce((sum, payment) => sum + payment.amount, 0),
     due: getSalaryDue(salaryProfile, date),
   }
 }
@@ -65,19 +95,33 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
   const lang = normalizeSalaryNotificationLanguage(language)
   const copy = COPY[lang]
   const summary = getDailySalaryNotificationSummary(salaryProfile, date)
+  const transactionLine = transaction => {
+    const detail = transaction.detail || expensePaymentMethodLabel(transaction.paymentMethod, lang)
+    return `  • ${formatSalaryNotificationAmount(transaction.amount)} ${copy.currency} — ${escapeTelegramHtml(detail)}`
+  }
+  const bonusLines = summary.bonuses.length > 0
+    ? summary.bonuses.map(transactionLine)
+    : [`  • ${copy.none}`]
   const fineLines = summary.fines.length > 0
     ? summary.fines.map(fine => (
         `  • ${formatSalaryNotificationAmount(fine.amount)} ${copy.currency} — ${escapeTelegramHtml(fine.reason || '-')}`
       ))
-    : [`  • ${copy.noFines}`]
+    : [`  • ${copy.none}`]
+  const paymentLines = summary.payments.length > 0
+    ? summary.payments.map(transactionLine)
+    : [`  • ${copy.none}`]
 
   return [
     `💼 <b>${copy.title}</b>`,
-    escapeTelegramHtml(date),
+    `📅 ${escapeTelegramHtml(formatDateOnly(date, date))}`,
     '',
     `<b>${copy.earned}:</b> ${formatSalaryNotificationAmount(summary.earned)} ${copy.currency}`,
+    `<b>${copy.bonuses}:</b> ${formatSalaryNotificationAmount(summary.bonusTotal)} ${copy.currency}`,
+    ...bonusLines,
     `<b>${copy.fines}:</b> ${formatSalaryNotificationAmount(summary.fineTotal)} ${copy.currency}`,
     ...fineLines,
+    `<b>${copy.payments}:</b> ${formatSalaryNotificationAmount(summary.paymentTotal)} ${copy.currency}`,
+    ...paymentLines,
     '',
     `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(summary.due)} ${copy.currency}`,
   ].join('\n')

@@ -17,8 +17,16 @@ const salaryProfile = {
     amount: 150_000,
     rate_unit: 'daily',
   }],
-  payments: [{ paid_date: '2026-07-10', amount: 300_000 }],
-  bonuses: [],
+  payments: [
+    { paid_date: '2026-07-10', amount: 300_000 },
+    { paid_date: '2026-07-29', amount: 100_000, payment_method: 'cash', note: 'Аванс' },
+  ],
+  bonuses: [{
+    bonus_date: '2026-07-29',
+    amount: 50_000,
+    payment_method: 'card',
+    note: '<Good work>',
+  }],
   absences: [],
   fines: [{
     fine_date: '2026-07-29',
@@ -30,16 +38,24 @@ const salaryProfile = {
 test('daily salary summary uses shared accrual, fine, and due calculations', () => {
   const summary = getDailySalaryNotificationSummary(salaryProfile, '2026-07-29')
   assert.equal(summary.earned, 150_000)
+  assert.equal(summary.bonusTotal, 50_000)
   assert.equal(summary.fineTotal, 20_000)
-  assert.equal(summary.due, 4_030_000)
+  assert.equal(summary.paymentTotal, 100_000)
+  assert.equal(summary.due, 3_930_000)
 })
 
-test('daily salary message escapes fine reasons and supports employee language', () => {
-  const message = buildDailySalaryMessage(salaryProfile, '2026-07-29', 'en')
-  assert.match(message, /Daily salary summary/)
+test('daily salary message formats date and shows bonuses, fines, and salary payments', () => {
+  const message = buildDailySalaryMessage(salaryProfile, '2026-07-29', 'ru')
+  assert.match(message, /Ежедневный отчёт по зарплате/)
+  assert.match(message, /📅 29\.07\.2026/)
   assert.match(message, /150 000 UZS/)
+  assert.match(message, /Бонусы за день:<\/b> 50 000 UZS/)
   assert.match(message, /20 000 UZS/)
+  assert.match(message, /Выплачено за день:<\/b> 100 000 UZS/)
+  assert.match(message, /Аванс/)
+  assert.match(message, /&lt;Good work&gt;/)
   assert.match(message, /&lt;Late arrival&gt;/)
+  assert.doesNotMatch(message, /<Good work>/)
   assert.doesNotMatch(message, /<Late arrival>/)
 })
 
