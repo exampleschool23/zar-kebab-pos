@@ -1,6 +1,12 @@
 import { json, methodNotAllowed, readJson } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
-import { parseEmployeeStartToken, normalizeSalaryNotificationLanguage } from './_lib/salaryMessages.js'
+import {
+  buildDailySalaryMessage,
+  getTashkentDate,
+  parseEmployeeStartToken,
+  normalizeSalaryNotificationLanguage,
+} from './_lib/salaryMessages.js'
+import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { callTelegramApi, sendTelegramMessage } from './_lib/telegram.js'
 
 const LANGUAGES = {
@@ -45,6 +51,10 @@ async function linkEmployee(supabase, message, token) {
     return
   }
 
+  const salaryProfiles = await loadSalaryProfiles(supabase, [link.salary_profile_id])
+  const salaryProfile = salaryProfiles.get(link.salary_profile_id)
+  if (!salaryProfile) throw new Error('Employee salary profile not found')
+
   const { data: updated, error: updateError } = await supabase
     .from('employee_salary_telegram_links')
     .update({
@@ -64,10 +74,20 @@ async function linkEmployee(supabase, message, token) {
     .maybeSingle()
 
   if (updateError) throw updateError
-  await sendTelegramMessage(
-    message.chat.id,
-    updated ? linkedMessage() : invalidLinkMessage()
-  )
+  if (!updated) {
+    await sendTelegramMessage(message.chat.id, invalidLinkMessage())
+    return
+  }
+
+  const currentStatus = buildDailySalaryMessage(salaryProfile, getTashkentDate(), 'ru')
+  try {
+    await sendTelegramMessage(
+      message.chat.id,
+      `${linkedMessage()}\n\n📌 <b>Текущий статус</b>\n\n${currentStatus}`
+    )
+  } catch (error) {
+    console.error('[telegram/webhook] linked status send failed:', error)
+  }
 }
 
 function languageKeyboard() {

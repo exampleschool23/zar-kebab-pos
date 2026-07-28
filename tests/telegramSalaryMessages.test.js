@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import {
   buildDailySalaryMessage,
   getDailySalaryNotificationSummary,
+  getTashkentDate,
   parseEmployeeStartToken,
 } from '../api/telegram/_lib/salaryMessages.js'
 
@@ -101,4 +103,17 @@ test('employee start links accept only the expected token shape', () => {
   assert.equal(parseEmployeeStartToken(`/start employee_${token}`), token)
   assert.equal(parseEmployeeStartToken(`/start@zar_bot employee_${token}`), token)
   assert.equal(parseEmployeeStartToken('/start employee_not-a-token'), '')
+})
+
+test('employee linking sends the current Tashkent salary status after confirmation', () => {
+  const webhook = fs.readFileSync(new URL('../api/telegram/webhook.js', import.meta.url), 'utf8')
+  assert.match(webhook, /loadSalaryProfiles\(supabase, \[link\.salary_profile_id\]\)/)
+  assert.match(webhook, /buildDailySalaryMessage\(salaryProfile, getTashkentDate\(\), 'ru'\)/)
+  assert.match(webhook, /Текущий статус/)
+  assert.match(webhook, /linkedMessage\(\)/)
+})
+
+test('current employee status uses the Tashkent calendar date', () => {
+  assert.equal(getTashkentDate(new Date('2026-07-28T18:59:59Z')), '2026-07-28')
+  assert.equal(getTashkentDate(new Date('2026-07-28T19:00:00Z')), '2026-07-29')
 })

@@ -66,6 +66,17 @@ export function formatSalaryNotificationAmount(value) {
     .replace(/\s/g, ' ')
 }
 
+export function getTashkentDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Asia/Tashkent',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now)
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
+
 export function getDailySalaryNotificationSummary(salaryProfile, date) {
   const absence = (salaryProfile?.absences || []).find(
     item => String(item?.absence_date || item?.date || '').slice(0, 10) === date

@@ -1,21 +1,11 @@
 import { json, methodNotAllowed, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
-import { buildDailySalaryMessage } from './_lib/salaryMessages.js'
+import { buildDailySalaryMessage, getTashkentDate } from './_lib/salaryMessages.js'
+import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
 
-function tashkentDate(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en', {
-    timeZone: 'Asia/Tashkent',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now)
-  const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
-  return `${values.year}-${values.month}-${values.day}`
-}
-
 function completedTashkentDate(now = new Date()) {
-  const today = tashkentDate(now)
+  const today = getTashkentDate(now)
   const date = new Date(`${today}T12:00:00.000Z`)
   date.setUTCDate(date.getUTCDate() - 1)
   return date.toISOString().slice(0, 10)
@@ -26,45 +16,6 @@ function requireCronSecret(req) {
   if (!expected || getBearerToken(req) !== expected) {
     throw Object.assign(new Error('Unauthorized'), { status: 401 })
   }
-}
-
-function composeSalaryProfile(row, related) {
-  return {
-    ...row,
-    rates: related.rates.filter(item => item.salary_profile_id === row.id),
-    payments: related.payments.filter(item => item.salary_profile_id === row.id),
-    bonuses: related.bonuses.filter(item => item.salary_profile_id === row.id),
-    fines: related.fines.filter(item => item.salary_profile_id === row.id),
-    absences: related.absences.filter(item => item.salary_profile_id === row.id),
-  }
-}
-
-async function loadSalaryProfiles(supabase, links) {
-  const profileIds = links.map(link => link.salary_profile_id)
-  if (profileIds.length === 0) return new Map()
-
-  const [profiles, rates, payments, bonuses, fines, absences] = await Promise.all([
-    supabase.from('employee_salary_profiles').select('*').in('id', profileIds),
-    supabase.from('employee_salary_rates').select('*').in('salary_profile_id', profileIds),
-    supabase.from('employee_salary_payments').select('*').in('salary_profile_id', profileIds),
-    supabase.from('employee_salary_bonuses').select('*').in('salary_profile_id', profileIds),
-    supabase.from('employee_salary_fines').select('*').in('salary_profile_id', profileIds),
-    supabase.from('employee_salary_absences').select('*').in('salary_profile_id', profileIds),
-  ])
-  const failed = [profiles, rates, payments, bonuses, fines, absences].find(result => result.error)
-  if (failed?.error) throw failed.error
-
-  const related = {
-    rates: rates.data || [],
-    payments: payments.data || [],
-    bonuses: bonuses.data || [],
-    fines: fines.data || [],
-    absences: absences.data || [],
-  }
-  return new Map((profiles.data || []).map(profile => [
-    profile.id,
-    composeSalaryProfile(profile, related),
-  ]))
 }
 
 async function claimDelivery(supabase, salaryProfileId, notificationDate) {
@@ -98,7 +49,10 @@ export default async function handler(req, res) {
       .not('chat_id', 'is', null)
     if (linksError) throw linksError
 
-    const salaryProfiles = await loadSalaryProfiles(supabase, links || [])
+    const salaryProfiles = await loadSalaryProfiles(
+      supabase,
+      (links || []).map(link => link.salary_profile_id)
+    )
     const results = []
 
     for (const link of links || []) {
