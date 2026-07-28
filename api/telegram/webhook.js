@@ -13,7 +13,10 @@ const CHOOSE_LANGUAGE = "Tilni tanlang / Выберите язык / Choose lang
 function requireWebhookSecret(req) {
   const expected = process.env.TELEGRAM_WEBHOOK_SECRET
   const received = req.headers['x-telegram-bot-api-secret-token']
-  if (!expected || received !== expected) {
+  if (!expected) {
+    throw Object.assign(new Error('Telegram webhook secret is not configured'), { status: 503 })
+  }
+  if (received !== expected) {
     throw Object.assign(new Error('Unauthorized'), { status: 401 })
   }
 }
