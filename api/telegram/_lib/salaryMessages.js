@@ -10,6 +10,11 @@ import { escapeTelegramHtml } from './telegram.js'
 const COPY = {
   uz: {
     title: 'Kunlik maosh hisoboti',
+    greeting: name => `Assalomu alaykum, ${name}!`,
+    gratitude: 'Mehnatingiz uchun rahmat.',
+    attendance: 'Kun holati',
+    present: 'Ish kuni',
+    absent: 'Ishga kelmadi',
     earned: 'Bugun hisoblangan',
     bonuses: 'Bugungi bonuslar',
     fines: 'Bugungi jarimalar',
@@ -20,6 +25,11 @@ const COPY = {
   },
   ru: {
     title: 'Ежедневный отчёт по зарплате',
+    greeting: name => `Здравствуйте, ${name}!`,
+    gratitude: 'Спасибо за ваш труд.',
+    attendance: 'Статус дня',
+    present: 'Рабочий день',
+    absent: 'Отсутствовал',
     earned: 'Начислено за день',
     bonuses: 'Бонусы за день',
     fines: 'Штрафы за день',
@@ -30,6 +40,11 @@ const COPY = {
   },
   en: {
     title: 'Daily salary summary',
+    greeting: name => `Hello, ${name}!`,
+    gratitude: 'Thank you for your work.',
+    attendance: 'Day status',
+    present: 'Working day',
+    absent: 'Absent',
     earned: 'Earned today',
     bonuses: 'Bonuses today',
     fines: 'Fines today',
@@ -52,6 +67,9 @@ export function formatSalaryNotificationAmount(value) {
 }
 
 export function getDailySalaryNotificationSummary(salaryProfile, date) {
+  const absence = (salaryProfile?.absences || []).find(
+    item => String(item?.absence_date || item?.date || '').slice(0, 10) === date
+  )
   const bonuses = (salaryProfile?.bonuses || [])
     .filter(bonus => String(bonus?.bonus_date || '').slice(0, 10) === date)
     .map(bonus => ({
@@ -80,6 +98,7 @@ export function getDailySalaryNotificationSummary(salaryProfile, date) {
 
   return {
     date,
+    absence: absence ? { note: String(absence?.note || '').trim() } : null,
     earned: getSalaryAccruedAmount(salaryProfile, date, date),
     bonuses,
     bonusTotal: bonuses.reduce((sum, bonus) => sum + bonus.amount, 0),
@@ -110,10 +129,23 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
   const paymentLines = summary.payments.length > 0
     ? summary.payments.map(transactionLine)
     : [`  • ${copy.none}`]
+  const employeeName = escapeTelegramHtml(
+    salaryProfile?.employee_name
+      || salaryProfile?.profile?.full_name
+      || salaryProfile?.profile?.email
+      || 'сотрудник'
+  )
+  const attendanceValue = summary.absence
+    ? `${copy.absent}${summary.absence.note ? ` — ${escapeTelegramHtml(summary.absence.note)}` : ''}`
+    : copy.present
 
   return [
     `💼 <b>${copy.title}</b>`,
     `📅 ${escapeTelegramHtml(formatDateOnly(date, date))}`,
+    '',
+    `<b>${copy.greeting(employeeName)}</b>`,
+    copy.gratitude,
+    `<b>${copy.attendance}:</b> ${attendanceValue}`,
     '',
     `<b>${copy.earned}:</b> ${formatSalaryNotificationAmount(summary.earned)} ${copy.currency}`,
     `<b>${copy.bonuses}:</b> ${formatSalaryNotificationAmount(summary.bonusTotal)} ${copy.currency}`,
