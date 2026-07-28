@@ -138,6 +138,31 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
   const attendanceValue = summary.absence
     ? `${copy.absent}${summary.absence.note ? ` — ${escapeTelegramHtml(summary.absence.note)}` : ''}`
     : copy.present
+  const moneySections = []
+  if (summary.earned > 0) {
+    moneySections.push(`<b>${copy.earned}:</b> ${formatSalaryNotificationAmount(summary.earned)} ${copy.currency}`)
+  }
+  if (summary.bonusTotal > 0) {
+    moneySections.push(
+      `<b>${copy.bonuses}:</b> ${formatSalaryNotificationAmount(summary.bonusTotal)} ${copy.currency}`,
+      ...bonusLines
+    )
+  }
+  if (summary.fineTotal > 0) {
+    moneySections.push(
+      `<b>${copy.fines}:</b> ${formatSalaryNotificationAmount(summary.fineTotal)} ${copy.currency}`,
+      ...fineLines
+    )
+  }
+  if (summary.paymentTotal > 0) {
+    moneySections.push(
+      `<b>${copy.payments}:</b> ${formatSalaryNotificationAmount(summary.paymentTotal)} ${copy.currency}`,
+      ...paymentLines
+    )
+  }
+  if (summary.due > 0) {
+    moneySections.push('', `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(summary.due)} ${copy.currency}`)
+  }
 
   return [
     `💼 <b>${copy.title}</b>`,
@@ -147,16 +172,8 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
     copy.gratitude,
     `<b>${copy.attendance}:</b> ${attendanceValue}`,
     '',
-    `<b>${copy.earned}:</b> ${formatSalaryNotificationAmount(summary.earned)} ${copy.currency}`,
-    `<b>${copy.bonuses}:</b> ${formatSalaryNotificationAmount(summary.bonusTotal)} ${copy.currency}`,
-    ...bonusLines,
-    `<b>${copy.fines}:</b> ${formatSalaryNotificationAmount(summary.fineTotal)} ${copy.currency}`,
-    ...fineLines,
-    `<b>${copy.payments}:</b> ${formatSalaryNotificationAmount(summary.paymentTotal)} ${copy.currency}`,
-    ...paymentLines,
-    '',
-    `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(summary.due)} ${copy.currency}`,
-  ].join('\n')
+    ...moneySections,
+  ].join('\n').trim()
 }
 
 export function parseEmployeeStartToken(text) {

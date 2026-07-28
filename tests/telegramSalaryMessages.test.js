@@ -69,8 +69,31 @@ test('daily salary message clearly shows a recorded absence and its note', () =>
   }, '2026-07-29', 'ru')
 
   assert.match(message, /Статус дня:<\/b> Отсутствовал — &lt;Болезнь&gt;/)
-  assert.match(message, /Начислено за день:<\/b> 0 UZS/)
+  assert.doesNotMatch(message, /Начислено за день/)
   assert.doesNotMatch(message, /<Болезнь>/)
+})
+
+test('daily salary message omits every zero-value money section including amount due', () => {
+  const message = buildDailySalaryMessage({
+    id: 'salary-zero',
+    employee_name: 'Новый сотрудник',
+    joined_at: '2026-07-29',
+    is_active: true,
+    rates: [{ effective_from: '2026-07-29', amount: 150_000, rate_unit: 'daily' }],
+    payments: [],
+    bonuses: [],
+    fines: [],
+    absences: [{ absence_date: '2026-07-29', note: 'Болезнь' }],
+  }, '2026-07-29', 'ru')
+
+  assert.match(message, /Здравствуйте, Новый сотрудник!/)
+  assert.match(message, /Статус дня:<\/b> Отсутствовал — Болезнь/)
+  assert.doesNotMatch(message, /Начислено за день/)
+  assert.doesNotMatch(message, /Бонусы за день/)
+  assert.doesNotMatch(message, /Штрафы за день/)
+  assert.doesNotMatch(message, /Выплачено за день/)
+  assert.doesNotMatch(message, /К выплате/)
+  assert.doesNotMatch(message, /0 UZS/)
 })
 
 test('employee start links accept only the expected token shape', () => {
