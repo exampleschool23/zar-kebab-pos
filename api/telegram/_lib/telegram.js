@@ -113,24 +113,27 @@ export function verifyTelegramSession(token) {
   return payload
 }
 
-export async function sendTelegramMessage(chatId, text) {
-  if (!chatId || !text) return { skipped: true }
-
-  const res = await fetch(`https://api.telegram.org/bot${getBotToken()}/sendMessage`, {
+export async function callTelegramApi(method, payload) {
+  const res = await fetch(`https://api.telegram.org/bot${getBotToken()}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML',
-    }),
+    body: JSON.stringify(payload),
   })
 
   const body = await res.json().catch(() => ({}))
   if (!res.ok || body.ok === false) {
-    throw new Error(body.description || `Telegram sendMessage failed with ${res.status}`)
+    throw new Error(body.description || `Telegram ${method} failed with ${res.status}`)
   }
   return body
+}
+
+export async function sendTelegramMessage(chatId, text) {
+  if (!chatId || !text) return { skipped: true }
+  return callTelegramApi('sendMessage', {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+  })
 }
 
 export function escapeTelegramHtml(value) {

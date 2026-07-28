@@ -128,6 +128,8 @@ const checks = await Promise.all([
   checkTable('employee_salary_bonuses', 'id, salary_profile_id, bonus_date, amount, payment_method', false),
   checkTable('employee_salary_fines', 'id, salary_profile_id, fine_date, amount, reason, created_by_name', false),
   checkTable('employee_salary_absences', 'id, salary_profile_id, absence_date', false),
+  checkTable('employee_salary_telegram_links', 'salary_profile_id, telegram_user_id, chat_id, preferred_language, notifications_enabled, linked_at', false),
+  checkTable('employee_salary_notification_deliveries', 'id, salary_profile_id, notification_date, notification_type, status, sent_at', false),
   checkTable('accounting_record_audit', 'id, entity_type, entity_id, action, old_record, new_record, changed_by, changed_at', false),
   checkTable('restaurant_tables', 'id, name, status, zone_id, zone_name, capacity, sort_order, is_active, reserved_for_name, reserved_for_phone, reserved_at, reserved_until, reservation_notes, created_at, updated_at'),
   checkTable('table_zones', 'id, name, sort_order, is_active, created_at, updated_at'),

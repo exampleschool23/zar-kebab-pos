@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BadgeMinus, CalendarX2, Loader2, Plus, Save, Users, WalletCards } from 'lucide-react'
+import { ArrowLeft, BadgeMinus, CalendarX2, Copy, Loader2, Plus, Save, Send, Users, WalletCards } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -210,6 +210,13 @@ export default function Salaries() {
       empty: 'Maosh sozlamalari yo‘q',
       migration: 'Maosh jadvallari yangilanmagan. supabase/054_employee_salary_profiles.sql dan supabase/063_employee_salary_absences.sql gacha va supabase/099_employee_salary_fines.sql migratsiyalarini ishga tushiring.',
       readOnly: 'Bu sahifa faqat egasi uchun.',
+      telegramTitle: 'Telegram xabarnomalari',
+      telegramHelp: 'Xodimga 30 daqiqada muddati tugaydigan shaxsiy ulanish havolasini yuboring.',
+      telegramCreateLink: 'Ulanish havolasini yaratish',
+      telegramCopy: 'Nusxalash',
+      telegramCopied: 'Telegram havolasi nusxalandi',
+      telegramLinked: 'Telegram ulangan',
+      telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME sozlanmagan.',
     },
     ru: {
       title: 'Зарплаты',
@@ -284,6 +291,13 @@ export default function Salaries() {
       empty: 'Настроек зарплаты пока нет',
       migration: 'Таблицы зарплат не обновлены. Запустите миграции с supabase/054_employee_salary_profiles.sql по supabase/063_employee_salary_absences.sql и supabase/099_employee_salary_fines.sql.',
       readOnly: 'Эта страница доступна только владельцу.',
+      telegramTitle: 'Telegram-уведомления',
+      telegramHelp: 'Отправьте сотруднику личную ссылку, которая действует 30 минут.',
+      telegramCreateLink: 'Создать ссылку',
+      telegramCopy: 'Копировать',
+      telegramCopied: 'Ссылка Telegram скопирована',
+      telegramLinked: 'Telegram подключён',
+      telegramBotMissing: 'Не настроен VITE_TELEGRAM_BOT_USERNAME.',
     },
     en: {
       title: 'Salaries',
@@ -358,11 +372,21 @@ export default function Salaries() {
       empty: 'No salary settings yet',
       migration: 'Salary tables are not up to date. Run migrations from supabase/054_employee_salary_profiles.sql through supabase/063_employee_salary_absences.sql, plus supabase/099_employee_salary_fines.sql.',
       readOnly: 'Only the owner can manage this page.',
+      telegramTitle: 'Telegram notifications',
+      telegramHelp: 'Send the employee a private link that expires after 30 minutes.',
+      telegramCreateLink: 'Create link',
+      telegramCopy: 'Copy',
+      telegramCopied: 'Telegram link copied',
+      telegramLinked: 'Telegram linked',
+      telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME is not configured.',
     },
   }
   const l = L[lang] || L.en
 
   const [salaryProfiles, setSalaryProfiles] = useState([])
+  const [telegramLinks, setTelegramLinks] = useState([])
+  const [telegramSalaryProfileId, setTelegramSalaryProfileId] = useState('')
+  const [telegramInviteUrl, setTelegramInviteUrl] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState('')
   const [error, setError] = useState('')
@@ -400,7 +424,7 @@ export default function Salaries() {
   async function loadData() {
     setLoading(true)
     setError('')
-    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes] = await Promise.all([
+    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, telegramLinkRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
       supabase.from('employee_salary_profiles').select('*').order('employee_name'),
       supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
@@ -408,6 +432,7 @@ export default function Salaries() {
       supabase.from('employee_salary_bonuses').select('*').order('bonus_date', { ascending: false }),
       supabase.from('employee_salary_fines').select('*').order('fine_date', { ascending: false }),
       supabase.from('employee_salary_absences').select('*').order('absence_date', { ascending: false }),
+      supabase.from('employee_salary_telegram_links').select('salary_profile_id, telegram_user_id, linked_at, notifications_enabled'),
     ])
     if (profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error) {
       const err = profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
@@ -418,11 +443,45 @@ export default function Salaries() {
       const teamRows = teamRes.data || []
       setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], fineRes.error ? [] : fineRes.data || [], absenceRes.data || [], teamRows)
         .filter(salaryProfile => !salaryProfile.deleted_at))
+      setTelegramLinks(telegramLinkRes.error ? [] : telegramLinkRes.data || [])
     }
     setLoading(false)
   }
 
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function createTelegramInvite() {
+    const botUsername = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').trim().replace(/^@/, '')
+    if (!botUsername) {
+      setError(l.telegramBotMissing)
+      return
+    }
+    if (!canManage || !telegramSalaryProfileId) return
+
+    setError('')
+    setMessage('')
+    setTelegramInviteUrl('')
+    setSaving('telegram-link')
+    const { data: token, error: linkError } = await supabase.rpc('create_employee_salary_telegram_link', {
+      target_salary_profile_id: telegramSalaryProfileId,
+    })
+    setSaving('')
+    if (linkError) {
+      setError(linkError.message)
+      return
+    }
+    setTelegramInviteUrl(`https://t.me/${botUsername}?start=employee_${token}`)
+  }
+
+  async function copyTelegramInvite() {
+    if (!telegramInviteUrl) return
+    try {
+      await navigator.clipboard.writeText(telegramInviteUrl)
+      setMessage(l.telegramCopied)
+    } catch {
+      setError(telegramInviteUrl)
+    }
+  }
 
   const sortedSalaryProfiles = useMemo(() => (
     [...salaryProfiles].sort((a, b) => {
@@ -1139,6 +1198,51 @@ export default function Salaries() {
                   >
                     {saving === 'rate-create' ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}{l.save}
                   </button>
+                </div>
+              </div>
+
+              <div className="h-full rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
+                <CardHeading icon={Send} title={l.telegramTitle} description={l.telegramHelp} tone="blue" />
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <Field label={l.selectEmployee}>
+                    <select
+                      value={telegramSalaryProfileId}
+                      onChange={event => {
+                        setTelegramSalaryProfileId(event.target.value)
+                        setTelegramInviteUrl('')
+                      }}
+                      className={FIELD}
+                      disabled={!canManage || loading}
+                    >
+                      <option value="">{l.selectEmployee}</option>
+                      {activeSalaryProfiles.map(item => {
+                        const linked = telegramLinks.some(link => link.salary_profile_id === item.id && link.linked_at)
+                        const name = item.employee_name || item.profile?.full_name || item.profile?.email
+                        return <option key={item.id} value={item.id}>{name}{linked ? ` · ${l.telegramLinked}` : ''}</option>
+                      })}
+                    </select>
+                  </Field>
+                  <button
+                    type="button"
+                    onClick={createTelegramInvite}
+                    disabled={!canManage || loading || !telegramSalaryProfileId || saving === 'telegram-link'}
+                    className="inline-flex h-11 self-end items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+                  >
+                    {saving === 'telegram-link' ? <Loader2 size={16} className="animate-spin" /> : <Send size={15} />}
+                    {l.telegramCreateLink}
+                  </button>
+                  {telegramInviteUrl && (
+                    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-2 sm:col-span-2">
+                      <input readOnly value={telegramInviteUrl} className={`${FIELD} min-w-0 bg-white font-mono text-xs`} />
+                      <button
+                        type="button"
+                        onClick={copyTelegramInvite}
+                        className="inline-flex h-11 flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-4 text-sm font-black text-white hover:bg-black"
+                      >
+                        <Copy size={15} />{l.telegramCopy}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

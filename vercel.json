@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/telegram/daily-salary",
+      "schedule": "0 19 * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/:path*",

@@ -226,6 +226,9 @@ Run migrations in order. Important recent files:
 - `supabase/106_atomic_paid_order_stock_deduction.sql`
   Deducts non-cancelled piece and selected-variant shelf stock in the same transaction that marks an order paid, with an order-level marker that makes payment retries idempotent.
 
+- `supabase/107_employee_salary_telegram_notifications.sql`
+  Adds verified employee-to-Telegram links, expiring one-time invite tokens, notification preferences, and duplicate-safe daily salary delivery history.
+
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
 ## Supabase Notes
