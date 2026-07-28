@@ -1,21 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import {
-  buildEmployeeFineMessage,
-  getEmployeeFineChatIds,
-} from '../api/telegram/_lib/fineMessages.js'
-
-test('employee fine notifications prefer the dedicated team chat and fall back to the order group', () => {
-  assert.deepEqual(getEmployeeFineChatIds({
-    TELEGRAM_TEAM_CHAT_ID: '-100-team',
-    TELEGRAM_COMPLETED_ORDERS_CHAT_ID: '-100-orders',
-  }), ['-100-team'])
-
-  assert.deepEqual(getEmployeeFineChatIds({
-    TELEGRAM_COMPLETED_ORDERS_CHAT_IDS: '-100-orders,-100-backup',
-  }), ['-100-orders', '-100-backup'])
-})
+import { buildEmployeeFineMessage } from '../api/telegram/_lib/fineMessages.js'
 
 test('employee fine notification contains persisted details and escapes Telegram HTML', () => {
   const text = buildEmployeeFineMessage({
@@ -26,8 +12,8 @@ test('employee fine notification contains persisted details and escapes Telegram
     created_by_name: 'Владелец > Админ',
   })
 
-  assert.match(text, /Штраф сотруднику/)
-  assert.match(text, /Али &lt;Сотрудник&gt;/)
+  assert.match(text, /Уведомление о штрафе/)
+  assert.match(text, /Здравствуйте, Али &lt;Сотрудник&gt;!/)
   assert.match(text, /150 000 UZS/)
   assert.match(text, /21\.07\.2026/)
   assert.match(text, /Опоздание &amp; нарушение/)
@@ -42,6 +28,11 @@ test('fine notification endpoint authenticates accounting access and reads the s
   assert.match(api, /access\?\.includes\('expenses'\)/)
   assert.match(api, /fine\.created_by !== user\.id/)
   assert.match(api, /buildEmployeeFineMessage/)
+  assert.match(api, /\.from\('employee_salary_telegram_links'\)/)
+  assert.match(api, /\.eq\('salary_profile_id', fine\.salary_profile_id\)/)
+  assert.match(api, /sendTelegramMessage\(employeeLink\.chat_id, text\)/)
+  assert.doesNotMatch(api, /TELEGRAM_TEAM_CHAT_ID/)
+  assert.doesNotMatch(api, /getEmployeeFineChatIds/)
   assert.match(salaries, /\.select\('id'\)\.single\(\)/)
   assert.match(salaries, /notifyTelegramEmployeeFine\(writeResult\.data\?\.id\)/)
 })

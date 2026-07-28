@@ -16,14 +16,16 @@ VITE_TELEGRAM_BOT_USERNAME=your_bot_username
 TELEGRAM_WEBHOOK_SECRET=use-a-different-long-random-string
 CRON_SECRET=use-another-long-random-string
 TELEGRAM_COMPLETED_ORDERS_CHAT_ID=
-TELEGRAM_TEAM_CHAT_ID=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Keep `TELEGRAM_BOT_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` server-only. Do not prefix them with `VITE_`.
 `VITE_TELEGRAM_BOT_USERNAME` contains only the bot's public username and is safe for the browser.
 Set `TELEGRAM_COMPLETED_ORDERS_CHAT_ID` to the Telegram group chat id that should receive paid order completion messages. Add the bot to the group first; group and supergroup chat ids are usually negative numbers. You can also provide multiple chat ids separated by commas.
-Set `TELEGRAM_TEAM_CHAT_ID` to the ZarKebab Team group id for employee fine notifications. If it is empty, fine notifications use `TELEGRAM_COMPLETED_ORDERS_CHAT_ID` as a fallback. Both settings also support plural `..._CHAT_IDS` variables with comma-separated ids.
+New fines are sent privately to the Telegram account linked to the affected
+employee salary profile. Fine notifications never use the completed-order
+group chat. If the employee is not linked or has disabled notifications, the
+fine is saved normally and the Telegram notification is skipped.
 
 ### BotFather setup
 

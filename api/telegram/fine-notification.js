@@ -1,6 +1,6 @@
 import { json, methodNotAllowed, readJson, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
-import { buildEmployeeFineMessage, getEmployeeFineChatIds } from './_lib/fineMessages.js'
+import { buildEmployeeFineMessage } from './_lib/fineMessages.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
 
 const EDITOR_ROLES = new Set(['owner', 'admin'])
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     const { supabase, user } = await requireExpensesWriteAccess(req)
     const { data: fine, error } = await supabase
       .from('employee_salary_fines')
-      .select('id, fine_date, amount, reason, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)')
+      .select('id, salary_profile_id, fine_date, amount, reason, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)')
       .eq('id', fineId)
       .maybeSingle()
     if (error) throw error
@@ -57,23 +57,23 @@ export default async function handler(req, res) {
       return json(res, 404, { error: 'Fine not found' })
     }
 
-    const chatIds = getEmployeeFineChatIds()
-    if (chatIds.length === 0) return json(res, 200, { skipped: true })
+    const { data: employeeLink, error: linkError } = await supabase
+      .from('employee_salary_telegram_links')
+      .select('chat_id, notifications_enabled')
+      .eq('salary_profile_id', fine.salary_profile_id)
+      .maybeSingle()
+    if (linkError) throw linkError
+    if (!employeeLink?.chat_id || employeeLink.notifications_enabled === false) {
+      return json(res, 200, { skipped: true, reason: 'employee_not_linked' })
+    }
 
     const text = buildEmployeeFineMessage({
       ...fine,
       employee_name: fine.salary_profile?.employee_name || '',
     })
-    const results = await Promise.allSettled(chatIds.map(chatId => sendTelegramMessage(chatId, text)))
-    const failedCount = results.filter(result => result.status === 'rejected').length
-    if (failedCount > 0) {
-      for (const result of results) {
-        if (result.status === 'rejected') console.error('[telegram/fine-notification] send failed:', result.reason)
-      }
-      return json(res, 502, { error: 'Could not notify every Telegram chat', failedCount })
-    }
+    await sendTelegramMessage(employeeLink.chat_id, text)
 
-    return json(res, 200, { ok: true, sentCount: results.length })
+    return json(res, 200, { ok: true, sentCount: 1 })
   } catch (error) {
     console.error('[telegram/fine-notification]', error)
     return json(res, error?.status || 400, { error: error.message || 'Could not notify Telegram' })
