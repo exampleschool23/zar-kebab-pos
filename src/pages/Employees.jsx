@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CalendarDays, CalendarX2, ChevronDown, ChevronUp, History, Loader2, Power, RefreshCw, Trash2, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Power, RefreshCw, Trash2, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -59,7 +59,9 @@ export default function Employees() {
   const lang = state.lang || 'ru'
   const today = todayExpenseDate()
   const canManage = canEditFeature(profile || { role: state.user?.role }, 'expenses')
-  const canDeleteHistory = canManage && normalizeRole(profile?.role || state.user?.role) === 'owner'
+  const isOwner = normalizeRole(profile?.role || state.user?.role) === 'owner'
+  const canEditName = canManage && isOwner
+  const canDeleteHistory = canManage && isOwner
 
   const L = {
     uz: {
@@ -87,6 +89,11 @@ export default function Employees() {
       fineLabel: 'Jarima',
       absenceHistory: 'Kelmagan kunlar',
       absentLabel: 'Kelmagan',
+      editName: 'Ismni o‘zgartirish',
+      employeeName: 'Xodim ismi',
+      saveName: 'Saqlash',
+      cancel: 'Bekor qilish',
+      nameRequired: 'Xodim ismini kiriting.',
       deactivate: 'Faolsizlantirish',
       reactivate: 'Qayta yoqish',
       delete: 'O‘chirish',
@@ -119,6 +126,11 @@ export default function Employees() {
       fineLabel: 'Штраф',
       absenceHistory: 'Дни отсутствия',
       absentLabel: 'Отсутствовал',
+      editName: 'Изменить имя',
+      employeeName: 'Имя сотрудника',
+      saveName: 'Сохранить',
+      cancel: 'Отмена',
+      nameRequired: 'Введите имя сотрудника.',
       deactivate: 'Деактивировать',
       reactivate: 'Включить снова',
       delete: 'Удалить',
@@ -151,6 +163,11 @@ export default function Employees() {
       fineLabel: 'Fine',
       absenceHistory: 'Absent dates',
       absentLabel: 'Absent',
+      editName: 'Edit name',
+      employeeName: 'Employee name',
+      saveName: 'Save',
+      cancel: 'Cancel',
+      nameRequired: 'Enter the employee name.',
       deactivate: 'Deactivate',
       reactivate: 'Reactivate',
       delete: 'Delete',
@@ -168,6 +185,8 @@ export default function Employees() {
   const [deactivateDates, setDeactivateDates] = useState({})
   const [inactiveExpanded, setInactiveExpanded] = useState(false)
   const [historyOpenId, setHistoryOpenId] = useState(null)
+  const [editingNameId, setEditingNameId] = useState(null)
+  const [editingName, setEditingName] = useState('')
   const [error, setError] = useState('')
 
   async function loadEmployees() {
@@ -313,6 +332,43 @@ export default function Employees() {
     await loadEmployees()
   }
 
+  function startNameEdit(employee) {
+    if (!canEditName || !employee?.id) return
+    setEditingNameId(employee.id)
+    setEditingName(employeeName(employee))
+    setConfirmActionKey('')
+    setError('')
+  }
+
+  function cancelNameEdit() {
+    setEditingNameId(null)
+    setEditingName('')
+  }
+
+  async function saveEmployeeName(employee) {
+    if (!canEditName || !employee?.id || editingNameId !== employee.id) return
+    const nextName = editingName.trim()
+    if (!nextName) {
+      setError(l.nameRequired)
+      return
+    }
+
+    const key = `employee-name-${employee.id}`
+    setSaving(key)
+    setError('')
+    const { error: updateError } = await supabase
+      .from('employee_salary_profiles')
+      .update({ employee_name: nextName })
+      .eq('id', employee.id)
+    setSaving('')
+    if (updateError) {
+      setError(updateError.message)
+      return
+    }
+    cancelNameEdit()
+    await loadEmployees()
+  }
+
   async function deleteHistoryEntry(entry) {
     if (!canDeleteHistory || !entry?.id) return
     const tableByType = {
@@ -405,6 +461,8 @@ export default function Employees() {
                 const activeUntil = getSalaryActiveUntil(employee, today)
                 const toggleKey = `employee-toggle-${employee.id}`
                 const confirmToggle = confirmActionKey === toggleKey
+                const editingEmployeeName = editingNameId === employee.id
+                const nameSavingKey = `employee-name-${employee.id}`
                 const joinedDate = String(employee.joined_at || '').slice(0, 10)
                 const deactivateDate = normalizeSalaryEndDate(employee, deactivateDates[employee.id], today)
                 return (
@@ -426,8 +484,59 @@ export default function Employees() {
                         }`}>
                           {absentToday ? <CalendarX2 size={19} /> : <UserRound size={19} />}
                         </div>
-                        <div className="min-w-0">
-                          <h2 className={`truncate text-base font-black ${inactive ? 'text-[#6B7280]' : 'text-[#1F2937]'}`}>{employeeName(employee)}</h2>
+                        <div className="min-w-0 flex-1">
+                          {editingEmployeeName ? (
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={editingName}
+                                onChange={event => setEditingName(event.target.value)}
+                                onKeyDown={event => {
+                                  if (event.key === 'Enter') saveEmployeeName(employee)
+                                  if (event.key === 'Escape') cancelNameEdit()
+                                }}
+                                maxLength={120}
+                                autoFocus
+                                aria-label={l.employeeName}
+                                className="h-9 min-w-0 flex-1 rounded-lg border border-orange-300 bg-white px-2.5 text-sm font-black text-[#1F2937] outline-none ring-2 ring-orange-100"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => saveEmployeeName(employee)}
+                                disabled={saving === nameSavingKey}
+                                title={l.saveName}
+                                aria-label={l.saveName}
+                                className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#ff5a00] text-white disabled:opacity-60"
+                              >
+                                {saving === nameSavingKey ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelNameEdit}
+                                disabled={saving === nameSavingKey}
+                                title={l.cancel}
+                                aria-label={l.cancel}
+                                className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#6B7280] disabled:opacity-60"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <h2 className={`truncate text-base font-black ${inactive ? 'text-[#6B7280]' : 'text-[#1F2937]'}`}>{employeeName(employee)}</h2>
+                              {canEditName && (
+                                <button
+                                  type="button"
+                                  onClick={() => startNameEdit(employee)}
+                                  title={l.editName}
+                                  aria-label={`${l.editName}: ${employeeName(employee)}`}
+                                  className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[#9CA3AF] transition-colors hover:bg-orange-50 hover:text-[#ff5a00]"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{employee.profile?.role || l.status}</p>
                         </div>
                       </div>
