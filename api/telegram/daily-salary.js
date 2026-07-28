@@ -117,7 +117,7 @@ export default async function handler(req, res) {
       try {
         const response = await sendTelegramMessage(
           link.chat_id,
-          buildDailySalaryMessage(salaryProfile, notificationDate, link.preferred_language)
+          buildDailySalaryMessage(salaryProfile, notificationDate, 'ru')
         )
         await Promise.all([
           supabase.from('employee_salary_notification_deliveries').update({

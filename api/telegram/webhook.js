@@ -21,27 +21,17 @@ function requireWebhookSecret(req) {
   }
 }
 
-function linkedMessage(language) {
-  const messages = {
-    uz: '✅ Telegram hisobingiz maosh profilingizga xavfsiz bog‘landi.',
-    ru: '✅ Ваш Telegram безопасно привязан к профилю зарплаты.',
-    en: '✅ Your Telegram account is securely linked to your salary profile.',
-  }
-  return messages[normalizeSalaryNotificationLanguage(language)]
+function linkedMessage() {
+  return '✅ Ваш Telegram-аккаунт успешно привязан к профилю зарплаты.'
 }
 
-function invalidLinkMessage(language) {
-  const messages = {
-    uz: 'Bu havola yaroqsiz yoki muddati tugagan. Administratordan yangi havola so‘rang.',
-    ru: 'Эта ссылка недействительна или устарела. Попросите администратора создать новую.',
-    en: 'This link is invalid or expired. Ask an administrator for a new one.',
-  }
-  return messages[normalizeSalaryNotificationLanguage(language)]
+function invalidLinkMessage() {
+  return 'Эта ссылка недействительна или устарела. Попросите администратора создать новую.'
 }
 
 async function linkEmployee(supabase, message, token) {
   const user = message.from
-  const language = normalizeSalaryNotificationLanguage(user?.language_code)
+  const language = 'ru'
   const { data: link, error: findError } = await supabase
     .from('employee_salary_telegram_links')
     .select('salary_profile_id')
@@ -51,7 +41,7 @@ async function linkEmployee(supabase, message, token) {
   if (findError) throw findError
 
   if (!link) {
-    await sendTelegramMessage(message.chat.id, invalidLinkMessage(language))
+    await sendTelegramMessage(message.chat.id, invalidLinkMessage())
     return
   }
 
@@ -76,7 +66,7 @@ async function linkEmployee(supabase, message, token) {
   if (updateError) throw updateError
   await sendTelegramMessage(
     message.chat.id,
-    updated ? linkedMessage(language) : invalidLinkMessage(language)
+    updated ? linkedMessage() : invalidLinkMessage()
   )
 }
 
