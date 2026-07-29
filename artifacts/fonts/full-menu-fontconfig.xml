@@ -1,8 +1,0 @@
-<?xml version="1.0"?>
-<fontconfig>
-  <dir>/Users/hoggish/Desktop/ZARKEBAB/artifacts/fonts</dir>
-  <dir>/System/Library/Fonts</dir>
-  <dir>/System/Library/Fonts/Supplemental</dir>
-  <dir>/Library/Fonts</dir>
-  <cachedir>/Users/hoggish/Desktop/ZARKEBAB/artifacts/.fontconfig-cache</cachedir>
-</fontconfig>
