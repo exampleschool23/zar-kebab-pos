@@ -27,13 +27,13 @@ export async function notifyTelegramEmployeeFine(fineId) {
     if (sessionError) throw sessionError
     if (!session?.access_token) throw new Error('Authentication required')
 
-    const response = await fetch('/api/telegram/fine-notification', {
+    const response = await fetch('/api/telegram/employee-notification', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ fineId }),
+      body: JSON.stringify({ type: 'fine', fineId }),
     })
     if (!response.ok) throw new Error(`Telegram fine notification failed with ${response.status}`)
     return true
@@ -50,13 +50,13 @@ export async function notifyTelegramEmployeePayment(paymentId) {
     if (sessionError) throw sessionError
     if (!session?.access_token) throw new Error('Authentication required')
 
-    const response = await fetch('/api/telegram/payment-notification', {
+    const response = await fetch('/api/telegram/employee-notification', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ paymentId }),
+      body: JSON.stringify({ type: 'payment', paymentId }),
     })
     if (!response.ok) throw new Error(`Telegram payment notification failed with ${response.status}`)
     const result = await response.json().catch(() => ({}))

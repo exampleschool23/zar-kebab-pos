@@ -21,7 +21,7 @@ test('employee fine notification contains persisted details and escapes Telegram
 })
 
 test('fine notification endpoint authenticates accounting access and reads the saved fine', () => {
-  const api = fs.readFileSync(new URL('../api/telegram/fine-notification.js', import.meta.url), 'utf8')
+  const api = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
   const salaries = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
 
   assert.match(api, /supabase\.auth\.getUser\(token\)/)
@@ -31,6 +31,7 @@ test('fine notification endpoint authenticates accounting access and reads the s
   assert.match(api, /\.from\('employee_salary_telegram_links'\)/)
   assert.match(api, /\.eq\('salary_profile_id', fine\.salary_profile_id\)/)
   assert.match(api, /sendTelegramMessage\(employeeLink\.chat_id, text\)/)
+  assert.match(api, /notificationType === 'fine'/)
   assert.doesNotMatch(api, /TELEGRAM_TEAM_CHAT_ID/)
   assert.doesNotMatch(api, /getEmployeeFineChatIds/)
   assert.match(salaries, /\.select\('id'\)\.single\(\)/)

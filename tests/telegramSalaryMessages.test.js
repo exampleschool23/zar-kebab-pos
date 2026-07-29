@@ -89,18 +89,19 @@ test('salary payment notification includes the saved payment and remaining due',
 test('recorded salary payments trigger the authenticated Telegram payment endpoint', () => {
   const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
   const notifications = fs.readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
-  const endpoint = fs.readFileSync(new URL('../api/telegram/payment-notification.js', import.meta.url), 'utf8')
+  const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
 
   assert.match(salariesPage, /\.select\('id'\)\.single\(\)/)
   assert.match(salariesPage, /notifyTelegramEmployeePayment\(writeResult\.data\?\.id\)/)
-  assert.match(notifications, /\/api\/telegram\/payment-notification/)
+  assert.match(notifications, /\/api\/telegram\/employee-notification/)
+  assert.match(notifications, /type: 'payment'/)
   assert.match(endpoint, /payment\.created_by !== user\.id/)
   assert.match(endpoint, /buildEmployeePaymentMessage/)
   assert.match(endpoint, /employee_salary_telegram_links/)
 })
 
 test('salary payment notifications persist delivery status and employee confirmation', () => {
-  const endpoint = fs.readFileSync(new URL('../api/telegram/payment-notification.js', import.meta.url), 'utf8')
+  const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
   const webhook = fs.readFileSync(new URL('../api/telegram/webhook.js', import.meta.url), 'utf8')
   const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
   const migration = fs.readFileSync(new URL('../supabase/108_employee_salary_payment_notification_deliveries.sql', import.meta.url), 'utf8')
@@ -116,6 +117,28 @@ test('salary payment notifications persist delivery status and employee confirma
   assert.match(salariesPage, /paymentDeliveryStatusClasses/)
   assert.match(migration, /unique\s+references public\.employee_salary_payments|payment_id\s+uuid not null unique/)
   assert.match(migration, /'confirmed'/)
+})
+
+test('employee salary notifications share one endpoint within the Hobby function limit', () => {
+  const notifications = fs.readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
+  const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
+  const apiRoot = new URL('../api/', import.meta.url)
+
+  function countApiFunctions(directory) {
+    return fs.readdirSync(directory, { withFileTypes: true }).reduce((total, entry) => {
+      if (entry.name === '_lib') return total
+      const child = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, directory)
+      if (entry.isDirectory()) return total + countApiFunctions(child)
+      return total + (entry.name.endsWith('.js') ? 1 : 0)
+    }, 0)
+  }
+
+  assert.equal((notifications.match(/\/api\/telegram\/employee-notification/g) || []).length, 2)
+  assert.match(endpoint, /notificationType === 'fine'/)
+  assert.match(endpoint, /notifyPayment\(supabase, user, paymentId\)/)
+  assert.equal(fs.existsSync(new URL('../api/telegram/fine-notification.js', import.meta.url)), false)
+  assert.equal(fs.existsSync(new URL('../api/telegram/payment-notification.js', import.meta.url)), false)
+  assert.ok(countApiFunctions(apiRoot) <= 12)
 })
 
 test('daily salary message clearly shows a recorded absence and its note', () => {
