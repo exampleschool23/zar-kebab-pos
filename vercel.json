@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/telegram/daily-salary",
-      "schedule": "0 19 * * *"
+      "schedule": "30 17 * * *"
     }
   ],
   "redirects": [

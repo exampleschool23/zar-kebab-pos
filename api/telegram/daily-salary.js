@@ -4,13 +4,6 @@ import { buildDailySalaryMessage, getTashkentDate } from './_lib/salaryMessages.
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
 
-function completedTashkentDate(now = new Date()) {
-  const today = getTashkentDate(now)
-  const date = new Date(`${today}T12:00:00.000Z`)
-  date.setUTCDate(date.getUTCDate() - 1)
-  return date.toISOString().slice(0, 10)
-}
-
 function requireCronSecret(req) {
   const expected = process.env.CRON_SECRET
   if (!expected || getBearerToken(req) !== expected) {
@@ -41,7 +34,7 @@ export default async function handler(req, res) {
   try {
     requireCronSecret(req)
     const supabase = getSupabaseAdmin()
-    const notificationDate = completedTashkentDate()
+    const notificationDate = getTashkentDate()
     const { data: links, error: linksError } = await supabase
       .from('employee_salary_telegram_links')
       .select('salary_profile_id, chat_id, preferred_language')
