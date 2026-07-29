@@ -12,14 +12,26 @@ import {
   hasOrdersCostCoverage,
 } from '../src/lib/profit.js'
 
-test('sale profit summary reports unit gain and selling-price margin percentage', () => {
+test('sale profit summary reports unit gain, selling-price margin, and cost markup percentages', () => {
   assert.deepEqual(getSaleProfitSummary(25_000, 10_000), {
     profit: 15_000,
     marginPct: 60,
+    markupPct: 150,
   })
   assert.deepEqual(getSaleProfitSummary(10_000, 12_500), {
     profit: -2_500,
     marginPct: -25,
+    markupPct: -20,
+  })
+  assert.deepEqual(getSaleProfitSummary(12_000, 4_166), {
+    profit: 7_834,
+    marginPct: 65.3,
+    markupPct: 188,
+  })
+  assert.deepEqual(getSaleProfitSummary(10_000, 0), {
+    profit: 10_000,
+    marginPct: 100,
+    markupPct: null,
   })
   assert.equal(getSaleProfitSummary(0, 0), null)
 })

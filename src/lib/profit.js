@@ -20,6 +20,7 @@ export function getSaleProfitSummary(price, cost) {
   return {
     profit: Math.round(profit),
     marginPct: Math.round((profit / sellingPrice) * 1000) / 10,
+    markupPct: realCost > 0 ? Math.round((profit / realCost) * 1000) / 10 : null,
   }
 }
 

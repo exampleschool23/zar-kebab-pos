@@ -1365,6 +1365,8 @@ test('menu costs stay private, snapshot onto sold items, and drive profit output
   assert.match(adminMenu, /variant_costs: editorToVariantCosts\(form\.option_groups_editor\)/)
   assert.match(adminMenu, /function ProfitMarginPreview/)
   assert.match(adminMenu, /getSaleProfitSummary\(numberFromMoneyInput\(price\), numberFromMoneyInput\(cost\)\)/)
+  assert.match(adminMenu, /summary\.markupPct/)
+  assert.match(adminMenu, /markup: 'Наценка'/)
   assert.match(adminMenu, /<ProfitMarginPreview price=\{form\.price\} cost=\{form\.cost_price\} lang=\{lang\}/)
   assert.match(adminMenu, /<ProfitMarginPreview price=\{option\.price\} cost=\{effectiveCost\} lang=\{lang\} inheritedCost=\{!hasOwnCost\}/)
   assert.match(profit, /getOrderRevenueTotal\(order\) - getOrderCostTotal\(order, menuItemMap\)/)

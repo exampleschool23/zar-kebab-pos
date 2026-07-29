@@ -209,12 +209,14 @@ function ProfitMarginPreview({ price, cost, lang, inheritedCost = false }) {
   if (!summary) return null
 
   const labels = lang === 'uz'
-    ? { profit: 'Sotuv foydasi', margin: 'Foyda marjasi', inherited: 'Asosiy tannarx' }
+    ? { profit: 'Sotuv foydasi', markup: 'Ustama', inherited: 'Asosiy tannarx' }
     : lang === 'ru'
-      ? { profit: 'Прибыль с продажи', margin: 'Маржа', inherited: 'Себестоимость товара' }
-      : { profit: 'Profit per sale', margin: 'Profit margin', inherited: 'Parent cost' }
+      ? { profit: 'Прибыль с продажи', markup: 'Наценка', inherited: 'Себестоимость товара' }
+      : { profit: 'Profit per sale', markup: 'Markup', inherited: 'Parent cost' }
   const locale = lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ'
-  const margin = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(summary.marginPct)
+  const markup = summary.markupPct == null
+    ? '—'
+    : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(summary.markupPct)}%`
   const positive = summary.profit >= 0
 
   return (
@@ -225,7 +227,7 @@ function ProfitMarginPreview({ price, cost, lang, inheritedCost = false }) {
       </div>
       <div className={`flex items-center gap-2 text-xs font-black tabular-nums ${positive ? 'text-emerald-700' : 'text-red-700'}`}>
         <span>{formatCurrency(summary.profit)}</span>
-        <span className={`rounded-full px-2 py-0.5 ${positive ? 'bg-emerald-100' : 'bg-red-100'}`}>{labels.margin}: {margin}%</span>
+        <span className={`rounded-full px-2 py-0.5 ${positive ? 'bg-emerald-100' : 'bg-red-100'}`}>{labels.markup}: {markup}</span>
       </div>
     </div>
   )
