@@ -92,6 +92,19 @@ test('database health requires the employee salary fines migration', async () =>
   assert.match(cliHealthSource, /checkTable\('employee_salary_fines'/)
 })
 
+test('database health requires auditable salary payment notifications', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    missingTable: 'employee_salary_payment_notification_deliveries',
+  }))
+
+  assert.equal(result.ok, false)
+  assert.match(
+    result.failed.find(check => check.name === 'employee_salary_payment_notification_deliveries').hint,
+    /108_employee_salary_payment_notification_deliveries/
+  )
+  assert.match(cliHealthSource, /checkTable\('employee_salary_payment_notification_deliveries'/)
+})
+
 test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)

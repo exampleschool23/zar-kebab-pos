@@ -7,6 +7,7 @@ import {
   getTashkentDate,
   parseEmployeeStartToken,
 } from '../api/telegram/_lib/salaryMessages.js'
+import { buildEmployeePaymentMessage } from '../api/telegram/_lib/paymentMessages.js'
 
 const salaryProfile = {
   id: 'salary-1',
@@ -62,6 +63,59 @@ test('daily salary message formats date and shows bonuses, fines, and salary pay
   assert.match(message, /&lt;Late arrival&gt;/)
   assert.doesNotMatch(message, /<Good work>/)
   assert.doesNotMatch(message, /<Late arrival>/)
+})
+
+test('salary payment notification includes the saved payment and remaining due', () => {
+  const message = buildEmployeePaymentMessage({
+    employee_name: 'Зилола <кассир>',
+    paid_date: '2026-07-29',
+    amount: 300_000,
+    payment_method: 'cash',
+    note: '<Аванс>',
+    created_by_name: 'Jasurbek & Co',
+  }, 200_000, 'ru')
+
+  assert.match(message, /Выплата зарплаты/)
+  assert.match(message, /Зилола &lt;кассир&gt;/)
+  assert.match(message, /Выплачено:<\/b> 300 000 UZS/)
+  assert.match(message, /Дата выплаты:<\/b> 29\.07\.2026/)
+  assert.match(message, /Наличные/)
+  assert.match(message, /&lt;Аванс&gt;/)
+  assert.match(message, /Осталось к выплате:<\/b> 200 000 UZS/)
+  assert.match(message, /Jasurbek &amp; Co/)
+  assert.doesNotMatch(message, /<Аванс>/)
+})
+
+test('recorded salary payments trigger the authenticated Telegram payment endpoint', () => {
+  const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
+  const notifications = fs.readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
+  const endpoint = fs.readFileSync(new URL('../api/telegram/payment-notification.js', import.meta.url), 'utf8')
+
+  assert.match(salariesPage, /\.select\('id'\)\.single\(\)/)
+  assert.match(salariesPage, /notifyTelegramEmployeePayment\(writeResult\.data\?\.id\)/)
+  assert.match(notifications, /\/api\/telegram\/payment-notification/)
+  assert.match(endpoint, /payment\.created_by !== user\.id/)
+  assert.match(endpoint, /buildEmployeePaymentMessage/)
+  assert.match(endpoint, /employee_salary_telegram_links/)
+})
+
+test('salary payment notifications persist delivery status and employee confirmation', () => {
+  const endpoint = fs.readFileSync(new URL('../api/telegram/payment-notification.js', import.meta.url), 'utf8')
+  const webhook = fs.readFileSync(new URL('../api/telegram/webhook.js', import.meta.url), 'utf8')
+  const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
+  const migration = fs.readFileSync(new URL('../supabase/108_employee_salary_payment_notification_deliveries.sql', import.meta.url), 'utf8')
+
+  assert.match(endpoint, /employee_salary_payment_notification_deliveries/)
+  assert.match(endpoint, /salary_payment_confirm:\$\{deliveryId\}/)
+  assert.match(endpoint, /telegram_message_id/)
+  assert.match(endpoint, /status: 'failed'/)
+  assert.match(webhook, /handleSalaryPaymentConfirmation/)
+  assert.match(webhook, /confirmed_by_telegram_user_id/)
+  assert.match(webhook, /editMessageReplyMarkup/)
+  assert.match(salariesPage, /telegramDeliveryTitle/)
+  assert.match(salariesPage, /paymentDeliveryStatusClasses/)
+  assert.match(migration, /unique\s+references public\.employee_salary_payments|payment_id\s+uuid not null unique/)
+  assert.match(migration, /'confirmed'/)
 })
 
 test('daily salary message clearly shows a recorded absence and its note', () => {

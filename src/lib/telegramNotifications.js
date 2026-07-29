@@ -42,3 +42,27 @@ export async function notifyTelegramEmployeeFine(fineId) {
     return false
   }
 }
+
+export async function notifyTelegramEmployeePayment(paymentId) {
+  if (!paymentId) return false
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) throw sessionError
+    if (!session?.access_token) throw new Error('Authentication required')
+
+    const response = await fetch('/api/telegram/payment-notification', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ paymentId }),
+    })
+    if (!response.ok) throw new Error(`Telegram payment notification failed with ${response.status}`)
+    const result = await response.json().catch(() => ({}))
+    return result?.ok === true
+  } catch (error) {
+    console.warn('[telegram] employee payment notification failed:', error)
+    return false
+  }
+}

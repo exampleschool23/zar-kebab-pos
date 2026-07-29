@@ -6,7 +6,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
-import { formatLongDate } from '../lib/dateFormat'
+import { formatDateTime, formatLongDate } from '../lib/dateFormat'
 import { canEditFeature } from '../lib/permissions'
 import {
   EXPENSE_PAYMENT_METHODS,
@@ -23,7 +23,7 @@ import {
 } from '../lib/expenses'
 import { todayExpenseDate } from '../lib/expenses'
 import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
-import { notifyTelegramEmployeeFine } from '../lib/telegramNotifications'
+import { notifyTelegramEmployeeFine, notifyTelegramEmployeePayment } from '../lib/telegramNotifications'
 
 const FIELD = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
 const SECTION_GRID = 'grid items-stretch gap-4 lg:grid-cols-2'
@@ -193,6 +193,7 @@ export default function Salaries() {
       createdMessage: 'Xodim maoshi qo‘shildi',
       rateSavedMessage: 'Yangi maosh stavkasi saqlandi',
       transactionSavedMessage: 'Operatsiya saqlandi',
+      paymentTelegramFailed: 'To‘lov saqlandi, lekin Telegram xabari yuborilmadi.',
       absenceSavedMessage: 'Kelmagan kun saqlandi',
       accruedToday: 'Bugungi xarajat',
       history: 'Maosh tarixi',
@@ -217,6 +218,16 @@ export default function Salaries() {
       telegramCopied: 'Telegram havolasi nusxalandi',
       telegramLinked: 'Telegram ulangan',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME sozlanmagan.',
+      telegramDeliveryTitle: 'To‘lov xabarlari holati',
+      telegramDeliveryHelp: 'Telegram yuborilishi va xodim tasdig‘ini kuzating.',
+      telegramDeliveryEmpty: 'Hali to‘lov xabarlari yo‘q.',
+      telegramDeliveryMigration: 'To‘lov xabarlari tarixi uchun 108-migratsiyani ishga tushiring.',
+      telegramStatusPending: 'Kutilmoqda',
+      telegramStatusSent: 'Yuborildi',
+      telegramStatusFailed: 'Xato',
+      telegramStatusSkipped: 'O‘tkazib yuborildi',
+      telegramStatusConfirmed: 'Qabul qilindi',
+      telegramMessageId: 'Xabar',
     },
     ru: {
       title: 'Зарплаты',
@@ -274,6 +285,7 @@ export default function Salaries() {
       createdMessage: 'Зарплата сотрудника добавлена',
       rateSavedMessage: 'Новая ставка зарплаты сохранена',
       transactionSavedMessage: 'Операция сохранена',
+      paymentTelegramFailed: 'Выплата сохранена, но сообщение в Telegram не отправлено.',
       absenceSavedMessage: 'Отсутствие сохранено',
       accruedToday: 'Расход за день',
       history: 'История зарплаты',
@@ -298,6 +310,16 @@ export default function Salaries() {
       telegramCopied: 'Ссылка Telegram скопирована',
       telegramLinked: 'Telegram подключён',
       telegramBotMissing: 'Не настроен VITE_TELEGRAM_BOT_USERNAME.',
+      telegramDeliveryTitle: 'Статус уведомлений о выплатах',
+      telegramDeliveryHelp: 'Проверяйте доставку в Telegram и подтверждение сотрудника.',
+      telegramDeliveryEmpty: 'Уведомлений о выплатах пока нет.',
+      telegramDeliveryMigration: 'Запустите миграцию 108 для истории уведомлений о выплатах.',
+      telegramStatusPending: 'Ожидает',
+      telegramStatusSent: 'Отправлено',
+      telegramStatusFailed: 'Ошибка',
+      telegramStatusSkipped: 'Пропущено',
+      telegramStatusConfirmed: 'Получено',
+      telegramMessageId: 'Сообщение',
     },
     en: {
       title: 'Salaries',
@@ -355,6 +377,7 @@ export default function Salaries() {
       createdMessage: 'Employee salary added',
       rateSavedMessage: 'New salary rate saved',
       transactionSavedMessage: 'Transaction saved',
+      paymentTelegramFailed: 'Payment saved, but the Telegram message was not sent.',
       absenceSavedMessage: 'Absence saved',
       accruedToday: 'Daily expense',
       history: 'Salary history',
@@ -379,12 +402,24 @@ export default function Salaries() {
       telegramCopied: 'Telegram link copied',
       telegramLinked: 'Telegram linked',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME is not configured.',
+      telegramDeliveryTitle: 'Payment notification status',
+      telegramDeliveryHelp: 'Track Telegram delivery and employee confirmation.',
+      telegramDeliveryEmpty: 'No payment notifications yet.',
+      telegramDeliveryMigration: 'Run migration 108 to enable payment notification history.',
+      telegramStatusPending: 'Pending',
+      telegramStatusSent: 'Sent',
+      telegramStatusFailed: 'Failed',
+      telegramStatusSkipped: 'Skipped',
+      telegramStatusConfirmed: 'Received',
+      telegramMessageId: 'Message',
     },
   }
   const l = L[lang] || L.en
 
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [telegramLinks, setTelegramLinks] = useState([])
+  const [paymentDeliveries, setPaymentDeliveries] = useState([])
+  const [paymentDeliveriesUnavailable, setPaymentDeliveriesUnavailable] = useState(false)
   const [telegramSalaryProfileId, setTelegramSalaryProfileId] = useState('')
   const [telegramInviteUrl, setTelegramInviteUrl] = useState('')
   const [loading, setLoading] = useState(true)
@@ -424,7 +459,7 @@ export default function Salaries() {
   async function loadData() {
     setLoading(true)
     setError('')
-    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, telegramLinkRes] = await Promise.all([
+    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, telegramLinkRes, paymentDeliveryRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
       supabase.from('employee_salary_profiles').select('*').order('employee_name'),
       supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
@@ -433,6 +468,10 @@ export default function Salaries() {
       supabase.from('employee_salary_fines').select('*').order('fine_date', { ascending: false }),
       supabase.from('employee_salary_absences').select('*').order('absence_date', { ascending: false }),
       supabase.from('employee_salary_telegram_links').select('salary_profile_id, telegram_user_id, linked_at, notifications_enabled'),
+      supabase.from('employee_salary_payment_notification_deliveries')
+        .select('id, payment_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, confirmed_at')
+        .order('attempted_at', { ascending: false })
+        .limit(20),
     ])
     if (profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error) {
       const err = profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
@@ -444,6 +483,8 @@ export default function Salaries() {
       setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], fineRes.error ? [] : fineRes.data || [], absenceRes.data || [], teamRows)
         .filter(salaryProfile => !salaryProfile.deleted_at))
       setTelegramLinks(telegramLinkRes.error ? [] : telegramLinkRes.data || [])
+      setPaymentDeliveries(paymentDeliveryRes.error ? [] : paymentDeliveryRes.data || [])
+      setPaymentDeliveriesUnavailable(Boolean(paymentDeliveryRes.error))
     }
     setLoading(false)
   }
@@ -498,6 +539,33 @@ export default function Salaries() {
   const activeSalaryProfiles = useMemo(() => (
     sortedSalaryProfiles.filter(item => item.is_active !== false)
   ), [sortedSalaryProfiles])
+  const paymentDeliveryRows = useMemo(() => {
+    const salaryProfileMap = new Map(salaryProfiles.map(item => [item.id, item]))
+    return paymentDeliveries.map(delivery => {
+      const salaryProfile = salaryProfileMap.get(delivery.salary_profile_id)
+      const payment = salaryProfile?.payments?.find(item => item.id === delivery.payment_id)
+      return {
+        ...delivery,
+        employeeName: salaryProfile?.employee_name || salaryProfile?.profile?.full_name || '—',
+        amount: payment?.amount || 0,
+        paidDate: payment?.paid_date || '',
+      }
+    })
+  }, [paymentDeliveries, salaryProfiles])
+  const paymentDeliveryStatusLabels = {
+    pending: l.telegramStatusPending,
+    sent: l.telegramStatusSent,
+    failed: l.telegramStatusFailed,
+    skipped: l.telegramStatusSkipped,
+    confirmed: l.telegramStatusConfirmed,
+  }
+  const paymentDeliveryStatusClasses = {
+    pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    sent: 'border-blue-200 bg-blue-50 text-blue-700',
+    failed: 'border-red-200 bg-red-50 text-red-700',
+    skipped: 'border-gray-200 bg-gray-50 text-gray-600',
+    confirmed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  }
   const transactionSalaryProfiles = useMemo(() => (
     sortedSalaryProfiles.filter(item => canRecordSalaryTransaction(
       item,
@@ -651,7 +719,7 @@ export default function Salaries() {
         note: transactionForm.note || '',
         created_by: profile?.id || null,
         created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
-      })
+      }).select('id').single()
     }
     setSaving('')
     const { error: writeError } = writeResult
@@ -659,7 +727,11 @@ export default function Salaries() {
       setError(writeError.message)
       return
     }
+    let paymentTelegramSent = true
     if (isFine) await notifyTelegramEmployeeFine(writeResult.data?.id)
+    if (!isFine && !isBonus) {
+      paymentTelegramSent = await notifyTelegramEmployeePayment(writeResult.data?.id)
+    }
     setTransactionForm({
       salary_profile_id: '',
       entry_type: 'payment',
@@ -668,7 +740,7 @@ export default function Salaries() {
       payment_method: 'cash',
       note: '',
     })
-    setMessage(l.transactionSavedMessage)
+    setMessage(paymentTelegramSent ? l.transactionSavedMessage : l.paymentTelegramFailed)
     await loadData()
   }
 
@@ -1243,6 +1315,53 @@ export default function Salaries() {
                       </button>
                     </div>
                   )}
+                  <div className="mt-2 border-t border-blue-100 pt-4 sm:col-span-2">
+                    <div className="mb-3">
+                      <p className="text-sm font-black text-[#1F2937]">{l.telegramDeliveryTitle}</p>
+                      <p className="mt-0.5 text-xs font-semibold text-gray-500">{l.telegramDeliveryHelp}</p>
+                    </div>
+                    {paymentDeliveriesUnavailable ? (
+                      <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-800">
+                        {l.telegramDeliveryMigration}
+                      </p>
+                    ) : paymentDeliveryRows.length === 0 ? (
+                      <p className="rounded-xl border border-dashed border-blue-200 bg-blue-50/50 px-3 py-4 text-center text-xs font-semibold text-gray-500">
+                        {l.telegramDeliveryEmpty}
+                      </p>
+                    ) : (
+                      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                        {paymentDeliveryRows.map(delivery => (
+                          <div key={delivery.id} className="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-black text-[#1F2937]">{delivery.employeeName}</p>
+                                <p className="mt-0.5 text-xs font-bold text-gray-600">
+                                  {formatCurrency(delivery.amount)}
+                                  {delivery.paidDate ? ` · ${formatLongDate(delivery.paidDate, lang, delivery.paidDate)}` : ''}
+                                </p>
+                              </div>
+                              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
+                                paymentDeliveryStatusClasses[delivery.status] || paymentDeliveryStatusClasses.pending
+                              }`}>
+                                {paymentDeliveryStatusLabels[delivery.status] || delivery.status}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold text-gray-500">
+                              <span>{formatDateTime(delivery.confirmed_at || delivery.sent_at || delivery.attempted_at, '—')}</span>
+                              {delivery.telegram_message_id && (
+                                <span>{l.telegramMessageId} #{delivery.telegram_message_id}</span>
+                              )}
+                            </div>
+                            {delivery.error_message && (
+                              <p className="mt-2 break-words rounded-lg bg-red-50 px-2.5 py-2 text-[11px] font-semibold text-red-700">
+                                {delivery.error_message}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

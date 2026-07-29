@@ -127,12 +127,13 @@ export async function callTelegramApi(method, payload) {
   return body
 }
 
-export async function sendTelegramMessage(chatId, text) {
+export async function sendTelegramMessage(chatId, text, options = {}) {
   if (!chatId || !text) return { skipped: true }
   return callTelegramApi('sendMessage', {
     chat_id: chatId,
     text,
     parse_mode: 'HTML',
+    ...options,
   })
 }
 

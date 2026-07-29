@@ -8,6 +8,7 @@ import {
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { callTelegramApi, sendTelegramMessage } from './_lib/telegram.js'
+import { getEmployeePaymentConfirmationCopy } from './_lib/paymentMessages.js'
 
 const LANGUAGES = {
   uz: { label: "O'zbekcha", saved: "Til tanlandi. Menyuni ochishingiz mumkin.", openMenu: "Menyuni ochish" },
@@ -163,6 +164,74 @@ async function handleLanguageCallback(supabase, callbackQuery) {
   })
 }
 
+async function handleSalaryPaymentConfirmation(supabase, callbackQuery) {
+  const deliveryId = String(callbackQuery?.data || '').split(':')[1]
+  const telegramUserId = String(callbackQuery?.from?.id || '')
+  const chatId = String(callbackQuery?.message?.chat?.id || '')
+  if (!deliveryId || !telegramUserId || !chatId) return
+
+  const { data: delivery, error: deliveryError } = await supabase
+    .from('employee_salary_payment_notification_deliveries')
+    .select('id, status, telegram_message_id, salary_profile_id')
+    .eq('id', deliveryId)
+    .maybeSingle()
+  if (deliveryError) throw deliveryError
+  if (!delivery) {
+    await callTelegramApi('answerCallbackQuery', {
+      callback_query_id: callbackQuery.id,
+      text: 'This confirmation is not available.',
+      show_alert: true,
+    })
+    return
+  }
+
+  const { data: employeeLink, error: linkError } = await supabase
+    .from('employee_salary_telegram_links')
+    .select('telegram_user_id, chat_id, preferred_language')
+    .eq('salary_profile_id', delivery.salary_profile_id)
+    .maybeSingle()
+  if (linkError) throw linkError
+
+  const confirmation = getEmployeePaymentConfirmationCopy(employeeLink?.preferred_language)
+  const ownsDelivery = delivery
+    && String(employeeLink?.telegram_user_id || '') === telegramUserId
+    && String(employeeLink?.chat_id || '') === chatId
+    && String(delivery.telegram_message_id || '') === String(callbackQuery?.message?.message_id || '')
+  if (!ownsDelivery) {
+    await callTelegramApi('answerCallbackQuery', {
+      callback_query_id: callbackQuery.id,
+      text: 'This confirmation is not available.',
+      show_alert: true,
+    })
+    return
+  }
+
+  if (delivery.status !== 'confirmed') {
+    const confirmedAt = new Date().toISOString()
+    const { error: confirmError } = await supabase
+      .from('employee_salary_payment_notification_deliveries')
+      .update({
+        status: 'confirmed',
+        confirmed_at: confirmedAt,
+        confirmed_by_telegram_user_id: telegramUserId,
+        updated_at: confirmedAt,
+      })
+      .eq('id', delivery.id)
+      .in('status', ['sent', 'confirmed'])
+    if (confirmError) throw confirmError
+  }
+
+  await callTelegramApi('answerCallbackQuery', {
+    callback_query_id: callbackQuery.id,
+    text: confirmation.confirmed,
+  })
+  await callTelegramApi('editMessageReplyMarkup', {
+    chat_id: chatId,
+    message_id: callbackQuery.message.message_id,
+    reply_markup: { inline_keyboard: [] },
+  })
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
@@ -182,6 +251,8 @@ export default async function handler(req, res) {
       })
     } else if (update?.callback_query?.data?.startsWith('language:')) {
       await handleLanguageCallback(supabase, update.callback_query)
+    } else if (update?.callback_query?.data?.startsWith('salary_payment_confirm:')) {
+      await handleSalaryPaymentConfirmation(supabase, update.callback_query)
     }
     return json(res, 200, { ok: true })
   } catch (error) {
