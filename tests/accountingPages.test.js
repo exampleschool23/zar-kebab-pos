@@ -115,6 +115,21 @@ test('Accounting page totals and average change with the selected date range', (
   )
 })
 
+test('Accounting excludes loyalty value from spendable cafe income and net income', () => {
+  const summary = getAccountingPageSummary([
+    paidOrder('loyalty-order', '2026-07-10', 800, 'cash', {
+      loyalty_used_amount: 200,
+      items: [{ menu_item_id: 'kebab', quantity: 1, price: 1_000, cost_price: 300, status: 'served' }],
+    }),
+  ], [], '2026-07-10', '2026-07-10')
+
+  assert.equal(summary.cafeIncome, 800)
+  assert.equal(summary.loyaltyIncome, 200)
+  assert.equal(summary.cafeIncomeSummary.salesValueTotal, 1_000)
+  assert.equal(summary.netIncome, 800)
+  assert.equal(summary.netProfit, 500)
+})
+
 test('All Accounting filters by entry type and localized searchable fields', () => {
   const rows = [
     { id: 'bazaar', expense_date: '2026-07-12', category: 'products_bazaar', payment_method: 'cash', vendor: 'Mavtuna', description: 'Tomatoes' },

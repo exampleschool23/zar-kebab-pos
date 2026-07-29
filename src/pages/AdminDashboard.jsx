@@ -15,6 +15,7 @@ import {
   getOrderDate,
   getOrderActivityDate,
   getOrderItems,
+  getOrderLoyaltyIncomeTotal,
   getOrderRevenueTotal,
   getOrderTotal,
   groupOrdersBySession,
@@ -47,6 +48,7 @@ const L = {
     greeting:       n => `Xush kelibsiz, ${n}! 👋`,
     subtitle:       "Bugun Zar Kebab'da nima bo'layotganini ko'rishingiz mumkin.",
     todayRevenue:   'Bugungi daromad',
+    loyaltyIncome:  'Loyallik daromadi',
     netProfit:      'Sof foyda',
     ordersToday:    'Bugungi buyurtmalar',
     avgOrder:       "O'rtacha buyurtma",
@@ -110,6 +112,7 @@ const L = {
     greeting:       n => `Добро пожаловать, ${n}! 👋`,
     subtitle:       'Вот что сегодня происходит в Zar Kebab.',
     todayRevenue:   'Доход сегодня',
+    loyaltyIncome:  'Доход по лояльности',
     netProfit:      'Чистая прибыль',
     ordersToday:    'Заказы сегодня',
     avgOrder:       'Средний заказ',
@@ -172,7 +175,8 @@ const L = {
     title:          'Dashboard',
     greeting:       n => `Welcome back, ${n}! 👋`,
     subtitle:       "Here's what's happening at Zar Kebab today.",
-    todayRevenue:   "Today's Revenue",
+    todayRevenue:   "Today's Income",
+    loyaltyIncome:  'Loyalty income',
     netProfit:      'Net Profit',
     ordersToday:    'Orders Today',
     avgOrder:       'Avg Order Value',
@@ -181,7 +185,7 @@ const L = {
     needAttention:  'NEED ATTENTION',
     yesterday:      'Yesterday',
     vsYesterday:    'vs yesterday',
-    revenueStats:   'Revenue Statistics',
+    revenueStats:   'Income Statistics',
     avgDailyCafeIncome: 'Avg daily cafe income',
     today:          'Today',
     days7:          '7 Days',
@@ -212,7 +216,7 @@ const L = {
     table:          'Table',
     pcs:            'pcs',
     orders:         'orders',
-    revenue:        'Revenue',
+    revenue:        'Income',
     avgOrderShort:  'Avg',
     items:          'items',
     paid:           'Paid',
@@ -767,12 +771,13 @@ export default function AdminDashboard() {
   )
 
   const {
-    periodRevenue, previousKpiRevenue, revenueChange,
+    periodRevenue, periodLoyaltyIncome, previousKpiRevenue, revenueChange,
     periodNetProfit, periodProfitMargin, previousKpiNetProfit, netProfitChange,
     periodOrderCount, previousOrderCount, orderChange,
     periodItemsSold,
   } = useMemo(() => {
     const currentRevenue = periodPaidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
+    const currentLoyaltyIncome = periodPaidOrders.reduce((sum, order) => sum + getOrderLoyaltyIncomeTotal(order), 0)
     const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
     const currentNetProfit = getOrdersNetProfit(periodPaidOrders, menuItemMap)
     const previousNetProfit = getOrdersNetProfit(previousPeriodOrders, menuItemMap)
@@ -784,6 +789,7 @@ export default function AdminDashboard() {
 
     return {
       periodRevenue: currentRevenue,
+      periodLoyaltyIncome: currentLoyaltyIncome,
       previousKpiRevenue: previousRevenue,
       revenueChange: previousRevenue > 0
         ? Math.round(((currentRevenue - previousRevenue) / previousRevenue) * 100)
@@ -1071,7 +1077,7 @@ export default function AdminDashboard() {
             icon={TrendingUp}
             label={`${l.revenue} · ${currentKpiPeriodLabel}`}
             value={formatCurrency(periodRevenue)}
-            sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousKpiRevenue)}`}
+            sub={`${l.loyaltyIncome}: ${formatCurrency(periodLoyaltyIncome)} · ${previousKpiPeriodLabel}: ${formatCurrency(previousKpiRevenue)}`}
             badge={pctBadge(revenueChange)}
           />
           <KpiCard
@@ -1086,7 +1092,7 @@ export default function AdminDashboard() {
             icon={CalendarDays}
             label={`${l.avgDailyCafeIncome} · ${currentKpiPeriodLabel}`}
             value={formatCurrency(selectedPeriodCafeIncome.averageDaily)}
-            sub={`${l.total}: ${formatCurrency(selectedPeriodCafeIncome.total)}`}
+            sub={`${l.total}: ${formatCurrency(selectedPeriodCafeIncome.total)} · ${l.loyaltyIncome}: ${formatCurrency(selectedPeriodCafeIncome.loyaltyTotal)}`}
           />
           <KpiCard
             icon={ShoppingBag}

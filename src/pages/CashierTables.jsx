@@ -12,6 +12,7 @@ import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurre
 import {
   getGroupedOrderItems,
   getOrderDate,
+  getOrderLoyaltyIncomeTotal,
   getOrderPaymentBreakdown,
   getOrderRevenueTotal,
   getOrderTotal,
@@ -72,6 +73,7 @@ const L = {
     needsBill:       'Hisob kerak',
     paidToday:       "Bugun to'langan",
     todayRevenue:    'Bugungi daromad',
+    loyaltyIncome:   'Loyallik daromadi',
     todayNetProfit:  'Bugungi sof foyda',
     netProfitSub:    'Daromad minus sotilgan mahsulot tannarxi',
     netProfitUnavailable: 'Tannarx maʼlumoti toʻliq emas',
@@ -128,6 +130,7 @@ const L = {
     needsBill:       'Нужен счёт',
     paidToday:       'Оплачено сегодня',
     todayRevenue:    'Доход за день',
+    loyaltyIncome:   'Доход по лояльности',
     todayNetProfit:  'Чистая прибыль за день',
     netProfitSub:    'Доход минус себестоимость проданных товаров',
     netProfitUnavailable: 'Не все данные о себестоимости доступны',
@@ -182,9 +185,10 @@ const L = {
     activeBills:     'Active Bills',
     needsBill:       'Needs Bill',
     paidToday:       'Paid Today',
-    todayRevenue:    'Today Revenue',
+    todayRevenue:    'Today Income',
+    loyaltyIncome:   'Loyalty income',
     todayNetProfit:  'Net Profit Today',
-    netProfitSub:    'Revenue minus cost of sold items',
+    netProfitSub:    'Income minus cost of sold items',
     netProfitUnavailable: 'Some cost data is unavailable',
     payMethods:      'Payment Methods Today',
     tables:          'tables',
@@ -229,7 +233,7 @@ const L = {
     quickItems:      'Cashier quick items',
     addQuickFailed:  'Could not add quick item',
     payments:        n => `${n} payment${n === 1 ? '' : 's'}`,
-    ofTodayRev:      "of today's revenue",
+    ofTodayRev:      "of today's income",
   },
 }
 
@@ -701,6 +705,7 @@ export default function CashierTables() {
     return paidTodayOrders.length
   }, [paidTodayOrders])
   const todayRevenue   = paidTodayOrders.reduce((s, o) => s + getOrderRevenueTotal(o), 0)
+  const todayLoyaltyIncome = paidTodayOrders.reduce((s, o) => s + getOrderLoyaltyIncomeTotal(o), 0)
   const todayProfitSummary = useMemo(() => {
     if (!hasOrdersCostCoverage(paidTodayOrders, menuItemMap)) {
       return { value: null, marginPct: null, available: false }
@@ -983,7 +988,7 @@ export default function CashierTables() {
             <KpiCard
               label={l.todayRevenue}
               value={formatCurrency(todayRevenue)}
-              sub={l.totalCollected}
+              sub={`${l.loyaltyIncome}: ${formatCurrency(todayLoyaltyIncome)}`}
               accent="text-[#2563EB]"
               icon={Table2}
               iconBg="bg-blue-50"

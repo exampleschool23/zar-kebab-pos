@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
-import { getOrderDate, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getOrderDate, getOrderLoyaltyIncomeTotal, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatLongDate } from '../lib/dateFormat'
 import {
   buildSalaryBonusExpenseRows,
@@ -149,6 +149,7 @@ export default function MonthlyEstimate() {
       monthPlan: 'Oy rejasi',
       clearOverview: 'Asosiy raqamlar',
       salesRevenue: 'Kafe savdosi',
+      loyaltyIncome: 'Loyallik daromadi',
       cafePaidIn: 'Kafedan kelgan pul',
       investorInvested: 'Investor kiritgan pul',
       investorSupport: 'Investor yordami',
@@ -186,7 +187,8 @@ export default function MonthlyEstimate() {
       methodFlow: 'Движение по способам оплаты',
       monthPlan: 'План месяца',
       clearOverview: 'Главные цифры',
-      salesRevenue: 'Выручка кафе',
+      salesRevenue: 'Доход кафе',
+      loyaltyIncome: 'Доход по лояльности',
       cafePaidIn: 'Пришло из кафе',
       investorInvested: 'Инвестор вложил',
       investorSupport: 'Поддержка инвестора',
@@ -224,7 +226,8 @@ export default function MonthlyEstimate() {
       methodFlow: 'Flow by payment method',
       monthPlan: 'Month plan',
       clearOverview: 'Main numbers',
-      salesRevenue: 'Cafe sales',
+      salesRevenue: 'Cafe income',
+      loyaltyIncome: 'Loyalty income',
       cafePaidIn: 'Came from cafe',
       investorInvested: 'Investor invested',
       investorSupport: 'Investor support',
@@ -362,6 +365,7 @@ export default function MonthlyEstimate() {
   ), [salaryProfiles, cutoffEnd, firstFinancialActivityDate, state.settings?.monthlyRentUzs])
 
   const salesRevenue = paidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
+  const loyaltyIncome = paidOrders.reduce((sum, order) => sum + getOrderLoyaltyIncomeTotal(order), 0)
   const incomeSummary = summarizeIncomeEntries(incomeEntries)
   const allActualExpenseRows = [...salaryPaymentRows, ...salaryBonusRows, ...manualExpenseRows]
   const actualExpenseSummary = summarizeExpenses(allActualExpenseRows)
@@ -392,7 +396,7 @@ export default function MonthlyEstimate() {
 
   const overviewRows = [
     { key: 'investor-invested', icon: Banknote, label: l.investorInvested, value: formatCurrency(investorInvestedTotal), tone: 'purple' },
-    { key: 'cafe-paid-in', icon: TrendingUp, label: l.cafePaidIn, value: formatCurrency(salesRevenue), tone: 'green', sub: l.paidOrders },
+    { key: 'cafe-paid-in', icon: TrendingUp, label: l.cafePaidIn, value: formatCurrency(salesRevenue), tone: 'green', sub: `${l.loyaltyIncome}: ${formatCurrency(loyaltyIncome)}` },
     { key: 'salary-paid', icon: Users, label: l.salaryPaid, value: formatCurrency(monthlyEstimate.employeePaidToDate), tone: 'blue' },
     { key: 'products-spent', icon: ReceiptText, label: l.productsSpent, value: formatCurrency(productsSpentTotal), tone: 'orange' },
     {
@@ -631,18 +635,19 @@ function MethodCard({ row, lang, labels }) {
   }
   const Icon = icons[row.method] || WalletCards
   const balance = row.inflow - row.outflow
+  const isLoyaltyIncome = row.method === 'loyalty_card'
 
   return (
     <div className="rounded-2xl border border-[#EEF2F6] bg-[#FBFCFE] p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-2 text-sm font-black text-[#1F2937]">
-          <Icon size={16} className="text-[#ff5a00]" />{methodLabel(row.method, lang)}
+          <Icon size={16} className="text-[#ff5a00]" />{isLoyaltyIncome ? labels.loyaltyIncome : methodLabel(row.method, lang)}
         </span>
-        <span className={`text-base font-black ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-          {formatCurrency(balance)}
+        <span className={`text-base font-black ${isLoyaltyIncome || balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          {formatCurrency(isLoyaltyIncome ? row.inflow : balance)}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+      {!isLoyaltyIncome && <div className="grid grid-cols-2 gap-2 text-xs font-bold">
         <div className="rounded-xl bg-green-50 px-3 py-2 text-green-700">
           <span className="block text-[10px] uppercase text-green-500">{labels.inflow}</span>
           {formatCurrency(row.inflow)}
@@ -651,7 +656,7 @@ function MethodCard({ row, lang, labels }) {
           <span className="block text-[10px] uppercase text-orange-400">{labels.outflow}</span>
           {formatCurrency(row.outflow)}
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

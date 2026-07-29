@@ -215,7 +215,7 @@ export default function Expenses() {
       sub: 'Daromad, xarajat, investor yordami va maoshlarni kuzatish',
       income: 'Daromad',
       cafeIncome: 'Kafe daromadi',
-      cafeIncomeSub: 'Investor yordamisiz',
+      loyaltyIncome: 'Loyallik daromadi',
       netProfit: 'Sof foyda',
       netProfitSub: 'Kafe daromadi minus sotilgan mahsulot tannarxi',
       avgDailyCafeIncome: "Kafe o'rtacha kunlik daromadi",
@@ -296,7 +296,7 @@ export default function Expenses() {
       sub: 'Учёт доходов, расходов, поддержки инвестора и зарплат',
       income: 'Доход',
       cafeIncome: 'Доход кафе',
-      cafeIncomeSub: 'Без поддержки инвестора',
+      loyaltyIncome: 'Доход по лояльности',
       netProfit: 'Чистая прибыль',
       netProfitSub: 'Доход кафе минус себестоимость проданных товаров',
       avgDailyCafeIncome: 'Среднедневной доход кафе',
@@ -377,7 +377,7 @@ export default function Expenses() {
       sub: 'Track income, expenses, investor support, and salaries',
       income: 'Income',
       cafeIncome: 'Cafe income',
-      cafeIncomeSub: 'Excludes investor support',
+      loyaltyIncome: 'Loyalty income',
       netProfit: 'Net Profit',
       netProfitSub: 'Cafe income minus cost of sold items',
       avgDailyCafeIncome: 'Avg daily cafe income',
@@ -600,6 +600,7 @@ export default function Expenses() {
   )
   const {
     cafeIncome,
+    loyaltyIncome,
     cafeIncomeSummary: selectedRangeCafeIncome,
     expenseSummary: summary,
     cashflow,
@@ -784,7 +785,7 @@ export default function Expenses() {
               description={`${l.overviewHelp} · ${formatLongDate(dateFrom, lang, dateFrom)} — ${formatLongDate(dateTo, lang, dateTo)}`}
             />
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi icon={WalletCards} label={l.cafeIncome} value={loading ? '—' : formatCurrency(cafeIncome)} sub={l.cafeIncomeSub} tone="green" />
+            <Kpi icon={WalletCards} label={l.cafeIncome} value={loading ? '—' : formatCurrency(cafeIncome)} sub={loading ? '' : `${l.loyaltyIncome}: ${formatCurrency(loyaltyIncome)}`} tone="green" />
             <Kpi
               icon={BadgeDollarSign}
               label={l.netProfit}
@@ -797,7 +798,7 @@ export default function Expenses() {
               icon={CalendarDays}
               label={l.avgDailyCafeIncome}
               value={loading ? '—' : formatCurrency(selectedRangeCafeIncome.averageDaily)}
-              sub={loading ? l.periodHelp : `${l.periodCafeIncome}: ${formatCurrency(selectedRangeCafeIncome.total)}`}
+              sub={loading ? l.periodHelp : `${l.periodCafeIncome}: ${formatCurrency(selectedRangeCafeIncome.total)} · ${l.loyaltyIncome}: ${formatCurrency(selectedRangeCafeIncome.loyaltyTotal)}`}
               tone="blue"
             />
             <Kpi
@@ -1197,6 +1198,7 @@ function MethodBalancesDisclosure({ rows, lang, labels }) {
         <div id="accounting-method-balances" className="mt-4 space-y-3">
           {rows.map(row => {
             const Icon = methodIcon(row.method)
+            const isLoyaltyIncome = row.method === 'loyalty_card'
             return (
               <div key={row.method} className="rounded-xl border border-[#EEF0F3] bg-[#FBFCFD] p-3">
                 <div className="flex items-center justify-between gap-3">
@@ -1204,16 +1206,16 @@ function MethodBalancesDisclosure({ rows, lang, labels }) {
                     <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-orange-50 text-[#ff5a00]">
                       <Icon size={15} />
                     </span>
-                    <span className="truncate text-sm font-black text-[#1F2937]">{expensePaymentMethodLabel(row.method, lang)}</span>
+                    <span className="truncate text-sm font-black text-[#1F2937]">{isLoyaltyIncome ? labels.loyaltyIncome : expensePaymentMethodLabel(row.method, lang)}</span>
                   </div>
                   <div className="text-right">
-                    <span className="block text-[9px] font-black uppercase tracking-wide text-[#9CA3AF]">{labels.remaining}</span>
-                    <span className={`mt-0.5 block text-base font-black leading-tight tabular-nums ${row.left >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(row.left)}
+                    <span className="block text-[9px] font-black uppercase tracking-wide text-[#9CA3AF]">{isLoyaltyIncome ? labels.loyaltyIncome : labels.remaining}</span>
+                    <span className={`mt-0.5 block text-base font-black leading-tight tabular-nums ${isLoyaltyIncome || row.left >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(isLoyaltyIncome ? row.income : row.left)}
                     </span>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                {!isLoyaltyIncome && <div className="mt-2 grid grid-cols-2 gap-2">
                   <div className="min-w-0 rounded-lg bg-green-50 px-2.5 py-2 text-green-700">
                     <span className="block text-[9px] font-black uppercase tracking-wide text-green-500">{labels.incomeIn}</span>
                     <span className="mt-1 block break-words text-xs font-black leading-tight tabular-nums">{formatCurrency(row.income)}</span>
@@ -1222,7 +1224,7 @@ function MethodBalancesDisclosure({ rows, lang, labels }) {
                     <span className="block text-[9px] font-black uppercase tracking-wide text-orange-400">{labels.spentOut}</span>
                     <span className="mt-1 block break-words text-xs font-black leading-tight tabular-nums">{formatCurrency(row.expenses)}</span>
                   </div>
-                </div>
+                </div>}
               </div>
             )
           })}

@@ -95,6 +95,7 @@ test('completed table rounds merge into one Telegram order summary', () => {
     orderNetProfit: 72500,
     orderProfitMarginPct: 70,
     dailyRevenueTotal: 500000,
+    dailyLoyaltyIncomeTotal: 25000,
     dailyNetProfitTotal: 310000,
     dailyProfitMarginPct: 62,
   })
@@ -106,9 +107,9 @@ test('completed table rounds merge into one Telegram order summary', () => {
   assert.match(message, /Чистая прибыль: 72 500 UZS · 70%/)
   assert.match(
     message,
-    /Чистая прибыль: 72 500 UZS · 70%\n\nЧистая прибыль: 310 000 UZS · 62%\n<b>Доход: 500 000 UZS<\/b>/
+    /Чистая прибыль: 72 500 UZS · 70%\n\n<b>Доход: 500 000 UZS<\/b>\nДоход по лояльности: 25 000 UZS\nЧистая прибыль: 310 000 UZS · 62%/
   )
-  assert.equal(message.endsWith('<b>Доход: 500 000 UZS</b>'), true)
+  assert.equal(message.endsWith('Чистая прибыль: 310 000 UZS · 62%'), true)
   assert.doesNotMatch(message, /· Заказ|· Сегодня|Маржа прибыли/)
   assert.equal((message.match(/Стол: Table 3/g) || []).length, 1)
 })
@@ -188,7 +189,8 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
   assert.doesNotMatch(message, /К оплате: 163 300 UZS/)
   assert.match(message, /Чистая прибыль: 101 300 UZS · 62%/)
   assert.match(message, /Чистая прибыль: 337 800 UZS · 64,3%/)
-  assert.equal(message.endsWith('<b>Доход: 525 300 UZS</b>'), true)
+  assert.match(message, /<b>Доход: 525 300 UZS<\/b>\nЧистая прибыль: 337 800 UZS · 64,3%/)
+  assert.equal(message.endsWith('Чистая прибыль: 337 800 UZS · 64,3%'), true)
   assert.doesNotMatch(message, /· Заказ|· Сегодня|Маржа прибыли/)
 })
 

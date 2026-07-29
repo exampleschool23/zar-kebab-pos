@@ -186,10 +186,17 @@ function hasOrderLoyaltyWalletPaymentField(order) {
 
 export function getOrderRevenueTotal(o, fallbackServicePct = 20) {
   const summary = getOrderPaymentSummary(o, getOrderItems(o), fallbackServicePct)
-  const walletPayment = getOrderLoyaltyWalletPaymentAmount(o)
-  if (walletPayment <= 0) return summary.total
-  if (summary.grossAmount <= 0) return summary.total
-  return Math.min(summary.grossAmount, summary.total + walletPayment)
+  return summary.total
+}
+
+export function getOrderLoyaltyIncomeTotal(o, fallbackServicePct = 20) {
+  const summary = getOrderPaymentSummary(o, getOrderItems(o), fallbackServicePct)
+  return Math.max(0, Math.round(Number(summary.loyaltyUsedAmount) || 0))
+}
+
+export function getOrderSalesValueTotal(o, fallbackServicePct = 20) {
+  return getOrderRevenueTotal(o, fallbackServicePct) +
+    getOrderLoyaltyIncomeTotal(o, fallbackServicePct)
 }
 
 export function getLoyaltyUsedAmount(order) {
@@ -503,11 +510,8 @@ export function getOrderPaymentBreakdown(order) {
     map[method] = (map[method] || 0) + (Number(row.amount) || 0)
   })
   if (isPaidOrder(order)) {
-    const paymentSum = Object.values(map).reduce((sum, amount) => sum + (Number(amount) || 0), 0)
-    const revenueTotal = getOrderRevenueTotal(order)
-    const missingRevenue = Math.max(0, revenueTotal - paymentSum)
-    const walletPayment = Math.min(getOrderLoyaltyWalletPaymentAmount(order), missingRevenue)
-    if (walletPayment > 0) {
+    const walletPayment = getOrderLoyaltyIncomeTotal(order)
+    if (walletPayment > 0 && !map.loyalty_card) {
       map.loyalty_card = (map.loyalty_card || 0) + walletPayment
     }
   }
@@ -734,6 +738,7 @@ export function getCafeIncomeForRange(orders = [], from, to, now = new Date()) {
   const rangeOrders = groupOrdersBySession(orders)
     .filter(order => isPaidOrder(order) && matchesRange(order, requestedFrom, effectiveTo))
   const total = rangeOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
+  const loyaltyTotal = rangeOrders.reduce((sum, order) => sum + getOrderLoyaltyIncomeTotal(order), 0)
   const salesDayCount = new Set(
     rangeOrders
       .map(order => toRestaurantDateStr(getOrderDate(order)))
@@ -747,6 +752,8 @@ export function getCafeIncomeForRange(orders = [], from, to, now = new Date()) {
 
   return {
     total,
+    loyaltyTotal,
+    salesValueTotal: total + loyaltyTotal,
     averageDaily: dayCount > 0 ? Math.round(total / dayCount) : 0,
     dayCount,
     salesDayCount,

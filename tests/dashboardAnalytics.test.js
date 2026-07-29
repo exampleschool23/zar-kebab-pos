@@ -35,7 +35,7 @@ const categoryMap = {
   salads: { id: 'salads', name_en: 'Salads' },
 }
 
-function order({ id, paidAt, method = 'cash', items, total, waiter = 'Jasurbek', orderType, tableName }) {
+function order({ id, paidAt, method = 'cash', items, total, waiter = 'Jasurbek', orderType, tableName, ...overrides }) {
   return {
     id,
     payment_status: 'paid',
@@ -47,6 +47,7 @@ function order({ id, paidAt, method = 'cash', items, total, waiter = 'Jasurbek',
     total,
     service_rate_pct: 0,
     items,
+    ...overrides,
   }
 }
 
@@ -256,6 +257,23 @@ test('cafe income average follows the selected accounting date range', () => {
   assert.equal(earlyMonthRange.dayCount, 14)
   assert.equal(earlyMonthRange.salesDayCount, 1)
   assert.equal(earlyMonthRange.averageDaily, 4286)
+})
+
+test('cafe income keeps loyalty value separate from spendable payments', () => {
+  const result = getCafeIncomeForRange([
+    order({
+      id: 'loyalty-order',
+      paidAt: '2026-05-19T10:00:00',
+      items: [item('kebab', 'Kebab', 1, 100000)],
+      total: 75000,
+      loyalty_used_amount: 25000,
+    }),
+  ], '2026-05-19', '2026-05-19')
+
+  assert.equal(result.total, 75000)
+  assert.equal(result.loyaltyTotal, 25000)
+  assert.equal(result.salesValueTotal, 100000)
+  assert.equal(result.averageDaily, 75000)
 })
 
 test('cafe income average caps future ranges at the current restaurant day', () => {

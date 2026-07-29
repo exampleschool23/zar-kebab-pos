@@ -1,4 +1,10 @@
-import { getOrderPaymentBreakdown, getOrderRevenueTotal, isPaidOrder, toLocalDateStr } from './analytics.js'
+import {
+  getOrderLoyaltyIncomeTotal,
+  getOrderPaymentBreakdown,
+  getOrderRevenueTotal,
+  isPaidOrder,
+  toLocalDateStr,
+} from './analytics.js'
 
 export function getDailyCloseout(orders = [], date = toLocalDateStr(new Date().toISOString())) {
   const paidOrders = orders.filter(order => isPaidOrder(order) && toLocalDateStr(order.paid_at || order.created_at) === date)
@@ -12,12 +18,12 @@ export function getDailyCloseout(orders = [], date = toLocalDateStr(new Date().t
     other: 0,
   }
   let revenue = 0
-  let loyaltyUsed = 0
+  let loyaltyIncome = 0
   let cashbackIssued = 0
 
   for (const order of paidOrders) {
     revenue += getOrderRevenueTotal(order)
-    loyaltyUsed += Number(order.loyalty_used_amount || order.loyalty_redeem_amount || 0) || 0
+    loyaltyIncome += getOrderLoyaltyIncomeTotal(order)
     cashbackIssued += Number(order.cashback_earned || 0) || 0
     const breakdown = getOrderPaymentBreakdown(order)
     if (breakdown.length === 0) {
@@ -35,7 +41,8 @@ export function getDailyCloseout(orders = [], date = toLocalDateStr(new Date().t
     orderCount: paidOrders.length,
     revenue,
     totals,
-    loyaltyUsed,
+    loyaltyIncome,
+    loyaltyUsed: loyaltyIncome,
     cashbackIssued,
     cancelledCount: orders.filter(order => order.status === 'cancelled' && toLocalDateStr(order.updated_at || order.created_at) === date).length,
     variance: 0,
@@ -52,7 +59,7 @@ export function closeoutToCsv(closeout) {
     ['Card', closeout.totals.card],
     ['Terminal', closeout.totals.terminal],
     ['QR', closeout.totals.qr],
-    ['Loyalty used', closeout.loyaltyUsed],
+    ['Loyalty income', closeout.loyaltyIncome ?? closeout.loyaltyUsed],
     ['Cashback issued', closeout.cashbackIssued],
     ['Cancelled orders', closeout.cancelledCount],
     ['Variance', closeout.variance],

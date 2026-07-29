@@ -2,6 +2,10 @@ import { json, methodNotAllowed, readJson } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { sendTelegramMessage, TELEGRAM_STATUS_MESSAGES } from './_lib/telegram.js'
 import {
+  getOrderLoyaltyIncomeTotal,
+  getOrderRevenueTotal,
+} from '../../src/lib/analytics.js'
+import {
   getOrderNetProfit,
   getOrderProfitMarginPct,
   getOrdersCostTotal,
@@ -98,14 +102,14 @@ async function loadPaidTotalsForRestaurantDay(supabase, paidAt) {
   const { start, end } = getRestaurantDayUtcRange(paidAt)
   let { data, error } = await supabase
     .from('orders')
-    .select('total, items:order_items(menu_item_id, quantity, sale_unit, cost_price, selected_options, status)')
+    .select('order_type, subtotal, service_fee, service_rate_pct, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, items:order_items(menu_item_id, quantity, sale_unit, price, unit_price, base_price, price_mode, item_type, is_counter_item, cost_price, selected_options, status)')
     .eq('payment_status', 'paid')
     .gte('paid_at', start)
     .lt('paid_at', end)
   if (error && isMissingProfitSchema(error)) {
     ;({ data, error } = await supabase
       .from('orders')
-      .select('total, items:order_items(menu_item_id, quantity, sale_unit, selected_options, status)')
+      .select('order_type, subtotal, service_fee, service_rate_pct, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, items:order_items(menu_item_id, quantity, sale_unit, price, unit_price, base_price, price_mode, item_type, is_counter_item, selected_options, status)')
       .eq('payment_status', 'paid')
       .gte('paid_at', start)
       .lt('paid_at', end))
@@ -113,17 +117,19 @@ async function loadPaidTotalsForRestaurantDay(supabase, paidAt) {
   if (error) throw error
 
   const orders = data || []
-  const revenueTotal = orders.reduce((sum, row) => sum + (Number(row.total) || 0), 0)
+  const revenueTotal = orders.reduce((sum, row) => sum + getOrderRevenueTotal(row), 0)
+  const loyaltyIncomeTotal = orders.reduce((sum, row) => sum + getOrderLoyaltyIncomeTotal(row), 0)
   const { available, menuItemMap } = await loadCurrentMenuItemCosts(
     supabase,
     orders.flatMap(order => order.items || [])
   )
-  if (!available) return { revenueTotal, netProfitTotal: null, profitMarginPct: null }
+  if (!available) return { revenueTotal, loyaltyIncomeTotal, netProfitTotal: null, profitMarginPct: null }
 
   const costTotal = getOrdersCostTotal(orders, menuItemMap)
   const profitSummary = getSaleProfitSummary(revenueTotal, costTotal)
   return {
     revenueTotal,
+    loyaltyIncomeTotal,
     netProfitTotal: profitSummary?.profit ?? Math.round(revenueTotal - costTotal),
     profitMarginPct: profitSummary?.marginPct ?? null,
   }
@@ -214,6 +220,7 @@ export default async function handler(req, res) {
       )
       const {
         revenueTotal: dailyRevenueTotal,
+        loyaltyIncomeTotal: dailyLoyaltyIncomeTotal,
         netProfitTotal: dailyNetProfitTotal,
         profitMarginPct: dailyProfitMarginPct,
       } = await loadPaidTotalsForRestaurantDay(
@@ -225,6 +232,7 @@ export default async function handler(req, res) {
         orderNetProfit,
         orderProfitMarginPct,
         dailyRevenueTotal,
+        dailyLoyaltyIncomeTotal,
         dailyNetProfitTotal,
         dailyProfitMarginPct,
       })

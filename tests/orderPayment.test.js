@@ -5,9 +5,11 @@ import {
   allocateSplitPaymentsToOrders,
   calculateLoyaltyCashback,
   getGroupedOrderItems,
+  getOrderLoyaltyIncomeTotal,
   getOrderPaymentBreakdown,
   getOrderPaymentFields,
   getOrderRevenueTotal,
+  getOrderSalesValueTotal,
   getOrderTotal,
   getOrderPaymentSummary,
   getPaymentMethodSummary,
@@ -362,7 +364,7 @@ test('cashier-entered loyalty redeem amount reduces remaining payable total', ()
   assert.equal(summary.total, 73650)
 })
 
-test('loyalty wallet payment is included in cafe revenue while payable total stays reduced', () => {
+test('loyalty wallet value is separate from spendable cafe income', () => {
   const rows = [
     item({ id: 'chicken', menu_item_id: 'chicken', quantity: 1, price: 22000 }),
     item({ id: 'beef', menu_item_id: 'beef', quantity: 1, price: 25000 }),
@@ -378,7 +380,9 @@ test('loyalty wallet payment is included in cafe revenue while payable total sta
   })
 
   assert.equal(getOrderTotal(order), 73650)
-  assert.equal(getOrderRevenueTotal(order), 81650)
+  assert.equal(getOrderRevenueTotal(order), 73650)
+  assert.equal(getOrderLoyaltyIncomeTotal(order), 8000)
+  assert.equal(getOrderSalesValueTotal(order), 81650)
   assert.deepEqual(getOrderPaymentBreakdown(order), [
     { method: 'cash', amount: 73650 },
     { method: 'loyalty_card', amount: 8000 },

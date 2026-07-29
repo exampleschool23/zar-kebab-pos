@@ -301,14 +301,17 @@ export function buildCompletedOrderGroupMessage(order) {
     lines.push(`Чистая прибыль: ${escapeTelegramHtml(`${formatMoney(order.orderNetProfit)}${margin}`)}`)
   }
   const dailySummaryLines = []
+  if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
+    dailySummaryLines.push(`<b>Доход: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}</b>`)
+  }
+  if (Number(order?.dailyLoyaltyIncomeTotal) > 0) {
+    dailySummaryLines.push(`Доход по лояльности: ${escapeTelegramHtml(formatMoney(order.dailyLoyaltyIncomeTotal))}`)
+  }
   if (order?.dailyNetProfitTotal != null && Number.isFinite(Number(order.dailyNetProfitTotal))) {
     const margin = order?.dailyProfitMarginPct != null && Number.isFinite(Number(order.dailyProfitMarginPct))
       ? ` · ${formatPercent(order.dailyProfitMarginPct)}`
       : ''
     dailySummaryLines.push(`Чистая прибыль: ${escapeTelegramHtml(`${formatMoney(order.dailyNetProfitTotal)}${margin}`)}`)
-  }
-  if (Number.isFinite(Number(order?.dailyRevenueTotal))) {
-    dailySummaryLines.push(`<b>Доход: ${escapeTelegramHtml(formatMoney(order.dailyRevenueTotal))}</b>`)
   }
   if (dailySummaryLines.length > 0) {
     lines.push('', ...dailySummaryLines)

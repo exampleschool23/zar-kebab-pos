@@ -9,6 +9,7 @@ import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import {
   getOrderDate,
   getOrderItems,
+  getOrderLoyaltyIncomeTotal,
   getOrderPaymentBreakdown,
   getOrderPaymentSummary,
   getOrderRevenueTotal,
@@ -960,9 +961,11 @@ function ByHourTab({ orders, lang }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PaymentMethodsTab({ orders, lang }) {
-  const { data, totalRevenue } = useMemo(() => {
+  const { data, totalRevenue, loyaltyIncome } = useMemo(() => {
     const map = {}
-    let total = 0
+    let totalPaymentValue = 0
+    let cashIncome = 0
+    let loyalty = 0
     orders.forEach(o => {
       const breakdown = getOrderPaymentBreakdown(o)
       const rows = breakdown.length > 0 ? breakdown : [{ method: getPaymentMethod(o), amount: getOrderRevenueTotal(o) }]
@@ -973,13 +976,15 @@ function PaymentMethodsTab({ orders, lang }) {
         if (!map[m]) map[m] = { method: m, revenue: 0, count: 0 }
         map[m].revenue += rev
         map[m].count   += 1
-        total          += rev
+        totalPaymentValue += rev
+        if (m === 'loyalty_card') loyalty += rev
+        else cashIncome += rev
       })
     })
     const rows = Object.values(map)
-      .map(d => ({ ...d, pct: total > 0 ? Math.round(d.revenue / total * 100) : 0 }))
+      .map(d => ({ ...d, pct: totalPaymentValue > 0 ? Math.round(d.revenue / totalPaymentValue * 100) : 0 }))
       .sort((a, b) => b.revenue - a.revenue)
-    return { data: rows, totalRevenue: total }
+    return { data: rows, totalRevenue: cashIncome, loyaltyIncome: loyalty }
   }, [orders])
 
   if (data.length === 0) return <EmptyState lang={lang} />
@@ -1035,11 +1040,16 @@ function PaymentMethodsTab({ orders, lang }) {
           )
         })}
         {/* Totals row */}
-        <div className="flex items-center justify-between px-5 py-4 bg-gray-50 border-t border-gray-100">
+        <div className="flex items-start justify-between gap-4 px-5 py-4 bg-gray-50 border-t border-gray-100">
           <span className="font-black text-sm text-[#1F2937]">
-            {lang === 'uz' ? 'Jami' : lang === 'ru' ? 'Итого' : 'Total'}
+            {lang === 'uz' ? 'Daromad' : lang === 'ru' ? 'Доход' : 'Income'}
           </span>
-          <span className="font-black text-lg text-[#ff5a00]">{formatCurrency(totalRevenue)}</span>
+          <span className="text-right">
+            <span className="block font-black text-lg text-[#ff5a00]">{formatCurrency(totalRevenue)}</span>
+            <span className="mt-1 block text-xs font-bold text-amber-700">
+              {lang === 'uz' ? 'Loyallik daromadi' : lang === 'ru' ? 'Доход по лояльности' : 'Loyalty income'}: {formatCurrency(loyaltyIncome)}
+            </span>
+          </span>
         </div>
       </div>
     </div>
@@ -1698,6 +1708,7 @@ export default function Reports() {
   // ── KPI ───────────────────────────────────────────────────────────────────
 
   const kpiRevenue   = filteredForAnalytics.reduce((s, o) => s + getOrderRevenueTotal(o), 0)
+  const kpiLoyaltyIncome = filteredForAnalytics.reduce((s, o) => s + getOrderLoyaltyIncomeTotal(o), 0)
   const kpiOrders    = filteredForAnalytics.length
   const kpiAvg       = kpiOrders > 0 ? Math.round(kpiRevenue / kpiOrders) : 0
   const kpiItemsSold = filteredForAnalytics.reduce(
@@ -1870,9 +1881,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Jami daromad', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', loyaltyUsed: 'Sodiqlik ishlatildi', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Общая выручка',  numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано', expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', loyaltyUsed: 'Использовано лояльности', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Total Revenue',  numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold', expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', loyaltyUsed: 'Loyalty used', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано', expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold', expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled' },
   }
   const l = L[lang] || L.en
 
@@ -1984,7 +1995,7 @@ export default function Reports() {
 
             {/* KPI cards */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
-              <KpiCard icon={DollarSign}  iconCls="bg-green-50 text-green-600"   label={l.totalRev}  value={formatCurrency(kpiRevenue)} sub={`${kpiOrders} ${lang === 'uz' ? "ta to'langan" : lang === 'ru' ? 'оплаченных' : 'paid orders'}`} />
+              <KpiCard icon={DollarSign}  iconCls="bg-green-50 text-green-600"   label={l.totalRev}  value={formatCurrency(kpiRevenue)} sub={`${l.loyaltyIncome}: ${formatCurrency(kpiLoyaltyIncome)}`} />
               <KpiCard icon={ShoppingBag} iconCls="bg-orange-50 text-[#ff5a00]"  label={l.numOrders} value={kpiOrders} />
               <KpiCard icon={BarChart2}   iconCls="bg-blue-50 text-blue-600"     label={l.avgOrder}  value={formatCurrency(kpiAvg)} />
               <KpiCard icon={Package}     iconCls="bg-purple-50 text-purple-600" label={l.itemsSold} value={kpiItemsSold} />
@@ -2002,7 +2013,7 @@ export default function Reports() {
                   {lang === 'uz' ? 'Menyu turi bo‘yicha savdo' : lang === 'ru' ? 'Продажи по типу меню' : 'Sales by menu type'}
                 </p>
                 <p className="text-xs font-semibold text-[#9CA3AF]">
-                  {lang === 'uz' ? 'Oddiy va turist narxlari bo‘yicha tushum' : lang === 'ru' ? 'Выручка по обычным и туристическим ценам' : 'Revenue split between regular and tourist pricing'}
+                  {lang === 'uz' ? 'Oddiy va turist narxlari bo‘yicha daromad' : lang === 'ru' ? 'Доход по обычным и туристическим ценам' : 'Income split between regular and tourist pricing'}
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -2033,7 +2044,7 @@ export default function Reports() {
                 <SummaryRow label="Card" value={formatCurrency(closeout.totals.card)} />
                 <SummaryRow label="Terminal" value={formatCurrency(closeout.totals.terminal)} />
                 <SummaryRow label="QR" value={formatCurrency(closeout.totals.qr)} />
-                <SummaryRow label={l.loyaltyUsed} value={formatCurrency(closeout.loyaltyUsed)} />
+                <SummaryRow label={l.loyaltyIncome} value={formatCurrency(closeout.loyaltyIncome)} />
                 <SummaryRow label={l.cashbackIssued} value={formatCurrency(closeout.cashbackIssued)} />
                 <SummaryRow label={l.cancelled} value={closeout.cancelledCount} />
                 <SummaryRow label="Variance" value={formatCurrency(closeout.variance)} />

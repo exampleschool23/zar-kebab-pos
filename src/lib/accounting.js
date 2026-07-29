@@ -55,6 +55,7 @@ export function getAccountingPageSummary(orders = [], entries = [], dateFrom, da
   return {
     paidOrders,
     cafeIncome: cafeIncomeSummary.total,
+    loyaltyIncome: cafeIncomeSummary.loyaltyTotal,
     netProfit,
     profitMarginPct,
     cafeIncomeSummary,
@@ -195,10 +196,12 @@ export function groupAccountingHistoryRows(visibleRows = [], allRows = [], order
 
   return groups.map(group => {
     const dayRows = (allRows || []).filter(row => row?.expense_date === group.date)
+    const cafeIncomeSummary = getCafeIncomeForRange(orders, group.date, group.date)
     return {
       ...group,
       totalExpenses: summarizeExpenses(dayRows).total,
-      cafeIncome: getCafeIncomeForRange(orders, group.date, group.date).total,
+      cafeIncome: cafeIncomeSummary.total,
+      loyaltyIncome: cafeIncomeSummary.loyaltyTotal,
       investorIncome: dayRows
         .filter(row => normalizeExpenseEntryType(row?.entry_type) === 'income' && row?.category === 'investor_support')
         .reduce((sum, row) => sum + Number(row?.amount || 0), 0),

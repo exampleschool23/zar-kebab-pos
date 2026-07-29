@@ -62,8 +62,8 @@ test('order profit margin uses recognized revenue with service loyalty and cance
     ],
   }
 
-  assert.equal(getOrderNetProfit(loyaltyOrder), 75_000)
-  assert.equal(getOrderProfitMarginPct(loyaltyOrder), 65.2)
+  assert.equal(getOrderNetProfit(loyaltyOrder), 60_000)
+  assert.equal(getOrderProfitMarginPct(loyaltyOrder), 60)
   assert.equal(getOrderNetProfit(discountedOrder), 63_500)
   assert.equal(getOrderProfitMarginPct(discountedOrder), 61.4)
   assert.equal(getOrderProfitMarginPct({ payment_status: 'paid', total: 0, items: [] }), null)
