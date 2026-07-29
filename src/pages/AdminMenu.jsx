@@ -1231,6 +1231,8 @@ function editorToVariantCosts(options) {
 }
 
 function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
+  const [pendingDeleteIndex, setPendingDeleteIndex] = useState(null)
+
   function updateOption(optionIndex, patch) {
     onChange(value.map((option, index) => index === optionIndex ? { ...option, ...patch } : option))
   }
@@ -1254,6 +1256,7 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
 
   function removeOption(index) {
     onChange(value.filter((_, itemIndex) => itemIndex !== index))
+    setPendingDeleteIndex(null)
   }
 
   const labels = {
@@ -1265,14 +1268,29 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
     price: lang === 'uz' ? 'Narx' : lang === 'ru' ? 'Цена' : 'Price',
     cost: lang === 'uz' ? 'Haqiqiy tannarx' : lang === 'ru' ? 'Реальная себестоимость' : 'Real cost',
     stock: lang === 'uz' ? 'Qoldiq' : lang === 'ru' ? 'Остаток' : 'Stock',
+    visibility: lang === 'uz' ? 'Ko‘rinish' : lang === 'ru' ? 'Видимость' : 'Visibility',
     publicMenu: lang === 'uz' ? 'Ommaviy menyu' : lang === 'ru' ? 'Публичное меню' : 'Public menu',
     waiterMenu: lang === 'uz' ? 'Ofitsiant menyusi' : lang === 'ru' ? 'Меню официанта' : 'Waiter menu',
     visible: lang === 'uz' ? 'Ko‘rinadi' : lang === 'ru' ? 'Видно' : 'Visible',
     hidden: lang === 'uz' ? 'Yashirilgan' : lang === 'ru' ? 'Скрыто' : 'Hidden',
     empty: lang === 'uz' ? 'Mahsulotda variantlar bo‘lsa qo‘shing.' : lang === 'ru' ? 'Добавьте варианты, если они есть у товара.' : 'Add variants when this item has choices.',
+    deleteTitle: lang === 'uz' ? 'Variantni o‘chirish' : lang === 'ru' ? 'Удалить вариант' : 'Delete variant',
+    deletePrompt: lang === 'uz'
+      ? 'Bu variantni o‘chirishni xohlaysizmi? Bu amal mahsulot saqlanganda qo‘llanadi.'
+      : lang === 'ru'
+        ? 'Удалить этот вариант? Изменение будет применено после сохранения товара.'
+        : 'Delete this variant? The change will be applied when the product is saved.',
+    cancel: lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel',
+    confirmDelete: lang === 'uz' ? 'Variantni o‘chirish' : lang === 'ru' ? 'Удалить вариант' : 'Delete variant',
   }
 
+  const pendingDeleteOption = pendingDeleteIndex === null ? null : value[pendingDeleteIndex]
+  const pendingDeleteName = pendingDeleteOption
+    ? (pendingDeleteOption[`name_${lang}`] || pendingDeleteOption.name_ru || pendingDeleteOption.name_uz || pendingDeleteOption.name_en || '')
+    : ''
+
   return (
+    <>
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <label className="text-xs font-black uppercase tracking-wide text-gray-500">{labels.title}</label>
@@ -1327,71 +1345,76 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
                   />
                 </label>
               </div>
-              <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_40px]">
-                <div className="min-w-0">
+              <div className="mt-3 grid min-w-0 items-end gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="grid min-w-0 gap-3 sm:grid-cols-3">
                   <MoneyField
                     label={labels.price}
                     value={option.price}
                     onChange={event => updateOption(optionIndex, { price: event.target.value })}
                     placeholder={labels.price}
-                    labelClassName="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400"
-                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm tabular-nums focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                    labelClassName="mb-1.5 flex h-10 items-end text-[11px] font-black leading-4 text-gray-500"
+                    className="h-11 min-w-0 w-full rounded-xl border border-gray-200 px-3 text-sm tabular-nums focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
                   />
-                </div>
-                <div className="min-w-0">
                   <MoneyField
                     label={labels.cost}
                     value={option.cost_price}
                     onChange={event => updateOption(optionIndex, { cost_price: event.target.value })}
                     placeholder={String(parentCost || '').trim() || labels.cost}
-                    labelClassName="mb-1 block text-[10px] font-black uppercase tracking-wide text-emerald-600"
-                    className="min-w-0 w-full rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-2.5 text-sm font-bold tabular-nums focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
+                    labelClassName="mb-1.5 flex h-10 items-end text-[11px] font-black leading-4 text-emerald-700"
+                    className="h-11 min-w-0 w-full rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 text-sm font-bold tabular-nums focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"
                   />
+                  <label className="min-w-0">
+                    <span className="mb-1.5 flex h-10 items-end text-[11px] font-black leading-4 text-gray-500">{labels.stock}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={option.stock_count}
+                      onChange={event => updateOption(optionIndex, { stock_count: event.target.value })}
+                      placeholder={labels.stock}
+                      className="h-11 min-w-0 w-full rounded-xl border border-gray-200 px-3 text-sm tabular-nums focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
+                    />
+                  </label>
                 </div>
-                <label className="min-w-0">
-                  <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.stock}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={option.stock_count}
-                    onChange={event => updateOption(optionIndex, { stock_count: event.target.value })}
-                    placeholder={labels.stock}
-                    className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
-                  />
-                </label>
-                <div className="flex self-end rounded-xl border border-gray-200 bg-gray-50 p-1">
-                  {[
-                    ['public_hidden', labels.publicMenu],
-                    ['waiter_hidden', labels.waiterMenu],
-                  ].map(([field, menuLabel]) => {
-                    const hidden = !!option[field]
-                    return (
-                      <button
-                        key={field}
-                        type="button"
-                        onClick={() => updateOption(optionIndex, { [field]: !hidden })}
-                        title={`${menuLabel}: ${hidden ? labels.hidden : labels.visible}`}
-                        aria-label={`${menuLabel}: ${hidden ? labels.hidden : labels.visible}`}
-                        aria-pressed={!hidden}
-                        className={`flex h-8 min-w-[112px] items-center justify-center gap-1.5 rounded-lg px-2 text-[11px] font-black transition-colors ${
-                          hidden
-                            ? 'text-gray-400 hover:bg-white hover:text-[#ff5a00]'
-                            : 'bg-white text-emerald-700 shadow-sm'
-                        }`}
-                      >
-                        {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
-                        <span>{menuLabel}</span>
-                      </button>
-                    )
-                  })}
+                <div className="min-w-0">
+                  <span className="mb-1.5 flex h-10 items-end text-[11px] font-black leading-4 text-gray-500">{labels.visibility}</span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="grid min-w-0 flex-1 grid-cols-2 rounded-xl border border-gray-200 bg-gray-50 p-1 xl:flex-none">
+                      {[
+                        ['public_hidden', labels.publicMenu],
+                        ['waiter_hidden', labels.waiterMenu],
+                      ].map(([field, menuLabel]) => {
+                        const hidden = !!option[field]
+                        return (
+                          <button
+                            key={field}
+                            type="button"
+                            onClick={() => updateOption(optionIndex, { [field]: !hidden })}
+                            title={`${menuLabel}: ${hidden ? labels.hidden : labels.visible}`}
+                            aria-label={`${menuLabel}: ${hidden ? labels.hidden : labels.visible}`}
+                            aria-pressed={!hidden}
+                            className={`flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[11px] font-black transition-colors xl:min-w-[132px] ${
+                              hidden
+                                ? 'text-gray-400 hover:bg-white hover:text-[#ff5a00]'
+                                : 'bg-white text-emerald-700 shadow-sm'
+                            }`}
+                          >
+                            {hidden ? <EyeOff size={14} className="flex-shrink-0" /> : <Eye size={14} className="flex-shrink-0" />}
+                            <span className="truncate">{menuLabel}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeleteIndex(optionIndex)}
+                      aria-label={labels.deleteTitle}
+                      title={labels.deleteTitle}
+                      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-red-100 bg-white text-red-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeOption(optionIndex)}
-                  className="flex h-10 w-10 self-end items-center justify-center rounded-xl border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 size={15} />
-                </button>
               </div>
               <div className="mt-2">
                 <ProfitMarginPreview price={option.price} cost={effectiveCost} lang={lang} inheritedCost={!hasOwnCost} />
@@ -1402,6 +1425,36 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
         </div>
       )}
     </div>
+    {pendingDeleteOption && (
+      <Modal title={labels.deleteTitle} onClose={() => setPendingDeleteIndex(null)}>
+        <p className="text-sm font-semibold leading-6 text-gray-600">
+          {labels.deletePrompt}
+        </p>
+        {pendingDeleteName && (
+          <p className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-bold text-gray-900">
+            {pendingDeleteName}
+          </p>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setPendingDeleteIndex(null)}
+            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-50"
+          >
+            {labels.cancel}
+          </button>
+          <button
+            type="button"
+            onClick={() => removeOption(pendingDeleteIndex)}
+            className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700"
+          >
+            <Trash2 size={15} />
+            {labels.confirmDelete}
+          </button>
+        </div>
+      </Modal>
+    )}
+    </>
   )
 }
 
