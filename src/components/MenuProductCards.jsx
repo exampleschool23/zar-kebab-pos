@@ -95,7 +95,7 @@ function localizedOptionText(value, lang, fallback = '') {
   return value[`label_${lang}`] || value[`title_${lang}`] || value.label || value.title || value.name || fallback
 }
 
-export function getMenuItemOptionGroups(item, lang = 'en') {
+export function getMenuItemOptionGroups(item, lang = 'en', { audience = 'public', includeUnavailable = false } = {}) {
   let raw = item?.option_groups ?? item?.optionGroups ?? []
   if (typeof raw === 'string') {
     try {
@@ -111,24 +111,33 @@ export function getMenuItemOptionGroups(item, lang = 'en') {
       id: String(group?.id || `group_${groupIndex + 1}`),
       title: localizedOptionText(group, lang, lang === 'uz' ? 'Variantlar' : lang === 'ru' ? 'Варианты' : 'Variants'),
       required: group?.required !== false,
-      options: options.map((option, optionIndex) => ({
-        id: String(option?.id || `option_${optionIndex + 1}`),
-        label: localizedOptionText(option, lang, String(option?.label || option?.name || '')),
-        price: Math.max(0, Math.round(Number(option?.price ?? option?.variant_price ?? 0) || 0)),
-        price_delta: Math.max(0, Math.round(Number(option?.price_delta ?? option?.priceDelta ?? 0) || 0)),
-        stock_count: Math.max(0, Math.round(Number(option?.stock_count ?? option?.stockCount ?? 0) || 0)),
-      })).filter(option => option.label),
+      configured_options_count: options.length,
+      options: options.map((option, optionIndex) => {
+        const publicHidden = option?.public_hidden === true || option?.publicHidden === true
+        const waiterHidden = option?.waiter_hidden === true || option?.waiterHidden === true
+        const audienceVisible = audience === 'waiter' ? !waiterHidden : !publicHidden
+        return {
+          id: String(option?.id || `option_${optionIndex + 1}`),
+          label: localizedOptionText(option, lang, String(option?.label || option?.name || '')),
+          price: Math.max(0, Math.round(Number(option?.price ?? option?.variant_price ?? 0) || 0)),
+          price_delta: Math.max(0, Math.round(Number(option?.price_delta ?? option?.priceDelta ?? 0) || 0)),
+          stock_count: Math.max(0, Math.round(Number(option?.stock_count ?? option?.stockCount ?? 0) || 0)),
+          available: option?.available !== false && audienceVisible,
+          public_hidden: publicHidden,
+          waiter_hidden: waiterHidden,
+        }
+      }).filter(option => option.label && (includeUnavailable || option.available)),
     }
-  }).filter(group => group.options.length > 0)
+  }).filter(group => group.configured_options_count > 0)
 }
 
-export function menuItemRequiresOptions(item) {
-  return getMenuItemOptionGroups(item).some(group => group.required && group.options.length > 0)
+export function menuItemRequiresOptions(item, audience = 'public') {
+  return getMenuItemOptionGroups(item, 'en', { audience }).some(group => group.required)
 }
 
 export function getOrderItemOptionLines(item, menuItem, lang = 'en') {
   const selectedOptions = item?.selected_options || item?.selectedOptions || {}
-  const groups = getMenuItemOptionGroups(menuItem || item, lang)
+  const groups = getMenuItemOptionGroups(menuItem || item, lang, { includeUnavailable: true })
   const lines = selectedOptions && typeof selectedOptions === 'object'
     ? groups.map(group => {
         const selectedId = selectedOptions[group.id]
@@ -410,7 +419,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   )
 }
 
-export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false, formatPrice = formatCurrency, linkBasePath = '/menu', languageControl = null }) {
+export function ProductDetailPage({ item, category, currentQty, currentNotes, lang, onBack, onCancel, onAddToCart, readOnly = false, formatPrice = formatCurrency, linkBasePath = '/menu', languageControl = null, audience = 'public' }) {
   const [qty, setQty] = useState(normalizeMenuQuantity(currentQty, item))
   const [notes, setNotes] = useState(currentNotes || '')
   const [selectedOptions, setSelectedOptions] = useState({})
@@ -436,8 +445,10 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const priceUnit = menuPriceUnitSuffix(item, lang)
   const mediaUrls = getMenuItemMediaUrls(item)
   const displayedMediaUrl = mediaUrls.includes(activeMediaUrl) ? activeMediaUrl : mediaUrls[0] || ''
-  const optionGroups = getMenuItemOptionGroups(item, lang)
-  const missingRequiredOptions = optionGroups.some(group => group.required && !selectedOptions[group.id])
+  const optionGroups = getMenuItemOptionGroups(item, lang, { audience })
+  const missingRequiredOptions = optionGroups.some(group => (
+    group.required && !group.options.some(option => option.id === selectedOptions[group.id])
+  ))
   const selectedOptionPriceDelta = optionGroups.reduce((sum, group) => {
     const option = group.options.find(item => item.id === selectedOptions[group.id])
     return sum + (Number(option?.price_delta) || 0)
@@ -466,6 +477,11 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
   }
   const optionSectionTitle = lang === 'uz' ? 'Variantlar' : lang === 'ru' ? 'Варианты' : 'Options'
+  const noAvailableOptions = lang === 'uz'
+    ? 'Hozircha mavjud variant yo‘q.'
+    : lang === 'ru'
+      ? 'Сейчас нет доступных вариантов.'
+      : 'No variants are currently available.'
   const shouldShowOptionSectionTitle = optionGroups.length !== 1 ||
     String(optionGroups[0]?.title || '').trim().toLocaleLowerCase() !== optionSectionTitle.toLocaleLowerCase()
 
@@ -644,6 +660,11 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                         {group.title}{group.required && <span className="text-[#ff5a00]">*</span>}
                       </p>
                       <div className="space-y-2">
+                        {group.options.length === 0 && (
+                          <p className="rounded-2xl border border-dashed border-gray-200 bg-white px-3 py-3 text-sm font-semibold text-gray-400">
+                            {noAvailableOptions}
+                          </p>
+                        )}
                         {group.options.map(option => (
                           <label
                             key={option.id}

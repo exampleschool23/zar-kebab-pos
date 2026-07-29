@@ -799,7 +799,7 @@ export default function WaiterOrder() {
 
   function handleAdd(item, animation) {
     if (isSendingOrder || !canEditTables) return
-    if (menuItemRequiresOptions(item) || isMenuItemSoldByWeight(item)) {
+    if (menuItemRequiresOptions(item, 'waiter') || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -809,7 +809,7 @@ export default function WaiterOrder() {
 
   function handleIncrement(item, animation) {
     if (isSendingOrder || !canEditTables) return
-    if (menuItemRequiresOptions(item) || isMenuItemSoldByWeight(item)) {
+    if (menuItemRequiresOptions(item, 'waiter') || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -819,7 +819,7 @@ export default function WaiterOrder() {
 
   function handleDecrement(item) {
     if (isSendingOrder || !canEditTables) return
-    if (menuItemRequiresOptions(item) || isMenuItemSoldByWeight(item)) {
+    if (menuItemRequiresOptions(item, 'waiter') || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -860,7 +860,7 @@ export default function WaiterOrder() {
   function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionPriceDelta = 0) {
     if (isSendingOrder || !canEditTables) return
     const payload = makeCartPayload(item, { selectedOptions, selectedOptionPriceDelta })
-    const isOptionProduct = getMenuItemOptionGroups(item, lang).length > 0
+    const isOptionProduct = getMenuItemOptionGroups(item, lang, { audience: 'waiter' }).length > 0
     if (isOptionProduct) {
       dispatch({
         type: 'ADD_TO_CART',
@@ -1049,9 +1049,10 @@ export default function WaiterOrder() {
           <ProductDetailPage
             item={detailItem}
             category={categoryMap[detailItem.category_id]}
-            currentQty={getMenuItemOptionGroups(detailItem, lang).length > 0 ? 0 : (cartQtyMap[detailItem.id] || 0)}
+            currentQty={getMenuItemOptionGroups(detailItem, lang, { audience: 'waiter' }).length > 0 ? 0 : (cartQtyMap[detailItem.id] || 0)}
             currentNotes={cartNotesMap[detailItem.id] || ''}
             lang={lang}
+            audience="waiter"
             onBack={() => setDetailItem(null)}
             onCancel={() => setDetailItem(null)}
             onAddToCart={handleProductDetailAdd}

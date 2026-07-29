@@ -1172,6 +1172,8 @@ function optionGroupsToEditor(value, variantCosts = {}) {
         price: option.price ?? option.variant_price ?? '',
         cost_price: Object.prototype.hasOwnProperty.call(protectedVariantCosts, id) ? protectedVariantCosts[id] : '',
         stock_count: option.stock_count ?? option.stockCount ?? '',
+        public_hidden: option.public_hidden === true || option.publicHidden === true || option.available === false,
+        waiter_hidden: option.waiter_hidden === true || option.waiterHidden === true || option.available === false,
       }
     })
   })
@@ -1202,6 +1204,9 @@ function editorToOptionGroups(options, basePrice = 0) {
       price: optionPrice,
       price_delta: Math.max(0, optionPrice - parentPrice),
       stock_count: stockCount,
+      available: true,
+      public_hidden: !!option.public_hidden,
+      waiter_hidden: !!option.waiter_hidden,
     }
   }).filter(Boolean)
 
@@ -1241,6 +1246,8 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
         price: '',
         cost_price: '',
         stock_count: '',
+        public_hidden: false,
+        waiter_hidden: false,
       },
     ])
   }
@@ -1258,6 +1265,10 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
     price: lang === 'uz' ? 'Narx' : lang === 'ru' ? 'Цена' : 'Price',
     cost: lang === 'uz' ? 'Haqiqiy tannarx' : lang === 'ru' ? 'Реальная себестоимость' : 'Real cost',
     stock: lang === 'uz' ? 'Qoldiq' : lang === 'ru' ? 'Остаток' : 'Stock',
+    publicMenu: lang === 'uz' ? 'Ommaviy menyu' : lang === 'ru' ? 'Публичное меню' : 'Public menu',
+    waiterMenu: lang === 'uz' ? 'Ofitsiant menyusi' : lang === 'ru' ? 'Меню официанта' : 'Waiter menu',
+    visible: lang === 'uz' ? 'Ko‘rinadi' : lang === 'ru' ? 'Видно' : 'Visible',
+    hidden: lang === 'uz' ? 'Yashirilgan' : lang === 'ru' ? 'Скрыто' : 'Hidden',
     empty: lang === 'uz' ? 'Mahsulotda variantlar bo‘lsa qo‘shing.' : lang === 'ru' ? 'Добавьте варианты, если они есть у товара.' : 'Add variants when this item has choices.',
   }
 
@@ -1316,7 +1327,7 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
                   />
                 </label>
               </div>
-              <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_40px]">
+              <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_40px]">
                 <div className="min-w-0">
                   <MoneyField
                     label={labels.price}
@@ -1348,6 +1359,32 @@ function OptionGroupsEditor({ value = [], onChange, lang, parentCost = '' }) {
                     className="min-w-0 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
                   />
                 </label>
+                <div className="flex self-end rounded-xl border border-gray-200 bg-gray-50 p-1">
+                  {[
+                    ['public_hidden', labels.publicMenu],
+                    ['waiter_hidden', labels.waiterMenu],
+                  ].map(([field, menuLabel]) => {
+                    const hidden = !!option[field]
+                    return (
+                      <button
+                        key={field}
+                        type="button"
+                        onClick={() => updateOption(optionIndex, { [field]: !hidden })}
+                        title={`${menuLabel}: ${hidden ? labels.hidden : labels.visible}`}
+                        aria-label={`${menuLabel}: ${hidden ? labels.hidden : labels.visible}`}
+                        aria-pressed={!hidden}
+                        className={`flex h-8 min-w-[112px] items-center justify-center gap-1.5 rounded-lg px-2 text-[11px] font-black transition-colors ${
+                          hidden
+                            ? 'text-gray-400 hover:bg-white hover:text-[#ff5a00]'
+                            : 'bg-white text-emerald-700 shadow-sm'
+                        }`}
+                      >
+                        {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                        <span>{menuLabel}</span>
+                      </button>
+                    )
+                  })}
+                </div>
                 <button
                   type="button"
                   onClick={() => removeOption(optionIndex)}
