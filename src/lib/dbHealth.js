@@ -75,6 +75,7 @@ const MIGRATION_HINTS = {
   create_employee_salary_telegram_link: 'Run supabase/107_employee_salary_telegram_notifications.sql',
   create_menu_item_with_cost: 'Run supabase/102_atomic_menu_item_cost_creation.sql',
   create_menu_item_with_media_and_cost: 'Run supabase/103_menu_item_media_gallery.sql',
+  get_accounting_paid_order_summary: 'Run supabase/109_accounting_paid_order_summary.sql',
 }
 
 function missingColumnMessage(error) {
@@ -139,6 +140,10 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'current_staff_can_write', { feature_key: 'bazaar' }))
   checks.push(await checkRpc(dbClient, 'save_bazaar_purchase'))
   checks.push(await checkRpc(dbClient, 'delete_bazaar_purchase', { p_purchase_id: '00000000-0000-0000-0000-000000000000' }))
+  checks.push(await checkRpc(dbClient, 'get_accounting_paid_order_summary', {
+    p_date_from: '2000-01-01',
+    p_date_to: '2000-01-01',
+  }))
   const failed = checks.filter(check => !check.ok)
   return {
     ok: failed.length === 0,

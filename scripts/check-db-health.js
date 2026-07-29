@@ -210,6 +210,14 @@ const checks = await Promise.all([
     'bazaar write access is required'
   ),
   checkRpc(
+    'get_accounting_paid_order_summary(p_date_from,p_date_to)',
+    () => supabase.rpc('get_accounting_paid_order_summary', {
+      p_date_from: '2000-01-01',
+      p_date_to: '2000-01-01',
+    }),
+    'accounting access is required'
+  ),
+  checkRpc(
     'remove_loyalty_card(p_card_id)',
     () => supabase.rpc('remove_loyalty_card', { p_card_id: '00000000-0000-0000-0000-000000000000' }),
     'loyalty card not found',

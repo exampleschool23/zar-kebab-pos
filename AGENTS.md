@@ -174,6 +174,12 @@ These bugs were recently fixed and are now protected by tests:
    - `orders.stock_deducted_at` prevents payment retries or later payment-method corrections from deducting twice.
    - Existing paid orders are marked as already processed when the migration is applied, so historical sales never rewrite manually maintained stock.
 
+16. The Accounting overview must not download complete paid orders for its summary cards.
+   - Migration `109` exposes a permission-checked aggregate of paid revenue, loyalty value, protected sold-item cost, sales days, and payment-method income.
+   - `Expenses` loads that compact summary instead of all order and item rows for the selected period.
+   - The legacy full-history loader is only a deployment-order fallback while migration `109` is missing.
+   - Detailed order rows remain the responsibility of reports, receipts, and historical drill-down pages.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -228,6 +234,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/107_employee_salary_telegram_notifications.sql`
   Adds verified employee-to-Telegram links, expiring one-time invite tokens, notification preferences, and duplicate-safe daily salary delivery history.
+
+- `supabase/109_accounting_paid_order_summary.sql`
+  Adds the lightweight, Accounting-authorized paid-order aggregate so the overview can calculate revenue, loyalty, net profit, and method balances without downloading complete orders.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

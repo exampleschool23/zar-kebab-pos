@@ -582,24 +582,38 @@ export function summarizeExpenses(expenses = []) {
 }
 
 export function summarizeExpenseCashflow(paidOrders = [], expenses = []) {
-  const byMethod = ACCOUNTING_CASHFLOW_METHODS.reduce((acc, method) => {
-    acc[method] = { income: 0, expenses: 0, left: 0 }
-    return acc
-  }, {})
+  const orderIncomeByMethod = {}
 
   for (const order of paidOrders || []) {
     let hasLoyaltyPaymentRow = false
     for (const payment of getOrderPayments(order)) {
       const method = payment.method || payment.payment_method
       if (method === 'loyalty_card') hasLoyaltyPaymentRow = true
-      if (!byMethod[method]) continue
-      byMethod[method].income += normalizeExpenseAmount(payment.amount)
+      if (!ACCOUNTING_CASHFLOW_METHODS.includes(method)) continue
+      orderIncomeByMethod[method] = (
+        orderIncomeByMethod[method] || 0
+      ) + normalizeExpenseAmount(payment.amount)
     }
     const loyaltyUsed = normalizeExpenseAmount(order?.loyalty_used_amount ?? order?.loyalty_redeem_amount ?? 0)
     if (loyaltyUsed > 0 && !hasLoyaltyPaymentRow) {
-      byMethod.loyalty_card.income += loyaltyUsed
+      orderIncomeByMethod.loyalty_card = (
+        orderIncomeByMethod.loyalty_card || 0
+      ) + loyaltyUsed
     }
   }
+
+  return summarizeExpenseCashflowFromIncome(orderIncomeByMethod, expenses)
+}
+
+export function summarizeExpenseCashflowFromIncome(orderIncomeByMethod = {}, expenses = []) {
+  const byMethod = ACCOUNTING_CASHFLOW_METHODS.reduce((acc, method) => {
+    acc[method] = {
+      income: normalizeExpenseAmount(orderIncomeByMethod?.[method]),
+      expenses: 0,
+      left: 0,
+    }
+    return acc
+  }, {})
 
   const incomeSummary = summarizeIncomeEntries(expenses)
   for (const method of ACCOUNTING_CASHFLOW_METHODS) {

@@ -1,5 +1,6 @@
 import {
   getCafeIncomeForRange,
+  getInclusiveCalendarDayCount,
   groupOrdersBySession,
   isPaidOrder,
   matchesRange,
@@ -10,11 +11,12 @@ import {
   expensePaymentMethodLabel,
   normalizeExpenseEntryType,
   summarizeExpenseCashflow,
+  summarizeExpenseCashflowFromIncome,
   summarizeExpenses,
   summarizeIncomeEntries,
   todayExpenseDate,
 } from './expenses.js'
-import { getOrdersNetProfit, getSaleProfitSummary } from './profit.js'
+import { getOrdersCostTotal, getOrdersNetProfit, getSaleProfitSummary } from './profit.js'
 
 function normalizeIsoDate(value, fallback = todayExpenseDate()) {
   const date = String(value || '').slice(0, 10)
@@ -29,6 +31,10 @@ function shiftIsoDate(value, days) {
 export function getAccountingQuickRange(key = 'month', today = todayExpenseDate()) {
   const normalizedToday = normalizeIsoDate(today)
   if (key === 'today') return { dateFrom: normalizedToday, dateTo: normalizedToday }
+  if (key === 'yesterday') {
+    const yesterday = shiftIsoDate(normalizedToday, -1)
+    return { dateFrom: yesterday, dateTo: yesterday }
+  }
   if (key === 'week') return { dateFrom: shiftIsoDate(normalizedToday, -6), dateTo: normalizedToday }
   if (key === 'previousMonth') {
     const previousMonthEnd = shiftIsoDate(`${normalizedToday.slice(0, 8)}01`, -1)
@@ -37,35 +43,109 @@ export function getAccountingQuickRange(key = 'month', today = todayExpenseDate(
   return { dateFrom: `${normalizedToday.slice(0, 8)}01`, dateTo: normalizedToday }
 }
 
-export function getAccountingPageSummary(orders = [], entries = [], dateFrom, dateTo, menuItemMap = null) {
-  const rangeEntries = (entries || []).filter(entry => expenseMatchesRange(entry, dateFrom, dateTo))
+function normalizeSummaryAmount(value) {
+  return Math.max(0, Math.round(Number(value) || 0))
+}
+
+export function normalizeAccountingPaidOrderSummary(summary = {}, dateFrom, dateTo) {
+  const normalizedFrom = normalizeIsoDate(dateFrom)
+  const normalizedTo = normalizeIsoDate(dateTo, normalizedFrom)
+  const today = todayExpenseDate()
+  const effectiveTo = normalizedTo > today ? today : normalizedTo
+  const cafeIncome = normalizeSummaryAmount(summary.cafeIncome ?? summary.cafe_income)
+  const loyaltyIncome = normalizeSummaryAmount(summary.loyaltyIncome ?? summary.loyalty_income)
+  const costTotal = normalizeSummaryAmount(summary.costTotal ?? summary.cost_total)
+  const paymentMethodIncome = summary.paymentMethodIncome ?? summary.payment_method_income ?? {}
+  const dayCount = getInclusiveCalendarDayCount(normalizedFrom, effectiveTo)
+
+  return {
+    cafeIncome,
+    loyaltyIncome,
+    costTotal,
+    orderCount: normalizeSummaryAmount(summary.orderCount ?? summary.order_count),
+    salesDayCount: normalizeSummaryAmount(summary.salesDayCount ?? summary.sales_day_count),
+    paymentMethodIncome: Object.fromEntries(
+      ['cash', 'card', 'terminal', 'qr', 'loyalty_card']
+        .map(method => [method, normalizeSummaryAmount(paymentMethodIncome?.[method])])
+    ),
+    cafeIncomeSummary: {
+      total: cafeIncome,
+      loyaltyTotal: loyaltyIncome,
+      salesValueTotal: cafeIncome + loyaltyIncome,
+      averageDaily: dayCount > 0 ? Math.round(cafeIncome / dayCount) : 0,
+      dayCount,
+      salesDayCount: normalizeSummaryAmount(summary.salesDayCount ?? summary.sales_day_count),
+      from: normalizedFrom,
+      to: normalizedTo,
+      effectiveTo,
+    },
+  }
+}
+
+export function getAccountingPaidOrderSummary(orders = [], dateFrom, dateTo, menuItemMap = null) {
   const paidOrders = groupOrdersBySession(orders || [])
     .filter(order => isPaidOrder(order) && matchesRange(order, dateFrom, dateTo))
   const cafeIncomeSummary = getCafeIncomeForRange(orders, dateFrom, dateTo)
+  const orderCashflow = summarizeExpenseCashflow(paidOrders, [])
+  const costTotal = getOrdersCostTotal(paidOrders, menuItemMap)
+
+  return normalizeAccountingPaidOrderSummary({
+    cafeIncome: cafeIncomeSummary.total,
+    loyaltyIncome: cafeIncomeSummary.loyaltyTotal,
+    costTotal,
+    orderCount: paidOrders.reduce((sum, order) => sum + (order?._orderCount || 1), 0),
+    salesDayCount: cafeIncomeSummary.salesDayCount,
+    paymentMethodIncome: Object.fromEntries(
+      orderCashflow.rows.map(row => [row.method, row.income])
+    ),
+  }, dateFrom, dateTo)
+}
+
+export function getAccountingPageSummaryFromOrderSummary(orderSummary = {}, entries = [], dateFrom, dateTo) {
+  const normalizedOrderSummary = normalizeAccountingPaidOrderSummary(orderSummary, dateFrom, dateTo)
+  const rangeEntries = (entries || []).filter(entry => expenseMatchesRange(entry, dateFrom, dateTo))
   const expenseSummary = summarizeExpenses(rangeEntries)
   const expenseBreakdown = getAccountingExpenseBreakdown(rangeEntries)
   const incomeSummary = summarizeIncomeEntries(rangeEntries)
   const investorSupportTotal = incomeSummary.byCategory.investor_support || 0
-  const netProfit = getOrdersNetProfit(paidOrders, menuItemMap)
+  const netProfit = normalizedOrderSummary.cafeIncome - normalizedOrderSummary.costTotal
   const profitMarginPct = getSaleProfitSummary(
-    cafeIncomeSummary.total,
-    cafeIncomeSummary.total - netProfit
+    normalizedOrderSummary.cafeIncome,
+    normalizedOrderSummary.costTotal
   )?.marginPct ?? null
 
   return {
-    paidOrders,
-    cafeIncome: cafeIncomeSummary.total,
-    loyaltyIncome: cafeIncomeSummary.loyaltyTotal,
+    paidOrders: [],
+    cafeIncome: normalizedOrderSummary.cafeIncome,
+    loyaltyIncome: normalizedOrderSummary.loyaltyIncome,
     netProfit,
     profitMarginPct,
-    cafeIncomeSummary,
+    cafeIncomeSummary: normalizedOrderSummary.cafeIncomeSummary,
     expenseSummary,
     ...expenseBreakdown,
     incomeSummary,
     investorSupportTotal,
     otherIncomeTotal: Math.max(0, incomeSummary.total - investorSupportTotal),
-    netIncome: cafeIncomeSummary.total + incomeSummary.total - expenseSummary.total,
-    cashflow: summarizeExpenseCashflow(paidOrders, rangeEntries),
+    netIncome: normalizedOrderSummary.cafeIncome + incomeSummary.total - expenseSummary.total,
+    cashflow: summarizeExpenseCashflowFromIncome(
+      normalizedOrderSummary.paymentMethodIncome,
+      rangeEntries
+    ),
+  }
+}
+
+export function getAccountingPageSummary(orders = [], entries = [], dateFrom, dateTo, menuItemMap = null) {
+  const paidOrders = groupOrdersBySession(orders || [])
+    .filter(order => isPaidOrder(order) && matchesRange(order, dateFrom, dateTo))
+  return {
+    ...getAccountingPageSummaryFromOrderSummary(
+      getAccountingPaidOrderSummary(orders, dateFrom, dateTo, menuItemMap),
+      entries,
+      dateFrom,
+      dateTo
+    ),
+    paidOrders,
+    netProfit: getOrdersNetProfit(paidOrders, menuItemMap),
   }
 }
 

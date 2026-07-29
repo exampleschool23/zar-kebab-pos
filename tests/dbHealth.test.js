@@ -117,6 +117,7 @@ test('database health reports missing tables and missing RPC', async () => {
     'current_staff_can_view_menu_catalog',
     'current_staff_can_write',
     'delete_bazaar_purchase',
+    'get_accounting_paid_order_summary',
     'order_payments',
     'recall_table_from_cashier',
     'save_bazaar_purchase',
@@ -137,6 +138,20 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.match(result.failed.find(check => check.name === 'current_staff_can_write').hint, /097_daily_bazaar/)
   assert.match(result.failed.find(check => check.name === 'save_bazaar_purchase').hint, /097_daily_bazaar/)
   assert.match(result.failed.find(check => check.name === 'delete_bazaar_purchase').hint, /097_daily_bazaar/)
+  assert.match(result.failed.find(check => check.name === 'get_accounting_paid_order_summary').hint, /109_accounting_paid_order_summary/)
+})
+
+test('database health requires the lightweight Accounting summary RPC', async () => {
+  const result = await runDbHealthChecks(makeClient({ missingRpc: true }))
+
+  assert.equal(result.ok, false)
+  assert.match(
+    result.failed.find(check => check.name === 'get_accounting_paid_order_summary').hint,
+    /109_accounting_paid_order_summary/
+  )
+  assert.match(cliHealthSource, /get_accounting_paid_order_summary\(p_date_from,p_date_to\)/)
+  assert.match(cliHealthSource, /p_date_from: '2000-01-01'/)
+  assert.match(cliHealthSource, /p_date_to: '2000-01-01'/)
 })
 
 test('daily Bazaar schema and RPC checks are required in the CLI health command', async () => {

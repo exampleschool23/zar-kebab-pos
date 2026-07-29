@@ -28,7 +28,12 @@ import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature } from '../lib/permissions'
-import { collapseDailyBazaarExpenseRows, getAccountingPageSummary, getAccountingQuickRange } from '../lib/accounting'
+import {
+  collapseDailyBazaarExpenseRows,
+  getAccountingPageSummaryFromOrderSummary,
+  getAccountingQuickRange,
+} from '../lib/accounting'
+import { loadAccountingPaidOrderSummary } from '../lib/accountingSummary'
 import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
 import { formatLongDate, formatTime } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
@@ -49,7 +54,7 @@ import {
   normalizeExpenseEntryType,
   todayExpenseDate,
 } from '../lib/expenses'
-import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
+import { collectPagedRows } from '../lib/orderHistory'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 const FIELD_INPUT_CLASS = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
@@ -192,8 +197,7 @@ export default function Expenses() {
   const [activeRangeKey, setActiveRangeKey] = useState('month')
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
-  const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
-  const [paidHistoryReady, setPaidHistoryReady] = useState(false)
+  const [paidOrderSummary, setPaidOrderSummary] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -261,6 +265,7 @@ export default function Expenses() {
       expenseSaved: 'Xarajat saqlandi',
       incomeSaved: 'Daromad saqlandi',
       today: 'Bugun',
+      yesterday: 'Kecha',
       week: '7 kun',
       month: 'Oy',
       previousMonth: 'O‘tgan oy',
@@ -342,6 +347,7 @@ export default function Expenses() {
       expenseSaved: 'Расход сохранён',
       incomeSaved: 'Доход сохранён',
       today: 'Сегодня',
+      yesterday: 'Вчера',
       week: '7 дней',
       month: 'Месяц',
       previousMonth: 'Прошлый месяц',
@@ -423,6 +429,7 @@ export default function Expenses() {
       expenseSaved: 'Expense saved',
       incomeSaved: 'Income saved',
       today: 'Today',
+      yesterday: 'Yesterday',
       week: '7 days',
       month: 'Month',
       previousMonth: 'Previous month',
@@ -469,7 +476,7 @@ export default function Expenses() {
     const requestId = loadRequestRef.current + 1
     loadRequestRef.current = requestId
     setLoading(true)
-    setPaidHistoryReady(false)
+    setPaidOrderSummary({})
     setError('')
     const expensePromise = loadPagedResult((from, to) => supabase
         .from('expenses')
@@ -489,9 +496,10 @@ export default function Expenses() {
       loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
     ])
-    const orderPromise = loadPaidOrdersForRange(dateFrom, dateTo)
+    const fallbackMenuItemMap = Object.fromEntries(state.menuItems.map(item => [item.id, item]))
+    const orderPromise = loadAccountingPaidOrderSummary(dateFrom, dateTo, { fallbackMenuItemMap })
       .then(data => ({ data, error: null }))
-      .catch(error => ({ data: [], error }))
+      .catch(error => ({ data: {}, error }))
 
     const [
       expenseResult,
@@ -511,11 +519,10 @@ export default function Expenses() {
     }
 
     if (orderHistoryResult.error) {
-      setPaidHistoryOrders([])
+      setPaidOrderSummary({})
       loadError ||= orderHistoryResult.error.message || l.loadFailed
     } else {
-      setPaidHistoryOrders(orderHistoryResult.data || [])
-      setPaidHistoryReady(true)
+      setPaidOrderSummary(orderHistoryResult.data || {})
     }
 
     const salaryError = salaryProfileResult.error
@@ -585,19 +592,14 @@ export default function Expenses() {
       filteredExpenses.filter(expense => normalizeExpenseEntryType(expense.entry_type) !== 'income')
     )
   ), [filteredExpenses])
-  const accountingOrders = useMemo(
-    () => paidHistoryReady
-      ? mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo)
-      : [],
-    [paidHistoryReady, paidHistoryOrders, state.orders, dateFrom, dateTo]
-  )
-  const menuItemMap = useMemo(
-    () => Object.fromEntries(state.menuItems.map(item => [item.id, item])),
-    [state.menuItems]
-  )
   const accountingSummary = useMemo(
-    () => getAccountingPageSummary(accountingOrders, filteredExpenses, dateFrom, dateTo, menuItemMap),
-    [accountingOrders, filteredExpenses, dateFrom, dateTo, menuItemMap]
+    () => getAccountingPageSummaryFromOrderSummary(
+      paidOrderSummary,
+      filteredExpenses,
+      dateFrom,
+      dateTo
+    ),
+    [paidOrderSummary, filteredExpenses, dateFrom, dateTo]
   )
   const {
     cafeIncome,
@@ -751,6 +753,7 @@ export default function Expenses() {
               <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 {[
                   { key: 'today', label: l.today },
+                  { key: 'yesterday', label: l.yesterday },
                   { key: 'week', label: l.week },
                   { key: 'month', label: l.month },
                   { key: 'previousMonth', label: l.previousMonth },

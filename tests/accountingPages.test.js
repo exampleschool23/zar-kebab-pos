@@ -7,9 +7,12 @@ import {
   getAccountingHistoryDeleteTarget,
   getAccountingExpenseBreakdown,
   getAccountingHistoryPageSummary,
+  getAccountingPaidOrderSummary,
   getAccountingPageSummary,
+  getAccountingPageSummaryFromOrderSummary,
   getAccountingQuickRange,
   groupAccountingHistoryRows,
+  normalizeAccountingPaidOrderSummary,
 } from '../src/lib/accounting.js'
 
 function paidOrder(id, date, total, paymentMethod = 'cash', overrides = {}) {
@@ -26,10 +29,18 @@ function paidOrder(id, date, total, paymentMethod = 'cash', overrides = {}) {
   }
 }
 
-test('Accounting quick ranges cover today, seven days, month, previous month, and year rollover', () => {
+test('Accounting quick ranges cover today, yesterday, seven days, month, previous month, and year rollover', () => {
   assert.deepEqual(getAccountingQuickRange('today', '2026-07-14'), {
     dateFrom: '2026-07-14',
     dateTo: '2026-07-14',
+  })
+  assert.deepEqual(getAccountingQuickRange('yesterday', '2026-07-14'), {
+    dateFrom: '2026-07-13',
+    dateTo: '2026-07-13',
+  })
+  assert.deepEqual(getAccountingQuickRange('yesterday', '2026-01-01'), {
+    dateFrom: '2025-12-31',
+    dateTo: '2025-12-31',
   })
   assert.deepEqual(getAccountingQuickRange('week', '2026-07-14'), {
     dateFrom: '2026-07-08',
@@ -128,6 +139,80 @@ test('Accounting excludes loyalty value from spendable cafe income and net incom
   assert.equal(summary.cafeIncomeSummary.salesValueTotal, 1_000)
   assert.equal(summary.netIncome, 800)
   assert.equal(summary.netProfit, 500)
+})
+
+test('Accounting database summary produces the same overview as complete paid orders', () => {
+  const orders = [
+    paidOrder('cash', '2026-07-10', 800, 'cash', {
+      loyalty_used_amount: 200,
+      items: [{ menu_item_id: 'kebab', quantity: 2, cost_price: 150, status: 'served' }],
+    }),
+    paidOrder('split', '2026-07-11', 700, 'mixed', {
+      payments: [
+        { method: 'card', amount: 400 },
+        { method: 'terminal', amount: 300 },
+      ],
+      items: [{ menu_item_id: 'tea', quantity: 1, cost_price: 100, status: 'served' }],
+    }),
+  ]
+  const entries = [
+    { expense_date: '2026-07-10', category: 'products_bazaar', payment_method: 'cash', amount: 250 },
+    { entry_type: 'income', expense_date: '2026-07-11', category: 'other_income', payment_method: 'card', amount: 50 },
+  ]
+
+  const fromOrders = getAccountingPageSummary(orders, entries, '2026-07-01', '2026-07-14')
+  const orderSummary = getAccountingPaidOrderSummary(orders, '2026-07-01', '2026-07-14')
+  const fromSummary = getAccountingPageSummaryFromOrderSummary(
+    orderSummary,
+    entries,
+    '2026-07-01',
+    '2026-07-14'
+  )
+
+  assert.deepEqual(
+    {
+      cafeIncome: fromSummary.cafeIncome,
+      loyaltyIncome: fromSummary.loyaltyIncome,
+      netProfit: fromSummary.netProfit,
+      profitMarginPct: fromSummary.profitMarginPct,
+      averageDaily: fromSummary.cafeIncomeSummary.averageDaily,
+      netIncome: fromSummary.netIncome,
+      cashflow: fromSummary.cashflow,
+    },
+    {
+      cafeIncome: fromOrders.cafeIncome,
+      loyaltyIncome: fromOrders.loyaltyIncome,
+      netProfit: fromOrders.netProfit,
+      profitMarginPct: fromOrders.profitMarginPct,
+      averageDaily: fromOrders.cafeIncomeSummary.averageDaily,
+      netIncome: fromOrders.netIncome,
+      cashflow: fromOrders.cashflow,
+    }
+  )
+})
+
+test('Accounting normalizes the compact database response for the selected range', () => {
+  const summary = normalizeAccountingPaidOrderSummary({
+    cafe_income: '1500',
+    loyalty_income: '200',
+    cost_total: '400',
+    order_count: '2',
+    sales_day_count: '2',
+    payment_method_income: {
+      cash: '800',
+      card: '700',
+      loyalty_card: '200',
+    },
+  }, '2026-07-01', '2026-07-14')
+
+  assert.equal(summary.cafeIncome, 1_500)
+  assert.equal(summary.costTotal, 400)
+  assert.equal(summary.paymentMethodIncome.cash, 800)
+  assert.equal(summary.paymentMethodIncome.qr, 0)
+  assert.equal(summary.cafeIncomeSummary.salesValueTotal, 1_700)
+  assert.equal(summary.cafeIncomeSummary.effectiveTo, '2026-07-14')
+  assert.equal(summary.cafeIncomeSummary.dayCount, 14)
+  assert.equal(summary.cafeIncomeSummary.averageDaily, 107)
 })
 
 test('All Accounting filters by entry type and localized searchable fields', () => {
