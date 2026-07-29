@@ -142,6 +142,8 @@ test('All Accounting filters by entry type and localized searchable fields', () 
   assert.deepEqual(filterAccountingHistoryRows(rows, { query: 'Продукты', lang: 'ru' }).map(row => row.id), ['bazaar'])
   assert.deepEqual(filterAccountingHistoryRows(rows, { query: 'terminal', lang: 'en' }).map(row => row.id), ['investor'])
   assert.deepEqual(filterAccountingHistoryRows(rows, { query: 'salary payment' }).map(row => row.id), ['salary'])
+  assert.deepEqual(filterAccountingHistoryRows(rows, { type: 'expense', category: 'products_bazaar' }).map(row => row.id), ['bazaar'])
+  assert.deepEqual(filterAccountingHistoryRows(rows, { category: 'salary_waiter' }).map(row => row.id), ['salary'])
 })
 
 test('All Accounting removal targets the underlying financial record', () => {

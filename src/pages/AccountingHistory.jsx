@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Clock3, Search, Trash2 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, Clock3, Search, Tag, Trash2 } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
@@ -20,6 +20,7 @@ import {
 import {
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
+  EXPENSE_CATEGORIES,
   expenseCategoryLabel,
   expensePaymentMethodLabel,
   getAccountingHistoryRange,
@@ -59,10 +60,17 @@ function loadPagedResult(loadPage) {
     .catch(error => ({ data: [], error }))
 }
 
+function linkedHistoryDate(value) {
+  const date = String(value || '')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return ''
+  return Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ? '' : date
+}
+
 export default function AccountingHistory() {
   const { state } = useApp()
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const lang = state.lang || 'ru'
   const role = (profile?.role || state.user?.role || 'guest').toLowerCase()
   const canDelete = canEditFeature(profile || { role }, 'expenses')
@@ -74,12 +82,24 @@ export default function AccountingHistory() {
   const [salaryLoading, setSalaryLoading] = useState(true)
   const [orderLoading, setOrderLoading] = useState(true)
   const [error, setError] = useState('')
-  const [query, setQuery] = useState('')
-  const [type, setType] = useState('all')
-  const [period, setPeriod] = useState('thisMonth')
+  const requestedType = searchParams.get('type')
+  const requestedCategory = searchParams.get('category')
+  const requestedFrom = linkedHistoryDate(searchParams.get('from'))
+  const requestedTo = linkedHistoryDate(searchParams.get('to'))
+  const hasLinkedRange = Boolean(requestedFrom && requestedTo && requestedFrom <= requestedTo)
+  const expenseCategoryKeys = useMemo(() => new Set(EXPENSE_CATEGORIES.map(item => item.key)), [])
+  const [query, setQuery] = useState(() => searchParams.get('query') || '')
+  const [type, setType] = useState(() => ['all', 'expense', 'income'].includes(requestedType) ? requestedType : 'all')
+  const [category, setCategory] = useState(() => expenseCategoryKeys.has(requestedCategory) ? requestedCategory : 'all')
+  const [period, setPeriod] = useState(() => hasLinkedRange ? 'linked' : 'thisMonth')
   const [confirmDeleteId, setConfirmDeleteId] = useState('')
   const [deletingId, setDeletingId] = useState('')
-  const { dateFrom, dateTo } = useMemo(() => getAccountingHistoryRange(period), [period])
+  const { dateFrom, dateTo } = useMemo(
+    () => period === 'linked'
+      ? { dateFrom: requestedFrom, dateTo: requestedTo }
+      : getAccountingHistoryRange(period),
+    [period, requestedFrom, requestedTo]
+  )
 
   const labels = {
     uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana va vaqt', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', actions: 'Amallar', remove: 'O‘chirish', confirmRemove: 'Tasdiqlash', removing: 'O‘chirilmoqda...', removeFailed: 'Yozuvni o‘chirib bo‘lmadi.', manageBazaar: 'Kunlik bozorda boshqarish', bazaarManaged: 'Kunlik bozorda boshqariladi', totalExpenses: 'Jami xarajat', salaryExpenses: 'Maosh xarajatlari', productBazaarExpenses: 'Mahsulot / bozor xarajatlari', otherExpenses: 'Boshqa xarajatlar', investorSupport: 'Investor yordami', cafeIncome: 'Kafe daromadi', loyaltyIncome: 'Loyallik daromadi', investorIncome: 'Investor yordami', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
@@ -148,8 +168,8 @@ export default function AccountingHistory() {
   const displayRows = useMemo(() => collapseDailyBazaarExpenseRows(rows), [rows])
 
   const visibleRows = useMemo(() => {
-    return filterAccountingHistoryRows(displayRows, { type, query, lang })
-  }, [displayRows, query, type, lang])
+    return filterAccountingHistoryRows(displayRows, { type, category, query, lang })
+  }, [displayRows, query, type, category, lang])
 
   const accountingOrders = useMemo(
     () => mergePaidOrderHistory(paidHistoryOrders, state.orders, dateFrom, dateTo),
@@ -218,12 +238,35 @@ export default function AccountingHistory() {
                 {['thisMonth', 'lastMonth', 'allTime'].map(value => <button key={value} onClick={() => setPeriod(value)} className={`rounded-lg px-3 py-1.5 text-xs font-black transition-colors ${period === value ? 'bg-blue-600 text-white shadow-sm' : 'text-blue-700 hover:bg-white'}`}>{l[value]}</button>)}
               </div>
               {['all', 'expense', 'income'].map(value => <button key={value} onClick={() => setType(value)} className={`rounded-xl border px-3 py-2 text-xs font-black ${type === value ? 'border-[#ff5a00] bg-[#ff5a00] text-white' : 'border-[#E5E7EB] bg-white text-[#6B7280]'}`}>{l[value]}</button>)}
+              <label className="flex min-w-[210px] items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
+                <Tag size={15} className="flex-shrink-0 text-[#9CA3AF]" />
+                <select
+                  aria-label={l.category}
+                  value={category}
+                  onChange={event => {
+                    const nextCategory = event.target.value
+                    setCategory(nextCategory)
+                    if (nextCategory !== 'all') setType('expense')
+                  }}
+                  className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#4B5563] outline-none"
+                >
+                  <option value="all">{l.all} — {l.category}</option>
+                  {EXPENSE_CATEGORIES.map(item => (
+                    <option key={item.key} value={item.key}>{expenseCategoryLabel(item.key, lang)}</option>
+                  ))}
+                </select>
+              </label>
               <label className="flex min-w-[240px] items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2">
                 <Search size={15} className="text-[#9CA3AF]" />
                 <input value={query} onChange={event => setQuery(event.target.value)} placeholder={l.search} className="w-full bg-transparent text-sm font-semibold outline-none" />
               </label>
             </div>
           </div>
+          {period === 'linked' && (
+            <div className="mb-4 inline-flex rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700">
+              {formatLongDate(dateFrom, lang, dateFrom)} — {formatLongDate(dateTo, lang, dateTo)}
+            </div>
+          )}
           <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.cafeIncome}</p><p className="mt-1 text-2xl font-black text-emerald-600">{orderLoading ? '—' : formatCurrency(cafeIncomeSummary.total)}</p><p className="mt-1 text-xs font-bold text-amber-700">{orderLoading ? '' : `${l.loyaltyIncome}: ${formatCurrency(cafeIncomeSummary.loyaltyTotal)}`}</p></div>
             <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalExpenses}</p><p className="mt-1 text-2xl font-black text-red-600">{loading || salaryLoading ? '—' : formatCurrency(expenseSummary.total)}</p></div>

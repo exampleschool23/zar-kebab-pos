@@ -144,11 +144,12 @@ export function collapseDailyBazaarExpenseRows(rows = []) {
   ))
 }
 
-export function filterAccountingHistoryRows(rows = [], { type = 'all', query = '', lang = 'en' } = {}) {
+export function filterAccountingHistoryRows(rows = [], { type = 'all', category = 'all', query = '', lang = 'en' } = {}) {
   const needle = String(query || '').trim().toLowerCase()
   return (rows || []).filter(row => {
     const entryType = normalizeExpenseEntryType(row?.entry_type)
     if (type !== 'all' && entryType !== type) return false
+    if (category !== 'all' && row?.category !== category) return false
     if (!needle) return true
     return [
       row?.vendor,

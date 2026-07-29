@@ -5,6 +5,7 @@ import {
   BadgeDollarSign,
   CalendarDays,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Clock3,
   CreditCard,
@@ -645,6 +646,16 @@ export default function Expenses() {
     setDateTo(range.dateTo)
   }
 
+  function openCategoryHistory(category) {
+    const params = new URLSearchParams({
+      type: 'expense',
+      category,
+      from: dateFrom,
+      to: dateTo,
+    })
+    navigate(`/admin/accounting/history?${params.toString()}`)
+  }
+
   async function saveExpense(event) {
     event.preventDefault()
     setMessage('')
@@ -951,7 +962,13 @@ export default function Expenses() {
                 </section>
                 <MethodBalancesDisclosure rows={cashflow.rows} lang={lang} labels={l} />
               </div>
-              <ExpenseCategoryChart title={l.moneyFlow} rows={categoryRows} total={summary.total} lang={lang} />
+              <ExpenseCategoryChart
+                title={l.moneyFlow}
+                rows={categoryRows}
+                total={summary.total}
+                lang={lang}
+                onCategoryClick={openCategoryHistory}
+              />
             </div>
           </section>
 
@@ -1138,7 +1155,7 @@ function ExpenseHistorySection({
   )
 }
 
-function ExpenseCategoryChart({ title, rows, total, lang }) {
+function ExpenseCategoryChart({ title, rows, total, lang, onCategoryClick }) {
   const palette = ['#ff5a00', '#16a34a', '#2563eb', '#9333ea', '#dc2626', '#0f766e']
   const visibleRows = rows.slice(0, 6)
 
@@ -1152,7 +1169,12 @@ function ExpenseCategoryChart({ title, rows, total, lang }) {
           {visibleRows.map(([key, amount], index) => {
             const width = total > 0 ? Math.max(6, Math.round((amount / total) * 100)) : 0
             return (
-              <div key={key} className="grid gap-2 sm:grid-cols-[180px_1fr_120px] sm:items-center">
+              <button
+                key={key}
+                type="button"
+                onClick={() => onCategoryClick?.(key)}
+                className="group grid w-full gap-2 rounded-xl p-1 text-left transition-colors hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a00]/30 sm:grid-cols-[180px_1fr_120px] sm:items-center"
+              >
                 <span className="truncate text-sm font-black text-[#374151]">{expenseCategoryLabel(key, lang)}</span>
                 <div className="h-8 overflow-hidden rounded-xl bg-gray-100">
                   <div
@@ -1162,8 +1184,11 @@ function ExpenseCategoryChart({ title, rows, total, lang }) {
                     {width >= 18 ? `${width}%` : ''}
                   </div>
                 </div>
-                <span className="text-sm font-black text-[#1F2937] sm:text-right">{formatCurrency(amount)}</span>
-              </div>
+                <span className="flex items-center gap-1 text-sm font-black text-[#1F2937] sm:justify-end">
+                  {formatCurrency(amount)}
+                  <ChevronRight size={15} className="flex-shrink-0 text-[#9CA3AF] transition-transform group-hover:translate-x-0.5 group-hover:text-[#ff5a00]" />
+                </span>
+              </button>
             )
           })}
         </div>
