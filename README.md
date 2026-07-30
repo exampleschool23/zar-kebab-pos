@@ -33,6 +33,8 @@ messages. `TELEGRAM_SALARY_PAYMENTS_LANGUAGE` defaults to `ru`.
 After deploying the webhook code, send `/chatid` inside the salary group to
 have the bot reply with the exact value to use for
 `TELEGRAM_SALARY_PAYMENTS_CHAT_ID`.
+`/start` also returns the chat id when used in a group. Language selection is
+shown only in a private chat with the bot.
 New fines are sent privately to the Telegram account linked to the affected
 employee salary profile. Fine notifications never use the completed-order
 group chat. If the employee is not linked or has disabled notifications, the

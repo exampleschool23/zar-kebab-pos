@@ -113,6 +113,14 @@ function openMenuKeyboard(language) {
   } : undefined
 }
 
+async function sendChatIdMessage(message) {
+  const chatName = escapeTelegramHtml(message.chat.title || message.chat.first_name || 'this chat')
+  await sendTelegramMessage(
+    message.chat.id,
+    `Telegram chat ID for <b>${chatName}</b>:\n<code>${escapeTelegramHtml(message.chat.id)}</code>`
+  )
+}
+
 async function savePreferredLanguage(supabase, user, chatId, language) {
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ')
     || user.username
@@ -241,20 +249,25 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin()
     const message = update?.message
     const token = parseEmployeeStartToken(message?.text)
+    const isPrivateChat = message?.chat?.type === 'private'
+    const isLanguageCommand = /^\/(?:start|language)(?:@\w+)?(?:\s|$)/i.test(message?.text || '')
     if (message?.chat?.id && /^\/chatid(?:@\w+)?(?:\s|$)/i.test(message?.text || '')) {
-      const chatName = escapeTelegramHtml(message.chat.title || message.chat.first_name || 'this chat')
+      await sendChatIdMessage(message)
+    } else if (message?.chat?.id && message?.from?.id && token && isPrivateChat) {
+      await linkEmployee(supabase, message, token)
+    } else if (message?.chat?.id && token) {
       await sendTelegramMessage(
         message.chat.id,
-        `Telegram chat ID for <b>${chatName}</b>:\n<code>${escapeTelegramHtml(message.chat.id)}</code>`
+        'Open the employee link in a private chat with the bot.'
       )
-    } else if (message?.chat?.id && message?.from?.id && token) {
-      await linkEmployee(supabase, message, token)
-    } else if (message?.chat?.id && /^\/(?:start|language)(?:@\w+)?(?:\s|$)/i.test(message?.text || '')) {
+    } else if (message?.chat?.id && isLanguageCommand && isPrivateChat) {
       await callTelegramApi('sendMessage', {
         chat_id: message.chat.id,
         text: CHOOSE_LANGUAGE,
         reply_markup: languageKeyboard(),
       })
+    } else if (message?.chat?.id && isLanguageCommand) {
+      await sendChatIdMessage(message)
     } else if (update?.callback_query?.data?.startsWith('language:')) {
       await handleLanguageCallback(supabase, update.callback_query)
     } else if (update?.callback_query?.data?.startsWith('salary_payment_confirm:')) {

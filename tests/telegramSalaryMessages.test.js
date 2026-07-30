@@ -231,6 +231,14 @@ test('Telegram webhook can reveal the exact salary group chat id during setup', 
   assert.match(webhook, /escapeTelegramHtml\(message\.chat\.id\)/)
 })
 
+test('group start returns its chat id while language selection stays private', () => {
+  const webhook = fs.readFileSync(new URL('../api/telegram/webhook.js', import.meta.url), 'utf8')
+  assert.match(webhook, /const isPrivateChat = message\?\.chat\?\.type === 'private'/)
+  assert.match(webhook, /isLanguageCommand && isPrivateChat/)
+  assert.match(webhook, /isLanguageCommand\) \{\s*await sendChatIdMessage\(message\)/)
+  assert.match(webhook, /token && isPrivateChat/)
+})
+
 test('current employee status uses the Tashkent calendar date', () => {
   assert.equal(getTashkentDate(new Date('2026-07-28T18:59:59Z')), '2026-07-28')
   assert.equal(getTashkentDate(new Date('2026-07-28T19:00:00Z')), '2026-07-29')
