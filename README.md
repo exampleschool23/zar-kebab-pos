@@ -16,12 +16,23 @@ VITE_TELEGRAM_BOT_USERNAME=your_bot_username
 TELEGRAM_WEBHOOK_SECRET=use-a-different-long-random-string
 CRON_SECRET=use-another-long-random-string
 TELEGRAM_COMPLETED_ORDERS_CHAT_ID=
+TELEGRAM_SALARY_PAYMENTS_CHAT_ID=
+TELEGRAM_SALARY_PAYMENTS_LANGUAGE=ru
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Keep `TELEGRAM_BOT_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` server-only. Do not prefix them with `VITE_`.
 `VITE_TELEGRAM_BOT_USERNAME` contains only the bot's public username and is safe for the browser.
 Set `TELEGRAM_COMPLETED_ORDERS_CHAT_ID` to the Telegram group chat id that should receive paid order completion messages. Add the bot to the group first; group and supergroup chat ids are usually negative numbers. You can also provide multiple chat ids separated by commas.
+Set `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` to the separate private group that
+should receive a message whenever an employee salary payment is recorded.
+The setting is intentionally separate from `TELEGRAM_TEAM_CHAT_ID` and
+`TELEGRAM_COMPLETED_ORDERS_CHAT_ID`, so salary details cannot be sent to the
+wrong group as a fallback. Add the bot to that group and allow it to send
+messages. `TELEGRAM_SALARY_PAYMENTS_LANGUAGE` defaults to `ru`.
+After deploying the webhook code, send `/chatid` inside the salary group to
+have the bot reply with the exact value to use for
+`TELEGRAM_SALARY_PAYMENTS_CHAT_ID`.
 New fines are sent privately to the Telegram account linked to the affected
 employee salary profile. Fine notifications never use the completed-order
 group chat. If the employee is not linked or has disabled notifications, the
@@ -61,6 +72,9 @@ Run `supabase/017_telegram_integration.sql` in the Supabase SQL editor. It adds:
 For private employee salary notifications, also run
 `supabase/107_employee_salary_telegram_notifications.sql`. It adds verified
 employee links, expiring one-time tokens, and idempotent delivery history.
+Run `supabase/108_employee_salary_payment_notification_deliveries.sql` and
+`supabase/110_salary_payment_group_notifications.sql` to audit private
+employee delivery and salary-group delivery independently.
 
 ### Daily employee salary notifications
 

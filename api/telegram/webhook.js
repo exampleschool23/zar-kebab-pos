@@ -7,7 +7,7 @@ import {
   normalizeSalaryNotificationLanguage,
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
-import { callTelegramApi, sendTelegramMessage } from './_lib/telegram.js'
+import { callTelegramApi, escapeTelegramHtml, sendTelegramMessage } from './_lib/telegram.js'
 import { getEmployeePaymentConfirmationCopy } from './_lib/paymentMessages.js'
 
 const LANGUAGES = {
@@ -241,7 +241,13 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin()
     const message = update?.message
     const token = parseEmployeeStartToken(message?.text)
-    if (message?.chat?.id && message?.from?.id && token) {
+    if (message?.chat?.id && /^\/chatid(?:@\w+)?(?:\s|$)/i.test(message?.text || '')) {
+      const chatName = escapeTelegramHtml(message.chat.title || message.chat.first_name || 'this chat')
+      await sendTelegramMessage(
+        message.chat.id,
+        `Telegram chat ID for <b>${chatName}</b>:\n<code>${escapeTelegramHtml(message.chat.id)}</code>`
+      )
+    } else if (message?.chat?.id && message?.from?.id && token) {
       await linkEmployee(supabase, message, token)
     } else if (message?.chat?.id && /^\/(?:start|language)(?:@\w+)?(?:\s|$)/i.test(message?.text || '')) {
       await callTelegramApi('sendMessage', {

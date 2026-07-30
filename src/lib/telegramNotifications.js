@@ -44,7 +44,13 @@ export async function notifyTelegramEmployeeFine(fineId) {
 }
 
 export async function notifyTelegramEmployeePayment(paymentId) {
-  if (!paymentId) return false
+  const failedResult = {
+    ok: false,
+    allSent: false,
+    employee: { status: 'failed' },
+    group: { status: 'failed' },
+  }
+  if (!paymentId) return failedResult
   try {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     if (sessionError) throw sessionError
@@ -60,9 +66,14 @@ export async function notifyTelegramEmployeePayment(paymentId) {
     })
     if (!response.ok) throw new Error(`Telegram payment notification failed with ${response.status}`)
     const result = await response.json().catch(() => ({}))
-    return result?.ok === true
+    return {
+      ...failedResult,
+      ...result,
+      employee: { ...failedResult.employee, ...(result?.employee || {}) },
+      group: { ...failedResult.group, ...(result?.group || {}) },
+    }
   } catch (error) {
     console.warn('[telegram] employee payment notification failed:', error)
-    return false
+    return failedResult
   }
 }

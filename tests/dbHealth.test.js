@@ -102,6 +102,10 @@ test('database health requires auditable salary payment notifications', async ()
     result.failed.find(check => check.name === 'employee_salary_payment_notification_deliveries').hint,
     /108_employee_salary_payment_notification_deliveries/
   )
+  assert.match(
+    result.failed.find(check => check.name === 'employee_salary_payment_notification_deliveries').hint,
+    /110_salary_payment_group_notifications/
+  )
   assert.match(cliHealthSource, /checkTable\('employee_salary_payment_notification_deliveries'/)
 })
 

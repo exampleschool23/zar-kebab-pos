@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { buildEmployeeFineMessage } from './_lib/fineMessages.js'
 import {
   buildEmployeePaymentMessage,
+  buildSalaryPaymentGroupMessage,
   getEmployeePaymentConfirmationCopy,
 } from './_lib/paymentMessages.js'
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
@@ -76,6 +77,8 @@ async function notifyFine(supabase, user, fineId) {
 
 async function notifyPayment(supabase, user, paymentId) {
   let deliveryId = null
+  let employeeAlreadyDelivered = false
+  let groupAlreadyDelivered = false
   try {
     const { data: payment, error } = await supabase
       .from('employee_salary_payments')
@@ -89,99 +92,234 @@ async function notifyPayment(supabase, user, paymentId) {
 
     const { data: existingDelivery, error: existingError } = await supabase
       .from('employee_salary_payment_notification_deliveries')
-      .select('id, status, telegram_message_id')
+      .select('*')
       .eq('payment_id', payment.id)
       .maybeSingle()
     if (existingError) throw existingError
-    if (existingDelivery && ['sent', 'confirmed'].includes(existingDelivery.status)) {
+    employeeAlreadyDelivered = ['sent', 'confirmed'].includes(existingDelivery?.status)
+    groupAlreadyDelivered = existingDelivery?.group_status === 'sent'
+    if (employeeAlreadyDelivered && groupAlreadyDelivered) {
       return {
         ok: true,
+        allSent: true,
         duplicate: true,
-        status: existingDelivery.status,
-        telegramMessageId: existingDelivery.telegram_message_id,
+        deliveryId: existingDelivery.id,
+        employee: {
+          status: existingDelivery.status,
+          telegramMessageId: existingDelivery.telegram_message_id,
+        },
+        group: {
+          status: existingDelivery.group_status,
+          telegramMessageId: existingDelivery.group_telegram_message_id,
+        },
       }
     }
 
     const now = new Date().toISOString()
-    const { data: delivery, error: deliveryError } = await supabase
-      .from('employee_salary_payment_notification_deliveries')
-      .upsert({
-        payment_id: payment.id,
-        salary_profile_id: payment.salary_profile_id,
-        status: 'pending',
-        telegram_message_id: null,
-        error_message: '',
-        attempted_at: now,
-        sent_at: null,
-        confirmed_at: null,
-        confirmed_by_telegram_user_id: null,
-        updated_at: now,
-      }, { onConflict: 'payment_id' })
-      .select('id')
-      .single()
-    if (deliveryError) throw deliveryError
-    deliveryId = delivery.id
-
-    const { data: employeeLink, error: linkError } = await supabase
-      .from('employee_salary_telegram_links')
-      .select('chat_id, notifications_enabled, preferred_language')
-      .eq('salary_profile_id', payment.salary_profile_id)
-      .maybeSingle()
-    if (linkError) throw linkError
-    if (!employeeLink?.chat_id || employeeLink.notifications_enabled === false) {
-      await supabase.from('employee_salary_payment_notification_deliveries').update({
-        status: 'skipped',
-        error_message: 'Employee Telegram is not linked or notifications are disabled',
-        updated_at: new Date().toISOString(),
-      }).eq('id', deliveryId)
-      return { skipped: true, reason: 'employee_not_linked', deliveryId }
+    const groupChatId = String(process.env.TELEGRAM_SALARY_PAYMENTS_CHAT_ID || '').trim()
+    const groupLanguage = String(process.env.TELEGRAM_SALARY_PAYMENTS_LANGUAGE || 'ru').trim()
+    let delivery = existingDelivery
+    if (!delivery) {
+      const { data: createdDelivery, error: deliveryError } = await supabase
+        .from('employee_salary_payment_notification_deliveries')
+        .insert({
+          payment_id: payment.id,
+          salary_profile_id: payment.salary_profile_id,
+          status: 'pending',
+          telegram_message_id: null,
+          error_message: '',
+          attempted_at: now,
+          group_status: groupChatId ? 'pending' : 'skipped',
+          group_chat_id: groupChatId || null,
+          group_telegram_message_id: null,
+          group_error_message: groupChatId
+            ? ''
+            : 'Salary payment Telegram group is not configured',
+          group_attempted_at: now,
+          group_sent_at: null,
+          updated_at: now,
+        })
+        .select('*')
+        .single()
+      if (deliveryError) throw deliveryError
+      delivery = createdDelivery
+    } else {
+      const retryFields = { updated_at: now }
+      if (!employeeAlreadyDelivered) {
+        Object.assign(retryFields, {
+          status: 'pending',
+          telegram_message_id: null,
+          error_message: '',
+          attempted_at: now,
+          sent_at: null,
+        })
+      }
+      if (!groupAlreadyDelivered) {
+        Object.assign(retryFields, {
+          group_status: groupChatId ? 'pending' : 'skipped',
+          group_chat_id: groupChatId || null,
+          group_telegram_message_id: null,
+          group_error_message: groupChatId
+            ? ''
+            : 'Salary payment Telegram group is not configured',
+          group_attempted_at: now,
+          group_sent_at: null,
+        })
+      }
+      const { data: updatedDelivery, error: deliveryError } = await supabase
+        .from('employee_salary_payment_notification_deliveries')
+        .update(retryFields)
+        .eq('id', delivery.id)
+        .select('*')
+        .single()
+      if (deliveryError) throw deliveryError
+      delivery = updatedDelivery
     }
+    deliveryId = delivery.id
 
     const salaryProfiles = await loadSalaryProfiles(supabase, [payment.salary_profile_id])
     const salaryProfile = salaryProfiles.get(payment.salary_profile_id)
     const remainingDue = salaryProfile
       ? getDailySalaryNotificationSummary(salaryProfile, getTashkentDate()).due
       : 0
-    const text = buildEmployeePaymentMessage({
+    const paymentWithEmployee = {
       ...payment,
       employee_name: payment.salary_profile?.employee_name || '',
-    }, remainingDue, employeeLink.preferred_language)
-    const confirmation = getEmployeePaymentConfirmationCopy(employeeLink.preferred_language)
-    const response = await sendTelegramMessage(employeeLink.chat_id, text, {
-      reply_markup: {
-        inline_keyboard: [[{
-          text: confirmation.button,
-          callback_data: `salary_payment_confirm:${deliveryId}`,
-        }]],
-      },
-    })
-    const telegramMessageId = String(response?.result?.message_id || '')
-    const sentAt = new Date().toISOString()
+    }
+
+    const employeeDelivery = employeeAlreadyDelivered
+      ? Promise.resolve({
+          status: delivery.status,
+          telegramMessageId: delivery.telegram_message_id,
+          sentAt: delivery.sent_at,
+          errorMessage: '',
+        })
+      : (async () => {
+          const { data: employeeLink, error: linkError } = await supabase
+            .from('employee_salary_telegram_links')
+            .select('chat_id, notifications_enabled, preferred_language')
+            .eq('salary_profile_id', payment.salary_profile_id)
+            .maybeSingle()
+          if (linkError) throw linkError
+          if (!employeeLink?.chat_id || employeeLink.notifications_enabled === false) {
+            return {
+              status: 'skipped',
+              telegramMessageId: null,
+              sentAt: null,
+              errorMessage: 'Employee Telegram is not linked or notifications are disabled',
+            }
+          }
+          const text = buildEmployeePaymentMessage(
+            paymentWithEmployee,
+            remainingDue,
+            employeeLink.preferred_language
+          )
+          const confirmation = getEmployeePaymentConfirmationCopy(employeeLink.preferred_language)
+          const response = await sendTelegramMessage(employeeLink.chat_id, text, {
+            reply_markup: {
+              inline_keyboard: [[{
+                text: confirmation.button,
+                callback_data: `salary_payment_confirm:${deliveryId}`,
+              }]],
+            },
+          })
+          return {
+            status: 'sent',
+            telegramMessageId: String(response?.result?.message_id || ''),
+            sentAt: new Date().toISOString(),
+            errorMessage: '',
+          }
+        })()
+
+    const groupDelivery = groupAlreadyDelivered
+      ? Promise.resolve({
+          status: delivery.group_status,
+          telegramMessageId: delivery.group_telegram_message_id,
+          sentAt: delivery.group_sent_at,
+          errorMessage: '',
+        })
+      : (async () => {
+          if (!groupChatId) {
+            return {
+              status: 'skipped',
+              telegramMessageId: null,
+              sentAt: null,
+              errorMessage: 'Salary payment Telegram group is not configured',
+            }
+          }
+          const text = buildSalaryPaymentGroupMessage(
+            paymentWithEmployee,
+            remainingDue,
+            groupLanguage
+          )
+          const response = await sendTelegramMessage(groupChatId, text)
+          return {
+            status: 'sent',
+            telegramMessageId: String(response?.result?.message_id || ''),
+            sentAt: new Date().toISOString(),
+            errorMessage: '',
+          }
+        })()
+
+    const [employeeSettled, groupSettled] = await Promise.allSettled([
+      employeeDelivery,
+      groupDelivery,
+    ])
+    const normalizeDelivery = settled => (
+      settled.status === 'fulfilled'
+        ? settled.value
+        : {
+            status: 'failed',
+            telegramMessageId: null,
+            sentAt: null,
+            errorMessage: String(settled.reason?.message || settled.reason).slice(0, 1000),
+          }
+    )
+    const employeeResult = normalizeDelivery(employeeSettled)
+    const groupResult = normalizeDelivery(groupSettled)
+    const updatedAt = new Date().toISOString()
     const { error: sentUpdateError } = await supabase
       .from('employee_salary_payment_notification_deliveries')
       .update({
-        status: 'sent',
-        telegram_message_id: telegramMessageId,
-        sent_at: sentAt,
-        error_message: '',
-        updated_at: sentAt,
+        status: employeeResult.status,
+        telegram_message_id: employeeResult.telegramMessageId,
+        error_message: employeeResult.errorMessage,
+        sent_at: employeeResult.sentAt,
+        group_status: groupResult.status,
+        group_chat_id: groupChatId || delivery.group_chat_id || null,
+        group_telegram_message_id: groupResult.telegramMessageId,
+        group_error_message: groupResult.errorMessage,
+        group_sent_at: groupResult.sentAt,
+        updated_at: updatedAt,
       })
       .eq('id', deliveryId)
     if (sentUpdateError) throw sentUpdateError
 
+    const employeeSent = ['sent', 'confirmed'].includes(employeeResult.status)
+    const groupSent = groupResult.status === 'sent'
     return {
-      ok: true,
-      sentCount: 1,
+      ok: employeeSent || groupSent,
+      allSent: employeeSent && groupSent,
       deliveryId,
-      telegramMessageId,
+      employee: employeeResult,
+      group: groupResult,
     }
   } catch (error) {
     if (deliveryId) {
-      await supabase.from('employee_salary_payment_notification_deliveries').update({
-        status: 'failed',
-        error_message: String(error?.message || error).slice(0, 1000),
-        updated_at: new Date().toISOString(),
-      }).eq('id', deliveryId)
+      const errorMessage = String(error?.message || error).slice(0, 1000)
+      const failureFields = { updated_at: new Date().toISOString() }
+      if (!employeeAlreadyDelivered) {
+        failureFields.status = 'failed'
+        failureFields.error_message = errorMessage
+      }
+      if (!groupAlreadyDelivered) {
+        failureFields.group_status = 'failed'
+        failureFields.group_error_message = errorMessage
+      }
+      await supabase
+        .from('employee_salary_payment_notification_deliveries')
+        .update(failureFields)
+        .eq('id', deliveryId)
     }
     throw error
   }

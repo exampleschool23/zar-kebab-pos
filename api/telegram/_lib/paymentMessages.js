@@ -48,12 +48,51 @@ const COPY = {
   },
 }
 
+const GROUP_COPY = {
+  uz: {
+    recorded: 'Xodimga maosh to‘lovi qayd etildi.',
+    employee: 'Xodim',
+  },
+  ru: {
+    recorded: 'Зарегистрирована выплата сотруднику.',
+    employee: 'Сотрудник',
+  },
+  en: {
+    recorded: 'A salary payment was recorded for an employee.',
+    employee: 'Employee',
+  },
+}
+
 export function getEmployeePaymentConfirmationCopy(language = 'ru') {
   const lang = normalizeSalaryNotificationLanguage(language)
   return {
     button: COPY[lang].confirm,
     confirmed: COPY[lang].confirmed,
   }
+}
+
+export function buildSalaryPaymentGroupMessage(payment, remainingDue = 0, language = 'ru') {
+  const lang = normalizeSalaryNotificationLanguage(language)
+  const copy = COPY[lang]
+  const groupCopy = GROUP_COPY[lang]
+  const lines = [
+    `💵 <b>${copy.title}</b>`,
+    '',
+    groupCopy.recorded,
+    '',
+    `<b>${groupCopy.employee}:</b> ${escapeTelegramHtml(payment?.employee_name || '-')}`,
+    `<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(payment?.amount)} UZS`,
+    `<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(payment?.paid_date, '-'))}`,
+    `<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(payment?.payment_method, lang))}`,
+  ]
+  if (String(payment?.note || '').trim()) {
+    lines.push(`<b>${copy.note}:</b> ${escapeTelegramHtml(payment.note)}`)
+  }
+  lines.push(
+    `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,
+    `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(payment?.created_by_name || '-')}`
+  )
+  return lines.join('\n')
 }
 
 export function buildEmployeePaymentMessage(payment, remainingDue = 0, language = 'ru') {

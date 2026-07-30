@@ -180,6 +180,12 @@ These bugs were recently fixed and are now protected by tests:
    - The legacy full-history loader is only a deployment-order fallback while migration `109` is missing.
    - Detailed order rows remain the responsibility of reports, receipts, and historical drill-down pages.
 
+17. Salary-payment Telegram delivery has two independent destinations.
+   - The private employee message keeps its receipt-confirmation button.
+   - The salary group uses `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` and receives a separate message without a confirmation button.
+   - Never fall back to `TELEGRAM_TEAM_CHAT_ID` or the completed-orders group for salary details.
+   - Employee and group delivery statuses are recorded separately so either destination can fail or retry without duplicating the other.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -237,6 +243,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/109_accounting_paid_order_summary.sql`
   Adds the lightweight, Accounting-authorized paid-order aggregate so the overview can calculate revenue, loyalty, net profit, and method balances without downloading complete orders.
+
+- `supabase/110_salary_payment_group_notifications.sql`
+  Adds independent Telegram group delivery status, message ids, timestamps, and errors to each salary-payment notification record.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

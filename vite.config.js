@@ -4,6 +4,7 @@ import registerAuth from './api/auth/register.js'
 import deleteAuthUser from './api/auth/delete-user.js'
 import uploadMenuImage from './api/menu-image/upload.js'
 import deleteMenuImage from './api/menu-image/delete.js'
+import notifyTelegramEmployee from './api/telegram/employee-notification.js'
 import notifyTelegramOrderStatus from './api/telegram/order-status.js'
 
 const SERVER_ENV_KEYS = [
@@ -19,6 +20,8 @@ const SERVER_ENV_KEYS = [
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_COMPLETED_ORDERS_CHAT_ID',
   'TELEGRAM_COMPLETED_ORDERS_CHAT_IDS',
+  'TELEGRAM_SALARY_PAYMENTS_CHAT_ID',
+  'TELEGRAM_SALARY_PAYMENTS_LANGUAGE',
   'TELEGRAM_SESSION_SECRET',
 ]
 
@@ -37,6 +40,7 @@ function localApiRoutes() {
       server.middlewares.use('/api/auth/delete-user', (req, res) => deleteAuthUser(req, res))
       server.middlewares.use('/api/menu-image/upload', (req, res) => uploadMenuImage(req, res))
       server.middlewares.use('/api/menu-image/delete', (req, res) => deleteMenuImage(req, res))
+      server.middlewares.use('/api/telegram/employee-notification', (req, res) => notifyTelegramEmployee(req, res))
       server.middlewares.use('/api/telegram/order-status', (req, res) => notifyTelegramOrderStatus(req, res))
     },
   }
