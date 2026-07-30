@@ -109,6 +109,28 @@ test('database health requires auditable salary payment notifications', async ()
   assert.match(cliHealthSource, /checkTable\('employee_salary_payment_notification_deliveries'/)
 })
 
+test('database health requires the salary group target and event delivery history', async () => {
+  const missingTarget = await runDbHealthChecks(makeClient({
+    missingTable: 'telegram_notification_targets',
+  }))
+  const missingDeliveries = await runDbHealthChecks(makeClient({
+    missingTable: 'employee_salary_group_notification_deliveries',
+  }))
+
+  assert.equal(missingTarget.ok, false)
+  assert.match(
+    missingTarget.failed.find(check => check.name === 'telegram_notification_targets').hint,
+    /111_salary_group_event_notifications/
+  )
+  assert.equal(missingDeliveries.ok, false)
+  assert.match(
+    missingDeliveries.failed.find(check => check.name === 'employee_salary_group_notification_deliveries').hint,
+    /111_salary_group_event_notifications/
+  )
+  assert.match(cliHealthSource, /checkTable\('telegram_notification_targets'/)
+  assert.match(cliHealthSource, /checkTable\('employee_salary_group_notification_deliveries'/)
+})
+
 test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)

@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { buildEmployeeFineMessage } from './_lib/fineMessages.js'
 import {
   buildEmployeePaymentMessage,
+  buildSalaryGroupEventMessage,
   buildSalaryPaymentGroupMessage,
   getEmployeePaymentConfirmationCopy,
 } from './_lib/paymentMessages.js'
@@ -12,6 +13,21 @@ import { sendTelegramMessage } from './_lib/telegram.js'
 
 const EDITOR_ROLES = new Set(['owner', 'admin'])
 const FEATURE_ACCESS_MANAGER_EMAILS = new Set(['dangerhoggish@gmail.com'])
+const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
+const GROUP_EVENT_CONFIG = {
+  bonus: {
+    table: 'employee_salary_bonuses',
+    select: 'id, salary_profile_id, bonus_date, amount, payment_method, note, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)',
+  },
+  fine: {
+    table: 'employee_salary_fines',
+    select: 'id, salary_profile_id, fine_date, amount, reason, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)',
+  },
+  absence: {
+    table: 'employee_salary_absences',
+    select: 'id, salary_profile_id, absence_date, note, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)',
+  },
+}
 
 function normalizeRole(role) {
   const value = String(role || '').toLowerCase()
@@ -46,33 +62,250 @@ async function requireExpensesWriteAccess(req) {
   return { supabase, user }
 }
 
-async function notifyFine(supabase, user, fineId) {
-  const { data: fine, error } = await supabase
-    .from('employee_salary_fines')
-    .select('id, salary_profile_id, fine_date, amount, reason, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)')
-    .eq('id', fineId)
+async function loadSalaryGroupTarget(supabase) {
+  const fallback = {
+    chatId: String(process.env.TELEGRAM_SALARY_PAYMENTS_CHAT_ID || '').trim(),
+    language: String(process.env.TELEGRAM_SALARY_PAYMENTS_LANGUAGE || 'ru').trim(),
+  }
+  const { data, error } = await supabase
+    .from('telegram_notification_targets')
+    .select('chat_id, language, is_enabled')
+    .eq('target_key', 'salary_events')
+    .maybeSingle()
+  if (error) {
+    const missingMigration = ['42P01', 'PGRST205'].includes(error.code)
+      || (
+        /telegram_notification_targets/i.test(error.message || '')
+        && /does not exist|schema cache/i.test(error.message || '')
+      )
+    if (!missingMigration) throw error
+    return fallback
+  }
+  if (!data?.is_enabled) return { chatId: '', language: data?.language || fallback.language }
+  return {
+    chatId: String(data.chat_id || fallback.chatId).trim(),
+    language: String(data.language || fallback.language || 'ru').trim(),
+  }
+}
+
+async function loadOwnedSalaryEvent(supabase, user, type, eventId) {
+  const config = GROUP_EVENT_CONFIG[type]
+  if (!config) throw Object.assign(new Error('Unsupported salary event type'), { status: 400 })
+  const { data, error } = await supabase
+    .from(config.table)
+    .select(config.select)
+    .eq('id', eventId)
     .maybeSingle()
   if (error) throw error
-  if (!fine || fine.created_by !== user.id) {
-    throw Object.assign(new Error('Fine not found'), { status: 404 })
+  if (!data || data.created_by !== user.id) {
+    throw Object.assign(new Error('Salary event not found'), { status: 404 })
   }
+  return {
+    ...data,
+    employee_name: data.salary_profile?.employee_name || '',
+  }
+}
 
-  const { data: employeeLink, error: linkError } = await supabase
-    .from('employee_salary_telegram_links')
-    .select('chat_id, notifications_enabled')
-    .eq('salary_profile_id', fine.salary_profile_id)
+function getTelegramMessageId(response) {
+  const messageId = String(response?.result?.message_id || '').trim()
+  if (!messageId) throw new Error('Telegram did not return a message id')
+  return messageId
+}
+
+function savedGroupDeliveryResult(delivery, duplicate = true) {
+  return {
+    status: delivery?.status || 'pending',
+    duplicate,
+    telegramMessageId: delivery?.telegram_message_id || null,
+    sentAt: delivery?.sent_at || null,
+    errorMessage: delivery?.error_message || '',
+  }
+}
+
+async function deliverSalaryGroupEvent(supabase, type, event) {
+  const { data: existing, error: existingError } = await supabase
+    .from('employee_salary_group_notification_deliveries')
+    .select('*')
+    .eq('event_type', type)
+    .eq('event_id', event.id)
     .maybeSingle()
-  if (linkError) throw linkError
-  if (!employeeLink?.chat_id || employeeLink.notifications_enabled === false) {
-    return { skipped: true, reason: 'employee_not_linked' }
+  if (existingError) throw existingError
+  if (existing?.status === 'sent') {
+    return savedGroupDeliveryResult(existing)
+  }
+  const pendingAge = Date.now() - new Date(existing?.attempted_at || 0).getTime()
+  if (existing?.status === 'pending' && pendingAge < PENDING_DELIVERY_RETRY_MS) {
+    return savedGroupDeliveryResult(existing)
   }
 
-  const text = buildEmployeeFineMessage({
-    ...fine,
-    employee_name: fine.salary_profile?.employee_name || '',
-  })
-  await sendTelegramMessage(employeeLink.chat_id, text)
-  return { ok: true, sentCount: 1 }
+  const target = await loadSalaryGroupTarget(supabase)
+  const now = new Date().toISOString()
+  const pendingFields = {
+    event_type: type,
+    event_id: event.id,
+    salary_profile_id: event.salary_profile_id,
+    status: target.chatId ? 'pending' : 'skipped',
+    telegram_chat_id: target.chatId || null,
+    telegram_message_id: null,
+    error_message: target.chatId ? '' : 'Salary events Telegram group is not configured',
+    attempted_at: now,
+    sent_at: null,
+    updated_at: now,
+  }
+  let delivery
+  if (!existing) {
+    const created = await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .insert(pendingFields)
+      .select('id')
+      .single()
+    if (created.error?.code === '23505') {
+      const { data: concurrent, error: concurrentError } = await supabase
+        .from('employee_salary_group_notification_deliveries')
+        .select('*')
+        .eq('event_type', type)
+        .eq('event_id', event.id)
+        .single()
+      if (concurrentError) throw concurrentError
+      return savedGroupDeliveryResult(concurrent)
+    }
+    if (created.error) throw created.error
+    delivery = created.data
+  } else {
+    const claimed = await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .update(pendingFields)
+      .eq('id', existing.id)
+      .eq('updated_at', existing.updated_at)
+      .select('id')
+      .maybeSingle()
+    if (claimed.error) throw claimed.error
+    if (!claimed.data) {
+      const { data: concurrent, error: concurrentError } = await supabase
+        .from('employee_salary_group_notification_deliveries')
+        .select('*')
+        .eq('id', existing.id)
+        .single()
+      if (concurrentError) throw concurrentError
+      return savedGroupDeliveryResult(concurrent)
+    }
+    delivery = claimed.data
+  }
+
+  if (!target.chatId) {
+    return {
+      status: 'skipped',
+      telegramMessageId: null,
+      sentAt: null,
+      errorMessage: 'Salary events Telegram group is not configured',
+    }
+  }
+
+  try {
+    const salaryProfiles = await loadSalaryProfiles(supabase, [event.salary_profile_id])
+    const salaryProfile = salaryProfiles.get(event.salary_profile_id)
+    const remainingDue = salaryProfile
+      ? getDailySalaryNotificationSummary(salaryProfile, getTashkentDate()).due
+      : 0
+    const text = buildSalaryGroupEventMessage(type, event, remainingDue, target.language)
+    const response = await sendTelegramMessage(target.chatId, text)
+    const sentAt = new Date().toISOString()
+    const telegramMessageId = getTelegramMessageId(response)
+    const { error: updateError } = await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .update({
+        status: 'sent',
+        telegram_message_id: telegramMessageId,
+        error_message: '',
+        sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('id', delivery.id)
+    if (updateError) throw updateError
+    return { status: 'sent', telegramMessageId, sentAt, errorMessage: '' }
+  } catch (error) {
+    const errorMessage = String(error?.message || error).slice(0, 1000)
+    await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .update({
+        status: 'failed',
+        error_message: errorMessage,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', delivery.id)
+    return {
+      status: 'failed',
+      telegramMessageId: null,
+      sentAt: null,
+      errorMessage,
+    }
+  }
+}
+
+function normalizeDeliverySettlement(settled) {
+  return settled.status === 'fulfilled'
+    ? settled.value
+    : {
+        status: 'failed',
+        telegramMessageId: null,
+        sentAt: null,
+        errorMessage: String(settled.reason?.message || settled.reason).slice(0, 1000),
+      }
+}
+
+async function notifyFine(supabase, user, fineId) {
+  const fine = await loadOwnedSalaryEvent(supabase, user, 'fine', fineId)
+  const employeeDelivery = (async () => {
+    const { data: employeeLink, error: linkError } = await supabase
+      .from('employee_salary_telegram_links')
+      .select('chat_id, notifications_enabled')
+      .eq('salary_profile_id', fine.salary_profile_id)
+      .maybeSingle()
+    if (linkError) throw linkError
+    if (!employeeLink?.chat_id || employeeLink.notifications_enabled === false) {
+      return {
+        status: 'skipped',
+        telegramMessageId: null,
+        sentAt: null,
+        errorMessage: 'Employee Telegram is not linked or notifications are disabled',
+      }
+    }
+    const response = await sendTelegramMessage(
+      employeeLink.chat_id,
+      buildEmployeeFineMessage(fine)
+    )
+    return {
+      status: 'sent',
+      telegramMessageId: getTelegramMessageId(response),
+      sentAt: new Date().toISOString(),
+      errorMessage: '',
+    }
+  })()
+  const [employeeSettled, groupSettled] = await Promise.allSettled([
+    employeeDelivery,
+    deliverSalaryGroupEvent(supabase, 'fine', fine),
+  ])
+  const employee = normalizeDeliverySettlement(employeeSettled)
+  const group = normalizeDeliverySettlement(groupSettled)
+  const employeeSent = employee.status === 'sent'
+  const groupSent = group.status === 'sent'
+  return {
+    ok: employeeSent || groupSent,
+    allSent: employeeSent && groupSent,
+    employee,
+    group,
+  }
+}
+
+async function notifyGroupOnlyEvent(supabase, user, type, eventId) {
+  const event = await loadOwnedSalaryEvent(supabase, user, type, eventId)
+  const group = await deliverSalaryGroupEvent(supabase, type, event)
+  return {
+    ok: group.status === 'sent',
+    allSent: group.status === 'sent',
+    employee: { status: 'not_applicable' },
+    group,
+  }
 }
 
 async function notifyPayment(supabase, user, paymentId) {
@@ -116,8 +349,9 @@ async function notifyPayment(supabase, user, paymentId) {
     }
 
     const now = new Date().toISOString()
-    const groupChatId = String(process.env.TELEGRAM_SALARY_PAYMENTS_CHAT_ID || '').trim()
-    const groupLanguage = String(process.env.TELEGRAM_SALARY_PAYMENTS_LANGUAGE || 'ru').trim()
+    const groupTarget = await loadSalaryGroupTarget(supabase)
+    const groupChatId = groupTarget.chatId
+    const groupLanguage = groupTarget.language
     let delivery = existingDelivery
     if (!delivery) {
       const { data: createdDelivery, error: deliveryError } = await supabase
@@ -225,7 +459,7 @@ async function notifyPayment(supabase, user, paymentId) {
           })
           return {
             status: 'sent',
-            telegramMessageId: String(response?.result?.message_id || ''),
+            telegramMessageId: getTelegramMessageId(response),
             sentAt: new Date().toISOString(),
             errorMessage: '',
           }
@@ -255,7 +489,7 @@ async function notifyPayment(supabase, user, paymentId) {
           const response = await sendTelegramMessage(groupChatId, text)
           return {
             status: 'sent',
-            telegramMessageId: String(response?.result?.message_id || ''),
+            telegramMessageId: getTelegramMessageId(response),
             sentAt: new Date().toISOString(),
             errorMessage: '',
           }
@@ -329,18 +563,36 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
   try {
-    const { type, fineId, paymentId } = await readJson(req)
-    const notificationType = type || (paymentId ? 'payment' : fineId ? 'fine' : '')
-    if (!['fine', 'payment'].includes(notificationType)) {
-      return json(res, 400, { error: 'type must be fine or payment' })
+    const { type, fineId, paymentId, bonusId, absenceId } = await readJson(req)
+    const notificationType = type
+      || (paymentId ? 'payment' : fineId ? 'fine' : bonusId ? 'bonus' : absenceId ? 'absence' : '')
+    const eventIds = {
+      payment: paymentId,
+      fine: fineId,
+      bonus: bonusId,
+      absence: absenceId,
     }
-    if (notificationType === 'fine' && !fineId) return json(res, 400, { error: 'fineId is required' })
-    if (notificationType === 'payment' && !paymentId) return json(res, 400, { error: 'paymentId is required' })
+    if (!['fine', 'payment', 'bonus', 'absence'].includes(notificationType)) {
+      return json(res, 400, { error: 'type must be payment, fine, bonus, or absence' })
+    }
+    if (!eventIds[notificationType]) {
+      return json(res, 400, { error: `${notificationType}Id is required` })
+    }
 
     const { supabase, user } = await requireExpensesWriteAccess(req)
-    const result = notificationType === 'fine'
-      ? await notifyFine(supabase, user, fineId)
-      : await notifyPayment(supabase, user, paymentId)
+    let result
+    if (notificationType === 'payment') {
+      result = await notifyPayment(supabase, user, paymentId)
+    } else if (notificationType === 'fine') {
+      result = await notifyFine(supabase, user, fineId)
+    } else {
+      result = await notifyGroupOnlyEvent(
+        supabase,
+        user,
+        notificationType,
+        eventIds[notificationType]
+      )
+    }
     return json(res, 200, result)
   } catch (error) {
     console.error('[telegram/employee-notification]', error)

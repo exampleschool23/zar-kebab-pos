@@ -25,7 +25,8 @@ Keep `TELEGRAM_BOT_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` server-only. Do not pr
 `VITE_TELEGRAM_BOT_USERNAME` contains only the bot's public username and is safe for the browser.
 Set `TELEGRAM_COMPLETED_ORDERS_CHAT_ID` to the Telegram group chat id that should receive paid order completion messages. Add the bot to the group first; group and supergroup chat ids are usually negative numbers. You can also provide multiple chat ids separated by commas.
 Set `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` to the separate private group that
-should receive a message whenever an employee salary payment is recorded.
+should receive salary-operation messages if migration `111` has not been
+applied yet.
 The setting is intentionally separate from `TELEGRAM_TEAM_CHAT_ID` and
 `TELEGRAM_COMPLETED_ORDERS_CHAT_ID`, so salary details cannot be sent to the
 wrong group as a fallback. Add the bot to that group and allow it to send
@@ -35,10 +36,12 @@ have the bot reply with the exact value to use for
 `TELEGRAM_SALARY_PAYMENTS_CHAT_ID`.
 `/start` also returns the chat id when used in a group. Language selection is
 shown only in a private chat with the bot.
-New fines are sent privately to the Telegram account linked to the affected
-employee salary profile. Fine notifications never use the completed-order
-group chat. If the employee is not linked or has disabled notifications, the
-fine is saved normally and the Telegram notification is skipped.
+Migration `111` stores the confirmed salary-events group in Supabase and uses
+it as the primary destination; the environment variable remains a deployment
+fallback. Salary payments and fines notify both the group and the linked
+employee. Bonuses and absences notify the group. None of these messages use
+the team or completed-orders groups as a fallback. If a private employee link
+is missing or disabled, the group notification is still attempted and tracked.
 
 ### BotFather setup
 
@@ -58,7 +61,8 @@ On Vercel, use Telegram webhooks instead of running the polling process. After d
 ```bash
 curl -s "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
   -d "url=https://your-domain.com/api/telegram/webhook" \
-  -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+  -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>" \
+  -d 'allowed_updates=["message","callback_query"]'
 ```
 
 Telegram webhooks and `npm run bot:telegram` polling cannot be active at the same time.
@@ -77,6 +81,8 @@ employee links, expiring one-time tokens, and idempotent delivery history.
 Run `supabase/108_employee_salary_payment_notification_deliveries.sql` and
 `supabase/110_salary_payment_group_notifications.sql` to audit private
 employee delivery and salary-group delivery independently.
+Run `supabase/111_salary_group_event_notifications.sql` to configure the
+salary-events group and track duplicate-safe bonus, fine, and absence delivery.
 
 ### Daily employee salary notifications
 

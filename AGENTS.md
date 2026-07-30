@@ -182,9 +182,15 @@ These bugs were recently fixed and are now protected by tests:
 
 17. Salary-payment Telegram delivery has two independent destinations.
    - The private employee message keeps its receipt-confirmation button.
-   - The salary group uses `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` and receives a separate message without a confirmation button.
+   - The salary group uses the `salary_events` row in `telegram_notification_targets`, with `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` only as a deployment-order fallback, and receives a separate message without a confirmation button.
    - Never fall back to `TELEGRAM_TEAM_CHAT_ID` or the completed-orders group for salary details.
    - Employee and group delivery statuses are recorded separately so either destination can fail or retry without duplicating the other.
+
+18. Every recorded salary operation must notify the dedicated salary group.
+   - Payment and fine records notify both the salary group and the linked employee; bonus and absence records notify the group only.
+   - All four types reuse `api/telegram/employee-notification.js` so the Vercel Hobby deployment remains at 12 functions.
+   - Bonus, fine, and absence group delivery is duplicate-safe and auditable through `employee_salary_group_notification_deliveries`.
+   - A Telegram notification is marked sent only after Telegram returns a message id.
 
 ## Database Migrations
 
@@ -246,6 +252,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/110_salary_payment_group_notifications.sql`
   Adds independent Telegram group delivery status, message ids, timestamps, and errors to each salary-payment notification record.
+
+- `supabase/111_salary_group_event_notifications.sql`
+  Stores the dedicated salary-events Telegram target and adds duplicate-safe delivery history for bonus, fine, and absence group notifications.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
