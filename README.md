@@ -2,7 +2,7 @@
 
 ## Telegram Bot and Mini App
 
-This MVP connects Telegram to the existing web app and Supabase order flow. Telegram chat only opens the Mini App; menu, checkout, kitchen, cashier, and admin data stay in the same backend/database.
+This MVP connects Telegram to the existing web app and Supabase data. Telegram chat opens the read-only Mini App menu, loyalty lookup, and restaurant contact page; kitchen, cashier, and admin data stay in the same backend/database.
 
 ### Environment variables
 
@@ -86,6 +86,11 @@ salary-events group and track duplicate-safe bonus, fine, and absence delivery.
 Run `supabase/112_salary_event_employee_notifications.sql` to track private
 employee delivery for bonus, fine, and absence notifications independently
 from the salary-group delivery.
+Run `supabase/113_salary_notification_attempt_tracking.sql` so every saved
+payment, bonus, fine, or absence immediately creates a delivery-status row,
+even when a stale browser or failed request never reaches Telegram. The
+Salaries page combines those records under Payment notification status, five
+at a time, and allows unsent records to be retried.
 
 ### Daily employee salary notifications
 
@@ -109,4 +114,4 @@ Supabase Cron with `Authorization: Bearer <CRON_SECRET>`.
 
 The Mini App reads `window.Telegram.WebApp.initData` and sends the raw string to `POST /api/telegram/auth`. The backend validates the signature with `TELEGRAM_BOT_TOKEN` before creating a signed app session. The frontend never trusts `initDataUnsafe` for authentication and never receives the bot token.
 
-Telegram order creation uses `POST /api/telegram/order`. The backend reloads menu item prices from Supabase and ignores any custom prices sent by the client.
+The Mini App is a read-only menu with loyalty-balance lookup and restaurant contact information. Its unused customer checkout and order-history endpoints were retired.

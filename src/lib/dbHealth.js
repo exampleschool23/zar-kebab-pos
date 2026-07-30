@@ -61,9 +61,9 @@ const MIGRATION_HINTS = {
   employee_salary_absences: 'Run supabase/063_employee_salary_absences.sql',
   employee_salary_telegram_links: 'Run supabase/107_employee_salary_telegram_notifications.sql',
   employee_salary_notification_deliveries: 'Run supabase/107_employee_salary_telegram_notifications.sql',
-  employee_salary_payment_notification_deliveries: 'Run supabase/108_employee_salary_payment_notification_deliveries.sql and supabase/110_salary_payment_group_notifications.sql',
+  employee_salary_payment_notification_deliveries: 'Run supabase/108_employee_salary_payment_notification_deliveries.sql, supabase/110_salary_payment_group_notifications.sql, and supabase/113_salary_notification_attempt_tracking.sql',
   telegram_notification_targets: 'Run supabase/111_salary_group_event_notifications.sql',
-  employee_salary_group_notification_deliveries: 'Run supabase/111_salary_group_event_notifications.sql and supabase/112_salary_event_employee_notifications.sql',
+  employee_salary_group_notification_deliveries: 'Run supabase/111_salary_group_event_notifications.sql, supabase/112_salary_event_employee_notifications.sql, and supabase/113_salary_notification_attempt_tracking.sql',
   accounting_record_audit: 'Run supabase/084_accounting_record_audit.sql',
   submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
@@ -75,7 +75,6 @@ const MIGRATION_HINTS = {
   current_staff_can_write: 'Run the latest supabase/097_daily_bazaar.sql',
   save_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
   delete_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
-  create_telegram_order: 'Run supabase/101_atomic_telegram_orders.sql',
   create_employee_salary_telegram_link: 'Run supabase/107_employee_salary_telegram_notifications.sql',
   create_menu_item_with_cost: 'Run supabase/102_atomic_menu_item_cost_creation.sql',
   create_menu_item_with_media_and_cost: 'Run supabase/103_menu_item_media_gallery.sql',
@@ -132,7 +131,6 @@ export async function runDbHealthChecks(dbClient = supabase) {
   const startedAt = new Date().toISOString()
   const checks = await Promise.all(TABLE_CHECKS.map(check => checkTable(dbClient, check)))
   checks.push(await checkRpc(dbClient, 'submit_order_to_kitchen'))
-  checks.push(await checkRpc(dbClient, 'create_telegram_order'))
   checks.push(await checkRpc(dbClient, 'create_menu_item_with_cost'))
   checks.push(await checkRpc(dbClient, 'create_menu_item_with_media_and_cost'))
   checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))

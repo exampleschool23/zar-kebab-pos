@@ -1833,7 +1833,6 @@ test('delivery order type is wired through POS surfaces and reports', () => {
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
   const migration = readSource('supabase/045_delivery_order_type.sql')
-  const telegramOrder = readSource('api/telegram/order.js')
 
   assert.match(orderTypes, /delivery: \{ uz: 'Yetkazib berish', ru: 'Доставка', en: 'Delivery' \}/)
   assert.match(cartPanel, /key: 'delivery'/)
@@ -1850,7 +1849,6 @@ test('delivery order type is wired through POS surfaces and reports', () => {
   assert.match(waiterOrder, /searchParams\.get\('orderType'\)/)
   assert.match(waiterOrder, /setOrderType\(routeOrderType\)/)
   assert.match(migration, /order_type in \('dine_in', 'take_away', 'delivery'\)/)
-  assert.match(telegramOrder, /normalizeOrderType\(body\.orderType\)/)
 })
 
 test('local API routes receive server auth and telegram env from Vite', () => {

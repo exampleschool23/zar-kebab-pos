@@ -180,15 +180,26 @@ These bugs were recently fixed and are now protected by tests:
    - The legacy full-history loader is only a deployment-order fallback while migration `109` is missing.
    - Detailed order rows remain the responsibility of reports, receipts, and historical drill-down pages.
 
-17. Salary-payment Telegram delivery has two independent destinations.
+17. The Telegram Mini App is a read-only customer menu.
+   - The unused customer checkout and “My Orders” features were retired after the production database showed no Telegram-created orders since their introduction.
+   - `/api/telegram/order` and `/api/telegram/orders` must not be restored without an explicit product decision.
+   - Keep Telegram authentication, loyalty lookup, contact information, employee notifications, and POS order-status notifications separate from the retired customer-ordering flow.
+
+18. Every saved salary operation must immediately have Telegram delivery tracking.
+   - Migration `113` queues a `not_attempted` delivery record when a payment, bonus, fine, or absence is inserted.
+   - The authenticated employee-notification endpoint advances that record through pending, sent, failed, skipped, or confirmed states for the private employee chat and salary group independently.
+   - This database-first tracking prevents stale browsers and failed API requests from leaving no trace.
+   - The Salaries page combines every salary-operation delivery under Payment notification status, five records per page, with retry controls for unsent destinations.
+
+19. Salary-payment Telegram delivery has two independent destinations.
    - The private employee message keeps its receipt-confirmation button.
    - The salary group uses the `salary_events` row in `telegram_notification_targets`, with `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` only as a deployment-order fallback, and receives a separate message without a confirmation button.
    - Never fall back to `TELEGRAM_TEAM_CHAT_ID` or the completed-orders group for salary details.
    - Employee and group delivery statuses are recorded separately so either destination can fail or retry without duplicating the other.
 
-18. Every recorded salary operation must notify the dedicated salary group.
+20. Every recorded salary operation must notify the dedicated salary group.
    - Payment, bonus, fine, and absence records notify both the salary group and the linked employee.
-   - All four types reuse `api/telegram/employee-notification.js` so the Vercel Hobby deployment remains at 12 functions.
+   - All four types reuse `api/telegram/employee-notification.js` so the Vercel Hobby deployment stays within its function limit.
    - Bonus, fine, and absence employee/group delivery is duplicate-safe and independently auditable through `employee_salary_group_notification_deliveries`.
    - A Telegram notification is marked sent only after Telegram returns a message id.
 
@@ -227,7 +238,7 @@ Run migrations in order. Important recent files:
   Adds protected per-variant real costs, snapshots selected variant costs on future sales, and lets Accounting-authorized staff read protected costs for net-profit reporting.
 
 - `supabase/101_atomic_telegram_orders.sql`
-  Adds the service-role-only `create_telegram_order(payload jsonb)` RPC so Telegram order and item inserts commit or roll back together.
+  Historical migration that added the service-role-only `create_telegram_order(payload jsonb)` RPC. The customer-ordering API that used it has since been retired; keep the migration file for deployment history.
 
 - `supabase/105_menu_items_sold_by_weight.sql`
   Adds per-item or per-kilogram menu sale units, decimal order quantities, historical unit snapshots, and decimal-safe kitchen, Telegram, payment, and owner-reopen calculations.
@@ -257,7 +268,10 @@ Run migrations in order. Important recent files:
   Stores the dedicated salary-events Telegram target and adds duplicate-safe delivery history for bonus, fine, and absence group notifications.
 
 - `supabase/112_salary_event_employee_notifications.sql`
-  Adds independent private employee delivery status, message ids, timestamps, and errors for bonus, fine, and absence notifications.
+  Adds private employee-delivery status fields for bonus, fine, and absence notifications.
+
+- `supabase/113_salary_notification_attempt_tracking.sql`
+  Queues delivery tracking at salary-operation insert time, backfills missing post-configuration attempts, and adds the explicit `not_attempted` status.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

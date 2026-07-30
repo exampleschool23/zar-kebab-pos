@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BadgeMinus, CalendarX2, Copy, Loader2, Plus, Save, Send, Users, WalletCards } from 'lucide-react'
+import { ArrowLeft, BadgeMinus, CalendarX2, ChevronLeft, ChevronRight, Copy, Loader2, Plus, Save, Send, Users, WalletCards } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -33,6 +33,7 @@ import {
 const FIELD = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
 const SECTION_GRID = 'grid items-stretch gap-4 lg:grid-cols-2'
 const PAGE_SIZE = 12
+const TELEGRAM_DELIVERY_PAGE_SIZE = 5
 
 function isMissingSalaryMigration(error) {
   const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
@@ -226,21 +227,25 @@ export default function Salaries() {
       telegramLinked: 'Telegram ulangan',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME sozlanmagan.',
       telegramDeliveryTitle: 'To‘lov xabarlari holati',
-      telegramDeliveryHelp: 'Xodim va maosh guruhi uchun Telegram yuborilishini alohida kuzating.',
-      telegramDeliveryEmpty: 'Hali to‘lov xabarlari yo‘q.',
-      telegramDeliveryMigration: 'To‘lov xabarlari tarixi uchun 108 va 110-migratsiyalarni ishga tushiring.',
+      telegramDeliveryHelp: 'To‘lov, bonus, jarima va kelmagan kun xabarlarining xodimga va guruhga yuborilishini kuzating.',
+      telegramDeliveryEmpty: 'Hali Telegram xabarlari yo‘q.',
+      telegramDeliveryMigration: 'Telegram xabarlari tarixi uchun 108, 110, 111, 112 va 113-migratsiyalarni ishga tushiring.',
       telegramEmployee: 'Xodim',
       telegramSalaryGroup: 'Maosh guruhi',
-      telegramGroupActivityTitle: 'Maosh operatsiyalari xabarlari',
-      telegramGroupActivityHelp: 'Bonus, jarima va yo‘qlik xabarlarining xodimga va guruhga yuborilishini kuzating.',
-      telegramGroupActivityEmpty: 'Hali operatsiya xabarlari yo‘q.',
-      telegramGroupActivityMigration: 'Operatsiya xabarlari tarixi uchun 111 va 112-migratsiyalarni ishga tushiring.',
+      telegramRetry: 'Qayta yuborish',
+      telegramRetrySent: 'Telegram xabarlari yuborildi.',
+      telegramRetryPartial: 'Telegram xabarlaridan biri yuborilmadi; holatni tekshiring.',
+      telegramRetryFailed: 'Telegram xabarlari yuborilmadi.',
       telegramStatusPending: 'Kutilmoqda',
+      telegramStatusNotAttempted: 'Urinilmagan',
       telegramStatusSent: 'Yuborildi',
       telegramStatusFailed: 'Xato',
       telegramStatusSkipped: 'O‘tkazib yuborildi',
       telegramStatusConfirmed: 'Qabul qilindi',
       telegramMessageId: 'Xabar',
+      previous: 'Oldingi',
+      next: 'Keyingi',
+      of: '/',
     },
     ru: {
       title: 'Зарплаты',
@@ -326,21 +331,25 @@ export default function Salaries() {
       telegramLinked: 'Telegram подключён',
       telegramBotMissing: 'Не настроен VITE_TELEGRAM_BOT_USERNAME.',
       telegramDeliveryTitle: 'Статус уведомлений о выплатах',
-      telegramDeliveryHelp: 'Отдельно проверяйте доставку сотруднику и в зарплатную группу.',
-      telegramDeliveryEmpty: 'Уведомлений о выплатах пока нет.',
-      telegramDeliveryMigration: 'Запустите миграции 108 и 110 для истории уведомлений о выплатах.',
+      telegramDeliveryHelp: 'Проверяйте доставку выплат, бонусов, штрафов и отсутствий сотруднику и в группу.',
+      telegramDeliveryEmpty: 'Уведомлений Telegram пока нет.',
+      telegramDeliveryMigration: 'Запустите миграции 108, 110, 111, 112 и 113 для истории уведомлений.',
       telegramEmployee: 'Сотрудник',
       telegramSalaryGroup: 'Группа зарплат',
-      telegramGroupActivityTitle: 'Уведомления по зарплатным операциям',
-      telegramGroupActivityHelp: 'Проверяйте доставку бонусов, штрафов и отсутствий сотруднику и в группу.',
-      telegramGroupActivityEmpty: 'Уведомлений по операциям пока нет.',
-      telegramGroupActivityMigration: 'Запустите миграции 111 и 112 для истории уведомлений по операциям.',
+      telegramRetry: 'Отправить снова',
+      telegramRetrySent: 'Сообщения Telegram отправлены.',
+      telegramRetryPartial: 'Одно сообщение Telegram не отправлено; проверьте статус.',
+      telegramRetryFailed: 'Сообщения Telegram не отправлены.',
       telegramStatusPending: 'Ожидает',
+      telegramStatusNotAttempted: 'Не отправлялось',
       telegramStatusSent: 'Отправлено',
       telegramStatusFailed: 'Ошибка',
       telegramStatusSkipped: 'Пропущено',
       telegramStatusConfirmed: 'Получено',
       telegramMessageId: 'Сообщение',
+      previous: 'Назад',
+      next: 'Далее',
+      of: 'из',
     },
     en: {
       title: 'Salaries',
@@ -426,21 +435,25 @@ export default function Salaries() {
       telegramLinked: 'Telegram linked',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME is not configured.',
       telegramDeliveryTitle: 'Payment notification status',
-      telegramDeliveryHelp: 'Track employee and salary-group Telegram delivery separately.',
-      telegramDeliveryEmpty: 'No payment notifications yet.',
-      telegramDeliveryMigration: 'Run migrations 108 and 110 to enable payment notification history.',
+      telegramDeliveryHelp: 'Track payments, bonuses, fines, and absences to the employee and salary group.',
+      telegramDeliveryEmpty: 'No Telegram notifications yet.',
+      telegramDeliveryMigration: 'Run migrations 108, 110, 111, 112, and 113 to enable notification history.',
       telegramEmployee: 'Employee',
       telegramSalaryGroup: 'Salary group',
-      telegramGroupActivityTitle: 'Salary-operation notifications',
-      telegramGroupActivityHelp: 'Track employee and group delivery for bonuses, fines, and absences.',
-      telegramGroupActivityEmpty: 'No operation notifications yet.',
-      telegramGroupActivityMigration: 'Run migrations 111 and 112 to enable operation notification history.',
+      telegramRetry: 'Send again',
+      telegramRetrySent: 'Telegram messages sent.',
+      telegramRetryPartial: 'One Telegram message was not sent; check the status.',
+      telegramRetryFailed: 'Telegram messages were not sent.',
       telegramStatusPending: 'Pending',
+      telegramStatusNotAttempted: 'Not attempted',
       telegramStatusSent: 'Sent',
       telegramStatusFailed: 'Failed',
       telegramStatusSkipped: 'Skipped',
       telegramStatusConfirmed: 'Received',
       telegramMessageId: 'Message',
+      previous: 'Previous',
+      next: 'Next',
+      of: 'of',
     },
   }
   const l = L[lang] || L.en
@@ -459,6 +472,7 @@ export default function Salaries() {
   const [message, setMessage] = useState('')
   const [confirmActionKey, setConfirmActionKey] = useState('')
   const [page, setPage] = useState(1)
+  const [telegramDeliveryPage, setTelegramDeliveryPage] = useState(1)
   const [form, setForm] = useState({
     employee_name: '',
     joined_at: today,
@@ -502,11 +516,11 @@ export default function Salaries() {
       supabase.from('employee_salary_payment_notification_deliveries')
         .select('id, payment_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, confirmed_at, group_status, group_telegram_message_id, group_error_message, group_attempted_at, group_sent_at')
         .order('attempted_at', { ascending: false })
-        .limit(20),
+        .limit(100),
       supabase.from('employee_salary_group_notification_deliveries')
         .select('id, event_type, event_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, employee_status, employee_telegram_message_id, employee_error_message, employee_attempted_at, employee_sent_at')
         .order('attempted_at', { ascending: false })
-        .limit(20),
+        .limit(100),
     ])
     if (profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error) {
       const err = profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
@@ -583,9 +597,20 @@ export default function Salaries() {
       const payment = salaryProfile?.payments?.find(item => item.id === delivery.payment_id)
       return {
         ...delivery,
+        eventType: 'payment',
+        eventId: delivery.payment_id,
         employeeName: salaryProfile?.employee_name || salaryProfile?.profile?.full_name || '—',
         amount: payment?.amount || 0,
-        paidDate: payment?.paid_date || '',
+        eventDate: payment?.paid_date || '',
+        sortAt: delivery.attempted_at || delivery.group_attempted_at || '',
+        employeeStatus: delivery.status,
+        employeeTimestamp: delivery.confirmed_at || delivery.sent_at || delivery.attempted_at,
+        employeeMessageId: delivery.telegram_message_id,
+        employeeError: delivery.error_message,
+        groupStatus: delivery.group_status,
+        groupTimestamp: delivery.group_sent_at || delivery.group_attempted_at,
+        groupMessageId: delivery.group_telegram_message_id,
+        groupError: delivery.group_error_message,
       }
     })
   }, [paymentDeliveries, salaryProfiles])
@@ -607,14 +632,40 @@ export default function Salaries() {
         ?.find(item => item.id === delivery.event_id)
       return {
         ...delivery,
+        eventType: delivery.event_type,
+        eventId: delivery.event_id,
         employeeName: salaryProfile?.employee_name || salaryProfile?.profile?.full_name || '—',
         amount: event?.amount || 0,
         eventDate: event?.[dateFields[delivery.event_type]] || '',
+        sortAt: delivery.attempted_at || delivery.employee_attempted_at || '',
+        employeeStatus: delivery.employee_status,
+        employeeTimestamp: delivery.employee_sent_at || delivery.employee_attempted_at,
+        employeeMessageId: delivery.employee_telegram_message_id,
+        employeeError: delivery.employee_error_message,
+        groupStatus: delivery.status,
+        groupTimestamp: delivery.sent_at || delivery.attempted_at,
+        groupMessageId: delivery.telegram_message_id,
+        groupError: delivery.error_message,
       }
     })
   }, [groupEventDeliveries, salaryProfiles])
+  const telegramDeliveryRows = useMemo(() => (
+    [...paymentDeliveryRows, ...groupEventDeliveryRows]
+      .sort((a, b) => String(b.sortAt || '').localeCompare(String(a.sortAt || '')))
+  ), [paymentDeliveryRows, groupEventDeliveryRows])
+  const telegramDeliveryPageCount = Math.max(
+    1,
+    Math.ceil(telegramDeliveryRows.length / TELEGRAM_DELIVERY_PAGE_SIZE)
+  )
+  const pagedTelegramDeliveryRows = useMemo(() => (
+    telegramDeliveryRows.slice(
+      (telegramDeliveryPage - 1) * TELEGRAM_DELIVERY_PAGE_SIZE,
+      telegramDeliveryPage * TELEGRAM_DELIVERY_PAGE_SIZE
+    )
+  ), [telegramDeliveryRows, telegramDeliveryPage])
   const paymentDeliveryStatusLabels = {
     pending: l.telegramStatusPending,
+    not_attempted: l.telegramStatusNotAttempted,
     sent: l.telegramStatusSent,
     failed: l.telegramStatusFailed,
     skipped: l.telegramStatusSkipped,
@@ -627,6 +678,7 @@ export default function Salaries() {
   }
   const paymentDeliveryStatusClasses = {
     pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    not_attempted: 'border-gray-300 bg-gray-100 text-gray-700',
     sent: 'border-blue-200 bg-blue-50 text-blue-700',
     failed: 'border-red-200 bg-red-50 text-red-700',
     skipped: 'border-gray-200 bg-gray-50 text-gray-600',
@@ -662,6 +714,10 @@ export default function Salaries() {
   useEffect(() => {
     setPage(current => Math.min(current, pageCount))
   }, [pageCount])
+
+  useEffect(() => {
+    setTelegramDeliveryPage(current => Math.min(current, telegramDeliveryPageCount))
+  }, [telegramDeliveryPageCount])
 
   async function createSalaryProfile(event) {
     event.preventDefault()
@@ -852,6 +908,33 @@ export default function Salaries() {
       : employeeTelegramSent || groupTelegramSent
         ? l.transactionTelegramPartial
         : l.transactionTelegramFailed)
+    await loadData()
+  }
+
+  async function retryTelegramDelivery(delivery) {
+    if (!canManage || !delivery?.eventId || !delivery?.eventType) return
+    const retryKey = `telegram-retry-${delivery.eventType}-${delivery.eventId}`
+    const senders = {
+      payment: notifyTelegramEmployeePayment,
+      bonus: notifyTelegramEmployeeBonus,
+      fine: notifyTelegramEmployeeFine,
+      absence: notifyTelegramEmployeeAbsence,
+    }
+    const send = senders[delivery.eventType]
+    if (!send) return
+
+    setError('')
+    setMessage('')
+    setSaving(retryKey)
+    const telegramResult = await send(delivery.eventId)
+    setSaving('')
+    const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
+    const groupTelegramSent = telegramResult?.group?.status === 'sent'
+    setMessage(employeeTelegramSent && groupTelegramSent
+      ? l.telegramRetrySent
+      : employeeTelegramSent || groupTelegramSent
+        ? l.telegramRetryPartial
+        : l.telegramRetryFailed)
     await loadData()
   }
 
@@ -1403,147 +1486,125 @@ export default function Salaries() {
                       <p className="text-sm font-black text-[#1F2937]">{l.telegramDeliveryTitle}</p>
                       <p className="mt-0.5 text-xs font-semibold text-gray-500">{l.telegramDeliveryHelp}</p>
                     </div>
-                    {paymentDeliveriesUnavailable ? (
+                    {paymentDeliveriesUnavailable || groupEventDeliveriesUnavailable ? (
                       <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-800">
                         {l.telegramDeliveryMigration}
                       </p>
-                    ) : paymentDeliveryRows.length === 0 ? (
+                    ) : telegramDeliveryRows.length === 0 ? (
                       <p className="rounded-xl border border-dashed border-blue-200 bg-blue-50/50 px-3 py-4 text-center text-xs font-semibold text-gray-500">
                         {l.telegramDeliveryEmpty}
                       </p>
                     ) : (
-                      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                        {paymentDeliveryRows.map(delivery => (
-                          <div key={delivery.id} className="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-black text-[#1F2937]">{delivery.employeeName}</p>
-                                <p className="mt-0.5 text-xs font-bold text-gray-600">
-                                  {formatCurrency(delivery.amount)}
-                                  {delivery.paidDate ? ` · ${formatLongDate(delivery.paidDate, lang, delivery.paidDate)}` : ''}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                              {[
-                                {
-                                  key: 'employee',
-                                  label: l.telegramEmployee,
-                                  status: delivery.status,
-                                  timestamp: delivery.confirmed_at || delivery.sent_at || delivery.attempted_at,
-                                  messageId: delivery.telegram_message_id,
-                                  error: delivery.error_message,
-                                },
-                                {
-                                  key: 'group',
-                                  label: l.telegramSalaryGroup,
-                                  status: delivery.group_status,
-                                  timestamp: delivery.group_sent_at || delivery.group_attempted_at,
-                                  messageId: delivery.group_telegram_message_id,
-                                  error: delivery.group_error_message,
-                                },
-                              ].map(target => (
-                                <div key={target.key} className="rounded-lg border border-gray-200 bg-white px-2.5 py-2">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="text-[11px] font-black text-gray-700">{target.label}</span>
-                                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
-                                      paymentDeliveryStatusClasses[target.status] || paymentDeliveryStatusClasses.pending
-                                    }`}>
-                                      {paymentDeliveryStatusLabels[target.status] || target.status || l.telegramStatusPending}
-                                    </span>
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-semibold text-gray-500">
-                                    <span>{formatDateTime(target.timestamp, '—')}</span>
-                                    {target.messageId && (
-                                      <span>{l.telegramMessageId} #{target.messageId}</span>
-                                    )}
-                                  </div>
-                                  {target.error && (
-                                    <p className="mt-1.5 break-words rounded-md bg-red-50 px-2 py-1.5 text-[10px] font-semibold text-red-700">
-                                      {target.error}
+                      <>
+                        <div className="space-y-2">
+                          {pagedTelegramDeliveryRows.map(delivery => {
+                            const retryKey = `telegram-retry-${delivery.eventType}-${delivery.eventId}`
+                            const canRetry = [
+                              delivery.employeeStatus,
+                              delivery.groupStatus,
+                            ].some(status => ['not_attempted', 'failed', 'skipped'].includes(status))
+                            return (
+                              <div key={`${delivery.eventType}-${delivery.id}`} className="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-black text-[#1F2937]">
+                                      {delivery.employeeName} · {groupEventTypeLabels[delivery.eventType] || l.paymentLabel}
                                     </p>
+                                    <p className="mt-0.5 text-xs font-bold text-gray-600">
+                                      {delivery.eventType === 'absence' ? l.absence : formatCurrency(delivery.amount)}
+                                      {delivery.eventDate ? ` · ${formatLongDate(delivery.eventDate, lang, delivery.eventDate)}` : ''}
+                                    </p>
+                                  </div>
+                                  {canRetry && (
+                                    <button
+                                      type="button"
+                                      onClick={() => retryTelegramDelivery(delivery)}
+                                      disabled={!canManage || saving === retryKey}
+                                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 text-[10px] font-black text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      {saving === retryKey ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                                      {l.telegramRetry}
+                                    </button>
                                   )}
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="border-t border-blue-100 pt-4 sm:col-span-2">
-                    <div className="mb-3">
-                      <p className="text-sm font-black text-[#1F2937]">{l.telegramGroupActivityTitle}</p>
-                      <p className="mt-0.5 text-xs font-semibold text-gray-500">{l.telegramGroupActivityHelp}</p>
-                    </div>
-                    {groupEventDeliveriesUnavailable ? (
-                      <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-800">
-                        {l.telegramGroupActivityMigration}
-                      </p>
-                    ) : groupEventDeliveryRows.length === 0 ? (
-                      <p className="rounded-xl border border-dashed border-blue-200 bg-blue-50/50 px-3 py-4 text-center text-xs font-semibold text-gray-500">
-                        {l.telegramGroupActivityEmpty}
-                      </p>
-                    ) : (
-                      <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                        {groupEventDeliveryRows.map(delivery => (
-                          <div key={delivery.id} className="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-black text-[#1F2937]">
-                                  {delivery.employeeName} · {groupEventTypeLabels[delivery.event_type] || delivery.event_type}
-                                </p>
-                                <p className="mt-0.5 text-xs font-bold text-gray-600">
-                                  {delivery.amount > 0 ? formatCurrency(delivery.amount) : l.absence}
-                                  {delivery.eventDate ? ` · ${formatLongDate(delivery.eventDate, lang, delivery.eventDate)}` : ''}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                              {[
-                                {
-                                  key: 'employee',
-                                  label: l.telegramEmployee,
-                                  status: delivery.employee_status,
-                                  timestamp: delivery.employee_sent_at || delivery.employee_attempted_at,
-                                  messageId: delivery.employee_telegram_message_id,
-                                  error: delivery.employee_error_message,
-                                },
-                                {
-                                  key: 'group',
-                                  label: l.telegramSalaryGroup,
-                                  status: delivery.status,
-                                  timestamp: delivery.sent_at || delivery.attempted_at,
-                                  messageId: delivery.telegram_message_id,
-                                  error: delivery.error_message,
-                                },
-                              ].map(target => (
-                                <div key={target.key} className="rounded-lg border border-gray-200 bg-white px-2.5 py-2">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <span className="text-[11px] font-black text-gray-700">{target.label}</span>
-                                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
-                                      paymentDeliveryStatusClasses[target.status] || paymentDeliveryStatusClasses.pending
-                                    }`}>
-                                      {paymentDeliveryStatusLabels[target.status] || target.status || l.telegramStatusPending}
-                                    </span>
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-semibold text-gray-500">
-                                    <span>{formatDateTime(target.timestamp, '—')}</span>
-                                    {target.messageId && (
-                                      <span>{l.telegramMessageId} #{target.messageId}</span>
-                                    )}
-                                  </div>
-                                  {target.error && (
-                                    <p className="mt-1.5 break-words rounded-md bg-red-50 px-2 py-1.5 text-[10px] font-semibold text-red-700">
-                                      {target.error}
-                                    </p>
-                                  )}
+                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                  {[
+                                    {
+                                      key: 'employee',
+                                      label: l.telegramEmployee,
+                                      status: delivery.employeeStatus,
+                                      timestamp: delivery.employeeTimestamp,
+                                      messageId: delivery.employeeMessageId,
+                                      error: delivery.employeeError,
+                                    },
+                                    {
+                                      key: 'group',
+                                      label: l.telegramSalaryGroup,
+                                      status: delivery.groupStatus,
+                                      timestamp: delivery.groupTimestamp,
+                                      messageId: delivery.groupMessageId,
+                                      error: delivery.groupError,
+                                    },
+                                  ].map(target => (
+                                    <div key={target.key} className="rounded-lg border border-gray-200 bg-white px-2.5 py-2">
+                                      <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="text-[11px] font-black text-gray-700">{target.label}</span>
+                                        <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
+                                          paymentDeliveryStatusClasses[target.status] || paymentDeliveryStatusClasses.pending
+                                        }`}>
+                                          {paymentDeliveryStatusLabels[target.status] || target.status || l.telegramStatusPending}
+                                        </span>
+                                      </div>
+                                      <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-semibold text-gray-500">
+                                        <span>{formatDateTime(target.timestamp, '—')}</span>
+                                        {target.messageId && (
+                                          <span>{l.telegramMessageId} #{target.messageId}</span>
+                                        )}
+                                      </div>
+                                      {target.error && (
+                                        <p className={`mt-1.5 break-words rounded-md px-2 py-1.5 text-[10px] font-semibold ${
+                                          target.status === 'failed'
+                                            ? 'bg-red-50 text-red-700'
+                                            : 'bg-amber-50 text-amber-800'
+                                        }`}>
+                                          {target.error}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {telegramDeliveryPageCount > 1 && (
+                          <div className="mt-3 flex items-center justify-between gap-3 border-t border-blue-100 pt-3">
+                            <button
+                              type="button"
+                              aria-label={l.previous}
+                              title={l.previous}
+                              disabled={telegramDeliveryPage <= 1}
+                              onClick={() => setTelegramDeliveryPage(current => Math.max(1, current - 1))}
+                              className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 text-xs font-black text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <ChevronLeft size={14} /> {l.previous}
+                            </button>
+                            <span className="text-xs font-black text-gray-600">
+                              {l.page} {telegramDeliveryPage} {l.of} {telegramDeliveryPageCount}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={l.next}
+                              title={l.next}
+                              disabled={telegramDeliveryPage >= telegramDeliveryPageCount}
+                              onClick={() => setTelegramDeliveryPage(current => Math.min(telegramDeliveryPageCount, current + 1))}
+                              className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 text-xs font-black text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              {l.next} <ChevronRight size={14} />
+                            </button>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

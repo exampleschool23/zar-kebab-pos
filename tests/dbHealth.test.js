@@ -142,7 +142,6 @@ test('database health reports missing tables and missing RPC', async () => {
     'change_paid_order_payment_method_owner',
     'create_menu_item_with_cost',
     'create_menu_item_with_media_and_cost',
-    'create_telegram_order',
     'current_staff_can_access',
     'current_staff_can_view_menu_catalog',
     'current_staff_can_write',
@@ -159,7 +158,6 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.match(result.failed.find(check => check.name === 'settle_loyalty_wallet_payment').hint, /027_atomic_loyalty_wallet_settlement/)
   assert.match(result.failed.find(check => check.name === 'settle_orders_payment').hint, /083_atomic_order_payment_settlement/)
   assert.match(result.failed.find(check => check.name === 'change_paid_order_payment_method_owner').hint, /090_owner_change_completed_order_payment_method/)
-  assert.match(result.failed.find(check => check.name === 'create_telegram_order').hint, /101_atomic_telegram_orders/)
   assert.match(result.failed.find(check => check.name === 'create_menu_item_with_cost').hint, /102_atomic_menu_item_cost_creation/)
   assert.match(result.failed.find(check => check.name === 'create_menu_item_with_media_and_cost').hint, /103_menu_item_media_gallery/)
   assert.match(result.failed.find(check => check.name === 'recall_table_from_cashier').hint, /094_admin_cashier_recall_access/)

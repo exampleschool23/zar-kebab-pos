@@ -211,6 +211,7 @@ test('salary payment notifications persist delivery status and employee confirma
   const groupMigration = fs.readFileSync(new URL('../supabase/110_salary_payment_group_notifications.sql', import.meta.url), 'utf8')
   const groupEventMigration = fs.readFileSync(new URL('../supabase/111_salary_group_event_notifications.sql', import.meta.url), 'utf8')
   const employeeEventMigration = fs.readFileSync(new URL('../supabase/112_salary_event_employee_notifications.sql', import.meta.url), 'utf8')
+  const attemptTrackingMigration = fs.readFileSync(new URL('../supabase/113_salary_notification_attempt_tracking.sql', import.meta.url), 'utf8')
 
   assert.match(endpoint, /employee_salary_payment_notification_deliveries/)
   assert.match(endpoint, /salary_payment_confirm:\$\{deliveryId\}/)
@@ -247,6 +248,15 @@ test('salary payment notifications persist delivery status and employee confirma
   assert.match(employeeEventMigration, /employee_sent_at/)
   assert.match(salariesPage, /delivery\.employee_status/)
   assert.match(salariesPage, /delivery\.employee_telegram_message_id/)
+  assert.match(salariesPage, /TELEGRAM_DELIVERY_PAGE_SIZE = 5/)
+  assert.match(salariesPage, /pagedTelegramDeliveryRows/)
+  assert.match(salariesPage, /retryTelegramDelivery/)
+  assert.match(attemptTrackingMigration, /queue_salary_payment_telegram_delivery_trigger/)
+  assert.match(attemptTrackingMigration, /queue_salary_bonus_telegram_delivery_trigger/)
+  assert.match(attemptTrackingMigration, /queue_salary_fine_telegram_delivery_trigger/)
+  assert.match(attemptTrackingMigration, /queue_salary_absence_telegram_delivery_trigger/)
+  assert.match(attemptTrackingMigration, /'not_attempted'/)
+  assert.match(attemptTrackingMigration, /Notification request was not recorded when the operation was saved/)
 })
 
 test('employee salary notifications share one endpoint within the Hobby function limit', () => {

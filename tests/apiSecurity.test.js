@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import {
   assertImageFile,
   assertMenuMediaFile,
@@ -52,27 +52,20 @@ test('R2 object keys are limited to flat product and category menu paths', () =>
   assert.equal(normalizeMenuObjectKey('menu%2Fproducts%2F..%2Fsecret.webp'), '')
 })
 
-test('Telegram order creation uses one service-role-only transactional RPC', () => {
-  const api = readSource('api/telegram/order.js')
-  const migration = readSource('supabase/101_atomic_telegram_orders.sql')
+test('unused Telegram customer ordering endpoints stay retired', () => {
+  const miniApp = readSource('src/pages/TelegramMiniApp.jsx')
 
-  assert.match(api, /supabase\.rpc\('create_telegram_order'/)
-  assert.doesNotMatch(api, /\.from\('orders'\)[\s\S]{0,120}\.insert\(orderInsert\)/)
-  assert.doesNotMatch(api, /\.from\('order_items'\)[\s\S]{0,120}\.insert/)
-  assert.match(migration, /insert into public\.orders[\s\S]*insert into public\.order_items/)
-  assert.match(migration, /revoke all on function public\.create_telegram_order\(jsonb\) from public, anon, authenticated/)
-  assert.match(migration, /grant execute on function public\.create_telegram_order\(jsonb\) to service_role/)
+  assert.equal(existsSync(`${root}/api/telegram/order.js`), false)
+  assert.equal(existsSync(`${root}/api/telegram/orders.js`), false)
+  assert.doesNotMatch(miniApp, /\/api\/telegram\/orders?/)
+  assert.doesNotMatch(miniApp, /CheckoutView|OrdersView|submitOrder/)
 })
 
 test('Telegram loyalty responses are minimal and active zero-balance cards remain valid', () => {
   const lookup = readSource('api/telegram/loyalty/[cardNumber].js')
-  const order = readSource('api/telegram/order.js')
 
   assert.match(lookup, /select\('balance, cashback_type, is_active'\)/)
   assert.doesNotMatch(lookup, /select\('\*'\)/)
   assert.doesNotMatch(lookup, /card:\s*data/)
   assert.match(lookup, /const valid = !!data && data\.is_active !== false/)
-  assert.match(order, /select\('card_number, balance, cashback_type, is_active'\)/)
-  assert.match(order, /!loyaltyCard \|\| loyaltyCard\.is_active === false/)
-  assert.doesNotMatch(order, /balance <= 0/)
 })
