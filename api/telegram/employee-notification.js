@@ -11,6 +11,10 @@ import {
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
+import {
+  getSalaryEventRetryTargets,
+  getSalaryPaymentRetryTargets,
+} from './_lib/deliveryRetry.js'
 
 const EDITOR_ROLES = new Set(['owner', 'admin'])
 const FEATURE_ACCESS_MANAGER_EMAILS = new Set(['dangerhoggish@gmail.com'])
@@ -141,11 +145,9 @@ async function deliverSalaryGroupEvent(supabase, type, event, remainingDue) {
     .eq('event_id', event.id)
     .maybeSingle()
   if (existingError) throw existingError
-  if (existing?.status === 'sent') {
-    return savedGroupDeliveryResult(existing)
-  }
-  const pendingAge = Date.now() - new Date(existing?.attempted_at || 0).getTime()
-  if (existing?.status === 'pending' && pendingAge < PENDING_DELIVERY_RETRY_MS) {
+  if (!getSalaryEventRetryTargets(existing, {
+    pendingRetryMs: PENDING_DELIVERY_RETRY_MS,
+  }).group) {
     return savedGroupDeliveryResult(existing)
   }
 
@@ -256,11 +258,9 @@ async function deliverEmployeeSalaryEvent(supabase, type, event, remainingDue) {
     .eq('event_id', event.id)
     .single()
   if (existingError) throw existingError
-  if (existing.employee_status === 'sent') {
-    return savedEmployeeEventDeliveryResult(existing)
-  }
-  const pendingAge = Date.now() - new Date(existing.employee_attempted_at || 0).getTime()
-  if (existing.employee_status === 'pending' && pendingAge < PENDING_DELIVERY_RETRY_MS) {
+  if (!getSalaryEventRetryTargets(existing, {
+    pendingRetryMs: PENDING_DELIVERY_RETRY_MS,
+  }).employee) {
     return savedEmployeeEventDeliveryResult(existing)
   }
 
@@ -286,13 +286,15 @@ async function deliverEmployeeSalaryEvent(supabase, type, event, remainingDue) {
     employee_sent_at: null,
     updated_at: now,
   }
-  const claimed = await supabase
+  let claimQuery = supabase
     .from('employee_salary_group_notification_deliveries')
     .update(pendingFields)
     .eq('id', existing.id)
     .eq('employee_status', existing.employee_status)
-    .select('*')
-    .maybeSingle()
+  if (existing.employee_attempted_at) {
+    claimQuery = claimQuery.eq('employee_attempted_at', existing.employee_attempted_at)
+  }
+  const claimed = await claimQuery.select('*').maybeSingle()
   if (claimed.error) throw claimed.error
   if (!claimed.data) {
     const { data: concurrent, error: concurrentError } = await supabase
@@ -388,6 +390,8 @@ async function notifySalaryEvent(supabase, user, type, eventId) {
 
 async function notifyPayment(supabase, user, paymentId) {
   let deliveryId = null
+  let employeeShouldSend = false
+  let groupShouldSend = false
   let employeeAlreadyDelivered = false
   let groupAlreadyDelivered = false
   try {
@@ -407,27 +411,41 @@ async function notifyPayment(supabase, user, paymentId) {
       .eq('payment_id', payment.id)
       .maybeSingle()
     if (existingError) throw existingError
+    const retryTargets = getSalaryPaymentRetryTargets(existingDelivery, {
+      pendingRetryMs: PENDING_DELIVERY_RETRY_MS,
+    })
+    employeeShouldSend = retryTargets.employee
+    groupShouldSend = retryTargets.group
     employeeAlreadyDelivered = ['sent', 'confirmed'].includes(existingDelivery?.status)
     groupAlreadyDelivered = existingDelivery?.group_status === 'sent'
-    if (employeeAlreadyDelivered && groupAlreadyDelivered) {
+    if (!employeeShouldSend && !groupShouldSend) {
       return {
-        ok: true,
-        allSent: true,
+        ok: employeeAlreadyDelivered || groupAlreadyDelivered,
+        allSent: employeeAlreadyDelivered && groupAlreadyDelivered,
         duplicate: true,
         deliveryId: existingDelivery.id,
         employee: {
           status: existingDelivery.status,
           telegramMessageId: existingDelivery.telegram_message_id,
+          sentAt: existingDelivery.sent_at,
+          errorMessage: existingDelivery.error_message || '',
         },
         group: {
           status: existingDelivery.group_status,
           telegramMessageId: existingDelivery.group_telegram_message_id,
+          sentAt: existingDelivery.group_sent_at,
+          errorMessage: existingDelivery.group_error_message || '',
         },
       }
     }
 
     const now = new Date().toISOString()
-    const groupTarget = await loadSalaryGroupTarget(supabase)
+    const groupTarget = groupShouldSend
+      ? await loadSalaryGroupTarget(supabase)
+      : {
+          chatId: String(existingDelivery?.group_chat_id || '').trim(),
+          language: 'ru',
+        }
     const groupChatId = groupTarget.chatId
     const groupLanguage = groupTarget.language
     let delivery = existingDelivery
@@ -453,11 +471,39 @@ async function notifyPayment(supabase, user, paymentId) {
         })
         .select('*')
         .single()
+      if (deliveryError?.code === '23505') {
+        const { data: concurrent, error: concurrentError } = await supabase
+          .from('employee_salary_payment_notification_deliveries')
+          .select('*')
+          .eq('payment_id', payment.id)
+          .single()
+        if (concurrentError) throw concurrentError
+        return {
+          ok: ['sent', 'confirmed'].includes(concurrent.status)
+            || concurrent.group_status === 'sent',
+          allSent: ['sent', 'confirmed'].includes(concurrent.status)
+            && concurrent.group_status === 'sent',
+          duplicate: true,
+          deliveryId: concurrent.id,
+          employee: {
+            status: concurrent.status,
+            telegramMessageId: concurrent.telegram_message_id,
+            sentAt: concurrent.sent_at,
+            errorMessage: concurrent.error_message || '',
+          },
+          group: {
+            status: concurrent.group_status,
+            telegramMessageId: concurrent.group_telegram_message_id,
+            sentAt: concurrent.group_sent_at,
+            errorMessage: concurrent.group_error_message || '',
+          },
+        }
+      }
       if (deliveryError) throw deliveryError
       delivery = createdDelivery
     } else {
       const retryFields = { updated_at: now }
-      if (!employeeAlreadyDelivered) {
+      if (employeeShouldSend) {
         Object.assign(retryFields, {
           status: 'pending',
           telegram_message_id: null,
@@ -466,7 +512,7 @@ async function notifyPayment(supabase, user, paymentId) {
           sent_at: null,
         })
       }
-      if (!groupAlreadyDelivered) {
+      if (groupShouldSend) {
         Object.assign(retryFields, {
           group_status: groupChatId ? 'pending' : 'skipped',
           group_chat_id: groupChatId || null,
@@ -478,14 +524,43 @@ async function notifyPayment(supabase, user, paymentId) {
           group_sent_at: null,
         })
       }
-      const { data: updatedDelivery, error: deliveryError } = await supabase
+      const claim = await supabase
         .from('employee_salary_payment_notification_deliveries')
         .update(retryFields)
         .eq('id', delivery.id)
+        .eq('updated_at', delivery.updated_at)
         .select('*')
-        .single()
-      if (deliveryError) throw deliveryError
-      delivery = updatedDelivery
+        .maybeSingle()
+      if (claim.error) throw claim.error
+      if (!claim.data) {
+        const { data: concurrent, error: concurrentError } = await supabase
+          .from('employee_salary_payment_notification_deliveries')
+          .select('*')
+          .eq('id', delivery.id)
+          .single()
+        if (concurrentError) throw concurrentError
+        return {
+          ok: ['sent', 'confirmed'].includes(concurrent.status)
+            || concurrent.group_status === 'sent',
+          allSent: ['sent', 'confirmed'].includes(concurrent.status)
+            && concurrent.group_status === 'sent',
+          duplicate: true,
+          deliveryId: concurrent.id,
+          employee: {
+            status: concurrent.status,
+            telegramMessageId: concurrent.telegram_message_id,
+            sentAt: concurrent.sent_at,
+            errorMessage: concurrent.error_message || '',
+          },
+          group: {
+            status: concurrent.group_status,
+            telegramMessageId: concurrent.group_telegram_message_id,
+            sentAt: concurrent.group_sent_at,
+            errorMessage: concurrent.group_error_message || '',
+          },
+        }
+      }
+      delivery = claim.data
     }
     deliveryId = delivery.id
 
@@ -499,12 +574,12 @@ async function notifyPayment(supabase, user, paymentId) {
       employee_name: payment.salary_profile?.employee_name || '',
     }
 
-    const employeeDelivery = employeeAlreadyDelivered
+    const employeeDelivery = !employeeShouldSend
       ? Promise.resolve({
           status: delivery.status,
           telegramMessageId: delivery.telegram_message_id,
           sentAt: delivery.sent_at,
-          errorMessage: '',
+          errorMessage: delivery.error_message || '',
         })
       : (async () => {
           const { data: employeeLink, error: linkError } = await supabase
@@ -543,12 +618,12 @@ async function notifyPayment(supabase, user, paymentId) {
           }
         })()
 
-    const groupDelivery = groupAlreadyDelivered
+    const groupDelivery = !groupShouldSend
       ? Promise.resolve({
           status: delivery.group_status,
           telegramMessageId: delivery.group_telegram_message_id,
           sentAt: delivery.group_sent_at,
-          errorMessage: '',
+          errorMessage: delivery.group_error_message || '',
         })
       : (async () => {
           if (!groupChatId) {
@@ -590,20 +665,27 @@ async function notifyPayment(supabase, user, paymentId) {
     const employeeResult = normalizeDelivery(employeeSettled)
     const groupResult = normalizeDelivery(groupSettled)
     const updatedAt = new Date().toISOString()
-    const { error: sentUpdateError } = await supabase
-      .from('employee_salary_payment_notification_deliveries')
-      .update({
+    const deliveredFields = { updated_at: updatedAt }
+    if (employeeShouldSend) {
+      Object.assign(deliveredFields, {
         status: employeeResult.status,
         telegram_message_id: employeeResult.telegramMessageId,
         error_message: employeeResult.errorMessage,
         sent_at: employeeResult.sentAt,
+      })
+    }
+    if (groupShouldSend) {
+      Object.assign(deliveredFields, {
         group_status: groupResult.status,
         group_chat_id: groupChatId || delivery.group_chat_id || null,
         group_telegram_message_id: groupResult.telegramMessageId,
         group_error_message: groupResult.errorMessage,
         group_sent_at: groupResult.sentAt,
-        updated_at: updatedAt,
       })
+    }
+    const { error: sentUpdateError } = await supabase
+      .from('employee_salary_payment_notification_deliveries')
+      .update(deliveredFields)
       .eq('id', deliveryId)
     if (sentUpdateError) throw sentUpdateError
 
@@ -620,11 +702,11 @@ async function notifyPayment(supabase, user, paymentId) {
     if (deliveryId) {
       const errorMessage = String(error?.message || error).slice(0, 1000)
       const failureFields = { updated_at: new Date().toISOString() }
-      if (!employeeAlreadyDelivered) {
+      if (employeeShouldSend) {
         failureFields.status = 'failed'
         failureFields.error_message = errorMessage
       }
-      if (!groupAlreadyDelivered) {
+      if (groupShouldSend) {
         failureFields.group_status = 'failed'
         failureFields.group_error_message = errorMessage
       }

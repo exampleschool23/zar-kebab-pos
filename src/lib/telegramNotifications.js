@@ -35,6 +35,7 @@ async function notifyTelegramSalaryEvent(type, eventId) {
 
     const response = await fetch('/api/telegram/employee-notification', {
       method: 'POST',
+      keepalive: true,
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',

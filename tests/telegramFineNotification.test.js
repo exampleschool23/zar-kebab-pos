@@ -39,5 +39,6 @@ test('fine notification endpoint authenticates accounting access and reads the s
   assert.doesNotMatch(api, /TELEGRAM_TEAM_CHAT_ID/)
   assert.doesNotMatch(api, /getEmployeeFineChatIds/)
   assert.match(salaries, /\.select\('id'\)\.single\(\)/)
-  assert.match(salaries, /notifyTelegramEmployeeFine\(writeResult\.data\?\.id\)/)
+  assert.match(salaries, /runTelegramNotificationInBackground\(entryType, writeResult\.data\?\.id\)/)
+  assert.doesNotMatch(salaries, /await notifyTelegramEmployeeFine/)
 })

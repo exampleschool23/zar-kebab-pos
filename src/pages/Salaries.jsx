@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BadgeMinus, CalendarX2, ChevronLeft, ChevronRight, Copy, Loader2, Plus, Save, Send, Users, WalletCards } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
+import { OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -147,6 +148,8 @@ export default function Salaries() {
       title: 'Maoshlar',
       sub: 'Ishga kirgan sana, maosh va to‘lanishi kerak summa',
       back: 'Buxgalteriyaga qaytish',
+      loadingTitle: 'Maosh ma’lumotlari yuklanmoqda',
+      loadingDescription: 'Xodimlar, operatsiyalar va qoldiqlar tayyorlanmoqda.',
       add: 'Xodim maoshi qo‘shish',
       employee: 'Xodim',
       employeeName: 'Xodim ismi',
@@ -251,6 +254,8 @@ export default function Salaries() {
       title: 'Зарплаты',
       sub: 'Дата выхода, зарплата и сумма к выплате',
       back: 'Назад к бухгалтерии',
+      loadingTitle: 'Загрузка данных о зарплатах',
+      loadingDescription: 'Подготавливаем сотрудников, операции и остатки.',
       add: 'Добавить зарплату сотрудника',
       employee: 'Сотрудник',
       employeeName: 'Имя сотрудника',
@@ -355,6 +360,8 @@ export default function Salaries() {
       title: 'Salaries',
       sub: 'Joining date, salary, and amount due',
       back: 'Back to accounting',
+      loadingTitle: 'Loading salary data',
+      loadingDescription: 'Preparing employees, operations, and balances.',
       add: 'Add employee salary',
       employee: 'Employee',
       employeeName: 'Employee name',
@@ -468,6 +475,7 @@ export default function Salaries() {
   const [telegramInviteUrl, setTelegramInviteUrl] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState('')
+  const [telegramSendingKeys, setTelegramSendingKeys] = useState([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [confirmActionKey, setConfirmActionKey] = useState('')
@@ -501,46 +509,105 @@ export default function Salaries() {
     note: '',
   })
 
-  async function loadData() {
-    setLoading(true)
-    setError('')
-    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, telegramLinkRes, paymentDeliveryRes, groupEventDeliveryRes] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
-      supabase.from('employee_salary_profiles').select('*').order('employee_name'),
-      supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
-      supabase.from('employee_salary_payments').select('*').order('paid_date', { ascending: false }),
-      supabase.from('employee_salary_bonuses').select('*').order('bonus_date', { ascending: false }),
-      supabase.from('employee_salary_fines').select('*').order('fine_date', { ascending: false }),
-      supabase.from('employee_salary_absences').select('*').order('absence_date', { ascending: false }),
-      supabase.from('employee_salary_telegram_links').select('salary_profile_id, telegram_user_id, linked_at, notifications_enabled'),
-      supabase.from('employee_salary_payment_notification_deliveries')
-        .select('id, payment_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, confirmed_at, group_status, group_telegram_message_id, group_error_message, group_attempted_at, group_sent_at')
-        .order('attempted_at', { ascending: false })
-        .limit(100),
-      supabase.from('employee_salary_group_notification_deliveries')
-        .select('id, event_type, event_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, employee_status, employee_telegram_message_id, employee_error_message, employee_attempted_at, employee_sent_at')
-        .order('attempted_at', { ascending: false })
-        .limit(100),
-    ])
-    if (profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error) {
-      const err = profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
-      setError(isMissingSalaryMigration(err) ? l.migration : err.message)
-      setSalaryProfiles([])
-    } else {
-      if (fineRes.error) setError(isMissingSalaryMigration(fineRes.error) ? l.migration : fineRes.error.message)
-      const teamRows = teamRes.data || []
-      setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], fineRes.error ? [] : fineRes.data || [], absenceRes.data || [], teamRows)
-        .filter(salaryProfile => !salaryProfile.deleted_at))
-      setTelegramLinks(telegramLinkRes.error ? [] : telegramLinkRes.data || [])
+  async function loadTelegramDeliveryData() {
+    try {
+      const [paymentDeliveryRes, groupEventDeliveryRes] = await Promise.all([
+        supabase.from('employee_salary_payment_notification_deliveries')
+          .select('id, payment_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, confirmed_at, group_status, group_telegram_message_id, group_error_message, group_attempted_at, group_sent_at')
+          .order('attempted_at', { ascending: false })
+          .limit(100),
+        supabase.from('employee_salary_group_notification_deliveries')
+          .select('id, event_type, event_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, employee_status, employee_telegram_message_id, employee_error_message, employee_attempted_at, employee_sent_at')
+          .order('attempted_at', { ascending: false })
+          .limit(100),
+      ])
       setPaymentDeliveries(paymentDeliveryRes.error ? [] : paymentDeliveryRes.data || [])
       setPaymentDeliveriesUnavailable(Boolean(paymentDeliveryRes.error))
       setGroupEventDeliveries(groupEventDeliveryRes.error ? [] : groupEventDeliveryRes.data || [])
       setGroupEventDeliveriesUnavailable(Boolean(groupEventDeliveryRes.error))
+    } catch (deliveryError) {
+      console.warn('[telegram] salary delivery status refresh failed:', deliveryError)
+      setPaymentDeliveriesUnavailable(true)
+      setGroupEventDeliveriesUnavailable(true)
     }
-    setLoading(false)
   }
 
-  useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  async function loadData({ showLoader = false, refreshTelegram = true } = {}) {
+    if (showLoader) setLoading(true)
+    setError('')
+    try {
+      const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, telegramLinkRes] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
+        supabase.from('employee_salary_profiles').select('*').order('employee_name'),
+        supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
+        supabase.from('employee_salary_payments').select('*').order('paid_date', { ascending: false }),
+        supabase.from('employee_salary_bonuses').select('*').order('bonus_date', { ascending: false }),
+        supabase.from('employee_salary_fines').select('*').order('fine_date', { ascending: false }),
+        supabase.from('employee_salary_absences').select('*').order('absence_date', { ascending: false }),
+        supabase.from('employee_salary_telegram_links').select('salary_profile_id, telegram_user_id, linked_at, notifications_enabled'),
+        refreshTelegram ? loadTelegramDeliveryData() : Promise.resolve(),
+      ])
+      if (profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error) {
+        const err = profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
+        setError(isMissingSalaryMigration(err) ? l.migration : err.message)
+        setSalaryProfiles([])
+      } else {
+        if (fineRes.error) setError(isMissingSalaryMigration(fineRes.error) ? l.migration : fineRes.error.message)
+        const teamRows = teamRes.data || []
+        setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], fineRes.error ? [] : fineRes.data || [], absenceRes.data || [], teamRows)
+          .filter(salaryProfile => !salaryProfile.deleted_at))
+        setTelegramLinks(telegramLinkRes.error ? [] : telegramLinkRes.data || [])
+      }
+    } catch (loadError) {
+      setError(isMissingSalaryMigration(loadError) ? l.migration : loadError.message)
+      setSalaryProfiles([])
+    } finally {
+      if (showLoader) setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadData({ showLoader: true }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function runTelegramNotificationInBackground(eventType, eventId, {
+    retryKey = '',
+    announceResult = false,
+  } = {}) {
+    const senders = {
+      payment: notifyTelegramEmployeePayment,
+      bonus: notifyTelegramEmployeeBonus,
+      fine: notifyTelegramEmployeeFine,
+      absence: notifyTelegramEmployeeAbsence,
+    }
+    const send = senders[eventType]
+    if (!send || !eventId) return
+
+    if (retryKey) {
+      setTelegramSendingKeys(current => (
+        current.includes(retryKey) ? current : [...current, retryKey]
+      ))
+    }
+    void send(eventId)
+      .then(telegramResult => {
+        if (!announceResult) return
+        const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
+        const groupTelegramSent = telegramResult?.group?.status === 'sent'
+        setMessage(employeeTelegramSent && groupTelegramSent
+          ? l.telegramRetrySent
+          : employeeTelegramSent || groupTelegramSent
+            ? l.telegramRetryPartial
+            : l.telegramRetryFailed)
+      })
+      .catch(notificationError => {
+        console.warn(`[telegram] background ${eventType} notification failed:`, notificationError)
+        if (announceResult) setMessage(l.telegramRetryFailed)
+      })
+      .finally(() => {
+        if (retryKey) {
+          setTelegramSendingKeys(current => current.filter(key => key !== retryKey))
+        }
+        void loadTelegramDeliveryData()
+      })
+  }
 
   async function createTelegramInvite() {
     const botUsername = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').trim().replace(/^@/, '')
@@ -762,7 +829,7 @@ export default function Salaries() {
     }
     setMessage(l.createdMessage)
     setForm(current => ({ ...current, employee_name: '', salary_amount: '' }))
-    await loadData()
+    await loadData({ refreshTelegram: false })
   }
 
   async function addRate() {
@@ -795,7 +862,7 @@ export default function Salaries() {
       note: '',
     })
     setMessage(l.rateSavedMessage)
-    await loadData()
+    await loadData({ refreshTelegram: false })
   }
 
   async function addTransaction() {
@@ -849,10 +916,6 @@ export default function Salaries() {
       setError(writeError.message)
       return
     }
-    let telegramResult = null
-    if (isFine) telegramResult = await notifyTelegramEmployeeFine(writeResult.data?.id)
-    else if (isBonus) telegramResult = await notifyTelegramEmployeeBonus(writeResult.data?.id)
-    else telegramResult = await notifyTelegramEmployeePayment(writeResult.data?.id)
     setTransactionForm({
       salary_profile_id: '',
       entry_type: 'payment',
@@ -861,19 +924,9 @@ export default function Salaries() {
       payment_method: 'cash',
       note: '',
     })
-    const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
-    const groupTelegramSent = telegramResult?.group?.status === 'sent'
-    const allTelegramSent = groupTelegramSent && employeeTelegramSent
-    const anyTelegramSent = groupTelegramSent || employeeTelegramSent
-    const transactionMessage = allTelegramSent
-      ? l.transactionSavedMessage
-      : anyTelegramSent
-        ? l.transactionTelegramPartial
-        : isFine || isBonus
-          ? l.transactionTelegramFailed
-          : l.paymentTelegramFailed
-    setMessage(transactionMessage)
-    await loadData()
+    setMessage(l.transactionSavedMessage)
+    runTelegramNotificationInBackground(entryType, writeResult.data?.id)
+    await loadData({ refreshTelegram: false })
   }
 
   async function addAbsence() {
@@ -899,43 +952,21 @@ export default function Salaries() {
       setError(writeError.code === '23505' ? l.absenceDuplicate : writeError.message)
       return
     }
-    const telegramResult = await notifyTelegramEmployeeAbsence(savedAbsence?.id)
     setAbsenceForm({ salary_profile_id: '', absence_date: today, note: '' })
-    const employeeTelegramSent = telegramResult?.employee?.status === 'sent'
-    const groupTelegramSent = telegramResult?.group?.status === 'sent'
-    setMessage(employeeTelegramSent && groupTelegramSent
-      ? l.absenceSavedMessage
-      : employeeTelegramSent || groupTelegramSent
-        ? l.transactionTelegramPartial
-        : l.transactionTelegramFailed)
-    await loadData()
+    setMessage(l.absenceSavedMessage)
+    runTelegramNotificationInBackground('absence', savedAbsence?.id)
+    await loadData({ refreshTelegram: false })
   }
 
-  async function retryTelegramDelivery(delivery) {
+  function retryTelegramDelivery(delivery) {
     if (!canManage || !delivery?.eventId || !delivery?.eventType) return
     const retryKey = `telegram-retry-${delivery.eventType}-${delivery.eventId}`
-    const senders = {
-      payment: notifyTelegramEmployeePayment,
-      bonus: notifyTelegramEmployeeBonus,
-      fine: notifyTelegramEmployeeFine,
-      absence: notifyTelegramEmployeeAbsence,
-    }
-    const send = senders[delivery.eventType]
-    if (!send) return
-
     setError('')
     setMessage('')
-    setSaving(retryKey)
-    const telegramResult = await send(delivery.eventId)
-    setSaving('')
-    const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
-    const groupTelegramSent = telegramResult?.group?.status === 'sent'
-    setMessage(employeeTelegramSent && groupTelegramSent
-      ? l.telegramRetrySent
-      : employeeTelegramSent || groupTelegramSent
-        ? l.telegramRetryPartial
-        : l.telegramRetryFailed)
-    await loadData()
+    runTelegramNotificationInBackground(delivery.eventType, delivery.eventId, {
+      retryKey,
+      announceResult: true,
+    })
   }
 
   async function deleteRate(rate) {
@@ -1090,6 +1121,19 @@ export default function Salaries() {
       return
     }
     await loadData()
+  }
+
+  if (loading) {
+    return (
+      <AppShell title={l.title}>
+        <div className="h-full overflow-y-auto bg-[#FAF7F0]">
+          <OperationalLoading
+            title={l.loadingTitle}
+            description={l.loadingDescription}
+          />
+        </div>
+      </AppShell>
+    )
   }
 
   return (
@@ -1519,10 +1563,10 @@ export default function Salaries() {
                                     <button
                                       type="button"
                                       onClick={() => retryTelegramDelivery(delivery)}
-                                      disabled={!canManage || saving === retryKey}
+                                      disabled={!canManage || telegramSendingKeys.includes(retryKey)}
                                       className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white px-2.5 text-[10px] font-black text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                      {saving === retryKey ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                                      <Send size={12} />
                                       {l.telegramRetry}
                                     </button>
                                   )}

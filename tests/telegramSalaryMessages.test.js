@@ -182,11 +182,12 @@ test('recorded salary operations trigger the authenticated shared Telegram endpo
   const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
 
   assert.match(salariesPage, /\.select\('id'\)\.single\(\)/)
-  assert.match(salariesPage, /notifyTelegramEmployeePayment\(writeResult\.data\?\.id\)/)
-  assert.match(salariesPage, /notifyTelegramEmployeeFine\(writeResult\.data\?\.id\)/)
-  assert.match(salariesPage, /notifyTelegramEmployeeBonus\(writeResult\.data\?\.id\)/)
-  assert.match(salariesPage, /notifyTelegramEmployeeAbsence\(savedAbsence\?\.id\)/)
+  assert.match(salariesPage, /runTelegramNotificationInBackground\(entryType, writeResult\.data\?\.id\)/)
+  assert.match(salariesPage, /runTelegramNotificationInBackground\('absence', savedAbsence\?\.id\)/)
+  assert.match(salariesPage, /void send\(eventId\)/)
+  assert.doesNotMatch(salariesPage, /await notifyTelegramEmployee(?:Payment|Fine|Bonus|Absence)/)
   assert.match(notifications, /\/api\/telegram\/employee-notification/)
+  assert.match(notifications, /keepalive: true/)
   assert.match(notifications, /\['payment', 'fine', 'bonus', 'absence'\]/)
   assert.match(notifications, /\[`\\?\$\{type\}Id`\]: eventId/)
   assert.match(endpoint, /payment\.created_by !== user\.id/)
@@ -201,6 +202,18 @@ test('recorded salary operations trigger the authenticated shared Telegram endpo
   assert.match(endpoint, /TELEGRAM_SALARY_PAYMENTS_CHAT_ID/)
   assert.doesNotMatch(endpoint, /TELEGRAM_TEAM_CHAT_ID/)
   assert.match(endpoint, /Promise\.allSettled/)
+})
+
+test('salary loading is visible while Telegram delivery refresh stays non-blocking', () => {
+  const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
+
+  assert.match(salariesPage, /loadData\(\{ showLoader: true \}\)/)
+  assert.match(salariesPage, /if \(loading\) \{[\s\S]*?<OperationalLoading/)
+  assert.match(salariesPage, /async function loadData\(\{ showLoader = false, refreshTelegram = true \} = \{\}\)/)
+  assert.match(salariesPage, /await loadData\(\{ refreshTelegram: false \}\)/)
+  assert.match(salariesPage, /\.finally\(\(\) => \{[\s\S]*?void loadTelegramDeliveryData\(\)/)
+  assert.match(salariesPage, /disabled=\{!canManage \|\| telegramSendingKeys\.includes\(retryKey\)\}/)
+  assert.doesNotMatch(salariesPage, /saving === retryKey \? <Loader2/)
 })
 
 test('salary payment notifications persist delivery status and employee confirmation', () => {
@@ -234,6 +247,11 @@ test('salary payment notifications persist delivery status and employee confirma
   assert.match(endpoint, /getTelegramMessageId/)
   assert.match(endpoint, /Telegram did not return a message id/)
   assert.match(endpoint, /PENDING_DELIVERY_RETRY_MS/)
+  assert.match(endpoint, /getSalaryPaymentRetryTargets/)
+  assert.match(endpoint, /getSalaryEventRetryTargets/)
+  assert.match(endpoint, /\.eq\('updated_at', delivery\.updated_at\)/)
+  assert.match(endpoint, /if \(employeeShouldSend\)/)
+  assert.match(endpoint, /if \(groupShouldSend\)/)
   assert.match(endpoint, /created\.error\?\.code === '23505'/)
   assert.match(salariesPage, /groupEventDeliveryRows/)
   assert.match(groupEventMigration, /telegram_notification_targets/)
