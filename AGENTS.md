@@ -187,9 +187,9 @@ These bugs were recently fixed and are now protected by tests:
    - Employee and group delivery statuses are recorded separately so either destination can fail or retry without duplicating the other.
 
 18. Every recorded salary operation must notify the dedicated salary group.
-   - Payment and fine records notify both the salary group and the linked employee; bonus and absence records notify the group only.
+   - Payment, bonus, fine, and absence records notify both the salary group and the linked employee.
    - All four types reuse `api/telegram/employee-notification.js` so the Vercel Hobby deployment remains at 12 functions.
-   - Bonus, fine, and absence group delivery is duplicate-safe and auditable through `employee_salary_group_notification_deliveries`.
+   - Bonus, fine, and absence employee/group delivery is duplicate-safe and independently auditable through `employee_salary_group_notification_deliveries`.
    - A Telegram notification is marked sent only after Telegram returns a message id.
 
 ## Database Migrations
@@ -255,6 +255,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/111_salary_group_event_notifications.sql`
   Stores the dedicated salary-events Telegram target and adds duplicate-safe delivery history for bonus, fine, and absence group notifications.
+
+- `supabase/112_salary_event_employee_notifications.sql`
+  Adds independent private employee delivery status, message ids, timestamps, and errors for bonus, fine, and absence notifications.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

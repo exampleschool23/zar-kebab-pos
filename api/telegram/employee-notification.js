@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { buildEmployeeFineMessage } from './_lib/fineMessages.js'
 import {
   buildEmployeePaymentMessage,
+  buildEmployeeSalaryEventMessage,
   buildSalaryGroupEventMessage,
   buildSalaryPaymentGroupMessage,
   getEmployeePaymentConfirmationCopy,
@@ -122,7 +123,17 @@ function savedGroupDeliveryResult(delivery, duplicate = true) {
   }
 }
 
-async function deliverSalaryGroupEvent(supabase, type, event) {
+function savedEmployeeEventDeliveryResult(delivery, duplicate = true) {
+  return {
+    status: delivery?.employee_status || 'pending',
+    duplicate,
+    telegramMessageId: delivery?.employee_telegram_message_id || null,
+    sentAt: delivery?.employee_sent_at || null,
+    errorMessage: delivery?.employee_error_message || '',
+  }
+}
+
+async function deliverSalaryGroupEvent(supabase, type, event, remainingDue) {
   const { data: existing, error: existingError } = await supabase
     .from('employee_salary_group_notification_deliveries')
     .select('*')
@@ -202,11 +213,6 @@ async function deliverSalaryGroupEvent(supabase, type, event) {
   }
 
   try {
-    const salaryProfiles = await loadSalaryProfiles(supabase, [event.salary_profile_id])
-    const salaryProfile = salaryProfiles.get(event.salary_profile_id)
-    const remainingDue = salaryProfile
-      ? getDailySalaryNotificationSummary(salaryProfile, getTashkentDate()).due
-      : 0
     const text = buildSalaryGroupEventMessage(type, event, remainingDue, target.language)
     const response = await sendTelegramMessage(target.chatId, text)
     const sentAt = new Date().toISOString()
@@ -242,6 +248,108 @@ async function deliverSalaryGroupEvent(supabase, type, event) {
   }
 }
 
+async function deliverEmployeeSalaryEvent(supabase, type, event, remainingDue) {
+  const { data: existing, error: existingError } = await supabase
+    .from('employee_salary_group_notification_deliveries')
+    .select('*')
+    .eq('event_type', type)
+    .eq('event_id', event.id)
+    .single()
+  if (existingError) throw existingError
+  if (existing.employee_status === 'sent') {
+    return savedEmployeeEventDeliveryResult(existing)
+  }
+  const pendingAge = Date.now() - new Date(existing.employee_attempted_at || 0).getTime()
+  if (existing.employee_status === 'pending' && pendingAge < PENDING_DELIVERY_RETRY_MS) {
+    return savedEmployeeEventDeliveryResult(existing)
+  }
+
+  const { data: employeeLink, error: linkError } = await supabase
+    .from('employee_salary_telegram_links')
+    .select('chat_id, notifications_enabled, preferred_language')
+    .eq('salary_profile_id', event.salary_profile_id)
+    .maybeSingle()
+  if (linkError) throw linkError
+
+  const employeeChatId = employeeLink?.notifications_enabled === false
+    ? ''
+    : String(employeeLink?.chat_id || '').trim()
+  const now = new Date().toISOString()
+  const pendingFields = {
+    employee_status: employeeChatId ? 'pending' : 'skipped',
+    employee_chat_id: employeeChatId || null,
+    employee_telegram_message_id: null,
+    employee_error_message: employeeChatId
+      ? ''
+      : 'Employee Telegram is not linked or notifications are disabled',
+    employee_attempted_at: now,
+    employee_sent_at: null,
+    updated_at: now,
+  }
+  const claimed = await supabase
+    .from('employee_salary_group_notification_deliveries')
+    .update(pendingFields)
+    .eq('id', existing.id)
+    .eq('employee_status', existing.employee_status)
+    .select('*')
+    .maybeSingle()
+  if (claimed.error) throw claimed.error
+  if (!claimed.data) {
+    const { data: concurrent, error: concurrentError } = await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .select('*')
+      .eq('id', existing.id)
+      .single()
+    if (concurrentError) throw concurrentError
+    return savedEmployeeEventDeliveryResult(concurrent)
+  }
+  if (!employeeChatId) {
+    return savedEmployeeEventDeliveryResult(claimed.data, false)
+  }
+
+  try {
+    const text = type === 'fine'
+      ? buildEmployeeFineMessage(event)
+      : buildEmployeeSalaryEventMessage(
+          type,
+          event,
+          remainingDue,
+          employeeLink.preferred_language
+        )
+    const response = await sendTelegramMessage(employeeChatId, text)
+    const sentAt = new Date().toISOString()
+    const telegramMessageId = getTelegramMessageId(response)
+    const { error: updateError } = await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .update({
+        employee_status: 'sent',
+        employee_telegram_message_id: telegramMessageId,
+        employee_error_message: '',
+        employee_sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('id', existing.id)
+    if (updateError) throw updateError
+    return { status: 'sent', telegramMessageId, sentAt, errorMessage: '' }
+  } catch (error) {
+    const errorMessage = String(error?.message || error).slice(0, 1000)
+    await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .update({
+        employee_status: 'failed',
+        employee_error_message: errorMessage,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+    return {
+      status: 'failed',
+      telegramMessageId: null,
+      sentAt: null,
+      errorMessage,
+    }
+  }
+}
+
 function normalizeDeliverySettlement(settled) {
   return settled.status === 'fulfilled'
     ? settled.value
@@ -253,37 +361,18 @@ function normalizeDeliverySettlement(settled) {
       }
 }
 
-async function notifyFine(supabase, user, fineId) {
-  const fine = await loadOwnedSalaryEvent(supabase, user, 'fine', fineId)
-  const employeeDelivery = (async () => {
-    const { data: employeeLink, error: linkError } = await supabase
-      .from('employee_salary_telegram_links')
-      .select('chat_id, notifications_enabled')
-      .eq('salary_profile_id', fine.salary_profile_id)
-      .maybeSingle()
-    if (linkError) throw linkError
-    if (!employeeLink?.chat_id || employeeLink.notifications_enabled === false) {
-      return {
-        status: 'skipped',
-        telegramMessageId: null,
-        sentAt: null,
-        errorMessage: 'Employee Telegram is not linked or notifications are disabled',
-      }
-    }
-    const response = await sendTelegramMessage(
-      employeeLink.chat_id,
-      buildEmployeeFineMessage(fine)
-    )
-    return {
-      status: 'sent',
-      telegramMessageId: getTelegramMessageId(response),
-      sentAt: new Date().toISOString(),
-      errorMessage: '',
-    }
-  })()
-  const [employeeSettled, groupSettled] = await Promise.allSettled([
-    employeeDelivery,
-    deliverSalaryGroupEvent(supabase, 'fine', fine),
+async function notifySalaryEvent(supabase, user, type, eventId) {
+  const event = await loadOwnedSalaryEvent(supabase, user, type, eventId)
+  const salaryProfiles = await loadSalaryProfiles(supabase, [event.salary_profile_id])
+  const salaryProfile = salaryProfiles.get(event.salary_profile_id)
+  const remainingDue = salaryProfile
+    ? getDailySalaryNotificationSummary(salaryProfile, getTashkentDate()).due
+    : 0
+  const [groupSettled] = await Promise.allSettled([
+    deliverSalaryGroupEvent(supabase, type, event, remainingDue),
+  ])
+  const [employeeSettled] = await Promise.allSettled([
+    deliverEmployeeSalaryEvent(supabase, type, event, remainingDue),
   ])
   const employee = normalizeDeliverySettlement(employeeSettled)
   const group = normalizeDeliverySettlement(groupSettled)
@@ -293,17 +382,6 @@ async function notifyFine(supabase, user, fineId) {
     ok: employeeSent || groupSent,
     allSent: employeeSent && groupSent,
     employee,
-    group,
-  }
-}
-
-async function notifyGroupOnlyEvent(supabase, user, type, eventId) {
-  const event = await loadOwnedSalaryEvent(supabase, user, type, eventId)
-  const group = await deliverSalaryGroupEvent(supabase, type, event)
-  return {
-    ok: group.status === 'sent',
-    allSent: group.status === 'sent',
-    employee: { status: 'not_applicable' },
     group,
   }
 }
@@ -583,10 +661,8 @@ export default async function handler(req, res) {
     let result
     if (notificationType === 'payment') {
       result = await notifyPayment(supabase, user, paymentId)
-    } else if (notificationType === 'fine') {
-      result = await notifyFine(supabase, user, fineId)
     } else {
-      result = await notifyGroupOnlyEvent(
+      result = await notifySalaryEvent(
         supabase,
         user,
         notificationType,

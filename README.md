@@ -38,10 +38,10 @@ have the bot reply with the exact value to use for
 shown only in a private chat with the bot.
 Migration `111` stores the confirmed salary-events group in Supabase and uses
 it as the primary destination; the environment variable remains a deployment
-fallback. Salary payments and fines notify both the group and the linked
-employee. Bonuses and absences notify the group. None of these messages use
-the team or completed-orders groups as a fallback. If a private employee link
-is missing or disabled, the group notification is still attempted and tracked.
+fallback. Salary payments, bonuses, fines, and absences notify both the group
+and the linked employee. None of these messages use the team or
+completed-orders groups as a fallback. If a private employee link is missing
+or disabled, the group notification is still attempted and tracked.
 
 ### BotFather setup
 
@@ -83,6 +83,9 @@ Run `supabase/108_employee_salary_payment_notification_deliveries.sql` and
 employee delivery and salary-group delivery independently.
 Run `supabase/111_salary_group_event_notifications.sql` to configure the
 salary-events group and track duplicate-safe bonus, fine, and absence delivery.
+Run `supabase/112_salary_event_employee_notifications.sql` to track private
+employee delivery for bonus, fine, and absence notifications independently
+from the salary-group delivery.
 
 ### Daily employee salary notifications
 

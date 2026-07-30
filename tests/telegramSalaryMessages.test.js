@@ -9,6 +9,7 @@ import {
 } from '../api/telegram/_lib/salaryMessages.js'
 import {
   buildEmployeePaymentMessage,
+  buildEmployeeSalaryEventMessage,
   buildSalaryGroupEventMessage,
   buildSalaryPaymentGroupMessage,
 } from '../api/telegram/_lib/paymentMessages.js'
@@ -146,6 +147,35 @@ test('salary group messages cover bonuses, fines, and absences', () => {
   assert.match(absence, /К выплате:<\/b> 80 000 UZS/)
 })
 
+test('employee bonus and absence messages are private and localized', () => {
+  const common = {
+    employee_name: 'Зилола <кассир>',
+    created_by_name: 'Jasurbek & Co',
+  }
+  const bonus = buildEmployeeSalaryEventMessage('bonus', {
+    ...common,
+    bonus_date: '2026-07-29',
+    amount: 100_000,
+    payment_method: 'card',
+    note: '<Отличная работа>',
+  }, 250_000, 'ru')
+  const absence = buildEmployeeSalaryEventMessage('absence', {
+    ...common,
+    absence_date: '2026-07-29',
+    note: '<Болезнь>',
+  }, 80_000, 'ru')
+
+  assert.match(bonus, /Здравствуйте, Зилола &lt;кассир&gt;!/)
+  assert.match(bonus, /Вам начислен бонус\./)
+  assert.match(bonus, /100 000 UZS/)
+  assert.match(bonus, /&lt;Отличная работа&gt;/)
+  assert.match(absence, /Здравствуйте, Зилола &lt;кассир&gt;!/)
+  assert.match(absence, /Ваше отсутствие зарегистрировано\./)
+  assert.match(absence, /&lt;Болезнь&gt;/)
+  assert.match(absence, /К выплате:<\/b> 80 000 UZS/)
+  assert.doesNotMatch(absence, /<Болезнь>/)
+})
+
 test('recorded salary operations trigger the authenticated shared Telegram endpoint', () => {
   const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
   const notifications = fs.readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
@@ -164,6 +194,8 @@ test('recorded salary operations trigger the authenticated shared Telegram endpo
   assert.match(endpoint, /buildEmployeePaymentMessage/)
   assert.match(endpoint, /buildSalaryPaymentGroupMessage/)
   assert.match(endpoint, /buildSalaryGroupEventMessage/)
+  assert.match(endpoint, /buildEmployeeSalaryEventMessage/)
+  assert.match(endpoint, /deliverEmployeeSalaryEvent/)
   assert.match(endpoint, /employee_salary_telegram_links/)
   assert.match(endpoint, /telegram_notification_targets/)
   assert.match(endpoint, /TELEGRAM_SALARY_PAYMENTS_CHAT_ID/)
@@ -178,6 +210,7 @@ test('salary payment notifications persist delivery status and employee confirma
   const migration = fs.readFileSync(new URL('../supabase/108_employee_salary_payment_notification_deliveries.sql', import.meta.url), 'utf8')
   const groupMigration = fs.readFileSync(new URL('../supabase/110_salary_payment_group_notifications.sql', import.meta.url), 'utf8')
   const groupEventMigration = fs.readFileSync(new URL('../supabase/111_salary_group_event_notifications.sql', import.meta.url), 'utf8')
+  const employeeEventMigration = fs.readFileSync(new URL('../supabase/112_salary_event_employee_notifications.sql', import.meta.url), 'utf8')
 
   assert.match(endpoint, /employee_salary_payment_notification_deliveries/)
   assert.match(endpoint, /salary_payment_confirm:\$\{deliveryId\}/)
@@ -206,6 +239,14 @@ test('salary payment notifications persist delivery status and employee confirma
   assert.match(groupEventMigration, /employee_salary_group_notification_deliveries/)
   assert.match(groupEventMigration, /unique \(event_type, event_id\)/)
   assert.match(groupEventMigration, /'-1003915715160'/)
+  assert.match(employeeEventMigration, /employee_status/)
+  assert.match(employeeEventMigration, /employee_chat_id/)
+  assert.match(employeeEventMigration, /employee_telegram_message_id/)
+  assert.match(employeeEventMigration, /employee_error_message/)
+  assert.match(employeeEventMigration, /employee_attempted_at/)
+  assert.match(employeeEventMigration, /employee_sent_at/)
+  assert.match(salariesPage, /delivery\.employee_status/)
+  assert.match(salariesPage, /delivery\.employee_telegram_message_id/)
 })
 
 test('employee salary notifications share one endpoint within the Hobby function limit', () => {
@@ -223,10 +264,11 @@ test('employee salary notifications share one endpoint within the Hobby function
   }
 
   assert.equal((notifications.match(/\/api\/telegram\/employee-notification/g) || []).length, 1)
-  assert.match(endpoint, /notificationType === 'fine'/)
+  assert.match(endpoint, /fine: fineId/)
   assert.match(endpoint, /\['fine', 'payment', 'bonus', 'absence'\]/)
   assert.match(endpoint, /notifyPayment\(supabase, user, paymentId\)/)
-  assert.match(endpoint, /notifyGroupOnlyEvent/)
+  assert.match(endpoint, /notifySalaryEvent/)
+  assert.match(endpoint, /deliverEmployeeSalaryEvent/)
   assert.match(endpoint, /buildSalaryPaymentGroupMessage/)
   assert.equal(fs.existsSync(new URL('../api/telegram/fine-notification.js', import.meta.url)), false)
   assert.equal(fs.existsSync(new URL('../api/telegram/payment-notification.js', import.meta.url)), false)

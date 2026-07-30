@@ -127,6 +127,10 @@ test('database health requires the salary group target and event delivery histor
     missingDeliveries.failed.find(check => check.name === 'employee_salary_group_notification_deliveries').hint,
     /111_salary_group_event_notifications/
   )
+  assert.match(
+    missingDeliveries.failed.find(check => check.name === 'employee_salary_group_notification_deliveries').hint,
+    /112_salary_event_employee_notifications/
+  )
   assert.match(cliHealthSource, /checkTable\('telegram_notification_targets'/)
   assert.match(cliHealthSource, /checkTable\('employee_salary_group_notification_deliveries'/)
 })

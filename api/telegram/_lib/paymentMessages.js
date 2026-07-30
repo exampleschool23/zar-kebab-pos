@@ -105,6 +105,24 @@ const GROUP_EVENT_COPY = {
   },
 }
 
+const EMPLOYEE_EVENT_COPY = {
+  uz: {
+    greeting: name => `Assalomu alaykum, ${name}!`,
+    bonusRecorded: 'Sizga bonus hisoblandi.',
+    absenceRecorded: 'Sizning yo‘qligingiz qayd etildi.',
+  },
+  ru: {
+    greeting: name => `Здравствуйте, ${name}!`,
+    bonusRecorded: 'Вам начислен бонус.',
+    absenceRecorded: 'Ваше отсутствие зарегистрировано.',
+  },
+  en: {
+    greeting: name => `Hello, ${name}!`,
+    bonusRecorded: 'A bonus was recorded for you.',
+    absenceRecorded: 'Your absence was recorded.',
+  },
+}
+
 export function getEmployeePaymentConfirmationCopy(language = 'ru') {
   const lang = normalizeSalaryNotificationLanguage(language)
   return {
@@ -157,6 +175,39 @@ export function buildSalaryGroupEventMessage(type, event, remainingDue = 0, lang
   const detail = normalizedType === 'fine' ? event?.reason : event?.note
   if (String(detail || '').trim()) {
     lines.push(`<b>${normalizedType === 'fine' ? copy.reason : copy.note}:</b> ${escapeTelegramHtml(detail)}`)
+  }
+  lines.push(
+    `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,
+    `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(event?.created_by_name || '-')}`
+  )
+  return lines.join('\n')
+}
+
+export function buildEmployeeSalaryEventMessage(type, event, remainingDue = 0, language = 'ru') {
+  const lang = normalizeSalaryNotificationLanguage(language)
+  const copy = GROUP_EVENT_COPY[lang]
+  const employeeCopy = EMPLOYEE_EVENT_COPY[lang]
+  const normalizedType = type === 'bonus' ? 'bonus' : 'absence'
+  const date = normalizedType === 'bonus' ? event?.bonus_date : event?.absence_date
+  const employeeName = escapeTelegramHtml(event?.employee_name || '-')
+  const lines = [
+    `${normalizedType === 'bonus' ? '🎁' : '📅'} <b>${copy[normalizedType]}</b>`,
+    '',
+    `<b>${employeeCopy.greeting(employeeName)}</b>`,
+    normalizedType === 'bonus' ? employeeCopy.bonusRecorded : employeeCopy.absenceRecorded,
+    '',
+  ]
+  if (normalizedType === 'bonus') {
+    lines.push(
+      `<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`,
+      `<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(date, '-'))}`,
+      `<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`
+    )
+  } else {
+    lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(date, '-'))}`)
+  }
+  if (String(event?.note || '').trim()) {
+    lines.push(`<b>${copy.note}:</b> ${escapeTelegramHtml(event.note)}`)
   }
   lines.push(
     `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,

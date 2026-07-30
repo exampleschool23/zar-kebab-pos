@@ -201,7 +201,6 @@ export default function Salaries() {
       paymentTelegramFailed: 'To‘lov saqlandi, lekin Telegram xabarlari yuborilmadi.',
       transactionTelegramFailed: 'Operatsiya saqlandi, lekin Telegram xabarlari yuborilmadi.',
       transactionTelegramPartial: 'Operatsiya saqlandi. Telegram xabarlaridan biri yuborilmadi; holatni pastda tekshiring.',
-      salaryGroupTelegramFailed: 'Operatsiya saqlandi, lekin maosh guruhiga Telegram xabari yuborilmadi.',
       absenceSavedMessage: 'Kelmagan kun saqlandi',
       accruedToday: 'Bugungi xarajat',
       history: 'Maosh tarixi',
@@ -232,10 +231,10 @@ export default function Salaries() {
       telegramDeliveryMigration: 'To‘lov xabarlari tarixi uchun 108 va 110-migratsiyalarni ishga tushiring.',
       telegramEmployee: 'Xodim',
       telegramSalaryGroup: 'Maosh guruhi',
-      telegramGroupActivityTitle: 'Guruhdagi maosh xabarlari',
-      telegramGroupActivityHelp: 'Bonus, jarima va yo‘qlik xabarlarining yuborilishini kuzating.',
-      telegramGroupActivityEmpty: 'Hali guruh xabarlari yo‘q.',
-      telegramGroupActivityMigration: 'Guruh xabarlari tarixi uchun 111-migratsiyani ishga tushiring.',
+      telegramGroupActivityTitle: 'Maosh operatsiyalari xabarlari',
+      telegramGroupActivityHelp: 'Bonus, jarima va yo‘qlik xabarlarining xodimga va guruhga yuborilishini kuzating.',
+      telegramGroupActivityEmpty: 'Hali operatsiya xabarlari yo‘q.',
+      telegramGroupActivityMigration: 'Operatsiya xabarlari tarixi uchun 111 va 112-migratsiyalarni ishga tushiring.',
       telegramStatusPending: 'Kutilmoqda',
       telegramStatusSent: 'Yuborildi',
       telegramStatusFailed: 'Xato',
@@ -302,7 +301,6 @@ export default function Salaries() {
       paymentTelegramFailed: 'Выплата сохранена, но сообщения в Telegram не отправлены.',
       transactionTelegramFailed: 'Операция сохранена, но сообщения в Telegram не отправлены.',
       transactionTelegramPartial: 'Операция сохранена. Одно из сообщений Telegram не отправлено; проверьте статус ниже.',
-      salaryGroupTelegramFailed: 'Операция сохранена, но сообщение в зарплатную группу не отправлено.',
       absenceSavedMessage: 'Отсутствие сохранено',
       accruedToday: 'Расход за день',
       history: 'История зарплаты',
@@ -333,10 +331,10 @@ export default function Salaries() {
       telegramDeliveryMigration: 'Запустите миграции 108 и 110 для истории уведомлений о выплатах.',
       telegramEmployee: 'Сотрудник',
       telegramSalaryGroup: 'Группа зарплат',
-      telegramGroupActivityTitle: 'Уведомления в зарплатной группе',
-      telegramGroupActivityHelp: 'Проверяйте доставку бонусов, штрафов и отсутствий.',
-      telegramGroupActivityEmpty: 'Уведомлений для группы пока нет.',
-      telegramGroupActivityMigration: 'Запустите миграцию 111 для истории групповых уведомлений.',
+      telegramGroupActivityTitle: 'Уведомления по зарплатным операциям',
+      telegramGroupActivityHelp: 'Проверяйте доставку бонусов, штрафов и отсутствий сотруднику и в группу.',
+      telegramGroupActivityEmpty: 'Уведомлений по операциям пока нет.',
+      telegramGroupActivityMigration: 'Запустите миграции 111 и 112 для истории уведомлений по операциям.',
       telegramStatusPending: 'Ожидает',
       telegramStatusSent: 'Отправлено',
       telegramStatusFailed: 'Ошибка',
@@ -403,7 +401,6 @@ export default function Salaries() {
       paymentTelegramFailed: 'Payment saved, but the Telegram messages were not sent.',
       transactionTelegramFailed: 'Transaction saved, but the Telegram messages were not sent.',
       transactionTelegramPartial: 'Transaction saved. One Telegram message was not sent; check the status below.',
-      salaryGroupTelegramFailed: 'Transaction saved, but the salary-group Telegram message was not sent.',
       absenceSavedMessage: 'Absence saved',
       accruedToday: 'Daily expense',
       history: 'Salary history',
@@ -434,10 +431,10 @@ export default function Salaries() {
       telegramDeliveryMigration: 'Run migrations 108 and 110 to enable payment notification history.',
       telegramEmployee: 'Employee',
       telegramSalaryGroup: 'Salary group',
-      telegramGroupActivityTitle: 'Salary-group notifications',
-      telegramGroupActivityHelp: 'Track group delivery for bonuses, fines, and absences.',
-      telegramGroupActivityEmpty: 'No group notifications yet.',
-      telegramGroupActivityMigration: 'Run migration 111 to enable group notification history.',
+      telegramGroupActivityTitle: 'Salary-operation notifications',
+      telegramGroupActivityHelp: 'Track employee and group delivery for bonuses, fines, and absences.',
+      telegramGroupActivityEmpty: 'No operation notifications yet.',
+      telegramGroupActivityMigration: 'Run migrations 111 and 112 to enable operation notification history.',
       telegramStatusPending: 'Pending',
       telegramStatusSent: 'Sent',
       telegramStatusFailed: 'Failed',
@@ -507,7 +504,7 @@ export default function Salaries() {
         .order('attempted_at', { ascending: false })
         .limit(20),
       supabase.from('employee_salary_group_notification_deliveries')
-        .select('id, event_type, event_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at')
+        .select('id, event_type, event_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, employee_status, employee_telegram_message_id, employee_error_message, employee_attempted_at, employee_sent_at')
         .order('attempted_at', { ascending: false })
         .limit(20),
     ])
@@ -810,19 +807,15 @@ export default function Salaries() {
     })
     const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
     const groupTelegramSent = telegramResult?.group?.status === 'sent'
-    const employeeDeliveryApplies = !isBonus
-    const allTelegramSent = groupTelegramSent
-      && (!employeeDeliveryApplies || employeeTelegramSent)
+    const allTelegramSent = groupTelegramSent && employeeTelegramSent
     const anyTelegramSent = groupTelegramSent || employeeTelegramSent
     const transactionMessage = allTelegramSent
       ? l.transactionSavedMessage
       : anyTelegramSent
         ? l.transactionTelegramPartial
-        : isBonus
-          ? l.salaryGroupTelegramFailed
-          : isFine
-            ? l.transactionTelegramFailed
-            : l.paymentTelegramFailed
+        : isFine || isBonus
+          ? l.transactionTelegramFailed
+          : l.paymentTelegramFailed
     setMessage(transactionMessage)
     await loadData()
   }
@@ -852,11 +845,13 @@ export default function Salaries() {
     }
     const telegramResult = await notifyTelegramEmployeeAbsence(savedAbsence?.id)
     setAbsenceForm({ salary_profile_id: '', absence_date: today, note: '' })
-    setMessage(
-      telegramResult?.group?.status === 'sent'
-        ? l.absenceSavedMessage
-        : l.salaryGroupTelegramFailed
-    )
+    const employeeTelegramSent = telegramResult?.employee?.status === 'sent'
+    const groupTelegramSent = telegramResult?.group?.status === 'sent'
+    setMessage(employeeTelegramSent && groupTelegramSent
+      ? l.absenceSavedMessage
+      : employeeTelegramSent || groupTelegramSent
+        ? l.transactionTelegramPartial
+        : l.transactionTelegramFailed)
     await loadData()
   }
 
@@ -1503,23 +1498,49 @@ export default function Salaries() {
                                   {delivery.eventDate ? ` · ${formatLongDate(delivery.eventDate, lang, delivery.eventDate)}` : ''}
                                 </p>
                               </div>
-                              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
-                                paymentDeliveryStatusClasses[delivery.status] || paymentDeliveryStatusClasses.pending
-                              }`}>
-                                {paymentDeliveryStatusLabels[delivery.status] || delivery.status}
-                              </span>
                             </div>
-                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold text-gray-500">
-                              <span>{formatDateTime(delivery.sent_at || delivery.attempted_at, '—')}</span>
-                              {delivery.telegram_message_id && (
-                                <span>{l.telegramMessageId} #{delivery.telegram_message_id}</span>
-                              )}
+                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                              {[
+                                {
+                                  key: 'employee',
+                                  label: l.telegramEmployee,
+                                  status: delivery.employee_status,
+                                  timestamp: delivery.employee_sent_at || delivery.employee_attempted_at,
+                                  messageId: delivery.employee_telegram_message_id,
+                                  error: delivery.employee_error_message,
+                                },
+                                {
+                                  key: 'group',
+                                  label: l.telegramSalaryGroup,
+                                  status: delivery.status,
+                                  timestamp: delivery.sent_at || delivery.attempted_at,
+                                  messageId: delivery.telegram_message_id,
+                                  error: delivery.error_message,
+                                },
+                              ].map(target => (
+                                <div key={target.key} className="rounded-lg border border-gray-200 bg-white px-2.5 py-2">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="text-[11px] font-black text-gray-700">{target.label}</span>
+                                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
+                                      paymentDeliveryStatusClasses[target.status] || paymentDeliveryStatusClasses.pending
+                                    }`}>
+                                      {paymentDeliveryStatusLabels[target.status] || target.status || l.telegramStatusPending}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-semibold text-gray-500">
+                                    <span>{formatDateTime(target.timestamp, '—')}</span>
+                                    {target.messageId && (
+                                      <span>{l.telegramMessageId} #{target.messageId}</span>
+                                    )}
+                                  </div>
+                                  {target.error && (
+                                    <p className="mt-1.5 break-words rounded-md bg-red-50 px-2 py-1.5 text-[10px] font-semibold text-red-700">
+                                      {target.error}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                            {delivery.error_message && (
-                              <p className="mt-2 break-words rounded-lg bg-red-50 px-2.5 py-2 text-[11px] font-semibold text-red-700">
-                                {delivery.error_message}
-                              </p>
-                            )}
                           </div>
                         ))}
                       </div>
