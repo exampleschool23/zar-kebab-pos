@@ -18,7 +18,7 @@ import { getMenuPricing } from '../lib/menuPricing'
 import { generateMenuExternalId } from '../lib/menuExternalId'
 import AppShell from '../components/AppShell'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
-import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem, isWaiterHiddenMenuItem } from '../lib/menuItems'
+import { getQuickItemSortOrder, isActiveMenuCategory, isActiveMenuItem, isCashierQuickItem, isWaiterHiddenMenuItem } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
@@ -1594,7 +1594,7 @@ export default function AdminMenu() {
     [state.categories]
   )
   const realSortedCats = useMemo(() =>
-    sortedCategories.filter(c => c.id !== 'all'),
+    sortedCategories.filter(c => c.id !== 'all' && isActiveMenuCategory(c)),
     [sortedCategories]
   )
 

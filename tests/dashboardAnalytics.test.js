@@ -176,6 +176,27 @@ test('dashboard analytics keep category context for soft-deleted menu items', ()
   assert.equal(rows.find(row => row.name === 'Kebab').revenue, 50000)
 })
 
+test('dashboard analytics keep historical category context after category archival', () => {
+  const archivedCategoryMap = {
+    ...categoryMap,
+    kebab: {
+      ...categoryMap.kebab,
+      hidden: true,
+      waiter_hidden: true,
+      deleted_at: '2026-08-01T10:00:00.000Z',
+    },
+  }
+  const rows = getDashboardSalesByCategory(
+    getDashboardPeriodOrders(orders, 'today', now),
+    menuItemMap,
+    archivedCategoryMap,
+    'en'
+  )
+
+  assert.deepEqual(rows.map(row => row.name), ['Kebab', 'Drinks'])
+  assert.equal(rows.find(row => row.name === 'Kebab').revenue, 50000)
+})
+
 test('dashboard period change from 7 days to month updates all widgets to month data', () => {
   const month = analyticsFor('month')
 

@@ -11,21 +11,15 @@ import {
 } from '../api/telegram/_lib/orderStatusMessages.js'
 import { hasCompleteOrderItemCostCoverage } from '../api/telegram/order-status.js'
 
-test('completed order profit requires cost coverage for every legacy item', () => {
-  const currentCosts = new Map([
-    ['legacy-covered', { menu_item_id: 'legacy-covered', cost_price: 20_000 }],
-  ])
-
+test('completed order profit requires immutable cost snapshots for every sold item', () => {
   assert.equal(hasCompleteOrderItemCostCoverage([
     { menu_item_id: 'snapshotted', cost_price: 0 },
     { menu_item_id: 'legacy-covered', cost_price: null },
-  ], currentCosts), true)
+  ]), false)
   assert.equal(hasCompleteOrderItemCostCoverage([
-    { menu_item_id: 'legacy-missing', cost_price: null },
-  ], currentCosts), false)
-  assert.equal(hasCompleteOrderItemCostCoverage([
-    { name: 'Unknown legacy item', cost_price: null },
-  ], currentCosts), false)
+    { menu_item_id: 'snapshotted-zero', cost_price: 0 },
+    { menu_item_id: 'snapshotted-positive', cost_price: 20_000 },
+  ]), true)
 })
 
 test('Telegram completed order names include the selected Qurutoba portion', () => {

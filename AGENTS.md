@@ -142,8 +142,10 @@ These bugs were recently fixed and are now protected by tests:
    - `order_items.cost_price` is filled by a database trigger when an item is sold.
    - The trigger snapshots the selected variant cost when configured, otherwise the parent item cost.
    - Profit is paid revenue minus non-cancelled sold-item cost via `src/lib/profit.js`.
+   - Saved order-item selling prices and real-cost snapshots are immutable reporting inputs. Later edits to `price`, `old_price`, parent cost, or variant cost affect only order items created after the edit and must never change previous revenue, Net Profit, reports, or analytics.
+   - Product and category deletion is archival. Archived lookup rows remain available to historical dish/category reports, and database triggers reject physical catalog deletion.
    - Product-editor profit margin is `(selling price - real cost) / selling price`; it is a live preview and is not persisted.
-   - Legacy order items with no snapshot may fall back to the selected current protected variant cost, then the parent cost; explicit zero snapshots remain zero.
+   - Migration `114` freezes missing legacy costs once. Runtime reporting never falls back to the current menu cost; missing coverage is shown as unavailable until the migration is applied.
 
 12. Employee fines must reduce payroll liability without becoming cash expenses.
    - Fine records live in `employee_salary_fines` and require a non-empty reason.
@@ -272,6 +274,12 @@ Run migrations in order. Important recent files:
 
 - `supabase/113_salary_notification_attempt_tracking.sql`
   Queues delivery tracking at salary-operation insert time, backfills missing post-configuration attempts, and adds the explicit `not_attempted` status.
+
+- `supabase/114_freeze_historical_order_prices_and_costs.sql`
+  Permanently backfills missing sold-item costs, makes future cost snapshots non-null, and removes current-menu cost fallbacks from the Accounting summary.
+
+- `supabase/115_archive_menu_catalog_deletions.sql`
+  Archives removed categories and blocks physical product/category deletion so historical report context cannot disappear.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

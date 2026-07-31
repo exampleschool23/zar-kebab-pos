@@ -1,11 +1,5 @@
 import { getOrderRevenueTotal, getSoldOrderItems } from './analytics.js'
 
-function menuItemFor(menuItemMap, menuItemId) {
-  if (!menuItemMap || !menuItemId) return null
-  if (menuItemMap instanceof Map) return menuItemMap.get(menuItemId) || null
-  return menuItemMap[menuItemId] || null
-}
-
 function normalizedCost(value) {
   if (value == null || value === '') return null
   const amount = Number(value)
@@ -24,48 +18,17 @@ export function getSaleProfitSummary(price, cost) {
   }
 }
 
-function getSelectedVariantCost(item, menuItem) {
-  const variantCosts = menuItem?.variant_costs ?? menuItem?.variantCosts
-  if (!variantCosts || typeof variantCosts !== 'object' || Array.isArray(variantCosts)) return null
-
-  const selectedOptions = item?.selected_options ?? item?.selectedOptions
-  if (!selectedOptions || typeof selectedOptions !== 'object' || Array.isArray(selectedOptions)) return null
-
-  for (const selectedOptionId of Object.values(selectedOptions)) {
-    const id = String(selectedOptionId ?? '')
-    if (!Object.prototype.hasOwnProperty.call(variantCosts, id)) continue
-    const cost = normalizedCost(variantCosts[id])
-    if (cost != null) return cost
-  }
-  return null
-}
-
-export function getOrderItemCostPrice(item, menuItemMap = null) {
+export function getOrderItemCostPrice(item) {
   const snapshotCost = normalizedCost(
     item?.cost_price ?? item?.costPrice ?? item?.real_cost ?? item?.realCost
   )
-  if (snapshotCost != null) return snapshotCost
-
-  const menuItem = menuItemFor(menuItemMap, item?.menu_item_id ?? item?.menuItemId)
-  const selectedVariantCost = getSelectedVariantCost(item, menuItem)
-  if (selectedVariantCost != null) return selectedVariantCost
-  return normalizedCost(
-    menuItem?.cost_price ?? menuItem?.costPrice ?? menuItem?.real_cost ?? menuItem?.realCost
-  ) || 0
+  return snapshotCost ?? 0
 }
 
-export function hasOrdersCostCoverage(orders, menuItemMap = null) {
+export function hasOrdersCostCoverage(orders) {
   return (orders || []).every(order => getSoldOrderItems(order).every(item => {
-    const snapshotCost = normalizedCost(
-      item?.cost_price ?? item?.costPrice ?? item?.real_cost ?? item?.realCost
-    )
-    if (snapshotCost != null) return true
-
-    const menuItem = menuItemFor(menuItemMap, item?.menu_item_id ?? item?.menuItemId)
-    if (!menuItem) return false
-    if (getSelectedVariantCost(item, menuItem) != null) return true
     return normalizedCost(
-      menuItem?.cost_price ?? menuItem?.costPrice ?? menuItem?.real_cost ?? menuItem?.realCost
+      item?.cost_price ?? item?.costPrice ?? item?.real_cost ?? item?.realCost
     ) != null
   }))
 }
@@ -73,7 +36,7 @@ export function hasOrdersCostCoverage(orders, menuItemMap = null) {
 export function getOrderCostTotal(order, menuItemMap = null) {
   return Math.round(getSoldOrderItems(order).reduce((sum, item) => {
     const quantity = Math.max(0, Number(item?.quantity) || 1)
-    return sum + getOrderItemCostPrice(item, menuItemMap) * quantity
+    return sum + getOrderItemCostPrice(item) * quantity
   }, 0))
 }
 

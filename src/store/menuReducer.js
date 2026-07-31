@@ -103,8 +103,22 @@ export function menuReducer(state, action) {
     case 'UPDATE_CATEGORY':
       return { ...state, categories: state.categories.map(c => c.id === action.payload.id ? action.payload : c) }
 
-    case 'DELETE_CATEGORY':
-      return { ...state, categories: state.categories.filter(c => c.id !== action.payload) }
+    case 'DELETE_CATEGORY': {
+      const deletedAt = action.meta?.deleted_at || action.meta?.deletedAt || new Date().toISOString()
+      return {
+        ...state,
+        categories: state.categories.map(category =>
+          category.id === action.payload
+            ? {
+                ...category,
+                hidden: true,
+                waiter_hidden: true,
+                deleted_at: deletedAt,
+              }
+            : category
+        ),
+      }
+    }
 
     case 'REORDER_CATEGORY': {
       if (Array.isArray(action.payload?.updates)) {

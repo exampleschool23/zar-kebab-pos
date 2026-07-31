@@ -8,6 +8,10 @@ const migration = readFileSync(
   new URL('../supabase/109_accounting_paid_order_summary.sql', import.meta.url),
   'utf8'
 )
+const immutableSnapshotsMigration = readFileSync(
+  new URL('../supabase/114_freeze_historical_order_prices_and_costs.sql', import.meta.url),
+  'utf8'
+)
 
 test('Accounting summary loader uses one RPC and returns no complete order rows', async () => {
   const calls = []
@@ -50,4 +54,20 @@ test('Accounting summary migration aggregates protected financial fields with pe
   assert.match(migration, /public\.order_payments/)
   assert.match(migration, /'payment_method_income'/)
   assert.match(migration, /grant execute on function public\.get_accounting_paid_order_summary\(date, date\)/)
+})
+
+test('Accounting freezes legacy costs and never joins current menu costs for historical profit', () => {
+  assert.match(immutableSnapshotsMigration, /update public\.order_items as sold_item/)
+  assert.match(immutableSnapshotsMigration, /where sold_item\.cost_price is null/)
+  assert.match(immutableSnapshotsMigration, /disable trigger guard_paid_order_items/)
+  assert.match(immutableSnapshotsMigration, /enable trigger guard_paid_order_items/)
+  assert.match(immutableSnapshotsMigration, /exception[\s\S]*when others[\s\S]*enable trigger guard_paid_order_items/)
+  assert.match(immutableSnapshotsMigration, /paid_order_items_guard_state[\s\S]*trigger\.tgenabled/)
+  assert.match(immutableSnapshotsMigration, /paid_order_items_guard_state = 'R'[\s\S]*enable replica trigger/)
+  assert.match(immutableSnapshotsMigration, /paid_order_items_guard_state = 'A'[\s\S]*enable always trigger/)
+  assert.match(immutableSnapshotsMigration, /before insert on public\.order_items|snapshot_order_item_cost/)
+  assert.match(immutableSnapshotsMigration, /alter column cost_price set not null/)
+  assert.match(immutableSnapshotsMigration, /greatest\(0, sold_item\.cost_price::numeric\)/)
+  assert.doesNotMatch(immutableSnapshotsMigration, /left join public\.menu_item_costs/)
+  assert.match(immutableSnapshotsMigration, /coalesce\(orders\.total, 0\)/)
 })

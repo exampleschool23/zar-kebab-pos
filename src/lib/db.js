@@ -1362,8 +1362,14 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'DELETE_CATEGORY': {
-      const { error } = await supabase.from('menu_categories').delete().eq('id', action.payload)
+      const deletedAt = new Date().toISOString()
+      const { error } = await supabase.from('menu_categories').update({
+        hidden: true,
+        waiter_hidden: true,
+        deleted_at: deletedAt,
+      }).eq('id', action.payload)
       if (error) throw error
+      action.meta = { ...(action.meta || {}), deleted_at: deletedAt }
       break
     }
 

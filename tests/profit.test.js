@@ -81,19 +81,19 @@ test('order profit margin uses recognized revenue with service loyalty and cance
   assert.equal(getOrderProfitMarginPct({ payment_status: 'paid', total: 0, items: [] }), null)
 })
 
-test('legacy order items fall back to the protected current menu cost', () => {
+test('an order with no captured cost never reads a later current menu cost', () => {
   const menuItemMap = new Map([
     ['kebab', { id: 'kebab', cost_price: 21_000 }],
   ])
   const legacyItem = { menu_item_id: 'kebab', quantity: 3, price: 33_333, cost_price: null, status: 'served' }
   const order = { payment_status: 'paid', total: 99_999, service_rate_pct: 0, items: [legacyItem] }
 
-  assert.equal(getOrderItemCostPrice(legacyItem, menuItemMap), 21_000)
-  assert.equal(getOrderCostTotal(order, menuItemMap), 63_000)
-  assert.equal(getOrderNetProfit(order, menuItemMap), 36_999)
+  assert.equal(getOrderItemCostPrice(legacyItem, menuItemMap), 0)
+  assert.equal(getOrderCostTotal(order, menuItemMap), 0)
+  assert.equal(getOrderNetProfit(order, menuItemMap), 99_999)
 })
 
-test('legacy variant sales use the selected protected variant cost before the parent cost', () => {
+test('captured variant cost stays fixed after both variant and parent costs change', () => {
   const menuItemMap = {
     qurutoba: {
       id: 'qurutoba',
@@ -107,22 +107,16 @@ test('legacy variant sales use the selected protected variant cost before the pa
   const selectedVariant = {
     menu_item_id: 'qurutoba',
     selected_options: { variants: 'two_three_people' },
-    cost_price: null,
-  }
-  const unknownVariant = {
-    menu_item_id: 'qurutoba',
-    selected_options: { variants: 'four_five_people' },
-    cost_price: null,
+    cost_price: 65_000,
   }
 
-  assert.equal(getOrderItemCostPrice(selectedVariant, menuItemMap), 72_000)
-  assert.equal(getOrderItemCostPrice(unknownVariant, menuItemMap), 40_000)
+  assert.equal(getOrderItemCostPrice(selectedVariant, menuItemMap), 65_000)
   assert.equal(getOrderProfitMarginPct({
     payment_status: 'paid',
     service_rate_pct: 0,
     total: 145_000,
     items: [{ ...selectedVariant, quantity: 1, price: 145_000, status: 'served' }],
-  }, menuItemMap), 50.3)
+  }, menuItemMap), 55.2)
 })
 
 test('immutable sale snapshots still win after a variant cost changes', () => {
@@ -136,6 +130,65 @@ test('immutable sale snapshots still win after a variant cost changes', () => {
   }
 
   assert.equal(getOrderItemCostPrice(item, menuItemMap), 65_000)
+})
+
+test('menu price and real-cost changes affect future orders without rewriting previous profit', () => {
+  const previousOrder = {
+    payment_status: 'paid',
+    total: 50_000,
+    service_rate_pct: 0,
+    items: [{
+      menu_item_id: 'kebab',
+      quantity: 1,
+      price: 50_000,
+      cost_price: 18_000,
+      status: 'served',
+    }],
+  }
+  const futureOrder = {
+    payment_status: 'paid',
+    total: 70_000,
+    service_rate_pct: 0,
+    items: [{
+      menu_item_id: 'kebab',
+      quantity: 1,
+      price: 70_000,
+      cost_price: 25_000,
+      status: 'served',
+    }],
+  }
+  const editedMenu = {
+    kebab: { price: 70_000, old_price: 60_000, cost_price: 25_000 },
+  }
+
+  assert.equal(getOrderNetProfit(previousOrder, editedMenu), 32_000)
+  assert.equal(getOrderNetProfit(futureOrder, editedMenu), 45_000)
+})
+
+test('archiving or removing current menu lookup data cannot change historical profit', () => {
+  const order = {
+    payment_status: 'paid',
+    total: 50_000,
+    service_rate_pct: 0,
+    items: [{
+      menu_item_id: 'retired-kebab',
+      quantity: 1,
+      price: 50_000,
+      cost_price: 18_000,
+      status: 'served',
+    }],
+  }
+  const archivedMenu = {
+    'retired-kebab': {
+      id: 'retired-kebab',
+      cost_price: 99_000,
+      available: false,
+      deleted_at: '2026-08-01T10:00:00.000Z',
+    },
+  }
+
+  assert.equal(getOrderNetProfit(order, archivedMenu), 32_000)
+  assert.equal(getOrderNetProfit(order, {}), 32_000)
 })
 
 test('explicit zero snapshots stay historical and cancelled items do not reduce profit', () => {
@@ -166,7 +219,7 @@ test('profit coverage rejects unknown sold-item costs without rejecting cancelle
   assert.equal(hasOrdersCostCoverage([order]), false)
   assert.equal(hasOrdersCostCoverage([order], {
     legacy: { cost_price: 20_000 },
-  }), true)
+  }), false)
   assert.equal(hasOrdersCostCoverage([{
     ...order,
     items: [{ ...soldItem, cost_price: 0 }, cancelledItem],

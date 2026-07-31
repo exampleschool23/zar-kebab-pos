@@ -2,11 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  isActiveMenuCategory,
   isActiveMenuItem,
   isCashierOnlyItem,
   isCashierQuickItem,
   isCustomerMenuCategory,
   isCustomerMenuItem,
+  isDeletedMenuCategory,
   isDeletedMenuItem,
   isHiddenMenuCategory,
   isPublicHiddenMenuItem,
@@ -66,6 +68,19 @@ test('hidden menu categories are excluded from customer menus', () => {
   assert.equal(isCustomerMenuCategory({ hidden: true }), false)
   assert.equal(isCustomerMenuCategory({ hidden: false }), true)
   assert.equal(isCustomerMenuCategory({}), true)
+})
+
+test('archived categories stay out of active menus while retaining report context', () => {
+  const archived = {
+    hidden: false,
+    waiter_hidden: false,
+    deleted_at: '2026-08-01T10:00:00.000Z',
+  }
+
+  assert.equal(isDeletedMenuCategory(archived), true)
+  assert.equal(isActiveMenuCategory(archived), false)
+  assert.equal(isCustomerMenuCategory(archived), false)
+  assert.equal(isWaiterMenuCategory(archived), false)
 })
 
 test('waiter-hidden categories are excluded from waiter ordering only', () => {

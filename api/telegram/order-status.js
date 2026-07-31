@@ -51,50 +51,17 @@ function isMissingProfitSchema(error) {
   return message.includes('cost_price') || message.includes('menu_item_costs') || message.includes('schema cache')
 }
 
-export function hasCompleteOrderItemCostCoverage(items = [], menuItemMap = new Map()) {
-  return items
-    .filter(item => item?.cost_price == null)
-    .every(item => item?.menu_item_id && menuItemMap.has(item.menu_item_id))
+export function hasCompleteOrderItemCostCoverage(items = []) {
+  return items.every(item => item?.cost_price != null)
 }
 
-async function loadCurrentMenuItemCosts(supabase, items = []) {
-  const menuItemIds = [...new Set(items
-    .filter(item => item?.cost_price == null)
-    .map(item => item?.menu_item_id)
-    .filter(Boolean))]
-  if (menuItemIds.length === 0) {
-    const menuItemMap = new Map()
-    return { available: hasCompleteOrderItemCostCoverage(items, menuItemMap), menuItemMap }
+async function loadCompletedOrderProfit(_supabase, order) {
+  if (!hasCompleteOrderItemCostCoverage(order?.items || [])) {
+    return { netProfit: null, marginPct: null }
   }
-
-  let { data, error } = await supabase
-    .from('menu_item_costs')
-    .select('menu_item_id, cost_price, variant_costs')
-    .in('menu_item_id', menuItemIds)
-  if (error && isMissingProfitSchema(error)) {
-    ;({ data, error } = await supabase
-      .from('menu_item_costs')
-      .select('menu_item_id, cost_price')
-      .in('menu_item_id', menuItemIds))
-  }
-  if (error) {
-    if (isMissingProfitSchema(error)) return { available: false, menuItemMap: new Map() }
-    throw error
-  }
-
-  const menuItemMap = new Map((data || []).map(row => [row.menu_item_id, row]))
   return {
-    available: hasCompleteOrderItemCostCoverage(items, menuItemMap),
-    menuItemMap,
-  }
-}
-
-async function loadCompletedOrderProfit(supabase, order) {
-  const { available, menuItemMap } = await loadCurrentMenuItemCosts(supabase, order?.items || [])
-  if (!available) return { netProfit: null, marginPct: null }
-  return {
-    netProfit: getOrderNetProfit(order, menuItemMap),
-    marginPct: getOrderProfitMarginPct(order, menuItemMap),
+    netProfit: getOrderNetProfit(order),
+    marginPct: getOrderProfitMarginPct(order),
   }
 }
 
@@ -119,13 +86,11 @@ async function loadPaidTotalsForRestaurantDay(supabase, paidAt) {
   const orders = data || []
   const revenueTotal = orders.reduce((sum, row) => sum + getOrderRevenueTotal(row), 0)
   const loyaltyIncomeTotal = orders.reduce((sum, row) => sum + getOrderLoyaltyIncomeTotal(row), 0)
-  const { available, menuItemMap } = await loadCurrentMenuItemCosts(
-    supabase,
-    orders.flatMap(order => order.items || [])
-  )
-  if (!available) return { revenueTotal, loyaltyIncomeTotal, netProfitTotal: null, profitMarginPct: null }
+  if (!hasCompleteOrderItemCostCoverage(orders.flatMap(order => order.items || []))) {
+    return { revenueTotal, loyaltyIncomeTotal, netProfitTotal: null, profitMarginPct: null }
+  }
 
-  const costTotal = getOrdersCostTotal(orders, menuItemMap)
+  const costTotal = getOrdersCostTotal(orders)
   const profitSummary = getSaleProfitSummary(revenueTotal, costTotal)
   return {
     revenueTotal,

@@ -68,6 +68,14 @@ export function isHiddenMenuCategory(category) {
   return !!(category?.hidden || category?.is_hidden || category?.isHidden)
 }
 
+export function isDeletedMenuCategory(category) {
+  return !!(category?.deleted_at || category?.deletedAt || category?.is_deleted || category?.isDeleted)
+}
+
+export function isActiveMenuCategory(category) {
+  return !!category && !isDeletedMenuCategory(category)
+}
+
 export function isWaiterHiddenMenuCategory(category) {
   return !!(
     category?.waiter_hidden ||
@@ -78,11 +86,15 @@ export function isWaiterHiddenMenuCategory(category) {
 }
 
 export function isCustomerMenuCategory(category, date = new Date()) {
-  return !isHiddenMenuCategory(category) && isWithinMenuTimeWindow(category, date)
+  return isActiveMenuCategory(category) &&
+    !isHiddenMenuCategory(category) &&
+    isWithinMenuTimeWindow(category, date)
 }
 
 export function isWaiterMenuCategory(category, date = new Date()) {
-  return !isWaiterHiddenMenuCategory(category) && isWithinMenuTimeWindow(category, date)
+  return isActiveMenuCategory(category) &&
+    !isWaiterHiddenMenuCategory(category) &&
+    isWithinMenuTimeWindow(category, date)
 }
 
 export function isDeletedMenuItem(item) {
