@@ -123,6 +123,123 @@ const EMPLOYEE_EVENT_COPY = {
   },
 }
 
+const SALARY_RATE_COPY = {
+  uz: {
+    title: 'Maosh o\u2018zgarishi',
+    raiseTitle: 'Ajoyib yangilik — maoshingiz oshdi!',
+    greeting: name => `Assalomu alaykum, ${name}!`,
+    employeeRecorded: 'Maoshingiz o\u2018zgartirildi.',
+    raiseRecorded: 'Tabriklaymiz! Mehnatingiz qadrlanib, maoshingiz oshirildi. 🎉',
+    raiseThanks: 'Zar Kebab jamoasiga qo\u2018shayotgan hissangiz uchun katta rahmat! Yangi yutuqlar sari birga davom etamiz. 🌟',
+    groupRecorded: 'Xodimning maoshi o\u2018zgartirildi.',
+    employee: 'Xodim',
+    previousRate: 'Oldingi maosh',
+    newRate: 'Yangi maosh',
+    effectiveFrom: 'Amal qilish sanasi',
+    note: 'Izoh',
+    due: 'To\u2018lanishi kerak',
+    createdBy: 'O\u2018zgartirdi',
+    daily: 'kunlik',
+    monthly: 'oylik',
+  },
+  ru: {
+    title: 'Изменение зарплаты',
+    raiseTitle: 'Отличная новость — ваша зарплата повышена!',
+    greeting: name => `Здравствуйте, ${name}!`,
+    employeeRecorded: 'Ваша ставка зарплаты изменена.',
+    raiseRecorded: 'Поздравляем! Ваш труд и вклад в команду получили заслуженное признание. 🎉',
+    raiseThanks: 'Спасибо, что развиваетесь вместе с Zar Kebab. Желаем новых успехов и достижений! 🌟',
+    groupRecorded: 'Ставка зарплаты сотрудника изменена.',
+    employee: 'Сотрудник',
+    previousRate: 'Предыдущая зарплата',
+    newRate: 'Новая зарплата',
+    effectiveFrom: 'Действует с',
+    note: 'Примечание',
+    due: 'К выплате',
+    createdBy: 'Изменил',
+    daily: 'дневная',
+    monthly: 'месячная',
+  },
+  en: {
+    title: 'Salary change',
+    raiseTitle: 'Great news — your salary has increased!',
+    greeting: name => `Hello, ${name}!`,
+    employeeRecorded: 'Your salary rate was changed.',
+    raiseRecorded: 'Congratulations! Your hard work and contribution to the team have been recognized. 🎉',
+    raiseThanks: 'Thank you for growing with Zar Kebab. Here\u2019s to even more success and achievements ahead! 🌟',
+    groupRecorded: 'An employee salary rate was changed.',
+    employee: 'Employee',
+    previousRate: 'Previous salary',
+    newRate: 'New salary',
+    effectiveFrom: 'Effective from',
+    note: 'Note',
+    due: 'Salary due',
+    createdBy: 'Changed by',
+    daily: 'daily',
+    monthly: 'monthly',
+  },
+}
+
+function formatSalaryRate(rate, copy) {
+  const unit = rate?.rate_unit === 'monthly' ? copy.monthly : copy.daily
+  return `${formatSalaryNotificationAmount(rate?.amount)} UZS (${unit})`
+}
+
+function appendSalaryRateDetails(lines, rate, copy) {
+  if (rate?.previous_rate?.amount) {
+    lines.push(`<b>${copy.previousRate}:</b> ${escapeTelegramHtml(formatSalaryRate(rate.previous_rate, copy))}`)
+  }
+  lines.push(
+    `<b>${copy.newRate}:</b> ${escapeTelegramHtml(formatSalaryRate(rate, copy))}`,
+    `<b>${copy.effectiveFrom}:</b> ${escapeTelegramHtml(formatDateOnly(rate?.effective_from, '-'))}`
+  )
+  if (String(rate?.note || '').trim()) {
+    lines.push(`<b>${copy.note}:</b> ${escapeTelegramHtml(rate.note)}`)
+  }
+}
+
+export function buildSalaryRateGroupMessage(rate, remainingDue = 0, language = 'ru') {
+  const lang = normalizeSalaryNotificationLanguage(language)
+  const copy = SALARY_RATE_COPY[lang]
+  const lines = [
+    `📈 <b>${copy.title}</b>`,
+    '',
+    copy.groupRecorded,
+    '',
+    `<b>${copy.employee}:</b> ${escapeTelegramHtml(rate?.employee_name || '-')}`,
+  ]
+  appendSalaryRateDetails(lines, rate, copy)
+  lines.push(
+    `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,
+    `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(rate?.created_by_name || '-')}`
+  )
+  return lines.join('\n')
+}
+
+export function buildEmployeeSalaryRateMessage(rate, remainingDue = 0, language = 'ru') {
+  const lang = normalizeSalaryNotificationLanguage(language)
+  const copy = SALARY_RATE_COPY[lang]
+  const employeeName = escapeTelegramHtml(rate?.employee_name || '-')
+  const isIncrease = rate?.previous_rate?.rate_unit === rate?.rate_unit
+    && Number(rate?.amount || 0) > Number(rate?.previous_rate?.amount || 0)
+  const lines = [
+    `${isIncrease ? '🎉' : '📈'} <b>${isIncrease ? copy.raiseTitle : copy.title}</b>`,
+    '',
+    `<b>${copy.greeting(employeeName)}</b>`,
+    isIncrease ? copy.raiseRecorded : copy.employeeRecorded,
+    '',
+  ]
+  appendSalaryRateDetails(lines, rate, copy)
+  lines.push(
+    `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,
+    `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(rate?.created_by_name || '-')}`
+  )
+  if (isIncrease) {
+    lines.push('', copy.raiseThanks)
+  }
+  return lines.join('\n')
+}
+
 export function getEmployeePaymentConfirmationCopy(language = 'ru') {
   const lang = normalizeSalaryNotificationLanguage(language)
   return {

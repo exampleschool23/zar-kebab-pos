@@ -3,9 +3,11 @@ import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { buildEmployeeFineMessage } from './_lib/fineMessages.js'
 import {
   buildEmployeePaymentMessage,
+  buildEmployeeSalaryRateMessage,
   buildEmployeeSalaryEventMessage,
   buildSalaryGroupEventMessage,
   buildSalaryPaymentGroupMessage,
+  buildSalaryRateGroupMessage,
   getEmployeePaymentConfirmationCopy,
 } from './_lib/paymentMessages.js'
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
@@ -32,6 +34,10 @@ const GROUP_EVENT_CONFIG = {
     table: 'employee_salary_absences',
     select: 'id, salary_profile_id, absence_date, note, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)',
   },
+  rate: {
+    table: 'employee_salary_rates',
+    select: 'id, salary_profile_id, effective_from, amount, rate_unit, note, created_by, created_at, salary_profile:employee_salary_profiles(employee_name)',
+  },
 }
 
 function normalizeRole(role) {
@@ -49,7 +55,7 @@ async function requireExpensesWriteAccess(req) {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, status, email, feature_access')
+    .select('role, status, full_name, email, feature_access')
     .eq('id', user.id)
     .maybeSingle()
   if (profileError) throw profileError
@@ -64,7 +70,11 @@ async function requireExpensesWriteAccess(req) {
     throw Object.assign(new Error('Forbidden'), { status: 403 })
   }
 
-  return { supabase, user }
+  return {
+    supabase,
+    user,
+    actorName: profile?.full_name || profile?.email || user.email || '',
+  }
 }
 
 async function loadSalaryGroupTarget(supabase) {
@@ -93,7 +103,7 @@ async function loadSalaryGroupTarget(supabase) {
   }
 }
 
-async function loadOwnedSalaryEvent(supabase, user, type, eventId) {
+async function loadOwnedSalaryEvent(supabase, user, type, eventId, actorName = '') {
   const config = GROUP_EVENT_CONFIG[type]
   if (!config) throw Object.assign(new Error('Unsupported salary event type'), { status: 400 })
   const { data, error } = await supabase
@@ -105,9 +115,27 @@ async function loadOwnedSalaryEvent(supabase, user, type, eventId) {
   if (!data || data.created_by !== user.id) {
     throw Object.assign(new Error('Salary event not found'), { status: 404 })
   }
+  let previousRate = null
+  if (type === 'rate') {
+    const { data: previous, error: previousError } = await supabase
+      .from('employee_salary_rates')
+      .select('id, amount, rate_unit, effective_from, created_at')
+      .eq('salary_profile_id', data.salary_profile_id)
+      .neq('id', data.id)
+      .lte('effective_from', data.effective_from)
+      .lte('created_at', data.created_at)
+      .order('effective_from', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (previousError) throw previousError
+    previousRate = previous || null
+  }
   return {
     ...data,
     employee_name: data.salary_profile?.employee_name || '',
+    created_by_name: data.created_by_name || actorName,
+    previous_rate: previousRate,
   }
 }
 
@@ -215,7 +243,9 @@ async function deliverSalaryGroupEvent(supabase, type, event, remainingDue) {
   }
 
   try {
-    const text = buildSalaryGroupEventMessage(type, event, remainingDue, target.language)
+    const text = type === 'rate'
+      ? buildSalaryRateGroupMessage(event, remainingDue, target.language)
+      : buildSalaryGroupEventMessage(type, event, remainingDue, target.language)
     const response = await sendTelegramMessage(target.chatId, text)
     const sentAt = new Date().toISOString()
     const telegramMessageId = getTelegramMessageId(response)
@@ -312,12 +342,18 @@ async function deliverEmployeeSalaryEvent(supabase, type, event, remainingDue) {
   try {
     const text = type === 'fine'
       ? buildEmployeeFineMessage(event)
-      : buildEmployeeSalaryEventMessage(
-          type,
-          event,
-          remainingDue,
-          employeeLink.preferred_language
-        )
+      : type === 'rate'
+        ? buildEmployeeSalaryRateMessage(
+            event,
+            remainingDue,
+            employeeLink.preferred_language
+          )
+        : buildEmployeeSalaryEventMessage(
+            type,
+            event,
+            remainingDue,
+            employeeLink.preferred_language
+          )
     const response = await sendTelegramMessage(employeeChatId, text)
     const sentAt = new Date().toISOString()
     const telegramMessageId = getTelegramMessageId(response)
@@ -363,8 +399,27 @@ function normalizeDeliverySettlement(settled) {
       }
 }
 
-async function notifySalaryEvent(supabase, user, type, eventId) {
-  const event = await loadOwnedSalaryEvent(supabase, user, type, eventId)
+async function requireQueuedSalaryRateDelivery(supabase, eventId) {
+  const { data, error } = await supabase
+    .from('employee_salary_group_notification_deliveries')
+    .select('id')
+    .eq('event_type', 'rate')
+    .eq('event_id', eventId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) {
+    throw Object.assign(
+      new Error('Initial salary setup is not a salary-change notification'),
+      { status: 409 }
+    )
+  }
+}
+
+async function notifySalaryEvent(supabase, user, actorName, type, eventId) {
+  const event = await loadOwnedSalaryEvent(supabase, user, type, eventId, actorName)
+  if (type === 'rate') {
+    await requireQueuedSalaryRateDelivery(supabase, event.id)
+  }
   const salaryProfiles = await loadSalaryProfiles(supabase, [event.salary_profile_id])
   const salaryProfile = salaryProfiles.get(event.salary_profile_id)
   const remainingDue = salaryProfile
@@ -723,23 +778,34 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
   try {
-    const { type, fineId, paymentId, bonusId, absenceId } = await readJson(req)
+    const { type, fineId, paymentId, bonusId, absenceId, rateId } = await readJson(req)
     const notificationType = type
-      || (paymentId ? 'payment' : fineId ? 'fine' : bonusId ? 'bonus' : absenceId ? 'absence' : '')
+      || (paymentId
+        ? 'payment'
+        : fineId
+          ? 'fine'
+          : bonusId
+            ? 'bonus'
+            : absenceId
+              ? 'absence'
+              : rateId
+                ? 'rate'
+                : '')
     const eventIds = {
       payment: paymentId,
       fine: fineId,
       bonus: bonusId,
       absence: absenceId,
+      rate: rateId,
     }
-    if (!['fine', 'payment', 'bonus', 'absence'].includes(notificationType)) {
-      return json(res, 400, { error: 'type must be payment, fine, bonus, or absence' })
+    if (!['fine', 'payment', 'bonus', 'absence', 'rate'].includes(notificationType)) {
+      return json(res, 400, { error: 'type must be payment, fine, bonus, absence, or rate' })
     }
     if (!eventIds[notificationType]) {
       return json(res, 400, { error: `${notificationType}Id is required` })
     }
 
-    const { supabase, user } = await requireExpensesWriteAccess(req)
+    const { supabase, user, actorName } = await requireExpensesWriteAccess(req)
     let result
     if (notificationType === 'payment') {
       result = await notifyPayment(supabase, user, paymentId)
@@ -747,6 +813,7 @@ export default async function handler(req, res) {
       result = await notifySalaryEvent(
         supabase,
         user,
+        actorName,
         notificationType,
         eventIds[notificationType]
       )

@@ -89,8 +89,11 @@ from the salary-group delivery.
 Run `supabase/113_salary_notification_attempt_tracking.sql` so every saved
 payment, bonus, fine, or absence immediately creates a delivery-status row,
 even when a stale browser or failed request never reaches Telegram. The
-Salaries page combines those records under Payment notification status, five
-at a time, and allows unsent records to be retried.
+Salaries page combines those records under Salary notification status, five
+at a time, and allows unsent records to be retried. Run
+`supabase/116_salary_rate_change_telegram_notifications.sql` to add the same
+tracked private/group delivery for genuine salary-rate changes; an employee's
+first salary rate is intentionally treated as setup rather than a change.
 
 ### Daily employee salary notifications
 

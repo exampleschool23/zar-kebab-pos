@@ -189,9 +189,10 @@ These bugs were recently fixed and are now protected by tests:
 
 18. Every saved salary operation must immediately have Telegram delivery tracking.
    - Migration `113` queues a `not_attempted` delivery record when a payment, bonus, fine, or absence is inserted.
+   - Migration `116` adds the same database-first tracking for effective-dated salary-rate changes, while deliberately excluding an employee's first/initial rate.
    - The authenticated employee-notification endpoint advances that record through pending, sent, failed, skipped, or confirmed states for the private employee chat and salary group independently.
    - This database-first tracking prevents stale browsers and failed API requests from leaving no trace.
-   - The Salaries page combines every salary-operation delivery under Payment notification status, five records per page, with retry controls for unsent destinations.
+   - The Salaries page combines every salary-operation delivery under Salary notification status, five records per page, with retry controls for unsent destinations.
 
 19. Salary-payment Telegram delivery has two independent destinations.
    - The private employee message keeps its receipt-confirmation button.
@@ -200,9 +201,10 @@ These bugs were recently fixed and are now protected by tests:
    - Employee and group delivery statuses are recorded separately so either destination can fail or retry without duplicating the other.
 
 20. Every recorded salary operation must notify the dedicated salary group.
-   - Payment, bonus, fine, and absence records notify both the salary group and the linked employee.
-   - All four types reuse `api/telegram/employee-notification.js` so the Vercel Hobby deployment stays within its function limit.
-   - Bonus, fine, and absence employee/group delivery is duplicate-safe and independently auditable through `employee_salary_group_notification_deliveries`.
+   - Payment, bonus, fine, absence, and salary-rate change records notify both the salary group and the linked employee.
+   - All five types reuse `api/telegram/employee-notification.js` so the Vercel Hobby deployment stays within its function limit.
+   - Bonus, fine, absence, and rate-change employee/group delivery is duplicate-safe and independently auditable through `employee_salary_group_notification_deliveries`.
+   - A rate-change message includes the applicable previous rate when available, the new amount and unit, and its effective date; initial salary setup is not treated as a change.
    - A Telegram notification is marked sent only after Telegram returns a message id.
 
 ## Database Migrations
@@ -280,6 +282,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/115_archive_menu_catalog_deletions.sql`
   Archives removed categories and blocks physical product/category deletion so historical report context cannot disappear.
+
+- `supabase/116_salary_rate_change_telegram_notifications.sql`
+  Adds database-first, duplicate-safe private employee and salary-group delivery tracking for genuine salary-rate changes without announcing an employee's initial rate.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

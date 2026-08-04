@@ -29,6 +29,7 @@ import {
   notifyTelegramEmployeeBonus,
   notifyTelegramEmployeeFine,
   notifyTelegramEmployeePayment,
+  notifyTelegramEmployeeRate,
 } from '../lib/telegramNotifications'
 
 const FIELD = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
@@ -201,6 +202,7 @@ export default function Salaries() {
       absenceDuplicate: 'Bu xodimning tanlangan sanadagi yo‘qligi allaqachon belgilangan.',
       createdMessage: 'Xodim maoshi qo‘shildi',
       rateSavedMessage: 'Yangi maosh stavkasi saqlandi',
+      rateTelegramFailed: 'Maosh stavkasi saqlandi, lekin Telegram xabarlari yuborilmadi. 116-migratsiya va yetkazib berish holatini tekshiring.',
       transactionSavedMessage: 'Operatsiya saqlandi',
       paymentTelegramFailed: 'To‘lov saqlandi, lekin Telegram xabarlari yuborilmadi.',
       transactionTelegramFailed: 'Operatsiya saqlandi, lekin Telegram xabarlari yuborilmadi.',
@@ -229,10 +231,10 @@ export default function Salaries() {
       telegramCopied: 'Telegram havolasi nusxalandi',
       telegramLinked: 'Telegram ulangan',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME sozlanmagan.',
-      telegramDeliveryTitle: 'To‘lov xabarlari holati',
-      telegramDeliveryHelp: 'To‘lov, bonus, jarima va kelmagan kun xabarlarining xodimga va guruhga yuborilishini kuzating.',
+      telegramDeliveryTitle: 'Maosh xabarlari holati',
+      telegramDeliveryHelp: 'Maosh o‘zgarishi, to‘lov, bonus, jarima va kelmagan kun xabarlarining xodimga va guruhga yuborilishini kuzating.',
       telegramDeliveryEmpty: 'Hali Telegram xabarlari yo‘q.',
-      telegramDeliveryMigration: 'Telegram xabarlari tarixi uchun 108, 110, 111, 112 va 113-migratsiyalarni ishga tushiring.',
+      telegramDeliveryMigration: 'Telegram xabarlari tarixi uchun 108, 110, 111, 112, 113 va 116-migratsiyalarni ishga tushiring.',
       telegramEmployee: 'Xodim',
       telegramSalaryGroup: 'Maosh guruhi',
       telegramRetry: 'Qayta yuborish',
@@ -307,6 +309,7 @@ export default function Salaries() {
       absenceDuplicate: 'Отсутствие этого сотрудника на выбранную дату уже отмечено.',
       createdMessage: 'Зарплата сотрудника добавлена',
       rateSavedMessage: 'Новая ставка зарплаты сохранена',
+      rateTelegramFailed: 'Ставка зарплаты сохранена, но сообщения в Telegram не отправлены. Проверьте миграцию 116 и статус доставки.',
       transactionSavedMessage: 'Операция сохранена',
       paymentTelegramFailed: 'Выплата сохранена, но сообщения в Telegram не отправлены.',
       transactionTelegramFailed: 'Операция сохранена, но сообщения в Telegram не отправлены.',
@@ -335,10 +338,10 @@ export default function Salaries() {
       telegramCopied: 'Ссылка Telegram скопирована',
       telegramLinked: 'Telegram подключён',
       telegramBotMissing: 'Не настроен VITE_TELEGRAM_BOT_USERNAME.',
-      telegramDeliveryTitle: 'Статус уведомлений о выплатах',
-      telegramDeliveryHelp: 'Проверяйте доставку выплат, бонусов, штрафов и отсутствий сотруднику и в группу.',
+      telegramDeliveryTitle: 'Статус уведомлений о зарплате',
+      telegramDeliveryHelp: 'Проверяйте доставку изменений зарплаты, выплат, бонусов, штрафов и отсутствий сотруднику и в группу.',
       telegramDeliveryEmpty: 'Уведомлений Telegram пока нет.',
-      telegramDeliveryMigration: 'Запустите миграции 108, 110, 111, 112 и 113 для истории уведомлений.',
+      telegramDeliveryMigration: 'Запустите миграции 108, 110, 111, 112, 113 и 116 для истории уведомлений.',
       telegramEmployee: 'Сотрудник',
       telegramSalaryGroup: 'Группа зарплат',
       telegramRetry: 'Отправить снова',
@@ -413,6 +416,7 @@ export default function Salaries() {
       absenceDuplicate: 'This employee is already marked absent on the selected date.',
       createdMessage: 'Employee salary added',
       rateSavedMessage: 'New salary rate saved',
+      rateTelegramFailed: 'The salary rate was saved, but Telegram messages were not sent. Check migration 116 and the delivery status.',
       transactionSavedMessage: 'Transaction saved',
       paymentTelegramFailed: 'Payment saved, but the Telegram messages were not sent.',
       transactionTelegramFailed: 'Transaction saved, but the Telegram messages were not sent.',
@@ -441,10 +445,10 @@ export default function Salaries() {
       telegramCopied: 'Telegram link copied',
       telegramLinked: 'Telegram linked',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME is not configured.',
-      telegramDeliveryTitle: 'Payment notification status',
-      telegramDeliveryHelp: 'Track payments, bonuses, fines, and absences to the employee and salary group.',
+      telegramDeliveryTitle: 'Salary notification status',
+      telegramDeliveryHelp: 'Track salary changes, payments, bonuses, fines, and absences to the employee and salary group.',
       telegramDeliveryEmpty: 'No Telegram notifications yet.',
-      telegramDeliveryMigration: 'Run migrations 108, 110, 111, 112, and 113 to enable notification history.',
+      telegramDeliveryMigration: 'Run migrations 108, 110, 111, 112, 113, and 116 to enable notification history.',
       telegramEmployee: 'Employee',
       telegramSalaryGroup: 'Salary group',
       telegramRetry: 'Send again',
@@ -571,12 +575,14 @@ export default function Salaries() {
   function runTelegramNotificationInBackground(eventType, eventId, {
     retryKey = '',
     announceResult = false,
+    failureMessage = '',
   } = {}) {
     const senders = {
       payment: notifyTelegramEmployeePayment,
       bonus: notifyTelegramEmployeeBonus,
       fine: notifyTelegramEmployeeFine,
       absence: notifyTelegramEmployeeAbsence,
+      rate: notifyTelegramEmployeeRate,
     }
     const send = senders[eventType]
     if (!send || !eventId) return
@@ -588,9 +594,14 @@ export default function Salaries() {
     }
     void send(eventId)
       .then(telegramResult => {
-        if (!announceResult) return
         const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
         const groupTelegramSent = telegramResult?.group?.status === 'sent'
+        if (!announceResult) {
+          if (failureMessage && !employeeTelegramSent && !groupTelegramSent) {
+            setMessage(failureMessage)
+          }
+          return
+        }
         setMessage(employeeTelegramSent && groupTelegramSent
           ? l.telegramRetrySent
           : employeeTelegramSent || groupTelegramSent
@@ -600,6 +611,7 @@ export default function Salaries() {
       .catch(notificationError => {
         console.warn(`[telegram] background ${eventType} notification failed:`, notificationError)
         if (announceResult) setMessage(l.telegramRetryFailed)
+        else if (failureMessage) setMessage(failureMessage)
       })
       .finally(() => {
         if (retryKey) {
@@ -687,11 +699,13 @@ export default function Salaries() {
       bonus: 'bonuses',
       fine: 'fines',
       absence: 'absences',
+      rate: 'rates',
     }
     const dateFields = {
       bonus: 'bonus_date',
       fine: 'fine_date',
       absence: 'absence_date',
+      rate: 'effective_from',
     }
     return groupEventDeliveries.map(delivery => {
       const salaryProfile = salaryProfileMap.get(delivery.salary_profile_id)
@@ -703,6 +717,7 @@ export default function Salaries() {
         eventId: delivery.event_id,
         employeeName: salaryProfile?.employee_name || salaryProfile?.profile?.full_name || '—',
         amount: event?.amount || 0,
+        eventUnit: event?.rate_unit || '',
         eventDate: event?.[dateFields[delivery.event_type]] || '',
         sortAt: delivery.attempted_at || delivery.employee_attempted_at || '',
         employeeStatus: delivery.employee_status,
@@ -742,6 +757,7 @@ export default function Salaries() {
     bonus: l.bonusLabel,
     fine: l.fineLabel,
     absence: l.absence,
+    rate: l.changeSalary,
   }
   const paymentDeliveryStatusClasses = {
     pending: 'border-amber-200 bg-amber-50 text-amber-700',
@@ -835,20 +851,25 @@ export default function Salaries() {
   async function addRate() {
     const selectedProfile = salaryProfiles.find(item => item.id === changeForm.salary_profile_id)
     if (!selectedProfile) return
+    const isInitialRate = (selectedProfile.rates || []).length === 0
     const amount = normalizeExpenseAmount(changeForm.salary_amount)
     const effectiveFrom = changeForm.effective_from || today
     if (!canManage || amount <= 0) return
     setError('')
     setMessage('')
     setSaving('rate-create')
-    const { error: rateError } = await supabase.from('employee_salary_rates').insert(buildSalaryRatePayload({
-      salaryProfileId: selectedProfile.id,
-      effectiveFrom,
-      amount,
-      salaryUnit: changeForm.salary_unit || 'daily',
-      note: changeForm.note || '',
-      createdBy: profile?.id || null,
-    }))
+    const { data: savedRate, error: rateError } = await supabase
+      .from('employee_salary_rates')
+      .insert(buildSalaryRatePayload({
+        salaryProfileId: selectedProfile.id,
+        effectiveFrom,
+        amount,
+        salaryUnit: changeForm.salary_unit || 'daily',
+        note: changeForm.note || '',
+        createdBy: profile?.id || null,
+      }))
+      .select('id')
+      .single()
     setSaving('')
     if (rateError) {
       setError(rateError.message)
@@ -862,6 +883,11 @@ export default function Salaries() {
       note: '',
     })
     setMessage(l.rateSavedMessage)
+    if (!isInitialRate) {
+      runTelegramNotificationInBackground('rate', savedRate?.id, {
+        failureMessage: l.rateTelegramFailed,
+      })
+    }
     await loadData({ refreshTelegram: false })
   }
 
@@ -1555,7 +1581,11 @@ export default function Salaries() {
                                       {delivery.employeeName} · {groupEventTypeLabels[delivery.eventType] || l.paymentLabel}
                                     </p>
                                     <p className="mt-0.5 text-xs font-bold text-gray-600">
-                                      {delivery.eventType === 'absence' ? l.absence : formatCurrency(delivery.amount)}
+                                      {delivery.eventType === 'absence'
+                                        ? l.absence
+                                        : delivery.eventType === 'rate'
+                                          ? `${formatCurrency(delivery.amount)} · ${salaryRateUnitLabel(delivery.eventUnit, lang)}`
+                                          : formatCurrency(delivery.amount)}
                                       {delivery.eventDate ? ` · ${formatLongDate(delivery.eventDate, lang, delivery.eventDate)}` : ''}
                                     </p>
                                   </div>

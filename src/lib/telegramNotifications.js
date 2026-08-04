@@ -27,7 +27,7 @@ async function notifyTelegramSalaryEvent(type, eventId) {
     employee: { status: 'failed' },
     group: { status: 'failed' },
   }
-  if (!eventId || !['payment', 'fine', 'bonus', 'absence'].includes(type)) return failedResult
+  if (!eventId || !['payment', 'fine', 'bonus', 'absence', 'rate'].includes(type)) return failedResult
   try {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     if (sessionError) throw sessionError
@@ -70,4 +70,8 @@ export function notifyTelegramEmployeeBonus(bonusId) {
 
 export function notifyTelegramEmployeeAbsence(absenceId) {
   return notifyTelegramSalaryEvent('absence', absenceId)
+}
+
+export function notifyTelegramEmployeeRate(rateId) {
+  return notifyTelegramSalaryEvent('rate', rateId)
 }
