@@ -109,12 +109,12 @@ test('expense cashflow shows what is left by tracked payment method', () => {
   assert.equal(cashflow.byMethod.cash.expenses, 300_000)
   assert.equal(cashflow.byMethod.cash.left, 900_000)
   assert.equal(cashflow.byMethod.card.left, 150_000)
-  assert.equal(cashflow.byMethod.terminal.left, -50_000)
-  assert.equal(cashflow.byMethod.qr.income, 90_000)
-  assert.equal(cashflow.byMethod.qr.left, 90_000)
+  assert.equal(cashflow.byMethod.terminal.income, 440_000)
+  assert.equal(cashflow.byMethod.terminal.left, 40_000)
+  assert.equal(cashflow.byMethod.qr, undefined)
   assert.equal(cashflow.byMethod.loyalty_card.income, 50_000)
   assert.equal(cashflow.byMethod.loyalty_card.left, 50_000)
-  assert.deepEqual(cashflow.rows.map(row => row.method), ['cash', 'card', 'terminal', 'qr', 'loyalty_card'])
+  assert.deepEqual(cashflow.rows.map(row => row.method), ['cash', 'card', 'terminal', 'loyalty_card'])
 })
 
 test('expense cashflow does not double count explicit loyalty payment rows', () => {

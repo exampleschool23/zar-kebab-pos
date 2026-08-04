@@ -201,6 +201,8 @@ test('Accounting normalizes the compact database response for the selected range
     payment_method_income: {
       cash: '800',
       card: '700',
+      terminal: '50',
+      qr: '100',
       loyalty_card: '200',
     },
   }, '2026-07-01', '2026-07-14')
@@ -208,7 +210,8 @@ test('Accounting normalizes the compact database response for the selected range
   assert.equal(summary.cafeIncome, 1_500)
   assert.equal(summary.costTotal, 400)
   assert.equal(summary.paymentMethodIncome.cash, 800)
-  assert.equal(summary.paymentMethodIncome.qr, 0)
+  assert.equal(summary.paymentMethodIncome.terminal, 150)
+  assert.equal(summary.paymentMethodIncome.qr, undefined)
   assert.equal(summary.cafeIncomeSummary.salesValueTotal, 1_700)
   assert.equal(summary.cafeIncomeSummary.effectiveTo, '2026-07-14')
   assert.equal(summary.cafeIncomeSummary.dayCount, 14)

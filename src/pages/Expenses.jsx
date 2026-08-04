@@ -14,7 +14,6 @@ import {
   Plus,
   ReceiptText,
   RefreshCw,
-  QrCode,
   Tag,
   Users,
   Terminal,
@@ -66,7 +65,6 @@ const HISTORY_SECTION_GRID = 'grid items-stretch gap-5 lg:grid-cols-2'
 function methodIcon(method) {
   if (method === 'card') return CreditCard
   if (method === 'terminal') return Terminal
-  if (method === 'qr') return QrCode
   if (method === 'loyalty_card') return Tag
   return Banknote
 }

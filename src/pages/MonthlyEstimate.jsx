@@ -7,7 +7,6 @@ import {
   CreditCard,
   Home,
   Monitor,
-  QrCode,
   ReceiptText,
   RefreshCw,
   Tag,
@@ -98,7 +97,6 @@ function addMonths(monthStart, delta) {
 
 function methodLabel(method, lang) {
   if (['cash', 'card', 'terminal'].includes(method)) return expensePaymentMethodLabel(method, lang)
-  if (method === 'qr') return 'QR'
   if (method === 'loyalty_card') return lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty'
   return method || '—'
 }
@@ -630,7 +628,6 @@ function MethodCard({ row, lang, labels }) {
     cash: Banknote,
     card: CreditCard,
     terminal: Monitor,
-    qr: QrCode,
     loyalty_card: Tag,
   }
   const Icon = icons[row.method] || WalletCards

@@ -270,10 +270,6 @@ function normalizeReceiptMarketing(value) {
   return RECEIPT_MARKETING_MODES.has(value) ? value : 'compactFooter'
 }
 
-function shouldShowQr(mode) {
-  return mode === 'compactFooter' || mode === 'instagramOnly' || mode === 'full'
-}
-
 function ReceiptMarketingFooter({ labels, mode }) {
   const marketingMode = normalizeReceiptMarketing(mode)
   if (marketingMode === 'none') return null
@@ -281,8 +277,6 @@ function ReceiptMarketingFooter({ labels, mode }) {
   const showThanks = ['compactFooter', 'full'].includes(marketingMode)
   const showLoyalty = ['compactFooter', 'loyaltyOnly', 'full'].includes(marketingMode)
   const showInstagram = ['compactFooter', 'instagramOnly', 'full'].includes(marketingMode)
-  const isFull = marketingMode === 'full'
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=https://instagram.com/zarkebab&size=132x132&margin=4&color=111111&bgcolor=ffffff`
 
   return (
     <>
@@ -303,23 +297,7 @@ function ReceiptMarketingFooter({ labels, mode }) {
           </>
         )}
         {showInstagram && (
-          <>
-            <div style={{ fontWeight: 600, marginBottom: shouldShowQr(marketingMode) ? '7px' : 0 }}>Instagram: @zarkebab</div>
-            {shouldShowQr(marketingMode) && (
-              <img
-                src={qrUrl}
-                alt="Instagram QR"
-                width={isFull ? 84 : 72}
-                height={isFull ? 84 : 72}
-                style={{
-                  display: 'block',
-                  margin: '0 auto 8px',
-                  width: isFull ? '22mm' : '19mm',
-                  height: isFull ? '22mm' : '19mm',
-                }}
-              />
-            )}
-          </>
+          <div style={{ fontWeight: 600 }}>Instagram: @zarkebab</div>
         )}
       </div>
     </>

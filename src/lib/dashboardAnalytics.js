@@ -21,6 +21,16 @@ function todayStr(now = new Date()) {
   return restaurantTodayStr(now)
 }
 
+export function getRollingDashboardMonthRange(today = todayStr()) {
+  const dateFrom = addRestaurantDays(today, -31)
+  return {
+    dateFrom,
+    dateTo: today,
+    dateToExclusive: addRestaurantDays(today, 1),
+    dayCount: 32,
+  }
+}
+
 export function isOrderInDashboardPeriod(order, period, now = new Date()) {
   const ds = localDateStr(getOrderDate(order))
   if (!ds) return false
@@ -31,6 +41,11 @@ export function isOrderInDashboardPeriod(order, period, now = new Date()) {
     const today = todayStr(now)
     const start = addRestaurantDays(today, -6)
     return ds >= start && ds <= today
+  }
+
+  if (period === 'rollingMonth') {
+    const range = getRollingDashboardMonthRange(todayStr(now))
+    return ds >= range.dateFrom && ds < range.dateToExclusive
   }
 
   if (period === 'month') {
@@ -54,6 +69,7 @@ export function getDashboardPeriodCafeIncome(orders, period, now = new Date()) {
   const today = todayStr(now)
   let dateFrom = today
   if (period === '7days') dateFrom = addRestaurantDays(today, -6)
+  else if (period === 'rollingMonth') dateFrom = getRollingDashboardMonthRange(today).dateFrom
   else if (period === 'month') dateFrom = `${today.slice(0, 8)}01`
   else if (period === 'year') dateFrom = `${today.slice(0, 4)}-01-01`
   return getCafeIncomeForRange(orders, dateFrom, today, now)
@@ -142,7 +158,6 @@ export function getDashboardPaymentMethods(orders, labels = {}) {
     cash: labels.cash || 'Cash',
     card: labels.card || 'Card',
     terminal: labels.terminal || 'Terminal',
-    qr: labels.qr || 'QR Code',
     loyalty_card: labels.loyalty || 'Loyalty',
     unknown: labels.unknown || 'Unknown',
   }
@@ -157,7 +172,7 @@ export function getDashboardPaymentMethods(orders, labels = {}) {
 
     rows.forEach(row => {
       const raw = (row.method || '').toLowerCase().trim()
-      const key = ['cash', 'card', 'terminal', 'qr', 'loyalty_card'].includes(raw) ? raw : 'unknown'
+      const key = ['cash', 'card', 'terminal', 'loyalty_card'].includes(raw) ? raw : 'unknown'
       const amount = Number(row.amount) || 0
       map[key] = (map[key] || 0) + amount
     })

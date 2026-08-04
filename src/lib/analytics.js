@@ -384,9 +384,9 @@ export function getOrderPaymentFields(order, items = getOrderItems(order), fallb
 
 export function normalizePaymentMethod(method) {
   const raw = String(method || '').toLowerCase().trim()
-  if (raw === 'qr_code' || raw === 'qr-code' || raw === 'qrcode') return 'qr'
+  if (raw === 'qr' || raw === 'qr_code' || raw === 'qr-code' || raw === 'qrcode') return 'terminal'
   if (raw === 'loyalty' || raw === 'loyalty-card' || raw === 'loyalty_card') return 'loyalty_card'
-  if (['cash', 'card', 'terminal', 'qr', 'loyalty_card', 'other', 'mixed'].includes(raw)) return raw
+  if (['cash', 'card', 'terminal', 'loyalty_card', 'other', 'mixed'].includes(raw)) return raw
   return raw || 'unknown'
 }
 

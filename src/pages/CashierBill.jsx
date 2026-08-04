@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Printer, CheckCircle2, Banknote, CreditCard,
   Receipt, Users, Clock, Tag, UtensilsCrossed, Menu as MenuIcon,
-  Monitor, QrCode, MoreHorizontal, Plus, Minus, Trash2, ClipboardPaste,
+  Monitor, MoreHorizontal, Plus, Minus, Trash2, ClipboardPaste,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -50,7 +50,6 @@ const PAY_METHODS = [
   { key: 'cash',     icon: Banknote,  labelUz: 'Naqd',    labelRu: 'Наличные',  labelEn: 'Cash'     },
   { key: 'card',     icon: CreditCard, labelUz: 'Karta',   labelRu: 'Карта',     labelEn: 'Card'     },
   { key: 'terminal', icon: Monitor,   labelUz: 'Terminal', labelRu: 'Терминал',  labelEn: 'Terminal' },
-  { key: 'qr',       icon: QrCode,    labelUz: 'QR Code',  labelRu: 'QR-код',    labelEn: 'QR Code'  },
 ]
 
 function payLabel(m, lang) {

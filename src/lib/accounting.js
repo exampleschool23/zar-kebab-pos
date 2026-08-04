@@ -64,10 +64,12 @@ export function normalizeAccountingPaidOrderSummary(summary = {}, dateFrom, date
     costTotal,
     orderCount: normalizeSummaryAmount(summary.orderCount ?? summary.order_count),
     salesDayCount: normalizeSummaryAmount(summary.salesDayCount ?? summary.sales_day_count),
-    paymentMethodIncome: Object.fromEntries(
-      ['cash', 'card', 'terminal', 'qr', 'loyalty_card']
-        .map(method => [method, normalizeSummaryAmount(paymentMethodIncome?.[method])])
-    ),
+    paymentMethodIncome: {
+      cash: normalizeSummaryAmount(paymentMethodIncome?.cash),
+      card: normalizeSummaryAmount(paymentMethodIncome?.card),
+      terminal: normalizeSummaryAmount(paymentMethodIncome?.terminal) + normalizeSummaryAmount(paymentMethodIncome?.qr),
+      loyalty_card: normalizeSummaryAmount(paymentMethodIncome?.loyalty_card),
+    },
     cafeIncomeSummary: {
       total: cafeIncome,
       loyaltyTotal: loyaltyIncome,

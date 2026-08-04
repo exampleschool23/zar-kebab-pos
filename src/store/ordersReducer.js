@@ -442,7 +442,7 @@ export function ordersReducer(state, action) {
     case 'CHANGE_PAID_ORDER_PAYMENT_METHOD': {
       const orderIds = new Set((action.payload?.orderIds || []).filter(Boolean))
       const paymentMethod = String(action.payload?.paymentMethod || '').trim().toLowerCase()
-      if (orderIds.size === 0 || !['cash', 'card', 'terminal', 'qr'].includes(paymentMethod)) return state
+      if (orderIds.size === 0 || !['cash', 'card', 'terminal'].includes(paymentMethod)) return state
       return {
         ...state,
         orders: state.orders.map(order => orderIds.has(order.id)

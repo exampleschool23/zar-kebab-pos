@@ -30,7 +30,7 @@ import {
   TrendingUp, ShoppingBag, DollarSign, Package,
   Download, X, Printer, Eye, ChevronLeft, ChevronRight,
   Search, SlidersHorizontal, CreditCard,
-  Monitor, QrCode, Banknote, UtensilsCrossed,
+  Monitor, Banknote, UtensilsCrossed,
   BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck, Pencil,
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
@@ -100,7 +100,6 @@ const PAY_CFG = {
   cash:     { label: { uz: 'Naqd',      ru: 'Наличные',   en: 'Cash'     }, cls: 'bg-green-50 text-green-700',   Icon: Banknote,   bar: '#16A34A' },
   card:     { label: { uz: 'Karta',     ru: 'Карта',      en: 'Card'     }, cls: 'bg-blue-50 text-blue-700',     Icon: CreditCard, bar: '#2563EB' },
   terminal: { label: { uz: 'Terminal',  ru: 'Терминал',   en: 'Terminal' }, cls: 'bg-purple-50 text-purple-700', Icon: Monitor,    bar: '#7C3AED' },
-  qr:       { label: { uz: 'QR Kod',    ru: 'QR Код',     en: 'QR Code'  }, cls: 'bg-pink-50 text-pink-700',     Icon: QrCode,     bar: '#DB2777' },
   loyalty_card: { label: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' }, cls: 'bg-amber-50 text-amber-700', Icon: Tag, bar: '#D97706' },
   mixed:    { label: { uz: 'Aralash',    ru: 'Смешанная',  en: 'Mixed'    }, cls: 'bg-teal-50 text-teal-700',     Icon: CreditCard, bar: '#0F766E' },
   unknown:  { label: { uz: "Noma'lum",  ru: 'Неизвестно', en: 'Unknown'  }, cls: 'bg-gray-50 text-gray-600',     Icon: HelpCircle, bar: '#9CA3AF' },
@@ -1404,7 +1403,6 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
                   <option value="cash">{lang === 'uz' ? 'Naqd' : lang === 'ru' ? 'Наличные' : 'Cash'}</option>
                   <option value="card">{lang === 'uz' ? 'Karta' : lang === 'ru' ? 'Карта' : 'Card'}</option>
                   <option value="terminal">Terminal</option>
-                  <option value="qr">{lang === 'uz' ? 'QR kod' : lang === 'ru' ? 'QR-код' : 'QR Code'}</option>
                 </select>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -1514,7 +1512,6 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
           <option value="cash">{lang === 'uz' ? 'Naqd' : lang === 'ru' ? 'Наличные' : 'Cash'}</option>
           <option value="card">{lang === 'uz' ? 'Karta' : lang === 'ru' ? 'Карта' : 'Card'}</option>
           <option value="terminal">Terminal</option>
-          <option value="qr">{lang === 'uz' ? 'QR Kod' : lang === 'ru' ? 'QR Код' : 'QR Code'}</option>
         </select>
       </div>
 
@@ -1832,7 +1829,7 @@ export default function Reports() {
 
   function startPaymentMethodChange(order) {
     if (!canChangePaymentMethod || !order?.id) return
-    const currentMethod = ['cash', 'card', 'terminal', 'qr'].includes(order.payment_method)
+    const currentMethod = ['cash', 'card', 'terminal'].includes(order.payment_method)
       ? order.payment_method
       : 'cash'
     setConfirmDeleteOrderId('')
@@ -1881,9 +1878,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано', expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold', expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано', expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold', expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance' },
   }
   const l = L[lang] || L.en
 
@@ -1962,8 +1959,8 @@ export default function Reports() {
                   })}
                 </div>
                 {/* Date range inputs + other filters */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1.5 bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 shadow-sm">
+                <div className="flex flex-wrap items-stretch gap-2 xl:flex-nowrap">
+                  <div className="flex h-11 items-center gap-1.5 bg-white border border-[#E5E7EB] rounded-xl px-3 shadow-sm">
                     <span className="text-[11px] text-[#9CA3AF] font-semibold">{l.from}</span>
                     <DateInput value={dateFrom} lang={lang} onChange={setDateFrom} />
                     <span className="text-[11px] text-[#9CA3AF] font-semibold mx-1">—</span>
@@ -1971,16 +1968,16 @@ export default function Reports() {
                     <DateInput value={dateTo} lang={lang} onChange={setDateTo} />
                   </div>
                   <select value={tableFilter} onChange={e => setTableFilter(e.target.value)}
-                    className="bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm text-[#6B7280] focus:outline-none shadow-sm cursor-pointer">
+                    className="h-11 bg-white border border-[#E5E7EB] rounded-xl px-3 text-sm text-[#6B7280] focus:outline-none shadow-sm cursor-pointer">
                     <option value="all">{l.allTables}</option>
                     {state.tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                   <select value={waiterFilter} onChange={e => setWaiterFilter(e.target.value)}
-                    className="bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm text-[#6B7280] focus:outline-none shadow-sm cursor-pointer">
+                    className="h-11 bg-white border border-[#E5E7EB] rounded-xl px-3 text-sm text-[#6B7280] focus:outline-none shadow-sm cursor-pointer">
                     <option value="all">{l.allWaiters}</option>
                     {uniqueWaiters.map(w => <option key={w} value={w}>{w}</option>)}
                   </select>
-                  <button onClick={exportCloseout} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E5E7EB] rounded-xl text-sm font-semibold text-[#6B7280] hover:bg-gray-50 shadow-sm">
+                  <button onClick={exportCloseout} className="flex h-11 items-center gap-1.5 px-4 bg-white border border-[#E5E7EB] rounded-xl text-sm font-semibold text-[#6B7280] hover:bg-gray-50 shadow-sm">
                     <Download size={14} />{l.export}
                   </button>
                 </div>
@@ -2033,21 +2030,20 @@ export default function Reports() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-black text-[#1F2937]">{l.closeout}</p>
-                  <p className="text-xs font-semibold text-[#9CA3AF]">{closeout.date}</p>
+                  <p className="text-xs font-semibold text-[#9CA3AF]">{formatLongDate(closeout.date, lang, closeout.date)}</p>
                 </div>
                 <button onClick={exportCloseout} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-xs font-black text-[#6B7280]">
                   <Download size={13} className="mr-1 inline" />{l.export}
                 </button>
               </div>
               <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                <SummaryRow label="Cash" value={formatCurrency(closeout.totals.cash)} />
-                <SummaryRow label="Card" value={formatCurrency(closeout.totals.card)} />
-                <SummaryRow label="Terminal" value={formatCurrency(closeout.totals.terminal)} />
-                <SummaryRow label="QR" value={formatCurrency(closeout.totals.qr)} />
+                <SummaryRow label={l.cash} value={formatCurrency(closeout.totals.cash)} />
+                <SummaryRow label={l.card} value={formatCurrency(closeout.totals.card)} />
+                <SummaryRow label={l.terminal} value={formatCurrency(closeout.totals.terminal)} />
                 <SummaryRow label={l.loyaltyIncome} value={formatCurrency(closeout.loyaltyIncome)} />
                 <SummaryRow label={l.cashbackIssued} value={formatCurrency(closeout.cashbackIssued)} />
                 <SummaryRow label={l.cancelled} value={closeout.cancelledCount} />
-                <SummaryRow label="Variance" value={formatCurrency(closeout.variance)} />
+                <SummaryRow label={l.variance} value={formatCurrency(closeout.variance)} />
               </div>
             </div>
 

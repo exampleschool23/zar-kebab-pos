@@ -538,7 +538,7 @@ test('maximum loyalty redeem amount is capped by balance and remaining order tot
   assert.equal(getMaxLoyaltyRedeemAmount(9007199254740991, 9007199254740000), 9007199254740000)
 })
 
-test('split payment can settle one order with cash card loyalty and qr methods', () => {
+test('split payment can settle one order with cash card loyalty and terminal methods', () => {
   const rows = [item({ id: 'split-row', menu_item_id: 'table-bill', quantity: 1, price: 214000 })]
   const order = paidOrder({
     id: 'split-payment-order',
@@ -552,7 +552,7 @@ test('split payment can settle one order with cash card loyalty and qr methods',
     { method: 'cash', amount: 50000 },
     { method: 'card', amount: 100000 },
     { method: 'loyalty_card', amount: 40000 },
-    { method: 'qr', amount: 53960 },
+    { method: 'terminal', amount: 53960 },
   ], summary.total)
   const paid = payments.reduce((sum, row) => sum + row.amount, 0)
   const paymentOrder = { ...order, payments, payment_method: getPaymentMethodSummary(payments) }
@@ -620,11 +620,11 @@ test('split payment confirm is enabled only when paid amount exactly matches tot
   assert.equal(overpaid.overpaidAmount, 4680)
 })
 
-test('single payment keeps its original method for legacy reports and badges', () => {
+test('legacy QR payments display under terminal after QR retirement', () => {
   const payments = normalizeSplitPayments([{ method: 'qr_code', amount: 58500 }], 58500)
 
-  assert.equal(getPaymentMethodSummary(payments), 'qr')
-  assert.deepEqual(payments, [{ method: 'qr', amount: 58500 }])
+  assert.equal(getPaymentMethodSummary(payments), 'terminal')
+  assert.deepEqual(payments, [{ method: 'terminal', amount: 58500 }])
 })
 
 test('unpaid bills do not invent a payment breakdown before checkout', () => {

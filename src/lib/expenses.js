@@ -1,7 +1,7 @@
 import { getOrderPayments, toLocalDateStr } from './analytics.js'
 
 export const EXPENSE_PAYMENT_METHODS = ['cash', 'card', 'terminal']
-export const ACCOUNTING_CASHFLOW_METHODS = ['cash', 'card', 'terminal', 'qr', 'loyalty_card']
+export const ACCOUNTING_CASHFLOW_METHODS = ['cash', 'card', 'terminal', 'loyalty_card']
 export const EXPENSE_ENTRY_TYPES = ['expense', 'income']
 export const DEFAULT_MONTHLY_RENT_UZS = 0
 export const ACCOUNTING_HISTORY_START_DATE = '2000-01-01'
@@ -123,7 +123,6 @@ export function expensePaymentMethodLabel(method, lang = 'en') {
     card: { uz: 'Karta', ru: 'Карта', en: 'Card' },
     terminal: { uz: 'Terminal', ru: 'Терминал', en: 'Terminal' },
     mixed: { uz: 'Aralash', ru: 'Смешанный', en: 'Mixed' },
-    qr: { uz: 'QR Code', ru: 'QR Code', en: 'QR Code' },
     loyalty_card: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' },
   }
   const cfg = labels[method] || labels.cash

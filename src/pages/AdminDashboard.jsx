@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingBag, Package, Receipt,
   Clock, CalendarDays, ArrowUpRight, ArrowDownRight, Users, Loader2,
-  Printer, CreditCard, Trash2, Wallet, Monitor, QrCode, BadgeDollarSign,
+  Printer, CreditCard, Trash2, Wallet, Monitor, BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -32,6 +32,7 @@ import {
   getDashboardPaymentMethods,
   getDashboardPeriodCafeIncome,
   getDashboardPeriodOrders,
+  getRollingDashboardMonthRange,
   getDashboardSalesByCategory,
   isOrderInDashboardPeriod,
 } from '../lib/dashboardAnalytics'
@@ -61,6 +62,7 @@ const L = {
     avgDailyCafeIncome: "Kafe o'rtacha kunlik daromadi",
     today:          'Bugun',
     days7:          '7 kun',
+    rollingMonth:   'Oy',
     thisMonth:      'Bu oy',
     thisYear:       'Bu yil',
     prevPeriod:     'Oldingi davr',
@@ -70,7 +72,6 @@ const L = {
     cash:           'Naqd',
     card:           'Karta',
     terminal:       'Terminal',
-    qr:             'QR Kod',
     unknown:        "Noma'lum",
     salesByCategory:'Kategoriya bo\'yicha savdo',
     orderTypePerformance:'Buyurtma turi bo‘yicha savdo',
@@ -125,6 +126,7 @@ const L = {
     avgDailyCafeIncome: 'Среднедневной доход кафе',
     today:          'Сегодня',
     days7:          '7 дней',
+    rollingMonth:   'Месяц',
     thisMonth:      'Этот месяц',
     thisYear:       'Этот год',
     prevPeriod:     'Предыдущий период',
@@ -134,7 +136,6 @@ const L = {
     cash:           'Наличные',
     card:           'Карта',
     terminal:       'Терминал',
-    qr:             'QR Код',
     unknown:        'Неизвестно',
     salesByCategory:'Продажи по категориям',
     orderTypePerformance:'Продажи по типу заказа',
@@ -189,6 +190,7 @@ const L = {
     avgDailyCafeIncome: 'Avg daily cafe income',
     today:          'Today',
     days7:          '7 Days',
+    rollingMonth:   'Month',
     thisMonth:      'This Month',
     thisYear:       'This Year',
     prevPeriod:     'Previous Period',
@@ -198,7 +200,6 @@ const L = {
     cash:           'Cash',
     card:           'Card',
     terminal:       'Terminal',
-    qr:             'QR Code',
     unknown:        'Unknown',
     salesByCategory:'Sales by Category',
     orderTypePerformance:'Order Type Performance',
@@ -318,9 +319,9 @@ function shortLabel(ds, mode) {
 
 function dashboardPeriodLabel(period, lang) {
   const labels = {
-    uz: { today: 'Bugun', '7days': '7 kun', month: 'Bu oy', year: 'Bu yil' },
-    ru: { today: 'Сегодня', '7days': '7 дней', month: 'Этот месяц', year: 'Этот год' },
-    en: { today: 'Today', '7days': '7 days', month: 'This month', year: 'This year' },
+    uz: { today: 'Bugun', '7days': '7 kun', rollingMonth: 'Oy', month: 'Bu oy', year: 'Bu yil' },
+    ru: { today: 'Сегодня', '7days': '7 дней', rollingMonth: 'Месяц', month: 'Этот месяц', year: 'Этот год' },
+    en: { today: 'Today', '7days': '7 days', rollingMonth: 'Month', month: 'This month', year: 'This year' },
   }
   return (labels[lang] || labels.en)[period] || (labels[lang] || labels.en)['7days']
 }
@@ -345,6 +346,16 @@ function getPreviousDashboardPeriodOrders(orders, period) {
     return orders.filter(order => days.has(localDateStr(getOrderDate(order))))
   }
 
+  if (period === 'rollingMonth') {
+    const range = getRollingDashboardMonthRange(todayDs)
+    const previousStart = addRestaurantDays(range.dateFrom, -range.dayCount)
+    const previousEnd = addRestaurantDays(range.dateFrom, -1)
+    return orders.filter(order => {
+      const date = localDateStr(getOrderDate(order))
+      return date >= previousStart && date <= previousEnd
+    })
+  }
+
   if (period === 'month') {
     const [year, monthNumber] = todayDs.split('-').map(Number)
     const month = monthNumber - 1
@@ -361,6 +372,10 @@ function getPreviousDashboardPeriodOrders(orders, period) {
 function getDashboardHistoryRange(period, today = todayStr()) {
   if (period === 'today') return { dateFrom: addRestaurantDays(today, -1), dateTo: today }
   if (period === '7days') return { dateFrom: addRestaurantDays(today, -13), dateTo: today }
+  if (period === 'rollingMonth') {
+    const range = getRollingDashboardMonthRange(today)
+    return { dateFrom: addRestaurantDays(range.dateFrom, -range.dayCount), dateTo: today }
+  }
   if (period === 'month') {
     const previousMonthEnd = addRestaurantDays(`${today.slice(0, 8)}01`, -1)
     return { dateFrom: `${previousMonthEnd.slice(0, 8)}01`, dateTo: today }
@@ -583,7 +598,6 @@ const PAYMENT_COLORS = {
   cash:     '#16A34A',
   card:     '#7C3AED',
   terminal: '#2563EB',
-  qr:       '#D97706',
   unknown:  '#D1D5DB',
 }
 
@@ -715,6 +729,7 @@ export default function AdminDashboard() {
   const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
   const [historyError, setHistoryError] = useState('')
+  const [historyLoading, setHistoryLoading] = useState(true)
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
 
   const dashboardHistoryRange = useMemo(() => getDashboardHistoryRange(period), [period])
@@ -722,14 +737,18 @@ export default function AdminDashboard() {
   useEffect(() => {
     let cancelled = false
     setHistoryError('')
+    setHistoryLoading(true)
     loadPaidOrdersForRange(dashboardHistoryRange.dateFrom, dashboardHistoryRange.dateTo)
       .then(orders => {
-        if (!cancelled) setPaidHistoryOrders(orders)
+        if (cancelled) return
+        setPaidHistoryOrders(orders)
+        setHistoryLoading(false)
       })
       .catch(error => {
         if (cancelled) return
         setPaidHistoryOrders([])
         setHistoryError(error?.message || 'Could not load complete dashboard history')
+        setHistoryLoading(false)
       })
     return () => { cancelled = true }
   }, [dashboardHistoryRange])
@@ -864,6 +883,30 @@ export default function AdminDashboard() {
       }
     }
 
+    if (period === 'rollingMonth') {
+      const range = getRollingDashboardMonthRange(todayStr())
+      const days = Array.from({ length: range.dayCount }, (_, index) => addRestaurantDays(range.dateFrom, index))
+      const previousStart = addRestaurantDays(range.dateFrom, -range.dayCount)
+      const previousDays = Array.from({ length: range.dayCount }, (_, index) => addRestaurantDays(previousStart, index))
+      const bars = days.map(date => ({
+        label: formatLongDate(date, lang, date, { includeYear: false }),
+        revenue: paidOrders
+          .filter(order => localDateStr(getOrderDate(order)) === date)
+          .reduce((sum, order) => sum + getOrderRevenueTotal(order), 0),
+        isToday: date === range.dateTo,
+      }))
+      const previousPeriodTotal = previousDays.reduce((sum, date) => (
+        sum + paidOrders
+          .filter(order => localDateStr(getOrderDate(order)) === date)
+          .reduce((dateSum, order) => dateSum + getOrderRevenueTotal(order), 0)
+      ), 0)
+      return {
+        chartBars: bars,
+        currentPeriodTotal: bars.reduce((sum, bar) => sum + bar.revenue, 0),
+        previousPeriodTotal,
+      }
+    }
+
     if (period === 'month') {
       const todayDs = todayStr()
       const [year, monthNumber] = todayDs.split('-').map(Number)
@@ -922,7 +965,6 @@ export default function AdminDashboard() {
       cash: l.cash,
       card: l.card,
       terminal: l.terminal,
-      qr: l.qr,
       loyalty: lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty',
       unknown: l.unknown,
       colors: PAYMENT_COLORS,
@@ -984,7 +1026,6 @@ export default function AdminDashboard() {
       cash: { Icon: Wallet, label: l.cash, cls: 'text-green-600' },
       card: { Icon: CreditCard, label: l.card, cls: 'text-violet-600' },
       terminal: { Icon: Monitor, label: l.terminal, cls: 'text-blue-600' },
-      qr: { Icon: QrCode, label: l.qr, cls: 'text-amber-600' },
       loyalty: { Icon: CreditCard, label: lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty', cls: 'text-emerald-600' },
     }
     return map[method] || null
@@ -1036,6 +1077,7 @@ export default function AdminDashboard() {
   const now      = new Date()
   const lastUpdated = formatReadableDateTime(now)
   const currentKpiPeriodLabel = dashboardPeriodLabel(period, lang)
+  const rollingMonthRange = getRollingDashboardMonthRange(todayStr())
   const previousKpiPeriodLabel = previousDashboardPeriodLabel(period, lang, l.prevPeriod)
 
   if (!state.loaded) {
@@ -1123,11 +1165,19 @@ export default function AdminDashboard() {
           {/* Revenue Statistics — left 2 cols */}
           <div className="col-span-12 xl:col-span-8 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h3 className="font-bold text-[#1F2937] text-base">{l.revenueStats}</h3>
+              <div>
+                <h3 className="font-bold text-[#1F2937] text-base">{l.revenueStats}</h3>
+                {period === 'rollingMonth' && (
+                  <p className="mt-0.5 text-[11px] font-semibold text-[#9CA3AF]">
+                    {formatLongDate(rollingMonthRange.dateFrom, lang, rollingMonthRange.dateFrom)} — {formatLongDate(rollingMonthRange.dateToExclusive, lang, rollingMonthRange.dateToExclusive)}
+                  </p>
+                )}
+              </div>
               <div className="flex gap-1 flex-wrap">
                 {[
                   { key: 'today',  label: l.today    },
                   { key: '7days',  label: l.days7    },
+                  { key: 'rollingMonth', label: l.rollingMonth },
                   { key: 'month',  label: l.thisMonth },
                   { key: 'year',   label: l.thisYear  },
                 ].map(tab => (
@@ -1173,7 +1223,7 @@ export default function AdminDashboard() {
             {/* X-axis labels — show max 10 evenly, rest hidden */}
             <div className="flex gap-[3px] mb-4">
               {chartBars.map((bar, i) => {
-                const show = chartBars.length <= 10 || i % Math.ceil(chartBars.length / 10) === 0
+                const show = chartBars.length <= 10 || i === chartBars.length - 1 || i % Math.ceil(chartBars.length / 10) === 0
                 return (
                   <p key={i} className={`flex-1 text-center text-[10px] font-semibold truncate min-w-[6px] ${
                     bar.isToday ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'
@@ -1241,12 +1291,17 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-12 gap-4 mb-4 min-w-0">
 
           {/* Sales by Category */}
-          <div className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-4 min-w-0">
-            <h3 className="font-black text-[#1F2937] text-base mb-3">{l.salesByCategory}</h3>
-            {salesByCategory.length === 0 ? (
+          <div aria-busy={historyLoading} className="col-span-12 xl:col-span-4 flex min-h-0 min-w-0 flex-col bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-4">
+            <h3 className="font-black text-[#1F2937] text-base mb-3">{l.salesByCategory} · {currentKpiPeriodLabel}</h3>
+            {historyLoading ? (
+              <div className="flex flex-1 items-center justify-center gap-2 py-8 text-sm font-semibold text-[#9CA3AF]">
+                <Loader2 size={16} className="animate-spin text-[#ff5a00]" />
+                {l.loading}
+              </div>
+            ) : salesByCategory.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
             ) : (
-              <div className="max-h-[230px] space-y-2 overflow-y-auto pr-1">
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {salesByCategory.map(cat => (
                   <div key={cat.name}>
                     <div className="flex items-center justify-between mb-1 gap-2">
@@ -1266,9 +1321,14 @@ export default function AdminDashboard() {
           </div>
 
           {/* Best-selling */}
-          <div className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
-            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.bestSelling}</h3>
-            {bestSelling.length === 0 ? (
+          <div aria-busy={historyLoading} className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
+            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.bestSelling} · {currentKpiPeriodLabel}</h3>
+            {historyLoading ? (
+              <div className="flex min-h-32 items-center justify-center gap-2 py-8 text-sm font-semibold text-[#9CA3AF]">
+                <Loader2 size={16} className="animate-spin text-[#ff5a00]" />
+                {l.loading}
+              </div>
+            ) : bestSelling.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
             ) : (
               <div className="space-y-2">

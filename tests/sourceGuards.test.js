@@ -1717,6 +1717,19 @@ test('AdminDashboard defaults to today period', () => {
   assert.match(analytics, /export function getDashboardPeriodCafeIncome\(orders, period, now = new Date\(\)\)/)
 })
 
+test('AdminDashboard offers a rolling Month from 4 July to the 5 August boundary', () => {
+  const dashboard = readSource('src/pages/AdminDashboard.jsx')
+  const analytics = readSource('src/lib/dashboardAnalytics.js')
+
+  assert.match(dashboard, /\{ key: 'rollingMonth', label: l\.rollingMonth \}/)
+  assert.match(dashboard, /period === 'rollingMonth'/)
+  assert.match(dashboard, /formatLongDate\(rollingMonthRange\.dateFrom/)
+  assert.match(dashboard, /formatLongDate\(rollingMonthRange\.dateToExclusive/)
+  assert.match(analytics, /export function getRollingDashboardMonthRange/)
+  assert.match(analytics, /dateFrom = addRestaurantDays\(today, -31\)/)
+  assert.match(analytics, /dateToExclusive: addRestaurantDays\(today, 1\)/)
+})
+
 test('AdminDashboard shows period-based order type performance', () => {
   const dashboard = readSource('src/pages/AdminDashboard.jsx')
   const analytics = readSource('src/lib/dashboardAnalytics.js')
@@ -1736,6 +1749,26 @@ test('AdminDashboard shows period-based order type performance', () => {
   assert.match(card, /row\.items/)
   assert.match(card, /row\.avgOrder/)
   assert.match(card, /row\.pct/)
+})
+
+test('AdminDashboard category sales use the available card height before scrolling', () => {
+  const dashboard = readSource('src/pages/AdminDashboard.jsx')
+
+  assert.match(dashboard, /flex min-h-0 min-w-0 flex-col bg-white rounded-2xl/)
+  assert.match(dashboard, /min-h-0 flex-1 space-y-2 overflow-y-auto pr-1/)
+  assert.doesNotMatch(dashboard, /max-h-\[230px\] space-y-2 overflow-y-auto/)
+})
+
+test('AdminDashboard period filter owns category and best-selling analytics loading state', () => {
+  const dashboard = readSource('src/pages/AdminDashboard.jsx')
+
+  assert.match(dashboard, /const \[historyLoading, setHistoryLoading\] = useState\(true\)/)
+  assert.match(dashboard, /setHistoryLoading\(true\)[\s\S]*loadPaidOrdersForRange/)
+  assert.match(dashboard, /\{l\.salesByCategory\} · \{currentKpiPeriodLabel\}/)
+  assert.match(dashboard, /\{l\.bestSelling\} · \{currentKpiPeriodLabel\}/)
+  assert.equal((dashboard.match(/aria-busy=\{historyLoading\}/g) || []).length, 2)
+  assert.match(dashboard, /historyLoading \? \([\s\S]*salesByCategory\.length === 0/)
+  assert.match(dashboard, /historyLoading \? \([\s\S]*bestSelling\.length === 0/)
 })
 
 test('AdminDashboard omits staff performance and its profile-loading work', () => {
@@ -2163,6 +2196,36 @@ test('reports date range text opens the native calendar picker', () => {
   assert.match(dateInput, /formatLongDate\(value, lang, value\)/)
   assert.match(dateInput, /text-transparent caret-transparent/)
   assert.doesNotMatch(dateInput, /opacity-0/)
+})
+
+test('reports closeout localizes labels and date while filter controls stay aligned', () => {
+  const reports = readSource('src/pages/Reports.jsx')
+
+  assert.match(reports, /cash: 'Наличные'/)
+  assert.match(reports, /<SummaryRow label=\{l\.cash\}/)
+  assert.match(reports, /formatLongDate\(closeout\.date, lang, closeout\.date\)/)
+  assert.match(reports, /flex flex-wrap items-stretch gap-2 xl:flex-nowrap/)
+  assert.match(reports, /className="flex h-11 items-center gap-1\.5 px-4/)
+  assert.equal((reports.match(/className="h-11 bg-white border/g) || []).length, 2)
+})
+
+test('QR is retired from payment, reporting, accounting, dashboard, and receipt surfaces', () => {
+  const visibleSurfaces = [
+    'src/pages/CashierBill.jsx',
+    'src/pages/CashierTables.jsx',
+    'src/pages/Reports.jsx',
+    'src/pages/AdminDashboard.jsx',
+    'src/pages/Expenses.jsx',
+    'src/pages/MonthlyEstimate.jsx',
+    'src/pages/Receipt.jsx',
+  ].map(readSource).join('\n')
+  const analytics = readSource('src/lib/analytics.js')
+  const closeout = readSource('src/lib/closeout.js')
+
+  assert.doesNotMatch(visibleSurfaces, /QrCode|QR Code|QR Kod|QR Код|QR-код|Instagram QR|api\.qrserver/)
+  assert.doesNotMatch(visibleSurfaces, /key: 'qr'|value="qr"/)
+  assert.match(analytics, /raw === 'qr'[\s\S]*return 'terminal'/)
+  assert.doesNotMatch(closeout, /\['QR'/)
 })
 
 test('expenses date range text opens the native calendar picker', () => {

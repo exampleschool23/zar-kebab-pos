@@ -8,6 +8,7 @@ import {
   getDashboardPaymentMethods,
   getDashboardPeriodCafeIncome,
   getDashboardPeriodOrders,
+  getRollingDashboardMonthRange,
   getDashboardSalesByCategory,
   getDashboardStaffPerformance,
 } from '../src/lib/dashboardAnalytics.js'
@@ -98,6 +99,27 @@ const orders = [
     total: 225000,
   }),
 ]
+
+test('rolling month uses a next-day boundary from 4 July to 5 August', () => {
+  assert.deepEqual(getRollingDashboardMonthRange('2026-08-04'), {
+    dateFrom: '2026-07-04',
+    dateTo: '2026-08-04',
+    dateToExclusive: '2026-08-05',
+    dayCount: 32,
+  })
+
+  const rangeOrders = [
+    order({ id: 'before', paidAt: '2026-07-03T12:00:00', total: 10, items: [] }),
+    order({ id: 'start', paidAt: '2026-07-04T12:00:00', total: 20, items: [] }),
+    order({ id: 'today', paidAt: '2026-08-04T12:00:00', total: 30, items: [] }),
+    order({ id: 'exclusive-end', paidAt: '2026-08-05T12:00:00', total: 40, items: [] }),
+  ]
+
+  assert.deepEqual(
+    getDashboardPeriodOrders(rangeOrders, 'rollingMonth', new Date('2026-08-04T12:00:00+05:00')).map(row => row.id),
+    ['start', 'today']
+  )
+})
 
 function analyticsFor(period) {
   const periodOrders = getDashboardPeriodOrders(orders, period, now)
@@ -202,7 +224,7 @@ test('dashboard period change from 7 days to month updates all widgets to month 
 
   assert.deepEqual(month.ids, ['today', 'week', 'month'])
   assert.equal(month.revenue, 218000)
-  assert.deepEqual(month.payments.map(row => row.key), ['card', 'cash', 'qr'])
+  assert.deepEqual(month.payments.map(row => row.key), ['card', 'cash', 'terminal'])
   assert.deepEqual(month.categories.map(row => row.name), ['First Meal', 'Salads', 'Kebab', 'Drinks'])
   assert.deepEqual(month.best.map(row => row.menuItemId), ['salad', 'lagman', 'kebab', 'cola'])
   assert.deepEqual(month.staff.map(row => row.name), ['Dildora', 'Jasurbek'])
@@ -375,7 +397,7 @@ test('dashboard period change from month to year updates all widgets to year dat
 
   assert.deepEqual(year.ids, ['today', 'week', 'month', 'year'])
   assert.equal(year.revenue, 278000)
-  assert.deepEqual(year.payments.map(row => row.key), ['card', 'cash', 'qr', 'terminal'])
+  assert.deepEqual(year.payments.map(row => row.key), ['terminal', 'card', 'cash'])
   assert.deepEqual(year.categories.map(row => row.name), ['First Meal', 'Drinks', 'Salads', 'Kebab'])
   assert.deepEqual(year.best.map(row => row.menuItemId), ['cola', 'salad', 'lagman', 'kebab'])
   assert.deepEqual(year.staff.map(row => row.name), ['Dildora', 'Jasurbek', 'Aziz'])

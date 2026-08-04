@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Receipt, CreditCard, Menu as MenuIcon, Clock, Users, Search,
-  ChevronDown, Table2, Banknote, Monitor, QrCode,
+  ChevronDown, Table2, Banknote, Monitor,
   UtensilsCrossed, ArrowUpDown, X, HelpCircle, Trash2, RotateCcw, Plus,
   BadgeDollarSign,
 } from 'lucide-react'
@@ -241,7 +241,6 @@ const PAY_METHOD_CONFIG = [
   { key: 'cash',     icon: Banknote,    color: '#16A34A', labelEn: 'Cash',     labelUz: 'Naqd',      labelRu: 'Наличные'    },
   { key: 'card',     icon: CreditCard,  color: '#7C3AED', labelEn: 'Card',     labelUz: 'Karta',     labelRu: 'Карта'       },
   { key: 'terminal', icon: Monitor,     color: '#2563EB', labelEn: 'Terminal', labelUz: 'Terminal',  labelRu: 'Терминал'    },
-  { key: 'qr',       icon: QrCode,      color: '#D97706', labelEn: 'QR Code',  labelUz: 'QR Code',   labelRu: 'QR Код'      },
   { key: 'unknown',  icon: HelpCircle,  color: '#9CA3AF', labelEn: 'Unknown',  labelUz: "Noma'lum",  labelRu: 'Неизвестно'  },
 ]
 
@@ -722,7 +721,7 @@ export default function CashierTables() {
 
   // Payment method breakdown — tracks { amount, count } per method
   const payMethodTotals = useMemo(() => {
-    const KNOWN = ['cash', 'card', 'terminal', 'qr', 'loyalty_card']
+    const KNOWN = ['cash', 'card', 'terminal', 'loyalty_card']
     const map = {}
     paidTodayOrders.forEach(o => {
       const breakdown = getOrderPaymentBreakdown(o)
