@@ -49,6 +49,21 @@ function getPaymentMethod(o) {
   return breakdown[0]?.method || o.payment_method || null
 }
 
+function applyIndividualPaymentMethodChanges(order, changes) {
+  const methodByPaymentId = new Map(changes.map(row => [row.paymentId, row.method]))
+  const payments = (order.payments || []).map(payment => methodByPaymentId.has(payment.id)
+    ? { ...payment, method: methodByPaymentId.get(payment.id) }
+    : payment)
+  const methods = [...new Set(payments
+    .filter(payment => payment.method !== 'loyalty_card' && Number(payment.amount) > 0)
+    .map(payment => payment.method))]
+  return {
+    ...order,
+    payment_method: methods.length > 1 ? 'mixed' : (methods[0] || order.payment_method),
+    payments,
+  }
+}
+
 function addDays(isoDate, n) {
   const d = new Date(isoDate + 'T00:00:00')
   d.setDate(d.getDate() + n)
@@ -179,6 +194,20 @@ function PayBadge({ method, lang }) {
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.cls}`}>
       <Icon size={10} />
       {cfg.label[lang] || cfg.label.en}
+    </span>
+  )
+}
+
+function PaymentMethodBadges({ order, lang }) {
+  const methods = [...new Set(getOrderPaymentBreakdown(order)
+    .filter(row => row.method !== 'loyalty_card' && row.amount > 0)
+    .map(row => row.method))]
+  const visibleMethods = methods.length > 0 ? methods : [order?.payment_method]
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {visibleMethods.filter(Boolean).map(method => (
+        <PayBadge key={method} method={method} lang={lang} />
+      ))}
     </span>
   )
 }
@@ -1248,6 +1277,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
   const change     = order.change_amount   || (received > 0 ? Math.max(0, received - total) : 0)
   const orderNum   = order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '—'
   const sessionCnt = order._orderCount || 1
+  const paymentRows = (order.payments || []).filter(row => Number(row.amount) > 0)
 
   return (
     <div className="flex flex-col h-full">
@@ -1278,7 +1308,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
             { label: lang === 'uz' ? 'Stol'      : lang === 'ru' ? 'Стол'      : 'Table',    value: orderTableLabel(order, lang) },
             { label: lang === 'uz' ? 'Ochgan'    : lang === 'ru' ? 'Открыл'    : 'Opened By', value: order.opened_by_name || order.waiter_name || '—' },
             { label: lang === 'uz' ? 'Yopgan'    : lang === 'ru' ? 'Закрыл'    : 'Completed By', value: order.completed_by_name || '—' },
-            { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PayBadge method={order.payment_method} lang={lang} /> },
+            { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PaymentMethodBadges order={order} lang={lang} /> },
             { label: lang === 'uz' ? 'Yaratildi' : lang === 'ru' ? 'Создан'    : 'Created',  value: fmtDate(order.created_at, lang) },
             { label: lang === 'uz' ? "To'landi"  : lang === 'ru' ? 'Оплачен'   : 'Paid At',  value: fmtDate(order.paid_at, lang) },
             { label: lang === 'uz' ? 'Holat'     : lang === 'ru' ? 'Статус'    : 'Status',   value: <StatusBadge status={order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')} lang={lang} /> },
@@ -1389,21 +1419,38 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
               <div className="grid gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3">
                 <p className="text-[11px] font-semibold leading-relaxed text-orange-800">
                   {lang === 'uz'
-                    ? 'Faqat to‘lov turi o‘zgaradi. Buyurtma, summa, holat va sodiqlik ma’lumotlari o‘zgarmaydi.'
+                    ? 'Har bir to‘lov turini alohida o‘zgartirish mumkin. Summalar va sodiqlik ma’lumotlari o‘zgarmaydi.'
                     : lang === 'ru'
-                      ? 'Изменится только способ оплаты. Заказ, сумма, статус и данные лояльности не изменятся.'
-                      : 'Only the payment method will change. Items, totals, status, and loyalty data stay unchanged.'}
+                      ? 'Каждый способ оплаты можно изменить отдельно. Суммы и данные лояльности не изменятся.'
+                      : 'Each payment method can be changed separately. Amounts and loyalty data stay unchanged.'}
                 </p>
-                <select
-                  value={paymentMethodDraft}
-                  onChange={event => onPaymentMethodDraftChange(event.target.value)}
-                  disabled={savingPaymentOrderId === order.id}
-                  className="h-10 rounded-xl border border-orange-200 bg-white px-3 text-sm font-bold text-[#1F2937] outline-none focus:border-[#ff5a00]"
-                >
-                  <option value="cash">{lang === 'uz' ? 'Naqd' : lang === 'ru' ? 'Наличные' : 'Cash'}</option>
-                  <option value="card">{lang === 'uz' ? 'Karta' : lang === 'ru' ? 'Карта' : 'Card'}</option>
-                  <option value="terminal">Terminal</option>
-                </select>
+                {(paymentRows.length > 0 ? paymentRows : [{ id: 'legacy', method: order.payment_method, amount: total }]).map((row, index) => (
+                  <div key={row.id || `${row.method}-${index}`} className="grid grid-cols-[1fr_150px] items-center gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-[#1F2937]">
+                        {row.method === 'loyalty_card'
+                          ? (lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty')
+                          : `${lang === 'uz' ? "To‘lov" : lang === 'ru' ? 'Платёж' : 'Payment'} ${index + 1}`}
+                      </p>
+                      <p className="text-[11px] text-[#6B7280]">{formatCurrency(row.amount)}</p>
+                    </div>
+                    {row.method === 'loyalty_card' ? (
+                      <div className="flex justify-end"><PayBadge method="loyalty_card" lang={lang} /></div>
+                    ) : (
+                      <select
+                        value={paymentMethodDraft[row.id || 'legacy'] || row.method || 'cash'}
+                        onChange={event => onPaymentMethodDraftChange(row.id || 'legacy', event.target.value)}
+                        disabled={savingPaymentOrderId === order.id}
+                        className="h-10 rounded-xl border border-orange-200 bg-white px-3 text-sm font-bold text-[#1F2937] outline-none focus:border-[#ff5a00]"
+                      >
+                        <option value="cash">{lang === 'uz' ? 'Naqd' : lang === 'ru' ? 'Наличные' : 'Cash'}</option>
+                        <option value="card">{lang === 'uz' ? 'Karta' : lang === 'ru' ? 'Карта' : 'Card'}</option>
+                        <option value="terminal">Terminal</option>
+                        {row.method === 'other' && <option value="other" disabled>{lang === 'uz' ? 'Boshqa' : lang === 'ru' ? 'Другое' : 'Other'}</option>}
+                      </select>
+                    )}
+                  </div>
+                ))}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => onSavePaymentMethod(order)}
@@ -1519,9 +1566,9 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
         <EmptyState label={lang === 'uz' ? 'Buyurtmalar topilmadi' : lang === 'ru' ? 'Заказы не найдены' : 'No orders found'} lang={lang} />
       ) : (
         <div className="w-full overflow-x-auto rounded-2xl border border-[#E5E7EB] shadow-sm">
-        <div className="bg-white rounded-2xl overflow-hidden min-w-[1180px]">
+        <div className="bg-white rounded-2xl overflow-hidden min-w-[1230px]">
           {/* Desktop header */}
-          <div className="hidden lg:grid grid-cols-[80px_90px_120px_120px_145px_90px_110px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
+          <div className="hidden lg:grid grid-cols-[80px_90px_120px_120px_145px_90px_140px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
             <span>{lang === 'uz' ? 'Buyurtma' : lang === 'ru' ? 'Заказ' : 'Order ID'}</span>
             <span>{lang === 'uz' ? 'Stol' : lang === 'ru' ? 'Стол' : 'Table'}</span>
             <span>{lang === 'uz' ? 'Ochgan' : lang === 'ru' ? 'Открыл' : 'Opened by'}</span>
@@ -1550,7 +1597,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                   className={`px-4 py-3 transition-colors cursor-pointer ${isSelected ? 'bg-orange-50/60' : 'hover:bg-gray-50/60'}`}
                 >
                   {/* Desktop row */}
-                  <div className="hidden lg:grid grid-cols-[80px_90px_120px_120px_145px_90px_110px_60px_60px_110px_100px] gap-2 items-center">
+                  <div className="hidden lg:grid grid-cols-[80px_90px_120px_120px_145px_90px_140px_60px_60px_110px_100px] gap-2 items-center">
                     <span className="font-black text-[#ff5a00] text-sm flex items-center gap-1">
                       {orderNum}
                       {sessionCnt > 1 && (
@@ -1562,7 +1609,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                     <span className="text-sm text-[#6B7280] truncate">{(order.completed_by_name || '—').split(' ')[0]}</span>
                     <span className="text-[12px] text-[#6B7280]">{fmtDate(getOrderDate(order), lang)}</span>
                     <span><StatusBadge status={status} lang={lang} /></span>
-                    <span><PayBadge method={order.payment_method} lang={lang} /></span>
+                    <span><PaymentMethodBadges order={order} lang={lang} /></span>
                     <span className="text-center text-sm text-[#6B7280]">{loyaltyUsed > 0 ? formatCurrency(loyaltyUsed) : '—'}</span>
                     <span className="text-center text-sm text-[#6B7280]">{servicePct}%</span>
                     <span className="text-right font-black text-sm text-[#ff5a00]">{formatCurrency(getOrderTotal(order))}</span>
@@ -1594,7 +1641,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                         </p>
                       )}
                       <p className="text-[11px] text-[#9CA3AF] mt-0.5">{fmtDate(getOrderDate(order), lang)}</p>
-                      <div className="mt-1.5"><PayBadge method={order.payment_method} lang={lang} /></div>
+                      <div className="mt-1.5"><PaymentMethodBadges order={order} lang={lang} /></div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
                       <span className="font-black text-[#ff5a00] text-base">{formatCurrency(getOrderTotal(order))}</span>
@@ -1654,7 +1701,7 @@ export default function Reports() {
   const [deletingOrderId, setDeletingOrderId] = useState('')
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
   const [paymentMethodOrderId, setPaymentMethodOrderId] = useState('')
-  const [paymentMethodDraft, setPaymentMethodDraft] = useState('cash')
+  const [paymentMethodDraft, setPaymentMethodDraft] = useState({})
   const [savingPaymentOrderId, setSavingPaymentOrderId] = useState('')
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
@@ -1832,41 +1879,66 @@ export default function Reports() {
     const currentMethod = ['cash', 'card', 'terminal'].includes(order.payment_method)
       ? order.payment_method
       : 'cash'
+    const editablePayments = (order.payments || []).filter(payment => payment.id && payment.method !== 'loyalty_card')
     setConfirmDeleteOrderId('')
-    setPaymentMethodDraft(currentMethod)
+    setPaymentMethodDraft(editablePayments.length > 0
+      ? Object.fromEntries(editablePayments.map(payment => [payment.id, payment.method || 'cash']))
+      : { legacy: currentMethod })
     setPaymentMethodOrderId(order.id)
+  }
+
+  function changePaymentMethodDraft(paymentId, method) {
+    setPaymentMethodDraft(current => ({ ...current, [paymentId]: method }))
   }
 
   async function saveCompletedOrderPaymentMethod(order) {
     if (!canChangePaymentMethod || !order?.id || savingPaymentOrderId || paymentMethodOrderId !== order.id) return
     const orderIds = [...new Set((order._mergedIds?.length ? order._mergedIds : [order.id]).filter(Boolean))]
+    const editablePayments = (order.payments || [])
+      .filter(payment => payment.id && payment.method !== 'loyalty_card')
+    const changes = editablePayments
+      .map(payment => ({ paymentId: payment.id, method: paymentMethodDraft[payment.id] || payment.method, previousMethod: payment.method }))
+      .filter(change => change.method !== change.previousMethod)
+      .map(({ paymentId, method }) => ({ paymentId, method }))
+    if (editablePayments.length > 0 && changes.length === 0) {
+      setPaymentMethodOrderId('')
+      return
+    }
     setSavingPaymentOrderId(order.id)
     try {
-      const result = await dispatch({
-        type: 'CHANGE_PAID_ORDER_PAYMENT_METHOD',
-        payload: { orderIds, paymentMethod: paymentMethodDraft },
-      })
+      const result = editablePayments.length > 0
+        ? await dispatch({
+            type: 'CHANGE_PAID_ORDER_PAYMENT_METHODS',
+            payload: { changes },
+          })
+        : await dispatch({
+            type: 'CHANGE_PAID_ORDER_PAYMENT_METHOD',
+            payload: { orderIds, paymentMethod: paymentMethodDraft.legacy },
+          })
       if (result?.error) return
-      setHistoryOrders(current => current.map(row => orderIds.includes(row.id)
-        ? {
-            ...row,
-            payment_method: paymentMethodDraft,
-            payments: (row.payments || []).map(payment => payment.method === 'loyalty_card'
-              ? payment
-              : { ...payment, method: paymentMethodDraft }
-            ),
-          }
-        : row
-      ))
+      setHistoryOrders(current => current.map(row => {
+        if (!orderIds.includes(row.id)) return row
+        if (changes.length > 0) return applyIndividualPaymentMethodChanges(row, changes)
+        return {
+          ...row,
+          payment_method: paymentMethodDraft.legacy,
+          payments: (row.payments || []).map(payment => payment.method === 'loyalty_card'
+            ? payment
+            : { ...payment, method: paymentMethodDraft.legacy }
+          ),
+        }
+      }))
       setSelectedOrder(current => current?.id === order.id
-        ? {
-            ...current,
-            payment_method: paymentMethodDraft,
-            payments: (current.payments || []).map(payment => payment.method === 'loyalty_card'
-              ? payment
-              : { ...payment, method: paymentMethodDraft }
-            ),
-          }
+        ? (changes.length > 0
+            ? applyIndividualPaymentMethodChanges(current, changes)
+            : {
+                ...current,
+                payment_method: paymentMethodDraft.legacy,
+                payments: (current.payments || []).map(payment => payment.method === 'loyalty_card'
+                  ? payment
+                  : { ...payment, method: paymentMethodDraft.legacy }
+                ),
+              })
         : current
       )
       setPaymentMethodOrderId('')
@@ -2126,7 +2198,7 @@ export default function Reports() {
                 paymentMethodOrderId={paymentMethodOrderId}
                 paymentMethodDraft={paymentMethodDraft}
                 onStartPaymentMethodChange={startPaymentMethodChange}
-                onPaymentMethodDraftChange={setPaymentMethodDraft}
+                onPaymentMethodDraftChange={changePaymentMethodDraft}
                 onSavePaymentMethod={saveCompletedOrderPaymentMethod}
                 onCancelPaymentMethod={() => setPaymentMethodOrderId('')}
                 savingPaymentOrderId={savingPaymentOrderId}

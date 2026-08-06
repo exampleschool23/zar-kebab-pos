@@ -460,6 +460,29 @@ export function ordersReducer(state, action) {
       }
     }
 
+    case 'CHANGE_PAID_ORDER_PAYMENT_METHODS': {
+      const methodByPaymentId = new Map((action.payload?.changes || [])
+        .filter(row => row?.paymentId && ['cash', 'card', 'terminal'].includes(row?.method))
+        .map(row => [row.paymentId, row.method]))
+      if (methodByPaymentId.size === 0) return state
+
+      return {
+        ...state,
+        orders: state.orders.map(order => {
+          const payments = (order.payments || []).map(payment => methodByPaymentId.has(payment.id)
+            ? { ...payment, method: methodByPaymentId.get(payment.id) }
+            : payment)
+          if (!payments.some((payment, index) => payment !== (order.payments || [])[index])) return order
+          const nonLoyaltyPayments = payments.filter(payment => payment.method !== 'loyalty_card')
+          return {
+            ...order,
+            payment_method: getPaymentMethodSummary(nonLoyaltyPayments, order.payment_method),
+            payments,
+          }
+        }),
+      }
+    }
+
     case 'DELETE_ORDER': {
       const orderId = typeof action.payload === 'string' ? action.payload : action.payload?.orderId
       if (!orderId) return state

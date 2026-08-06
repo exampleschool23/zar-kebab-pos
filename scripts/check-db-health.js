@@ -177,6 +177,11 @@ const checks = await Promise.all([
     'cashier write access is required'
   ),
   checkRpc(
+    'change_paid_order_payment_methods_owner(p_changes)',
+    () => supabase.rpc('change_paid_order_payment_methods_owner', { p_changes: [] }),
+    'only owner can change a completed order payment method'
+  ),
+  checkRpc(
     'recall_table_from_cashier(p_table_id)',
     () => supabase.rpc('recall_table_from_cashier', { p_table_id: '__db_health_check__' }),
     'cashier access is required'

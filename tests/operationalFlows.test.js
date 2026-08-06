@@ -139,6 +139,37 @@ test('owner correction changes only the completed order payment method', () => {
   assert.deepEqual(changed.tables, base.tables)
 })
 
+test('owner correction can change one split payment without changing amounts or loyalty', () => {
+  const base = {
+    ...state(),
+    orders: [{
+      id: 'o1',
+      status: 'paid',
+      payment_status: 'paid',
+      payment_method: 'cash',
+      total: 126500,
+      payments: [
+        { id: 'p1', method: 'cash', amount: 55000 },
+        { id: 'p2', method: 'cash', amount: 66500 },
+        { id: 'p3', method: 'loyalty_card', amount: 5000 },
+      ],
+    }],
+  }
+
+  const changed = ordersReducer(base, {
+    type: 'CHANGE_PAID_ORDER_PAYMENT_METHODS',
+    payload: { changes: [{ paymentId: 'p2', method: 'card' }] },
+  })
+
+  assert.equal(changed.orders[0].payment_method, 'mixed')
+  assert.deepEqual(changed.orders[0].payments, [
+    { id: 'p1', method: 'cash', amount: 55000 },
+    { id: 'p2', method: 'card', amount: 66500 },
+    { id: 'p3', method: 'loyalty_card', amount: 5000 },
+  ])
+  assert.equal(changed.orders[0].total, 126500)
+})
+
 test('kitchen can cancel one unavailable item without cancelling the rest of the order', () => {
   const sent = ordersReducer(state(), {
     type: 'SEND_TO_KITCHEN',

@@ -1150,6 +1150,21 @@ export async function writeToSupabase(action, state, options = {}) {
       break
     }
 
+    case 'CHANGE_PAID_ORDER_PAYMENT_METHODS': {
+      const changes = (action.payload?.changes || [])
+        .map(row => ({
+          paymentId: String(row?.paymentId || '').trim(),
+          method: String(row?.method || '').trim().toLowerCase(),
+        }))
+        .filter(row => row.paymentId && row.method)
+      if (changes.length === 0) return
+      const { error } = await supabase.rpc('change_paid_order_payment_methods_owner', {
+        p_changes: changes,
+      })
+      if (error) throw error
+      break
+    }
+
     case 'DELETE_ORDER': {
       const orderId = typeof action.payload === 'string' ? action.payload : action.payload?.orderId
       if (!orderId) return

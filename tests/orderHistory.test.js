@@ -37,6 +37,38 @@ test('full report history merges paid, unpaid, and cancelled rows for the select
   ])
 })
 
+test('fresh historical payment rows are not replaced by stale operational payment data', () => {
+  const history = [{
+    id: 'paid',
+    payment_status: 'paid',
+    payment_method: 'mixed',
+    paid_at: '2025-12-03T10:00:00+05:00',
+    payments: [
+      { id: 'p1', method: 'cash', amount: 55000 },
+      { id: 'p2', method: 'card', amount: 71500 },
+    ],
+  }]
+  const live = [{
+    id: 'paid',
+    payment_status: 'paid',
+    payment_method: 'cash',
+    paid_at: '2025-12-03T10:00:00+05:00',
+    total: 126500,
+    payments: [
+      { id: 'p1', method: 'cash', amount: 55000 },
+      { id: 'p2', method: 'cash', amount: 71500 },
+    ],
+  }]
+
+  const [merged] = mergeOrderHistory(history, live, '2025-12-01', '2025-12-31')
+  assert.equal(merged.total, 126500)
+  assert.equal(merged.payment_method, 'mixed')
+  assert.deepEqual(merged.payments.map(row => [row.method, row.amount]), [
+    ['cash', 55000],
+    ['card', 71500],
+  ])
+})
+
 test('order history pagination reads every page without truncating at one response', async () => {
   const source = Array.from({ length: 1_205 }, (_, index) => ({ id: `order-${index}` }))
   const ranges = []

@@ -166,7 +166,22 @@ export function mergeOrderHistory(historyOrders = [], liveOrders = [], dateFrom,
     .map(order => [order.id, order]))
   for (const order of liveOrders || []) {
     if (!order?.id || !matchesRange(order, dateFrom, dateTo)) continue
-    byId.set(order.id, order)
+    const historyOrder = byId.get(order.id)
+    if (!historyOrder) {
+      byId.set(order.id, order)
+      continue
+    }
+    const historyPayments = historyOrder.payments || historyOrder.order_payments
+    byId.set(order.id, {
+      ...historyOrder,
+      ...order,
+      ...(Array.isArray(historyPayments) && historyPayments.length > 0
+        ? {
+            payment_method: historyOrder.payment_method,
+            payments: historyPayments,
+          }
+        : {}),
+    })
   }
   return [...byId.values()]
 }

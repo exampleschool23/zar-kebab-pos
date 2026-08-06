@@ -207,6 +207,12 @@ These bugs were recently fixed and are now protected by tests:
    - A rate-change message includes the applicable previous rate when available, the new amount and unit, and its effective date; initial salary setup is not treated as a change.
    - A Telegram notification is marked sent only after Telegram returns a message id.
 
+21. Completed split payments must remain individually correctable.
+   - The owner correction UI shows every saved payment row with its fixed amount and an independent method selector.
+   - Migration `117` updates the selected `order_payments` rows atomically and recalculates each affected order's summary method (`cash`, `card`, `terminal`, or `mixed`).
+   - Loyalty payment rows are visible but immutable because changing them requires a separate wallet reversal workflow.
+   - Individual corrections must never change payment amounts, order items, totals, paid status/time, or loyalty data.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -285,6 +291,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/116_salary_rate_change_telegram_notifications.sql`
   Adds database-first, duplicate-safe private employee and salary-group delivery tracking for genuine salary-rate changes without announcing an employee's initial rate.
+
+- `supabase/117_owner_change_individual_payment_methods.sql`
+  Lets owners correct each non-loyalty payment method independently on a completed check while preserving amounts and recalculating the order-level method summary.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
