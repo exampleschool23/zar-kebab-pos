@@ -266,7 +266,7 @@ async function loadPublicMenuData(now = new Date()) {
   console.warn('[guest-menu] public menu RPC unavailable, falling back to direct selects', rpcRes.error)
   const [catRes, itemRes] = await Promise.all([
     supabase.from('menu_categories').select('*').order('sort_order'),
-    supabase.from('menu_items').select('*').eq('available', true).order('sort_order'),
+    supabase.from('menu_items').select('*').order('sort_order'),
   ])
 
   if (catRes.error || itemRes.error) {

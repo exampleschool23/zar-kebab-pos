@@ -105,9 +105,12 @@ export function isActiveMenuItem(item) {
   return !!item && !isDeletedMenuItem(item)
 }
 
+export function isMenuItemOrderable(item) {
+  return isActiveMenuItem(item) && item?.available === true
+}
+
 export function isCustomerMenuItem(item, date = new Date()) {
   return isActiveMenuItem(item) &&
-    !!item?.available &&
     !isCashierOnlyItem(item) &&
     !isPublicHiddenMenuItem(item) &&
     isWithinMenuTimeWindow(item, date)
@@ -115,7 +118,6 @@ export function isCustomerMenuItem(item, date = new Date()) {
 
 export function isWaiterMenuItem(item, date = new Date()) {
   return isActiveMenuItem(item) &&
-    !!item?.available &&
     !isCashierOnlyItem(item) &&
     !isWaiterHiddenMenuItem(item) &&
     isWithinMenuTimeWindow(item, date)

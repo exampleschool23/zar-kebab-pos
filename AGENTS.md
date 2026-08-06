@@ -213,6 +213,14 @@ These bugs were recently fixed and are now protected by tests:
    - Loyalty payment rows are visible but immutable because changing them requires a separate wallet reversal workflow.
    - Individual corrections must never change payment amounts, order items, totals, paid status/time, or loyalty data.
 
+22. Temporarily unavailable meals must remain visible without becoming orderable.
+   - `menu_items.available` controls whether a meal can be ordered; it no longer controls whether an active meal is visible.
+   - Public, Telegram, and waiter menus show unavailable meals in a disabled state, and waiter add/increment/detail-submit paths must reject them.
+   - `public_hidden`, `waiter_hidden`, `cashier_only`, menu time windows, and category visibility remain separate audience filters and must still hide matching products.
+   - `deleted_at` is the archive boundary. Archived products and categories must never reappear merely because unavailable meals are now visible.
+   - `stock_count` is shelf inventory and is not an availability flag; do not infer menu visibility or orderability from a zero stock count.
+   - Migration `118` returns active unavailable products from the customer-menu RPC and anonymous select policy while preserving every explicit hiding and archive rule.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -294,6 +302,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/117_owner_change_individual_payment_methods.sql`
   Lets owners correct each non-loyalty payment method independently on a completed check while preserving amounts and recalculating the order-level method summary.
+
+- `supabase/118_show_unavailable_menu_items.sql`
+  Keeps active unavailable meals visible in customer menu data while retaining public-hidden, cashier-only, schedule, category, and archive filters.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
@@ -466,4 +477,5 @@ The Vite build currently emits a large chunk warning. That warning is known and 
 - Do not clear the whole cart after async submits.
 - Do not assume applying migration `018` means the database has `011` or `012`.
 - Do not hard-delete tables with order history; disable them so reports and receipts stay intact.
+- Do not use `available` as a visibility filter or `stock_count` as an availability proxy; explicit hidden, schedule, cashier-only, and archive fields control menu visibility.
 - Do not trust old browser console logs after hot reloads without checking timestamps.

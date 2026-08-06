@@ -260,6 +260,7 @@ export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
 
 export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu', density = 'comfortable' }) {
   const inCart = !readOnly && qty > 0
+  const unavailable = item?.available === false
   const [copied, setCopied] = useState(false)
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
@@ -272,6 +273,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   const labels = {
     copy: lang === 'uz' ? 'Havolani nusxalash' : lang === 'ru' ? 'Скопировать ссылку' : 'Copy link',
     copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
+    unavailable: lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Недоступно' : 'Unavailable',
   }
 
   async function copyProductLink(event) {
@@ -304,19 +306,21 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onOpenDetail(item)}
-      className={`group flex h-full flex-col overflow-hidden bg-white transition-all cursor-pointer select-none ${
-        inCart
-          ? 'rounded-[18px] border-2 border-[#ff5a00]/40 shadow-md shadow-orange-100/60'
+      className={`group flex h-full flex-col overflow-hidden transition-all cursor-pointer select-none ${
+        unavailable
+          ? 'rounded-[18px] border-2 border-[#D1D5DB] bg-[#F3F4F6] shadow-none'
+          : inCart
+          ? 'rounded-[18px] border-2 border-[#ff5a00]/40 bg-white shadow-md shadow-orange-100/60'
           : showCompactPublicCard
-            ? 'rounded-[18px] border border-[#E6EAF0] shadow-sm hover:-translate-y-0.5 hover:border-[#D8DEE8] hover:shadow-md'
-            : 'rounded-[18px] border-2 border-[#E5E7EB] shadow-sm hover:shadow-md hover:border-gray-200'
+            ? 'rounded-[18px] border border-[#E6EAF0] bg-white shadow-sm hover:-translate-y-0.5 hover:border-[#D8DEE8] hover:shadow-md'
+            : 'rounded-[18px] border-2 border-[#E5E7EB] bg-white shadow-sm hover:shadow-md hover:border-gray-200'
       }`}
     >
       <div data-menu-product-image className={`relative aspect-square w-full flex-shrink-0 overflow-hidden bg-orange-50 ${showCompactPublicCard ? 'rounded-b-[14px]' : ''}`}>
         <SafeMenuImage
           src={item.image_url}
           alt={getItemName(item, lang)}
-          className="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.02]"
+          className={`h-full w-full object-cover object-center transition-all duration-300 ${unavailable ? 'grayscale opacity-55' : 'group-hover:scale-[1.02]'}`}
           fallbackIconSize={34}
           loading={eager ? 'eager' : 'lazy'}
           fetchPriority={eager ? 'high' : undefined}
@@ -325,6 +329,11 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           <span className="pointer-events-none absolute left-2 top-2 inline-flex h-8 items-center gap-1 rounded-full border border-white/80 bg-black/55 px-2.5 text-[10px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur">
             <Play size={12} fill="currentColor" />
             Video
+          </span>
+        )}
+        {unavailable && (
+          <span className="pointer-events-none absolute bottom-2 left-2 rounded-full border border-white/80 bg-[#4B5563]/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur">
+            {labels.unavailable}
           </span>
         )}
         {inCart && (
@@ -346,7 +355,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
       </div>
 
       <div className={`${showCompactPublicCard ? 'p-3 pt-2.5' : dense ? 'p-2.5' : 'p-3'} flex flex-col flex-1`}>
-        <h3 className={`${showCompactPublicCard ? 'text-[13px] sm:text-[15px]' : dense ? 'text-[14px] mb-0.5 flex-1' : 'text-[15px] mb-1 flex-1'} font-bold text-[#1F2937] line-clamp-2 leading-snug`}>
+        <h3 className={`${showCompactPublicCard ? 'text-[13px] sm:text-[15px]' : dense ? 'text-[14px] mb-0.5 flex-1' : 'text-[15px] mb-1 flex-1'} font-bold ${unavailable ? 'text-[#6B7280]' : 'text-[#1F2937]'} line-clamp-2 leading-snug`}>
           {getItemName(item, lang)}
         </h3>
         {showCompactPublicCard && getItemDesc(item, lang) && (
@@ -360,7 +369,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             {pricing.discounted && (
               <p className={`${showCompactPublicCard ? 'text-[13px]' : 'text-[12px]'} font-bold text-[#9CA3AF] line-through`}>{formatPrice(pricing.oldPrice)}</p>
             )}
-            <p className={`${pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[16px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
+            <p className={`${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[16px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
               {formatPrice(pricing.price)}{priceUnit}
             </p>
           </div>
@@ -388,7 +397,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         {readOnly ? null : inCart ? (
           <div
             onClick={e => e.stopPropagation()}
-            className="flex items-center justify-between bg-[#fff1e8] rounded-xl px-2 py-1 border border-[#ff5a00]/20"
+            className={`flex items-center justify-between rounded-xl border px-2 py-1 ${unavailable ? 'border-[#D1D5DB] bg-[#E5E7EB]' : 'border-[#ff5a00]/20 bg-[#fff1e8]'}`}
           >
             <button
               onClick={e => { e.stopPropagation(); onDecrement(item) }}
@@ -396,10 +405,11 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             >
               <Minus size={14} className="text-[#6B7280]" />
             </button>
-            <span className="font-black text-[18px] text-[#ff5a00] min-w-[24px] text-center">{formatMenuQuantity(qty, item)}</span>
+            <span className={`min-w-[24px] text-center text-[18px] font-black ${unavailable ? 'text-[#6B7280]' : 'text-[#ff5a00]'}`}>{formatMenuQuantity(qty, item)}</span>
             <button
               onClick={e => { e.stopPropagation(); onIncrement(item, cartAnimationPayload(e)) }}
-              className="w-9 h-9 rounded-xl bg-[#ff5a00] flex items-center justify-center hover:bg-[#cc4800] active:scale-90 transition-all shadow-sm"
+              disabled={unavailable}
+              className="w-9 h-9 rounded-xl bg-[#ff5a00] flex items-center justify-center hover:bg-[#cc4800] active:scale-90 transition-all shadow-sm disabled:cursor-not-allowed disabled:bg-[#9CA3AF] disabled:shadow-none"
             >
               <Plus size={14} className="text-white" />
             </button>
@@ -407,11 +417,12 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         ) : (
           <button
             onClick={e => { e.stopPropagation(); onAdd(item, cartAnimationPayload(e)) }}
-            className="w-full rounded-xl bg-[#fff1e8] text-[#ff5a00] border border-[#ff5a00]/20 text-[13px] font-bold hover:bg-[#ff5a00] hover:text-white active:scale-95 transition-all flex items-center justify-center gap-1.5"
+            disabled={unavailable}
+            className="w-full rounded-xl bg-[#fff1e8] text-[#ff5a00] border border-[#ff5a00]/20 text-[13px] font-bold hover:bg-[#ff5a00] hover:text-white active:scale-95 transition-all flex items-center justify-center gap-1.5 disabled:cursor-not-allowed disabled:border-[#D1D5DB] disabled:bg-[#E5E7EB] disabled:text-[#6B7280]"
             style={{ height: dense ? '34px' : '40px' }}
           >
-            <Plus size={14} />
-            {lang === 'uz' ? "Qo'shish" : lang === 'ru' ? 'Добавить' : 'Add'}
+            {!unavailable && <Plus size={14} />}
+            {unavailable ? labels.unavailable : lang === 'uz' ? "Qo'shish" : lang === 'ru' ? 'Добавить' : 'Add'}
           </button>
         )}
       </div>
@@ -444,6 +455,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const soldByWeight = isMenuItemSoldByWeight(item)
   const priceUnit = menuPriceUnitSuffix(item, lang)
   const mediaUrls = getMenuItemMediaUrls(item)
+  const unavailable = item?.available === false
   const displayedMediaUrl = mediaUrls.includes(activeMediaUrl) ? activeMediaUrl : mediaUrls[0] || ''
   const optionGroups = getMenuItemOptionGroups(item, lang, { audience })
   const missingRequiredOptions = optionGroups.some(group => (
@@ -475,6 +487,12 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     add: lang === 'uz' ? "Savatga qo'shish" : lang === 'ru' ? 'Добавить в корзину' : 'Add to Cart',
     copy: lang === 'uz' ? 'Havolani nusxalash' : lang === 'ru' ? 'Скопировать ссылку' : 'Copy link',
     copied: lang === 'uz' ? 'Nusxalandi' : lang === 'ru' ? 'Скопировано' : 'Copied',
+    unavailable: lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Недоступно' : 'Unavailable',
+    unavailableSub: lang === 'uz'
+      ? 'Bu taomni hozir buyurtmaga qo‘shib bo‘lmaydi.'
+      : lang === 'ru'
+        ? 'Это блюдо сейчас нельзя добавить в заказ.'
+        : 'This meal cannot be added to an order right now.',
   }
   const optionSectionTitle = lang === 'uz' ? 'Variantlar' : lang === 'ru' ? 'Варианты' : 'Options'
   const noAvailableOptions = lang === 'uz'
@@ -504,7 +522,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
           <ArrowLeft size={20} />
         </button>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-black uppercase tracking-tight text-[#111827]">{name}</h1>
+          <h1 className={`truncate text-xl font-black uppercase tracking-tight ${unavailable ? 'text-[#6B7280]' : 'text-[#111827]'}`}>{name}</h1>
           {category && (
             <p className="mt-0.5 text-xs font-black uppercase tracking-wider text-[#FF4D00]">
               {getCategoryName(category, lang)}
@@ -530,7 +548,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
               {formatPrice(pricing.oldPrice)}
             </p>
           )}
-          <p className={`whitespace-nowrap text-xl sm:text-2xl font-black tabular-nums ${pricing.discounted ? 'text-red-600' : 'text-[#FF4D00]'}`}>
+          <p className={`whitespace-nowrap text-xl sm:text-2xl font-black tabular-nums ${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#FF4D00]'}`}>
             {formatPrice(pricing.price)}{priceUnit}
           </p>
           {(grams || millilitres || kcal) && (
@@ -563,7 +581,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                 <SafeMenuImage
                   src={displayedMediaUrl}
                   alt={name}
-                  className="h-full w-full object-cover object-center"
+                  className={`h-full w-full object-cover object-center ${unavailable ? 'grayscale opacity-55' : ''}`}
                   fallbackIconSize={64}
                   controls={isMenuVideoUrl(displayedMediaUrl)}
                 />
@@ -611,12 +629,20 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                     {getCategoryName(category, lang)}
                   </span>
                 )}
-                <h2 className="text-2xl font-black uppercase tracking-tight text-[#111827] sm:text-3xl">{name}</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className={`text-2xl font-black uppercase tracking-tight sm:text-3xl ${unavailable ? 'text-[#6B7280]' : 'text-[#111827]'}`}>{name}</h2>
+                  {unavailable && (
+                    <span className="inline-flex rounded-full bg-[#E5E7EB] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#4B5563] ring-1 ring-[#D1D5DB]">
+                      {labels.unavailable}
+                    </span>
+                  )}
+                </div>
+                {unavailable && <p className="mt-2 text-sm font-semibold text-[#6B7280]">{labels.unavailableSub}</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {pricing.discounted && (
                     <p className="text-sm font-bold text-[#9CA3AF] line-through">{formatPrice(pricing.oldPrice)}</p>
                   )}
-                  <p className={`${pricing.discounted ? 'text-xl text-red-600' : 'text-lg text-[#FF4D00]'} font-black`}>
+                  <p className={`${unavailable ? 'text-lg text-[#6B7280]' : pricing.discounted ? 'text-xl text-red-600' : 'text-lg text-[#FF4D00]'} font-black`}>
                     {formatPrice(pricing.price)}{priceUnit}
                   </p>
                   {grams && (
@@ -725,8 +751,9 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                           min={menuQuantityStep(item)}
                           step={menuQuantityStep(item)}
                           value={qty}
+                          disabled={unavailable}
                           onChange={event => setQty(normalizeMenuQuantity(event.target.value, item))}
-                          className="w-20 bg-transparent text-center text-2xl font-black leading-none text-[#111827] tabular-nums outline-none"
+                          className="w-20 bg-transparent text-center text-2xl font-black leading-none text-[#111827] tabular-nums outline-none disabled:cursor-not-allowed disabled:text-[#9CA3AF]"
                           aria-label={labels.quantity}
                         />
                         <span className="text-sm font-black text-[#64748B]">kg</span>
@@ -736,7 +763,8 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                     )}
                     <button
                       onClick={() => setQty(q => changeMenuQuantity(q, item, 1))}
-                      className="w-12 h-12 rounded-2xl bg-[#0F3B2E] flex items-center justify-center text-white hover:bg-[#0A2A20] active:scale-95 transition-all shadow-sm"
+                      disabled={unavailable}
+                      className="w-12 h-12 rounded-2xl bg-[#0F3B2E] flex items-center justify-center text-white hover:bg-[#0A2A20] active:scale-95 transition-all shadow-sm disabled:cursor-not-allowed disabled:bg-[#9CA3AF] disabled:shadow-none"
                     >
                       <Plus size={20} />
                     </button>
@@ -775,11 +803,11 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
               {t(lang, 'cancel')}
           </button>
           <button
-            onClick={() => { if (!missingRequiredOptions) onAddToCart(item, qty, finalNotes, selectedOptions, selectedOptionFullPrice - item.price) }}
-            disabled={missingRequiredOptions}
+            onClick={() => { if (!unavailable && !missingRequiredOptions) onAddToCart(item, qty, finalNotes, selectedOptions, selectedOptionFullPrice - item.price) }}
+            disabled={unavailable || missingRequiredOptions}
             className="h-14 flex-[2] rounded-2xl bg-[#0F3B2E] text-sm sm:text-base font-black text-white hover:bg-[#0A2A20] active:scale-[0.99] transition-all shadow-[0_8px_18px_rgba(15,59,46,0.22)] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] disabled:shadow-none"
           >
-            {labels.add} - {formatPrice(total)}
+            {unavailable ? labels.unavailable : `${labels.add} - ${formatPrice(total)}`}
           </button>
         </div>
       </div>

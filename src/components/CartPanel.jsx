@@ -66,6 +66,8 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
   const displayName = menuItem ? getItemName(menuItem, lang) : item.name
   const quantitySource = { ...menuItem, sale_unit: item.sale_unit || menuItem?.sale_unit }
   const soldByWeight = isMenuItemSoldByWeight(quantitySource)
+  const unavailable = !menuItem || menuItem.available === false
+  const unavailableLabel = lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Недоступно' : 'Unavailable'
 
   function decrement() {
     const qty = changeMenuQuantity(item.quantity, quantitySource, -1)
@@ -82,7 +84,7 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
       {/* Thumbnail */}
       <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-orange-50 border border-[#F3F4F6]">
         {menuItem?.image_url ? (
-          <img src={menuItem.image_url} alt="" className="w-full h-full object-cover" />
+          <img src={menuItem.image_url} alt="" className={`h-full w-full object-cover ${unavailable ? 'grayscale opacity-55' : ''}`} />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <UtensilsCrossed size={16} className="text-orange-300" />
@@ -104,6 +106,12 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
             <Trash2 size={13} />
           </button>
         </div>
+
+        {unavailable && (
+          <p className="mb-1.5 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-gray-600 ring-1 ring-gray-200">
+            {unavailableLabel}
+          </p>
+        )}
 
         {desc && <p className="text-[12px] text-[#9CA3AF] line-clamp-1 mb-1.5">{desc}</p>}
         {optionLines.map((line, index) => (
@@ -147,11 +155,12 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
                   min={menuQuantityStep(quantitySource)}
                   step={menuQuantityStep(quantitySource)}
                   value={item.quantity}
+                  disabled={unavailable}
                   onChange={event => dispatch({
                     type: 'UPDATE_CART_QTY',
                     payload: { cart_item_key: cartItemKey, qty: normalizeMenuQuantity(event.target.value, quantitySource) },
                   })}
-                  className="w-14 bg-transparent text-center text-[17px] font-black leading-none text-[#1F2937] tabular-nums outline-none"
+                  className="w-14 bg-transparent text-center text-[17px] font-black leading-none text-[#1F2937] tabular-nums outline-none disabled:cursor-not-allowed disabled:text-[#9CA3AF]"
                   aria-label={lang === 'ru' ? 'Вес (кг)' : lang === 'uz' ? 'Og‘irligi (kg)' : 'Weight (kg)'}
                 />
                 <span className="text-[11px] font-black text-[#64748B]">kg</span>
@@ -163,7 +172,8 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
             )}
             <button
               onClick={increment}
-              className="w-9 h-9 rounded-lg bg-[#ff5a00] flex items-center justify-center hover:bg-[#cc4800] active:scale-90 transition-all shadow-sm"
+              disabled={unavailable}
+              className="w-9 h-9 rounded-lg bg-[#ff5a00] flex items-center justify-center hover:bg-[#cc4800] active:scale-90 transition-all shadow-sm disabled:cursor-not-allowed disabled:bg-[#9CA3AF] disabled:shadow-none"
             >
               <Plus size={13} className="text-white" />
             </button>
@@ -210,6 +220,19 @@ export default function CartPanel({
     state.menuItems.forEach(i => { map[i.id] = i })
     return map
   }, [state.menuItems])
+  const unavailableCartItems = useMemo(
+    () => cart.filter(item => {
+      const menuItem = menuItemMap[item.menu_item_id]
+      return !menuItem || menuItem.available === false
+    }),
+    [cart, menuItemMap]
+  )
+  const hasUnavailableCartItems = unavailableCartItems.length > 0
+  const unavailableCartMessage = lang === 'uz'
+    ? 'Mavjud bo‘lmagan taomlarni savatdan olib tashlang. Ularni buyurtmaga yuborib bo‘lmaydi.'
+    : lang === 'ru'
+      ? 'Удалите недоступные блюда из корзины. Их нельзя отправить в заказ.'
+      : 'Remove unavailable meals from the cart. They cannot be submitted with the order.'
 
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : configuredServiceRatePct
@@ -221,6 +244,10 @@ export default function CartPanel({
 
   async function handleSend() {
     if (cart.length === 0 || isSending) return
+    if (hasUnavailableCartItems) {
+      setMessage({ tone: 'error', text: unavailableCartMessage })
+      return
+    }
     setMessage(null)
     onSendingChange?.(true)
     const fingerprint = cartSubmissionFingerprint(cart, orderType, normalizedPriceMode)
@@ -357,6 +384,11 @@ export default function CartPanel({
 
       {/* ── Summary + Send button ──────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-t border-[#F3F4F6] px-4 pt-4 pb-5">
+        {hasUnavailableCartItems && (
+          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-bold text-amber-800">
+            {unavailableCartMessage}
+          </div>
+        )}
         {message && (
           <div className={`mb-3 rounded-xl px-3 py-2 text-[12px] font-bold ${
             message.tone === 'error'
@@ -392,11 +424,11 @@ export default function CartPanel({
 
         <button
           onClick={handleSend}
-          disabled={cart.length === 0 || isSending}
+          disabled={cart.length === 0 || isSending || hasUnavailableCartItems}
           className={`w-full rounded-xl font-black text-[14px] active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
-            cart.length > 0 && !isSending
+            cart.length > 0 && !isSending && !hasUnavailableCartItems
               ? 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-lg shadow-orange-200'
-              : cart.length > 0
+              : cart.length > 0 && isSending
                 ? 'bg-[#ff5a00] text-white opacity-80 cursor-wait shadow-lg shadow-orange-200'
                 : 'bg-[#F3F4F6] text-[#D1D5DB] cursor-not-allowed'
           }`}
@@ -405,7 +437,9 @@ export default function CartPanel({
           {isSending ? <Loader2 size={17} className="animate-spin" /> : <UtensilsCrossed size={17} />}
           {isSending
             ? (lang === 'uz' ? 'Yuborilmoqda...' : lang === 'ru' ? 'Отправка...' : 'Sending...')
-            : (lang === 'uz' ? 'Buyurtmani yuborish' : lang === 'ru' ? 'Отправить заказ' : 'Submit order')}
+            : hasUnavailableCartItems
+              ? (lang === 'uz' ? 'Mavjud bo‘lmagan taomni olib tashlang' : lang === 'ru' ? 'Удалите недоступное блюдо' : 'Remove unavailable meal')
+              : (lang === 'uz' ? 'Buyurtmani yuborish' : lang === 'ru' ? 'Отправить заказ' : 'Submit order')}
         </button>
       </div>
     </div>

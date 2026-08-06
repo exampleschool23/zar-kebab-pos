@@ -36,7 +36,7 @@ async function loadTelegramMenuData(now = new Date()) {
 
   const [catRes, itemRes] = await Promise.all([
     supabase.from('menu_categories').select('*').order('sort_order'),
-    supabase.from('menu_items').select('*').eq('available', true).order('sort_order'),
+    supabase.from('menu_items').select('*').order('sort_order'),
   ])
   if (catRes.error || itemRes.error) throw catRes.error || itemRes.error
   const categories = (catRes.data || []).filter(category => isCustomerMenuCategory(category, now))
@@ -65,6 +65,7 @@ const T = {
     loadError: 'Telegram mini ilovasini yuklab bo‘lmadi.',
     invalidCard: '8 xonali karta raqamini kiriting.',
     availableBalance: amount => `Mavjud balans: ${amount}`,
+    unavailable: 'Mavjud emas',
     cardNotFound: 'Karta topilmadi.',
   },
   ru: {
@@ -84,6 +85,7 @@ const T = {
     loadError: 'Не удалось загрузить Telegram mini app.',
     invalidCard: 'Введите 8-значный номер карты.',
     availableBalance: amount => `Доступный баланс: ${amount}`,
+    unavailable: 'Недоступно',
     cardNotFound: 'Карта не найдена.',
   },
   en: {
@@ -103,6 +105,7 @@ const T = {
     loadError: 'Telegram Mini App failed to load.',
     invalidCard: 'Enter an 8-digit card number.',
     availableBalance: amount => `Available balance: ${amount}`,
+    unavailable: 'Unavailable',
     cardNotFound: 'Card not found.',
   },
 }
@@ -160,13 +163,22 @@ function ProductCard({ item, lang }) {
   const millilitres = millilitresLabel(item, lang)
   const kcal = kcalLabel(item, lang)
   const pricing = getMenuPricing(item)
+  const unavailable = item?.available === false
+  const l = tr(lang)
   return (
-    <article className="overflow-hidden rounded-[8px] border border-[#E8DED2] bg-white shadow-sm">
-      <div className="aspect-square">
-        <SafeImage src={item.image_url} alt={name} />
+    <article className={`overflow-hidden rounded-[8px] border shadow-sm ${unavailable ? 'border-[#D1D5DB] bg-[#F3F4F6]' : 'border-[#E8DED2] bg-white'}`}>
+      <div className="relative aspect-square">
+        <div className={`h-full w-full ${unavailable ? 'grayscale opacity-55' : ''}`}>
+          <SafeImage src={item.image_url} alt={name} />
+        </div>
+        {unavailable && (
+          <span className="absolute bottom-2 left-2 rounded-full border border-white/80 bg-[#4B5563]/90 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-white shadow-sm">
+            {l.unavailable}
+          </span>
+        )}
       </div>
       <div className="flex min-h-[152px] flex-col p-3">
-        <h3 className="line-clamp-2 text-[15px] font-black leading-snug text-[#1E2B24]">{name}</h3>
+        <h3 className={`line-clamp-2 text-[15px] font-black leading-snug ${unavailable ? 'text-[#6B7280]' : 'text-[#1E2B24]'}`}>{name}</h3>
         <p className="mt-1 line-clamp-1 text-[12px] font-semibold text-[#8B9388]">{getItemDesc(item, lang)}</p>
         {(grams || millilitres || kcal) && (
           <div className="mt-2 flex flex-wrap gap-1">
@@ -191,7 +203,7 @@ function ProductCard({ item, lang }) {
           {pricing.discounted && (
             <p className="text-[12px] font-bold text-[#8B9388] line-through">{formatCurrency(pricing.oldPrice)}</p>
           )}
-          <p className={`${pricing.discounted ? 'text-red-600' : 'text-[#FF5A00]'} text-[16px] font-black`}>
+          <p className={`${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#FF5A00]'} text-[16px] font-black`}>
             {formatCurrency(pricing.price)}{menuPriceUnitSuffix(item, lang)}
           </p>
         </div>

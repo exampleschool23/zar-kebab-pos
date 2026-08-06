@@ -799,6 +799,7 @@ export default function WaiterOrder() {
 
   function handleAdd(item, animation) {
     if (isSendingOrder || !canEditTables) return
+    if (item?.available === false) return
     if (menuItemRequiresOptions(item, 'waiter') || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
@@ -809,6 +810,7 @@ export default function WaiterOrder() {
 
   function handleIncrement(item, animation) {
     if (isSendingOrder || !canEditTables) return
+    if (item?.available === false) return
     if (menuItemRequiresOptions(item, 'waiter') || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
@@ -859,6 +861,7 @@ export default function WaiterOrder() {
 
   function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionPriceDelta = 0) {
     if (isSendingOrder || !canEditTables) return
+    if (item?.available === false) return
     const payload = makeCartPayload(item, { selectedOptions, selectedOptionPriceDelta })
     const isOptionProduct = getMenuItemOptionGroups(item, lang, { audience: 'waiter' }).length > 0
     if (isOptionProduct) {
