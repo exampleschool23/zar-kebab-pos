@@ -59,7 +59,25 @@ function employeeName(employee, fallback) {
   return employee?.employee_name || fallback
 }
 
-export default function EmployeeSalaryHistory({ preview = false }) {
+function formatRecordCount(count, lang) {
+  const amount = Number(count) || 0
+  if (lang === 'ru') {
+    const mod100 = amount % 100
+    const mod10 = amount % 10
+    const word = mod100 >= 11 && mod100 <= 14
+      ? 'записей'
+      : mod10 === 1
+        ? 'запись'
+        : mod10 >= 2 && mod10 <= 4
+          ? 'записи'
+          : 'записей'
+    return `${amount} ${word}`
+  }
+  if (lang === 'en') return `${amount} ${amount === 1 ? 'record' : 'records'}`
+  return `${amount} yozuv`
+}
+
+export default function EmployeeSalaryHistory() {
   const { employeeId } = useParams()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -233,22 +251,6 @@ export default function EmployeeSalaryHistory({ preview = false }) {
   const [page, setPage] = useState(1)
 
   async function loadHistory({ showLoader = true } = {}) {
-    if (preview) {
-      setEmployee({ id: 'preview', employee_name: 'Нодир', joined_at: '2026-04-12', is_active: true })
-      setEntries(buildSalaryHistoryEntries({
-        payments: [
-          { id: 'p1', paid_date: '2026-08-08', created_at: '2026-08-08T10:06:00+05:00', amount: 500000, payment_method: 'card' },
-          { id: 'p2', paid_date: '2026-08-07', created_at: '2026-08-07T11:37:00+05:00', amount: 2200000, payment_method: 'cash' },
-          { id: 'p3', paid_date: '2026-08-05', created_at: '2026-08-05T12:01:00+05:00', amount: 1500000, payment_method: 'cash' },
-          { id: 'p4', paid_date: '2026-08-03', created_at: '2026-08-03T12:02:00+05:00', amount: 100000, payment_method: 'cash' },
-        ],
-        bonuses: [{ id: 'b1', bonus_date: '2026-08-07', created_at: '2026-08-07T13:20:00+05:00', amount: 250000, note: 'За отличную смену' }],
-        fines: [{ id: 'f1', fine_date: '2026-08-05', created_at: '2026-08-05T17:40:00+05:00', amount: 50000, reason: 'Опоздание' }],
-        absences: [{ id: 'a1', absence_date: '2026-08-02', created_at: '2026-08-02T09:00:00+05:00', note: 'По болезни' }],
-      }))
-      setLoading(false)
-      return
-    }
     if (!employeeId) return
     if (showLoader) setLoading(true)
     setError('')
@@ -286,7 +288,7 @@ export default function EmployeeSalaryHistory({ preview = false }) {
     }
   }
 
-  useEffect(() => { loadHistory() }, [employeeId, preview]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadHistory() }, [employeeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const calendarDays = useMemo(
     () => buildSalaryHistoryCalendar(visibleMonth, entries, today),
@@ -534,7 +536,7 @@ export default function EmployeeSalaryHistory({ preview = false }) {
                       key={day.date}
                       type="button"
                       role="gridcell"
-                      aria-label={`${formatLongDate(day.date, lang, day.date)} · ${day.entries.length} ${l.records}`}
+                      aria-label={`${formatLongDate(day.date, lang, day.date)} · ${formatRecordCount(day.entries.length, lang)}`}
                       aria-current={day.isToday ? 'date' : undefined}
                       aria-pressed={selected}
                       onClick={() => selectCalendarDay(day)}
@@ -585,7 +587,7 @@ export default function EmployeeSalaryHistory({ preview = false }) {
                     {selectedDate ? l.selectedDayActivity : l.monthActivity}
                   </h2>
                   <p className="mt-0.5 text-xs font-semibold text-[#6B7280]">
-                    {selectedDate ? formatLongDate(selectedDate, lang, selectedDate) : formatMonthYear(visibleMonth, lang, visibleMonth)} · {visibleEntries.length} {l.records}
+                    {selectedDate ? formatLongDate(selectedDate, lang, selectedDate) : formatMonthYear(visibleMonth, lang, visibleMonth)} · {formatRecordCount(visibleEntries.length, lang)}
                   </p>
                 </div>
                 {selectedDate && (
