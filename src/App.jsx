@@ -325,6 +325,9 @@ function InternalAppRoutes({ adminHost = false }) {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
+        {import.meta.env.DEV && (
+          <Route path="/__salary-history-preview" element={<Suspense fallback={<Spinner />}><EmployeeSalaryHistory preview /></Suspense>} />
+        )}
 
         {/* Tables/order flow: visible to profiles with the tables feature. */}
         <Route path="/waiter/tables" element={
