@@ -359,6 +359,25 @@ test('salary decreases remain clear and neutral instead of being presented as a 
   assert.doesNotMatch(employee, /Congratulations|Great news|🎉|🌟/)
 })
 
+test('salary payments and salary-rate changes never target ZarKebab Team', () => {
+  const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
+  const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
+  const notifyPaymentSource = endpoint.slice(
+    endpoint.indexOf('async function notifyPayment'),
+    endpoint.indexOf('export default async function handler')
+  )
+  const teamDeliverySource = endpoint.slice(
+    endpoint.indexOf('async function deliverSalaryTeamEvent'),
+    endpoint.indexOf('async function deliverEmployeeSalaryEvent')
+  )
+
+  assert.match(endpoint, /const TEAM_EVENT_TYPES = new Set\(\['bonus', 'fine', 'absence'\]\)/)
+  assert.match(teamDeliverySource, /if \(!TEAM_EVENT_TYPES\.has\(type\)\)[\s\S]*?status: 'skipped'/)
+  assert.doesNotMatch(notifyPaymentSource, /deliverSalaryTeamEvent|loadSalaryTeamTarget|buildSalaryTeamEventMessage|team_events/)
+  assert.match(salariesPage, /const teamDeliveryRequired = \['bonus', 'fine', 'absence'\]\.includes\(eventType\)/)
+  assert.match(salariesPage, /showTeamDelivery: \['bonus', 'fine', 'absence'\]\.includes\(delivery\.event_type\)/)
+})
+
 test('recorded salary operations trigger the authenticated shared Telegram endpoint', () => {
   const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
   const notifications = fs.readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
