@@ -36,6 +36,7 @@ const AccountingHistory = lazy(() => import('./pages/AccountingHistory'))
 const Salaries = lazy(() => import('./pages/Salaries'))
 const MonthlyEstimate = lazy(() => import('./pages/MonthlyEstimate'))
 const Employees = lazy(() => import('./pages/Employees'))
+const EmployeeSalaryHistory = lazy(() => import('./pages/EmployeeSalaryHistory'))
 const Reports = lazy(() => import('./pages/Reports'))
 const AdminAudit = lazy(() => import('./pages/AdminAudit'))
 const AdminSettings = lazy(() => import('./pages/AdminSettings'))
@@ -397,6 +398,9 @@ function InternalAppRoutes({ adminHost = false }) {
         } />
         <Route path="/admin/accounting/employees" element={
           <LazyProtectedRoute page="expenses"><Employees /></LazyProtectedRoute>
+        } />
+        <Route path="/admin/accounting/employees/:employeeId/history" element={
+          <LazyProtectedRoute page="expenses"><EmployeeSalaryHistory /></LazyProtectedRoute>
         } />
         <Route path="/admin/expenses" element={<Navigate to="/admin/accounting" replace />} />
         <Route path="/admin/expenses/salaries" element={<Navigate to="/admin/accounting/salaries" replace />} />

@@ -8,6 +8,7 @@ import {
   formatElapsedSince,
   formatLongDate,
   formatLongDateTime,
+  formatMonthYear,
   formatTime,
   normalizeDateLang,
   parseInstantDate,
@@ -41,6 +42,12 @@ test('long date formatter localizes month names', () => {
   assert.equal(formatLongDate('2026-06-20', 'en', '', { includeYear: false }), '20 June')
   assert.equal(normalizeDateLang('ru-RU'), 'ru')
   assert.equal(normalizeDateLang('unknown'), 'en')
+})
+
+test('month heading formatter uses standalone localized month names', () => {
+  assert.equal(formatMonthYear('2026-08', 'en'), 'August 2026')
+  assert.equal(formatMonthYear('2026-08', 'ru'), 'Август 2026')
+  assert.equal(formatMonthYear('2026-08', 'uz'), 'Avgust 2026')
 })
 
 test('long date time formatter localizes month names and keeps hour minutes', () => {

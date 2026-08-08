@@ -77,6 +77,12 @@ const LONG_MONTHS = {
   uz: ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentabr', 'oktabr', 'noyabr', 'dekabr'],
 }
 
+const MONTH_TITLES = {
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+  ru: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
+  uz: ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'],
+}
+
 export function normalizeDateLang(lang = 'en') {
   const normalized = String(lang || 'en').toLowerCase().split(/[-_]/)[0]
   return LONG_MONTHS[normalized] ? normalized : 'en'
@@ -89,6 +95,15 @@ export function formatLongDate(value, lang = 'en', fallback = '', { includeYear 
   return includeYear
     ? `${parts.day} ${months[parts.month - 1]} ${parts.year}`
     : `${parts.day} ${months[parts.month - 1]}`
+}
+
+export function formatMonthYear(value, lang = 'en', fallback = '') {
+  const raw = String(value || '')
+  const normalized = /^\d{4}-\d{2}$/.test(raw) ? `${raw}-01` : raw
+  const parts = getRestaurantDateParts(normalized, { dateOnly: true })
+  if (!parts) return fallback
+  const months = MONTH_TITLES[normalizeDateLang(lang)]
+  return `${months[parts.month - 1]} ${parts.year}`
 }
 
 export function formatTime(value, fallback = '') {

@@ -24,7 +24,6 @@ import {
   normalizeExpenseAmount,
 } from '../lib/expenses'
 import { todayExpenseDate } from '../lib/expenses'
-import { compareSalaryTransactionsNewestFirst } from '../lib/salaryTransactions'
 import {
   notifyTelegramEmployeeAbsence,
   notifyTelegramEmployeeBonus,
@@ -101,39 +100,6 @@ function buildSalaryRatePayload({ salaryProfileId, effectiveFrom, amount, salary
     note,
     created_by: createdBy,
   }
-}
-
-function buildTransactionHistoryForSourceGuard(salaryProfile, lang) {
-  const transactionHistory = [
-    ...(salaryProfile?.payments || []).map(payment => ({
-      id: payment.id,
-      entryType: 'payment',
-      date: payment.paid_date,
-      createdAt: payment.created_at,
-      amount: payment.amount,
-      detail: payment.note || expensePaymentMethodLabel(payment.payment_method, lang),
-      row: payment,
-    })),
-    ...(salaryProfile?.bonuses || []).map(bonus => ({
-      id: bonus.id,
-      entryType: 'bonus',
-      date: bonus.bonus_date,
-      createdAt: bonus.created_at,
-      amount: bonus.amount,
-      detail: bonus.note || expensePaymentMethodLabel(bonus.payment_method, lang),
-      row: bonus,
-    })),
-    ...(salaryProfile?.fines || []).map(fine => ({
-      id: fine.id,
-      entryType: 'fine',
-      date: fine.fine_date,
-      createdAt: fine.created_at,
-      amount: fine.amount,
-      detail: fine.reason,
-      row: fine,
-    })),
-  ]
-  return transactionHistory.sort(compareSalaryTransactionsNewestFirst)
 }
 
 export default function Salaries() {
@@ -815,11 +781,6 @@ export default function Salaries() {
     : transactionForm.entry_type === 'bonus'
       ? l.bonusHelp
       : l.paymentHelp
-  const salaryHistoryLabels = useMemo(() => ({
-    absence: l.absenceHistory,
-    payment: l.paymentHistory,
-  }), [l.absenceHistory, l.paymentHistory])
-
   useEffect(() => {
     setPage(current => Math.min(current, pageCount))
   }, [pageCount])
@@ -1030,78 +991,6 @@ export default function Salaries() {
     }
     setSaving(key)
     const { error: deleteError } = await supabase.from('employee_salary_rates').delete().eq('id', rate.id)
-    setSaving('')
-    setConfirmActionKey('')
-    if (deleteError) {
-      setError(deleteError.message)
-      return
-    }
-    await loadData()
-  }
-
-  async function deletePayment(payment) {
-    if (!canManage || !payment?.id) return
-    const key = `payment-delete-${payment.id}`
-    if (confirmActionKey !== key) {
-      setConfirmActionKey(key)
-      return
-    }
-    setSaving(key)
-    const { error: deleteError } = await supabase.from('employee_salary_payments').delete().eq('id', payment.id)
-    setSaving('')
-    setConfirmActionKey('')
-    if (deleteError) {
-      setError(deleteError.message)
-      return
-    }
-    await loadData()
-  }
-
-  async function deleteBonus(bonus) {
-    if (!canManage || !bonus?.id) return
-    const key = `bonus-delete-${bonus.id}`
-    if (confirmActionKey !== key) {
-      setConfirmActionKey(key)
-      return
-    }
-    setSaving(key)
-    const { error: deleteError } = await supabase.from('employee_salary_bonuses').delete().eq('id', bonus.id)
-    setSaving('')
-    setConfirmActionKey('')
-    if (deleteError) {
-      setError(deleteError.message)
-      return
-    }
-    await loadData()
-  }
-
-  async function deleteFine(fine) {
-    if (!canManage || !fine?.id) return
-    const key = `fine-delete-${fine.id}`
-    if (confirmActionKey !== key) {
-      setConfirmActionKey(key)
-      return
-    }
-    setSaving(key)
-    const { error: deleteError } = await supabase.from('employee_salary_fines').delete().eq('id', fine.id)
-    setSaving('')
-    setConfirmActionKey('')
-    if (deleteError) {
-      setError(deleteError.message)
-      return
-    }
-    await loadData()
-  }
-
-  async function deleteAbsence(absence) {
-    if (!canManage || !absence?.id) return
-    const key = `absence-delete-${absence.id}`
-    if (confirmActionKey !== key) {
-      setConfirmActionKey(key)
-      return
-    }
-    setSaving(key)
-    const { error: deleteError } = await supabase.from('employee_salary_absences').delete().eq('id', absence.id)
     setSaving('')
     setConfirmActionKey('')
     if (deleteError) {
