@@ -83,25 +83,45 @@ test('a stale pending payment retries only the unresolved destination', () => {
 
 test('bonus, fine, and absence retries also select destinations independently', () => {
   assert.deepEqual(getSalaryEventRetryTargets({
+    event_type: 'bonus',
     employee_status: 'sent',
     status: 'failed',
+    team_status: 'sent',
   }, {
     now: NOW,
     pendingRetryMs: TWO_MINUTES,
   }), {
     employee: false,
     group: true,
+    team: false,
   })
 
   assert.deepEqual(getSalaryEventRetryTargets({
+    event_type: 'absence',
     employee_status: 'not_attempted',
     status: 'sent',
+    team_status: 'sent',
   }, {
     now: NOW,
     pendingRetryMs: TWO_MINUTES,
   }), {
     employee: true,
     group: false,
+    team: false,
+  })
+
+  assert.deepEqual(getSalaryEventRetryTargets({
+    event_type: 'fine',
+    employee_status: 'sent',
+    status: 'sent',
+    team_status: 'failed',
+  }, {
+    now: NOW,
+    pendingRetryMs: TWO_MINUTES,
+  }), {
+    employee: false,
+    group: false,
+    team: true,
   })
 })
 
@@ -116,6 +136,7 @@ test('recent pending salary events are protected and stale ones can retry', () =
   }), {
     employee: false,
     group: false,
+    team: false,
   })
 
   assert.deepEqual(getSalaryEventRetryTargets({
@@ -128,5 +149,52 @@ test('recent pending salary events are protected and stale ones can retry', () =
   }), {
     employee: true,
     group: false,
+    team: false,
+  })
+})
+
+test('recent pending team delivery is protected, stale delivery retries, and rate changes never target the team', () => {
+  assert.deepEqual(getSalaryEventRetryTargets({
+    event_type: 'bonus',
+    employee_status: 'sent',
+    status: 'sent',
+    team_status: 'pending',
+    team_attempted_at: '2026-07-30T17:59:30.000Z',
+  }, {
+    now: NOW,
+    pendingRetryMs: TWO_MINUTES,
+  }), {
+    employee: false,
+    group: false,
+    team: false,
+  })
+
+  assert.deepEqual(getSalaryEventRetryTargets({
+    event_type: 'absence',
+    employee_status: 'sent',
+    status: 'sent',
+    team_status: 'pending',
+    team_attempted_at: '2026-07-30T17:55:00.000Z',
+  }, {
+    now: NOW,
+    pendingRetryMs: TWO_MINUTES,
+  }), {
+    employee: false,
+    group: false,
+    team: true,
+  })
+
+  assert.deepEqual(getSalaryEventRetryTargets({
+    event_type: 'rate',
+    employee_status: 'sent',
+    status: 'sent',
+    team_status: 'not_attempted',
+  }, {
+    now: NOW,
+    pendingRetryMs: TWO_MINUTES,
+  }), {
+    employee: false,
+    group: false,
+    team: false,
   })
 })

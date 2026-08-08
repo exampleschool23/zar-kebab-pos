@@ -18,6 +18,8 @@ CRON_SECRET=use-another-long-random-string
 TELEGRAM_COMPLETED_ORDERS_CHAT_ID=
 TELEGRAM_SALARY_PAYMENTS_CHAT_ID=
 TELEGRAM_SALARY_PAYMENTS_LANGUAGE=ru
+TELEGRAM_TEAM_CHAT_ID=
+TELEGRAM_TEAM_LANGUAGE=ru
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
@@ -42,6 +44,15 @@ fallback. Salary payments, bonuses, fines, and absences notify both the group
 and the linked employee. None of these messages use the team or
 completed-orders groups as a fallback. If a private employee link is missing
 or disabled, the group notification is still attempted and tracked.
+
+Migration `117` adds ZarKebab Team as a third, independently tracked
+destination for bonuses, fines, and absences. The database target
+`team_events` is primary; `TELEGRAM_TEAM_CHAT_ID` is its deployment-order
+fallback, and `TELEGRAM_TEAM_LANGUAGE` defaults to Russian. Team messages show
+the employee, date, full bonus/fine amount, bonus payment method, and the full
+saved reason or note. They deliberately omit the employee's remaining salary
+balance and the manager who recorded the operation. Salary payments and rate
+changes continue to stay out of ZarKebab Team.
 
 ### BotFather setup
 
@@ -93,7 +104,10 @@ Salaries page combines those records under Salary notification status, five
 at a time, and allows unsent records to be retried. Run
 `supabase/116_salary_rate_change_telegram_notifications.sql` to add the same
 tracked private/group delivery for genuine salary-rate changes; an employee's
-first salary rate is intentionally treated as setup rather than a change.
+first salary rate is intentionally treated as setup rather than a change. Run
+`supabase/119_salary_event_team_notifications.sql` to queue and audit the third
+ZarKebab Team destination for new bonuses, fines, and absences. Historical
+events are not replayed when that migration is installed.
 
 ### Daily employee salary notifications
 

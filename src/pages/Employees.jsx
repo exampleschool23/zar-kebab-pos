@@ -14,7 +14,8 @@ import {
   getDailySalaryAmount,
   getSalaryAbsenceDates,
   getSalaryActiveUntil,
-  getSalaryDue,
+  getSalaryBalance,
+  getTotalSalaryDue,
   buildSalaryReactivationAbsenceRows,
   normalizeSalaryEndDate,
   todayExpenseDate,
@@ -78,6 +79,7 @@ export default function Employees() {
       daily: 'Kunlik',
       activeDaily: 'Kunlik faol',
       absentToday: 'Bugun kelmagan',
+      balance: 'Balans',
       due: 'Qarz',
       endDate: 'Tugash sanasi',
       status: 'Holat',
@@ -115,6 +117,7 @@ export default function Employees() {
       daily: 'За день',
       activeDaily: 'Активные за день',
       absentToday: 'Сегодня отсутствует',
+      balance: 'Баланс',
       due: 'Долг',
       endDate: 'Дата окончания',
       status: 'Статус',
@@ -152,6 +155,7 @@ export default function Employees() {
       daily: 'Daily',
       activeDaily: 'Active daily',
       absentToday: 'Absent today',
+      balance: 'Balance',
       due: 'Due',
       endDate: 'End date',
       status: 'Status',
@@ -253,7 +257,7 @@ export default function Employees() {
   const activeDailySalary = useMemo(() => (
     activeEmployees.reduce((sum, item) => sum + getDailySalaryAmount(item, today), 0)
   ), [activeEmployees, today])
-  const totalDue = useMemo(() => employees.reduce((sum, item) => sum + getSalaryDue(item, today), 0), [employees, today])
+  const totalDue = useMemo(() => getTotalSalaryDue(employees, today), [employees, today])
 
   async function toggleEmployeeActive(employee) {
     if (!canManage || !employee?.id) return
@@ -459,6 +463,7 @@ export default function Employees() {
                 const inactive = employee.is_active === false
                 const absentToday = !inactive && absentTodayEmployeeIds.has(employee.id)
                 const activeUntil = getSalaryActiveUntil(employee, today)
+                const salaryBalance = getSalaryBalance(employee, today)
                 const toggleKey = `employee-toggle-${employee.id}`
                 const confirmToggle = confirmActionKey === toggleKey
                 const editingEmployeeName = editingNameId === employee.id
@@ -555,7 +560,12 @@ export default function Employees() {
                       <Row label={l.joined} value={formatLongDate(employee.joined_at, lang, employee.joined_at)} icon={CalendarDays} />
                       {inactive && employee.ended_at && <Row label={l.ended} value={formatLongDate(employee.ended_at, lang, employee.ended_at)} icon={CalendarDays} />}
                       <Row label={l.daily} value={formatCurrency(getDailySalaryAmount(employee, activeUntil))} />
-                      <Row label={l.due} value={formatCurrency(getSalaryDue(employee, today))} hot />
+                      <Row
+                        label={l.balance}
+                        value={formatCurrency(salaryBalance)}
+                        hot={salaryBalance > 0}
+                        negative={salaryBalance < 0}
+                      />
                     </div>
 
                     {!inactive && confirmToggle && (
@@ -758,11 +768,11 @@ function Kpi({ icon: Icon, label, value, hot = false, danger = false }) {
   )
 }
 
-function Row({ icon: Icon, label, value, hot = false }) {
+function Row({ icon: Icon, label, value, hot = false, negative = false }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] px-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-[#9CA3AF]">{Icon && <Icon size={13} />}{label}</span>
-      <span className={`text-right font-black ${hot ? 'text-[#ff5a00]' : 'text-[#1F2937]'}`}>{value}</span>
+      <span className={`text-right font-black ${negative ? 'text-red-600' : hot ? 'text-[#ff5a00]' : 'text-[#1F2937]'}`}>{value}</span>
     </div>
   )
 }

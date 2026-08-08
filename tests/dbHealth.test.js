@@ -131,8 +131,26 @@ test('database health requires the salary group target and event delivery histor
     missingDeliveries.failed.find(check => check.name === 'employee_salary_group_notification_deliveries').hint,
     /112_salary_event_employee_notifications/
   )
+  assert.match(
+    missingDeliveries.failed.find(check => check.name === 'employee_salary_group_notification_deliveries').hint,
+    /119_salary_event_team_notifications/
+  )
   assert.match(cliHealthSource, /checkTable\('telegram_notification_targets'/)
   assert.match(cliHealthSource, /checkTable\('employee_salary_group_notification_deliveries'/)
+})
+
+test('database health requires independent ZarKebab Team salary-event delivery tracking', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'employee_salary_group_notification_deliveries',
+    missingColumn: 'team_status',
+  }))
+
+  assert.equal(result.ok, false)
+  const failed = result.failed.find(check => check.name === 'employee_salary_group_notification_deliveries')
+  assert.equal(failed.detail, 'team_status')
+  assert.match(failed.hint, /119_salary_event_team_notifications/)
+  assert.match(cliHealthSource, /team_status/)
+  assert.match(cliHealthSource, /team_telegram_message_id/)
 })
 
 test('database health reports missing tables and missing RPC', async () => {

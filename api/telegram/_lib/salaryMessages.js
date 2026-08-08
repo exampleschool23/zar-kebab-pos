@@ -1,7 +1,7 @@
 import {
   expensePaymentMethodLabel,
   getSalaryAccruedAmount,
-  getSalaryDue,
+  getSalaryBalance,
   normalizeExpenseAmount,
 } from '../../../src/lib/expenses.js'
 import { formatDateOnly } from '../../../src/lib/dateFormat.js'
@@ -61,8 +61,12 @@ export function normalizeSalaryNotificationLanguage(language) {
 }
 
 export function formatSalaryNotificationAmount(value) {
+  const numeric = typeof value === 'string'
+    ? Number(value.replace(/\s/g, '').replace(/,/g, ''))
+    : Number(value)
+  const amount = Number.isFinite(numeric) ? Math.round(numeric) : 0
   return new Intl.NumberFormat('ru-RU')
-    .format(normalizeExpenseAmount(value))
+    .format(amount)
     .replace(/\s/g, ' ')
 }
 
@@ -117,7 +121,7 @@ export function getDailySalaryNotificationSummary(salaryProfile, date) {
     fineTotal: fines.reduce((sum, fine) => sum + fine.amount, 0),
     payments,
     paymentTotal: payments.reduce((sum, payment) => sum + payment.amount, 0),
-    due: getSalaryDue(salaryProfile, date),
+    due: getSalaryBalance(salaryProfile, date),
   }
 }
 
@@ -171,7 +175,7 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
       ...paymentLines
     )
   }
-  if (summary.due > 0) {
+  if (summary.due !== 0) {
     moneySections.push('', `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(summary.due)} ${copy.currency}`)
   }
 

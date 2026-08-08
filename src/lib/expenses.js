@@ -407,11 +407,15 @@ export function getSalaryFineAmount(salaryProfile, dateTo = todayExpenseDate()) 
   }, 0)
 }
 
-export function getSalaryDue(salaryProfile, dateTo = todayExpenseDate()) {
+export function getSalaryBalance(salaryProfile, dateTo = todayExpenseDate()) {
   const joinedAt = String(salaryProfile?.joined_at || dateTo).slice(0, 10)
   const activeUntil = getSalaryActiveUntil(salaryProfile, dateTo)
   const accrued = getSalaryAccruedAmount(salaryProfile, joinedAt, activeUntil)
-  return Math.max(0, accrued - getSalaryPaidAmount(salaryProfile, dateTo) - getSalaryFineAmount(salaryProfile, dateTo))
+  return accrued - getSalaryPaidAmount(salaryProfile, dateTo) - getSalaryFineAmount(salaryProfile, dateTo)
+}
+
+export function getSalaryDue(salaryProfile, dateTo = todayExpenseDate()) {
+  return Math.max(0, getSalaryBalance(salaryProfile, dateTo))
 }
 
 export function canRecordSalaryTransaction(salaryProfile, entryType = 'payment', asOfDate = todayExpenseDate()) {

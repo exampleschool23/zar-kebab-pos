@@ -35,6 +35,7 @@ export function getSalaryEventRetryTargets(delivery, {
   now = Date.now(),
   pendingRetryMs = DEFAULT_PENDING_RETRY_MS,
 } = {}) {
+  const teamDeliveryApplies = ['bonus', 'fine', 'absence'].includes(delivery?.event_type)
   return {
     employee: shouldRetry(
       delivery?.employee_status,
@@ -46,6 +47,13 @@ export function getSalaryEventRetryTargets(delivery, {
     group: shouldRetry(
       delivery?.status,
       delivery?.attempted_at,
+      SENT_DELIVERY_STATUSES,
+      now,
+      pendingRetryMs
+    ),
+    team: teamDeliveryApplies && shouldRetry(
+      delivery?.team_status,
+      delivery?.team_attempted_at,
       SENT_DELIVERY_STATUSES,
       now,
       pendingRetryMs

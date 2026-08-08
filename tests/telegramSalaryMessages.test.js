@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import {
   buildDailySalaryMessage,
+  formatSalaryNotificationAmount,
   getDailySalaryNotificationSummary,
   getTashkentDate,
   parseEmployeeStartToken,
@@ -13,6 +14,7 @@ import {
   buildEmployeeSalaryEventMessage,
   buildSalaryRateGroupMessage,
   buildSalaryGroupEventMessage,
+  buildSalaryTeamEventMessage,
   buildSalaryPaymentGroupMessage,
 } from '../api/telegram/_lib/paymentMessages.js'
 
@@ -112,6 +114,38 @@ test('salary payment group notification identifies the employee without a privat
   assert.doesNotMatch(message, /Подтвердить получение/)
 })
 
+test('salary notifications preserve a negative balance after an overpayment', () => {
+  const overpaidProfile = {
+    id: 'salary-overpaid',
+    employee_name: 'Nodir',
+    joined_at: '2026-07-29',
+    is_active: true,
+    rates: [{ effective_from: '2026-07-29', amount: 100_000, rate_unit: 'daily' }],
+    payments: [{ paid_date: '2026-07-29', amount: 600_000, payment_method: 'cash' }],
+    bonuses: [],
+    fines: [],
+    absences: [],
+  }
+
+  const summary = getDailySalaryNotificationSummary(overpaidProfile, '2026-07-29')
+  const dailyMessage = buildDailySalaryMessage(overpaidProfile, '2026-07-29', 'en')
+  const payment = {
+    employee_name: 'Nodir',
+    paid_date: '2026-07-29',
+    amount: 500_000,
+    payment_method: 'cash',
+    created_by_name: 'Owner',
+  }
+  const employeeMessage = buildEmployeePaymentMessage(payment, -500_000, 'en')
+  const groupMessage = buildSalaryPaymentGroupMessage(payment, -500_000, 'en')
+
+  assert.equal(formatSalaryNotificationAmount(-500_000), '-500 000')
+  assert.equal(summary.due, -500_000)
+  assert.match(dailyMessage, /Current salary due:<\/b> -500 000 UZS/)
+  assert.match(employeeMessage, /Remaining salary due:<\/b> -500 000 UZS/)
+  assert.match(groupMessage, /Remaining salary due:<\/b> -500 000 UZS/)
+})
+
 test('salary group messages cover bonuses, fines, and absences', () => {
   const common = {
     employee_name: 'Зилола <кассир>',
@@ -147,6 +181,98 @@ test('salary group messages cover bonuses, fines, and absences', () => {
   assert.match(absence, /&lt;Болезнь&gt;/)
   assert.doesNotMatch(absence, /<Болезнь>/)
   assert.match(absence, /К выплате:<\/b> 80 000 UZS/)
+})
+
+test('ZarKebab Team messages publish full bonus, fine, and absence details without private salary fields', () => {
+  const common = {
+    employee_name: 'Зилола <кассир>',
+    created_by_name: 'Jasurbek & Co',
+  }
+  const bonus = buildSalaryTeamEventMessage('bonus', {
+    ...common,
+    bonus_date: '2026-07-29',
+    amount: 100_000,
+    payment_method: 'card',
+    note: '<Отличная работа & помощь команде>',
+  }, 'ru')
+  const fine = buildSalaryTeamEventMessage('fine', {
+    ...common,
+    fine_date: '2026-07-30',
+    amount: 20_000,
+    reason: '<Опоздание & невыполненная уборка>',
+  }, 'ru')
+  const absence = buildSalaryTeamEventMessage('absence', {
+    ...common,
+    absence_date: '2026-07-31',
+    note: '<Болезнь & визит к врачу>',
+  }, 'ru')
+
+  assert.equal(bonus, [
+    '🎁 <b>Достижение команды</b>',
+    '',
+    '👏 Отличная работа! Сотруднику начислен бонус за вклад в команду.',
+    '',
+    '<b>Сотрудник:</b> Зилола &lt;кассир&gt;',
+    '<b>Сумма:</b> 100 000 UZS',
+    '<b>Дата:</b> 29.07.2026',
+    '<b>Способ оплаты:</b> Карта',
+    '<b>Примечание:</b> &lt;Отличная работа &amp; помощь команде&gt;',
+    '',
+    'Спасибо за вклад в общий результат Zar Kebab! 🌟',
+  ].join('\n'))
+  assert.equal(fine, [
+    '⚠️ <b>Дисциплина команды</b>',
+    '',
+    'Сотруднику зарегистрирован дисциплинарный штраф.',
+    '',
+    '<b>Сотрудник:</b> Зилола &lt;кассир&gt;',
+    '<b>Сумма:</b> 20 000 UZS',
+    '<b>Дата:</b> 30.07.2026',
+    '<b>Причина:</b> &lt;Опоздание &amp; невыполненная уборка&gt;',
+    '',
+    'Сохраняем ответственность и высокие стандарты вместе.',
+  ].join('\n'))
+  assert.equal(absence, [
+    '📅 <b>Отсутствие сотрудника</b>',
+    '',
+    'Зарегистрировано отсутствие сотрудника.',
+    '',
+    '<b>Сотрудник:</b> Зилола &lt;кассир&gt;',
+    '<b>Дата:</b> 31.07.2026',
+    '<b>Примечание:</b> &lt;Болезнь &amp; визит к врачу&gt;',
+    '',
+    'Поддерживаем друг друга и сохраняем стабильную работу команды.',
+  ].join('\n'))
+
+  for (const message of [bonus, fine, absence]) {
+    assert.doesNotMatch(message, /К выплате|Осталось к выплате|Salary due|Remaining salary due/)
+    assert.doesNotMatch(message, /Jasurbek|Оформил|Recorded by/)
+    assert.doesNotMatch(message, /<(?:кассир|Отличная|Опоздание|Болезнь)/)
+  }
+})
+
+test('ZarKebab Team salary messages are localized in Uzbek and English', () => {
+  const uz = buildSalaryTeamEventMessage('bonus', {
+    employee_name: 'Nodir',
+    bonus_date: '2026-08-08',
+    amount: 500_000,
+    payment_method: 'cash',
+    note: 'Mehmonlarga yaxshi xizmat',
+  }, 'uz')
+  const en = buildSalaryTeamEventMessage('fine', {
+    employee_name: 'Alex',
+    fine_date: '2026-08-08',
+    amount: 75_000,
+    reason: 'Late arrival',
+  }, 'en')
+
+  assert.match(uz, /Jamoamizdagi yutuq/)
+  assert.match(uz, /500 000 UZS/)
+  assert.match(uz, /Naqd/)
+  assert.match(uz, /Mehmonlarga yaxshi xizmat/)
+  assert.match(en, /Team discipline/)
+  assert.match(en, /75 000 UZS/)
+  assert.match(en, /Reason:<\/b> Late arrival/)
 })
 
 test('employee bonus and absence messages are private and localized', () => {
@@ -237,6 +363,10 @@ test('recorded salary operations trigger the authenticated shared Telegram endpo
   const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
   const notifications = fs.readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
   const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
+  const salaryGroupTargetSource = endpoint.slice(
+    endpoint.indexOf('async function loadSalaryGroupTarget'),
+    endpoint.indexOf('async function loadSalaryTeamTarget')
+  )
   const createSalaryProfileSource = salariesPage.slice(
     salariesPage.indexOf('async function createSalaryProfile'),
     salariesPage.indexOf('async function addRate')
@@ -267,6 +397,7 @@ test('recorded salary operations trigger the authenticated shared Telegram endpo
   assert.match(notifications, /\[`\\?\$\{type\}Id`\]: eventId/)
   assert.match(notifications, /export function notifyTelegramEmployeeRate\(rateId\)/)
   assert.match(notifications, /notifyTelegramSalaryEvent\('rate', rateId\)/)
+  assert.match(notifications, /team: \{ status: 'failed' \}/)
   assert.match(endpoint, /payment\.created_by !== user\.id/)
   assert.match(endpoint, /loadOwnedSalaryEvent/)
   assert.match(endpoint, /rate:\s*\{[\s\S]*?table:\s*'employee_salary_rates'[\s\S]*?effective_from[\s\S]*?rate_unit[\s\S]*?created_by/)
@@ -286,7 +417,9 @@ test('recorded salary operations trigger the authenticated shared Telegram endpo
   assert.match(endpoint, /employee_salary_telegram_links/)
   assert.match(endpoint, /telegram_notification_targets/)
   assert.match(endpoint, /TELEGRAM_SALARY_PAYMENTS_CHAT_ID/)
-  assert.doesNotMatch(endpoint, /TELEGRAM_TEAM_CHAT_ID/)
+  assert.doesNotMatch(salaryGroupTargetSource, /TELEGRAM_TEAM_CHAT_ID/)
+  assert.match(endpoint, /async function loadSalaryTeamTarget/)
+  assert.match(endpoint, /TELEGRAM_TEAM_CHAT_ID/)
   assert.match(endpoint, /Promise\.allSettled/)
 })
 
@@ -322,7 +455,10 @@ test('salary payment notifications persist delivery status and employee confirma
   assert.match(salariesPage, /telegramDeliveryTitle/)
   assert.match(salariesPage, /paymentDeliveryStatusClasses/)
   assert.match(salariesPage, /telegramSalaryGroup/)
+  assert.match(salariesPage, /telegramTeam/)
   assert.match(salariesPage, /group_telegram_message_id/)
+  assert.match(salariesPage, /team_telegram_message_id/)
+  assert.match(salariesPage, /showTeamDelivery: \['bonus', 'fine', 'absence'\]\.includes/)
   assert.match(migration, /unique\s+references public\.employee_salary_payments|payment_id\s+uuid not null unique/)
   assert.match(migration, /'confirmed'/)
   assert.match(groupMigration, /group_status/)

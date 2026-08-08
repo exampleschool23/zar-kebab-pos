@@ -17,6 +17,7 @@ import {
   convertSalaryAmountToDaily,
   expensePaymentMethodLabel,
   getSalaryAbsenceDates,
+  getSalaryBalance,
   getSalaryDue,
   getTotalSalaryDue,
   getTotalMonthlySalaryCommitment,
@@ -183,6 +184,7 @@ export default function Salaries() {
       absenceHistory: 'Kelmagan kunlar',
       absentLabel: 'Kelmagan',
       amount: 'Summa',
+      balance: 'Maosh balansi',
       due: 'To‘lanishi kerak',
       totalDue: 'Jami qarzdorlik',
       monthlyPayroll: 'Oylik maoshlar',
@@ -232,11 +234,12 @@ export default function Salaries() {
       telegramLinked: 'Telegram ulangan',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME sozlanmagan.',
       telegramDeliveryTitle: 'Maosh xabarlari holati',
-      telegramDeliveryHelp: 'Maosh o‘zgarishi, to‘lov, bonus, jarima va kelmagan kun xabarlarining xodimga va guruhga yuborilishini kuzating.',
+      telegramDeliveryHelp: 'Maosh xabarlarining xodimga, maosh guruhiga va bonus, jarima hamda kelmagan kunlar uchun ZarKebab Team guruhiga yuborilishini kuzating.',
       telegramDeliveryEmpty: 'Hali Telegram xabarlari yo‘q.',
-      telegramDeliveryMigration: 'Telegram xabarlari tarixi uchun 108, 110, 111, 112, 113 va 116-migratsiyalarni ishga tushiring.',
+      telegramDeliveryMigration: 'Telegram xabarlari tarixi uchun 108, 110, 111, 112, 113, 116 va 119-migratsiyalarni ishga tushiring.',
       telegramEmployee: 'Xodim',
       telegramSalaryGroup: 'Maosh guruhi',
+      telegramTeam: 'ZarKebab Team',
       telegramRetry: 'Qayta yuborish',
       telegramRetrySent: 'Telegram xabarlari yuborildi.',
       telegramRetryPartial: 'Telegram xabarlaridan biri yuborilmadi; holatni tekshiring.',
@@ -290,6 +293,7 @@ export default function Salaries() {
       absenceHistory: 'Дни отсутствия',
       absentLabel: 'Отсутствовал',
       amount: 'Сумма',
+      balance: 'Баланс зарплаты',
       due: 'К выплате',
       totalDue: 'Общий долг',
       monthlyPayroll: 'Зарплаты в месяц',
@@ -339,11 +343,12 @@ export default function Salaries() {
       telegramLinked: 'Telegram подключён',
       telegramBotMissing: 'Не настроен VITE_TELEGRAM_BOT_USERNAME.',
       telegramDeliveryTitle: 'Статус уведомлений о зарплате',
-      telegramDeliveryHelp: 'Проверяйте доставку изменений зарплаты, выплат, бонусов, штрафов и отсутствий сотруднику и в группу.',
+      telegramDeliveryHelp: 'Проверяйте доставку сообщений сотруднику, в группу зарплат и, для бонусов, штрафов и отсутствий, в ZarKebab Team.',
       telegramDeliveryEmpty: 'Уведомлений Telegram пока нет.',
-      telegramDeliveryMigration: 'Запустите миграции 108, 110, 111, 112, 113 и 116 для истории уведомлений.',
+      telegramDeliveryMigration: 'Запустите миграции 108, 110, 111, 112, 113, 116 и 119 для истории уведомлений.',
       telegramEmployee: 'Сотрудник',
       telegramSalaryGroup: 'Группа зарплат',
+      telegramTeam: 'ZarKebab Team',
       telegramRetry: 'Отправить снова',
       telegramRetrySent: 'Сообщения Telegram отправлены.',
       telegramRetryPartial: 'Одно сообщение Telegram не отправлено; проверьте статус.',
@@ -397,6 +402,7 @@ export default function Salaries() {
       absenceHistory: 'Absent dates',
       absentLabel: 'Absent',
       amount: 'Amount',
+      balance: 'Salary balance',
       due: 'Salary due',
       totalDue: 'Total due',
       monthlyPayroll: 'Monthly salaries',
@@ -446,11 +452,12 @@ export default function Salaries() {
       telegramLinked: 'Telegram linked',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME is not configured.',
       telegramDeliveryTitle: 'Salary notification status',
-      telegramDeliveryHelp: 'Track salary changes, payments, bonuses, fines, and absences to the employee and salary group.',
+      telegramDeliveryHelp: 'Track messages to the employee, salary group, and ZarKebab Team for bonuses, fines, and absences.',
       telegramDeliveryEmpty: 'No Telegram notifications yet.',
-      telegramDeliveryMigration: 'Run migrations 108, 110, 111, 112, 113, and 116 to enable notification history.',
+      telegramDeliveryMigration: 'Run migrations 108, 110, 111, 112, 113, 116, and 119 to enable notification history.',
       telegramEmployee: 'Employee',
       telegramSalaryGroup: 'Salary group',
+      telegramTeam: 'ZarKebab Team',
       telegramRetry: 'Send again',
       telegramRetrySent: 'Telegram messages sent.',
       telegramRetryPartial: 'One Telegram message was not sent; check the status.',
@@ -521,7 +528,7 @@ export default function Salaries() {
           .order('attempted_at', { ascending: false })
           .limit(100),
         supabase.from('employee_salary_group_notification_deliveries')
-          .select('id, event_type, event_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, employee_status, employee_telegram_message_id, employee_error_message, employee_attempted_at, employee_sent_at')
+          .select('id, event_type, event_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, employee_status, employee_telegram_message_id, employee_error_message, employee_attempted_at, employee_sent_at, team_status, team_telegram_message_id, team_error_message, team_attempted_at, team_sent_at')
           .order('attempted_at', { ascending: false })
           .limit(100),
       ])
@@ -596,15 +603,23 @@ export default function Salaries() {
       .then(telegramResult => {
         const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
         const groupTelegramSent = telegramResult?.group?.status === 'sent'
+        const teamDeliveryRequired = ['bonus', 'fine', 'absence'].includes(eventType)
+        const teamTelegramSent = telegramResult?.team?.status === 'sent'
+        const allRequiredDestinationsSent = employeeTelegramSent
+          && groupTelegramSent
+          && (!teamDeliveryRequired || teamTelegramSent)
+        const anyDestinationSent = employeeTelegramSent
+          || groupTelegramSent
+          || (teamDeliveryRequired && teamTelegramSent)
         if (!announceResult) {
-          if (failureMessage && !employeeTelegramSent && !groupTelegramSent) {
+          if (failureMessage && !anyDestinationSent) {
             setMessage(failureMessage)
           }
           return
         }
-        setMessage(employeeTelegramSent && groupTelegramSent
+        setMessage(allRequiredDestinationsSent
           ? l.telegramRetrySent
-          : employeeTelegramSent || groupTelegramSent
+          : anyDestinationSent
             ? l.telegramRetryPartial
             : l.telegramRetryFailed)
       })
@@ -657,8 +672,8 @@ export default function Salaries() {
   const sortedSalaryProfiles = useMemo(() => (
     [...salaryProfiles].sort((a, b) => {
       if (Boolean(a.is_active) !== Boolean(b.is_active)) return a.is_active ? -1 : 1
-      const dueDiff = getSalaryDue(b, today) - getSalaryDue(a, today)
-      if (dueDiff !== 0) return dueDiff
+      const balanceDiff = getSalaryBalance(b, today) - getSalaryBalance(a, today)
+      if (balanceDiff !== 0) return balanceDiff
       return String(a.employee_name || '').localeCompare(String(b.employee_name || ''))
     })
   ), [salaryProfiles, today])
@@ -719,7 +734,10 @@ export default function Salaries() {
         amount: event?.amount || 0,
         eventUnit: event?.rate_unit || '',
         eventDate: event?.[dateFields[delivery.event_type]] || '',
-        sortAt: delivery.attempted_at || delivery.employee_attempted_at || '',
+        sortAt: [delivery.attempted_at, delivery.employee_attempted_at, delivery.team_attempted_at]
+          .filter(Boolean)
+          .sort()
+          .pop() || '',
         employeeStatus: delivery.employee_status,
         employeeTimestamp: delivery.employee_sent_at || delivery.employee_attempted_at,
         employeeMessageId: delivery.employee_telegram_message_id,
@@ -728,6 +746,11 @@ export default function Salaries() {
         groupTimestamp: delivery.sent_at || delivery.attempted_at,
         groupMessageId: delivery.telegram_message_id,
         groupError: delivery.error_message,
+        showTeamDelivery: ['bonus', 'fine', 'absence'].includes(delivery.event_type),
+        teamStatus: delivery.team_status,
+        teamTimestamp: delivery.team_sent_at || delivery.team_attempted_at,
+        teamMessageId: delivery.team_telegram_message_id,
+        teamError: delivery.team_error_message,
       }
     })
   }, [groupEventDeliveries, salaryProfiles])
@@ -777,6 +800,9 @@ export default function Salaries() {
   const totalDue = useMemo(() => getTotalSalaryDue(salaryProfiles, today), [salaryProfiles, today])
   const monthlyPayrollTotal = useMemo(() => getTotalMonthlySalaryCommitment(salaryProfiles, today), [salaryProfiles, today])
   const selectedTransactionProfile = salaryProfiles.find(item => item.id === transactionForm.salary_profile_id)
+  const selectedTransactionBalance = selectedTransactionProfile
+    ? getSalaryBalance(selectedTransactionProfile, transactionForm.paid_date || today)
+    : null
   const selectedAbsenceProfile = salaryProfiles.find(item => item.id === absenceForm.salary_profile_id)
   const selectedAbsenceDate = String(absenceForm.absence_date || today).slice(0, 10)
   const absenceAlreadyRecorded = Boolean(
@@ -1264,7 +1290,8 @@ export default function Salaries() {
                   <div className="sm:col-span-2">
                     <Field
                       label={l.employee}
-                      hint={selectedTransactionProfile ? `${l.due}: ${formatCurrency(getSalaryDue(selectedTransactionProfile, transactionForm.paid_date || today))}` : ''}
+                      hint={selectedTransactionProfile ? `${l.balance}: ${formatCurrency(selectedTransactionBalance)}` : ''}
+                      hintClassName={selectedTransactionBalance < 0 ? 'text-red-600' : ''}
                     >
                       <select
                         value={transactionForm.salary_profile_id}
@@ -1277,7 +1304,9 @@ export default function Salaries() {
                           setTransactionForm(current => ({
                             ...current,
                             salary_profile_id: event.target.value,
-                            amount: due ? String(due) : current.amount,
+                            amount: current.entry_type === 'payment'
+                              ? (due > 0 ? String(due) : '')
+                              : current.amount,
                             payment_method: selectedProfile?.payment_method || 'cash',
                           }))
                         }}
@@ -1288,7 +1317,7 @@ export default function Salaries() {
                         {transactionSalaryProfiles.map(item => {
                           const name = item.employee_name || item.profile?.full_name || item.profile?.email
                           const inactiveDue = item.is_active === false
-                            ? ` · ${l.inactive} · ${l.due}: ${formatCurrency(getSalaryDue(item, transactionForm.paid_date || today))}`
+                            ? ` · ${l.inactive} · ${l.balance}: ${formatCurrency(getSalaryBalance(item, transactionForm.paid_date || today))}`
                             : ''
                           return <option key={item.id} value={item.id}>{name}{inactiveDue}</option>
                         })}
@@ -1308,7 +1337,9 @@ export default function Salaries() {
                         setTransactionForm(current => ({
                           ...current,
                           paid_date: nextPaidDate,
-                          amount: due ? String(due) : current.amount,
+                          amount: current.entry_type === 'payment'
+                            ? (due > 0 ? String(due) : '')
+                            : current.amount,
                         }))
                       }}
                       disabled={!canManage || loading}
@@ -1572,6 +1603,7 @@ export default function Salaries() {
                             const canRetry = [
                               delivery.employeeStatus,
                               delivery.groupStatus,
+                              ...(delivery.showTeamDelivery ? [delivery.teamStatus] : []),
                             ].some(status => ['not_attempted', 'failed', 'skipped'].includes(status))
                             return (
                               <div key={`${delivery.eventType}-${delivery.id}`} className="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3">
@@ -1601,7 +1633,7 @@ export default function Salaries() {
                                     </button>
                                   )}
                                 </div>
-                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                <div className={`mt-3 grid gap-2 ${delivery.showTeamDelivery ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                                   {[
                                     {
                                       key: 'employee',
@@ -1619,6 +1651,14 @@ export default function Salaries() {
                                       messageId: delivery.groupMessageId,
                                       error: delivery.groupError,
                                     },
+                                    ...(delivery.showTeamDelivery ? [{
+                                      key: 'team',
+                                      label: l.telegramTeam,
+                                      status: delivery.teamStatus,
+                                      timestamp: delivery.teamTimestamp,
+                                      messageId: delivery.teamMessageId,
+                                      error: delivery.teamError,
+                                    }] : []),
                                   ].map(target => (
                                     <div key={target.key} className="rounded-lg border border-gray-200 bg-white px-2.5 py-2">
                                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1746,12 +1786,12 @@ function CardHeading({ icon: Icon, title, description, tone = 'orange' }) {
   )
 }
 
-function Field({ label, hint = '', children }) {
+function Field({ label, hint = '', hintClassName = '', children }) {
   return (
     <label className="block min-w-0">
       <span className="mb-1.5 block text-xs font-bold text-[#596170]">{label}</span>
       {children}
-      {hint && <span className="mt-1.5 block text-[11px] font-semibold text-[#6B7280]">{hint}</span>}
+      {hint && <span className={`mt-1.5 block text-[11px] font-semibold ${hintClassName || 'text-[#6B7280]'}`}>{hint}</span>}
     </label>
   )
 }

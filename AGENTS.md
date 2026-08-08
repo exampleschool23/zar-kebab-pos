@@ -197,7 +197,7 @@ These bugs were recently fixed and are now protected by tests:
 19. Salary-payment Telegram delivery has two independent destinations.
    - The private employee message keeps its receipt-confirmation button.
    - The salary group uses the `salary_events` row in `telegram_notification_targets`, with `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` only as a deployment-order fallback, and receives a separate message without a confirmation button.
-   - Never fall back to `TELEGRAM_TEAM_CHAT_ID` or the completed-orders group for salary details.
+   - Salary-payment delivery must never fall back to `TELEGRAM_TEAM_CHAT_ID` or the completed-orders group.
    - Employee and group delivery statuses are recorded separately so either destination can fail or retry without duplicating the other.
 
 20. Every recorded salary operation must notify the dedicated salary group.
@@ -220,6 +220,21 @@ These bugs were recently fixed and are now protected by tests:
    - `deleted_at` is the archive boundary. Archived products and categories must never reappear merely because unavailable meals are now visible.
    - `stock_count` is shelf inventory and is not an availability flag; do not infer menu visibility or orderability from a zero stock count.
    - Migration `118` returns active unavailable products from the customer-menu RPC and anonymous select policy while preserving every explicit hiding and archive rule.
+
+23. Salary advances must remain visible without reducing another employee's liability.
+   - `getSalaryBalance()` is the signed employee ledger: accrued salary minus recorded payments and fines.
+   - A payment or fine above the currently accrued salary creates a negative balance that carries forward against later accrual.
+   - `getSalaryDue()` remains the nonnegative amount currently owed to one employee.
+   - `getTotalSalaryDue()` sums those per-employee liabilities, so one employee's advance never hides salary owed to another employee.
+   - Salary payment entry must continue to accept a positive manual payment when the current balance is zero or negative.
+
+24. Bonus, fine, and absence events also notify ZarKebab Team.
+   - Migration `119` adds the separate `team_events` Telegram target and independent Team delivery columns to `employee_salary_group_notification_deliveries`.
+   - New bonus, fine, and absence rows queue Team delivery as `not_attempted` in the same database trigger that queues employee and salary-group delivery.
+   - Team announcements include the saved amount and the full fine reason or absence note, but omit the employee's remaining salary balance and the manager identity.
+   - Historical events are marked `skipped` during migration so deployment never broadcasts old salary events unexpectedly.
+   - Salary payments and salary-rate changes are not Team events; their Team status remains non-retryable `skipped`.
+   - Employee, salary-group, and Team retries must remain independent and duplicate-safe.
 
 ## Database Migrations
 
@@ -305,6 +320,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/118_show_unavailable_menu_items.sql`
   Keeps active unavailable meals visible in customer menu data while retaining public-hidden, cashier-only, schedule, category, and archive filters.
+
+- `supabase/119_salary_event_team_notifications.sql`
+  Adds database-first, independently retryable ZarKebab Team delivery tracking for new bonus, fine, and absence events without replaying historical operations.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

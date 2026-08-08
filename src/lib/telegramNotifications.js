@@ -26,6 +26,7 @@ async function notifyTelegramSalaryEvent(type, eventId) {
     allSent: false,
     employee: { status: 'failed' },
     group: { status: 'failed' },
+    team: { status: 'failed' },
   }
   if (!eventId || !['payment', 'fine', 'bonus', 'absence', 'rate'].includes(type)) return failedResult
   try {
@@ -49,6 +50,7 @@ async function notifyTelegramSalaryEvent(type, eventId) {
       ...result,
       employee: { ...failedResult.employee, ...(result?.employee || {}) },
       group: { ...failedResult.group, ...(result?.group || {}) },
+      team: { ...failedResult.team, ...(result?.team || {}) },
     }
   } catch (error) {
     console.warn(`[telegram] employee ${type} notification failed:`, error)

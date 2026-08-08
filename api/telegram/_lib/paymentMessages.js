@@ -105,6 +105,60 @@ const GROUP_EVENT_COPY = {
   },
 }
 
+const TEAM_EVENT_COPY = {
+  uz: {
+    bonusTitle: 'Jamoamizdagi yutuq',
+    bonusIntro: '👏 Ajoyib ish! Xodimga jamoaga qo\u2018shgan hissasi uchun bonus berildi.',
+    bonusClosing: 'Zar Kebab umumiy natijasiga qo\u2018shgan hissangiz uchun rahmat! 🌟',
+    fineTitle: 'Jamoa intizomi',
+    fineIntro: 'Xodimga intizom bo\u2018yicha jarima qayd etildi.',
+    fineClosing: 'Mas\u2019uliyat va yuqori standartlarni birgalikda saqlaymiz.',
+    absenceTitle: 'Xodim yo\u2018qligi',
+    absenceIntro: 'Xodimning ishda bo\u2018lmagan kuni qayd etildi.',
+    absenceClosing: 'Bir-birimizni qo\u2018llab-quvvatlab, jamoa ishini barqaror davom ettiramiz.',
+    employee: 'Xodim',
+    amount: 'Summa',
+    date: 'Sana',
+    method: 'To\u2018lov turi',
+    note: 'Izoh',
+    reason: 'Sabab',
+  },
+  ru: {
+    bonusTitle: 'Достижение команды',
+    bonusIntro: '👏 Отличная работа! Сотруднику начислен бонус за вклад в команду.',
+    bonusClosing: 'Спасибо за вклад в общий результат Zar Kebab! 🌟',
+    fineTitle: 'Дисциплина команды',
+    fineIntro: 'Сотруднику зарегистрирован дисциплинарный штраф.',
+    fineClosing: 'Сохраняем ответственность и высокие стандарты вместе.',
+    absenceTitle: 'Отсутствие сотрудника',
+    absenceIntro: 'Зарегистрировано отсутствие сотрудника.',
+    absenceClosing: 'Поддерживаем друг друга и сохраняем стабильную работу команды.',
+    employee: 'Сотрудник',
+    amount: 'Сумма',
+    date: 'Дата',
+    method: 'Способ оплаты',
+    note: 'Примечание',
+    reason: 'Причина',
+  },
+  en: {
+    bonusTitle: 'Team achievement',
+    bonusIntro: '👏 Great work! An employee received a bonus for contributing to the team.',
+    bonusClosing: 'Thank you for contributing to the shared success of Zar Kebab! 🌟',
+    fineTitle: 'Team discipline',
+    fineIntro: 'A disciplinary fine was recorded for an employee.',
+    fineClosing: 'Together, we uphold responsibility and high standards.',
+    absenceTitle: 'Employee absence',
+    absenceIntro: 'An employee absence was recorded.',
+    absenceClosing: 'We support one another and keep the team running reliably.',
+    employee: 'Employee',
+    amount: 'Amount',
+    date: 'Date',
+    method: 'Payment method',
+    note: 'Note',
+    reason: 'Reason',
+  },
+}
+
 const EMPLOYEE_EVENT_COPY = {
   uz: {
     greeting: name => `Assalomu alaykum, ${name}!`,
@@ -296,6 +350,34 @@ export function buildSalaryGroupEventMessage(type, event, remainingDue = 0, lang
   lines.push(
     `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,
     `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(event?.created_by_name || '-')}`
+  )
+  return lines.join('\n')
+}
+
+export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
+  const lang = normalizeSalaryNotificationLanguage(language)
+  const copy = TEAM_EVENT_COPY[lang]
+  const normalizedType = ['bonus', 'fine', 'absence'].includes(type) ? type : 'absence'
+  const date = event?.bonus_date || event?.fine_date || event?.absence_date
+  const detail = normalizedType === 'fine' ? event?.reason : event?.note
+  const lines = [
+    `${normalizedType === 'bonus' ? '🎁' : normalizedType === 'fine' ? '⚠️' : '📅'} <b>${copy[`${normalizedType}Title`]}</b>`,
+    '',
+    copy[`${normalizedType}Intro`],
+    '',
+    `<b>${copy.employee}:</b> ${escapeTelegramHtml(event?.employee_name || '-')}`,
+  ]
+  if (normalizedType !== 'absence') {
+    lines.push(`<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`)
+  }
+  lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(date, '-'))}`)
+  if (normalizedType === 'bonus') {
+    lines.push(`<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`)
+  }
+  lines.push(
+    `<b>${normalizedType === 'fine' ? copy.reason : copy.note}:</b> ${escapeTelegramHtml(String(detail || '').trim() || '-')}`,
+    '',
+    copy[`${normalizedType}Closing`]
   )
   return lines.join('\n')
 }

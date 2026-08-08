@@ -20,6 +20,7 @@ import {
   getNetIncome,
   getSalaryActiveUntil,
   getSalaryAbsenceDates,
+  getSalaryBalance,
   getSalaryDue,
   getSalaryFineAmount,
   getSalaryCategoryForRole,
@@ -744,6 +745,55 @@ test('salary bonuses do not reduce salary due or mutate payment history balances
   assert.equal(summarizeExpenses(bonusRows).total, 2_000_000)
 })
 
+test('salary balance preserves advance payments and carries their credit forward', () => {
+  const salaryProfile = {
+    id: 'salary-advance-balance-1',
+    joined_at: '2026-08-01',
+    rates: [{ effective_from: '2026-08-01', amount: 100_000, rate_unit: 'daily' }],
+    payments: [
+      { id: 'payment-settle-first-day', paid_date: '2026-08-01', amount: 100_000 },
+    ],
+    fines: [],
+    absences: [],
+  }
+
+  assert.equal(getSalaryBalance(salaryProfile, '2026-08-01'), 0)
+
+  salaryProfile.payments.push(
+    { id: 'payment-advance', paid_date: '2026-08-01', amount: 500_000 },
+    { id: 'payment-future', paid_date: '2026-08-03', amount: 200_000 },
+  )
+
+  assert.equal(getSalaryBalance(salaryProfile, '2026-08-01'), -500_000)
+  assert.equal(getSalaryDue(salaryProfile, '2026-08-01'), 0)
+  assert.equal(getSalaryBalance(salaryProfile, '2026-08-02'), -400_000)
+  assert.equal(getSalaryBalance(salaryProfile, '2026-08-03'), -500_000)
+})
+
+test('total salary due remains gross liability and does not net another employee advance', () => {
+  const employeeWithAdvance = {
+    id: 'salary-advance-total-1',
+    joined_at: '2026-08-01',
+    rates: [{ effective_from: '2026-08-01', amount: 100_000, rate_unit: 'daily' }],
+    payments: [{ paid_date: '2026-08-01', amount: 600_000 }],
+    fines: [],
+    absences: [],
+  }
+  const employeeWithLiability = {
+    id: 'salary-liability-total-1',
+    joined_at: '2026-08-01',
+    rates: [{ effective_from: '2026-08-01', amount: 300_000, rate_unit: 'daily' }],
+    payments: [],
+    fines: [],
+    absences: [],
+  }
+
+  assert.equal(getSalaryBalance(employeeWithAdvance, '2026-08-01'), -500_000)
+  assert.equal(getSalaryDue(employeeWithAdvance, '2026-08-01'), 0)
+  assert.equal(getSalaryDue(employeeWithLiability, '2026-08-01'), 300_000)
+  assert.equal(getTotalSalaryDue([employeeWithAdvance, employeeWithLiability], '2026-08-01'), 300_000)
+})
+
 test('salary fines reduce the amount due from their recorded date and carry forward', () => {
   const waiterProfile = {
     id: 'salary-fine-due-1',
@@ -758,6 +808,7 @@ test('salary fines reduce the amount due from their recorded date and carry forw
 
   assert.equal(getSalaryFineAmount(waiterProfile, '2026-06-02'), 0)
   assert.equal(getSalaryFineAmount(waiterProfile, '2026-06-03'), 500_000)
+  assert.equal(getSalaryBalance(waiterProfile, '2026-06-03'), -300_000)
   assert.equal(getSalaryDue(waiterProfile, '2026-06-03'), 0)
   assert.equal(getSalaryDue(waiterProfile, '2026-06-08'), 200_000)
   assert.equal(getSalaryDue(waiterProfile, '2026-06-10'), 200_000)

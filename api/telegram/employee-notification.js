@@ -8,6 +8,7 @@ import {
   buildSalaryGroupEventMessage,
   buildSalaryPaymentGroupMessage,
   buildSalaryRateGroupMessage,
+  buildSalaryTeamEventMessage,
   getEmployeePaymentConfirmationCopy,
 } from './_lib/paymentMessages.js'
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
@@ -21,6 +22,7 @@ import {
 const EDITOR_ROLES = new Set(['owner', 'admin'])
 const FEATURE_ACCESS_MANAGER_EMAILS = new Set(['dangerhoggish@gmail.com'])
 const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
+const TEAM_EVENT_TYPES = new Set(['bonus', 'fine', 'absence'])
 const GROUP_EVENT_CONFIG = {
   bonus: {
     table: 'employee_salary_bonuses',
@@ -103,6 +105,33 @@ async function loadSalaryGroupTarget(supabase) {
   }
 }
 
+async function loadSalaryTeamTarget(supabase) {
+  const fallback = {
+    chatId: String(process.env.TELEGRAM_TEAM_CHAT_ID || '').trim(),
+    language: String(process.env.TELEGRAM_TEAM_LANGUAGE || 'ru').trim(),
+  }
+  const { data, error } = await supabase
+    .from('telegram_notification_targets')
+    .select('chat_id, language, is_enabled')
+    .eq('target_key', 'team_events')
+    .maybeSingle()
+  if (error) {
+    const missingMigration = ['42P01', 'PGRST205'].includes(error.code)
+      || (
+        /telegram_notification_targets/i.test(error.message || '')
+        && /does not exist|schema cache/i.test(error.message || '')
+      )
+    if (!missingMigration) throw error
+    return fallback
+  }
+  if (!data) return fallback
+  if (!data.is_enabled) return { chatId: '', language: data.language || fallback.language }
+  return {
+    chatId: String(data.chat_id || fallback.chatId).trim(),
+    language: String(data.language || fallback.language || 'ru').trim(),
+  }
+}
+
 async function loadOwnedSalaryEvent(supabase, user, type, eventId, actorName = '') {
   const config = GROUP_EVENT_CONFIG[type]
   if (!config) throw Object.assign(new Error('Unsupported salary event type'), { status: 400 })
@@ -162,6 +191,16 @@ function savedEmployeeEventDeliveryResult(delivery, duplicate = true) {
     telegramMessageId: delivery?.employee_telegram_message_id || null,
     sentAt: delivery?.employee_sent_at || null,
     errorMessage: delivery?.employee_error_message || '',
+  }
+}
+
+function savedTeamDeliveryResult(delivery, duplicate = true) {
+  return {
+    status: delivery?.team_status || 'pending',
+    duplicate,
+    telegramMessageId: delivery?.team_telegram_message_id || null,
+    sentAt: delivery?.team_sent_at || null,
+    errorMessage: delivery?.team_error_message || '',
   }
 }
 
@@ -271,6 +310,101 @@ async function deliverSalaryGroupEvent(supabase, type, event, remainingDue) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', delivery.id)
+    return {
+      status: 'failed',
+      telegramMessageId: null,
+      sentAt: null,
+      errorMessage,
+    }
+  }
+}
+
+async function deliverSalaryTeamEvent(supabase, type, event) {
+  if (!TEAM_EVENT_TYPES.has(type)) {
+    return {
+      status: 'skipped',
+      telegramMessageId: null,
+      sentAt: null,
+      errorMessage: 'ZarKebab Team notifications apply only to bonuses, fines, and absences',
+    }
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('employee_salary_group_notification_deliveries')
+    .select('*')
+    .eq('event_type', type)
+    .eq('event_id', event.id)
+    .single()
+  if (existingError) throw existingError
+  if (!getSalaryEventRetryTargets(existing, {
+    pendingRetryMs: PENDING_DELIVERY_RETRY_MS,
+  }).team) {
+    return savedTeamDeliveryResult(existing)
+  }
+
+  const target = await loadSalaryTeamTarget(supabase)
+  const now = new Date().toISOString()
+  const pendingFields = {
+    team_status: target.chatId ? 'pending' : 'skipped',
+    team_chat_id: target.chatId || null,
+    team_telegram_message_id: null,
+    team_error_message: target.chatId ? '' : 'ZarKebab Team Telegram group is not configured',
+    team_attempted_at: now,
+    team_sent_at: null,
+    updated_at: now,
+  }
+  let claimQuery = supabase
+    .from('employee_salary_group_notification_deliveries')
+    .update(pendingFields)
+    .eq('id', existing.id)
+    .eq('team_status', existing.team_status)
+  if (existing.team_attempted_at) {
+    claimQuery = claimQuery.eq('team_attempted_at', existing.team_attempted_at)
+  } else {
+    claimQuery = claimQuery.is('team_attempted_at', null)
+  }
+  const claimed = await claimQuery.select('*').maybeSingle()
+  if (claimed.error) throw claimed.error
+  if (!claimed.data) {
+    const { data: concurrent, error: concurrentError } = await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .select('*')
+      .eq('id', existing.id)
+      .single()
+    if (concurrentError) throw concurrentError
+    return savedTeamDeliveryResult(concurrent)
+  }
+  if (!target.chatId) {
+    return savedTeamDeliveryResult(claimed.data, false)
+  }
+
+  try {
+    const text = buildSalaryTeamEventMessage(type, event, target.language)
+    const response = await sendTelegramMessage(target.chatId, text)
+    const sentAt = new Date().toISOString()
+    const telegramMessageId = getTelegramMessageId(response)
+    const { error: updateError } = await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .update({
+        team_status: 'sent',
+        team_telegram_message_id: telegramMessageId,
+        team_error_message: '',
+        team_sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('id', existing.id)
+    if (updateError) throw updateError
+    return { status: 'sent', telegramMessageId, sentAt, errorMessage: '' }
+  } catch (error) {
+    const errorMessage = String(error?.message || error).slice(0, 1000)
+    await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .update({
+        team_status: 'failed',
+        team_error_message: errorMessage,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
     return {
       status: 'failed',
       telegramMessageId: null,
@@ -428,18 +562,23 @@ async function notifySalaryEvent(supabase, user, actorName, type, eventId) {
   const [groupSettled] = await Promise.allSettled([
     deliverSalaryGroupEvent(supabase, type, event, remainingDue),
   ])
-  const [employeeSettled] = await Promise.allSettled([
+  const [employeeSettled, teamSettled] = await Promise.allSettled([
     deliverEmployeeSalaryEvent(supabase, type, event, remainingDue),
+    deliverSalaryTeamEvent(supabase, type, event),
   ])
   const employee = normalizeDeliverySettlement(employeeSettled)
   const group = normalizeDeliverySettlement(groupSettled)
+  const team = normalizeDeliverySettlement(teamSettled)
   const employeeSent = employee.status === 'sent'
   const groupSent = group.status === 'sent'
+  const teamSent = team.status === 'sent'
+  const teamRequired = TEAM_EVENT_TYPES.has(type)
   return {
-    ok: employeeSent || groupSent,
-    allSent: employeeSent && groupSent,
+    ok: employeeSent || groupSent || teamSent,
+    allSent: employeeSent && groupSent && (!teamRequired || teamSent),
     employee,
     group,
+    team,
   }
 }
 
