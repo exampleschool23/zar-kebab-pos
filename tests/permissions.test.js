@@ -6,6 +6,8 @@ import {
   FEATURE_KEYS,
   assignableRoles,
   canDeleteTeamMember,
+  canChangeMenuItemAvailability,
+  canChangeMenuItemPublicVisibility,
   canEditFeature,
   canEditMenu,
   canEditTeamMember,
@@ -70,6 +72,22 @@ test('menu is always viewable by staff while Manage menu controls editing', () =
   assert.equal(defaultPath(viewerWithoutMenu), '/admin/menu')
   assert.equal(FEATURE_DEFINITIONS.find(feature => feature.key === 'menu')?.kind, 'action')
   assert.equal(FEATURE_KEYS.includes('edit_menu_items'), false)
+})
+
+test('only owners with menu write access can change meal availability', () => {
+  assert.equal(canChangeMenuItemAvailability('owner'), true)
+  assert.equal(canChangeMenuItemAvailability({ role: 'owner', feature_access: ['menu'] }), true)
+  assert.equal(canChangeMenuItemAvailability({ role: 'owner', feature_access: ['dashboard'] }), false)
+  assert.equal(canChangeMenuItemAvailability({ role: 'admin', feature_access: ['menu'] }), false)
+  assert.equal(canChangeMenuItemAvailability({ role: 'viewer', feature_access: ['menu'] }), false)
+})
+
+test('only owners with menu write access can hide meals from the public menu', () => {
+  assert.equal(canChangeMenuItemPublicVisibility('owner'), true)
+  assert.equal(canChangeMenuItemPublicVisibility({ role: 'owner', feature_access: ['menu'] }), true)
+  assert.equal(canChangeMenuItemPublicVisibility({ role: 'owner', feature_access: ['dashboard'] }), false)
+  assert.equal(canChangeMenuItemPublicVisibility({ role: 'admin', feature_access: ['menu'] }), false)
+  assert.equal(canChangeMenuItemPublicVisibility({ role: 'viewer', feature_access: ['menu'] }), false)
 })
 
 test('feature selection keeps sensitive actions attached to relevant pages', () => {

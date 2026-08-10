@@ -1059,6 +1059,71 @@ test('AdminMenu visibility toggles show scoped loading feedback', () => {
   assert.match(source, /onClick=\{closeCatModal\}[\s\S]*disabled=\{savingCatForm\}/)
 })
 
+test('meal availability changes are owner-only in the UI and database', () => {
+  const source = readSource('src/pages/AdminMenu.jsx')
+  const permissions = readSource('src/lib/permissions.js')
+  const db = readSource('src/lib/db.js')
+  const migration = readSource('supabase/120_owner_only_menu_item_availability.sql')
+  const adminMenu = functionBody(source, 'AdminMenu')
+  const ownerOnlyField = functionBody(source, 'OwnerOnlyMenuItemCheckbox')
+  const itemCard = functionBody(source, 'SortableItemCard')
+  const itemRow = functionBody(source, 'SortableItemRow')
+  const deleteMenuItem = db.slice(
+    db.indexOf("case 'DELETE_MENU_ITEM'"),
+    db.indexOf("case 'REORDER_MENU_ITEM'")
+  )
+  const primaryArchivePayload = deleteMenuItem.slice(
+    deleteMenuItem.indexOf('const payload = {'),
+    deleteMenuItem.indexOf("const { error }")
+  )
+
+  assert.match(permissions, /function canChangeMenuItemAvailability\(profileOrRole\)/)
+  assert.match(permissions, /normalizeRole\(profileOrRole\?\.role \|\| profileOrRole\) === 'owner'[\s\S]*canEditMenu\(profileOrRole\)/)
+  assert.match(source, /const canChangeAvailability = canChangeMenuItemAvailability\(profile \|\| \{ role: state\.user\?\.role \}\)/)
+  assert.match(ownerOnlyField, /disabled=\{disabled \|\| locked\}/)
+  assert.match(ownerOnlyField, /\{ownerOnlyBadgeLabel\(lang\)\}/)
+  assert.match(itemCard, /canChangeAvailability \? \(\s*<VisibilityToggleButton/)
+  assert.match(itemRow, /canChangeAvailability \? \(\s*<VisibilityToggleButton/)
+  assert.equal((source.match(/canChange=\{canChangeAvailability\}/g) || []).length, 2)
+  assert.match(adminMenu, /const savedAvailability = canChangeAvailability[\s\S]*existingItem \? existingItem\.available !== false : true/)
+  assert.match(adminMenu, /available: savedAvailability/)
+  assert.match(adminMenu, /async function toggleItemVisibility\(item\) \{\s*if \(!canChangeAvailability/)
+
+  assert.match(primaryArchivePayload, /deleted_at: deletedAt/)
+  assert.doesNotMatch(primaryArchivePayload, /available:/)
+  assert.match(migration, /auth\.uid\(\) is null/)
+  assert.match(migration, /new\.available is distinct from true and not public\.is_owner\(\)/)
+  assert.match(migration, /old\.available is distinct from new\.available and not public\.is_owner\(\)/)
+  assert.match(migration, /before update of available on public\.menu_items/)
+  assert.match(migration, /when \(old\.available is distinct from new\.available\)/)
+  assert.match(migration, /using errcode = '42501'/)
+})
+
+test('public menu hiding is owner-only in the product editor and database', () => {
+  const source = readSource('src/pages/AdminMenu.jsx')
+  const permissions = readSource('src/lib/permissions.js')
+  const migration = readSource('supabase/121_owner_only_menu_item_public_visibility.sql')
+  const adminMenu = functionBody(source, 'AdminMenu')
+  const ownerOnlyField = functionBody(source, 'OwnerOnlyMenuItemCheckbox')
+
+  assert.match(permissions, /function canChangeMenuItemPublicVisibility\(profileOrRole\)/)
+  assert.match(source, /const canChangePublicVisibility = canChangeMenuItemPublicVisibility\(profile \|\| \{ role: state\.user\?\.role \}\)/)
+  assert.match(ownerOnlyField, /disabled=\{disabled \|\| locked\}/)
+  assert.equal((source.match(/canChange=\{canChangePublicVisibility\}/g) || []).length, 2)
+  assert.match(source, /id="product-public-hidden"/)
+  assert.match(source, /id="modal-product-public-hidden"/)
+  assert.match(adminMenu, /const savedPublicHidden = canChangePublicVisibility[\s\S]*existingItem \? isPublicHiddenMenuItem\(existingItem\) : false/)
+  assert.match(adminMenu, /public_hidden: savedPublicHidden/)
+  assert.doesNotMatch(adminMenu, /public_hidden: !!form\.public_hidden/)
+
+  assert.match(migration, /auth\.uid\(\) is null/)
+  assert.match(migration, /new\.public_hidden is distinct from false and not public\.is_owner\(\)/)
+  assert.match(migration, /old\.public_hidden is distinct from new\.public_hidden and not public\.is_owner\(\)/)
+  assert.match(migration, /before update of public_hidden on public\.menu_items/)
+  assert.match(migration, /when \(old\.public_hidden is distinct from new\.public_hidden\)/)
+  assert.match(migration, /using errcode = '42501'/)
+})
+
 test('AdminMenu edit save stays disabled until product fields change', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const adminMenu = functionBody(source, 'AdminMenu')
@@ -3529,4 +3594,25 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(kitchen, /getManualOrderNotes\(item, menuItem, lang\)/)
   assert.match(db, /selected_options: i\.selected_options \|\| i\.selectedOptions \|\| \{\}/)
   assert.match(rpc, /selected_options/)
+})
+
+test('Daily Bazaar filter toolbar stays grouped across responsive widths', () => {
+  const source = readSource('src/pages/DailyBazaar.jsx')
+  const toolbar = source.slice(
+    source.indexOf('function RangeAndFilters'),
+    source.indexOf('function BazaarEntryForm')
+  )
+  const dateInput = source.slice(source.indexOf('function FormattedDateInput'))
+
+  assert.match(toolbar, /aria-labelledby="bazaar-range-heading"/)
+  assert.match(toolbar, /aria-pressed=\{rangeKey === option\.key\}/)
+  assert.match(toolbar, /rangeSummary = dateFrom === dateTo/)
+  assert.match(toolbar, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(380px,520px\)\]/)
+  assert.match(toolbar, /border-t border-\[#EEF0F3\] pt-3/)
+  assert.match(toolbar, /lg:grid-cols-\[minmax\(200px,260px\)_minmax\(220px,280px\)_minmax\(260px,1fr\)\]/)
+  assert.match(toolbar, /id="bazaar-history-search"/)
+  assert.match(toolbar, /sm:col-span-2 lg:col-span-1/)
+  assert.doesNotMatch(toolbar, /AnimatedSearch/)
+  assert.doesNotMatch(toolbar, /min-w-\[130px\]/)
+  assert.match(dateInput, /right-10[^\n]+text-ellipsis/)
 })

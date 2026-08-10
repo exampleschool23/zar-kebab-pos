@@ -233,15 +233,11 @@ test('ZarKebab Team messages publish full bonus, fine, and absence details witho
     'Сохраняем ответственность и высокие стандарты вместе.',
   ].join('\n'))
   assert.equal(absence, [
-    '📅 <b>Коллега отсутствует</b>',
+    '📅 <b>Отсутствие сотрудника</b>',
     '',
-    'В этот день сотрудник не сможет быть с командой. Желаем, чтобы всё было хорошо 💛',
-    '',
-    '<b>Сотрудник:</b> Зилола &lt;кассир&gt;',
-    '<b>Дата:</b> 31.07.2026',
-    '<b>Примечание:</b> &lt;Болезнь &amp; визит к врачу&gt;',
-    '',
-    'Поддержим коллегу и поможем друг другу в течение смены 🤝',
+    '👤 <b>Сотрудник:</b> Зилола &lt;кассир&gt;',
+    '🗓 <b>Дата:</b> 31 июля 2026',
+    '📝 <b>Примечание:</b> &lt;Болезнь &amp; визит к врачу&gt;',
   ].join('\n'))
 
   for (const message of [bonus, fine, absence]) {
@@ -251,7 +247,7 @@ test('ZarKebab Team messages publish full bonus, fine, and absence details witho
   }
 })
 
-test('ZarKebab Team salary messages are localized in Uzbek and English', () => {
+test('ZarKebab Team bonus and fine messages localize while absence stays Russian', () => {
   const uz = buildSalaryTeamEventMessage('bonus', {
     employee_name: 'Nodir',
     bonus_date: '2026-08-08',
@@ -265,6 +261,16 @@ test('ZarKebab Team salary messages are localized in Uzbek and English', () => {
     amount: 75_000,
     reason: 'Late arrival',
   }, 'en')
+  const uzAbsence = buildSalaryTeamEventMessage('absence', {
+    employee_name: 'Gavhar',
+    absence_date: '2026-08-09',
+    note: '',
+  }, 'uz')
+  const enAbsence = buildSalaryTeamEventMessage('absence', {
+    employee_name: 'Gavhar',
+    absence_date: '2026-08-09',
+    note: 'Sick leave',
+  }, 'en')
 
   assert.match(uz, /Jamoamizdagi yutuq/)
   assert.match(uz, /500 000 UZS/)
@@ -273,6 +279,20 @@ test('ZarKebab Team salary messages are localized in Uzbek and English', () => {
   assert.match(en, /Team discipline/)
   assert.match(en, /75 000 UZS/)
   assert.match(en, /Reason:<\/b> Late arrival/)
+  assert.equal(uzAbsence, [
+    '📅 <b>Отсутствие сотрудника</b>',
+    '',
+    '👤 <b>Сотрудник:</b> Gavhar',
+    '🗓 <b>Дата:</b> 9 августа 2026',
+    '📝 <b>Примечание:</b> -',
+  ].join('\n'))
+  assert.equal(enAbsence, [
+    '📅 <b>Отсутствие сотрудника</b>',
+    '',
+    '👤 <b>Сотрудник:</b> Gavhar',
+    '🗓 <b>Дата:</b> 9 августа 2026',
+    '📝 <b>Примечание:</b> Sick leave',
+  ].join('\n'))
 })
 
 test('employee bonus and absence messages are private and localized', () => {

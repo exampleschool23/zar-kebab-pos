@@ -18,7 +18,14 @@ import { getMenuPricing } from '../lib/menuPricing'
 import { generateMenuExternalId } from '../lib/menuExternalId'
 import AppShell from '../components/AppShell'
 import MenuCategoryScroller, { menuCategorySectionId } from '../components/MenuCategoryScroller'
-import { getQuickItemSortOrder, isActiveMenuCategory, isActiveMenuItem, isCashierQuickItem, isWaiterHiddenMenuItem } from '../lib/menuItems'
+import {
+  getQuickItemSortOrder,
+  isActiveMenuCategory,
+  isActiveMenuItem,
+  isCashierQuickItem,
+  isPublicHiddenMenuItem,
+  isWaiterHiddenMenuItem,
+} from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
@@ -29,7 +36,11 @@ import { useAppDataStatus } from '../store/appHooks'
 import MenuMedia from '../components/MenuMedia'
 import { supabase } from '../lib/supabase'
 import { formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput } from '../lib/moneyInput'
-import { canEditMenu as canEditMenuForProfile } from '../lib/permissions'
+import {
+  canChangeMenuItemAvailability,
+  canChangeMenuItemPublicVisibility,
+  canEditMenu as canEditMenuForProfile,
+} from '../lib/permissions'
 import { getSaleProfitSummary } from '../lib/profit'
 import { getRequiredMenuItemCost, hasRequiredMenuItemCost } from '../lib/menuItemCosts'
 import {
@@ -685,6 +696,62 @@ function itemVisibilityStatusLabel(lang, visible) {
   return lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Недоступно' : 'Unavailable'
 }
 
+function ownerOnlyAvailabilityLabel(lang) {
+  return lang === 'uz'
+    ? 'Mavjudlikni faqat egasi o‘zgartira oladi'
+    : lang === 'ru'
+      ? 'Доступность может изменить только владелец'
+      : 'Only the owner can change availability'
+}
+
+function ownerOnlyPublicVisibilityLabel(lang) {
+  return lang === 'uz'
+    ? 'Ommaviy menyudan faqat egasi yashira oladi'
+    : lang === 'ru'
+      ? 'Скрытие из публичного меню может изменить только владелец'
+      : 'Only the owner can change public menu visibility'
+}
+
+function publicMenuHideControlLabel(lang) {
+  return lang === 'uz'
+    ? 'Ommaviy menyudan yashirish'
+    : lang === 'ru'
+      ? 'Скрыть из публичного меню'
+      : 'Hide from public menu'
+}
+
+function ownerOnlyBadgeLabel(lang) {
+  return lang === 'uz' ? 'Faqat egasi' : lang === 'ru' ? 'Только владелец' : 'Owner only'
+}
+
+function OwnerOnlyMenuItemCheckbox({ id, checked, onChange, disabled, canChange, label, ownerOnlyLabel, lang }) {
+  const locked = !canChange
+
+  return (
+    <label
+      htmlFor={id}
+      title={locked ? ownerOnlyLabel : undefined}
+      className={`flex items-center gap-2 pt-1 text-sm font-medium ${locked ? 'cursor-not-allowed text-gray-400' : 'cursor-pointer text-gray-700'}`}
+    >
+      <input
+        id={id}
+        type="checkbox"
+        checked={!!checked}
+        onChange={event => onChange(event.target.checked)}
+        disabled={disabled || locked}
+        className="h-4 w-4 accent-[#ff5a00] disabled:cursor-not-allowed"
+      />
+      <span>{label}</span>
+      {locked && (
+        <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-black text-gray-500">
+          <Lock size={11} />
+          {ownerOnlyBadgeLabel(lang)}
+        </span>
+      )}
+    </label>
+  )
+}
+
 function categoryVisibilityStatusLabel(lang, visible) {
   if (visible) return lang === 'uz' ? 'Ommaviy menyuda ko‘rinadi' : lang === 'ru' ? 'Видно в публичном меню' : 'Visible on public menu'
   return hiddenFromPublicMenuLabel(lang)
@@ -768,7 +835,7 @@ function VisibilityToggleButton({ visible, pending, onClick, lang, kind = 'item'
 
 // ── Sortable grid card ────────────────────────────────────────────────────────
 
-function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, isDragging: _isDragging, readOnly = false }) {
+function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, canChangeAvailability = false, isDragging: _isDragging, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -865,7 +932,7 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
           }`}>
             {itemVisibilityStatusLabel(lang, item.available)}
           </span>
-          {!readOnly && (
+          {!readOnly && (canChangeAvailability ? (
             <VisibilityToggleButton
               visible={!!item.available}
               pending={visibilityPending}
@@ -873,7 +940,15 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
               lang={lang}
               compact
             />
-          )}
+          ) : (
+            <span
+              title={ownerOnlyAvailabilityLabel(lang)}
+              aria-label={ownerOnlyAvailabilityLabel(lang)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-gray-400"
+            >
+              <Lock size={14} />
+            </span>
+          ))}
         </div>
 
         {/* Actions */}
@@ -903,7 +978,7 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
 
 // ── Sortable list row ─────────────────────────────────────────────────────────
 
-function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, readOnly = false }) {
+function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, canChangeAvailability = false, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -960,13 +1035,23 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
       </span>
       {!readOnly && (
         <div className="flex gap-1.5 flex-shrink-0">
-          <VisibilityToggleButton
-            visible={!!item.available}
-            pending={visibilityPending}
-            onClick={() => onToggleVisibility(item)}
-            lang={lang}
-            compact
-          />
+          {canChangeAvailability ? (
+            <VisibilityToggleButton
+              visible={!!item.available}
+              pending={visibilityPending}
+              onClick={() => onToggleVisibility(item)}
+              lang={lang}
+              compact
+            />
+          ) : (
+            <span
+              title={ownerOnlyAvailabilityLabel(lang)}
+              aria-label={ownerOnlyAvailabilityLabel(lang)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-gray-400"
+            >
+              <Lock size={13} />
+            </span>
+          )}
           <button
             onClick={() => onEdit(item)}
             disabled={visibilityPending}
@@ -1533,6 +1618,8 @@ export default function AdminMenu() {
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
   const canEditMenu = canEditMenuForProfile(profile || { role: state.user?.role })
+  const canChangeAvailability = canChangeMenuItemAvailability(profile || { role: state.user?.role })
+  const canChangePublicVisibility = canChangeMenuItemPublicVisibility(profile || { role: state.user?.role })
   const scheduleLabels = menuScheduleLabels(lang)
   const navigate = useNavigate()
   const { productId, categoryId } = useParams()
@@ -1835,6 +1922,12 @@ export default function AdminMenu() {
       const existingItem = itemModal === 'edit'
         ? state.menuItems.find(item => item.id === form.id)
         : null
+      const savedAvailability = canChangeAvailability
+        ? !!form.available
+        : (existingItem ? existingItem.available !== false : true)
+      const savedPublicHidden = canChangePublicVisibility
+        ? !!form.public_hidden
+        : (existingItem ? isPublicHiddenMenuItem(existingItem) : false)
       const oldMediaUrls = getMenuItemMediaUrls(existingItem)
       const mediaUrls = normalizeMenuMediaUrls(form.media_urls)
       const { option_groups_editor: _optionGroupsEditor, option_groups: _optionGroups, ...formFields } = form
@@ -1845,6 +1938,7 @@ export default function AdminMenu() {
           image_url: mediaUrls[0] || '',
           media_urls: mediaUrls,
           option_groups: optionGroups,
+          available: savedAvailability,
           external_id: itemModal === 'new' ? String(form.external_id || generateMenuExternalId()).trim() : state.menuItems.find(item => item.id === form.id)?.external_id,
           price: numberFromMoneyInput(form.price),
           old_price: Math.max(0, Math.round(numberFromMoneyInput(form.old_price))),
@@ -1861,7 +1955,7 @@ export default function AdminMenu() {
           quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
           show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
           cashier_only: !!form.cashier_only,
-          public_hidden: !!form.public_hidden,
+          public_hidden: savedPublicHidden,
           waiter_hidden: !!form.waiter_hidden,
           visible_from_time: nullableMenuTime(form.visible_from_time),
           visible_until_time: nullableMenuTime(form.visible_until_time),
@@ -1889,7 +1983,7 @@ export default function AdminMenu() {
     }
   }
   async function toggleItemVisibility(item) {
-    if (!canEditMenu || !item?.id || savingItemId) return
+    if (!canChangeAvailability || !item?.id || savingItemId) return
     setSavingItemId(item.id)
     setMenuNotice(null)
     try {
@@ -2437,18 +2531,30 @@ export default function AdminMenu() {
                       </div>
                       <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
                     </div>
-                    <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
-                      <input type="checkbox" checked={form.available} onChange={e => setForm(f => ({ ...f, available: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
-                      {t(lang, 'available_item')}
-                    </label>
+                    <OwnerOnlyMenuItemCheckbox
+                      id="product-availability"
+                      checked={form.available}
+                      onChange={available => setForm(current => ({ ...current, available }))}
+                      disabled={savingItemForm}
+                      canChange={canChangeAvailability}
+                      label={t(lang, 'available_item')}
+                      ownerOnlyLabel={ownerOnlyAvailabilityLabel(lang)}
+                      lang={lang}
+                    />
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
                       <input type="checkbox" checked={!!form.show_in_cashier_quick_items} onChange={e => setForm(f => ({ ...f, show_in_cashier_quick_items: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
                       {lang === 'uz' ? 'Kassir tezkor mahsulotlarida ko‘rsatish' : lang === 'ru' ? 'Показывать в быстрых товарах кассира' : 'Show in cashier quick items'}
                     </label>
-                    <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
-                      <input type="checkbox" checked={!!form.public_hidden} onChange={e => setForm(f => ({ ...f, public_hidden: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
-                      {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
-                    </label>
+                    <OwnerOnlyMenuItemCheckbox
+                      id="product-public-hidden"
+                      checked={form.public_hidden}
+                      onChange={public_hidden => setForm(current => ({ ...current, public_hidden }))}
+                      disabled={savingItemForm}
+                      canChange={canChangePublicVisibility}
+                      label={publicMenuHideControlLabel(lang)}
+                      ownerOnlyLabel={ownerOnlyPublicVisibilityLabel(lang)}
+                      lang={lang}
+                    />
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
                       <input type="checkbox" checked={!!form.waiter_hidden} onChange={e => setForm(f => ({ ...f, waiter_hidden: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
                       {lang === 'uz' ? 'Ofitsiant menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню официанта' : 'Hide from waiter menu'}
@@ -2728,6 +2834,7 @@ export default function AdminMenu() {
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
+                                      canChangeAvailability={canChangeAvailability}
                                       readOnly={!canEditMenu}
                                     />
                                   ))}
@@ -2744,6 +2851,7 @@ export default function AdminMenu() {
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
+                                      canChangeAvailability={canChangeAvailability}
                                       readOnly={!canEditMenu}
                                     />
                                   ))}
@@ -2775,6 +2883,7 @@ export default function AdminMenu() {
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
+                                      canChangeAvailability={canChangeAvailability}
                                       readOnly={!canEditMenu}
                                     />
                                   ))}
@@ -2791,6 +2900,7 @@ export default function AdminMenu() {
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
+                                      canChangeAvailability={canChangeAvailability}
                                       readOnly={!canEditMenu}
                                     />
                                   ))}
@@ -2813,6 +2923,7 @@ export default function AdminMenu() {
                                 onToggleVisibility={toggleItemVisibility}
                                 visibilityPending={savingItemId === item.id}
                                 categories={realSortedCats}
+                                canChangeAvailability={canChangeAvailability}
                                 readOnly={!canEditMenu}
                               />
                             ))}
@@ -2829,6 +2940,7 @@ export default function AdminMenu() {
                                 onToggleVisibility={toggleItemVisibility}
                                 visibilityPending={savingItemId === item.id}
                                 categories={realSortedCats}
+                                canChangeAvailability={canChangeAvailability}
                                 readOnly={!canEditMenu}
                               />
                             ))}
@@ -3021,6 +3133,7 @@ export default function AdminMenu() {
                             onToggleVisibility={toggleItemVisibility}
                             visibilityPending={savingItemId === item.id}
                             categories={realSortedCats}
+                            canChangeAvailability={canChangeAvailability}
                             readOnly={!canEditMenu}
                           />
                         ))}
@@ -3130,17 +3243,16 @@ export default function AdminMenu() {
               </div>
               <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
             </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="avail"
-                type="checkbox"
-                checked={form.available}
-                onChange={e => setForm(f => ({ ...f, available: e.target.checked }))}
-                disabled={savingItemForm}
-                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
-              />
-              <label htmlFor="avail" className="text-sm text-gray-700 font-medium">{t(lang, 'available_item')}</label>
-            </div>
+            <OwnerOnlyMenuItemCheckbox
+              id="modal-product-availability"
+              checked={form.available}
+              onChange={available => setForm(current => ({ ...current, available }))}
+              disabled={savingItemForm}
+              canChange={canChangeAvailability}
+              label={t(lang, 'available_item')}
+              ownerOnlyLabel={ownerOnlyAvailabilityLabel(lang)}
+              lang={lang}
+            />
             <div className="flex items-center gap-2 pt-1">
               <input
                 id="cashierQuick"
@@ -3154,19 +3266,16 @@ export default function AdminMenu() {
                 {lang === 'uz' ? 'Kassir tezkor mahsulotlarida ko‘rsatish' : lang === 'ru' ? 'Показывать в быстрых товарах кассира' : 'Show in cashier quick items'}
               </label>
             </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="publicHidden"
-                type="checkbox"
-                checked={!!form.public_hidden}
-                onChange={e => setForm(f => ({ ...f, public_hidden: e.target.checked }))}
-                disabled={savingItemForm}
-                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
-              />
-              <label htmlFor="publicHidden" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть из публичного меню' : 'Hide from public menu'}
-              </label>
-            </div>
+            <OwnerOnlyMenuItemCheckbox
+              id="modal-product-public-hidden"
+              checked={form.public_hidden}
+              onChange={public_hidden => setForm(current => ({ ...current, public_hidden }))}
+              disabled={savingItemForm}
+              canChange={canChangePublicVisibility}
+              label={publicMenuHideControlLabel(lang)}
+              ownerOnlyLabel={ownerOnlyPublicVisibilityLabel(lang)}
+              lang={lang}
+            />
             <div className="flex items-center gap-2 pt-1">
               <input
                 id="waiterHidden"

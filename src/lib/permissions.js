@@ -169,6 +169,16 @@ export function canChangeCompletedOrderPaymentMethod(profileOrRole) {
   return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
 }
 
+export function canChangeMenuItemAvailability(profileOrRole) {
+  return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
+    && canEditMenu(profileOrRole)
+}
+
+export function canChangeMenuItemPublicVisibility(profileOrRole) {
+  return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
+    && canEditMenu(profileOrRole)
+}
+
 export function canMoveBackToTable(profileOrRole) {
   return canEditFeature(profileOrRole, 'cashier')
 }

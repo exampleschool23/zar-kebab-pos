@@ -1289,7 +1289,6 @@ export async function writeToSupabase(action, state, options = {}) {
     case 'DELETE_MENU_ITEM': {
       const deletedAt = new Date().toISOString()
       const payload = {
-        available: false,
         show_in_cashier_quick_items: false,
         deleted_at: deletedAt,
       }

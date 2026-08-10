@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ArrowRight,
   Banknote,
   BarChart2,
   CalendarDays,
@@ -13,6 +14,7 @@ import {
   RefreshCw,
   Save,
   Scale,
+  Search,
   ShoppingBasket,
   Terminal,
   Trash2,
@@ -23,7 +25,6 @@ import {
   X,
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
-import AnimatedSearch from '../components/AnimatedSearch'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -944,66 +945,104 @@ function RangeAndFilters({
   onPayment,
   showSearch,
 }) {
+  const rangeSummary = dateFrom === dateTo
+    ? formatLongDate(dateFrom, lang, dateFrom)
+    : `${formatLongDate(dateFrom, lang, dateFrom)} — ${formatLongDate(dateTo, lang, dateTo)}`
+  const rangeOptions = [
+    { key: 'today', label: l.today },
+    { key: 'week', label: l.week },
+    { key: 'month', label: l.month },
+    { key: 'previousMonth', label: l.previousMonth },
+  ]
+
   return (
-    <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-sm sm:p-4">
-      <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wide text-[#9CA3AF]">
-        <CalendarDays size={14} />{l.dateRange}
+    <section aria-labelledby="bazaar-range-heading" className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-sm sm:p-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 id="bazaar-range-heading" className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-[#9CA3AF]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-50 text-[#ff5a00]">
+            <CalendarDays size={14} />
+          </span>
+          {l.dateRange}
+        </h2>
+        <p className="rounded-lg bg-[#F8F9FB] px-2.5 py-1.5 text-[11px] font-black text-[#7B8494]">
+          {rangeSummary}
+        </p>
       </div>
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: 'today', label: l.today },
-            { key: 'week', label: l.week },
-            { key: 'month', label: l.month },
-            { key: 'previousMonth', label: l.previousMonth },
-          ].map(option => (
+
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(380px,520px)] xl:items-center">
+        <div className="grid w-full grid-cols-2 gap-1.5 rounded-2xl bg-[#F8F9FB] p-1.5 sm:grid-cols-4 xl:max-w-[720px]">
+          {rangeOptions.map(option => (
             <button
               key={option.key}
               type="button"
               onClick={() => onRange(option.key)}
-              className={`rounded-xl border px-3 py-2 text-xs font-black transition-colors ${
+              aria-pressed={rangeKey === option.key}
+              className={`min-h-10 min-w-0 rounded-xl px-2 text-xs font-black transition-all sm:whitespace-nowrap sm:px-3 ${
                 rangeKey === option.key
-                  ? 'border-[#ff5a00] bg-[#ff5a00] text-white'
-                  : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-orange-200 hover:text-[#ff5a00]'
+                  ? 'bg-[#ff5a00] text-white shadow-sm'
+                  : 'bg-transparent text-[#6B7280] hover:bg-white hover:text-[#ff5a00]'
               }`}
             >
               {option.label}
             </button>
           ))}
-          <div className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-1.5 text-xs font-bold text-[#6B7280]">
-            <span>{l.from}</span>
-            <FormattedDateInput value={dateFrom} lang={lang} onChange={onFrom} className="h-7 min-w-[130px] bg-transparent pr-7 text-sm font-bold outline-none" />
-          </div>
-          <div className="flex items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-1.5 text-xs font-bold text-[#6B7280]">
-            <span>{l.to}</span>
-            <FormattedDateInput value={dateTo} lang={lang} onChange={onTo} className="h-7 min-w-[130px] bg-transparent pr-7 text-sm font-bold outline-none" />
-          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <select value={categoryFilter} onChange={event => onCategory(event.target.value)} className="h-10 min-w-[170px] rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 text-xs font-black text-[#6B7280] outline-none focus:border-[#ff5a00]">
-            <option value="all">{l.allCategories}</option>
-            {BAZAAR_CATEGORIES.map(category => <option key={category.key} value={category.key}>{bazaarCategoryLabel(category.key, lang)}</option>)}
-          </select>
-          <select value={paymentFilter} onChange={event => onPayment(event.target.value)} className="h-10 min-w-[170px] rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 text-xs font-black text-[#6B7280] outline-none focus:border-[#ff5a00]">
-            <option value="all">{l.allPayments}</option>
-            {BAZAAR_PAYMENT_METHODS.map(method => <option key={method.key} value={method.key}>{bazaarPaymentMethodLabel(method.key, lang)}</option>)}
-          </select>
-          {showSearch && (
-            <AnimatedSearch
-              value={query}
-              onChange={onQuery}
-              placeholder={l.search}
-              searchLabel={l.searchLabel}
-              clearLabel={l.clearSearch}
-              closeLabel={l.closeSearch}
-            />
-          )}
+        <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_20px_minmax(0,1fr)] sm:items-center">
+          <div className="min-w-0 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 transition-colors focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/10">
+            <p className="text-[9px] font-black uppercase tracking-wider text-[#9CA3AF]">{l.from}</p>
+            <FormattedDateInput value={dateFrom} lang={lang} onChange={onFrom} className="h-6 w-full min-w-0 bg-transparent pr-7 text-sm font-black outline-none" />
+          </div>
+          <ArrowRight size={14} className="hidden justify-self-center text-[#C3C8D0] sm:block" />
+          <div className="min-w-0 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 transition-colors focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/10">
+            <p className="text-[9px] font-black uppercase tracking-wider text-[#9CA3AF]">{l.to}</p>
+            <FormattedDateInput value={dateTo} lang={lang} onChange={onTo} className="h-6 w-full min-w-0 bg-transparent pr-7 text-sm font-black outline-none" />
+          </div>
         </div>
       </div>
-      <p className="mt-3 text-[11px] font-bold text-[#9CA3AF]">
-        {formatLongDate(dateFrom, lang, dateFrom)} — {formatLongDate(dateTo, lang, dateTo)}
-      </p>
+
+      <div className={`mt-3 grid min-w-0 gap-2 border-t border-[#EEF0F3] pt-3 lg:ml-auto lg:w-full ${
+        showSearch
+          ? 'sm:grid-cols-2 lg:max-w-[1100px] lg:grid-cols-[minmax(200px,260px)_minmax(220px,280px)_minmax(260px,1fr)]'
+          : 'sm:grid-cols-2 lg:max-w-[548px]'
+      }`}>
+          <label className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 transition-colors focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/10">
+            <span className="block text-[9px] font-black uppercase tracking-wider text-[#9CA3AF]">{l.category}</span>
+            <select value={categoryFilter} onChange={event => onCategory(event.target.value)} className="mt-0.5 h-6 w-full bg-transparent text-xs font-black text-[#4B5563] outline-none">
+              <option value="all">{l.allCategories}</option>
+              {BAZAAR_CATEGORIES.map(category => <option key={category.key} value={category.key}>{bazaarCategoryLabel(category.key, lang)}</option>)}
+            </select>
+          </label>
+          <label className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 transition-colors focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/10">
+            <span className="block text-[9px] font-black uppercase tracking-wider text-[#9CA3AF]">{l.payment}</span>
+            <select value={paymentFilter} onChange={event => onPayment(event.target.value)} className="mt-0.5 h-6 w-full bg-transparent text-xs font-black text-[#4B5563] outline-none">
+              <option value="all">{l.allPayments}</option>
+              {BAZAAR_PAYMENT_METHODS.map(method => <option key={method.key} value={method.key}>{bazaarPaymentMethodLabel(method.key, lang)}</option>)}
+            </select>
+          </label>
+          {showSearch && (
+            <div className="min-w-0 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 transition-colors focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/10 sm:col-span-2 lg:col-span-1">
+              <label htmlFor="bazaar-history-search" className="block text-[9px] font-black uppercase tracking-wider text-[#9CA3AF]">{l.searchLabel}</label>
+              <div className="relative mt-0.5">
+                <Search size={15} className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                <input
+                  id="bazaar-history-search"
+                  type="text"
+                  autoComplete="off"
+                  value={query}
+                  onChange={event => onQuery(event.target.value)}
+                  placeholder={l.search}
+                  className="h-6 w-full min-w-0 bg-transparent pl-6 pr-7 text-xs font-bold text-[#4B5563] outline-none placeholder:text-[#A8B0BD]"
+                />
+                {query && (
+                  <button type="button" onClick={() => onQuery('')} aria-label={l.clearSearch} className="absolute right-0 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[#9CA3AF] transition-colors hover:bg-white hover:text-[#ff5a00]">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
     </section>
   )
 }
@@ -1211,12 +1250,13 @@ function BazaarHistory({
       </div>
       <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px] border-collapse text-left">
+          <table className="w-full min-w-[1280px] border-collapse text-left">
             <thead className="bg-[#F8F9FB] text-[10px] font-black uppercase tracking-wide text-[#8B95A5]">
               <tr>
                 <th className="w-[150px] px-3 py-2.5">{l.purchaseDate}</th>
                 <th className="min-w-[220px] px-3 py-2.5">{l.productName}</th>
                 <th className="w-[140px] px-3 py-2.5">{l.quantity}</th>
+                <th className="w-[165px] px-3 py-2.5 text-right">{l.unitCost}</th>
                 <th className="w-[150px] px-3 py-2.5 text-right">{l.itemPrice}</th>
                 <th className="w-[150px] px-3 py-2.5">{l.category}</th>
                 <th className="w-[170px] px-3 py-2.5">{l.addedBy}</th>
@@ -1232,6 +1272,8 @@ function BazaarHistory({
                 return items.map((item, index) => {
                   const first = index === 0
                   const rowSpan = items.length
+                  const unitCost = getBazaarUnitCost(item)
+                  const baseUnit = normalizeBazaarQuantityToBase(item.quantity, item.unit).unit
                   return (
                     <tr key={`${purchase.id}-${item.id || index}`} className={`${first ? 'border-t border-[#E5E7EB]' : 'border-t border-[#F3F4F6]'} text-xs text-[#4B5563] first:border-t-0`}>
                       {first && (
@@ -1244,6 +1286,9 @@ function BazaarHistory({
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 font-black text-[#1F2937]">
                         {formatBazaarQuantity(item.quantity)} {bazaarUnitLabel(item.unit, lang)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-black text-[#1F2937] tabular-nums">
+                        {unitCost > 0 ? `${formatCurrency(Math.round(unitCost))} / ${bazaarUnitLabel(baseUnit, lang)}` : '—'}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-black text-[#1F2937] tabular-nums">
                         {formatCurrency(item.line_total)}
@@ -1528,7 +1573,7 @@ function FormattedDateInput({ value, lang, onChange, className = INPUT }) {
   const formatted = formatLongDate(value, lang, value)
   return (
     <div className="relative min-w-0 cursor-pointer" onPointerDown={openPicker}>
-      <span className="pointer-events-none absolute inset-y-0 left-3 right-8 z-10 flex items-center overflow-hidden whitespace-nowrap text-sm font-semibold text-[#1F2937]">
+      <span className="pointer-events-none absolute inset-y-0 left-3 right-10 z-10 flex items-center overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[#1F2937]">
         {formatted}
       </span>
       <input

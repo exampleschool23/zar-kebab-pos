@@ -1755,9 +1755,6 @@ export default function Reports() {
   const kpiLoyaltyIncome = filteredForAnalytics.reduce((s, o) => s + getOrderLoyaltyIncomeTotal(o), 0)
   const kpiOrders    = filteredForAnalytics.length
   const kpiAvg       = kpiOrders > 0 ? Math.round(kpiRevenue / kpiOrders) : 0
-  const kpiItemsSold = filteredForAnalytics.reduce(
-    (s, o) => s + getSoldOrderItems(o).reduce((a, i) => a + (Number(i.quantity) || 1), 0), 0
-  )
   const priceModeBreakdown = useMemo(() => {
     const rows = {
       regular: { mode: 'regular', orders: 0, revenue: 0 },
@@ -1950,9 +1947,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', itemsSold: 'Sotilgan', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      itemsSold: 'Продано', expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  itemsSold: 'Items Sold', expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance' },
   }
   const l = L[lang] || L.en
 
@@ -2063,11 +2060,10 @@ export default function Reports() {
             )}
 
             {/* KPI cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+            <div className={`grid grid-cols-2 lg:grid-cols-3 ${canViewExpenses ? 'xl:grid-cols-5' : 'xl:grid-cols-3'} gap-4 mb-6`}>
               <KpiCard icon={DollarSign}  iconCls="bg-green-50 text-green-600"   label={l.totalRev}  value={formatCurrency(kpiRevenue)} sub={`${l.loyaltyIncome}: ${formatCurrency(kpiLoyaltyIncome)}`} />
               <KpiCard icon={ShoppingBag} iconCls="bg-orange-50 text-[#ff5a00]"  label={l.numOrders} value={kpiOrders} />
               <KpiCard icon={BarChart2}   iconCls="bg-blue-50 text-blue-600"     label={l.avgOrder}  value={formatCurrency(kpiAvg)} />
-              <KpiCard icon={Package}     iconCls="bg-purple-50 text-purple-600" label={l.itemsSold} value={kpiItemsSold} />
               {canViewExpenses && (
                 <>
                   <KpiCard icon={CreditCard} iconCls="bg-red-50 text-red-600" label={l.expenses} value={formatCurrency(expenseSummary.total)} sub={expensesError || ''} />

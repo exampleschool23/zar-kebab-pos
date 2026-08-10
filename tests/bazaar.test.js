@@ -212,6 +212,12 @@ test('daily bazaar analytics reconcile spend and normalize grams/millilitres wit
   assert.equal(getBazaarUnitCost(rows[2].bazaar_purchase_items[0]), 24_000)
 })
 
+test('unit prices normalize weight to kilograms and preserve item units', () => {
+  assert.equal(getBazaarUnitCost({ quantity: 4, unit: 'kg', line_total: 60_000 }), 15_000)
+  assert.equal(getBazaarUnitCost({ quantity: 500, unit: 'g', line_total: 30_000 }), 60_000)
+  assert.equal(getBazaarUnitCost({ quantity: 1, unit: 'pcs', line_total: 70_000 }), 70_000)
+})
+
 test('product price changes compare aggregate unit costs across distinct purchases', () => {
   const rows = [
     purchase('older', '2026-07-10', 'cash', 'Mavtuna', [

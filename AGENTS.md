@@ -236,6 +236,18 @@ These bugs were recently fixed and are now protected by tests:
    - Salary payments and salary-rate changes are not Team events; their Team status remains non-retryable `skipped`.
    - Employee, salary-group, and Team retries must remain independent and duplicate-safe.
 
+25. Meal availability is controlled only by an owner.
+   - Admins with Menu write access may edit every other product field, but cannot change `menu_items.available`.
+   - The Admin Menu keeps the current availability visible to non-owners while disabling editor and quick-toggle controls.
+   - Migration `120` rejects non-owner availability changes and non-owner creation of unavailable products at the database boundary.
+   - Product archival uses `deleted_at` and must not change `available`, so menu-enabled admins can still archive products without bypassing the owner-only setting.
+
+26. Hiding an item from the public menu is controlled only by an owner.
+   - Admins with Menu write access may see `public_hidden` and edit other product fields, but the public-menu checkbox stays locked.
+   - Non-owner product saves preserve the stored `public_hidden` value, and new non-owner products default to public visibility.
+   - Migration `121` enforces the same restriction for direct updates and product-creation RPCs.
+   - `cashier_only`, category visibility, schedules, and per-option visibility are separate controls and are not covered by this field-specific rule.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -323,6 +335,12 @@ Run migrations in order. Important recent files:
 
 - `supabase/119_salary_event_team_notifications.sql`
   Adds database-first, independently retryable ZarKebab Team delivery tracking for new bonus, fine, and absence events without replaying historical operations.
+
+- `supabase/120_owner_only_menu_item_availability.sql`
+  Restricts new unavailable products and changes to existing product availability to active owners while preserving other Menu edits for authorized admins.
+
+- `supabase/121_owner_only_menu_item_public_visibility.sql`
+  Restricts top-level product hiding from the public menu to active owners while preserving other Menu edits for authorized admins.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

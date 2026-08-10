@@ -1,5 +1,5 @@
 import { expensePaymentMethodLabel } from '../../../src/lib/expenses.js'
-import { formatDateOnly } from '../../../src/lib/dateFormat.js'
+import { formatDateOnly, formatLongDate } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml } from './telegram.js'
 import {
   formatSalaryNotificationAmount,
@@ -114,8 +114,6 @@ const TEAM_EVENT_COPY = {
     fineIntro: 'Xodimga intizom bo\u2018yicha jarima qayd etildi.',
     fineClosing: 'Mas\u2019uliyat va yuqori standartlarni birgalikda saqlaymiz.',
     absenceTitle: 'Xodim yo\u2018qligi',
-    absenceIntro: 'Xodimning ishda bo\u2018lmagan kuni qayd etildi.',
-    absenceClosing: 'Bir-birimizni qo\u2018llab-quvvatlab, jamoa ishini barqaror davom ettiramiz.',
     employee: 'Xodim',
     amount: 'Summa',
     date: 'Sana',
@@ -130,9 +128,7 @@ const TEAM_EVENT_COPY = {
     fineTitle: 'Дисциплина команды',
     fineIntro: 'Сотруднику зарегистрирован дисциплинарный штраф.',
     fineClosing: 'Сохраняем ответственность и высокие стандарты вместе.',
-    absenceTitle: 'Коллега отсутствует',
-    absenceIntro: 'В этот день сотрудник не сможет быть с командой. Желаем, чтобы всё было хорошо 💛',
-    absenceClosing: 'Поддержим коллегу и поможем друг другу в течение смены 🤝',
+    absenceTitle: 'Отсутствие сотрудника',
     employee: 'Сотрудник',
     amount: 'Сумма',
     date: 'Дата',
@@ -148,8 +144,6 @@ const TEAM_EVENT_COPY = {
     fineIntro: 'A disciplinary fine was recorded for an employee.',
     fineClosing: 'Together, we uphold responsibility and high standards.',
     absenceTitle: 'Employee absence',
-    absenceIntro: 'An employee absence was recorded.',
-    absenceClosing: 'We support one another and keep the team running reliably.',
     employee: 'Employee',
     amount: 'Amount',
     date: 'Date',
@@ -360,6 +354,16 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
   const normalizedType = ['bonus', 'fine', 'absence'].includes(type) ? type : 'absence'
   const date = event?.bonus_date || event?.fine_date || event?.absence_date
   const detail = normalizedType === 'fine' ? event?.reason : event?.note
+  if (normalizedType === 'absence') {
+    const absenceCopy = TEAM_EVENT_COPY.ru
+    return [
+      `📅 <b>${absenceCopy.absenceTitle}</b>`,
+      '',
+      `👤 <b>${absenceCopy.employee}:</b> ${escapeTelegramHtml(event?.employee_name || '-')}`,
+      `🗓 <b>${absenceCopy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, 'ru', '-'))}`,
+      `📝 <b>${absenceCopy.note}:</b> ${escapeTelegramHtml(String(detail || '').trim() || '-')}`,
+    ].join('\n')
+  }
   const lines = [
     `${normalizedType === 'bonus' ? '🎁' : normalizedType === 'fine' ? '⚠️' : '📅'} <b>${copy[`${normalizedType}Title`]}</b>`,
     '',
@@ -367,18 +371,13 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
     '',
     `<b>${copy.employee}:</b> ${escapeTelegramHtml(event?.employee_name || '-')}`,
   ]
-  if (normalizedType !== 'absence') {
-    lines.push(`<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`)
-  }
+  lines.push(`<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`)
   lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(date, '-'))}`)
   if (normalizedType === 'bonus') {
     lines.push(`<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`)
   }
-  lines.push(
-    `<b>${normalizedType === 'fine' ? copy.reason : copy.note}:</b> ${escapeTelegramHtml(String(detail || '').trim() || '-')}`,
-    '',
-    copy[`${normalizedType}Closing`]
-  )
+  lines.push(`<b>${normalizedType === 'fine' ? copy.reason : copy.note}:</b> ${escapeTelegramHtml(String(detail || '').trim() || '-')}`)
+  lines.push('', copy[`${normalizedType}Closing`])
   return lines.join('\n')
 }
 
