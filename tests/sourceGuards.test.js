@@ -2308,10 +2308,21 @@ test('reports date range text opens the native calendar picker', () => {
 
 test('reports closeout localizes labels and date while filter controls stay aligned', () => {
   const reports = readSource('src/pages/Reports.jsx')
+  const exportCloseout = functionBody(reports, 'exportCloseout')
 
   assert.match(reports, /cash: 'Наличные'/)
   assert.match(reports, /<SummaryRow label=\{l\.cash\}/)
-  assert.match(reports, /formatLongDate\(closeout\.date, lang, closeout\.date\)/)
+  assert.match(reports, /getDailyCloseout\(reportOrders,\s*dateFrom,\s*dateTo,\s*\{/)
+  assert.match(reports, /tableId:\s*tableFilter/)
+  assert.match(reports, /waiterName:\s*waiterFilter/)
+  assert.match(reports, /\[reportOrders,\s*dateFrom,\s*dateTo,\s*tableFilter,\s*waiterFilter\]/)
+  assert.doesNotMatch(reports, /getDailyCloseout\(reportOrders,\s*dateTo\)/)
+  assert.match(reports, /tableFilter\s+=== 'all' \|\| o\.table_id === tableFilter/)
+  assert.match(reports, /waiterFilter === 'all' \|\| o\.waiter_name === waiterFilter/)
+  assert.match(reports, /formatLongDate\(closeout\.dateFrom, lang, closeout\.dateFrom\)/)
+  assert.match(reports, /formatLongDate\(closeout\.dateTo, lang, closeout\.dateTo\)/)
+  assert.match(exportCloseout, /closeout\.dateFrom/)
+  assert.match(exportCloseout, /closeout\.dateTo/)
   assert.match(reports, /flex flex-wrap items-stretch gap-2 xl:flex-nowrap/)
   assert.match(reports, /className="flex h-11 items-center gap-1\.5 px-4/)
   assert.equal((reports.match(/className="h-11 bg-white border/g) || []).length, 2)

@@ -2,12 +2,32 @@ import {
   getOrderLoyaltyIncomeTotal,
   getOrderPaymentBreakdown,
   getOrderRevenueTotal,
+  groupOrdersBySession,
   isPaidOrder,
   toLocalDateStr,
 } from './analytics.js'
 
-export function getDailyCloseout(orders = [], date = toLocalDateStr(new Date().toISOString())) {
-  const paidOrders = orders.filter(order => isPaidOrder(order) && toLocalDateStr(order.paid_at || order.created_at) === date)
+export function getDailyCloseout(
+  orders = [],
+  dateFrom = toLocalDateStr(new Date().toISOString()),
+  dateTo = dateFrom,
+  { tableId = 'all', waiterName = 'all' } = {},
+) {
+  const from = dateFrom || toLocalDateStr(new Date().toISOString())
+  const to = dateTo || from
+  const matchesCloseoutRange = value => {
+    const date = toLocalDateStr(value)
+    return !!date && date >= from && date <= to
+  }
+  const matchesSelectedScope = order => (
+    (tableId === 'all' || order.table_id === tableId) &&
+    (waiterName === 'all' || order.waiter_name === waiterName)
+  )
+  const paidOrders = groupOrdersBySession(orders).filter(order => (
+    isPaidOrder(order) &&
+    matchesCloseoutRange(order.paid_at || order.created_at) &&
+    matchesSelectedScope(order)
+  ))
   const totals = {
     cash: 0,
     card: 0,
@@ -36,22 +56,33 @@ export function getDailyCloseout(orders = [], date = toLocalDateStr(new Date().t
   }
 
   return {
-    date,
+    date: to,
+    dateFrom: from,
+    dateTo: to,
     orderCount: paidOrders.length,
     revenue,
     totals,
     loyaltyIncome,
     loyaltyUsed: loyaltyIncome,
     cashbackIssued,
-    cancelledCount: orders.filter(order => order.status === 'cancelled' && toLocalDateStr(order.updated_at || order.created_at) === date).length,
+    cancelledCount: orders.filter(order => (
+      order.status === 'cancelled' &&
+      matchesCloseoutRange(order.updated_at || order.created_at) &&
+      matchesSelectedScope(order)
+    )).length,
     variance: 0,
     notes: '',
   }
 }
 
 export function closeoutToCsv(closeout) {
+  const dateFrom = closeout.dateFrom || closeout.date
+  const dateTo = closeout.dateTo || closeout.date
+  const dateRows = dateFrom && dateTo && dateFrom !== dateTo
+    ? [['Date range', `${dateFrom} – ${dateTo}`]]
+    : [['Date', closeout.date || dateFrom || dateTo]]
   const rows = [
-    ['Date', closeout.date],
+    ...dateRows,
     ['Paid orders', closeout.orderCount],
     ['Revenue', closeout.revenue],
     ['Cash', closeout.totals.cash],

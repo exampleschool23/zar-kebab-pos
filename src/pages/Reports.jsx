@@ -1767,7 +1767,13 @@ export default function Reports() {
     })
     return Object.values(rows)
   }, [filteredForAnalytics])
-  const closeout = useMemo(() => getDailyCloseout(reportOrders, dateTo), [reportOrders, dateTo])
+  const closeout = useMemo(
+    () => getDailyCloseout(reportOrders, dateFrom, dateTo, {
+      tableId: tableFilter,
+      waiterName: waiterFilter,
+    }),
+    [reportOrders, dateFrom, dateTo, tableFilter, waiterFilter]
+  )
   const salaryExpenses = useMemo(() => (
     buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
   ), [salaryProfiles, dateFrom, dateTo])
@@ -1848,7 +1854,10 @@ export default function Reports() {
   }, [dateFrom, dateTo, canViewExpenses])
 
   function exportCloseout() {
-    downloadCsv(`zar-kebab-closeout-${closeout.date}.csv`, closeoutToCsv(closeout))
+    const dateSuffix = closeout.dateFrom === closeout.dateTo
+      ? closeout.dateTo
+      : `${closeout.dateFrom}-to-${closeout.dateTo}`
+    downloadCsv(`zar-kebab-closeout-${dateSuffix}.csv`, closeoutToCsv(closeout))
   }
 
   async function deleteOrder(order) {
@@ -2098,7 +2107,11 @@ export default function Reports() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-black text-[#1F2937]">{l.closeout}</p>
-                  <p className="text-xs font-semibold text-[#9CA3AF]">{formatLongDate(closeout.date, lang, closeout.date)}</p>
+                  <p className="text-xs font-semibold text-[#9CA3AF]">
+                    {closeout.dateFrom === closeout.dateTo
+                      ? formatLongDate(closeout.dateTo, lang, closeout.dateTo)
+                      : `${formatLongDate(closeout.dateFrom, lang, closeout.dateFrom)} — ${formatLongDate(closeout.dateTo, lang, closeout.dateTo)}`}
+                  </p>
                 </div>
                 <button onClick={exportCloseout} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-xs font-black text-[#6B7280]">
                   <Download size={13} className="mr-1 inline" />{l.export}
