@@ -726,7 +726,7 @@ test('owner can change completed-order payment methods individually', () => {
   assert.match(reports, /Each payment method can be changed separately\. Amounts and loyalty data stay unchanged\./)
   assert.match(reports, /function PaymentMethodBadges/)
   assert.match(reports, /getOrderPaymentBreakdown\(order\)/)
-  assert.match(reports, /<PaymentMethodBadges order=\{order\} lang=\{lang\} \/>/)
+  assert.match(reports, /<PaymentMethodBadges order=\{order\} lang=\{lang\} showAmounts \/>/)
   assert.match(reports, /type: 'CHANGE_PAID_ORDER_PAYMENT_METHODS'/)
   assert.match(reports, /paymentId: payment\.id/)
   assert.match(reports, /payment\.method !== 'loyalty_card'/)
@@ -754,6 +754,21 @@ test('owner can change completed-order payment methods individually', () => {
   assert.match(individualMigration, /when method_count > 1 then 'mixed'/)
   assert.match(individualMigration, /grant execute on function public\.change_paid_order_payment_methods_owner\(jsonb\) to authenticated/)
   assert.doesNotMatch(individualMigration, /delete from public\.(order_payments|loyalty_transactions)/)
+})
+
+test('completed order payment metadata uses a full-width responsive amount layout', () => {
+  const reports = readSource('src/pages/Reports.jsx')
+  const metaStart = reports.indexOf('{/* Order meta */}')
+  const meta = reports.slice(metaStart, reports.indexOf('{/* Items */}', metaStart))
+  const badges = reports.slice(reports.indexOf('function PayBadge'), reports.indexOf('function KpiCard'))
+
+  assert.match(meta, /value: <PaymentMethodBadges order=\{order\} lang=\{lang\} showAmounts \/>, fullWidth: true/)
+  assert.match(meta, /\.map\(\(\{ label, value, fullWidth = false \}\) =>/)
+  assert.match(meta, /min-w-0 rounded-xl bg-gray-50/)
+  assert.match(meta, /fullWidth \? 'col-span-2 p-4' : 'p-3'/)
+  assert.match(badges, /showAmounts \? 'flex w-full flex-wrap items-center gap-2'/)
+  assert.match(badges, /min-w-\[170px\] flex-1 justify-between/)
+  assert.match(badges, /hasAmount && <span className="whitespace-nowrap font-black tabular-nums">\{formatCurrency\(amount\)\}<\/span>/)
 })
 
 test('PublicMenu is read-only for QR customers', () => {
@@ -2408,6 +2423,26 @@ test('CashierBill uses loyalty wallet controls instead of percent card discounts
   assert.doesNotMatch(source, /lbl\.cashbackEarned/)
   assert.doesNotMatch(payMethodsBlock, /loyalty_card/)
   assert.doesNotMatch(payMethodsBlock, /Лояльность/)
+})
+
+test('new cashier payments use cash or terminal while historical card reporting stays intact', () => {
+  const cashier = readSource('src/pages/CashierBill.jsx')
+  const reports = readSource('src/pages/Reports.jsx')
+  const expenses = readSource('src/lib/expenses.js')
+  const payMethodsBlock = cashier.slice(cashier.indexOf('const PAY_METHODS = ['), cashier.indexOf('function payLabel'))
+  const correctionStart = reports.indexOf('{paymentMethodOrderId === order.id ? (')
+  const correctionEnd = reports.indexOf('{canDeleteOrder &&', correctionStart)
+  const correctionBlock = reports.slice(correctionStart, correctionEnd)
+
+  assert.match(payMethodsBlock, /key: 'cash'/)
+  assert.match(payMethodsBlock, /key: 'terminal'/)
+  assert.doesNotMatch(payMethodsBlock, /key: 'card'/)
+  assert.match(correctionBlock, /row\.method === 'card'/)
+  assert.match(correctionBlock, /<option value="card" disabled>/)
+  assert.doesNotMatch(correctionBlock, /<option value="card">/)
+  assert.match(reports, /card:\s+\{ label:/)
+  assert.match(reports, /<option value="card">\{lang === 'uz' \? 'Karta'/)
+  assert.match(expenses, /ACCOUNTING_CASHFLOW_METHODS = \['cash', 'card', 'terminal', 'loyalty_card'\]/)
 })
 
 test('active cashback calculation uses card type resolver instead of hardcoded default percent', () => {

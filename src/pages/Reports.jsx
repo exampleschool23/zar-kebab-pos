@@ -186,27 +186,41 @@ function StatusBadge({ status, lang }) {
   )
 }
 
-function PayBadge({ method, lang }) {
+function PayBadge({ method, lang, amount = null }) {
   const key = (method || '').toLowerCase()
   const cfg = PAY_CFG[key] || PAY_CFG.unknown
   const { Icon } = cfg
+  const hasAmount = amount != null
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cfg.cls}`}>
-      <Icon size={10} />
-      {cfg.label[lang] || cfg.label.en}
+    <span className={`inline-flex items-center font-semibold ${cfg.cls} ${
+      hasAmount
+        ? 'min-w-[170px] flex-1 justify-between gap-3 rounded-xl px-3 py-2.5 text-xs'
+        : 'gap-1 rounded-full px-2 py-0.5 text-[11px]'
+    }`}>
+      <span className={`inline-flex items-center whitespace-nowrap ${hasAmount ? 'gap-1.5' : 'gap-1'}`}>
+        <Icon size={hasAmount ? 13 : 10} />
+        {cfg.label[lang] || cfg.label.en}
+      </span>
+      {hasAmount && <span className="whitespace-nowrap font-black tabular-nums">{formatCurrency(amount)}</span>}
     </span>
   )
 }
 
-function PaymentMethodBadges({ order, lang }) {
-  const methods = [...new Set(getOrderPaymentBreakdown(order)
+function PaymentMethodBadges({ order, lang, showAmounts = false }) {
+  const payments = getOrderPaymentBreakdown(order)
     .filter(row => row.method !== 'loyalty_card' && row.amount > 0)
-    .map(row => row.method))]
-  const visibleMethods = methods.length > 0 ? methods : [order?.payment_method]
+  const visiblePayments = payments.length > 0
+    ? payments
+    : [{ method: order?.payment_method, amount: null }]
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      {visibleMethods.filter(Boolean).map(method => (
-        <PayBadge key={method} method={method} lang={lang} />
+    <span className={showAmounts ? 'flex w-full flex-wrap items-center gap-2' : 'inline-flex flex-wrap items-center gap-1'}>
+      {visiblePayments.filter(row => row.method).map(row => (
+        <PayBadge
+          key={row.method}
+          method={row.method}
+          lang={lang}
+          amount={showAmounts ? row.amount : null}
+        />
       ))}
     </span>
   )
@@ -1307,15 +1321,15 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
           {[
             { label: lang === 'uz' ? 'Stol'      : lang === 'ru' ? 'Стол'      : 'Table',    value: orderTableLabel(order, lang) },
             { label: lang === 'uz' ? 'Ochgan'    : lang === 'ru' ? 'Открыл'    : 'Opened By', value: order.opened_by_name || order.waiter_name || '—' },
+            { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PaymentMethodBadges order={order} lang={lang} showAmounts />, fullWidth: true },
             { label: lang === 'uz' ? 'Yopgan'    : lang === 'ru' ? 'Закрыл'    : 'Completed By', value: order.completed_by_name || '—' },
-            { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PaymentMethodBadges order={order} lang={lang} /> },
+            { label: lang === 'uz' ? 'Holat'     : lang === 'ru' ? 'Статус'    : 'Status',   value: <StatusBadge status={order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')} lang={lang} /> },
             { label: lang === 'uz' ? 'Yaratildi' : lang === 'ru' ? 'Создан'    : 'Created',  value: fmtDate(order.created_at, lang) },
             { label: lang === 'uz' ? "To'landi"  : lang === 'ru' ? 'Оплачен'   : 'Paid At',  value: fmtDate(order.paid_at, lang) },
-            { label: lang === 'uz' ? 'Holat'     : lang === 'ru' ? 'Статус'    : 'Status',   value: <StatusBadge status={order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')} lang={lang} /> },
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wide mb-1">{label}</p>
-              <div className="text-sm font-semibold text-[#1F2937]">{value}</div>
+          ].map(({ label, value, fullWidth = false }) => (
+            <div key={label} className={`min-w-0 rounded-xl bg-gray-50 ${fullWidth ? 'col-span-2 p-4' : 'p-3'}`}>
+              <p className={`text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wide ${fullWidth ? 'mb-2' : 'mb-1'}`}>{label}</p>
+              <div className={`text-sm font-semibold text-[#1F2937] ${fullWidth ? 'w-full' : ''}`}>{value}</div>
             </div>
           ))}
         </div>
@@ -1444,7 +1458,11 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
                         className="h-10 rounded-xl border border-orange-200 bg-white px-3 text-sm font-bold text-[#1F2937] outline-none focus:border-[#ff5a00]"
                       >
                         <option value="cash">{lang === 'uz' ? 'Naqd' : lang === 'ru' ? 'Наличные' : 'Cash'}</option>
-                        <option value="card">{lang === 'uz' ? 'Karta' : lang === 'ru' ? 'Карта' : 'Card'}</option>
+                        {row.method === 'card' && (
+                          <option value="card" disabled>
+                            {lang === 'uz' ? 'Karta (tarixiy)' : lang === 'ru' ? 'Карта (исторический)' : 'Card (historical)'}
+                          </option>
+                        )}
                         <option value="terminal">Terminal</option>
                         {row.method === 'other' && <option value="other" disabled>{lang === 'uz' ? 'Boshqa' : lang === 'ru' ? 'Другое' : 'Other'}</option>}
                       </select>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Printer, CheckCircle2, Banknote, CreditCard,
+  ArrowLeft, Printer, CheckCircle2, Banknote,
   Receipt, Users, Clock, Tag, UtensilsCrossed, Menu as MenuIcon,
   Monitor, MoreHorizontal, Plus, Minus, Trash2, ClipboardPaste,
 } from 'lucide-react'
@@ -48,7 +48,6 @@ const CASH_PRESETS    = [
 
 const PAY_METHODS = [
   { key: 'cash',     icon: Banknote,  labelUz: 'Naqd',    labelRu: 'Наличные',  labelEn: 'Cash'     },
-  { key: 'card',     icon: CreditCard, labelUz: 'Karta',   labelRu: 'Карта',     labelEn: 'Card'     },
   { key: 'terminal', icon: Monitor,   labelUz: 'Terminal', labelRu: 'Терминал',  labelEn: 'Terminal' },
 ]
 
