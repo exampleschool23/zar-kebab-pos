@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import {
   AlertCircle,
   BadgePercent,
+  Clock3,
   MapPin,
   Menu as MenuIcon,
   MessageCircle,
@@ -15,6 +16,7 @@ import { getCategoryName, getItemDesc, getItemName } from '../lib/i18n'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
 import { menuPriceUnitSuffix } from '../lib/menuSaleUnits'
+import { menuPrepTimeLabel } from '../lib/menuPrepTime'
 import MenuMedia from '../components/MenuMedia'
 import {
   getStoredTelegramSession,
@@ -170,6 +172,9 @@ function ProductCard({ item, lang }) {
       <div className="flex min-h-[152px] flex-col p-3">
         <h3 className="line-clamp-2 text-[15px] font-black leading-snug text-[#1E2B24]">{name}</h3>
         <p className="mt-1 line-clamp-1 text-[12px] font-semibold text-[#8B9388]">{getItemDesc(item, lang)}</p>
+        <span className="mt-2 inline-flex w-fit items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-700 ring-1 ring-amber-200">
+          <Clock3 size={11} /> {menuPrepTimeLabel(item, lang)}
+        </span>
         {(grams || millilitres || kcal) && (
           <div className="mt-2 flex flex-wrap gap-1">
             {grams && (

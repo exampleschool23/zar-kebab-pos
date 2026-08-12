@@ -137,7 +137,7 @@ const checks = await Promise.all([
   checkTable('restaurant_tables', 'id, name, status, zone_id, zone_name, capacity, sort_order, is_active, reserved_for_name, reserved_for_phone, reserved_at, reserved_until, reservation_notes, created_at, updated_at'),
   checkTable('table_zones', 'id, name, sort_order, is_active, created_at, updated_at'),
   checkTable('menu_categories', 'id, name_uz, name_ru, name_en, hidden, waiter_hidden, visible_from_time, visible_until_time, sort_order, deleted_at'),
-  checkTable('menu_items', 'id, category_id, name_uz, name_ru, name_en, price, sale_unit, image_url, media_urls, available, cashier_only, public_hidden, waiter_hidden, visible_from_time, visible_until_time, sort_order, stock_count, option_groups, deleted_at'),
+  checkTable('menu_items', 'id, category_id, name_uz, name_ru, name_en, price, sale_unit, image_url, media_urls, available, cashier_only, public_hidden, waiter_hidden, visible_from_time, visible_until_time, sort_order, stock_count, option_groups, estimated_prep_minutes, deleted_at'),
   checkTable('menu_item_costs', 'menu_item_id, cost_price, variant_costs, updated_at'),
   checkTable('orders', 'id, table_id, table_name, status, payment_status, service_rate_pct, order_type, order_number, loyalty_card_number, loyalty_used_amount, cashback_earned, stock_deducted_at'),
   checkTable('order_items', 'id, order_id, menu_item_id, status, quantity, sale_unit, order_type, kitchen_round_id, submitted_at, item_type, is_counter_item, selected_options, cost_price'),

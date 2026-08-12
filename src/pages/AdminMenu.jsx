@@ -13,6 +13,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import { DEFAULT_MENU_PREP_MINUTES, normalizeMenuPrepMinutes } from '../lib/menuPrepTime'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
 import { generateMenuExternalId } from '../lib/menuExternalId'
@@ -1171,7 +1172,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  external_id: '', price: '', old_price: '', cost_price: '', variant_costs: {}, sale_unit: MENU_SALE_UNIT_PIECE, grams: '', millilitres: '', kcal: '', stock_count: '', image_url: '', media_urls: [], available: true, sort_order: '',
+  external_id: '', price: '', old_price: '', cost_price: '', variant_costs: {}, sale_unit: MENU_SALE_UNIT_PIECE, grams: '', millilitres: '', kcal: '', stock_count: '', estimated_prep_minutes: DEFAULT_MENU_PREP_MINUTES, image_url: '', media_urls: [], available: true, sort_order: '',
   option_groups: [],
   option_groups_editor: [],
   show_in_cashier_quick_items: false,
@@ -1536,6 +1537,7 @@ function menuItemToProductForm(i) {
     sale_unit: normalizeMenuSaleUnit(i.sale_unit ?? i.saleUnit),
     millilitres: i.millilitres ?? i.milliliters ?? (Number(i.litres ?? i.liters) > 0 ? Math.round(Number(i.litres ?? i.liters) * 1000) : ''),
     stock_count: i.stock_count ?? i.stockCount ?? 0,
+    estimated_prep_minutes: normalizeMenuPrepMinutes(i.estimated_prep_minutes ?? i.estimatedPrepMinutes),
     sort_order: i.sort_order ?? 0,
     show_in_cashier_quick_items: isCashierQuickItem(i),
     cashier_only: !!(i.cashier_only || i.cashierOnly),
@@ -1575,6 +1577,7 @@ function getItemFormFingerprint(form = {}) {
     millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
     kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
     stock_count: Math.max(0, Math.round(Number(form.stock_count) || 0)),
+    estimated_prep_minutes: normalizeMenuPrepMinutes(form.estimated_prep_minutes),
     sort_order: Number(form.sort_order) || 0,
     quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
     available: !!form.available,
@@ -1933,6 +1936,7 @@ export default function AdminMenu() {
           millilitres: Math.max(0, Math.round(Number(form.millilitres) || 0)),
           kcal: Math.max(0, Math.round(Number(form.kcal) || 0)),
           stock_count: Math.max(0, Math.round(Number(form.stock_count) || 0)),
+          estimated_prep_minutes: normalizeMenuPrepMinutes(form.estimated_prep_minutes),
           sort_order: Number(form.sort_order) || 0,
           quick_item_sort_order: Number(form.quick_item_sort_order) || 0,
           show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
@@ -2425,7 +2429,7 @@ export default function AdminMenu() {
             ) : (
               <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <section className="min-w-0 space-y-4 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <div>
                       <label className="block text-xs text-gray-500 font-semibold mb-1.5">{t(lang, 'category')}</label>
                       <select
@@ -2445,6 +2449,15 @@ export default function AdminMenu() {
                       value={form.stock_count}
                       onChange={setF('stock_count')}
                       placeholder="24"
+                    />
+                    <Field
+                      label={lang === 'uz' ? 'Tayyorlash vaqti (daq)' : lang === 'ru' ? 'Время приготовления (мин)' : 'Preparation time (min)'}
+                      type="number"
+                      min="1"
+                      max="180"
+                      value={form.estimated_prep_minutes}
+                      onChange={setF('estimated_prep_minutes')}
+                      placeholder="15"
                     />
                   </div>
 
@@ -3188,6 +3201,15 @@ export default function AdminMenu() {
               value={form.stock_count}
               onChange={setF('stock_count')}
               placeholder="24"
+            />
+            <Field
+              label={lang === 'uz' ? 'Tayyorlash vaqti (daq)' : lang === 'ru' ? 'Время приготовления (мин)' : 'Preparation time (min)'}
+              type="number"
+              min="1"
+              max="180"
+              value={form.estimated_prep_minutes}
+              onChange={setF('estimated_prep_minutes')}
+              placeholder="15"
             />
             <MediaGalleryField
               label={t(lang, 'mediaUrl')}

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowLeft, Check, Copy, LayoutGrid, Minus, Play, Plus, UtensilsCrossed } from 'lucide-react'
+import { ArrowLeft, Check, Clock3, Copy, LayoutGrid, Minus, Play, Plus, UtensilsCrossed } from 'lucide-react'
 import { getCategoryName, getItemDesc, getItemName, t } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
 import { getMenuItemPublicUrl } from '../lib/menuLinks'
 import { getMenuItemMediaUrls, isMenuVideoUrl } from '../lib/menuMedia'
+import { menuPrepTimeLabel } from '../lib/menuPrepTime'
 import { calculateUnitPrice, getOrderItemBasePrice, normalizePriceMode } from '../lib/priceModes'
 import {
   changeMenuQuantity,
@@ -267,6 +268,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   const millilitres = millilitresLabel(item, lang)
   const pricing = getMenuPricing(item)
   const priceUnit = menuPriceUnitSuffix(item, lang)
+  const prepTime = menuPrepTimeLabel(item, lang)
   const hasVideo = isMenuVideoUrl(item.image_url)
   const showCompactPublicCard = readOnly
   const dense = !readOnly && density === 'compact'
@@ -358,6 +360,9 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         <h3 className={`${showCompactPublicCard ? 'text-[13px] sm:text-[15px]' : dense ? 'text-[14px] mb-0.5 flex-1' : 'text-[15px] mb-1 flex-1'} font-bold ${unavailable ? 'text-[#6B7280]' : 'text-[#1F2937]'} line-clamp-2 leading-snug`}>
           {getItemName(item, lang)}
         </h3>
+        <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-700 ring-1 ring-amber-200">
+          <Clock3 size={12} /> {prepTime}
+        </span>
         {showCompactPublicCard && getItemDesc(item, lang) && (
           <FadingMenuDescription text={getItemDesc(item, lang)} className="mt-0.5 min-h-[15px] text-[11px] leading-snug text-[#8A94A6] sm:min-h-[16px] sm:text-[12px]" />
         )}
@@ -454,6 +459,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const pricing = getMenuPricing(item)
   const soldByWeight = isMenuItemSoldByWeight(item)
   const priceUnit = menuPriceUnitSuffix(item, lang)
+  const prepTime = menuPrepTimeLabel(item, lang)
   const mediaUrls = getMenuItemMediaUrls(item)
   const unavailable = !readOnly && item?.available === false
   const displayedMediaUrl = mediaUrls.includes(activeMediaUrl) ? activeMediaUrl : mediaUrls[0] || ''
@@ -551,6 +557,9 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
           <p className={`whitespace-nowrap text-xl sm:text-2xl font-black tabular-nums ${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#FF4D00]'}`}>
             {formatPrice(pricing.price)}{priceUnit}
           </p>
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-700 ring-1 ring-amber-200">
+            <Clock3 size={12} /> {prepTime}
+          </span>
           {(grams || millilitres || kcal) && (
             <div className="flex flex-wrap justify-end gap-1">
               {grams && (

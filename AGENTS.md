@@ -262,6 +262,11 @@ These bugs were recently fixed and are now protected by tests:
    - Recalculate both plain products and configured variants from their immutable `base_price`; never compound the Tourist markup or replace a variant's base with its displayed Tourist price.
    - Paid order items remain historical snapshots and must never be repriced.
 
+29. Menu preparation estimates are customer-facing expectations.
+   - `menu_items.estimated_prep_minutes` stores a whole-number estimate from 1 to 180 minutes and defaults existing/new products to 15.
+   - Public, Telegram, guest, and waiter product cards use the current catalog estimate; it is not a promised completion timestamp and is not copied into historical order totals.
+   - Product creation and editing must preserve the configured estimate, and customer-facing labels stay localized.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -358,6 +363,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/122_menu_item_availability_manage_menu_access.sql`
   Lets every user with Manage Menu access create unavailable products and change availability while leaving public-menu hiding owner-only.
+
+- `supabase/123_menu_item_estimated_prep_time.sql`
+  Adds the per-product preparation estimate, defaults existing products to 15 minutes, validates the 1–180 minute range, and extends atomic media-aware product creation to save it.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
