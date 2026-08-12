@@ -15,6 +15,9 @@ import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivi
 import { formatDateTime, formatElapsedSince, formatTime } from '../lib/dateFormat'
 import { earliestReliableTime, getReliableOrderItemTime } from '../lib/orderTimestamps'
 import { canEditFeature } from '../lib/permissions'
+import { createGuestModeSession, writeGuestModeSession } from '../lib/guestMode'
+import { getTableGuestEntryContext } from '../lib/tableGuestEntry'
+import { TableGuestEntryDialog } from '../components/GuestModeUI'
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
@@ -556,6 +559,10 @@ export default function WaiterTables() {
   const navigate = useNavigate()
   const lang = state.lang || 'en'
   const [activeFilter, setActiveFilter] = useState('all')
+  const [pendingGuestTable, setPendingGuestTable] = useState(null)
+  const [pendingGuestPriceMode, setPendingGuestPriceMode] = useState('')
+  const [guestEntryBusy, setGuestEntryBusy] = useState(false)
+  const [guestEntryError, setGuestEntryError] = useState('')
 
   useEffect(() => {
     refreshPOSData()
@@ -617,11 +624,94 @@ export default function WaiterTables() {
     [state.tables]
   )
 
-  function handleTable(table, status) {
+  function handleTable(table) {
     if (!canEditTables) return
-    dispatch({ type: 'SET_TABLE', payload: table.id })
-    dispatch({ type: 'CLEAR_CART' })
-    navigate(`/waiter/order/${table.id}`)
+    const entryContext = getTableGuestEntryContext(table.id, state.orders)
+    if (entryContext.hasConflictingPriceModes) {
+      setGuestEntryError(lang === 'uz'
+        ? 'Bu stolda turli narx turlaridagi faol buyurtmalar bor. Avval buyurtmani xodim sifatida tekshiring.'
+        : lang === 'ru'
+          ? 'На этом столе есть активные заказы с разными типами цен. Сначала проверьте заказ как сотрудник.'
+          : 'This table has active orders with different pricing types. Review the order as staff first.')
+      setPendingGuestTable({ table, entryContext })
+      setPendingGuestPriceMode('')
+      return
+    }
+    setPendingGuestTable({ table, entryContext })
+    setPendingGuestPriceMode(entryContext.priceModeLocked ? entryContext.priceMode : '')
+    setGuestEntryError('')
+  }
+
+  function closeGuestEntry() {
+    if (guestEntryBusy) return
+    setPendingGuestTable(null)
+    setPendingGuestPriceMode('')
+    setGuestEntryError('')
+  }
+
+  async function openTableForGuest(pin) {
+    if (!canEditTables || !pendingGuestTable || guestEntryBusy) return
+    const { table } = pendingGuestTable
+    const latestContext = getTableGuestEntryContext(table.id, state.orders)
+    if (latestContext.hasConflictingPriceModes) {
+      setGuestEntryError(lang === 'uz'
+        ? 'Stol buyurtmasi o‘zgardi. Uni xodim sifatida tekshiring.'
+        : lang === 'ru'
+          ? 'Заказ стола изменился. Проверьте его как сотрудник.'
+          : 'The table order changed. Review it as staff.')
+      return
+    }
+    const entryChanged = latestContext.activeOrderIds.join('|') !== pendingGuestTable.entryContext.activeOrderIds.join('|') ||
+      latestContext.priceModeLocked !== pendingGuestTable.entryContext.priceModeLocked ||
+      latestContext.priceMode !== pendingGuestTable.entryContext.priceMode
+    if (entryChanged) {
+      setPendingGuestTable({ table, entryContext: latestContext })
+      setPendingGuestPriceMode(latestContext.priceModeLocked ? latestContext.priceMode : pendingGuestPriceMode)
+      setGuestEntryError(lang === 'uz'
+        ? 'Bu stol boshqa qurilmada o‘zgardi. Yangilangan narx turini tekshirib, yana tasdiqlang.'
+        : lang === 'ru'
+          ? 'Этот стол изменился на другом устройстве. Проверьте обновлённый тип цен и подтвердите ещё раз.'
+          : 'This table changed on another device. Review the updated pricing type and confirm again.')
+      return
+    }
+    const selectedPriceMode = latestContext.priceModeLocked ? latestContext.priceMode : pendingGuestPriceMode
+    if (!selectedPriceMode) return
+
+    setGuestEntryBusy(true)
+    setGuestEntryError('')
+    let storedSession = false
+    try {
+      const session = await createGuestModeSession({
+        tableId: table.id,
+        staffUserId: profile?.id || state.user?.id,
+        pin,
+        priceMode: selectedPriceMode,
+        guestLang: 'en',
+        cart: [],
+        activeOrderIds: latestContext.activeOrderIds,
+      })
+      writeGuestModeSession(session)
+      storedSession = true
+      if (table.status === 'reserved') {
+        const reservationResult = await dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
+        if (reservationResult?.error) throw reservationResult.error
+      }
+      dispatch({ type: 'SET_TABLE', payload: table.id })
+      dispatch({ type: 'CLEAR_CART' })
+      navigate(session.routePath, { replace: true })
+    } catch {
+      if (storedSession) {
+        navigate(`/waiter/order/${encodeURIComponent(table.id)}`, { replace: true })
+        return
+      }
+      setGuestEntryError(lang === 'uz'
+        ? 'Stolni xavfsiz ochib bo‘lmadi. Qayta urinib ko‘ring.'
+        : lang === 'ru'
+          ? 'Не удалось безопасно открыть стол. Попробуйте снова.'
+          : 'The table could not be opened safely. Please try again.')
+    } finally {
+      setGuestEntryBusy(false)
+    }
   }
 
   function handleManageOrder(table) {
@@ -651,15 +741,15 @@ export default function WaiterTables() {
       return
     }
     if (status === 'reserved') {
-      dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
+      handleTable(table)
+      return
     }
-    handleTable(table, status)
+    handleTable(table)
   }
 
   function seatReservation(table) {
     if (!canEditTables) return
-    dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
-    handleTable(table, 'reserved')
+    handleTable(table)
   }
 
   function cancelReservation(table) {
@@ -797,7 +887,7 @@ export default function WaiterTables() {
                         counts={counts}
                         lang={lang}
                         canEdit={canEditTables}
-                        onClick={() => itemStatus === 'reserved' ? handleCardAction(itemStatus, table) : handleTable(table, itemStatus)}
+                        onClick={() => handleTable(table)}
                         onAction={handleCardAction}
                         onManage={handleManageOrder}
                       />
@@ -816,6 +906,20 @@ export default function WaiterTables() {
               </div>
             )}
           </div>
+
+          {pendingGuestTable && (
+            <TableGuestEntryDialog
+              tableName={pendingGuestTable.table.name || pendingGuestTable.table.label}
+              lang={lang}
+              priceMode={pendingGuestPriceMode}
+              onPriceModeChange={setPendingGuestPriceMode}
+              priceModeLocked={pendingGuestTable.entryContext.priceModeLocked}
+              busy={guestEntryBusy}
+              error={guestEntryError}
+              onCancel={closeGuestEntry}
+              onSubmit={openTableForGuest}
+            />
+          )}
         </div>
       </div>
     </AppShell>

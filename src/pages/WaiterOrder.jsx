@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import {
   Search, ShoppingCart, Plus, UtensilsCrossed,
   Menu as MenuIcon, X, CheckCircle2, Clock,
   Receipt, Loader2, ArrowLeft, LogOut, Minus, Printer,
+  LockKeyhole,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -19,9 +20,24 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import { getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { isWaiterMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
-import { DEFAULT_PRICE_MODE, getMenuItemForPriceMode, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
+import { isCustomerMenuCategory, isCustomerMenuItem, isWaiterMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
+import { DEFAULT_PRICE_MODE, calculateUnitPrice, getMenuItemForPriceMode, resolveOrderingPriceMode } from '../lib/priceModes'
 import { canEditFeature } from '../lib/permissions'
+import { rebuildGuestCartFromCatalog } from '../lib/guestCart'
+import {
+  clearGuestModeSession,
+  getGuestModePinLength,
+  guestModePinLockSeconds,
+  isGuestModeSessionFor,
+  normalizeGuestModePriceMode,
+  readGuestModeSession,
+  registerGuestModePinFailure,
+  updateGuestModeSession,
+  verifyGuestModePin,
+  writeGuestModeSession,
+} from '../lib/guestMode'
+import { useGuestModeSession } from '../hooks/useGuestModeSession'
+import { GuestModeUtilities, GuestPinDialog, GuestSelectionReady, guestModeCopy } from '../components/GuestModeUI'
 import {
   changeMenuQuantity,
   formatMenuQuantity,
@@ -585,13 +601,24 @@ function FlyingCartItem({ flyer, onDone }) {
 export default function WaiterOrder() {
   const { tableId }         = useParams()
   const navigate            = useNavigate()
+  const location            = useLocation()
   const [searchParams]      = useSearchParams()
   const { state, dispatch } = useApp()
   const { loaded, loadError } = useAppDataStatus()
   const { profile, signOut } = useAuth()
-  const lang                = state.lang
   const role                = (profile?.role || state.user?.role || '').toLowerCase()
-  const shouldShowSidebar   = role !== 'guest'
+  const staffUserId         = profile?.id || ''
+  const guestModeSession    = useGuestModeSession()
+  const isGuestTabletMode   = isGuestModeSessionFor(guestModeSession, {
+    tableId,
+    staffUserId,
+    pathname: location.pathname,
+  })
+  const guestSessionPriceMode = normalizeGuestModePriceMode(guestModeSession?.priceMode)
+  const [guestLang, setGuestLang] = useState(() => guestModeSession?.guestLang || 'en')
+  const lang                = isGuestTabletMode ? guestLang : state.lang
+  const staffLang           = state.lang || 'en'
+  const shouldShowSidebar   = role !== 'guest' && !isGuestTabletMode
   const canEditTables       = canEditFeature(profile || { role }, 'tables')
   const [search,        setSearch]       = useState('')
   const [activeCategory,setCategory]     = useState('all')
@@ -600,8 +627,14 @@ export default function WaiterOrder() {
   const [isSendingOrder,setSendingOrder] = useState(false)
   const isTakeAwayFlow = !tableId
   const [orderType,     setOrderType]    = useState(isTakeAwayFlow ? 'take_away' : 'dine_in')
-  const [priceMode,     setPriceMode]    = useState(DEFAULT_PRICE_MODE)
-  const [pendingPriceMode, setPendingPriceMode] = useState(null)
+  const [priceMode,     setPriceMode]    = useState(isGuestTabletMode ? guestSessionPriceMode : DEFAULT_PRICE_MODE)
+  const [guestUnlockOpen, setGuestUnlockOpen] = useState(false)
+  const [guestModeBusy, setGuestModeBusy] = useState(false)
+  const [guestModeError, setGuestModeError] = useState('')
+  const [guestReviewWarning, setGuestReviewWarning] = useState('')
+  const [guestExpectedOrderIds, setGuestExpectedOrderIds] = useState(null)
+  const [guestCartReady, setGuestCartReady] = useState(false)
+  const [guestUnlockClock, setGuestUnlockClock] = useState(() => Date.now())
   const [detailItem,    setDetailItem]   = useState(null)
   const [visibilityNow, setVisibilityNow] = useState(() => new Date())
   const [cartFlyers, setCartFlyers] = useState([])
@@ -611,11 +644,14 @@ export default function WaiterOrder() {
   const cartButtonRef = useRef(null)
   const cartAnimationIdRef = useRef(0)
   const cartPulseTimerRef = useRef(null)
+  const preserveUnlockedGuestPriceModeRef = useRef(null)
+  const wasGuestTabletModeRef = useRef(isGuestTabletMode)
   const shouldOpenOrderPanel = searchParams.get('panel') === 'order'
   const isManageOrderPanel = shouldOpenOrderPanel
   const routeOrderType = isTakeAwayFlow
     ? normalizeOrderType(searchParams.get('orderType') || searchParams.get('type') || 'take_away')
     : 'dine_in'
+  const menuAudience = isGuestTabletMode ? 'public' : 'waiter'
 
   const table = isTakeAwayFlow ? null : state.tables.find(t => t.id === tableId)
   const orderTitle = isTakeAwayFlow
@@ -647,10 +683,122 @@ export default function WaiterOrder() {
     return merged
   }, [state.orders, tableId, isTakeAwayFlow])
 
+  const activeTableOrderIds = useMemo(() => (
+    isTakeAwayFlow
+      ? []
+      : state.orders
+        .filter(order => order.table_id === tableId && order.payment_status !== 'paid')
+        .map(order => String(order.id || '').trim())
+        .filter(Boolean)
+        .sort()
+  ), [state.orders, tableId, isTakeAwayFlow])
+
+  const guestOrderChangedWarning = staffLang === 'uz'
+    ? 'Bu stolning buyurtmasi mehmon rejimi vaqtida o‘zgargan. Oshxonaga yuborishdan oldin stol holati va tanlovni tekshiring.'
+    : staffLang === 'ru'
+      ? 'Заказ этого стола изменился во время гостевого режима. Проверьте стол и выбор перед отправкой на кухню.'
+      : 'This table order changed during Guest mode. Review the table and selection before sending it to the kitchen.'
+
   useEffect(() => {
-    if (isSendingOrder || pendingPriceMode) return
-    setPriceMode(normalizePriceMode(activeOrder?.price_mode || DEFAULT_PRICE_MODE))
-  }, [activeOrder?.id, activeOrder?.price_mode, isSendingOrder, pendingPriceMode])
+    if (isGuestTabletMode) {
+      setPriceMode(guestSessionPriceMode)
+      return
+    }
+    if (preserveUnlockedGuestPriceModeRef.current) {
+      setPriceMode(preserveUnlockedGuestPriceModeRef.current)
+      return
+    }
+    if (isSendingOrder) return
+    setPriceMode(resolveOrderingPriceMode(activeOrder, state.cart))
+  }, [activeOrder?.id, activeOrder?.price_mode, guestSessionPriceMode, isGuestTabletMode, isSendingOrder, state.cart.length])
+
+  useEffect(() => {
+    if (!isGuestTabletMode) {
+      setGuestCartReady(false)
+      return
+    }
+    if (!loaded || guestCartReady) return
+    const restoredCart = rebuildGuestCartFromCatalog({
+      cart: guestModeSession?.cart || [],
+      menuItems: state.menuItems,
+      categories: state.categories,
+      now: visibilityNow,
+      lang: guestModeSession?.guestLang || guestLang,
+      priceMode: guestSessionPriceMode,
+    })
+    dispatch({ type: 'REPLACE_CART', payload: restoredCart })
+    setGuestCartReady(true)
+  }, [isGuestTabletMode, loaded, guestModeSession?.id, guestCartReady, state.menuItems, state.categories, visibilityNow, guestLang, guestSessionPriceMode, dispatch])
+
+  useEffect(() => {
+    if (!isGuestTabletMode || !guestCartReady) return
+    updateGuestModeSession({ cart: state.cart })
+  }, [isGuestTabletMode, guestCartReady, state.cart])
+
+  useEffect(() => {
+    if (!isGuestTabletMode || !guestCartReady) return
+
+    const reviewedCart = rebuildGuestCartFromCatalog({
+      cart: state.cart,
+      menuItems: state.menuItems,
+      categories: state.categories,
+      now: visibilityNow,
+      lang,
+      priceMode: guestSessionPriceMode,
+    })
+    if (JSON.stringify(reviewedCart) !== JSON.stringify(state.cart)) {
+      dispatch({ type: 'REPLACE_CART', payload: reviewedCart })
+    }
+
+    if (!detailItem) return
+    const currentItem = state.menuItems.find(item => item.id === detailItem.id)
+    const currentCategory = state.categories.find(category => category.id === currentItem?.category_id)
+    const remainsVisible = currentItem &&
+      isCustomerMenuItem(currentItem, visibilityNow) &&
+      (!currentItem.category_id || (currentCategory && isCustomerMenuCategory(currentCategory, visibilityNow)))
+    if (!remainsVisible) {
+      setDetailItem(null)
+    } else {
+      const currentGuestItem = getMenuItemForPriceMode(currentItem, guestSessionPriceMode)
+      if (JSON.stringify(currentGuestItem) !== JSON.stringify(detailItem)) {
+        setDetailItem(currentGuestItem)
+      }
+    }
+  }, [isGuestTabletMode, guestCartReady, state.cart, state.menuItems, state.categories, visibilityNow, lang, guestSessionPriceMode, detailItem, dispatch])
+
+  useEffect(() => {
+    const wasGuestTabletMode = wasGuestTabletModeRef.current
+    if (wasGuestTabletMode && !isGuestTabletMode && !preserveUnlockedGuestPriceModeRef.current) {
+      dispatch({ type: 'CLEAR_CART' })
+      setDetailItem(null)
+      setCartOpen(false)
+    }
+    wasGuestTabletModeRef.current = isGuestTabletMode
+  }, [isGuestTabletMode, dispatch])
+
+  useEffect(() => {
+    if (!guestExpectedOrderIds) return
+    const orderContextChanged = guestExpectedOrderIds.join('|') !== activeTableOrderIds.join('|')
+    setGuestReviewWarning(orderContextChanged ? guestOrderChangedWarning : '')
+  }, [guestExpectedOrderIds, activeTableOrderIds, guestOrderChangedWarning])
+
+  useEffect(() => {
+    if (isGuestTabletMode || state.cart.length > 0 || !guestExpectedOrderIds) return
+    setGuestExpectedOrderIds(null)
+    setGuestReviewWarning('')
+  }, [isGuestTabletMode, state.cart.length, guestExpectedOrderIds])
+
+  useEffect(() => {
+    if (!isGuestTabletMode || !guestModeSession?.guestLang) return
+    setGuestLang(guestModeSession.guestLang)
+  }, [isGuestTabletMode, guestModeSession?.id])
+
+  useEffect(() => {
+    if (!guestUnlockOpen) return undefined
+    setGuestUnlockClock(Date.now())
+    const timer = window.setInterval(() => setGuestUnlockClock(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [guestUnlockOpen])
 
   useEffect(() => {
     if (!shouldOpenOrderPanel || detailItem) return
@@ -674,7 +822,7 @@ export default function WaiterOrder() {
   }, [state.cart])
 
   const cartCount = state.cart.reduce((s, i) => s + i.quantity, 0)
-  const isManageOrderOnly = isManageOrderPanel && cartCount === 0
+  const isManageOrderOnly = !isGuestTabletMode && isManageOrderPanel && cartCount === 0
   const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const cartSummary = useMemo(() => {
     const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : configuredServiceRatePct
@@ -684,9 +832,11 @@ export default function WaiterOrder() {
   // Categories
   const sortedCategories = useMemo(() =>
     [...state.categories]
-      .filter(category => isWaiterMenuCategory(category, visibilityNow))
+      .filter(category => isGuestTabletMode
+        ? isCustomerMenuCategory(category, visibilityNow)
+        : isWaiterMenuCategory(category, visibilityNow))
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
-    [state.categories, visibilityNow]
+    [state.categories, isGuestTabletMode, visibilityNow]
   )
 
   const visibleCategoryIds = useMemo(
@@ -697,13 +847,16 @@ export default function WaiterOrder() {
   const categoryItemCounts = useMemo(() => {
     const counts = { all: 0 }
     state.menuItems.forEach(item => {
-      if (!isWaiterMenuItem(item, visibilityNow)) return
+      const visible = isGuestTabletMode
+        ? isCustomerMenuItem(item, visibilityNow)
+        : isWaiterMenuItem(item, visibilityNow)
+      if (!visible) return
       if (item.category_id && !visibleCategoryIds.has(item.category_id)) return
       counts.all = (counts.all || 0) + 1
       counts[item.category_id] = (counts[item.category_id] || 0) + 1
     })
     return counts
-  }, [state.menuItems, visibleCategoryIds, visibilityNow])
+  }, [state.menuItems, visibleCategoryIds, isGuestTabletMode, visibilityNow])
 
   const allCategoryCards = useMemo(() => [
     { id: 'all' },
@@ -715,13 +868,16 @@ export default function WaiterOrder() {
   const filteredItems = useMemo(() => {
     return state.menuItems
       .filter(item => {
-        if (!isWaiterMenuItem(item, visibilityNow)) return false
+        const visible = isGuestTabletMode
+          ? isCustomerMenuItem(item, visibilityNow)
+          : isWaiterMenuItem(item, visibilityNow)
+        if (!visible) return false
         if (item.category_id && !visibleCategoryIds.has(item.category_id)) return false
         const matchSearch = !q || [item.name_uz, item.name_ru, item.name_en].some(n => n?.toLowerCase().includes(q))
         return matchSearch
       })
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
-  }, [state.menuItems, visibleCategoryIds, q, visibilityNow])
+  }, [state.menuItems, visibleCategoryIds, isGuestTabletMode, q, visibilityNow])
 
   const pricedFilteredItems = useMemo(
     () => filteredItems.map(item => getMenuItemForPriceMode(item, priceMode)),
@@ -800,7 +956,7 @@ export default function WaiterOrder() {
   function handleAdd(item, animation) {
     if (isSendingOrder || !canEditTables) return
     if (item?.available === false) return
-    if (menuItemRequiresOptions(item, 'waiter') || isMenuItemSoldByWeight(item)) {
+    if (menuItemRequiresOptions(item, menuAudience) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -811,7 +967,7 @@ export default function WaiterOrder() {
   function handleIncrement(item, animation) {
     if (isSendingOrder || !canEditTables) return
     if (item?.available === false) return
-    if (menuItemRequiresOptions(item, 'waiter') || isMenuItemSoldByWeight(item)) {
+    if (menuItemRequiresOptions(item, menuAudience) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -821,7 +977,7 @@ export default function WaiterOrder() {
 
   function handleDecrement(item) {
     if (isSendingOrder || !canEditTables) return
-    if (menuItemRequiresOptions(item, 'waiter') || isMenuItemSoldByWeight(item)) {
+    if (menuItemRequiresOptions(item, menuAudience) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
     }
@@ -850,6 +1006,8 @@ export default function WaiterOrder() {
   }
 
   function handleSubmittedOrderPrint(info) {
+    setGuestReviewWarning('')
+    setGuestExpectedOrderIds(null)
     if (!state.settings?.autoPrintKitchenCheck || !info?.orderId) return
     const params = new URLSearchParams({
       print: '1',
@@ -859,11 +1017,11 @@ export default function WaiterOrder() {
     navigate(`/kitchen-check/${encodeURIComponent(info.orderId)}?${params.toString()}`)
   }
 
-  function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionPriceDelta = 0) {
+  function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionBasePrice = null) {
     if (isSendingOrder || !canEditTables) return
     if (item?.available === false) return
-    const payload = makeCartPayload(item, { selectedOptions, selectedOptionPriceDelta })
-    const isOptionProduct = getMenuItemOptionGroups(item, lang, { audience: 'waiter' }).length > 0
+    const payload = makeCartPayload(item, { selectedOptions, selectedOptionBasePrice })
+    const isOptionProduct = getMenuItemOptionGroups(item, lang, { audience: menuAudience }).length > 0
     if (isOptionProduct) {
       dispatch({
         type: 'ADD_TO_CART',
@@ -909,9 +1067,11 @@ export default function WaiterOrder() {
 
   function makeCartPayload(item, extra = {}) {
     const pricedItem = getMenuItemForPriceMode(item, priceMode)
-    const optionPriceDelta = Number(extra.selectedOptionPriceDelta) || 0
-    const unitPrice = pricedItem.unit_price + optionPriceDelta
-    const basePrice = pricedItem.base_price + optionPriceDelta
+    const suppliedBasePrice = Number(extra.selectedOptionBasePrice)
+    const basePrice = Number.isFinite(suppliedBasePrice) && suppliedBasePrice > 0
+      ? Math.round(suppliedBasePrice)
+      : pricedItem.base_price
+    const unitPrice = calculateUnitPrice(basePrice, priceMode)
     const selectedOptions = extra.selectedOptions || {}
     const optionKey = selectedOptionsCartKey(selectedOptions)
     const hasSelectedOptions = optionKey !== 'plain'
@@ -931,29 +1091,88 @@ export default function WaiterOrder() {
     }
   }
 
-  function requestPriceModeChange(nextMode) {
-    const normalized = normalizePriceMode(nextMode)
-    if (normalized === priceMode || isSendingOrder || !canEditTables) return
-    const hasPricedItems = cartCount > 0 || ((activeOrder?.items || []).length > 0 && activeOrder?.payment_status !== 'paid')
-    if (hasPricedItems) {
-      setPendingPriceMode(normalized)
-      return
-    }
-    setPriceMode(normalized)
+  function changeGuestLanguage(nextLang) {
+    if (!['uz', 'ru', 'en'].includes(nextLang)) return
+    setGuestLang(nextLang)
+    if (isGuestTabletMode) updateGuestModeSession({ guestLang: nextLang })
   }
 
-  function confirmPriceModeChange() {
-    if (!pendingPriceMode || !canEditTables) return
-    const nextMode = pendingPriceMode
-    setPriceMode(nextMode)
-    dispatch({ type: 'UPDATE_CART_PRICE_MODE', payload: { priceMode: nextMode } })
-    if (activeOrder?.id || tableId) {
-      dispatch({ type: 'UPDATE_ORDER_PRICE_MODE', payload: { tableId, priceMode: nextMode } })
+  function finishGuestSelection() {
+    if (!isGuestTabletMode || cartCount === 0) return
+    const reviewedCart = rebuildGuestCartFromCatalog({
+      cart: state.cart,
+      menuItems: state.menuItems,
+      categories: state.categories,
+      now: new Date(),
+      lang,
+      priceMode: guestSessionPriceMode,
+    })
+    dispatch({ type: 'REPLACE_CART', payload: reviewedCart })
+    updateGuestModeSession({ finished: reviewedCart.length > 0, cart: reviewedCart })
+    if (reviewedCart.length === 0) return
+    setCartOpen(false)
+  }
+
+  function continueGuestSelection() {
+    if (!isGuestTabletMode) return
+    updateGuestModeSession({ finished: false })
+  }
+
+  async function unlockGuestMode(pin) {
+    const latestSession = readGuestModeSession()
+    if (!isGuestModeSessionFor(latestSession, { tableId, staffUserId, pathname: location.pathname })) return
+    if (guestModePinLockSeconds(latestSession) > 0) return
+    if (!loaded || loadError) {
+      setGuestModeError(staffLang === 'uz'
+        ? 'Menyu hali tayyor emas. Qayta yuklang va yana urinib ko‘ring.'
+        : staffLang === 'ru'
+          ? 'Меню ещё не готово. Перезагрузите страницу и попробуйте снова.'
+          : 'The menu is not ready yet. Reload and try again.')
+      return
     }
-    setPendingPriceMode(null)
+
+    setGuestModeBusy(true)
+    setGuestModeError('')
+    try {
+      const verified = await verifyGuestModePin(latestSession, pin)
+      if (!verified) {
+        const failedSession = registerGuestModePinFailure(latestSession)
+        writeGuestModeSession(failedSession)
+        setGuestUnlockClock(Date.now())
+        setGuestModeError(guestModeCopy(staffLang).wrongPin)
+        return
+      }
+      const reviewedCart = rebuildGuestCartFromCatalog({
+        cart: guestCartReady ? state.cart : (latestSession.cart || []),
+        menuItems: state.menuItems,
+        categories: state.categories,
+        now: new Date(),
+        lang: staffLang,
+        priceMode: normalizeGuestModePriceMode(latestSession.priceMode),
+      })
+      dispatch({ type: 'REPLACE_CART', payload: reviewedCart })
+      const expectedOrderIds = latestSession.activeOrderIds || []
+      setGuestExpectedOrderIds(expectedOrderIds)
+      setGuestReviewWarning(expectedOrderIds.join('|') === activeTableOrderIds.join('|') ? '' : guestOrderChangedWarning)
+      preserveUnlockedGuestPriceModeRef.current = normalizeGuestModePriceMode(latestSession.priceMode)
+      clearGuestModeSession()
+      setGuestUnlockOpen(false)
+      setGuestCartReady(false)
+      setDetailItem(null)
+      setCartOpen(true)
+    } catch {
+      setGuestModeError(staffLang === 'uz'
+        ? 'PIN-ni tekshirib bo‘lmadi. Planshet qulflangan holda qoladi.'
+        : staffLang === 'ru'
+          ? 'Не удалось проверить PIN. Планшет останется заблокированным.'
+          : 'The PIN could not be verified. The tablet will remain locked.')
+    } finally {
+      setGuestModeBusy(false)
+    }
   }
 
   function handleSignOut() {
+    clearGuestModeSession()
     dispatch({ type: 'LOGOUT' })
     signOut?.()
   }
@@ -999,6 +1218,28 @@ export default function WaiterOrder() {
             />
           )}
         </div>
+        {isGuestTabletMode && (
+          <button
+            type="button"
+            onClick={() => { setGuestModeError(''); setGuestUnlockOpen(true) }}
+            className="fixed bottom-4 right-4 z-40 inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-sm font-black text-[#6B7280] shadow-lg"
+          >
+            <LockKeyhole size={15} /> {guestModeCopy(staffLang).staff}
+          </button>
+        )}
+        {isGuestTabletMode && guestUnlockOpen && (
+          <GuestPinDialog
+            mode="unlock"
+            lang={staffLang}
+            pinLength={getGuestModePinLength(guestModeSession)}
+            busy={guestModeBusy}
+            error={guestModeError}
+            lockSeconds={guestModePinLockSeconds(guestModeSession, guestUnlockClock)}
+            onInput={() => setGuestModeError('')}
+            onCancel={() => { if (!guestModeBusy) { setGuestUnlockOpen(false); setGuestModeError('') } }}
+            onSubmit={unlockGuestMode}
+          />
+        )}
       </div>
     )
   }
@@ -1009,10 +1250,33 @@ export default function WaiterOrder() {
         <div className="text-center">
           <UtensilsCrossed size={40} className="mx-auto mb-3 text-gray-200" />
           <p className="mb-4 text-sm text-gray-400">{t(lang, 'tableNotFound')}</p>
-          <button onClick={() => navigate('/waiter/tables')} className="text-[#ff5a00] font-semibold hover:underline text-sm">
-            {t(lang, 'back')}
-          </button>
+          {isGuestTabletMode ? (
+            <button
+              type="button"
+              onClick={() => { setGuestModeError(''); setGuestUnlockOpen(true) }}
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-sm font-black text-[#6B7280] shadow-sm"
+            >
+              <LockKeyhole size={15} /> {guestModeCopy(staffLang).staff}
+            </button>
+          ) : (
+            <button onClick={() => navigate('/waiter/tables')} className="text-[#ff5a00] font-semibold hover:underline text-sm">
+              {t(lang, 'back')}
+            </button>
+          )}
         </div>
+        {isGuestTabletMode && guestUnlockOpen && (
+          <GuestPinDialog
+            mode="unlock"
+            lang={staffLang}
+            pinLength={getGuestModePinLength(guestModeSession)}
+            busy={guestModeBusy}
+            error={guestModeError}
+            lockSeconds={guestModePinLockSeconds(guestModeSession, guestUnlockClock)}
+            onInput={() => setGuestModeError('')}
+            onCancel={() => { if (!guestModeBusy) { setGuestUnlockOpen(false); setGuestModeError('') } }}
+            onSubmit={unlockGuestMode}
+          />
+        )}
       </div>
     )
   }
@@ -1024,6 +1288,52 @@ export default function WaiterOrder() {
     onIncrement:  handleIncrement,
     onDecrement:  handleDecrement,
     onOpenDetail: openDetail,
+  }
+
+  function renderSearchControl(className = '') {
+    return (
+      <AnimatedSearch
+        value={search}
+        onChange={setSearch}
+        placeholder={lang === 'uz' ? 'Menyu qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
+        searchLabel={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
+        clearLabel={lang === 'uz' ? 'Qidiruvni tozalash' : lang === 'ru' ? 'Очистить поиск' : 'Clear search'}
+        closeLabel={lang === 'uz' ? 'Qidiruvni yopish' : lang === 'ru' ? 'Закрыть поиск' : 'Close search'}
+        alwaysOpen
+        className={className}
+      />
+    )
+  }
+
+  function renderCartButton(className = '') {
+    return (
+      <button
+        ref={cartButtonRef}
+        onClick={() => setCartOpen(true)}
+        className={`relative min-w-0 max-w-[min(260px,38vw)] flex-shrink rounded-xl border font-black transition-all active:scale-[0.98] ${
+          cartCount > 0
+            ? 'bg-[#ff5a00] border-[#ff5a00] text-white shadow-md shadow-orange-100 hover:bg-[#e64d00]'
+            : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-orange-200 hover:bg-orange-50'
+        } ${cartPulse ? 'scale-[1.03] ring-4 ring-orange-200 ring-offset-2 ring-offset-white' : ''} ${className}`}
+        title={cartCount > 0
+          ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
+          : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
+      >
+        <span className="flex h-10 min-w-0 items-center gap-2 px-3 sm:px-4">
+          <ShoppingCart size={17} className="flex-shrink-0" />
+          <span className="hidden min-w-0 truncate whitespace-nowrap text-[13px] sm:inline">
+            {cartCount > 0
+              ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
+              : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
+          </span>
+        </span>
+        {cartCount > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#1F2937] px-1 text-[9px] font-black text-white sm:hidden">
+            {cartCount}
+          </span>
+        )}
+      </button>
+    )
   }
 
   return (
@@ -1052,10 +1362,19 @@ export default function WaiterOrder() {
           <ProductDetailPage
             item={detailItem}
             category={categoryMap[detailItem.category_id]}
-            currentQty={getMenuItemOptionGroups(detailItem, lang, { audience: 'waiter' }).length > 0 ? 0 : (cartQtyMap[detailItem.id] || 0)}
+            currentQty={getMenuItemOptionGroups(detailItem, lang, { audience: menuAudience }).length > 0 ? 0 : (cartQtyMap[detailItem.id] || 0)}
             currentNotes={cartNotesMap[detailItem.id] || ''}
             lang={lang}
-            audience="waiter"
+            audience={menuAudience}
+            languageControl={isGuestTabletMode ? (
+              <GuestModeUtilities
+                lang={lang}
+                staffLang={staffLang}
+                onLanguageChange={changeGuestLanguage}
+                onStaffAccess={() => { setGuestModeError(''); setGuestUnlockOpen(true) }}
+                compact
+              />
+            ) : null}
             onBack={() => setDetailItem(null)}
             onCancel={() => setDetailItem(null)}
             onAddToCart={handleProductDetailAdd}
@@ -1066,107 +1385,83 @@ export default function WaiterOrder() {
         {/* Public-menu style search */}
         <div className="flex-shrink-0 px-4 pt-4 pb-0">
           <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className={`lg:hidden p-2 -ml-1 rounded-xl hover:bg-gray-100 transition-colors flex-shrink-0 ${shouldShowSidebar ? '' : 'hidden'}`}
-          >
-            <MenuIcon size={20} className="text-[#6B7280]" />
-          </button>
-
-          {/* Back to Tables */}
-          <button
-            onClick={() => { if (!isSendingOrder) navigate('/waiter/tables') }}
-            disabled={isSendingOrder}
-            className="flex items-center justify-center w-9 h-9 rounded-xl border border-[#E5E7EB] text-[#6B7280] hover:text-[#ff5a00] hover:border-orange-300 hover:bg-orange-50 transition-colors flex-shrink-0"
-            title={lang === 'uz' ? 'Stollar' : lang === 'ru' ? 'Столы' : 'Tables'}
-          >
-            <ArrowLeft size={17} />
-          </button>
-
-          <div className="min-w-[92px] max-w-[180px] flex-shrink-0 sm:max-w-[240px]">
-            <p className="truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
-            <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
-          </div>
-
-          <div className="flex flex-shrink-0 rounded-xl bg-[#F3F4F6] p-1">
-            {['regular', 'tourist'].map(mode => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => requestPriceModeChange(mode)}
-                disabled={isSendingOrder || !canEditTables}
-                className={`h-8 rounded-lg px-3 text-[12px] font-black transition-all disabled:cursor-wait disabled:opacity-60 ${
-                  priceMode === mode
-                    ? 'bg-white text-[#ff5a00] shadow-sm'
-                    : 'text-[#6B7280] hover:text-[#1F2937]'
-                }`}
-              >
-                {getPriceModeLabel(mode, lang)}
-              </button>
-            ))}
-          </div>
-
-          <AnimatedSearch
-            value={search}
-            onChange={setSearch}
-            placeholder={lang === 'uz' ? 'Menyu qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
-            searchLabel={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
-            clearLabel={lang === 'uz' ? 'Qidiruvni tozalash' : lang === 'ru' ? 'Очистить поиск' : 'Clear search'}
-            closeLabel={lang === 'uz' ? 'Qidiruvni yopish' : lang === 'ru' ? 'Закрыть поиск' : 'Close search'}
-          />
-
-          <button
-            ref={cartButtonRef}
-            onClick={() => setCartOpen(true)}
-            className={`relative ml-auto min-w-0 max-w-[min(260px,38vw)] flex-shrink rounded-xl border font-black transition-all active:scale-[0.98] ${
-              cartCount > 0
-                ? 'bg-[#ff5a00] border-[#ff5a00] text-white shadow-md shadow-orange-100 hover:bg-[#e64d00]'
-                : 'bg-white border-[#E5E7EB] text-[#6B7280] hover:border-orange-200 hover:bg-orange-50'
-            } ${cartPulse ? 'scale-[1.03] ring-4 ring-orange-200 ring-offset-2 ring-offset-white' : ''}`}
-            title={cartCount > 0
-              ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
-              : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
-          >
-            <span className="flex h-10 min-w-0 items-center gap-2 px-3 sm:px-4">
-              <ShoppingCart size={17} className="flex-shrink-0" />
-              <span className="hidden min-w-0 truncate whitespace-nowrap text-[13px] sm:inline">
-                {cartCount > 0
-                  ? `${cartCount} ${lang === 'uz' ? 'ta' : lang === 'ru' ? 'поз.' : 'items'} · ${formatCurrency(cartSummary.total)}`
-                  : lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
-              </span>
-            </span>
-            {cartCount > 0 && (
-              <span className="sm:hidden absolute -top-1.5 -right-1.5 bg-[#1F2937] text-white text-[9px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {cartCount}
-              </span>
-            )}
-          </button>
-          {!shouldShowSidebar && (
-            <div className="flex items-center gap-1.5">
-              {['uz', 'ru', 'en'].map(l => (
+            {isGuestTabletMode ? (
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                <div className="flex min-w-0 items-center gap-3 xl:contents">
+                  <div className="min-w-0 flex-1 xl:max-w-[240px] xl:flex-none">
+                    <p className="truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
+                    <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
+                  </div>
+                  <div className="ml-auto xl:hidden">
+                    <GuestModeUtilities
+                      lang={lang}
+                      staffLang={staffLang}
+                      onLanguageChange={changeGuestLanguage}
+                      onStaffAccess={() => { setGuestModeError(''); setGuestUnlockOpen(true) }}
+                    />
+                  </div>
+                </div>
+                <div className="flex min-w-0 items-center gap-3 xl:contents">
+                  {renderSearchControl('!order-none min-w-0 flex-1 xl:ml-auto')}
+                  {renderCartButton('ml-auto xl:ml-0')}
+                  <div className="hidden xl:block">
+                    <GuestModeUtilities
+                      lang={lang}
+                      staffLang={staffLang}
+                      onLanguageChange={changeGuestLanguage}
+                      onStaffAccess={() => { setGuestModeError(''); setGuestUnlockOpen(true) }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+                {shouldShowSidebar && (
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="-ml-1 flex-shrink-0 rounded-xl p-2 transition-colors hover:bg-gray-100 lg:hidden"
+                  >
+                    <MenuIcon size={20} className="text-[#6B7280]" />
+                  </button>
+                )}
                 <button
-                  key={l}
-                  onClick={() => dispatch({ type: 'SET_LANG', payload: l })}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors ${
-                    lang === l ? 'bg-[#ff5a00] text-white' : 'bg-gray-100 text-[#6B7280] hover:bg-gray-200'
-                  }`}
+                  onClick={() => { if (!isSendingOrder) navigate('/waiter/tables') }}
+                  disabled={isSendingOrder}
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-[#ff5a00]"
+                  title={lang === 'uz' ? 'Stollar' : lang === 'ru' ? 'Столы' : 'Tables'}
                 >
-                  {l}
+                  <ArrowLeft size={17} />
                 </button>
-              ))}
-              <button
-                onClick={handleSignOut}
-                className="p-2 rounded-xl text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors"
-                title={lang === 'uz' ? 'Chiqish' : lang === 'ru' ? 'Выйти' : 'Logout'}
-              >
-                <LogOut size={16} />
-              </button>
-            </div>
-          )}
-
-            </div>
+                <div className="min-w-[92px] max-w-[180px] flex-shrink-0 sm:max-w-[240px]">
+                  <p className="truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
+                  <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
+                </div>
+                {renderSearchControl()}
+                {renderCartButton('ml-auto')}
+                {!shouldShowSidebar && (
+                  <div className="flex items-center gap-1.5">
+                    {['uz', 'ru', 'en'].map(l => (
+                      <button
+                        key={l}
+                        onClick={() => dispatch({ type: 'SET_LANG', payload: l })}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors ${
+                          lang === l ? 'bg-[#ff5a00] text-white' : 'bg-gray-100 text-[#6B7280] hover:bg-gray-200'
+                        }`}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                    <button
+                      onClick={handleSignOut}
+                      className="p-2 rounded-xl text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors"
+                      title={lang === 'uz' ? 'Chiqish' : lang === 'ru' ? 'Выйти' : 'Logout'}
+                    >
+                      <LogOut size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1236,7 +1531,7 @@ export default function WaiterOrder() {
         </div>
 
         {/* Bottom table chips */}
-        {!isTakeAwayFlow && (
+        {!isGuestTabletMode && !isTakeAwayFlow && (
           <BottomTableChips
             currentTableId={tableId}
             onNewOrder={() => { if (!isSendingOrder) navigate('/waiter/tables') }}
@@ -1266,18 +1561,20 @@ export default function WaiterOrder() {
                 <X size={16} />
               </button>
             )}
-            <div className={`${isManageOrderOnly ? 'flex-1 pt-14' : 'max-h-[48dvh] flex-shrink-0'} overflow-y-auto overscroll-contain`}>
-              <OrderActionPanel
-                order={activeOrder}
-                tableId={tableId}
-                lang={lang}
-                dispatch={dispatch}
-                cartCount={cartCount}
-                menuItemMap={menuItemMap}
-                canEditOrder={canEditTables}
-                onPrintKitchenCheck={handlePrintKitchenCheck}
-              />
-            </div>
+            {!isGuestTabletMode && (
+              <div className={`${isManageOrderOnly ? 'flex-1 pt-14' : 'max-h-[48dvh] flex-shrink-0'} overflow-y-auto overscroll-contain`}>
+                <OrderActionPanel
+                  order={activeOrder}
+                  tableId={tableId}
+                  lang={lang}
+                  dispatch={dispatch}
+                  cartCount={cartCount}
+                  menuItemMap={menuItemMap}
+                  canEditOrder={canEditTables}
+                  onPrintKitchenCheck={handlePrintKitchenCheck}
+                />
+              </div>
+            )}
             {!isManageOrderOnly && canEditTables && (
             <div className="flex-1 min-h-0 overflow-hidden">
               <CartPanel
@@ -1285,10 +1582,15 @@ export default function WaiterOrder() {
                 orderType={orderType}
                 onOrderTypeChange={canEditTables ? setOrderType : undefined}
                 priceMode={priceMode}
-                allowOrderTypeChange
+                allowOrderTypeChange={!isGuestTabletMode}
                 isSending={isSendingOrder}
                 onSendingChange={setSendingOrder}
                 onSubmitSuccess={handleSubmittedOrderPrint}
+                lang={lang}
+                guestMode={isGuestTabletMode}
+                onGuestFinish={finishGuestSelection}
+                reviewWarning={guestReviewWarning}
+                reviewKey={guestExpectedOrderIds ? `${guestExpectedOrderIds.join('|')}=>${activeTableOrderIds.join('|')}` : ''}
                 onClose={() => { if (!isSendingOrder) setCartOpen(false) }}
               />
             </div>
@@ -1297,40 +1599,30 @@ export default function WaiterOrder() {
         </div>
       )}
 
-      {pendingPriceMode && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-[380px] rounded-2xl border border-orange-100 bg-white p-5 shadow-2xl">
-            <p className="text-sm font-black uppercase tracking-wide text-[#ff5a00]">
-              {lang === 'uz' ? 'Menyu turini o‘zgartirish' : lang === 'ru' ? 'Изменить тип меню' : 'Change menu type'}
-            </p>
-            <h2 className="mt-2 text-xl font-black text-[#1F2937]">
-              {getPriceModeLabel(priceMode, lang)} → {getPriceModeLabel(pendingPriceMode, lang)}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[#6B7280]">
-              {lang === 'uz'
-                ? 'Savatdagi va shu stolning to‘lanmagan mahsulotlari yangi narx bo‘yicha qayta hisoblanadi.'
-                : lang === 'ru'
-                  ? 'Позиции в корзине и неоплаченные позиции этого стола будут пересчитаны по новому типу меню.'
-                  : 'Cart items and unpaid items on this table will be recalculated with the new menu type.'}
-            </p>
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setPendingPriceMode(null)}
-                className="h-11 flex-1 rounded-xl border border-[#E5E7EB] bg-white text-sm font-black text-[#6B7280] hover:bg-gray-50"
-              >
-                {lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={confirmPriceModeChange}
-                className="h-11 flex-1 rounded-xl bg-[#ff5a00] text-sm font-black text-white hover:bg-[#e64d00]"
-              >
-                {lang === 'uz' ? 'Qayta hisoblash' : lang === 'ru' ? 'Пересчитать' : 'Recalculate'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {isGuestTabletMode && guestCartReady && guestModeSession?.finished && (
+        <GuestSelectionReady
+          lang={lang}
+          staffLang={staffLang}
+          itemCount={cartCount}
+          total={cartSummary.total}
+          onLanguageChange={changeGuestLanguage}
+          onContinue={continueGuestSelection}
+          onStaffAccess={() => { setGuestModeError(''); setGuestUnlockOpen(true) }}
+        />
+      )}
+
+      {isGuestTabletMode && guestUnlockOpen && (
+        <GuestPinDialog
+          mode="unlock"
+          lang={staffLang}
+          pinLength={getGuestModePinLength(guestModeSession)}
+          busy={guestModeBusy}
+          error={guestModeError}
+          lockSeconds={guestModePinLockSeconds(guestModeSession, guestUnlockClock)}
+          onInput={() => setGuestModeError('')}
+          onCancel={() => { if (!guestModeBusy) { setGuestUnlockOpen(false); setGuestModeError('') } }}
+          onSubmit={unlockGuestMode}
+        />
       )}
 
     </div>

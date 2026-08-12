@@ -6,7 +6,7 @@ import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
 import { getMenuItemPublicUrl } from '../lib/menuLinks'
 import { getMenuItemMediaUrls, isMenuVideoUrl } from '../lib/menuMedia'
-import { calculateUnitPrice, normalizePriceMode } from '../lib/priceModes'
+import { calculateUnitPrice, getOrderItemBasePrice, normalizePriceMode } from '../lib/priceModes'
 import {
   changeMenuQuantity,
   formatMenuQuantity,
@@ -461,15 +461,13 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const missingRequiredOptions = optionGroups.some(group => (
     group.required && !group.options.some(option => option.id === selectedOptions[group.id])
   ))
-  const selectedOptionPriceDelta = optionGroups.reduce((sum, group) => {
-    const option = group.options.find(item => item.id === selectedOptions[group.id])
-    return sum + (Number(option?.price_delta) || 0)
-  }, 0)
   const itemPriceMode = normalizePriceMode(item.price_mode || item.priceMode)
-  const selectedOptionFullPrice = optionGroups.reduce((price, group) => {
+  const selectedOptionBasePrice = optionGroups.reduce((price, group) => {
     const option = group.options.find(item => item.id === selectedOptions[group.id])
-    return Number(option?.price) > 0 ? calculateUnitPrice(option.price, itemPriceMode) : price
-  }, item.price)
+    if (Number(option?.price) > 0) return Number(option.price)
+    return price + (Number(option?.price_delta) || 0)
+  }, getOrderItemBasePrice(item))
+  const selectedOptionFullPrice = calculateUnitPrice(selectedOptionBasePrice, itemPriceMode)
   const optionNotes = optionNoteLine(optionGroups, selectedOptions)
   const finalNotes = [optionNotes, notes.trim()].filter(Boolean).join('\n')
   const labels = {
@@ -530,17 +528,19 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
           )}
         </div>
         <div className="flex flex-col items-end gap-1">
-          {readOnly && (
+          {(languageControl || readOnly) && (
             <div className="mb-1 flex items-center justify-end gap-2">
               {languageControl}
-              <button
-                type="button"
-                onClick={copyProductLink}
-                className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[12px] font-black text-[#1F2937] shadow-sm transition-colors hover:border-orange-200 hover:bg-[#fff4ed] hover:text-[#ff5a00]"
-              >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                <span className="hidden sm:inline">{copied ? labels.copied : labels.copy}</span>
-              </button>
+              {readOnly && (
+                <button
+                  type="button"
+                  onClick={copyProductLink}
+                  className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-[12px] font-black text-[#1F2937] shadow-sm transition-colors hover:border-orange-200 hover:bg-[#fff4ed] hover:text-[#ff5a00]"
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  <span className="hidden sm:inline">{copied ? labels.copied : labels.copy}</span>
+                </button>
+              )}
             </div>
           )}
           {pricing.discounted && (
@@ -803,7 +803,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
               {t(lang, 'cancel')}
           </button>
           <button
-            onClick={() => { if (!unavailable && !missingRequiredOptions) onAddToCart(item, qty, finalNotes, selectedOptions, selectedOptionFullPrice - item.price) }}
+            onClick={() => { if (!unavailable && !missingRequiredOptions) onAddToCart(item, qty, finalNotes, selectedOptions, selectedOptionBasePrice) }}
             disabled={unavailable || missingRequiredOptions}
             className="h-14 flex-[2] rounded-2xl bg-[#0F3B2E] text-sm sm:text-base font-black text-white hover:bg-[#0A2A20] active:scale-[0.99] transition-all shadow-[0_8px_18px_rgba(15,59,46,0.22)] disabled:cursor-not-allowed disabled:bg-[#9CA3AF] disabled:shadow-none"
           >

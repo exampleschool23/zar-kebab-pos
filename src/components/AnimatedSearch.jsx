@@ -9,6 +9,7 @@ export default function AnimatedSearch({
   clearLabel = 'Clear search',
   closeLabel = 'Close search',
   variant = 'inline',
+  alwaysOpen = false,
   className = '',
   buttonClassName = '',
   panelClassName = '',
@@ -24,11 +25,12 @@ export default function AnimatedSearch({
   const inputRef = useRef(null)
   const hasValue = Boolean(value)
   const isFloating = floating && floatingViewport
+  const isOpen = alwaysOpen || open
 
   useEffect(() => {
-    if (!open) return
+    if (!open || alwaysOpen) return
     requestAnimationFrame(() => inputRef.current?.focus())
-  }, [open])
+  }, [alwaysOpen, open])
 
   useEffect(() => {
     if (!floating) {
@@ -150,28 +152,32 @@ export default function AnimatedSearch({
   return (
     <div
       className={`relative flex transition-all duration-200 ease-out ${
-        isFloating ? '' : 'order-last sm:order-none sm:min-w-0'
+        isFloating ? '' : alwaysOpen ? 'order-none min-w-0 flex-1' : 'order-last sm:order-none sm:min-w-0'
       } ${
         isFloating
           ? 'h-10 w-10 min-w-10 flex-none flex-shrink-0'
-          : open ? 'min-w-full flex-1 sm:min-w-[220px]' : 'h-10 w-10 min-w-10 flex-none flex-shrink-0'
+          : alwaysOpen
+            ? 'min-w-0 flex-1'
+            : isOpen ? 'min-w-full flex-1 sm:min-w-[220px]' : 'h-10 w-10 min-w-10 flex-none flex-shrink-0'
       } ${className}`}
     >
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label={searchLabel}
-        className={`flex h-10 w-10 min-w-10 flex-none items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-all duration-200 ease-out hover:border-orange-200 hover:bg-white hover:text-[#ff5a00] ${
-          open ? 'pointer-events-none absolute left-0 top-0 scale-95 opacity-0' : 'relative scale-100 opacity-100'
-        } ${hasValue ? 'text-[#ff5a00] ring-2 ring-[#ff5a00]/10' : ''} ${buttonClassName}`}
-      >
-        <Search size={17} />
-      </button>
+      {!alwaysOpen && (
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={searchLabel}
+          className={`flex h-10 w-10 min-w-10 flex-none items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-all duration-200 ease-out hover:border-orange-200 hover:bg-white hover:text-[#ff5a00] ${
+            open ? 'pointer-events-none absolute left-0 top-0 scale-95 opacity-0' : 'relative scale-100 opacity-100'
+          } ${hasValue ? 'text-[#ff5a00] ring-2 ring-[#ff5a00]/10' : ''} ${buttonClassName}`}
+        >
+          <Search size={17} />
+        </button>
+      )}
 
       <div
         className={`${isFloating ? 'z-[70]' : 'relative'} flex h-10 min-w-0 items-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] transition-all duration-200 ease-out focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/20 ${
-          open ? 'pointer-events-auto w-full scale-x-100 opacity-100' : 'pointer-events-none w-10 scale-x-0 opacity-0'
+          isOpen ? 'pointer-events-auto w-full scale-x-100 opacity-100' : 'pointer-events-none w-10 scale-x-0 opacity-0'
         } ${panelClassName}`}
         style={isFloating ? (floatingStyle || {
           position: 'fixed',
@@ -186,30 +192,33 @@ export default function AnimatedSearch({
           ref={inputRef}
           type="text"
           placeholder={placeholder}
+          aria-label={searchLabel}
           value={value}
           onChange={event => onChange(event.target.value)}
-          disabled={!open}
-          tabIndex={open ? 0 : -1}
-          className="h-full w-full bg-transparent pl-10 pr-20 text-[14px] text-[#1F2937] placeholder-[#9CA3AF] outline-none disabled:opacity-100"
+          disabled={!isOpen}
+          tabIndex={isOpen ? 0 : -1}
+          className={`h-full w-full bg-transparent pl-10 text-[14px] text-[#1F2937] placeholder-[#9CA3AF] outline-none disabled:opacity-100 ${alwaysOpen ? 'pr-10' : 'pr-20'}`}
         />
         {hasValue && (
           <button
             type="button"
             onClick={clearSearch}
-            className="absolute right-11 top-1/2 -translate-y-1/2 text-[#9CA3AF] transition-colors hover:text-[#6B7280]"
+            className={`absolute top-1/2 -translate-y-1/2 text-[#9CA3AF] transition-colors hover:text-[#6B7280] ${alwaysOpen ? 'right-3' : 'right-11'}`}
             aria-label={clearLabel}
           >
             <X size={14} />
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[#9CA3AF] transition-colors hover:bg-white hover:text-[#ff5a00]"
-          aria-label={closeLabel}
-        >
-          <X size={15} />
-        </button>
+        {!alwaysOpen && (
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[#9CA3AF] transition-colors hover:bg-white hover:text-[#ff5a00]"
+            aria-label={closeLabel}
+          >
+            <X size={15} />
+          </button>
+        )}
       </div>
     </div>
   )

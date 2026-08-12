@@ -1,11 +1,24 @@
 import React, { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { Loader2, LockKeyhole } from 'lucide-react'
 
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppProvider, useApp } from './store/AppContext'
 import { canViewPage, defaultPath as roleDefaultPath } from './lib/permissions'
 import { t } from './lib/i18n'
+import {
+  clearGuestModeSession,
+  getGuestModeLockState,
+  getGuestModePinLength,
+  guestModePinLockSeconds,
+  isGuestModeOwnedByCurrentTab,
+  readGuestModeSession,
+  registerGuestModePinFailure,
+  verifyGuestModePin,
+  writeGuestModeSession,
+} from './lib/guestMode'
+import { useGuestModeSession } from './hooks/useGuestModeSession'
+import { GuestPinDialog, guestModeCopy } from './components/GuestModeUI'
 
 import Login          from './pages/Login'
 import AuthCallback   from './pages/AuthCallback'
@@ -222,6 +235,109 @@ function LazyProtectedRoute({ page, children }) {
   )
 }
 
+function GuestModeRecoveryLock({ guestModeSession }) {
+  const { state } = useApp()
+  const lang = state.lang || 'en'
+  const copy = guestModeCopy(lang)
+  const recoveryBody = lang === 'uz'
+    ? 'Bu favqulodda qulfni ochish mehmon tanlovini bekor qiladi. Tanlovni saqlash uchun planshet berilgan asl oynaga qayting.'
+    : lang === 'ru'
+      ? 'Аварийная разблокировка отменит выбор гостя. Чтобы сохранить его, вернитесь в исходную вкладку планшета.'
+      : 'Emergency unlock discards the guest selection. Return to the original tablet tab to keep it.'
+  const [dialogOpen, setDialogOpen] = React.useState(true)
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState('')
+  const [clock, setClock] = React.useState(() => Date.now())
+
+  useEffect(() => {
+    if (!dialogOpen) return undefined
+    setClock(Date.now())
+    const timer = window.setInterval(() => setClock(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [dialogOpen])
+
+  async function unlock(pin) {
+    const latestSession = readGuestModeSession()
+    if (!latestSession || guestModePinLockSeconds(latestSession) > 0) return
+    setBusy(true)
+    setError('')
+    try {
+      const verified = await verifyGuestModePin(latestSession, pin)
+      if (!verified) {
+        writeGuestModeSession(registerGuestModePinFailure(latestSession))
+        setClock(Date.now())
+        setError(copy.wrongPin)
+        return
+      }
+      clearGuestModeSession()
+    } catch {
+      setError(lang === 'uz'
+        ? 'PIN-ni tekshirib bo‘lmadi. Planshet qulflangan holda qoladi.'
+        : lang === 'ru'
+          ? 'Не удалось проверить PIN. Планшет останется заблокированным.'
+          : 'The PIN could not be verified. The tablet will remain locked.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#FAF7F0] p-5">
+      <div className="w-full max-w-sm rounded-[28px] border border-[#E5E7EB] bg-white p-7 text-center shadow-xl">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-50 text-[#ff5a00]">
+          <LockKeyhole size={25} />
+        </div>
+        <h1 className="mt-5 text-2xl font-black text-[#1F2937]">{copy.unlockTitle}</h1>
+        <p className="mt-2 text-sm leading-6 text-[#6B7280]">{recoveryBody}</p>
+        <button
+          type="button"
+          onClick={() => { setError(''); setDialogOpen(true) }}
+          className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1F2937] text-sm font-black text-white hover:bg-black"
+        >
+          <LockKeyhole size={16} /> {copy.unlockTitle}
+        </button>
+      </div>
+      {dialogOpen && (
+        <GuestPinDialog
+          mode="unlock"
+          lang={lang}
+          pinLength={getGuestModePinLength(guestModeSession)}
+          busy={busy}
+          error={error}
+          lockSeconds={guestModePinLockSeconds(guestModeSession, clock)}
+          onInput={() => setError('')}
+          onCancel={() => { if (!busy) { setDialogOpen(false); setError('') } }}
+          onSubmit={unlock}
+        />
+      )}
+    </div>
+  )
+}
+
+function GuestModeRouteLock({ children }) {
+  const { session, profile, loading } = useAuth()
+  const location = useLocation()
+  const guestModeSession = useGuestModeSession()
+  const lockState = getGuestModeLockState(guestModeSession, {
+    authenticatedUserId: session?.user?.id,
+    profileUserId: profile?.id,
+    profileStatus: profile?.status,
+    canViewTables: !!profile && canViewPage(profile, 'tables'),
+    ownsGuestModeSession: isGuestModeOwnedByCurrentTab(guestModeSession),
+  })
+
+  if (!guestModeSession) return children
+  if (loading) return <Spinner />
+  if (lockState === 'recovery' || lockState === 'signed_out') {
+    return <GuestModeRecoveryLock guestModeSession={guestModeSession} />
+  }
+  if (lockState === 'active' && location.pathname !== guestModeSession.routePath) {
+    return <Navigate to={guestModeSession.routePath} replace />
+  }
+
+  return children
+}
+
 // Decides where to send user after login
 function RoleRedirect({ signedOutPath = '/menu' }) {
   const { session, profile, profileError, authError, loading, signOut } = useAuth()
@@ -431,7 +547,13 @@ function AppRoutes() {
   return (
     <>
       <ProfileSync />
-      {publicOnlyHost ? <PublicCustomerRoutes /> : <InternalAppRoutes adminHost={adminHost} />}
+      {publicOnlyHost ? (
+        <PublicCustomerRoutes />
+      ) : (
+        <GuestModeRouteLock>
+          <InternalAppRoutes adminHost={adminHost} />
+        </GuestModeRouteLock>
+      )}
     </>
   )
 }

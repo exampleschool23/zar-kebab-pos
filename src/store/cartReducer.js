@@ -78,6 +78,9 @@ export function cartReducer(state, action) {
       }
     }
 
+    case 'REPLACE_CART':
+      return { ...state, cart: Array.isArray(action.payload) ? action.payload.map(item => ({ ...item })) : [] }
+
     case 'CLEAR_CART':
       return { ...state, cart: [] }
 

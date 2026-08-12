@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react'
-import { X, ShoppingCart, Minus, Plus, Trash2, UtensilsCrossed, Loader2 } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { X, ShoppingCart, Minus, Plus, Trash2, UtensilsCrossed, Loader2, CheckCircle2 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { t, getItemDesc, getItemName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
@@ -207,13 +207,23 @@ export default function CartPanel({
   isSending = false,
   onSendingChange,
   onSubmitSuccess,
+  lang: langProp,
+  guestMode = false,
+  onGuestFinish,
+  reviewWarning = '',
+  reviewKey = '',
 }) {
   const { state, dispatch } = useApp()
-  const lang    = state.lang
+  const lang    = langProp || state.lang
   const cart    = state.cart
   const normalizedPriceMode = normalizePriceMode(priceMode)
   const [message, setMessage] = useState(null)
+  const [reviewConfirmed, setReviewConfirmed] = useState(false)
   const retrySubmissionRef = useRef(null)
+
+  useEffect(() => {
+    setReviewConfirmed(false)
+  }, [reviewWarning, reviewKey])
 
   const menuItemMap = useMemo(() => {
     const map = {}
@@ -244,6 +254,7 @@ export default function CartPanel({
 
   async function handleSend() {
     if (cart.length === 0 || isSending) return
+    if (reviewWarning && !reviewConfirmed) return
     if (hasUnavailableCartItems) {
       setMessage({ tone: 'error', text: unavailableCartMessage })
       return
@@ -384,6 +395,25 @@ export default function CartPanel({
 
       {/* ── Summary + Send button ──────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-t border-[#F3F4F6] px-4 pt-4 pb-5">
+        {reviewWarning && (
+          <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] font-bold leading-5 text-amber-900">
+            <p>{reviewWarning}</p>
+            <button
+              type="button"
+              onClick={() => setReviewConfirmed(true)}
+              disabled={reviewConfirmed}
+              className={`mt-2 inline-flex h-9 w-full items-center justify-center rounded-lg px-3 text-[11px] font-black transition-colors ${
+                reviewConfirmed
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-amber-900 text-white hover:bg-amber-950'
+              }`}
+            >
+              {reviewConfirmed
+                ? (lang === 'uz' ? 'Tekshirildi' : lang === 'ru' ? 'Проверено' : 'Reviewed')
+                : (lang === 'uz' ? 'Stol va tanlovni tekshirdim' : lang === 'ru' ? 'Я проверил стол и выбор' : 'I reviewed the table and selection')}
+            </button>
+          </div>
+        )}
         {hasUnavailableCartItems && (
           <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-bold text-amber-800">
             {unavailableCartMessage}
@@ -422,11 +452,21 @@ export default function CartPanel({
           </div>
         )}
 
+        {guestMode && cart.length > 0 && !hasUnavailableCartItems && (
+          <p className="mb-3 text-center text-[12px] font-semibold leading-5 text-[#6B7280]">
+            {lang === 'uz'
+              ? 'Ofitsiant tanlovni tekshiradi va oshxonaga yuboradi.'
+              : lang === 'ru'
+                ? 'Официант проверит выбор и отправит его на кухню.'
+                : 'A waiter will review and send this selection to the kitchen.'}
+          </p>
+        )}
+
         <button
-          onClick={handleSend}
-          disabled={cart.length === 0 || isSending || hasUnavailableCartItems}
+          onClick={guestMode ? onGuestFinish : handleSend}
+          disabled={cart.length === 0 || isSending || hasUnavailableCartItems || (!!reviewWarning && !reviewConfirmed)}
           className={`w-full rounded-xl font-black text-[14px] active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
-            cart.length > 0 && !isSending && !hasUnavailableCartItems
+            cart.length > 0 && !isSending && !hasUnavailableCartItems && (!reviewWarning || reviewConfirmed)
               ? 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-lg shadow-orange-200'
               : cart.length > 0 && isSending
                 ? 'bg-[#ff5a00] text-white opacity-80 cursor-wait shadow-lg shadow-orange-200'
@@ -434,8 +474,16 @@ export default function CartPanel({
           }`}
           style={{ height: '52px' }}
         >
-          {isSending ? <Loader2 size={17} className="animate-spin" /> : <UtensilsCrossed size={17} />}
-          {isSending
+          {guestMode
+            ? <CheckCircle2 size={17} />
+            : isSending ? <Loader2 size={17} className="animate-spin" /> : <UtensilsCrossed size={17} />}
+          {guestMode
+            ? hasUnavailableCartItems
+              ? (lang === 'uz' ? 'Mavjud bo‘lmagan taomni olib tashlang' : lang === 'ru' ? 'Удалите недоступное блюдо' : 'Remove unavailable meal')
+              : (lang === 'uz' ? 'Tanlovni yakunlash' : lang === 'ru' ? 'Завершить выбор' : 'Finish selection')
+            : reviewWarning && !reviewConfirmed
+              ? (lang === 'uz' ? 'Avval tekshiruvni tasdiqlang' : lang === 'ru' ? 'Сначала подтвердите проверку' : 'Confirm the review first')
+            : isSending
             ? (lang === 'uz' ? 'Yuborilmoqda...' : lang === 'ru' ? 'Отправка...' : 'Sending...')
             : hasUnavailableCartItems
               ? (lang === 'uz' ? 'Mavjud bo‘lmagan taomni olib tashlang' : lang === 'ru' ? 'Удалите недоступное блюдо' : 'Remove unavailable meal')

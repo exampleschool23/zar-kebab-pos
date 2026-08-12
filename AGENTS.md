@@ -248,6 +248,19 @@ These bugs were recently fixed and are now protected by tests:
    - Migration `121` enforces the same restriction for direct updates and product-creation RPCs.
    - `cashier_only`, category visibility, schedules, and per-option visibility are separate controls and are not covered by this field-specific rule.
 
+27. Customer tablet Guest mode must never become another staff ordering surface.
+   - Before opening a table, staff explicitly chooses the compact R or T pricing option and creates a temporary two-digit exit PIN. The menu opens only after the locked Guest session is stored.
+   - The lock is device-wide, but its live cart belongs to the handoff browser tab so another POS tab cannot overwrite an unrelated draft.
+   - Guest mode uses public menu/category/option visibility, keeps the selected price mode fixed, hides staff navigation and existing orders, and can only finish a selection for staff review; it never sends to the kitchen.
+   - Stored cart rows are rebuilt from the current public catalog on restore, visibility changes, finish, and unlock. Browser-stored names, availability, options, quantities, and prices are never authoritative.
+   - Unlock restores the selection for the waiter. If the table's active order set changed during handoff, kitchen submission stays blocked until the waiter explicitly confirms review.
+   - This PIN is a kiosk UX boundary layered over the authenticated staff session, not hostile-client authorization. Use iPad Guided Access, Android kiosk mode, or an equivalent single-app browser when physically handing the tablet to customers.
+
+28. Price-mode recalculation must keep the menu, cart, and open order in sync.
+   - Before a kitchen order exists, a non-empty cart's saved `price_mode` is the ordering-mode source of truth. Do not reset the menu to Regular merely because `activeOrder` is absent.
+   - Recalculate both plain products and configured variants from their immutable `base_price`; never compound the Tourist markup or replace a variant's base with its displayed Tourist price.
+   - Paid order items remain historical snapshots and must never be repriced.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -465,6 +478,9 @@ Tests use Node's built-in test runner. Current files:
 - `tests/salaryTransactions.test.js`
   Deterministic newest-first ordering for combined salary payments, bonuses, and fines.
 
+- `tests/guestMode.test.js` and `tests/guestCart.test.js`
+  Guest PIN/route locking, reload and cross-tab recovery, public-catalog cart rebuilding, and Tourist variant price integrity.
+
 Always run:
 
 ```bash
@@ -496,6 +512,7 @@ npm run build
 - Kitchen retries preserve their attempt ids and the RPC is idempotent by order/round.
 - Returning to `WaiterTables` refreshes orders/tables and renews realtime without clearing the visible grid.
 - Initial/realtime operational loading never downloads current-year paid history and still includes all active orders.
+- Tablet Guest mode hides staff controls, uses public visibility, never submits directly, and retains PIN/cart/order-context safety across reloads.
 
 If these tests fail, understand why before changing the guard. They exist because these exact failures reached the user.
 

@@ -49,3 +49,16 @@ export function withPriceModeFields(item, priceMode = DEFAULT_PRICE_MODE) {
 export function getMenuItemForPriceMode(item, priceMode = DEFAULT_PRICE_MODE) {
   return withPriceModeFields(item, priceMode)
 }
+
+export function resolveOrderingPriceMode(activeOrder, cart = []) {
+  const orderMode = activeOrder?.price_mode ?? activeOrder?.priceMode
+  if (orderMode === PRICE_MODE_REGULAR || orderMode === PRICE_MODE_TOURIST) {
+    return orderMode
+  }
+
+  const cartRow = (Array.isArray(cart) ? cart : []).find(item => {
+    const mode = item?.price_mode ?? item?.priceMode
+    return mode === PRICE_MODE_REGULAR || mode === PRICE_MODE_TOURIST
+  })
+  return normalizePriceMode(cartRow?.price_mode ?? cartRow?.priceMode ?? DEFAULT_PRICE_MODE)
+}
