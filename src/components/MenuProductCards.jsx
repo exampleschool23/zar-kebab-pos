@@ -260,7 +260,7 @@ export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
 
 export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu', density = 'comfortable' }) {
   const inCart = !readOnly && qty > 0
-  const unavailable = item?.available === false
+  const unavailable = !readOnly && item?.available === false
   const [copied, setCopied] = useState(false)
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
@@ -455,7 +455,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const soldByWeight = isMenuItemSoldByWeight(item)
   const priceUnit = menuPriceUnitSuffix(item, lang)
   const mediaUrls = getMenuItemMediaUrls(item)
-  const unavailable = item?.available === false
+  const unavailable = !readOnly && item?.available === false
   const displayedMediaUrl = mediaUrls.includes(activeMediaUrl) ? activeMediaUrl : mediaUrls[0] || ''
   const optionGroups = getMenuItemOptionGroups(item, lang, { audience })
   const missingRequiredOptions = optionGroups.some(group => (

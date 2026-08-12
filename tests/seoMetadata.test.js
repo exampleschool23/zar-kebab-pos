@@ -10,12 +10,13 @@ const sitemap = fs.readFileSync(path.join(root, 'public/sitemap.xml'), 'utf8')
 
 test('public site metadata describes the restaurant instead of the POS', () => {
   assert.match(html, /<html lang="ru">/)
-  assert.match(html, /<title>Zar Kebab — Uzbek, Uyghur &amp; Turkish restaurant<\/title>/)
+  assert.match(html, /<title>Zar Kebab — узбекская, уйгурская и турецкая кухня<\/title>/)
   assert.match(html, /name="description"/)
-  assert.match(html, /Reservation · About us · Menu · Promotions · Vacancy · Contacts\. Order type\./)
-  assert.match(html, /\+998905095545\. Every day from 08:00 to 01:00\./)
+  assert.match(html, /Завтрак · Обед · Ужин\./)
+  assert.match(html, /Меню · Бронирование · Акции · Контакты\./)
+  assert.match(html, /\+998 90 509-55-45\. Ежедневно с 08:00 до 01:00\./)
   assert.doesNotMatch(html, /<title>[^<]*POS[^<]*<\/title>/)
-  assert.match(html, /<h1>Zar Kebab — Uzbek, Uyghur &amp; Turkish restaurant in Tashkent<\/h1>/)
+  assert.match(html, /<h1>Zar Kebab — ресторан узбекской, уйгурской и турецкой кухни в Ташкенте<\/h1>/)
   assert.match(html, /href="\/menu">Меню<\/a>/)
 })
 
@@ -49,6 +50,10 @@ test('public menu reinforces homepage search signals and hides controls from sni
 
   assert.match(app, /<Route path="\/" element={<PublicMenu \/>} \/>/)
   assert.match(menu, /document\.title = seo\.title/)
+  assert.match(menu, /Завтрак · Обед · Ужин\./)
+  assert.match(menu, /Breakfast · Lunch · Dinner\./)
+  assert.match(menu, /\+998 90 509-55-45/)
+  assert.match(menu, /document\.documentElement\.lang = lang/)
   assert.match(menu, /<h1[^>]*>{seo\.heading}<\/h1>/)
   assert.match(menu, /<div data-nosnippet="">\s*<header ref=\{headerRef\}/)
   assert.match(menu, /<div data-nosnippet="">\s*<MenuCategoryScroller/)

@@ -44,23 +44,24 @@ const PUBLIC_CONTACTS = {
   },
 }
 
-const PUBLIC_SEARCH_DESCRIPTION = 'Reservation · About us · Menu · Promotions · Vacancy · Contacts. Order type. +998905095545. Every day from 08:00 to 01:00.'
-
 const PUBLIC_MENU_SEO = {
   uz: {
     title: 'Zar Kebab — O‘zbek, Uyg‘ur va Turk restorani',
     heading: 'Zar Kebab — Toshkentdagi O‘zbek, Uyg‘ur va Turk restorani',
-    description: PUBLIC_SEARCH_DESCRIPTION,
+    description: 'Nonushta · Tushlik · Kechki ovqat. Zar Kebab — Toshkentdagi O‘zbek, Uyg‘ur va Turk restorani. Menyu · Joy band qilish · Aksiyalar · Aloqa. +998 90 509-55-45. Har kuni 08:00 dan 01:00 gacha.',
+    locale: 'uz_UZ',
   },
   ru: {
     title: 'Zar Kebab — узбекская, уйгурская и турецкая кухня',
     heading: 'Zar Kebab — ресторан узбекской, уйгурской и турецкой кухни в Ташкенте',
-    description: PUBLIC_SEARCH_DESCRIPTION,
+    description: 'Завтрак · Обед · Ужин. Zar Kebab — узбекская, уйгурская и турецкая кухня в Ташкенте. Меню · Бронирование · Акции · Контакты. +998 90 509-55-45. Ежедневно с 08:00 до 01:00.',
+    locale: 'ru_RU',
   },
   en: {
     title: 'Zar Kebab — Uzbek, Uyghur & Turkish restaurant',
     heading: 'Zar Kebab — Uzbek, Uyghur & Turkish restaurant in Tashkent',
-    description: PUBLIC_SEARCH_DESCRIPTION,
+    description: 'Breakfast · Lunch · Dinner. Zar Kebab — Uzbek, Uyghur and Turkish restaurant in Tashkent. Menu · Reservations · Promotions · Contacts. +998 90 509-55-45. Open daily from 08:00 to 01:00.',
+    locale: 'en_US',
   },
 }
 
@@ -318,9 +319,16 @@ export default function PublicMenu({ premium = false }) {
     const description = document.querySelector('meta[name="description"]')
     description?.setAttribute('content', seo.description)
 
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', seo.title)
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', seo.description)
+    document.querySelector('meta[property="og:locale"]')?.setAttribute('content', seo.locale)
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', seo.title)
+    document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', seo.description)
+    document.documentElement.lang = lang
+
     const canonical = document.querySelector('link[rel="canonical"]')
     canonical?.setAttribute('href', 'https://www.zarkebab.uz/')
-  }, [premium, seo.description, seo.title])
+  }, [lang, premium, seo.description, seo.locale, seo.title])
 
   const refreshPublicMenu = useCallback(async ({ showLoading = false } = {}) => {
     const seq = menuLoadSeqRef.current + 1

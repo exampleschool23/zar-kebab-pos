@@ -13,7 +13,6 @@ import {
   isHiddenMenuCategory,
   isMenuItemOrderable,
   isPublicHiddenMenuItem,
-  isWaiterHiddenMenuItem,
   isWaiterHiddenMenuCategory,
   isWaiterMenuCategory,
   isWaiterMenuItem,
@@ -32,14 +31,14 @@ test('cashier-only items stay available for cashier quick items but hidden from 
   assert.equal(isCustomerMenuItem(item), false)
 })
 
-test('availability controls ordering without hiding active menu items', () => {
+test('availability hides active items from waiters while keeping them visible to customers', () => {
   assert.equal(isCustomerMenuItem({ available: true, cashier_only: false }), true)
   assert.equal(isWaiterMenuItem({ available: true }), true)
   assert.equal(isMenuItemOrderable({ available: true }), true)
 
   const unavailable = { available: false, cashier_only: false }
   assert.equal(isCustomerMenuItem(unavailable), true)
-  assert.equal(isWaiterMenuItem(unavailable), true)
+  assert.equal(isWaiterMenuItem(unavailable), false)
   assert.equal(isMenuItemOrderable(unavailable), false)
 })
 
@@ -51,11 +50,10 @@ test('public-hidden items are hidden from customer menus but available to waiter
   assert.equal(isWaiterMenuItem(item), true)
 })
 
-test('waiter-hidden items are hidden from waiter ordering but can stay public', () => {
+test('legacy waiter-hidden flags no longer hide an available product', () => {
   const item = { available: true, waiter_hidden: true, cashier_only: false }
 
-  assert.equal(isWaiterHiddenMenuItem(item), true)
-  assert.equal(isWaiterMenuItem(item), false)
+  assert.equal(isWaiterMenuItem(item), true)
   assert.equal(isCustomerMenuItem(item), true)
 })
 

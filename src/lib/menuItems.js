@@ -15,15 +15,6 @@ export function isPublicHiddenMenuItem(item) {
   return !!(item?.public_hidden || item?.publicHidden || item?.hide_from_public || item?.hideFromPublic)
 }
 
-export function isWaiterHiddenMenuItem(item) {
-  return !!(
-    item?.waiter_hidden ||
-    item?.waiterHidden ||
-    item?.hide_from_waiter ||
-    item?.hideFromWaiter
-  )
-}
-
 function parseMenuTime(value) {
   const raw = String(value || '').trim()
   if (!raw) return null
@@ -117,9 +108,8 @@ export function isCustomerMenuItem(item, date = new Date()) {
 }
 
 export function isWaiterMenuItem(item, date = new Date()) {
-  return isActiveMenuItem(item) &&
+  return isMenuItemOrderable(item) &&
     !isCashierOnlyItem(item) &&
-    !isWaiterHiddenMenuItem(item) &&
     isWithinMenuTimeWindow(item, date)
 }
 

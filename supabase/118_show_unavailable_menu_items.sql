@@ -1,7 +1,7 @@
--- Keep temporarily unavailable meals visible to customers and waiters while
--- preserving the explicit public-hidden, schedule, cashier-only, and archive
--- boundaries. The returned `available` value tells the UI whether ordering is
--- allowed; it no longer decides whether an active product can be seen.
+-- Keep temporarily unavailable meals visible to customers while preserving the
+-- explicit public-hidden, schedule, cashier-only, and archive boundaries. The
+-- customer menus deliberately ignore `available`; waiter menus use it as their
+-- visibility and orderability control in the application layer.
 
 begin;
 

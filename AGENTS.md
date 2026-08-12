@@ -213,10 +213,11 @@ These bugs were recently fixed and are now protected by tests:
    - Loyalty payment rows are visible but immutable because changing them requires a separate wallet reversal workflow.
    - Individual corrections must never change payment amounts, order items, totals, paid status/time, or loyalty data.
 
-22. Temporarily unavailable meals must remain visible without becoming orderable.
-   - `menu_items.available` controls whether a meal can be ordered; it no longer controls whether an active meal is visible.
-   - Public, Telegram, and waiter menus show unavailable meals in a disabled state, and waiter add/increment/detail-submit paths must reject them.
-   - `public_hidden`, `waiter_hidden`, `cashier_only`, menu time windows, and category visibility remain separate audience filters and must still hide matching products.
+22. Meal availability affects only the waiter menu.
+   - `menu_items.available` controls whether a meal appears in waiter ordering and whether stale waiter selections can still be ordered.
+   - Public and Telegram menus ignore `available` and render active meals normally. `public_hidden` is the independent control for hiding a product from customer menus and never hides it from waiters.
+   - Waiter add/increment/detail-submit paths must still reject stale unavailable selections.
+   - Products no longer have a separate waiter-hide editor control: legacy item values are ignored, while category and variant waiter visibility remain separate controls; `public_hidden`, `cashier_only`, schedules, and category visibility still apply.
    - `deleted_at` is the archive boundary. Archived products and categories must never reappear merely because unavailable meals are now visible.
    - `stock_count` is shelf inventory and is not an availability flag; do not infer menu visibility or orderability from a zero stock count.
    - Migration `118` returns active unavailable products from the customer-menu RPC and anonymous select policy while preserving every explicit hiding and archive rule.

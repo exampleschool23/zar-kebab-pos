@@ -24,7 +24,6 @@ import {
   isActiveMenuItem,
   isCashierQuickItem,
   isPublicHiddenMenuItem,
-  isWaiterHiddenMenuItem,
 } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
@@ -915,11 +914,6 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
               {hiddenFromPublicMenuLabel(lang)}
             </span>
           )}
-          {isWaiterHiddenMenuItem(item) && (
-            <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-black text-purple-700 ring-1 ring-purple-200">
-              {hiddenFromWaiterMenuLabel(lang)}
-            </span>
-          )}
           {scheduleLabel && (
             <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-200">
               {scheduleLabel}
@@ -1013,11 +1007,6 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
           {item.public_hidden && (
             <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-700">
               {hiddenFromPublicMenuLabel(lang)}
-            </span>
-          )}
-          {isWaiterHiddenMenuItem(item) && (
-            <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-black text-purple-700">
-              {hiddenFromWaiterMenuLabel(lang)}
             </span>
           )}
           {scheduleLabel && (
@@ -1196,7 +1185,6 @@ const blankItem = {
   show_in_cashier_quick_items: false,
   cashier_only: false,
   public_hidden: false,
-  waiter_hidden: false,
   visible_from_time: '',
   visible_until_time: '',
   send_to_kitchen: false,
@@ -1560,7 +1548,6 @@ function menuItemToProductForm(i) {
     show_in_cashier_quick_items: isCashierQuickItem(i),
     cashier_only: !!(i.cashier_only || i.cashierOnly),
     public_hidden: !!(i.public_hidden || i.publicHidden || i.hide_from_public || i.hideFromPublic),
-    waiter_hidden: isWaiterHiddenMenuItem(i),
     visible_from_time: String(i.visible_from_time || i.visibleFromTime || '').slice(0, 5),
     visible_until_time: String(i.visible_until_time || i.visibleUntilTime || '').slice(0, 5),
     send_to_kitchen: !!(i.send_to_kitchen || i.sendToKitchen),
@@ -1602,7 +1589,6 @@ function getItemFormFingerprint(form = {}) {
     show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
     cashier_only: !!form.cashier_only,
     public_hidden: !!form.public_hidden,
-    waiter_hidden: !!form.waiter_hidden,
     visible_from_time: nullableMenuTime(form.visible_from_time),
     visible_until_time: nullableMenuTime(form.visible_until_time),
     send_to_kitchen: !!form.send_to_kitchen,
@@ -1706,7 +1692,6 @@ export default function AdminMenu() {
         || (filterAvail === 'hidden' && !item.available)
         || (filterAvail === 'cashier_only' && !!item.cashier_only)
         || (filterAvail === 'public_hidden' && !!item.public_hidden)
-        || (filterAvail === 'waiter_hidden' && isWaiterHiddenMenuItem(item))
       const q           = search.trim().toLowerCase()
       const externalId  = String(item.external_id || item.externalId || '').toLowerCase()
       const matchSearch = !q || getItemName(item, lang).toLowerCase().includes(q) || externalId.includes(q)
@@ -1930,7 +1915,12 @@ export default function AdminMenu() {
         : (existingItem ? isPublicHiddenMenuItem(existingItem) : false)
       const oldMediaUrls = getMenuItemMediaUrls(existingItem)
       const mediaUrls = normalizeMenuMediaUrls(form.media_urls)
-      const { option_groups_editor: _optionGroupsEditor, option_groups: _optionGroups, ...formFields } = form
+      const {
+        option_groups_editor: _optionGroupsEditor,
+        option_groups: _optionGroups,
+        waiter_hidden: _legacyWaiterHidden,
+        ...formFields
+      } = form
       const result = await dispatch({
         type: itemModal === 'new' ? 'ADD_MENU_ITEM' : 'UPDATE_MENU_ITEM',
         payload: {
@@ -1956,7 +1946,6 @@ export default function AdminMenu() {
           show_in_cashier_quick_items: !!form.show_in_cashier_quick_items,
           cashier_only: !!form.cashier_only,
           public_hidden: savedPublicHidden,
-          waiter_hidden: !!form.waiter_hidden,
           visible_from_time: nullableMenuTime(form.visible_from_time),
           visible_until_time: nullableMenuTime(form.visible_until_time),
           send_to_kitchen: !!form.send_to_kitchen,
@@ -2556,10 +2545,6 @@ export default function AdminMenu() {
                       lang={lang}
                     />
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
-                      <input type="checkbox" checked={!!form.waiter_hidden} onChange={e => setForm(f => ({ ...f, waiter_hidden: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
-                      {lang === 'uz' ? 'Ofitsiant menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню официанта' : 'Hide from waiter menu'}
-                    </label>
-                    <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
                       <input type="checkbox" checked={!!form.cashier_only} onChange={e => setForm(f => ({ ...f, cashier_only: e.target.checked }))} disabled={savingItemForm} className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait" />
                       {lang === 'uz' ? 'Faqat kassirda ko‘rsatish' : lang === 'ru' ? 'Только для кассира' : 'Cashier only'}
                     </label>
@@ -2658,9 +2643,6 @@ export default function AdminMenu() {
                   </option>
                   <option value="public_hidden">
                     {hiddenFromPublicMenuLabel(lang)}
-                  </option>
-                  <option value="waiter_hidden">
-                    {hiddenFromWaiterMenuLabel(lang)}
                   </option>
                 </select>
                 <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -3276,19 +3258,6 @@ export default function AdminMenu() {
               ownerOnlyLabel={ownerOnlyPublicVisibilityLabel(lang)}
               lang={lang}
             />
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="waiterHidden"
-                type="checkbox"
-                checked={!!form.waiter_hidden}
-                onChange={e => setForm(f => ({ ...f, waiter_hidden: e.target.checked }))}
-                disabled={savingItemForm}
-                className="accent-[#ff5a00] w-4 h-4 disabled:cursor-wait"
-              />
-              <label htmlFor="waiterHidden" className="text-sm text-gray-700 font-medium">
-                {lang === 'uz' ? 'Ofitsiant menyusidan yashirish' : lang === 'ru' ? 'Скрыть из меню официанта' : 'Hide from waiter menu'}
-              </label>
-            </div>
             <div className="flex items-center gap-2 pt-1">
               <input
                 id="cashierOnly"
