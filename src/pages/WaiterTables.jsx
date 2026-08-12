@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -563,6 +563,7 @@ export default function WaiterTables() {
   const [pendingGuestPriceMode, setPendingGuestPriceMode] = useState('')
   const [guestEntryBusy, setGuestEntryBusy] = useState(false)
   const [guestEntryError, setGuestEntryError] = useState('')
+  const guestEntryRequestRef = useRef(false)
 
   useEffect(() => {
     refreshPOSData()
@@ -650,7 +651,7 @@ export default function WaiterTables() {
   }
 
   async function openTableForGuest(pin) {
-    if (!canEditTables || !pendingGuestTable || guestEntryBusy) return
+    if (!canEditTables || !pendingGuestTable || guestEntryBusy || guestEntryRequestRef.current) return
     const { table } = pendingGuestTable
     const latestContext = getTableGuestEntryContext(table.id, state.orders)
     if (latestContext.hasConflictingPriceModes) {
@@ -677,6 +678,7 @@ export default function WaiterTables() {
     const selectedPriceMode = latestContext.priceModeLocked ? latestContext.priceMode : pendingGuestPriceMode
     if (!selectedPriceMode) return
 
+    guestEntryRequestRef.current = true
     setGuestEntryBusy(true)
     setGuestEntryError('')
     let storedSession = false
@@ -710,6 +712,7 @@ export default function WaiterTables() {
           ? 'Не удалось безопасно открыть стол. Попробуйте снова.'
           : 'The table could not be opened safely. Please try again.')
     } finally {
+      guestEntryRequestRef.current = false
       setGuestEntryBusy(false)
     }
   }

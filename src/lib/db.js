@@ -599,7 +599,6 @@ export async function writeToSupabase(action, state, options = {}) {
       const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
       const isOffPremise = isOffPremiseOrderType(orderType)
       const table    = isOffPremise ? null : state.tables.find(t => t.id === tableId)
-      if ((!isOffPremise && !table) || state.cart.length === 0) return
 
       const submittedAt = action._submittedAt || new Date().toISOString()
       const kitchenRoundId = action._kitchenRoundId || `${orderId}-${submittedAt}`
@@ -618,6 +617,7 @@ export async function writeToSupabase(action, state, options = {}) {
         submitted_at: i.submitted_at || submittedAt,
         created_at: i.created_at || submittedAt,
       }))
+      if ((!isOffPremise && !table) || items.length === 0) return
       const addedSubtotal = items.reduce((s, i) => s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1), 0)
       const { data: existingOrder } = await withAbortSignal(supabase
         .from('orders')

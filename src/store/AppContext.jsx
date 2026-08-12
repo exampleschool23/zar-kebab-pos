@@ -130,6 +130,7 @@ export function AppProvider({ children }) {
       )
       const priceMode = normalizePriceMode(action.payload?.priceMode || activeOrder?.price_mode || DEFAULT_PRICE_MODE)
       const kitchenRoundId = action._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
+      const submissionCart = Array.isArray(action._cart) ? action._cart : stateRef.current.cart
       enriched = {
         ...action,
         _priceMode: priceMode,
@@ -143,7 +144,7 @@ export function AppProvider({ children }) {
         _orderNumber: action._orderNumber || (isOffPremise
           ? makeOrderNumber(Date.now(), orderType)
           : undefined),
-        _items: action._items || stateRef.current.cart.map(i => ({
+        _items: action._items || submissionCart.map(i => ({
           ...withPriceModeFields(i, i.price_mode || priceMode),
           id: makeLocalId('oi'),
           status: 'new',

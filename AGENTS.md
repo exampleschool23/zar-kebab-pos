@@ -267,6 +267,12 @@ These bugs were recently fixed and are now protected by tests:
    - Public, Telegram, guest, and waiter product cards use the current catalog estimate; it is not a promised completion timestamp and is not copied into historical order totals.
    - Product creation and editing must preserve the configured estimate, and customer-facing labels stay localized.
 
+30. Successful Guest-mode Staff Access is the order approval step.
+   - After PIN verification, rebuild the Guest selection from the current catalog and submit that reviewed snapshot to the kitchen before leaving Guest mode.
+   - Clear Guest mode and return to `/waiter/tables` only after the database submission succeeds. A failed or empty submission stays locked and displays an operational error.
+   - The submission action carries the reviewed cart snapshot because React cart state may not have committed before the database-first kitchen write begins.
+   - Matching-PIN auto-submit is single-flight because mobile keyboards can emit a change and form submit back-to-back.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:

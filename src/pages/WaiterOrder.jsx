@@ -38,6 +38,7 @@ import {
 } from '../lib/guestMode'
 import { useGuestModeSession } from '../hooks/useGuestModeSession'
 import { GuestModeUtilities, GuestPinDialog, GuestSelectionReady, guestModeCopy } from '../components/GuestModeUI'
+import { formatWriteError } from '../lib/writeErrorMessage'
 import {
   changeMenuQuantity,
   formatMenuQuantity,
@@ -1150,11 +1151,27 @@ export default function WaiterOrder() {
         lang: staffLang,
         priceMode: normalizeGuestModePriceMode(latestSession.priceMode),
       })
+      if (reviewedCart.length === 0) {
+        setGuestModeError(staffLang === 'uz'
+          ? 'Mehmon tanlovi bo‘sh. Buyurtma yaratilmadi.'
+          : staffLang === 'ru'
+            ? 'Выбор гостя пуст. Заказ не создан.'
+            : 'The guest selection is empty. No order was created.')
+        return
+      }
+      const selectedPriceMode = normalizeGuestModePriceMode(latestSession.priceMode)
       dispatch({ type: 'REPLACE_CART', payload: reviewedCart })
-      const expectedOrderIds = latestSession.activeOrderIds || []
-      setGuestExpectedOrderIds(expectedOrderIds)
-      setGuestReviewWarning(expectedOrderIds.join('|') === activeTableOrderIds.join('|') ? '' : guestOrderChangedWarning)
-      preserveUnlockedGuestPriceModeRef.current = normalizeGuestModePriceMode(latestSession.priceMode)
+      const submitResult = await dispatch({
+        type: 'SEND_TO_KITCHEN',
+        payload: { orderType: 'dine_in', priceMode: selectedPriceMode },
+        _cart: reviewedCart,
+      })
+      if (submitResult?.error) {
+        setGuestModeError(formatWriteError(submitResult.error, staffLang, 'SEND_TO_KITCHEN'))
+        return
+      }
+      setGuestExpectedOrderIds(null)
+      setGuestReviewWarning('')
       clearGuestModeSession()
       setGuestUnlockOpen(false)
       setGuestCartReady(false)

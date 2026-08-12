@@ -244,6 +244,7 @@ export function GuestPinDialog({ mode = 'setup', lang = 'en', pinLength = GUEST_
   const [validationError, setValidationError] = useState('')
   const pinInputRef = useRef(null)
   const confirmPinInputRef = useRef(null)
+  const submitRequestRef = useRef(false)
   const dialogRef = useRef(null)
   const titleId = useId()
   const descriptionId = useId()
@@ -290,7 +291,7 @@ export function GuestPinDialog({ mode = 'setup', lang = 'en', pinLength = GUEST_
       nextConfirmPin.length === expectedPinLength &&
       nextConfirmPin === pin
     ) {
-      onSubmit?.(pin)
+      submitPin(pin)
     }
   }
 
@@ -313,7 +314,17 @@ export function GuestPinDialog({ mode = 'setup', lang = 'en', pinLength = GUEST_
       return
     }
     setValidationError('')
-    onSubmit?.(pin)
+    submitPin(pin)
+  }
+
+  async function submitPin(value) {
+    if (busy || submitRequestRef.current) return
+    submitRequestRef.current = true
+    try {
+      await onSubmit?.(value)
+    } finally {
+      submitRequestRef.current = false
+    }
   }
 
   const visibleError = lockSeconds > 0 ? l.locked(lockSeconds) : validationError || error
@@ -418,6 +429,7 @@ export function TableGuestEntryDialog({
   const regularModeRef = useRef(null)
   const pinInputRef = useRef(null)
   const confirmPinInputRef = useRef(null)
+  const submitRequestRef = useRef(false)
   const titleId = useId()
   const descriptionId = useId()
   const pricingTitleId = useId()
@@ -466,7 +478,7 @@ export function TableGuestEntryDialog({
       nextConfirmPin.length === GUEST_MODE_PIN_LENGTH &&
       nextConfirmPin === pin
     ) {
-      onSubmit?.(pin)
+      submitPin(pin)
     }
   }
 
@@ -496,7 +508,17 @@ export function TableGuestEntryDialog({
       return
     }
     setValidationError('')
-    onSubmit?.(pin)
+    submitPin(pin)
+  }
+
+  async function submitPin(value) {
+    if (busy || submitRequestRef.current) return
+    submitRequestRef.current = true
+    try {
+      await onSubmit?.(value)
+    } finally {
+      submitRequestRef.current = false
+    }
   }
 
   const visibleError = validationError || error
