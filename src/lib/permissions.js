@@ -170,8 +170,7 @@ export function canChangeCompletedOrderPaymentMethod(profileOrRole) {
 }
 
 export function canChangeMenuItemAvailability(profileOrRole) {
-  return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
-    && canEditMenu(profileOrRole)
+  return canEditMenu(profileOrRole)
 }
 
 export function canChangeMenuItemPublicVisibility(profileOrRole) {

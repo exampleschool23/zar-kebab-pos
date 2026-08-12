@@ -1074,11 +1074,11 @@ test('AdminMenu visibility toggles show scoped loading feedback', () => {
   assert.match(source, /onClick=\{closeCatModal\}[\s\S]*disabled=\{savingCatForm\}/)
 })
 
-test('meal availability changes are owner-only in the UI and database', () => {
+test('meal availability changes require Manage Menu access in the UI and database', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const permissions = readSource('src/lib/permissions.js')
   const db = readSource('src/lib/db.js')
-  const migration = readSource('supabase/120_owner_only_menu_item_availability.sql')
+  const migration = readSource('supabase/122_menu_item_availability_manage_menu_access.sql')
   const adminMenu = functionBody(source, 'AdminMenu')
   const ownerOnlyField = functionBody(source, 'OwnerOnlyMenuItemCheckbox')
   const itemCard = functionBody(source, 'SortableItemCard')
@@ -1093,7 +1093,7 @@ test('meal availability changes are owner-only in the UI and database', () => {
   )
 
   assert.match(permissions, /function canChangeMenuItemAvailability\(profileOrRole\)/)
-  assert.match(permissions, /normalizeRole\(profileOrRole\?\.role \|\| profileOrRole\) === 'owner'[\s\S]*canEditMenu\(profileOrRole\)/)
+  assert.match(permissions, /function canChangeMenuItemAvailability\(profileOrRole\)\s*\{\s*return canEditMenu\(profileOrRole\)/)
   assert.match(source, /const canChangeAvailability = canChangeMenuItemAvailability\(profile \|\| \{ role: state\.user\?\.role \}\)/)
   assert.match(ownerOnlyField, /disabled=\{disabled \|\| locked\}/)
   assert.match(ownerOnlyField, /\{ownerOnlyBadgeLabel\(lang\)\}/)
@@ -1107,10 +1107,8 @@ test('meal availability changes are owner-only in the UI and database', () => {
   assert.match(primaryArchivePayload, /deleted_at: deletedAt/)
   assert.doesNotMatch(primaryArchivePayload, /available:/)
   assert.match(migration, /auth\.uid\(\) is null/)
-  assert.match(migration, /new\.available is distinct from true and not public\.is_owner\(\)/)
-  assert.match(migration, /old\.available is distinct from new\.available and not public\.is_owner\(\)/)
-  assert.match(migration, /before update of available on public\.menu_items/)
-  assert.match(migration, /when \(old\.available is distinct from new\.available\)/)
+  assert.match(migration, /current_staff_can_write\('menu'\)/)
+  assert.doesNotMatch(migration, /is_owner\(\)/)
   assert.match(migration, /using errcode = '42501'/)
 })
 

@@ -695,14 +695,6 @@ function itemVisibilityStatusLabel(lang, visible) {
   return lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Недоступно' : 'Unavailable'
 }
 
-function ownerOnlyAvailabilityLabel(lang) {
-  return lang === 'uz'
-    ? 'Mavjudlikni faqat egasi o‘zgartira oladi'
-    : lang === 'ru'
-      ? 'Доступность может изменить только владелец'
-      : 'Only the owner can change availability'
-}
-
 function ownerOnlyPublicVisibilityLabel(lang) {
   return lang === 'uz'
     ? 'Ommaviy menyudan faqat egasi yashira oladi'
@@ -936,8 +928,8 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
             />
           ) : (
             <span
-              title={ownerOnlyAvailabilityLabel(lang)}
-              aria-label={ownerOnlyAvailabilityLabel(lang)}
+              title={t(lang, 'available_item')}
+              aria-label={t(lang, 'available_item')}
               className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-gray-400"
             >
               <Lock size={14} />
@@ -1034,8 +1026,8 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
             />
           ) : (
             <span
-              title={ownerOnlyAvailabilityLabel(lang)}
-              aria-label={ownerOnlyAvailabilityLabel(lang)}
+              title={t(lang, 'available_item')}
+              aria-label={t(lang, 'available_item')}
               className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-gray-400"
             >
               <Lock size={13} />
@@ -2527,7 +2519,7 @@ export default function AdminMenu() {
                       disabled={savingItemForm}
                       canChange={canChangeAvailability}
                       label={t(lang, 'available_item')}
-                      ownerOnlyLabel={ownerOnlyAvailabilityLabel(lang)}
+                      ownerOnlyLabel={t(lang, 'available_item')}
                       lang={lang}
                     />
                     <label className="flex items-center gap-2 pt-1 text-sm font-medium text-gray-700">
@@ -3232,7 +3224,7 @@ export default function AdminMenu() {
               disabled={savingItemForm}
               canChange={canChangeAvailability}
               label={t(lang, 'available_item')}
-              ownerOnlyLabel={ownerOnlyAvailabilityLabel(lang)}
+              ownerOnlyLabel={t(lang, 'available_item')}
               lang={lang}
             />
             <div className="flex items-center gap-2 pt-1">

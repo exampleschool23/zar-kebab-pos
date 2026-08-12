@@ -74,11 +74,12 @@ test('menu is always viewable by staff while Manage menu controls editing', () =
   assert.equal(FEATURE_KEYS.includes('edit_menu_items'), false)
 })
 
-test('only owners with menu write access can change meal availability', () => {
+test('anyone with Manage Menu access can change meal availability', () => {
   assert.equal(canChangeMenuItemAvailability('owner'), true)
   assert.equal(canChangeMenuItemAvailability({ role: 'owner', feature_access: ['menu'] }), true)
   assert.equal(canChangeMenuItemAvailability({ role: 'owner', feature_access: ['dashboard'] }), false)
-  assert.equal(canChangeMenuItemAvailability({ role: 'admin', feature_access: ['menu'] }), false)
+  assert.equal(canChangeMenuItemAvailability({ role: 'admin', feature_access: ['menu'] }), true)
+  assert.equal(canChangeMenuItemAvailability({ role: 'admin', feature_access: ['dashboard'] }), false)
   assert.equal(canChangeMenuItemAvailability({ role: 'viewer', feature_access: ['menu'] }), false)
 })
 
