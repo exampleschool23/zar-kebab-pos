@@ -269,9 +269,13 @@ export function GuestPinDialog({ mode = 'setup', lang = 'en', pinLength = GUEST_
   }, [setup, error, lockSeconds > 0])
 
   function changePin(value) {
-    setPin(normalizeGuestModePin(value, expectedPinLength))
+    const nextPin = normalizeGuestModePin(value, expectedPinLength)
+    setPin(nextPin)
     setValidationError('')
     onInput?.()
+    if (setup && nextPin.length === expectedPinLength) {
+      focusWithoutScrolling(confirmPinInputRef.current)
+    }
   }
 
   function changeConfirmPin(value) {
@@ -433,8 +437,12 @@ export function TableGuestEntryDialog({
   }
 
   function changePin(value) {
-    setPin(normalizeGuestModePin(value))
+    const nextPin = normalizeGuestModePin(value)
+    setPin(nextPin)
     setValidationError('')
+    if (nextPin.length === GUEST_MODE_PIN_LENGTH) {
+      focusWithoutScrolling(confirmPinInputRef.current)
+    }
   }
 
   function changeConfirmPin(value) {

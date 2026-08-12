@@ -188,7 +188,7 @@ function Field({ label, type = 'text', value, onChange, placeholder, ...inputPro
         onChange={onChange}
         placeholder={placeholder}
         {...inputProps}
-        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00] transition-all"
+        className="h-11 w-full rounded-xl border border-gray-200 px-3 text-sm transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
       />
     </div>
   )
@@ -2431,7 +2431,7 @@ export default function AdminMenu() {
                       <select
                         value={form.category_id}
                         onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00]"
+                        className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
                       >
                         <option value="">— {t(lang, 'category')} —</option>
                         {realSortedCats.map(c => (
@@ -3151,7 +3151,7 @@ export default function AdminMenu() {
               <select
                 value={form.category_id}
                 onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 focus:border-[#ff5a00]"
+                className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20"
               >
                 <option value="">— {t(lang, 'category')} —</option>
                 {realSortedCats.map(c => (

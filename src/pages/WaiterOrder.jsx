@@ -1159,7 +1159,8 @@ export default function WaiterOrder() {
       setGuestUnlockOpen(false)
       setGuestCartReady(false)
       setDetailItem(null)
-      setCartOpen(true)
+      setCartOpen(false)
+      navigate('/waiter/tables', { replace: true })
     } catch {
       setGuestModeError(staffLang === 'uz'
         ? 'PIN-ni tekshirib bo‘lmadi. Planshet qulflangan holda qoladi.'
