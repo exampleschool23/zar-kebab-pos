@@ -37,7 +37,7 @@ import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
-import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenses } from '../lib/expenses'
+import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenseCashflow, summarizeExpenses } from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
 import { canChangeCompletedOrderPaymentMethod, canDeletePaidOrders, canViewPage } from '../lib/permissions'
 import { collectPagedRows, loadOrdersForRange, mergeOrderHistory } from '../lib/orderHistory'
@@ -1800,6 +1800,14 @@ export default function Reports() {
   ), [salaryProfiles, dateFrom, dateTo])
   const allExpenses = useMemo(() => [...salaryExpenses, ...salaryBonusExpenses, ...expenses], [salaryExpenses, salaryBonusExpenses, expenses])
   const expenseSummary = useMemo(() => summarizeExpenses(allExpenses), [allExpenses])
+  const expenseCashflow = useMemo(
+    () => summarizeExpenseCashflow(filteredForAnalytics, allExpenses),
+    [filteredForAnalytics, allExpenses]
+  )
+  const cashflowLeft = ['cash', 'card', 'terminal'].reduce(
+    (sum, method) => sum + (expenseCashflow.byMethod[method]?.left || 0),
+    0
+  )
   const netIncome = getNetIncome(kpiRevenue, allExpenses)
 
   useEffect(() => {
@@ -1974,9 +1982,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Jami qolgan', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'Итого осталось', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', leftAfterExpenses: 'Left after expenses', totalLeft: 'Total left', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance' },
   }
   const l = L[lang] || L.en
 
@@ -2145,6 +2153,26 @@ export default function Reports() {
                 <SummaryRow label={l.variance} value={formatCurrency(closeout.variance)} />
               </div>
             </div>
+
+            {canViewExpenses && (
+              <div className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+                <div className="mb-3">
+                  <p className="text-sm font-black text-[#1F2937]">{l.leftAfterExpenses}</p>
+                  <p className="text-xs font-semibold text-[#9CA3AF]">
+                    {closeout.dateFrom === closeout.dateTo
+                      ? formatLongDate(closeout.dateTo, lang, closeout.dateTo)
+                      : `${formatLongDate(closeout.dateFrom, lang, closeout.dateFrom)} — ${formatLongDate(closeout.dateTo, lang, closeout.dateTo)}`}
+                  </p>
+                </div>
+                <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <SummaryRow label={l.cash} value={formatCurrency(expenseCashflow.byMethod.cash.left)} />
+                  <SummaryRow label={l.card} value={formatCurrency(expenseCashflow.byMethod.card.left)} />
+                  <SummaryRow label={l.terminal} value={formatCurrency(expenseCashflow.byMethod.terminal.left)} />
+                  <SummaryRow label={l.expenses} value={formatCurrency(expenseSummary.total)} />
+                  <SummaryRow label={l.totalLeft} value={formatCurrency(cashflowLeft)} />
+                </div>
+              </div>
+            )}
 
             {/* Tab bar — scrolls horizontally when tabs don't fit */}
             <div className="flex gap-0 border-b border-[#E5E7EB] mb-5 overflow-x-auto scrollbar-none">
