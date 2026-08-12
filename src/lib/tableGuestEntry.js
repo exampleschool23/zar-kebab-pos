@@ -1,10 +1,19 @@
 import { PRICE_MODE_REGULAR, PRICE_MODES, normalizePriceMode } from './priceModes.js'
+import { getOrderItems, getOrderPaymentSummary, isCancelledOrderItem, isPaidOrder } from './analytics.js'
+
+function hasBillableOrderItems(order) {
+  const billableItems = getOrderItems(order).filter(item => !isCancelledOrderItem(item))
+  if (billableItems.length === 0) return false
+  return getOrderPaymentSummary(order, billableItems, order?.service_rate_pct).total > 0
+}
 
 function activeOrderRows(tableId, orders = []) {
   return (Array.isArray(orders) ? orders : []).filter(order =>
     order?.table_id === tableId &&
-    order?.payment_status !== 'paid' &&
-    order?.status !== 'cancelled'
+    !isPaidOrder(order) &&
+    order?.payment_status !== 'cancelled' &&
+    order?.status !== 'cancelled' &&
+    hasBillableOrderItems(order)
   )
 }
 

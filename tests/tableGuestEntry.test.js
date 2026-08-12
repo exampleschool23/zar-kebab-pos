@@ -15,10 +15,10 @@ test('a new table asks staff to choose its pricing mode', () => {
 
 test('an active table preserves its saved mode and sorted order identity', () => {
   const context = getTableGuestEntryContext('t1', [
-    { id: 'b', table_id: 't1', payment_status: 'unpaid', price_mode: 'tourist' },
-    { id: 'a', table_id: 't1', payment_status: null, price_mode: 'tourist' },
-    { id: 'paid', table_id: 't1', payment_status: 'paid', price_mode: 'regular' },
-    { id: 'other', table_id: 't2', payment_status: 'unpaid', price_mode: 'regular' },
+    { id: 'b', table_id: 't1', payment_status: 'unpaid', price_mode: 'tourist', items: [{ id: 'b1', price: 10_000 }] },
+    { id: 'a', table_id: 't1', payment_status: null, price_mode: 'tourist', items: [{ id: 'a1', price: 15_000 }] },
+    { id: 'paid', table_id: 't1', payment_status: 'paid', price_mode: 'regular', items: [{ id: 'p1', price: 10_000 }] },
+    { id: 'other', table_id: 't2', payment_status: 'unpaid', price_mode: 'regular', items: [{ id: 'o1', price: 10_000 }] },
   ])
 
   assert.deepEqual(context, {
@@ -32,11 +32,101 @@ test('an active table preserves its saved mode and sorted order identity', () =>
 
 test('mixed active pricing modes require staff review instead of guessing', () => {
   const context = getTableGuestEntryContext('t1', [
-    { id: 'a', table_id: 't1', payment_status: 'unpaid', price_mode: 'regular' },
-    { id: 'b', table_id: 't1', payment_status: 'unpaid', price_mode: 'tourist' },
+    { id: 'a', table_id: 't1', payment_status: 'unpaid', price_mode: 'regular', items: [{ id: 'a1', price: 10_000 }] },
+    { id: 'b', table_id: 't1', payment_status: 'unpaid', price_mode: 'tourist', items: [{ id: 'b1', price: 10_000 }] },
   ])
 
   assert.equal(context.hasConflictingPriceModes, true)
+  assert.equal(context.priceModeLocked, true)
+})
+
+test('empty unpaid order shells do not lock the Guest pricing option', () => {
+  const context = getTableGuestEntryContext('t1', [{
+    id: 'empty-shell',
+    table_id: 't1',
+    payment_status: 'unpaid',
+    status: 'sent_to_kitchen',
+    price_mode: 'regular',
+    subtotal: 65_000,
+    total: 78_000,
+    items: [],
+  }])
+
+  assert.deepEqual(context, {
+    activeOrderIds: [],
+    hasActiveOrders: false,
+    hasConflictingPriceModes: false,
+    priceMode: 'regular',
+    priceModeLocked: false,
+  })
+})
+
+test('orders containing only cancelled items do not lock the Guest pricing option', () => {
+  const context = getTableGuestEntryContext('t1', [{
+    id: 'cancelled-items',
+    table_id: 't1',
+    payment_status: 'unpaid',
+    price_mode: 'tourist',
+    items: [{ id: 'i1', status: 'cancelled', price: 40_000 }],
+  }])
+
+  assert.equal(context.hasActiveOrders, false)
+  assert.equal(context.priceModeLocked, false)
+})
+
+test('zero-value item rows and completed order states do not lock Guest pricing', () => {
+  const context = getTableGuestEntryContext('t1', [
+    {
+      id: 'zero-price',
+      table_id: 't1',
+      payment_status: 'unpaid',
+      items: [{ id: 'i1', quantity: 1, price: 0 }],
+    },
+    {
+      id: 'completed',
+      table_id: 't1',
+      status: 'completed',
+      items: [{ id: 'i2', quantity: 1, price: 20_000 }],
+    },
+    {
+      id: 'paid-at',
+      table_id: 't1',
+      paid_at: '2026-08-12T10:00:00.000Z',
+      items: [{ id: 'i3', quantity: 1, price: 20_000 }],
+    },
+    {
+      id: 'cancelled-payment',
+      table_id: 't1',
+      payment_status: 'cancelled',
+      items: [{ id: 'i4', quantity: 1, price: 20_000 }],
+    },
+  ])
+
+  assert.equal(context.hasActiveOrders, false)
+  assert.equal(context.priceModeLocked, false)
+})
+
+test('an empty Tourist shell cannot conflict with a real Regular order', () => {
+  const context = getTableGuestEntryContext('t1', [
+    {
+      id: 'empty-tourist',
+      table_id: 't1',
+      payment_status: 'unpaid',
+      price_mode: 'tourist',
+      items: [],
+    },
+    {
+      id: 'real-regular',
+      table_id: 't1',
+      payment_status: 'unpaid',
+      price_mode: 'regular',
+      items: [{ id: 'i1', quantity: 1, price: 20_000 }],
+    },
+  ])
+
+  assert.deepEqual(context.activeOrderIds, ['real-regular'])
+  assert.equal(context.priceMode, 'regular')
+  assert.equal(context.hasConflictingPriceModes, false)
   assert.equal(context.priceModeLocked, true)
 })
 
@@ -45,7 +135,7 @@ test('legacy active orders derive their locked mode from priced items', () => {
     id: 'legacy',
     table_id: 't1',
     payment_status: 'unpaid',
-    items: [{ id: 'i1', price_mode: 'tourist' }],
+    items: [{ id: 'i1', price_mode: 'tourist', price: 10_000 }],
   }])
   assert.equal(tourist.priceMode, 'tourist')
   assert.equal(tourist.hasConflictingPriceModes, false)
@@ -54,7 +144,7 @@ test('legacy active orders derive their locked mode from priced items', () => {
     id: 'older-legacy',
     table_id: 't1',
     payment_status: 'unpaid',
-    items: [{ id: 'i2' }],
+    items: [{ id: 'i2', price: 10_000 }],
   }])
   assert.equal(regular.priceMode, 'regular')
 })

@@ -273,6 +273,10 @@ These bugs were recently fixed and are now protected by tests:
    - The submission action carries the reviewed cart snapshot because React cart state may not have committed before the database-first kitchen write begins.
    - Matching-PIN auto-submit is single-flight because mobile keyboards can emit a change and form submit back-to-back.
 
+31. Empty order shells must not lock Guest-mode pricing.
+   - `getTableGuestEntryContext()` considers only unpaid, non-cancelled table orders that still contain at least one non-cancelled, positive-value item.
+   - Empty orders, stale stored totals without items, and orders whose items are all cancelled do not show the active-order notice or disable the R/T choice.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
