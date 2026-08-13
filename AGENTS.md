@@ -233,6 +233,9 @@ These bugs were recently fixed and are now protected by tests:
    - Migration `119` adds the separate `team_events` Telegram target and independent Team delivery columns to `employee_salary_group_notification_deliveries`.
    - New bonus, fine, and absence rows queue Team delivery as `not_attempted` in the same database trigger that queues employee and salary-group delivery.
    - Team announcements include the saved amount and the full fine reason or absence note, but omit the employee's remaining salary balance and the manager identity.
+   - Team announcements stay compact: no promotional intro/closing paragraphs or blank spacer lines; optional empty notes are omitted.
+   - Private employee bonus notifications omit payment method; the method remains stored in Accounting and visible to operational group recipients.
+   - Private employee, salary-group, and Team bonus/fine/absence dates use the shared localized long-date formatter (for example, `12 августа 2026` in Russian).
    - Historical events are marked `skipped` during migration so deployment never broadcasts old salary events unexpectedly.
    - Salary payments and salary-rate changes are not Team events; their Team status remains non-retryable `skipped`.
    - Employee, salary-group, and Team retries must remain independent and duplicate-safe.
@@ -272,10 +275,22 @@ These bugs were recently fixed and are now protected by tests:
    - Clear Guest mode and return to `/waiter/tables` only after the database submission succeeds. A failed or empty submission stays locked and displays an operational error.
    - The submission action carries the reviewed cart snapshot because React cart state may not have committed before the database-first kitchen write begins.
    - Matching-PIN auto-submit is single-flight because mobile keyboards can emit a change and form submit back-to-back.
+   - Unlock dialogs verify automatically as soon as the final PIN digit is entered; the Unlock button remains a fallback and must not be required.
 
 31. Empty order shells must not lock Guest-mode pricing.
    - `getTableGuestEntryContext()` considers only unpaid, non-cancelled table orders that still contain at least one non-cancelled, positive-value item.
    - Empty orders, stale stored totals without items, and orders whose items are all cancelled do not show the active-order notice or disable the R/T choice.
+
+32. Accounting Expense History may remove recorded employee bonuses.
+   - Bonus display rows are projections of `employee_salary_bonuses`; deleting one must target its `source_id`, never the synthetic Expense History id.
+   - Salary payments, automatic salary accruals, and Daily Bazaar total rows remain protected from deletion on the overview.
+   - Bonus removal follows Accounting write access and remains covered by the immutable accounting audit trigger.
+
+33. Today's employee absence can be corrected directly from the employee card.
+   - The Undo absence action is available only for an active employee with an exact absence row for the current Tashkent date and requires Accounting write access.
+   - Undo is a confirmed exact-row delete guarded by absence id, salary profile id, and date; a zero-row result is an error, never a silent success.
+   - The correction restores that day's salary accrual and is captured in the immutable Accounting audit. Telegram messages already delivered cannot be recalled.
+   - Deleted bonus, fine, absence, and salary-rate events remove their polymorphic Telegram delivery rows so they cannot remain retryable.
 
 ## Database Migrations
 
@@ -376,6 +391,12 @@ Run migrations in order. Important recent files:
 
 - `supabase/123_menu_item_estimated_prep_time.sql`
   Adds the per-product preparation estimate, defaults existing products to 15 minutes, validates the 1–180 minute range, and extends atomic media-aware product creation to save it.
+
+- `supabase/124_cleanup_deleted_salary_notification_deliveries.sql`
+  Removes polymorphic Telegram delivery rows when their bonus, fine, absence, or salary-rate source is deleted.
+
+- `supabase/125_audit_salary_absence.sql`
+  Adds immutable Accounting audit coverage for absence creation, editing, and deletion.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

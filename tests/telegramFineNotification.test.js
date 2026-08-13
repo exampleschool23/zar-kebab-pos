@@ -15,7 +15,7 @@ test('employee fine notification contains persisted details and escapes Telegram
   assert.match(text, /Уведомление о штрафе/)
   assert.match(text, /Здравствуйте, Али &lt;Сотрудник&gt;!/)
   assert.match(text, /150 000 UZS/)
-  assert.match(text, /21\.07\.2026/)
+  assert.match(text, /21 июля 2026/)
   assert.match(text, /Опоздание &amp; нарушение/)
   assert.match(text, /Владелец &gt; Админ/)
 })

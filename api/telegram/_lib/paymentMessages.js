@@ -107,46 +107,25 @@ const GROUP_EVENT_COPY = {
 
 const TEAM_EVENT_COPY = {
   uz: {
-    bonusTitle: 'Jamoamizdagi yutuq',
-    bonusIntro: '👏 Ajoyib ish! Xodimga jamoaga qo\u2018shgan hissasi uchun bonus berildi.',
-    bonusClosing: 'Zar Kebab umumiy natijasiga qo\u2018shgan hissangiz uchun rahmat! 🌟',
-    fineTitle: 'Jamoa intizomi',
-    fineIntro: 'Xodimga intizom bo\u2018yicha jarima qayd etildi.',
-    fineClosing: 'Mas\u2019uliyat va yuqori standartlarni birgalikda saqlaymiz.',
+    bonusTitle: 'Xodim bonusi',
+    fineTitle: 'Xodim jarimasi',
     absenceTitle: 'Xodim yo\u2018qligi',
-    employee: 'Xodim',
-    amount: 'Summa',
-    date: 'Sana',
     method: 'To\u2018lov turi',
     note: 'Izoh',
     reason: 'Sabab',
   },
   ru: {
-    bonusTitle: 'Достижение команды',
-    bonusIntro: '👏 Отличная работа! Сотруднику начислен бонус за вклад в команду.',
-    bonusClosing: 'Спасибо за вклад в общий результат Zar Kebab! 🌟',
-    fineTitle: 'Дисциплина команды',
-    fineIntro: 'Сотруднику зарегистрирован дисциплинарный штраф.',
-    fineClosing: 'Сохраняем ответственность и высокие стандарты вместе.',
+    bonusTitle: 'Бонус сотруднику',
+    fineTitle: 'Штраф сотрудника',
     absenceTitle: 'Отсутствие сотрудника',
-    employee: 'Сотрудник',
-    amount: 'Сумма',
-    date: 'Дата',
     method: 'Способ оплаты',
     note: 'Примечание',
     reason: 'Причина',
   },
   en: {
-    bonusTitle: 'Team achievement',
-    bonusIntro: '👏 Great work! An employee received a bonus for contributing to the team.',
-    bonusClosing: 'Thank you for contributing to the shared success of Zar Kebab! 🌟',
-    fineTitle: 'Team discipline',
-    fineIntro: 'A disciplinary fine was recorded for an employee.',
-    fineClosing: 'Together, we uphold responsibility and high standards.',
+    bonusTitle: 'Employee bonus',
+    fineTitle: 'Employee fine',
     absenceTitle: 'Employee absence',
-    employee: 'Employee',
-    amount: 'Amount',
-    date: 'Date',
     method: 'Payment method',
     note: 'Note',
     reason: 'Reason',
@@ -333,7 +312,7 @@ export function buildSalaryGroupEventMessage(type, event, remainingDue = 0, lang
   if (normalizedType !== 'absence') {
     lines.push(`<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`)
   }
-  lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(date, '-'))}`)
+  lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
   if (normalizedType === 'bonus') {
     lines.push(`<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`)
   }
@@ -356,28 +335,28 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
   const detail = normalizedType === 'fine' ? event?.reason : event?.note
   if (normalizedType === 'absence') {
     const absenceCopy = TEAM_EVENT_COPY.ru
-    return [
+    const lines = [
       `📅 <b>${absenceCopy.absenceTitle}</b>`,
-      '',
-      `👤 <b>${absenceCopy.employee}:</b> ${escapeTelegramHtml(event?.employee_name || '-')}`,
-      `🗓 <b>${absenceCopy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, 'ru', '-'))}`,
-      `📝 <b>${absenceCopy.note}:</b> ${escapeTelegramHtml(String(detail || '').trim() || '-')}`,
-    ].join('\n')
+      `👤 <b>${escapeTelegramHtml(event?.employee_name || '-')}</b> · 🗓 ${escapeTelegramHtml(formatLongDate(date, 'ru', '-'))}`,
+    ]
+    if (String(detail || '').trim()) {
+      lines.push(`📝 ${escapeTelegramHtml(String(detail).trim())}`)
+    }
+    return lines.join('\n')
   }
   const lines = [
     `${normalizedType === 'bonus' ? '🎁' : normalizedType === 'fine' ? '⚠️' : '📅'} <b>${copy[`${normalizedType}Title`]}</b>`,
-    '',
-    copy[`${normalizedType}Intro`],
-    '',
-    `<b>${copy.employee}:</b> ${escapeTelegramHtml(event?.employee_name || '-')}`,
+    `👤 <b>${escapeTelegramHtml(event?.employee_name || '-')}</b> · <b>${formatSalaryNotificationAmount(event?.amount)} UZS</b>`,
   ]
-  lines.push(`<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`)
-  lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(date, '-'))}`)
+  let dateLine = `🗓 ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`
   if (normalizedType === 'bonus') {
-    lines.push(`<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`)
+    dateLine += ` · ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`
   }
-  lines.push(`<b>${normalizedType === 'fine' ? copy.reason : copy.note}:</b> ${escapeTelegramHtml(String(detail || '').trim() || '-')}`)
-  lines.push('', copy[`${normalizedType}Closing`])
+  lines.push(dateLine)
+  if (String(detail || '').trim()) {
+    const detailLabel = normalizedType === 'fine' ? copy.reason : copy.note
+    lines.push(`📝 <b>${detailLabel}:</b> ${escapeTelegramHtml(String(detail).trim())}`)
+  }
   return lines.join('\n')
 }
 
@@ -398,11 +377,10 @@ export function buildEmployeeSalaryEventMessage(type, event, remainingDue = 0, l
   if (normalizedType === 'bonus') {
     lines.push(
       `<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`,
-      `<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(date, '-'))}`,
-      `<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`
+      `<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`
     )
   } else {
-    lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(date, '-'))}`)
+    lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
   }
   if (String(event?.note || '').trim()) {
     lines.push(`<b>${copy.note}:</b> ${escapeTelegramHtml(event.note)}`)

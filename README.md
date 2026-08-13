@@ -45,7 +45,7 @@ and the linked employee. None of these messages use the team or
 completed-orders groups as a fallback. If a private employee link is missing
 or disabled, the group notification is still attempted and tracked.
 
-Migration `117` adds ZarKebab Team as a third, independently tracked
+Migration `119` adds ZarKebab Team as a third, independently tracked
 destination for bonuses, fines, and absences. The database target
 `team_events` is primary; `TELEGRAM_TEAM_CHAT_ID` is its deployment-order
 fallback, and `TELEGRAM_TEAM_LANGUAGE` defaults to Russian. Team messages show
@@ -53,6 +53,11 @@ the employee, date, full bonus/fine amount, bonus payment method, and the full
 saved reason or note. They deliberately omit the employee's remaining salary
 balance and the manager who recorded the operation. Salary payments and rate
 changes continue to stay out of ZarKebab Team.
+
+Migration `124` removes Telegram delivery tracking when its bonus, fine,
+absence, or salary-rate source is deleted, preventing orphan retries. Migration
+`125` adds immutable Accounting audit snapshots for absence corrections.
+Messages that Telegram already delivered cannot be recalled.
 
 ### BotFather setup
 

@@ -17,8 +17,10 @@ import {
   expensePaymentMethodLabel,
   getDailySalaryAmount,
   getEstimatedMonthlyExpenseSummary,
+  getExpenseHistoryDeleteTarget,
   getNetIncome,
   getSalaryActiveUntil,
+  getSalaryAbsenceForDate,
   getSalaryAbsenceDates,
   getSalaryBalance,
   getSalaryDue,
@@ -447,6 +449,19 @@ test('salary absence dates collapse duplicate rows into one employee day', () =>
   assert.deepEqual([...absenceDates], ['2026-07-23', '2026-07-24'])
   assert.equal(absenceDates.has('2026-07-23'), true)
   assert.equal(absenceDates.has('2026-07-25'), false)
+})
+
+test('salary absence lookup returns the exact record for a same-day undo', () => {
+  const salaryProfile = {
+    absences: [
+      { id: 'yesterday-absence', absence_date: '2026-08-12' },
+      { id: 'today-absence', absence_date: '2026-08-13' },
+    ],
+  }
+
+  assert.equal(getSalaryAbsenceForDate(salaryProfile, '2026-08-13')?.id, 'today-absence')
+  assert.equal(getSalaryAbsenceForDate(salaryProfile, '2026-08-14'), null)
+  assert.equal(getSalaryAbsenceForDate(salaryProfile, 'not-a-date'), null)
 })
 
 test('salary bonuses create separate expense rows without changing salary due', () => {
@@ -916,6 +931,29 @@ test('generated salary accounting rows are not real manual expenses', () => {
   assert.equal(isGeneratedSalaryExpense({ id: 'salary-bonus-0983840e-ddeb-4291-bec4-c1726a50b37e' }), true)
   assert.equal(isGeneratedSalaryExpense({ id: 'salary-0983840e-ddeb-4291-bec4-c1726a50b37e-2026-07-07' }), true)
   assert.equal(isGeneratedSalaryExpense({ id: '0983840e-ddeb-4291-bec4-c1726a50b37e' }), false)
+})
+
+test('expense history deletes bonuses from their source while protecting generated salary rows', () => {
+  assert.deepEqual(
+    getExpenseHistoryDeleteTarget({
+      id: 'salary-bonus-display-id',
+      source_id: 'bonus-source-id',
+      is_salary_bonus: true,
+    }),
+    { table: 'employee_salary_bonuses', id: 'bonus-source-id' }
+  )
+  assert.deepEqual(
+    getExpenseHistoryDeleteTarget({ id: 'salary-bonus-fallback-id', is_salary_bonus: true }),
+    { table: 'employee_salary_bonuses', id: 'fallback-id' }
+  )
+  assert.deepEqual(
+    getExpenseHistoryDeleteTarget({ id: 'manual-expense-id' }),
+    { table: 'expenses', id: 'manual-expense-id' }
+  )
+  assert.equal(getExpenseHistoryDeleteTarget({ id: 'salary-payment-id', is_salary_payment: true }), null)
+  assert.equal(getExpenseHistoryDeleteTarget({ id: 'salary-accrual-id', is_salary_auto: true }), null)
+  assert.equal(getExpenseHistoryDeleteTarget({ id: 'bazaar-total-id', is_bazaar_daily_total: true }), null)
+  assert.equal(getExpenseHistoryDeleteTarget({ id: 'not-a-bonus-source', is_salary_bonus: true }), null)
 })
 
 test('monthly expense estimate tracks employee paid amount remaining salary and rent', () => {

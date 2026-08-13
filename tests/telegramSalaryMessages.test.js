@@ -172,12 +172,15 @@ test('salary group messages cover bonuses, fines, and absences', () => {
 
   assert.match(bonus, /Бонус сотруднику/)
   assert.match(bonus, /100 000 UZS/)
+  assert.match(bonus, /Дата:<\/b> 29 июля 2026/)
   assert.match(bonus, /Карта/)
   assert.match(bonus, /&lt;Отличная работа&gt;/)
   assert.match(fine, /Штраф сотрудника/)
   assert.match(fine, /20 000 UZS/)
+  assert.match(fine, /Дата:<\/b> 29 июля 2026/)
   assert.match(fine, /&lt;Опоздание&gt;/)
   assert.match(absence, /Отсутствие сотрудника/)
+  assert.match(absence, /Дата:<\/b> 29 июля 2026/)
   assert.match(absence, /&lt;Болезнь&gt;/)
   assert.doesNotMatch(absence, /<Болезнь>/)
   assert.match(absence, /К выплате:<\/b> 80 000 UZS/)
@@ -206,41 +209,39 @@ test('ZarKebab Team messages publish full bonus, fine, and absence details witho
     absence_date: '2026-07-31',
     note: '<Болезнь & визит к врачу>',
   }, 'ru')
+  const bonusWithoutNote = buildSalaryTeamEventMessage('bonus', {
+    ...common,
+    bonus_date: '2026-07-29',
+    amount: 93_000,
+    payment_method: 'cash',
+    note: '',
+  }, 'ru')
 
   assert.equal(bonus, [
-    '🎁 <b>Достижение команды</b>',
-    '',
-    '👏 Отличная работа! Сотруднику начислен бонус за вклад в команду.',
-    '',
-    '<b>Сотрудник:</b> Зилола &lt;кассир&gt;',
-    '<b>Сумма:</b> 100 000 UZS',
-    '<b>Дата:</b> 29.07.2026',
-    '<b>Способ оплаты:</b> Карта',
-    '<b>Примечание:</b> &lt;Отличная работа &amp; помощь команде&gt;',
-    '',
-    'Спасибо за вклад в общий результат Zar Kebab! 🌟',
+    '🎁 <b>Бонус сотруднику</b>',
+    '👤 <b>Зилола &lt;кассир&gt;</b> · <b>100 000 UZS</b>',
+    '🗓 29 июля 2026 · Карта',
+    '📝 <b>Примечание:</b> &lt;Отличная работа &amp; помощь команде&gt;',
   ].join('\n'))
   assert.equal(fine, [
-    '⚠️ <b>Дисциплина команды</b>',
-    '',
-    'Сотруднику зарегистрирован дисциплинарный штраф.',
-    '',
-    '<b>Сотрудник:</b> Зилола &lt;кассир&gt;',
-    '<b>Сумма:</b> 20 000 UZS',
-    '<b>Дата:</b> 30.07.2026',
-    '<b>Причина:</b> &lt;Опоздание &amp; невыполненная уборка&gt;',
-    '',
-    'Сохраняем ответственность и высокие стандарты вместе.',
+    '⚠️ <b>Штраф сотрудника</b>',
+    '👤 <b>Зилола &lt;кассир&gt;</b> · <b>20 000 UZS</b>',
+    '🗓 30 июля 2026',
+    '📝 <b>Причина:</b> &lt;Опоздание &amp; невыполненная уборка&gt;',
   ].join('\n'))
   assert.equal(absence, [
     '📅 <b>Отсутствие сотрудника</b>',
-    '',
-    '👤 <b>Сотрудник:</b> Зилола &lt;кассир&gt;',
-    '🗓 <b>Дата:</b> 31 июля 2026',
-    '📝 <b>Примечание:</b> &lt;Болезнь &amp; визит к врачу&gt;',
+    '👤 <b>Зилола &lt;кассир&gt;</b> · 🗓 31 июля 2026',
+    '📝 &lt;Болезнь &amp; визит к врачу&gt;',
+  ].join('\n'))
+  assert.equal(bonusWithoutNote, [
+    '🎁 <b>Бонус сотруднику</b>',
+    '👤 <b>Зилола &lt;кассир&gt;</b> · <b>93 000 UZS</b>',
+    '🗓 29 июля 2026 · Наличные',
   ].join('\n'))
 
-  for (const message of [bonus, fine, absence]) {
+  for (const message of [bonus, fine, absence, bonusWithoutNote]) {
+    assert.doesNotMatch(message, /\n\n/)
     assert.doesNotMatch(message, /К выплате|Осталось к выплате|Salary due|Remaining salary due/)
     assert.doesNotMatch(message, /Jasurbek|Оформил|Recorded by/)
     assert.doesNotMatch(message, /<(?:кассир|Отличная|Опоздание|Болезнь)/)
@@ -272,26 +273,23 @@ test('ZarKebab Team bonus and fine messages localize while absence stays Russian
     note: 'Sick leave',
   }, 'en')
 
-  assert.match(uz, /Jamoamizdagi yutuq/)
+  assert.match(uz, /Xodim bonusi/)
   assert.match(uz, /500 000 UZS/)
+  assert.match(uz, /8 avgust 2026/)
   assert.match(uz, /Naqd/)
   assert.match(uz, /Mehmonlarga yaxshi xizmat/)
-  assert.match(en, /Team discipline/)
+  assert.match(en, /Employee fine/)
   assert.match(en, /75 000 UZS/)
+  assert.match(en, /8 August 2026/)
   assert.match(en, /Reason:<\/b> Late arrival/)
   assert.equal(uzAbsence, [
     '📅 <b>Отсутствие сотрудника</b>',
-    '',
-    '👤 <b>Сотрудник:</b> Gavhar',
-    '🗓 <b>Дата:</b> 9 августа 2026',
-    '📝 <b>Примечание:</b> -',
+    '👤 <b>Gavhar</b> · 🗓 9 августа 2026',
   ].join('\n'))
   assert.equal(enAbsence, [
     '📅 <b>Отсутствие сотрудника</b>',
-    '',
-    '👤 <b>Сотрудник:</b> Gavhar',
-    '🗓 <b>Дата:</b> 9 августа 2026',
-    '📝 <b>Примечание:</b> Sick leave',
+    '👤 <b>Gavhar</b> · 🗓 9 августа 2026',
+    '📝 Sick leave',
   ].join('\n'))
 })
 
@@ -316,9 +314,12 @@ test('employee bonus and absence messages are private and localized', () => {
   assert.match(bonus, /Здравствуйте, Зилола &lt;кассир&gt;!/)
   assert.match(bonus, /Вам начислен бонус\./)
   assert.match(bonus, /100 000 UZS/)
+  assert.match(bonus, /Дата:<\/b> 29 июля 2026/)
   assert.match(bonus, /&lt;Отличная работа&gt;/)
+  assert.doesNotMatch(bonus, /Способ оплаты|Payment method|To‘lov turi|Карта/)
   assert.match(absence, /Здравствуйте, Зилола &lt;кассир&gt;!/)
   assert.match(absence, /Ваше отсутствие зарегистрировано\./)
+  assert.match(absence, /Дата:<\/b> 29 июля 2026/)
   assert.match(absence, /&lt;Болезнь&gt;/)
   assert.match(absence, /К выплате:<\/b> 80 000 UZS/)
   assert.doesNotMatch(absence, /<Болезнь>/)
@@ -498,6 +499,7 @@ test('salary payment notifications persist delivery status and employee confirma
   assert.match(salariesPage, /group_telegram_message_id/)
   assert.match(salariesPage, /team_telegram_message_id/)
   assert.match(salariesPage, /showTeamDelivery: \['bonus', 'fine', 'absence'\]\.includes/)
+  assert.match(salariesPage, /if \(!event\) return null/)
   assert.match(migration, /unique\s+references public\.employee_salary_payments|payment_id\s+uuid not null unique/)
   assert.match(migration, /'confirmed'/)
   assert.match(groupMigration, /group_status/)

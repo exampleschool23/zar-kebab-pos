@@ -46,9 +46,9 @@ import {
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
   expensePaymentMethodLabel,
+  getExpenseHistoryDeleteTarget,
   getSalaryMonthEndDate,
   getTotalSalaryDue,
-  isGeneratedSalaryExpense,
   normalizeExpenseAmount,
   normalizeExpenseEntryType,
   todayExpenseDate,
@@ -201,6 +201,7 @@ export default function Expenses() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState('')
+  const [deletingExpenseId, setDeletingExpenseId] = useState('')
   const loadRequestRef = useRef(0)
   const [form, setForm] = useState({
     entry_type: 'expense',
@@ -696,15 +697,23 @@ export default function Expenses() {
   }
 
   async function deleteExpense(expense) {
-    if (!canDelete || !expense?.id || isGeneratedSalaryExpense(expense)) return
+    if (!canDelete || deletingExpenseId) return
+    const target = getExpenseHistoryDeleteTarget(expense)
+    if (!target) return
     if (confirmDeleteId !== expense.id) {
       setConfirmDeleteId(expense.id)
       return
     }
+    setDeletingExpenseId(expense.id)
     setError('')
-    const { error: deleteError } = await supabase.from('expenses').delete().eq('id', expense.id)
-    if (deleteError) {
-      setError(deleteError.message || l.deleteFailed)
+    const { data, error: deleteError } = await supabase
+      .from(target.table)
+      .delete()
+      .eq('id', target.id)
+      .select('id')
+    setDeletingExpenseId('')
+    if (deleteError || !data?.length) {
+      setError(deleteError?.message || l.deleteFailed)
       return
     }
     setConfirmDeleteId('')
@@ -986,6 +995,7 @@ export default function Expenses() {
                 lang={lang}
                 canDelete={canDelete}
                 confirmDeleteId={confirmDeleteId}
+                deletingExpenseId={deletingExpenseId}
                 confirmDeleteLabel={l.confirmDelete}
                 deleteLabel={l.delete}
                 onDelete={deleteExpense}
@@ -1003,6 +1013,7 @@ export default function Expenses() {
                 lang={lang}
                 canDelete={canDelete}
                 confirmDeleteId={confirmDeleteId}
+                deletingExpenseId={deletingExpenseId}
                 confirmDeleteLabel={l.confirmDelete}
                 deleteLabel={l.delete}
                 onDelete={deleteExpense}
@@ -1070,6 +1081,7 @@ function ExpenseHistorySection({
   lang,
   canDelete,
   confirmDeleteId,
+  deletingExpenseId,
   confirmDeleteLabel,
   deleteLabel,
   onDelete,
@@ -1139,11 +1151,19 @@ function ExpenseHistorySection({
                 </div>
                 <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
                   <p className={`text-lg font-black ${tone.amount}`}>{formatCurrency(expense.amount)}</p>
-                  {canDelete && !isGeneratedSalaryExpense(expense) && !expense.is_bazaar_daily_total && (
-                    <button onClick={() => onDelete(expense)} className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${
-                      confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
-                    }`}>
-                      <Trash2 size={14} />{confirmDeleteId === expense.id ? confirmDeleteLabel : deleteLabel}
+                  {canDelete && getExpenseHistoryDeleteTarget(expense) && (
+                    <button
+                      type="button"
+                      disabled={Boolean(deletingExpenseId)}
+                      onClick={() => onDelete(expense)}
+                      className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-xs font-black disabled:cursor-not-allowed disabled:opacity-50 ${
+                        confirmDeleteId === expense.id ? 'border-red-200 bg-red-50 text-red-600' : 'border-[#E5E7EB] text-[#6B7280]'
+                      }`}
+                    >
+                      {deletingExpenseId === expense.id
+                        ? <Loader2 size={14} className="animate-spin" />
+                        : <Trash2 size={14} />}
+                      {confirmDeleteId === expense.id ? confirmDeleteLabel : deleteLabel}
                     </button>
                   )}
                 </div>

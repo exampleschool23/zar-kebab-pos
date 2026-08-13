@@ -33,3 +33,14 @@ test('automatic matching PIN submission remains guarded from duplicate requests'
   assert.match(dialogSource, /submitRequestRef\.current/)
   assert.match(tablesSource, /guestEntryRequestRef\.current/)
 })
+
+test('Staff Access verifies immediately when the final PIN digit is entered', () => {
+  const dialogSource = fs.readFileSync(new URL('../src/components/GuestModeUI.jsx', import.meta.url), 'utf8')
+  const changePinStart = dialogSource.indexOf('function changePin(value)')
+  const changePinEnd = dialogSource.indexOf('\n  function changeConfirmPin(value)', changePinStart)
+  const changePinSource = dialogSource.slice(changePinStart, changePinEnd)
+
+  assert.match(changePinSource, /!setup && lockSeconds <= 0 && nextPin\.length === expectedPinLength/)
+  assert.match(changePinSource, /submitPin\(nextPin\)/)
+  assert.match(dialogSource, /busy \|\| lockSeconds > 0 \|\| submitRequestRef\.current/)
+})

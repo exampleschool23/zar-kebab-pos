@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Power, RefreshCw, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { ArrowLeft, CalendarCheck2, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Power, RefreshCw, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -11,6 +11,7 @@ import { canEditFeature, normalizeRole } from '../lib/permissions'
 import { compareSalaryAbsencesNewestFirst } from '../lib/salaryTransactions'
 import {
   getDailySalaryAmount,
+  getSalaryAbsenceForDate,
   getSalaryAbsenceDates,
   getSalaryActiveUntil,
   getSalaryBalance,
@@ -76,6 +77,9 @@ export default function Employees() {
       daily: 'Kunlik',
       activeDaily: 'Kunlik faol',
       absentToday: 'Bugun kelmagan',
+      undoAbsence: 'Yo‘qlikni bekor qilish',
+      undoAbsenceWarning: 'Bugungi maosh qayta hisoblanadi. Telegramdagi yuborilgan xabarlar o‘chirilmaydi.',
+      undoAbsenceFailed: 'Bugungi yo‘qlikni bekor qilib bo‘lmadi.',
       balance: 'Balans',
       due: 'Qarz',
       endDate: 'Tugash sanasi',
@@ -113,6 +117,9 @@ export default function Employees() {
       daily: 'За день',
       activeDaily: 'Активные за день',
       absentToday: 'Сегодня отсутствует',
+      undoAbsence: 'Отменить отсутствие',
+      undoAbsenceWarning: 'Зарплата за сегодня будет восстановлена. Отправленные сообщения Telegram не удаляются.',
+      undoAbsenceFailed: 'Не удалось отменить сегодняшнее отсутствие.',
       balance: 'Баланс',
       due: 'Долг',
       endDate: 'Дата окончания',
@@ -150,6 +157,9 @@ export default function Employees() {
       daily: 'Daily',
       activeDaily: 'Active daily',
       absentToday: 'Absent today',
+      undoAbsence: 'Undo absence',
+      undoAbsenceWarning: "Today's salary will be restored. Sent Telegram messages are not recalled.",
+      undoAbsenceFailed: "Could not undo today's absence.",
       balance: 'Balance',
       due: 'Due',
       endDate: 'End date',
@@ -301,6 +311,37 @@ export default function Employees() {
     await loadEmployees()
   }
 
+  async function undoEmployeeAbsence(employee) {
+    if (!canManage || !employee?.id) return
+    const absence = getSalaryAbsenceForDate(employee, today)
+    if (!absence?.id) {
+      setError(l.undoAbsenceFailed)
+      await loadEmployees()
+      return
+    }
+    const key = `absence-undo-${employee.id}`
+    if (confirmActionKey !== key) {
+      setConfirmActionKey(key)
+      return
+    }
+
+    setSaving(key)
+    setError('')
+    const { data, error: deleteError } = await supabase
+      .from('employee_salary_absences')
+      .delete()
+      .eq('id', absence.id)
+      .eq('salary_profile_id', employee.id)
+      .eq('absence_date', today)
+      .select('id')
+    setSaving('')
+    setConfirmActionKey('')
+    if (deleteError || !data?.length) {
+      setError(deleteError?.message || l.undoAbsenceFailed)
+      return
+    }
+    await loadEmployees()
+  }
   function startNameEdit(employee) {
     if (!canEditName || !employee?.id) return
     setEditingNameId(employee.id)
@@ -397,11 +438,14 @@ export default function Employees() {
                 }
                 const employee = entry.employee
                 const inactive = employee.is_active === false
-                const absentToday = !inactive && absentTodayEmployeeIds.has(employee.id)
+                const todayAbsence = getSalaryAbsenceForDate(employee, today)
+                const absentToday = !inactive && Boolean(todayAbsence)
                 const activeUntil = getSalaryActiveUntil(employee, today)
                 const salaryBalance = getSalaryBalance(employee, today)
                 const toggleKey = `employee-toggle-${employee.id}`
                 const confirmToggle = confirmActionKey === toggleKey
+                const undoAbsenceKey = `absence-undo-${employee.id}`
+                const confirmUndoAbsence = confirmActionKey === undoAbsenceKey
                 const editingEmployeeName = editingNameId === employee.id
                 const nameSavingKey = `employee-name-${employee.id}`
                 const joinedDate = String(employee.joined_at || '').slice(0, 10)
@@ -520,6 +564,12 @@ export default function Employees() {
                       </label>
                     )}
 
+                    {confirmUndoAbsence && (
+                      <p role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold leading-relaxed text-amber-800">
+                        {l.undoAbsenceWarning}
+                      </p>
+                    )}
+
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       <button
                         type="button"
@@ -529,17 +579,36 @@ export default function Employees() {
                         <History size={14} />{l.historyBtn}
                       </button>
                       {canManage && (
-                        <button
-                          type="button"
-                          onClick={() => toggleEmployeeActive(employee)}
-                          disabled={saving === `employee-toggle-${employee.id}`}
-                          className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black ${
-                            inactive ? 'border-[#E5E7EB] bg-white text-[#1F2937]' : 'border-red-200 bg-red-50 text-red-600'
-                          }`}
-                        >
-                          {saving === toggleKey ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
-                          {confirmToggle ? l.confirm : inactive ? l.reactivate : l.deactivate}
-                        </button>
+                        <>
+                          {absentToday && (
+                            <button
+                              type="button"
+                              onClick={() => undoEmployeeAbsence(employee)}
+                              disabled={saving === undoAbsenceKey}
+                              className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black ${
+                                confirmUndoAbsence
+                                  ? 'border-red-200 bg-red-50 text-red-600'
+                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                              }`}
+                            >
+                              {saving === undoAbsenceKey
+                                ? <Loader2 size={14} className="animate-spin" />
+                                : <CalendarCheck2 size={14} />}
+                              {confirmUndoAbsence ? l.confirm : l.undoAbsence}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => toggleEmployeeActive(employee)}
+                            disabled={saving === `employee-toggle-${employee.id}`}
+                            className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-black ${
+                              inactive ? 'border-[#E5E7EB] bg-white text-[#1F2937]' : 'border-red-200 bg-red-50 text-red-600'
+                            }`}
+                          >
+                            {saving === toggleKey ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
+                            {confirmToggle ? l.confirm : inactive ? l.reactivate : l.deactivate}
+                          </button>
+                        </>
                       )}
                     </div>
                   </section>

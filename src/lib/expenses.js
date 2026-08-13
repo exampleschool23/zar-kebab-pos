@@ -253,6 +253,14 @@ export function getSalaryAbsenceDates(salaryProfile) {
   )
 }
 
+export function getSalaryAbsenceForDate(salaryProfile, date = todayExpenseDate()) {
+  const targetDate = String(date || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) return null
+  return (salaryProfile?.absences || []).find(absence => (
+    String(absence?.absence_date || absence?.date || '').slice(0, 10) === targetDate
+  )) || null
+}
+
 export function listLocalDateRange(dateFrom, dateTo) {
   const start = String(dateFrom || '').slice(0, 10)
   const end = String(dateTo || '').slice(0, 10)
@@ -389,6 +397,23 @@ export function isGeneratedSalaryExpense(expense) {
     expense?.is_salary_bonus ||
     id.startsWith('salary-')
   )
+}
+
+export function getExpenseHistoryDeleteTarget(expense) {
+  if (!expense?.id || expense.is_bazaar_daily_total) return null
+
+  if (expense.is_salary_bonus) {
+    const rowId = String(expense.id)
+    const sourceId = expense.source_id || (
+      rowId.startsWith('salary-bonus-')
+        ? rowId.slice('salary-bonus-'.length)
+        : ''
+    )
+    return sourceId ? { table: 'employee_salary_bonuses', id: sourceId } : null
+  }
+
+  if (isGeneratedSalaryExpense(expense)) return null
+  return { table: 'expenses', id: expense.id }
 }
 
 export function getSalaryPaidAmount(salaryProfile, dateTo = todayExpenseDate()) {

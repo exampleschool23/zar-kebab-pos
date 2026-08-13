@@ -276,6 +276,8 @@ export function GuestPinDialog({ mode = 'setup', lang = 'en', pinLength = GUEST_
     onInput?.()
     if (setup && nextPin.length === expectedPinLength) {
       focusWithoutScrolling(confirmPinInputRef.current)
+    } else if (!setup && lockSeconds <= 0 && nextPin.length === expectedPinLength) {
+      submitPin(nextPin)
     }
   }
 
@@ -318,7 +320,7 @@ export function GuestPinDialog({ mode = 'setup', lang = 'en', pinLength = GUEST_
   }
 
   async function submitPin(value) {
-    if (busy || submitRequestRef.current) return
+    if (busy || lockSeconds > 0 || submitRequestRef.current) return
     submitRequestRef.current = true
     try {
       await onSubmit?.(value)

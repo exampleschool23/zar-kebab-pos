@@ -1,4 +1,4 @@
-import { formatDateOnly } from '../../../src/lib/dateFormat.js'
+import { formatLongDate } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml } from './telegram.js'
 
 export function buildEmployeeFineMessage(fine) {
@@ -13,7 +13,7 @@ export function buildEmployeeFineMessage(fine) {
     'К сожалению, вам был назначен штраф.',
     '',
     `<b>Сумма:</b> ${escapeTelegramHtml(amount)} UZS`,
-    `<b>Дата:</b> ${escapeTelegramHtml(formatDateOnly(fine?.fine_date, '-'))}`,
+    `<b>Дата:</b> ${escapeTelegramHtml(formatLongDate(fine?.fine_date, 'ru', '-'))}`,
     `<b>Причина:</b> ${escapeTelegramHtml(fine?.reason || '-')}`,
     `<b>Оформил:</b> ${escapeTelegramHtml(fine?.created_by_name || '-')}`,
   ].join('\n')

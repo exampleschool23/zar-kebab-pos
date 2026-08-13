@@ -2,6 +2,16 @@
 -- Payment tracking already has an ON DELETE CASCADE foreign key. Event
 -- tracking is polymorphic, so it needs explicit cleanup for each source table.
 
+-- Remove the superseded preserve-and-skip triggers if an earlier development
+-- version of the absence-correction migration was applied.
+drop trigger if exists void_deleted_salary_bonus_deliveries
+  on public.employee_salary_bonuses;
+drop trigger if exists void_deleted_salary_fine_deliveries
+  on public.employee_salary_fines;
+drop trigger if exists void_deleted_salary_absence_deliveries
+  on public.employee_salary_absences;
+drop function if exists public.void_deleted_salary_event_deliveries();
+
 create or replace function public.cleanup_deleted_salary_event_telegram_delivery()
 returns trigger
 language plpgsql
