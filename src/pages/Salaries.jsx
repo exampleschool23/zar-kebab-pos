@@ -655,6 +655,7 @@ export default function Salaries() {
     return paymentDeliveries.map(delivery => {
       const salaryProfile = salaryProfileMap.get(delivery.salary_profile_id)
       const payment = salaryProfile?.payments?.find(item => item.id === delivery.payment_id)
+      if (!payment) return null
       return {
         ...delivery,
         eventType: 'payment',
@@ -672,7 +673,7 @@ export default function Salaries() {
         groupMessageId: delivery.group_telegram_message_id,
         groupError: delivery.group_error_message,
       }
-    })
+    }).filter(Boolean)
   }, [paymentDeliveries, salaryProfiles])
   const groupEventDeliveryRows = useMemo(() => {
     const salaryProfileMap = new Map(salaryProfiles.map(item => [item.id, item]))
@@ -692,6 +693,7 @@ export default function Salaries() {
       const salaryProfile = salaryProfileMap.get(delivery.salary_profile_id)
       const event = salaryProfile?.[collections[delivery.event_type]]
         ?.find(item => item.id === delivery.event_id)
+      if (!event) return null
       return {
         ...delivery,
         eventType: delivery.event_type,
@@ -718,7 +720,7 @@ export default function Salaries() {
         teamMessageId: delivery.team_telegram_message_id,
         teamError: delivery.team_error_message,
       }
-    })
+    }).filter(Boolean)
   }, [groupEventDeliveries, salaryProfiles])
   const telegramDeliveryRows = useMemo(() => (
     [...paymentDeliveryRows, ...groupEventDeliveryRows]
@@ -755,6 +757,28 @@ export default function Salaries() {
     failed: 'border-red-200 bg-red-50 text-red-700',
     skipped: 'border-gray-200 bg-gray-50 text-gray-600',
     confirmed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  }
+  const telegramDeliveryTypeStyles = {
+    payment: {
+      card: 'border-l-[#ff5a00] bg-orange-50/40',
+      label: 'bg-orange-100 text-[#d94d00]',
+    },
+    bonus: {
+      card: 'border-l-blue-500 bg-blue-50/40',
+      label: 'bg-blue-100 text-blue-700',
+    },
+    fine: {
+      card: 'border-l-red-500 bg-red-50/40',
+      label: 'bg-red-100 text-red-700',
+    },
+    absence: {
+      card: 'border-l-violet-500 bg-violet-50/40',
+      label: 'bg-violet-100 text-violet-700',
+    },
+    rate: {
+      card: 'border-l-emerald-500 bg-emerald-50/40',
+      label: 'bg-emerald-100 text-emerald-700',
+    },
   }
   const transactionSalaryProfiles = useMemo(() => (
     sortedSalaryProfiles.filter(item => canRecordSalaryTransaction(
@@ -1489,26 +1513,36 @@ export default function Salaries() {
                         <div className="space-y-2">
                           {pagedTelegramDeliveryRows.map(delivery => {
                             const retryKey = `telegram-retry-${delivery.eventType}-${delivery.eventId}`
+                            const typeStyle = telegramDeliveryTypeStyles[delivery.eventType] || telegramDeliveryTypeStyles.payment
+                            const deliveryValue = delivery.eventType === 'rate'
+                              ? `${formatCurrency(delivery.amount)} · ${salaryRateUnitLabel(delivery.eventUnit, lang)}`
+                              : delivery.eventType === 'absence'
+                                ? ''
+                                : formatCurrency(delivery.amount)
+                            const deliveryDate = delivery.eventDate
+                              ? formatLongDate(delivery.eventDate, lang, delivery.eventDate)
+                              : ''
                             const canRetry = [
                               delivery.employeeStatus,
                               delivery.groupStatus,
                               ...(delivery.showTeamDelivery ? [delivery.teamStatus] : []),
                             ].some(status => ['not_attempted', 'failed', 'skipped'].includes(status))
                             return (
-                              <div key={`${delivery.eventType}-${delivery.id}`} className="rounded-xl border border-gray-200 bg-gray-50/60 px-3 py-3">
+                              <div key={`${delivery.eventType}-${delivery.id}`} className={`rounded-xl border border-l-4 border-gray-200 px-3 py-3 ${typeStyle.card}`}>
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <div className="min-w-0">
-                                    <p className="truncate text-sm font-black text-[#1F2937]">
-                                      {delivery.employeeName} · {groupEventTypeLabels[delivery.eventType] || l.paymentLabel}
-                                    </p>
-                                    <p className="mt-0.5 text-xs font-bold text-gray-600">
-                                      {delivery.eventType === 'absence'
-                                        ? l.absence
-                                        : delivery.eventType === 'rate'
-                                          ? `${formatCurrency(delivery.amount)} · ${salaryRateUnitLabel(delivery.eventUnit, lang)}`
-                                          : formatCurrency(delivery.amount)}
-                                      {delivery.eventDate ? ` · ${formatLongDate(delivery.eventDate, lang, delivery.eventDate)}` : ''}
-                                    </p>
+                                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                      <p className="flex min-w-0 items-baseline gap-1.5 text-sm font-black text-[#1F2937]">
+                                        <span className="truncate">{delivery.employeeName}</span>
+                                        {(deliveryValue || deliveryDate) && <span className="flex-shrink-0 text-gray-400">—</span>}
+                                        {deliveryValue && <span className="flex-shrink-0 whitespace-nowrap">{deliveryValue}</span>}
+                                        {deliveryValue && deliveryDate && <span className="flex-shrink-0 text-gray-400">·</span>}
+                                        {deliveryDate && <span className="flex-shrink-0 whitespace-nowrap text-gray-600">{deliveryDate}</span>}
+                                      </p>
+                                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${typeStyle.label}`}>
+                                        {groupEventTypeLabels[delivery.eventType] || l.paymentLabel}
+                                      </span>
+                                    </div>
                                   </div>
                                   {canRetry && (
                                     <button
