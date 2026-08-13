@@ -9,13 +9,27 @@ test('successful Staff Access submits the reviewed guest cart before returning t
   const unlockSource = orderSource.slice(unlockStart, unlockEnd)
 
   const submitAt = unlockSource.indexOf("type: 'SEND_TO_KITCHEN'")
-  const clearAt = unlockSource.indexOf('clearGuestModeSession()')
-  const navigateAt = unlockSource.indexOf("navigate('/waiter/tables', { replace: true })")
+  const exitAt = unlockSource.lastIndexOf('exitGuestModeToTables()')
   assert.ok(submitAt > 0)
-  assert.ok(clearAt > submitAt)
-  assert.ok(navigateAt > clearAt)
+  assert.ok(exitAt > submitAt)
   assert.match(unlockSource, /_cart: reviewedCart/)
   assert.match(unlockSource, /if \(submitResult\?\.error\)/)
+})
+
+test('Staff Access exits Guest mode without creating an order when the selection is empty', () => {
+  const orderSource = fs.readFileSync(new URL('../src/pages/WaiterOrder.jsx', import.meta.url), 'utf8')
+  const unlockStart = orderSource.indexOf('async function unlockGuestMode(pin)')
+  const unlockEnd = orderSource.indexOf('\n  function handleSignOut()', unlockStart)
+  const unlockSource = orderSource.slice(unlockStart, unlockEnd)
+  const exitStart = orderSource.indexOf('function exitGuestModeToTables()')
+  const exitEnd = orderSource.indexOf('\n  async function unlockGuestMode(pin)', exitStart)
+  const exitSource = orderSource.slice(exitStart, exitEnd)
+
+  assert.match(unlockSource, /if \(guestCart\.length === 0\) \{\s*exitGuestModeToTables\(\)\s*return/)
+  assert.match(unlockSource, /if \(reviewedCart\.length === 0\) \{\s*exitGuestModeToTables\(\)\s*return/)
+  assert.doesNotMatch(unlockSource, /guest selection is empty|Выбор гостя пуст|Mehmon tanlovi bo‘sh/)
+  assert.match(exitSource, /clearGuestModeSession\(\)/)
+  assert.match(exitSource, /navigate\('\/waiter\/tables', \{ replace: true \}\)/)
 })
 
 test('Guest submission can use the reviewed cart snapshot before React state catches up', () => {

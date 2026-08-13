@@ -1119,19 +1119,21 @@ export default function WaiterOrder() {
     updateGuestModeSession({ finished: false })
   }
 
+  function exitGuestModeToTables() {
+    setGuestExpectedOrderIds(null)
+    setGuestReviewWarning('')
+    clearGuestModeSession()
+    setGuestUnlockOpen(false)
+    setGuestCartReady(false)
+    setDetailItem(null)
+    setCartOpen(false)
+    navigate('/waiter/tables', { replace: true })
+  }
+
   async function unlockGuestMode(pin) {
     const latestSession = readGuestModeSession()
     if (!isGuestModeSessionFor(latestSession, { tableId, staffUserId, pathname: location.pathname })) return
     if (guestModePinLockSeconds(latestSession) > 0) return
-    if (!loaded || loadError) {
-      setGuestModeError(staffLang === 'uz'
-        ? 'Menyu hali tayyor emas. Qayta yuklang va yana urinib ko‘ring.'
-        : staffLang === 'ru'
-          ? 'Меню ещё не готово. Перезагрузите страницу и попробуйте снова.'
-          : 'The menu is not ready yet. Reload and try again.')
-      return
-    }
-
     setGuestModeBusy(true)
     setGuestModeError('')
     try {
@@ -1143,8 +1145,21 @@ export default function WaiterOrder() {
         setGuestModeError(guestModeCopy(staffLang).wrongPin)
         return
       }
+      const guestCart = guestCartReady ? state.cart : (latestSession.cart || [])
+      if (guestCart.length === 0) {
+        exitGuestModeToTables()
+        return
+      }
+      if (!loaded || loadError) {
+        setGuestModeError(staffLang === 'uz'
+          ? 'Menyu hali tayyor emas. Qayta yuklang va yana urinib ko‘ring.'
+          : staffLang === 'ru'
+            ? 'Меню ещё не готово. Перезагрузите страницу и попробуйте снова.'
+            : 'The menu is not ready yet. Reload and try again.')
+        return
+      }
       const reviewedCart = rebuildGuestCartFromCatalog({
-        cart: guestCartReady ? state.cart : (latestSession.cart || []),
+        cart: guestCart,
         menuItems: state.menuItems,
         categories: state.categories,
         now: new Date(),
@@ -1152,11 +1167,7 @@ export default function WaiterOrder() {
         priceMode: normalizeGuestModePriceMode(latestSession.priceMode),
       })
       if (reviewedCart.length === 0) {
-        setGuestModeError(staffLang === 'uz'
-          ? 'Mehmon tanlovi bo‘sh. Buyurtma yaratilmadi.'
-          : staffLang === 'ru'
-            ? 'Выбор гостя пуст. Заказ не создан.'
-            : 'The guest selection is empty. No order was created.')
+        exitGuestModeToTables()
         return
       }
       const selectedPriceMode = normalizeGuestModePriceMode(latestSession.priceMode)
@@ -1170,14 +1181,7 @@ export default function WaiterOrder() {
         setGuestModeError(formatWriteError(submitResult.error, staffLang, 'SEND_TO_KITCHEN'))
         return
       }
-      setGuestExpectedOrderIds(null)
-      setGuestReviewWarning('')
-      clearGuestModeSession()
-      setGuestUnlockOpen(false)
-      setGuestCartReady(false)
-      setDetailItem(null)
-      setCartOpen(false)
-      navigate('/waiter/tables', { replace: true })
+      exitGuestModeToTables()
     } catch {
       setGuestModeError(staffLang === 'uz'
         ? 'PIN-ni tekshirib bo‘lmadi. Planshet qulflangan holda qoladi.'

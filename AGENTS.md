@@ -276,6 +276,7 @@ These bugs were recently fixed and are now protected by tests:
    - The submission action carries the reviewed cart snapshot because React cart state may not have committed before the database-first kitchen write begins.
    - Matching-PIN auto-submit is single-flight because mobile keyboards can emit a change and form submit back-to-back.
    - Unlock dialogs verify automatically as soon as the final PIN digit is entered; the Unlock button remains a fallback and must not be required.
+   - A correct Staff Access PIN always exits Guest mode. An empty or catalog-invalid guest selection returns directly to the table grid without creating an order or showing an empty-order error.
 
 31. Empty order shells must not lock Guest-mode pricing.
    - `getTableGuestEntryContext()` considers only unpaid, non-cancelled table orders that still contain at least one non-cancelled, positive-value item.
