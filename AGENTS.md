@@ -292,11 +292,13 @@ These bugs were recently fixed and are now protected by tests:
    - The correction restores that day's salary accrual and is captured in the immutable Accounting audit. Telegram messages already delivered cannot be recalled.
    - Deleted bonus, fine, absence, and salary-rate events remove their polymorphic Telegram delivery rows so they cannot remain retryable.
 
-34. Monthly estimates must expose the full remaining commitment.
-   - Monthly utilities are configured in `business_settings.monthly_utilities_uzs` and reconciled against recorded `utilities` expenses just like rent.
-   - The at-a-glance balance is income minus actual cash expenses, then minus remaining salary, salary arrears, rent, and utilities.
-   - Bonuses are cash expenses. Fines reduce payroll liability but never become cash expenses. Absences reduce projected salary and are shown as days.
-   - Payroll, fixed bills, and operating costs stay separate so paid, planned, and still-due amounts remain understandable.
+34. Monthly Estimate focuses on selected-month actuals.
+   - Do not restore the removed all-time Main numbers section; the page is for the selected month.
+   - Expenses at a glance combines payments already recorded in the selected month with the salary, rent, and utilities still expected for that same month.
+   - Never add salary arrears or other liabilities carried from previous months to the selected-month forecast.
+   - Calculate selected-month salary operating cost per employee so an advance or older-debt payment for one employee cannot reduce or inflate another employee's selected-month salary cost.
+   - Fines remain visible as payroll deductions but never become cash expenses. Absences remain visible as days.
+   - Monthly utilities are configured in `business_settings.monthly_utilities_uzs`; only recorded `utilities` expenses appear in the monthly actuals.
 
 ## Database Migrations
 

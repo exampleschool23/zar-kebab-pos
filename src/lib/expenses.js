@@ -556,6 +556,32 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
   }
 }
 
+export function getSelectedMonthSalaryOperatingSummary(salaryProfiles = [], asOfDate = todayExpenseDate()) {
+  return (salaryProfiles || []).reduce((totals, salaryProfile) => {
+    const estimate = getEstimatedMonthlyExpenseSummary([salaryProfile], asOfDate, {
+      monthlyRentUzs: 0,
+      monthlyUtilitiesUzs: 0,
+    })
+    const expectedSalaryCost = Math.max(0, estimate.employeeProjectedMonth - estimate.employeeFineToDate)
+    const appliedPayment = Math.min(expectedSalaryCost, estimate.employeePaidToDate)
+
+    totals.projectedSalary += estimate.employeeProjectedMonth
+    totals.fines += estimate.employeeFineToDate
+    totals.expectedSalaryCost += expectedSalaryCost
+    totals.appliedPayments += appliedPayment
+    totals.remainingSalary += Math.max(0, expectedSalaryCost - appliedPayment)
+    totals.excludedPayments += Math.max(0, estimate.employeePaidToDate - appliedPayment)
+    return totals
+  }, {
+    projectedSalary: 0,
+    fines: 0,
+    expectedSalaryCost: 0,
+    appliedPayments: 0,
+    remainingSalary: 0,
+    excludedPayments: 0,
+  })
+}
+
 function addLocalDateDays(isoDate, days) {
   const date = new Date(`${isoDate}T00:00:00`)
   date.setDate(date.getDate() + days)

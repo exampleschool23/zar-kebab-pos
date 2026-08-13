@@ -3,28 +3,25 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Banknote,
-  CalendarDays,
   CreditCard,
-  Home,
   Monitor,
   ReceiptText,
   RefreshCw,
   Tag,
-  TrendingDown,
-  TrendingUp,
   Users,
   WalletCards,
   Zap,
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
-import { getOrderDate, getOrderLoyaltyIncomeTotal, getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
+import { getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from '../lib/analytics'
 import { formatLongDate } from '../lib/dateFormat'
 import {
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   expensePaymentMethodLabel,
   getEstimatedMonthlyExpenseSummary,
+  getSelectedMonthSalaryOperatingSummary,
   normalizeExpenseEntryType,
   summarizeExpenses,
   summarizeIncomeEntries,
@@ -35,7 +32,6 @@ import { getMonthlyEstimateMethodRows } from '../lib/monthlyEstimate'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
 import { collectPagedRows, loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
-import { loadEarliestOrderDate } from '../lib/db'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 
@@ -102,22 +98,6 @@ function methodLabel(method, lang) {
   return method || '—'
 }
 
-function addDateCandidate(dates, value) {
-  const date = String(value || '').slice(0, 10)
-  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) dates.push(date)
-}
-
-function getFirstFinancialActivityDate(orders = [], expenses = [], salaryProfiles = []) {
-  const dates = []
-  for (const order of orders || []) addDateCandidate(dates, getOrderDate(order))
-  for (const expense of expenses || []) addDateCandidate(dates, expense.expense_date || expense.created_at)
-  for (const salaryProfile of salaryProfiles || []) {
-    for (const payment of salaryProfile?.payments || []) addDateCandidate(dates, payment.paid_date || payment.created_at)
-    for (const bonus of salaryProfile?.bonuses || []) addDateCandidate(dates, bonus.bonus_date || bonus.created_at)
-  }
-  return dates.sort()[0] || ''
-}
-
 export default function MonthlyEstimate() {
   const { state } = useApp()
   const navigate = useNavigate()
@@ -130,7 +110,6 @@ export default function MonthlyEstimate() {
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
-  const [firstOrderDate, setFirstOrderDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const loadRequestRef = useRef(0)
@@ -138,15 +117,17 @@ export default function MonthlyEstimate() {
   const L = {
     uz: {
       title: 'Oylik taxmin',
-      sub: 'Pul qayerdan keldi, qayerga ketdi va oy oxirigacha nimalar qolgan',
+      sub: 'Tanlangan oyning haqiqiy daromad va xarajatlari',
       back: 'Buxgalteriyaga qaytish',
       refresh: 'Yangilash',
       currentMonth: 'Joriy oy',
+      expectedMonthSpent: 'Tanlangan oy uchun jami kutilayotgan xarajat',
+      expectedSalary: 'Bu oy yana to‘lanadigan maosh',
+      salaryApplied: 'Shu oy maoshiga hisoblangan to‘lov',
       moneyCame: 'Pul qayerdan keldi',
       moneyWent: 'Pul qayerga ketdi',
       methodFlow: 'To‘lov turi bo‘yicha oqim',
       monthPlan: 'Oy rejasi',
-      clearOverview: 'Asosiy raqamlar',
       expenseBreakdown: 'Xarajatlar bir qarashda',
       salesRevenue: 'Kafe savdosi',
       loyaltyIncome: 'Loyallik daromadi',
@@ -194,15 +175,17 @@ export default function MonthlyEstimate() {
     },
     ru: {
       title: 'Прогноз месяца',
-      sub: 'Откуда поступили деньги, на что они ушли и сколько ещё нужно оплатить до конца месяца',
+      sub: 'Фактические доходы и расходы выбранного месяца',
       back: 'Назад к бухгалтерии',
       refresh: 'Обновить',
       currentMonth: 'Текущий месяц',
+      expectedMonthSpent: 'Ожидаемые расходы за выбранный месяц',
+      expectedSalary: 'Ещё выплатить зарплаты за этот месяц',
+      salaryApplied: 'Оплата в счёт зарплаты этого месяца',
       moneyCame: 'Откуда поступили деньги',
       moneyWent: 'На что ушли деньги',
       methodFlow: 'Движение по способам оплаты',
       monthPlan: 'План месяца',
-      clearOverview: 'Главные цифры',
       expenseBreakdown: 'Расходы одним взглядом',
       salesRevenue: 'Доход кафе',
       loyaltyIncome: 'Доход по лояльности',
@@ -250,15 +233,17 @@ export default function MonthlyEstimate() {
     },
     en: {
       title: 'Monthly estimate',
-      sub: 'Where money came from, where it went, and what remains due by month end',
+      sub: 'Actual income and expenses for the selected month',
       back: 'Back to accounting',
       refresh: 'Refresh',
       currentMonth: 'Current month',
+      expectedMonthSpent: 'Expected expenses for selected month',
+      expectedSalary: 'Salary still expected this month',
+      salaryApplied: 'Payment applied to this month',
       moneyCame: 'Where money came from',
       moneyWent: 'Where money went',
       methodFlow: 'Flow by payment method',
       monthPlan: 'Month plan',
-      clearOverview: 'Main numbers',
       expenseBreakdown: 'Expenses at a glance',
       salesRevenue: 'Cafe income',
       loyaltyIncome: 'Loyalty income',
@@ -312,7 +297,7 @@ export default function MonthlyEstimate() {
     loadRequestRef.current = requestId
     setLoading(true)
     setError('')
-    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult, orderHistoryResult, firstOrderResult] = await Promise.all([
+    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult, orderHistoryResult] = await Promise.all([
       loadPagedResult((from, to) => supabase
         .from('expenses')
         .select(SELECT_COLUMNS)
@@ -331,9 +316,6 @@ export default function MonthlyEstimate() {
       loadPaidOrdersForRange(monthStart, monthEnd)
         .then(data => ({ data, error: null }))
         .catch(error => ({ data: [], error })),
-      loadEarliestOrderDate()
-        .then(data => ({ data, error: null }))
-        .catch(error => ({ data: '', error })),
     ])
     if (requestId !== loadRequestRef.current) return
 
@@ -349,8 +331,6 @@ export default function MonthlyEstimate() {
     } else {
       setPaidHistoryOrders(orderHistoryResult.data || [])
     }
-    setFirstOrderDate(firstOrderResult.data || '')
-
     const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
     if (salaryError) {
       setSalaryProfiles([])
@@ -400,26 +380,20 @@ export default function MonthlyEstimate() {
   const salaryBonusRows = useMemo(() => (
     buildSalaryBonusExpenseRows(salaryProfiles, monthStart, cutoffEnd)
   ), [salaryProfiles, monthStart, cutoffEnd])
-  const firstFinancialActivityDate = useMemo(() => (
-    getFirstFinancialActivityDate([
-      ...(firstOrderDate ? [{ created_at: firstOrderDate }] : []),
-      ...state.orders,
-      ...accountingOrders,
-    ], expenses, salaryProfiles)
-  ), [firstOrderDate, state.orders, accountingOrders, expenses, salaryProfiles])
   const monthlyEstimate = useMemo(() => (
     getEstimatedMonthlyExpenseSummary(salaryProfiles, cutoffEnd, {
-      activeFromDate: firstFinancialActivityDate,
       monthlyRentUzs: state.settings?.monthlyRentUzs || 0,
       monthlyUtilitiesUzs: state.settings?.monthlyUtilitiesUzs || 0,
     })
-  ), [salaryProfiles, cutoffEnd, firstFinancialActivityDate, state.settings?.monthlyRentUzs, state.settings?.monthlyUtilitiesUzs])
-
+  ), [salaryProfiles, cutoffEnd, state.settings?.monthlyRentUzs, state.settings?.monthlyUtilitiesUzs])
+  const salaryOperatingSummary = useMemo(() => (
+    getSelectedMonthSalaryOperatingSummary(salaryProfiles, cutoffEnd)
+  ), [salaryProfiles, cutoffEnd])
   const salesRevenue = paidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
-  const loyaltyIncome = paidOrders.reduce((sum, order) => sum + getOrderLoyaltyIncomeTotal(order), 0)
   const incomeSummary = summarizeIncomeEntries(incomeEntries)
   const allActualExpenseRows = [...salaryPaymentRows, ...salaryBonusRows, ...manualExpenseRows]
   const actualExpenseSummary = summarizeExpenses(allActualExpenseRows)
+  const salaryPaymentTotal = summarizeExpenses(salaryPaymentRows).total
   const salaryBonusTotal = summarizeExpenses(salaryBonusRows).total
   const recordedExpenseTotal = summarizeExpenses(manualExpenseRows).total
   const investorInvestedTotal = incomeSummary.byCategory.investor_support || 0
@@ -433,17 +407,27 @@ export default function MonthlyEstimate() {
   const absenceDaysTotal = salaryProfiles.reduce((sum, profile) => (
     sum + (profile.absences || []).filter(absence => {
       const date = String(absence.absence_date || '').slice(0, 10)
-      return date >= monthStart && date <= monthEnd
+      return date >= monthStart && date <= cutoffEnd
     }).length
+  ), 0)
+  const salaryFineTotal = salaryProfiles.reduce((sum, profile) => (
+    sum + (profile.fines || []).reduce((profileSum, fine) => {
+      const date = String(fine.fine_date || '').slice(0, 10)
+      return date >= monthStart && date <= cutoffEnd
+        ? profileSum + Math.max(0, Math.round(Number(fine.amount) || 0))
+        : profileSum
+    }, 0)
   ), 0)
   const totalInflow = salesRevenue + incomeSummary.total
   const totalOutflow = actualExpenseSummary.total
-  const netLeft = totalInflow - totalOutflow
-  const rentDueUzs = Math.max(0, monthlyEstimate.monthlyRentUzs - recordedRentTotal)
-  const utilitiesDueUzs = Math.max(0, monthlyEstimate.monthlyUtilitiesUzs - recordedUtilitiesTotal)
-  const remainingCommitmentsUzs = monthlyEstimate.employeeRemainingTotal + rentDueUzs + utilitiesDueUzs
-  const plannedMonthOutflowUzs = totalOutflow + remainingCommitmentsUzs
-  const projectedLeftUzs = netLeft - remainingCommitmentsUzs
+  const salaryExpectedRemaining = salaryOperatingSummary.remainingSalary
+  const rentExpectedRemaining = Math.max(0, monthlyEstimate.monthlyRentUzs - recordedRentTotal)
+  const utilitiesExpectedRemaining = Math.max(0, monthlyEstimate.monthlyUtilitiesUzs - recordedUtilitiesTotal)
+  const expectedMonthOutflow = totalOutflow
+    - salaryPaymentTotal
+    + salaryOperatingSummary.expectedSalaryCost
+    + rentExpectedRemaining
+    + utilitiesExpectedRemaining
 
   const cameRows = [
     { key: 'sales', label: l.salesRevenue, amount: salesRevenue, color: '#16A34A' },
@@ -452,56 +436,41 @@ export default function MonthlyEstimate() {
   ].filter(row => row.amount > 0)
 
   const wentRows = [
-    { key: 'salary-paid', label: l.salaryPaid, amount: monthlyEstimate.employeePaidToDate, color: '#2563EB' },
+    { key: 'salary-paid', label: l.salaryPaid, amount: salaryPaymentTotal, color: '#2563EB' },
     { key: 'salary-bonus', label: l.salaryBonus, amount: salaryBonusTotal, color: '#9333EA' },
     { key: 'products', label: l.productsSpent, amount: productsSpentTotal, color: '#F97316' },
     { key: 'other-recorded', label: l.otherSpent, amount: otherRecordedExpenseTotal, color: '#64748B' },
     { key: 'rent-paid', label: l.rentPaidAmount, amount: recordedRentTotal, color: '#0F766E' },
     { key: 'utilities-paid', label: l.utilitiesPaid, amount: recordedUtilitiesTotal, color: '#CA8A04' },
-    { key: 'salary-arrears', label: l.salaryArrears, amount: monthlyEstimate.employeeArrearsRemaining, color: '#991B1B' },
-    { key: 'salary-remaining', label: l.salaryRemaining, amount: monthlyEstimate.employeeRemainingThisMonth, color: '#DC2626' },
-    { key: 'rent-due', label: l.rentRemaining, amount: rentDueUzs, color: '#14B8A6' },
-    { key: 'utilities-due', label: l.utilitiesRemaining, amount: utilitiesDueUzs, color: '#EAB308' },
   ].filter(row => row.amount > 0)
-
-  const overviewRows = [
-    { key: 'actual-in', icon: TrendingUp, label: l.actualIn, value: formatCurrency(totalInflow), tone: 'green', sub: `${l.loyaltyIncome}: ${formatCurrency(loyaltyIncome)}` },
-    { key: 'actual-out', icon: TrendingDown, label: l.actualOut, value: formatCurrency(totalOutflow), tone: 'orange' },
-    { key: 'net-left', icon: WalletCards, label: l.netLeft, value: formatCurrency(netLeft), tone: netLeft >= 0 ? 'blue' : 'red' },
-    { key: 'remaining', icon: CalendarDays, label: l.remainingCommitments, value: formatCurrency(remainingCommitmentsUzs), tone: remainingCommitmentsUzs > 0 ? 'purple' : 'green' },
-    { key: 'projected-left', icon: Banknote, label: l.projectedLeft, value: formatCurrency(projectedLeftUzs), tone: projectedLeftUzs >= 0 ? 'green' : 'red' },
-  ]
 
   const expenseBreakdownCards = [
     {
       key: 'payroll',
       icon: Users,
       title: l.payroll,
-      total: monthlyEstimate.employeePaidToDate + salaryBonusTotal + monthlyEstimate.employeeRemainingTotal,
+      total: salaryOperatingSummary.expectedSalaryCost + salaryBonusTotal,
       tone: 'blue',
       rows: [
-        { label: l.salaryPlan, value: formatCurrency(monthlyEstimate.employeeProjectedMonth) },
-        { label: l.salaryPaid, value: formatCurrency(monthlyEstimate.employeePaidToDate) },
+        { label: l.salaryPlan, value: formatCurrency(salaryOperatingSummary.projectedSalary) },
+        { label: l.salaryApplied, value: formatCurrency(salaryOperatingSummary.appliedPayments) },
         { label: l.salaryBonus, value: formatCurrency(salaryBonusTotal), accent: 'text-purple-600' },
-        { label: l.salaryFines, value: `− ${formatCurrency(monthlyEstimate.employeeFineToDate)}`, accent: 'text-red-600' },
+        { label: l.expectedSalary, value: formatCurrency(salaryExpectedRemaining), accent: salaryExpectedRemaining > 0 ? 'text-blue-600' : 'text-green-600' },
+        { label: l.salaryFines, value: `− ${formatCurrency(salaryFineTotal)}`, accent: 'text-red-600' },
         { label: l.absenceDays, value: String(absenceDaysTotal), accent: 'text-violet-600' },
-        { label: l.salaryArrears, value: formatCurrency(monthlyEstimate.employeeArrearsRemaining), accent: monthlyEstimate.employeeArrearsRemaining > 0 ? 'text-red-700' : 'text-green-600' },
-        { label: l.salaryRemaining, value: formatCurrency(monthlyEstimate.employeeRemainingThisMonth), accent: monthlyEstimate.employeeRemainingThisMonth > 0 ? 'text-red-600' : 'text-green-600' },
       ],
     },
     {
       key: 'fixed-bills',
       icon: Zap,
       title: l.fixedBills,
-      total: Math.max(monthlyEstimate.monthlyRentUzs, recordedRentTotal) + Math.max(monthlyEstimate.monthlyUtilitiesUzs, recordedUtilitiesTotal),
+      total: recordedRentTotal + rentExpectedRemaining + recordedUtilitiesTotal + utilitiesExpectedRemaining,
       tone: 'teal',
       rows: [
-        { label: l.rentPlan, value: formatCurrency(monthlyEstimate.monthlyRentUzs) },
         { label: l.rentPaidAmount, value: formatCurrency(recordedRentTotal) },
-        { label: l.rentRemaining, value: formatCurrency(rentDueUzs), accent: rentDueUzs > 0 ? 'text-red-600' : 'text-green-600' },
-        { label: l.utilitiesPlan, value: formatCurrency(monthlyEstimate.monthlyUtilitiesUzs) },
+        { label: l.rentRemaining, value: formatCurrency(rentExpectedRemaining), accent: rentExpectedRemaining > 0 ? 'text-teal-600' : 'text-green-600' },
         { label: l.utilitiesPaid, value: formatCurrency(recordedUtilitiesTotal) },
-        { label: l.utilitiesRemaining, value: formatCurrency(utilitiesDueUzs), accent: utilitiesDueUzs > 0 ? 'text-red-600' : 'text-green-600' },
+        { label: l.utilitiesRemaining, value: formatCurrency(utilitiesExpectedRemaining), accent: utilitiesExpectedRemaining > 0 ? 'text-amber-600' : 'text-green-600' },
       ],
     },
     {
@@ -586,24 +555,14 @@ export default function MonthlyEstimate() {
           {!error && (
             <>
               <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <h2 className="text-sm font-black text-[#1F2937]">{l.clearOverview}</h2>
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">
-                    <CalendarDays size={13} />
-                    {formatLongDate(monthStart, lang, monthStart)} - {formatLongDate(monthEnd, lang, monthEnd)}
-                  </span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                  {overviewRows.map(row => <Kpi key={row.key} {...row} />)}
-                </div>
-              </section>
-
-              <section className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-sm font-black text-[#1F2937]">{l.expenseBreakdown}</h2>
-                  <span className="text-xs font-black text-[#6B7280]">
-                    {l.plannedUzs}: {formatCurrency(plannedMonthOutflowUzs)}
-                  </span>
+                  <div className="text-right">
+                    <p className="text-xs font-black text-[#6B7280]">{l.expectedMonthSpent}: {formatCurrency(expectedMonthOutflow)}</p>
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF]">
+                      {formatLongDate(monthStart, lang, monthStart)} - {formatLongDate(monthEnd, lang, monthEnd)}
+                    </p>
+                  </div>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-3">
                   {expenseBreakdownCards.map(card => <BreakdownCard key={card.key} {...card} />)}
@@ -619,7 +578,7 @@ export default function MonthlyEstimate() {
                 />
                 <FlowSection
                   title={l.moneyWent}
-                  total={plannedMonthOutflowUzs}
+                  total={totalOutflow}
                   rows={wentRows}
                   emptyText={l.noData}
                 />
@@ -650,27 +609,6 @@ export default function MonthlyEstimate() {
         </div>
       </div>
     </AppShell>
-  )
-}
-
-function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange' }) {
-  const tones = {
-    green: 'bg-green-50 text-green-600',
-    orange: 'bg-orange-50 text-[#ff5a00]',
-    blue: 'bg-blue-50 text-blue-600',
-    red: 'bg-red-50 text-red-600',
-    purple: 'bg-purple-50 text-purple-600',
-    gray: 'bg-slate-50 text-slate-600',
-  }
-  return (
-    <div className="rounded-2xl border border-[#EEF2F6] bg-[#FBFCFE] p-4">
-      <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${tones[tone] || tones.orange}`}>
-        <Icon size={19} />
-      </div>
-      <p className="text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">{label}</p>
-      <p className="mt-1 break-words text-xl font-black text-[#1F2937]">{value}</p>
-      {sub && <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{sub}</p>}
-    </div>
   )
 }
 

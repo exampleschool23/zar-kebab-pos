@@ -28,6 +28,7 @@ import {
   getSalaryFineAmount,
   getSalaryCategoryForRole,
   getSalaryMonthEndDate,
+  getSelectedMonthSalaryOperatingSummary,
   getTotalMonthlySalaryCommitment,
   getTotalSalaryDue,
   isGeneratedSalaryExpense,
@@ -849,6 +850,34 @@ test('salary fines reduce projected payroll but never become cash expenses', () 
   assert.equal(summary.employeeProjectedMonth, 3_000_000)
   assert.equal(summary.employeeRemainingThisMonth, 2_300_000)
   assert.equal(summarizeExpenses(buildSalaryPaymentExpenseRows([salaryProfile], '2026-06-01', '2026-06-30')).total, 200_000)
+})
+
+test('selected-month salary operating cost excludes prior arrears and employee overpayments', () => {
+  const summary = getSelectedMonthSalaryOperatingSummary([
+    {
+      id: 'monthly-cost-with-arrears',
+      joined_at: '2026-05-01',
+      rates: [{ effective_from: '2026-05-01', amount: 100_000, rate_unit: 'daily' }],
+      payments: [{ paid_date: '2026-06-10', amount: 2_000_000 }],
+      fines: [{ fine_date: '2026-06-12', amount: 500_000 }],
+      absences: [],
+    },
+    {
+      id: 'monthly-cost-with-overpayment',
+      joined_at: '2026-06-01',
+      rates: [{ effective_from: '2026-06-01', amount: 100_000, rate_unit: 'daily' }],
+      payments: [{ paid_date: '2026-06-10', amount: 4_000_000 }],
+      fines: [],
+      absences: [],
+    },
+  ], '2026-06-16')
+
+  assert.equal(summary.projectedSalary, 6_000_000)
+  assert.equal(summary.fines, 500_000)
+  assert.equal(summary.expectedSalaryCost, 5_500_000)
+  assert.equal(summary.appliedPayments, 5_000_000)
+  assert.equal(summary.remainingSalary, 500_000)
+  assert.equal(summary.excludedPayments, 1_000_000)
 })
 
 test('salary expenses participate in expense cashflow by recorded payment method', () => {
