@@ -234,7 +234,7 @@ These bugs were recently fixed and are now protected by tests:
    - New bonus, fine, and absence rows queue Team delivery as `not_attempted` in the same database trigger that queues employee and salary-group delivery.
    - Team announcements include the saved amount and the full fine reason or absence note, but omit the employee's remaining salary balance and the manager identity.
    - Team announcements stay compact: no promotional intro/closing paragraphs or blank spacer lines; optional empty notes are omitted.
-   - Private employee bonus notifications omit payment method; the method remains stored in Accounting and visible to operational group recipients.
+   - Bonus notifications omit payment method for the employee, salary group, and Team; the method remains stored in Accounting.
    - Private employee, salary-group, and Team bonus/fine/absence dates use the shared localized long-date formatter (for example, `12 августа 2026` in Russian).
    - Historical events are marked `skipped` during migration so deployment never broadcasts old salary events unexpectedly.
    - Salary payments and salary-rate changes are not Team events; their Team status remains non-retryable `skipped`.

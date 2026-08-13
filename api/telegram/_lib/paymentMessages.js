@@ -71,7 +71,6 @@ const GROUP_EVENT_COPY = {
     employee: 'Xodim',
     amount: 'Summa',
     date: 'Sana',
-    method: 'To‘lov turi',
     note: 'Izoh',
     reason: 'Sabab',
     due: 'To‘lanishi kerak',
@@ -84,7 +83,6 @@ const GROUP_EVENT_COPY = {
     employee: 'Сотрудник',
     amount: 'Сумма',
     date: 'Дата',
-    method: 'Способ оплаты',
     note: 'Примечание',
     reason: 'Причина',
     due: 'К выплате',
@@ -97,7 +95,6 @@ const GROUP_EVENT_COPY = {
     employee: 'Employee',
     amount: 'Amount',
     date: 'Date',
-    method: 'Payment method',
     note: 'Note',
     reason: 'Reason',
     due: 'Salary due',
@@ -110,7 +107,6 @@ const TEAM_EVENT_COPY = {
     bonusTitle: 'Xodim bonusi',
     fineTitle: 'Xodim jarimasi',
     absenceTitle: 'Xodim yo\u2018qligi',
-    method: 'To\u2018lov turi',
     note: 'Izoh',
     reason: 'Sabab',
   },
@@ -118,7 +114,6 @@ const TEAM_EVENT_COPY = {
     bonusTitle: 'Бонус сотруднику',
     fineTitle: 'Штраф сотрудника',
     absenceTitle: 'Отсутствие сотрудника',
-    method: 'Способ оплаты',
     note: 'Примечание',
     reason: 'Причина',
   },
@@ -126,7 +121,6 @@ const TEAM_EVENT_COPY = {
     bonusTitle: 'Employee bonus',
     fineTitle: 'Employee fine',
     absenceTitle: 'Employee absence',
-    method: 'Payment method',
     note: 'Note',
     reason: 'Reason',
   },
@@ -313,9 +307,6 @@ export function buildSalaryGroupEventMessage(type, event, remainingDue = 0, lang
     lines.push(`<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`)
   }
   lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
-  if (normalizedType === 'bonus') {
-    lines.push(`<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`)
-  }
   const detail = normalizedType === 'fine' ? event?.reason : event?.note
   if (String(detail || '').trim()) {
     lines.push(`<b>${normalizedType === 'fine' ? copy.reason : copy.note}:</b> ${escapeTelegramHtml(detail)}`)
@@ -348,11 +339,7 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
     `${normalizedType === 'bonus' ? '🎁' : normalizedType === 'fine' ? '⚠️' : '📅'} <b>${copy[`${normalizedType}Title`]}</b>`,
     `👤 <b>${escapeTelegramHtml(event?.employee_name || '-')}</b> · <b>${formatSalaryNotificationAmount(event?.amount)} UZS</b>`,
   ]
-  let dateLine = `🗓 ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`
-  if (normalizedType === 'bonus') {
-    dateLine += ` · ${escapeTelegramHtml(expensePaymentMethodLabel(event?.payment_method, lang))}`
-  }
-  lines.push(dateLine)
+  lines.push(`🗓 ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
   if (String(detail || '').trim()) {
     const detailLabel = normalizedType === 'fine' ? copy.reason : copy.note
     lines.push(`📝 <b>${detailLabel}:</b> ${escapeTelegramHtml(String(detail).trim())}`)

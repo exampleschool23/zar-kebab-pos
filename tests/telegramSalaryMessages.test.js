@@ -173,7 +173,7 @@ test('salary group messages cover bonuses, fines, and absences', () => {
   assert.match(bonus, /Бонус сотруднику/)
   assert.match(bonus, /100 000 UZS/)
   assert.match(bonus, /Дата:<\/b> 29 июля 2026/)
-  assert.match(bonus, /Карта/)
+  assert.doesNotMatch(bonus, /Способ оплаты|Payment method|To‘lov turi|Карта/)
   assert.match(bonus, /&lt;Отличная работа&gt;/)
   assert.match(fine, /Штраф сотрудника/)
   assert.match(fine, /20 000 UZS/)
@@ -220,7 +220,7 @@ test('ZarKebab Team messages publish full bonus, fine, and absence details witho
   assert.equal(bonus, [
     '🎁 <b>Бонус сотруднику</b>',
     '👤 <b>Зилола &lt;кассир&gt;</b> · <b>100 000 UZS</b>',
-    '🗓 29 июля 2026 · Карта',
+    '🗓 29 июля 2026',
     '📝 <b>Примечание:</b> &lt;Отличная работа &amp; помощь команде&gt;',
   ].join('\n'))
   assert.equal(fine, [
@@ -237,7 +237,7 @@ test('ZarKebab Team messages publish full bonus, fine, and absence details witho
   assert.equal(bonusWithoutNote, [
     '🎁 <b>Бонус сотруднику</b>',
     '👤 <b>Зилола &lt;кассир&gt;</b> · <b>93 000 UZS</b>',
-    '🗓 29 июля 2026 · Наличные',
+    '🗓 29 июля 2026',
   ].join('\n'))
 
   for (const message of [bonus, fine, absence, bonusWithoutNote]) {
@@ -276,7 +276,7 @@ test('ZarKebab Team bonus and fine messages localize while absence stays Russian
   assert.match(uz, /Xodim bonusi/)
   assert.match(uz, /500 000 UZS/)
   assert.match(uz, /8 avgust 2026/)
-  assert.match(uz, /Naqd/)
+  assert.doesNotMatch(uz, /To‘lov turi|Naqd/)
   assert.match(uz, /Mehmonlarga yaxshi xizmat/)
   assert.match(en, /Employee fine/)
   assert.match(en, /75 000 UZS/)
