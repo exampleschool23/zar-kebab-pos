@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   restaurantName: 'Zar Kebab',
   serviceRate:    20,
   monthlyRentUzs: 0,
+  monthlyUtilitiesUzs: 0,
   receiptFooter:  '',
   receiptMarketing: 'compactFooter',
   autoPrint:      false,

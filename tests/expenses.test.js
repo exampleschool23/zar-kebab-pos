@@ -5,6 +5,7 @@ import {
   EXPENSE_CATEGORIES,
   MANUAL_EXPENSE_CATEGORIES,
   DEFAULT_MONTHLY_RENT_UZS,
+  DEFAULT_MONTHLY_UTILITIES_UZS,
   getAccountingHistoryRange,
   buildSalaryBonusExpenseRows,
   buildSalaryExpenseRows,
@@ -956,7 +957,7 @@ test('expense history deletes bonuses from their source while protecting generat
   assert.equal(getExpenseHistoryDeleteTarget({ id: 'not-a-bonus-source', is_salary_bonus: true }), null)
 })
 
-test('monthly expense estimate tracks employee paid amount remaining salary and rent', () => {
+test('monthly expense estimate tracks employee paid amount, fines, remaining salary, rent, and utilities', () => {
   const waiterProfile = {
     id: 'salary-monthly-estimate-1',
     profile_id: 'waiter-monthly-estimate-1',
@@ -969,22 +970,32 @@ test('monthly expense estimate tracks employee paid amount remaining salary and 
       { id: 'paid-before-now', paid_date: '2026-06-10', amount: 1_200_000 },
       { id: 'paid-after-now', paid_date: '2026-06-25', amount: 900_000 },
     ],
+    fines: [
+      { id: 'fine-before-now', fine_date: '2026-06-14', amount: 300_000 },
+      { id: 'fine-after-now', fine_date: '2026-06-25', amount: 500_000 },
+    ],
     absences: [
       { id: 'absence-before-now', absence_date: '2026-06-12' },
       { id: 'absence-after-now', absence_date: '2026-06-20' },
     ],
   }
 
-  const summary = getEstimatedMonthlyExpenseSummary([waiterProfile], '2026-06-16', { monthlyRentUzs: 24_000_000 })
+  const summary = getEstimatedMonthlyExpenseSummary([waiterProfile], '2026-06-16', {
+    monthlyRentUzs: 24_000_000,
+    monthlyUtilitiesUzs: 4_500_000,
+  })
 
   assert.equal(summary.monthStart, '2026-06-01')
   assert.equal(summary.monthEnd, '2026-06-30')
   assert.equal(summary.paidThroughDate, '2026-06-16')
   assert.equal(DEFAULT_MONTHLY_RENT_UZS, 0)
+  assert.equal(DEFAULT_MONTHLY_UTILITIES_UZS, 0)
   assert.equal(summary.monthlyRentUzs, 24_000_000)
+  assert.equal(summary.monthlyUtilitiesUzs, 4_500_000)
   assert.equal(summary.employeePaidToDate, 1_200_000)
+  assert.equal(summary.employeeFineToDate, 300_000)
   assert.equal(summary.employeeProjectedMonth, 8_400_000)
-  assert.equal(summary.employeeRemainingThisMonth, 7_200_000)
+  assert.equal(summary.employeeRemainingThisMonth, 6_900_000)
   assert.equal(summary.estimatedMonthlyExpenseUzs, 8_400_000)
 })
 
@@ -1033,6 +1044,7 @@ test('monthly expense estimate does not project salary or rent before POS activi
   assert.equal(summary.activeFromDate, '2026-06-01')
   assert.equal(summary.isBeforeActiveMonth, true)
   assert.equal(summary.monthlyRentUzs, 0)
+  assert.equal(summary.monthlyUtilitiesUzs, 0)
   assert.equal(summary.employeePaidToDate, 0)
   assert.equal(summary.employeeProjectedMonth, 0)
   assert.equal(summary.employeeRemainingThisMonth, 0)

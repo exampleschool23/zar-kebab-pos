@@ -292,6 +292,12 @@ These bugs were recently fixed and are now protected by tests:
    - The correction restores that day's salary accrual and is captured in the immutable Accounting audit. Telegram messages already delivered cannot be recalled.
    - Deleted bonus, fine, absence, and salary-rate events remove their polymorphic Telegram delivery rows so they cannot remain retryable.
 
+34. Monthly estimates must expose the full remaining commitment.
+   - Monthly utilities are configured in `business_settings.monthly_utilities_uzs` and reconciled against recorded `utilities` expenses just like rent.
+   - The at-a-glance balance is income minus actual cash expenses, then minus remaining salary, salary arrears, rent, and utilities.
+   - Bonuses are cash expenses. Fines reduce payroll liability but never become cash expenses. Absences reduce projected salary and are shown as days.
+   - Payroll, fixed bills, and operating costs stay separate so paid, planned, and still-due amounts remain understandable.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -397,6 +403,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/125_audit_salary_absence.sql`
   Adds immutable Accounting audit coverage for absence creation, editing, and deletion.
+
+- `supabase/126_business_settings_monthly_utilities.sql`
+  Adds the monthly utilities plan used by the Accounting monthly estimate.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

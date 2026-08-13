@@ -4,6 +4,7 @@ export const EXPENSE_PAYMENT_METHODS = ['cash', 'card', 'terminal']
 export const ACCOUNTING_CASHFLOW_METHODS = ['cash', 'card', 'terminal', 'loyalty_card']
 export const EXPENSE_ENTRY_TYPES = ['expense', 'income']
 export const DEFAULT_MONTHLY_RENT_UZS = 0
+export const DEFAULT_MONTHLY_UTILITIES_UZS = 0
 export const ACCOUNTING_HISTORY_START_DATE = '2000-01-01'
 
 export const EXPENSE_CATEGORIES = [
@@ -471,6 +472,7 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
   const activeFromDate = String(options.activeFromDate || '').slice(0, 10)
   const isBeforeActiveMonth = activeFromDate && monthEnd < activeFromDate
   const monthlyRentUzs = isBeforeActiveMonth ? 0 : Math.max(0, Math.round(Number(options.monthlyRentUzs ?? DEFAULT_MONTHLY_RENT_UZS) || 0))
+  const monthlyUtilitiesUzs = isBeforeActiveMonth ? 0 : Math.max(0, Math.round(Number(options.monthlyUtilitiesUzs ?? DEFAULT_MONTHLY_UTILITIES_UZS) || 0))
   let employeePaidToDate = 0
   let employeeFineToDate = 0
   let employeeProjectedMonth = 0
@@ -530,6 +532,8 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
     }
   }
   const employeeRemainingThisMonth = Math.max(0, employeeProjectedMonth - employeeAppliedToCurrentMonth)
+  const employeeArrearsRemaining = Math.max(0, employeeOpeningArrears - employeePaidTowardArrears)
+  const employeeRemainingTotal = employeeArrearsRemaining + employeeRemainingThisMonth
 
   return {
     monthStart,
@@ -538,6 +542,7 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
     activeFromDate,
     isBeforeActiveMonth: Boolean(isBeforeActiveMonth),
     monthlyRentUzs,
+    monthlyUtilitiesUzs,
     employeePaidToDate,
     employeeFineToDate,
     employeeProjectedMonth,
@@ -545,6 +550,8 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
     employeePaidTowardArrears,
     employeeAppliedToCurrentMonth,
     employeeRemainingThisMonth,
+    employeeArrearsRemaining,
+    employeeRemainingTotal,
     estimatedMonthlyExpenseUzs: employeeProjectedMonth,
   }
 }

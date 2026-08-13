@@ -153,6 +153,8 @@ test('current-month payments settle each employee opening arrears before current
   assert.equal(summary.employeePaidTowardArrears, 2_000_000)
   assert.equal(summary.employeeAppliedToCurrentMonth, 1_000_000)
   assert.equal(summary.employeeRemainingThisMonth, 5_200_000)
+  assert.equal(summary.employeeArrearsRemaining, 1_000_000)
+  assert.equal(summary.employeeRemainingTotal, 6_200_000)
 })
 
 test('payments that exceed opening arrears reduce only the remaining current-month salary', () => {
@@ -175,5 +177,7 @@ test('payments that exceed opening arrears reduce only the remaining current-mon
   assert.equal(summary.employeePaidTowardArrears, 2_000_000)
   assert.equal(summary.employeeAppliedToCurrentMonth, 1_000_000)
   assert.equal(summary.employeeRemainingThisMonth, 2_100_000)
+  assert.equal(summary.employeeArrearsRemaining, 0)
+  assert.equal(summary.employeeRemainingTotal, 2_100_000)
   assert.equal(getSalaryDue(profile, '2026-07-20'), 1_000_000)
 })

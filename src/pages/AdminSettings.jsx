@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Store, Percent, Globe, Printer, Bell, Shield, Table2, ChefHat,
-  Check, ChevronRight, Activity, AlertTriangle, RefreshCw, Home,
+  Check, ChevronRight, Activity, AlertTriangle, RefreshCw, Home, Zap,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -77,6 +77,7 @@ export default function AdminSettings() {
   const [restaurantName, setRestaurantName] = useState(settings.restaurantName)
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
   const [monthlyRentUzs, setMonthlyRentUzs] = useState(String(settings.monthlyRentUzs || ''))
+  const [monthlyUtilitiesUzs, setMonthlyUtilitiesUzs] = useState(String(settings.monthlyUtilitiesUzs || ''))
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
   const [autoPrintKitchenCheck, setAutoPrintKitchenCheck] = useState(!!settings.autoPrintKitchenCheck)
   const [receiptMarketing, setReceiptMarketing] = useState(settings.receiptMarketing || 'compactFooter')
@@ -92,10 +93,11 @@ export default function AdminSettings() {
     setRestaurantName(settings.restaurantName)
     setServiceRate(settings.serviceRate)
     setMonthlyRentUzs(String(settings.monthlyRentUzs || ''))
+    setMonthlyUtilitiesUzs(String(settings.monthlyUtilitiesUzs || ''))
     setAutoPrint(settings.autoPrint)
     setAutoPrintKitchenCheck(!!settings.autoPrintKitchenCheck)
     setReceiptMarketing(settings.receiptMarketing || 'compactFooter')
-  }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.autoPrint, settings.autoPrintKitchenCheck, settings.receiptMarketing])
+  }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.monthlyUtilitiesUzs, settings.autoPrint, settings.autoPrintKitchenCheck, settings.receiptMarketing])
 
   async function saveSettings(overrides = {}) {
     if (!canManageSettings) return
@@ -105,6 +107,7 @@ export default function AdminSettings() {
       restaurantName,
       serviceRate,
       monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0),
+      monthlyUtilitiesUzs: Number(normalizeMoneyInput(monthlyUtilitiesUzs) || 0),
       autoPrint,
       autoPrintKitchenCheck,
       receiptMarketing,
@@ -157,6 +160,8 @@ export default function AdminSettings() {
       serviceChargeSub: 'Barcha buyurtmalarga qo\'shiladi',
       monthlyRent:     'Oylik ijara',
       monthlyRentSub:  'Buxgalteriya taxminida UZS ko‘rinadi',
+      monthlyUtilities: 'Oylik kommunal',
+      monthlyUtilitiesSub: 'Kommunal to‘lovlar oylik taxminiga qo‘shiladi',
       system:          'Tizim',
       tableManagement: 'Stollar',
       tableManagementSub: 'Restoran stollari, zonalari va sig‘imini boshqarish',
@@ -219,6 +224,8 @@ export default function AdminSettings() {
       serviceChargeSub: 'Добавляется ко всем заказам',
       monthlyRent:     'Ежемесячная аренда',
       monthlyRentSub:  'Показывается в прогнозе бухгалтерии в UZS',
+      monthlyUtilities: 'Ежемесячная коммуналка',
+      monthlyUtilitiesSub: 'Добавляется в месячный прогноз расходов',
       system:          'Система',
       tableManagement: 'Столы',
       tableManagementSub: 'Управление столами, зонами и вместимостью',
@@ -281,6 +288,8 @@ export default function AdminSettings() {
       serviceChargeSub: 'Added to all orders',
       monthlyRent:     'Monthly rent',
       monthlyRentSub:  'Shown in accounting estimate as UZS',
+      monthlyUtilities: 'Monthly utilities bill',
+      monthlyUtilitiesSub: 'Included in the monthly accounting estimate',
       system:          'System',
       tableManagement: 'Tables',
       tableManagementSub: 'Manage restaurant tables, zones, and capacity',
@@ -387,6 +396,20 @@ export default function AdminSettings() {
                 inputMode="numeric"
                 value={formatMoneyInput(monthlyRentUzs)}
                 onChange={event => setMonthlyRentUzs(normalizeMoneyInput(event.target.value))}
+                disabled={!canManageSettings}
+                className="w-[180px] rounded-xl border border-[#E5E7EB] px-3 py-2 pr-12 text-right text-[13px] font-bold tabular-nums text-[#1F2937] transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]"
+                placeholder="0"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-black text-[#9CA3AF]">UZS</span>
+            </div>
+          </SettingRow>
+          <SettingRow icon={Zap} label={l.monthlyUtilities} sub={l.monthlyUtilitiesSub}>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatMoneyInput(monthlyUtilitiesUzs)}
+                onChange={event => setMonthlyUtilitiesUzs(normalizeMoneyInput(event.target.value))}
                 disabled={!canManageSettings}
                 className="w-[180px] rounded-xl border border-[#E5E7EB] px-3 py-2 pr-12 text-right text-[13px] font-bold tabular-nums text-[#1F2937] transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]"
                 placeholder="0"
