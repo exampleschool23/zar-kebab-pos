@@ -15,7 +15,6 @@ import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivi
 import { formatDateTime, formatElapsedSince, formatTime } from '../lib/dateFormat'
 import { earliestReliableTime, getReliableOrderItemTime } from '../lib/orderTimestamps'
 import { canEditFeature } from '../lib/permissions'
-import { createGuestModeSession, writeGuestModeSession } from '../lib/guestMode'
 import { getTableGuestEntryContext } from '../lib/tableGuestEntry'
 import { TableGuestEntryDialog } from '../components/GuestModeUI'
 
@@ -650,7 +649,7 @@ export default function WaiterTables() {
     setGuestEntryError('')
   }
 
-  async function openTableForGuest(pin) {
+  async function openTable() {
     if (!canEditTables || !pendingGuestTable || guestEntryBusy || guestEntryRequestRef.current) return
     const { table } = pendingGuestTable
     const latestContext = getTableGuestEntryContext(table.id, state.orders)
@@ -681,36 +680,20 @@ export default function WaiterTables() {
     guestEntryRequestRef.current = true
     setGuestEntryBusy(true)
     setGuestEntryError('')
-    let storedSession = false
     try {
-      const session = await createGuestModeSession({
-        tableId: table.id,
-        staffUserId: profile?.id || state.user?.id,
-        pin,
-        priceMode: selectedPriceMode,
-        guestLang: 'en',
-        cart: [],
-        activeOrderIds: latestContext.activeOrderIds,
-      })
-      writeGuestModeSession(session)
-      storedSession = true
       if (table.status === 'reserved') {
         const reservationResult = await dispatch({ type: 'UPDATE_TABLE', payload: clearReservationPatch(table) })
         if (reservationResult?.error) throw reservationResult.error
       }
       dispatch({ type: 'SET_TABLE', payload: table.id })
       dispatch({ type: 'CLEAR_CART' })
-      navigate(session.routePath, { replace: true })
+      navigate(`/waiter/order/${encodeURIComponent(table.id)}?priceMode=${encodeURIComponent(selectedPriceMode)}`)
     } catch {
-      if (storedSession) {
-        navigate(`/waiter/order/${encodeURIComponent(table.id)}`, { replace: true })
-        return
-      }
       setGuestEntryError(lang === 'uz'
-        ? 'Stolni xavfsiz ochib bo‘lmadi. Qayta urinib ko‘ring.'
+        ? 'Stolni ochib bo‘lmadi. Qayta urinib ko‘ring.'
         : lang === 'ru'
-          ? 'Не удалось безопасно открыть стол. Попробуйте снова.'
-          : 'The table could not be opened safely. Please try again.')
+          ? 'Не удалось открыть стол. Попробуйте снова.'
+          : 'The table could not be opened. Please try again.')
     } finally {
       guestEntryRequestRef.current = false
       setGuestEntryBusy(false)
@@ -920,7 +903,7 @@ export default function WaiterTables() {
               busy={guestEntryBusy}
               error={guestEntryError}
               onCancel={closeGuestEntry}
-              onSubmit={openTableForGuest}
+              onSubmit={openTable}
             />
           )}
         </div>

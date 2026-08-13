@@ -40,12 +40,34 @@ test('Guest submission can use the reviewed cart snapshot before React state cat
   assert.match(dbSource, /if \(\(!isOffPremise && !table\) \|\| items\.length === 0\) return/)
 })
 
-test('automatic matching PIN submission remains guarded from duplicate requests', () => {
+test('PIN verification and table entry remain guarded from duplicate requests', () => {
   const dialogSource = fs.readFileSync(new URL('../src/components/GuestModeUI.jsx', import.meta.url), 'utf8')
   const tablesSource = fs.readFileSync(new URL('../src/pages/WaiterTables.jsx', import.meta.url), 'utf8')
 
   assert.match(dialogSource, /submitRequestRef\.current/)
   assert.match(tablesSource, /guestEntryRequestRef\.current/)
+})
+
+test('table entry requires only R or T and carries the selected mode into waiter ordering', () => {
+  const dialogSource = fs.readFileSync(new URL('../src/components/GuestModeUI.jsx', import.meta.url), 'utf8')
+  const tablesSource = fs.readFileSync(new URL('../src/pages/WaiterTables.jsx', import.meta.url), 'utf8')
+  const orderSource = fs.readFileSync(new URL('../src/pages/WaiterOrder.jsx', import.meta.url), 'utf8')
+  const appSource = fs.readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+  const dialogStart = dialogSource.indexOf('export function TableGuestEntryDialog')
+  const dialogEnd = dialogSource.indexOf('\nexport function GuestSelectionReady', dialogStart)
+  const tableEntryDialog = dialogSource.slice(dialogStart, dialogEnd)
+  const openStart = tablesSource.indexOf('async function openTable()')
+  const openEnd = tablesSource.indexOf('\n  function handleManageOrder', openStart)
+  const openTable = tablesSource.slice(openStart, openEnd)
+
+  assert.match(tableEntryDialog, /name="table-price-mode"/)
+  assert.match(tableEntryDialog, /disabled=\{busy \|\| !validPriceMode\}/)
+  assert.doesNotMatch(tableEntryDialog, /type="password"|inputMode="numeric"|confirmPin|temporaryStaffPin/)
+  assert.doesNotMatch(tablesSource, /createGuestModeSession|writeGuestModeSession/)
+  assert.match(openTable, /priceMode=\$\{encodeURIComponent\(selectedPriceMode\)\}/)
+  assert.match(orderSource, /const requestedPriceMode\s*= normalizePriceMode\(searchParams\.get\('priceMode'\)\)/)
+  assert.match(orderSource, /activeOrder \|\| state\.cart\.length > 0[\s\S]*requestedPriceMode/)
+  assert.match(appSource, /if \(guestModeSession\) clearGuestModeSession\(\)/)
 })
 
 test('Staff Access verifies immediately when the final PIN digit is entered', () => {

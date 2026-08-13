@@ -21,7 +21,7 @@ import { useAppDataStatus } from '../store/appHooks'
 import { getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { isCustomerMenuCategory, isCustomerMenuItem, isWaiterMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
-import { DEFAULT_PRICE_MODE, calculateUnitPrice, getMenuItemForPriceMode, resolveOrderingPriceMode } from '../lib/priceModes'
+import { DEFAULT_PRICE_MODE, calculateUnitPrice, getMenuItemForPriceMode, normalizePriceMode, resolveOrderingPriceMode } from '../lib/priceModes'
 import { canEditFeature } from '../lib/permissions'
 import { rebuildGuestCartFromCatalog } from '../lib/guestCart'
 import {
@@ -604,6 +604,7 @@ export default function WaiterOrder() {
   const navigate            = useNavigate()
   const location            = useLocation()
   const [searchParams]      = useSearchParams()
+  const requestedPriceMode  = normalizePriceMode(searchParams.get('priceMode'))
   const { state, dispatch } = useApp()
   const { loaded, loadError } = useAppDataStatus()
   const { profile, signOut } = useAuth()
@@ -628,7 +629,7 @@ export default function WaiterOrder() {
   const [isSendingOrder,setSendingOrder] = useState(false)
   const isTakeAwayFlow = !tableId
   const [orderType,     setOrderType]    = useState(isTakeAwayFlow ? 'take_away' : 'dine_in')
-  const [priceMode,     setPriceMode]    = useState(isGuestTabletMode ? guestSessionPriceMode : DEFAULT_PRICE_MODE)
+  const [priceMode,     setPriceMode]    = useState(isGuestTabletMode ? guestSessionPriceMode : requestedPriceMode)
   const [guestUnlockOpen, setGuestUnlockOpen] = useState(false)
   const [guestModeBusy, setGuestModeBusy] = useState(false)
   const [guestModeError, setGuestModeError] = useState('')
@@ -710,8 +711,10 @@ export default function WaiterOrder() {
       return
     }
     if (isSendingOrder) return
-    setPriceMode(resolveOrderingPriceMode(activeOrder, state.cart))
-  }, [activeOrder?.id, activeOrder?.price_mode, guestSessionPriceMode, isGuestTabletMode, isSendingOrder, state.cart.length])
+    setPriceMode(activeOrder || state.cart.length > 0
+      ? resolveOrderingPriceMode(activeOrder, state.cart)
+      : requestedPriceMode)
+  }, [activeOrder?.id, activeOrder?.price_mode, guestSessionPriceMode, isGuestTabletMode, isSendingOrder, requestedPriceMode, state.cart.length])
 
   useEffect(() => {
     if (!isGuestTabletMode) {

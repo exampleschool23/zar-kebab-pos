@@ -252,13 +252,11 @@ These bugs were recently fixed and are now protected by tests:
    - Migration `121` enforces the same restriction for direct updates and product-creation RPCs.
    - `cashier_only`, category visibility, schedules, and per-option visibility are separate controls and are not covered by this field-specific rule.
 
-27. Customer tablet Guest mode must never become another staff ordering surface.
-   - Before opening a table, staff explicitly chooses the compact R or T pricing option and creates a temporary two-digit exit PIN. The menu opens only after the locked Guest session is stored.
-   - The lock is device-wide, but its live cart belongs to the handoff browser tab so another POS tab cannot overwrite an unrelated draft.
-   - Guest mode uses public menu/category/option visibility, keeps the selected price mode fixed, hides staff navigation and existing orders, and can only finish a selection for staff review; it never sends to the kitchen.
-   - Stored cart rows are rebuilt from the current public catalog on restore, visibility changes, finish, and unlock. Browser-stored names, availability, options, quantities, and prices are never authoritative.
-   - Unlock restores the selection for the waiter. If the table's active order set changed during handoff, kitchen submission stays blocked until the waiter explicitly confirms review.
-   - This PIN is a kiosk UX boundary layered over the authenticated staff session, not hostile-client authorization. Use iPad Guided Access, Android kiosk mode, or an equivalent single-app browser when physically handing the tablet to customers.
+27. Opening a waiter table is a direct price-mode choice.
+   - Staff chooses the compact R or T pricing option and enters the waiter order page immediately; table entry must not ask for a PIN or create a Guest-mode session.
+   - The selected mode is carried in the order route until the cart or active order becomes the authoritative price-mode source.
+   - Active orders keep their saved mode locked, and conflicting active modes still require staff review rather than guessing.
+   - Legacy stored Guest sessions are cleared automatically so older tablets cannot remain trapped behind the retired PIN flow.
 
 28. Price-mode recalculation must keep the menu, cart, and open order in sync.
    - Before a kitchen order exists, a non-empty cart's saved `price_mode` is the ordering-mode source of truth. Do not reset the menu to Regular merely because `activeOrder` is absent.
@@ -270,15 +268,12 @@ These bugs were recently fixed and are now protected by tests:
    - Public, Telegram, guest, and waiter product cards use the current catalog estimate; it is not a promised completion timestamp and is not copied into historical order totals.
    - Product creation and editing must preserve the configured estimate, and customer-facing labels stay localized.
 
-30. Successful Guest-mode Staff Access is the order approval step.
-   - After PIN verification, rebuild the Guest selection from the current catalog and submit that reviewed snapshot to the kitchen before leaving Guest mode.
-   - Clear Guest mode and return to `/waiter/tables` only after the database submission succeeds. A failed or empty submission stays locked and displays an operational error.
-   - The submission action carries the reviewed cart snapshot because React cart state may not have committed before the database-first kitchen write begins.
-   - Matching-PIN auto-submit is single-flight because mobile keyboards can emit a change and form submit back-to-back.
-   - Unlock dialogs verify automatically as soon as the final PIN digit is entered; the Unlock button remains a fallback and must not be required.
-   - A correct Staff Access PIN always exits Guest mode. An empty or catalog-invalid guest selection returns directly to the table grid without creating an order or showing an empty-order error.
+30. Table entry must remain understandable to operational staff.
+   - The entry dialog contains only R/T, Cancel, and Enter table controls.
+   - It never creates an order merely by opening the table; the waiter builds the cart and uses the normal Send to Kitchen action.
+   - Reserved-table seating still clears reservation fields before entering the order page.
 
-31. Empty order shells must not lock Guest-mode pricing.
+31. Empty order shells must not lock table pricing.
    - `getTableGuestEntryContext()` considers only unpaid, non-cancelled table orders that still contain at least one non-cancelled, positive-value item.
    - Empty orders, stale stored totals without items, and orders whose items are all cancelled do not show the active-order notice or disable the R/T choice.
 
@@ -534,7 +529,7 @@ Tests use Node's built-in test runner. Current files:
   Deterministic newest-first ordering for combined salary payments, bonuses, and fines.
 
 - `tests/guestMode.test.js` and `tests/guestCart.test.js`
-  Guest PIN/route locking, reload and cross-tab recovery, public-catalog cart rebuilding, and Tourist variant price integrity.
+  Legacy Guest-session storage safety and public-catalog cart rebuilding while the retired flow is phased out.
 
 Always run:
 
@@ -567,7 +562,7 @@ npm run build
 - Kitchen retries preserve their attempt ids and the RPC is idempotent by order/round.
 - Returning to `WaiterTables` refreshes orders/tables and renews realtime without clearing the visible grid.
 - Initial/realtime operational loading never downloads current-year paid history and still includes all active orders.
-- Tablet Guest mode hides staff controls, uses public visibility, never submits directly, and retains PIN/cart/order-context safety across reloads.
+- Waiter table entry requires only R/T, carries that mode into ordering, and clears legacy Guest locks.
 
 If these tests fail, understand why before changing the guard. They exist because these exact failures reached the user.
 

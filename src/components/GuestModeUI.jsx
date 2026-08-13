@@ -119,16 +119,13 @@ export function guestModeCopy(lang = 'en') {
       emptyCart: 'Avval menyudan taom tanlang.',
       entryEyebrow: 'Stolga kirish',
       entryTitle: tableName => `${tableName || 'Stol'} ni ochish`,
-      entryBody: 'Variantni tanlang va xodim boshqaruviga qaytish PIN-ini yarating.',
+      entryBody: 'R yoki T narx turini tanlab stolga kiring.',
       pricingTitle: 'Variant',
       regularPrice: 'Oddiy',
       touristPrice: 'Turist',
       priceModeRequired: 'R yoki T-ni tanlang.',
       pricingLocked: 'Bu stolda faol buyurtma bor. Tanlangan variantni o‘zgartirib bo‘lmaydi.',
-      temporaryStaffPin: 'Vaqtinchalik xodim PIN-i',
-      entryPinBody: 'Mehmon tanlovini tekshirish va xodim boshqaruviga qaytish uchun ushbu PIN-dan foydalanasiz.',
-      entryActivate: 'Qulflash va stolni ochish',
-      entrySafety: 'Xodim tekshirmaguncha hech narsa oshxonaga yuborilmaydi.',
+      entryActivate: 'Stolga kirish',
     },
     ru: {
       handToGuest: 'Передать гостю',
@@ -155,16 +152,13 @@ export function guestModeCopy(lang = 'en') {
       emptyCart: 'Сначала выберите блюда из меню.',
       entryEyebrow: 'Открытие стола',
       entryTitle: tableName => `Открыть ${tableName || 'стол'}`,
-      entryBody: 'Выберите вариант и создайте PIN для возврата к функциям персонала.',
+      entryBody: 'Выберите тип цены R или T и войдите в стол.',
       pricingTitle: 'Вариант',
       regularPrice: 'Обычное',
       touristPrice: 'Турист',
       priceModeRequired: 'Выберите R или T.',
       pricingLocked: 'У стола уже есть активный заказ. Выбранный вариант изменить нельзя.',
-      temporaryStaffPin: 'Временный PIN сотрудника',
-      entryPinBody: 'Используйте этот PIN, чтобы проверить выбор гостя и вернуться к функциям персонала.',
-      entryActivate: 'Заблокировать и открыть стол',
-      entrySafety: 'Ничего не будет отправлено на кухню, пока сотрудник не проверит выбор.',
+      entryActivate: 'Войти в стол',
     },
     en: {
       handToGuest: 'Hand to guest',
@@ -191,16 +185,13 @@ export function guestModeCopy(lang = 'en') {
       emptyCart: 'Choose something from the menu first.',
       entryEyebrow: 'Table access',
       entryTitle: tableName => `Open ${tableName || 'table'}`,
-      entryBody: 'Choose an option and create the PIN used to return to staff controls.',
+      entryBody: 'Choose the R or T price type and enter the table.',
       pricingTitle: 'Option',
       regularPrice: 'Regular',
       touristPrice: 'Tourist',
       priceModeRequired: 'Choose R or T.',
       pricingLocked: 'This table has an active order. Its selected option cannot be changed.',
-      temporaryStaffPin: 'Temporary staff PIN',
-      entryPinBody: 'Use this PIN to review the guest’s selection and return to staff controls.',
-      entryActivate: 'Lock and open table',
-      entrySafety: 'Nothing is sent to the kitchen until a staff member reviews the selection.',
+      entryActivate: 'Enter table',
     },
   }
   return copy[lang] || copy.en
@@ -424,33 +415,23 @@ export function TableGuestEntryDialog({
   onSubmit,
 }) {
   const l = guestModeCopy(lang)
-  const [pin, setPin] = useState('')
-  const [confirmPin, setConfirmPin] = useState('')
   const [validationError, setValidationError] = useState('')
   const dialogRef = useRef(null)
   const regularModeRef = useRef(null)
-  const pinInputRef = useRef(null)
-  const confirmPinInputRef = useRef(null)
   const submitRequestRef = useRef(false)
   const titleId = useId()
   const descriptionId = useId()
   const pricingTitleId = useId()
   const pricingLockedId = useId()
-  const pinHelpId = useId()
-  const safetyId = useId()
   const errorId = useId()
-  const pinInputId = useId()
-  const confirmPinInputId = useId()
   const validPriceMode = priceMode === PRICE_MODE_REGULAR || priceMode === PRICE_MODE_TOURIST
   const handleModalKeyDown = useModalKeyboard({
     dialogRef,
-    initialFocusRef: priceModeLocked ? pinInputRef : regularModeRef,
+    initialFocusRef: regularModeRef,
     onEscape: () => { if (!busy) onCancel?.() },
   })
 
   useEffect(() => {
-    setPin('')
-    setConfirmPin('')
     setValidationError('')
   }, [tableName])
 
@@ -460,38 +441,6 @@ export function TableGuestEntryDialog({
     onPriceModeChange?.(nextMode)
   }
 
-  function changePin(value) {
-    const nextPin = normalizeGuestModePin(value)
-    setPin(nextPin)
-    setValidationError('')
-    if (nextPin.length === GUEST_MODE_PIN_LENGTH) {
-      focusWithoutScrolling(confirmPinInputRef.current)
-    }
-  }
-
-  function changeConfirmPin(value) {
-    const nextConfirmPin = normalizeGuestModePin(value)
-    setConfirmPin(nextConfirmPin)
-    setValidationError('')
-    if (
-      !busy &&
-      validPriceMode &&
-      pin.length === GUEST_MODE_PIN_LENGTH &&
-      nextConfirmPin.length === GUEST_MODE_PIN_LENGTH &&
-      nextConfirmPin === pin
-    ) {
-      submitPin(pin)
-    }
-  }
-
-  function moveToConfirmPin(event) {
-    blockNonNumericPinKey(event)
-    if (event.defaultPrevented) return
-    if (event.key !== 'Enter') return
-    event.preventDefault()
-    focusWithoutScrolling(confirmPinInputRef.current)
-  }
-
   function submit(event) {
     event.preventDefault()
     if (!validPriceMode) {
@@ -499,25 +448,15 @@ export function TableGuestEntryDialog({
       focusWithoutScrolling(regularModeRef.current)
       return
     }
-    if (pin.length !== GUEST_MODE_PIN_LENGTH || confirmPin.length !== GUEST_MODE_PIN_LENGTH) {
-      setValidationError(l.pinLength(GUEST_MODE_PIN_LENGTH))
-      focusWithoutScrolling(pin.length === GUEST_MODE_PIN_LENGTH ? confirmPinInputRef.current : pinInputRef.current)
-      return
-    }
-    if (pin !== confirmPin) {
-      setValidationError(l.pinMismatch)
-      focusWithoutScrolling(confirmPinInputRef.current)
-      return
-    }
     setValidationError('')
-    submitPin(pin)
+    submitSelection()
   }
 
-  async function submitPin(value) {
+  async function submitSelection() {
     if (busy || submitRequestRef.current) return
     submitRequestRef.current = true
     try {
-      await onSubmit?.(value)
+      await onSubmit?.()
     } finally {
       submitRequestRef.current = false
     }
@@ -538,7 +477,7 @@ export function TableGuestEntryDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={`${descriptionId} ${pinHelpId} ${safetyId}${visibleError ? ` ${errorId}` : ''}`}
+        aria-describedby={`${descriptionId}${visibleError ? ` ${errorId}` : ''}`}
         tabIndex={-1}
         className="my-auto max-h-[calc(100dvh-2rem)] w-full max-w-[520px] overflow-y-auto rounded-[28px] border border-white/70 bg-white p-5 shadow-2xl sm:p-6"
       >
@@ -566,7 +505,7 @@ export function TableGuestEntryDialog({
                   <input
                     ref={index === 0 ? regularModeRef : undefined}
                     type="radio"
-                    name="guest-table-price-mode"
+                    name="table-price-mode"
                     value={choice.value}
                     checked={selected}
                     aria-label={choice.label}
@@ -586,65 +525,17 @@ export function TableGuestEntryDialog({
           )}
         </fieldset>
 
-        <div className="mt-5">
-          <label htmlFor={pinInputId} className="text-[12px] font-black uppercase tracking-wide text-[#1F2937]">{l.temporaryStaffPin}</label>
-          <p id={pinHelpId} className="mt-1 text-xs font-semibold leading-5 text-[#6B7280]">{l.entryPinBody}</p>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <input
-              ref={pinInputRef}
-              id={pinInputId}
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={GUEST_MODE_PIN_LENGTH}
-              enterKeyHint="next"
-              autoComplete="new-password"
-              aria-label={l.pin(GUEST_MODE_PIN_LENGTH)}
-              placeholder={l.pin(GUEST_MODE_PIN_LENGTH)}
-              value={pin}
-              onChange={event => changePin(event.target.value)}
-              onBeforeInput={blockNonNumericPinInput}
-              onKeyDown={moveToConfirmPin}
-              autoCapitalize="none"
-              spellCheck={false}
-              disabled={busy}
-              className="h-[52px] w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 text-center text-xl font-black tracking-[0.35em] text-[#1F2937] outline-none transition focus:border-[#ff5a00] focus:ring-4 focus:ring-orange-100 disabled:opacity-60"
-            />
-            <input
-              ref={confirmPinInputRef}
-              id={confirmPinInputId}
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={GUEST_MODE_PIN_LENGTH}
-              enterKeyHint="done"
-              autoComplete="new-password"
-              aria-label={l.confirmPin}
-              placeholder={l.confirmPin}
-              value={confirmPin}
-              onChange={event => changeConfirmPin(event.target.value)}
-              onBeforeInput={blockNonNumericPinInput}
-              onKeyDown={blockNonNumericPinKey}
-              autoCapitalize="none"
-              spellCheck={false}
-              disabled={busy}
-              className="h-[52px] w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 text-center text-xl font-black tracking-[0.35em] text-[#1F2937] outline-none transition focus:border-[#ff5a00] focus:ring-4 focus:ring-orange-100 disabled:opacity-60"
-            />
-          </div>
-        </div>
-
         {visibleError && (
           <p id={errorId} role="alert" className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-center text-xs font-bold text-red-700">{visibleError}</p>
         )}
 
-        <p id={safetyId} className="mt-4 text-center text-xs font-semibold leading-5 text-[#6B7280]">{l.entrySafety}</p>
         <div className="mt-4 flex gap-3">
           <button type="button" onClick={onCancel} disabled={busy} className="h-12 flex-1 rounded-xl border border-[#E5E7EB] bg-white text-sm font-black text-[#6B7280] hover:bg-gray-50 disabled:opacity-50">
             {l.cancel}
           </button>
           <button
             type="submit"
-            disabled={busy || !validPriceMode || pin.length !== GUEST_MODE_PIN_LENGTH || confirmPin.length !== GUEST_MODE_PIN_LENGTH}
+            disabled={busy || !validPriceMode}
             className="h-12 flex-[1.65] rounded-xl bg-[#ff5a00] px-3 text-sm font-black text-white shadow-lg shadow-orange-100 hover:bg-[#e64d00] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? '…' : l.entryActivate}
