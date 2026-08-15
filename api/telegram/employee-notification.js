@@ -15,6 +15,7 @@ import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salar
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
 import { buildInvestorIncomeGroupMessage } from './_lib/investorIncomeMessages.js'
+import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import {
   getSalaryEventRetryTargets,
   getSalaryPaymentRetryTargets,
@@ -61,6 +62,14 @@ function normalizeRole(role) {
 }
 
 async function requireExpensesWriteAccess(req) {
+  return requireFeatureWriteAccess(req, 'expenses')
+}
+
+async function requireBazaarWriteAccess(req) {
+  return requireFeatureWriteAccess(req, 'bazaar')
+}
+
+async function requireFeatureWriteAccess(req, featureKey) {
   const token = getBearerToken(req)
   if (!token) throw Object.assign(new Error('Authentication required'), { status: 401 })
 
@@ -80,8 +89,12 @@ async function requireExpensesWriteAccess(req) {
   const isPrimaryOwner = role === 'owner'
     && FEATURE_ACCESS_MANAGER_EMAILS.has(String(profile?.email || '').trim().toLowerCase())
   const hasImplicitOwnerAccess = role === 'owner' && access === null
-  const hasExplicitExpensesWrite = EDITOR_ROLES.has(role) && access?.includes('expenses')
-  if (profile?.status !== 'active' || (!isPrimaryOwner && !hasImplicitOwnerAccess && !hasExplicitExpensesWrite)) {
+  const hasExplicitFeatureWrite = EDITOR_ROLES.has(role) && (
+    featureKey === 'expenses'
+      ? access?.includes('expenses')
+      : featureKey === 'bazaar' && access?.includes('bazaar')
+  )
+  if (profile?.status !== 'active' || (!isPrimaryOwner && !hasImplicitOwnerAccess && !hasExplicitFeatureWrite)) {
     throw Object.assign(new Error('Forbidden'), { status: 403 })
   }
 
@@ -1021,11 +1034,55 @@ async function notifyInvestorIncome(supabase, user, expenseId) {
   }
 }
 
+async function notifyDailyBazaar(supabase, purchaseDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(purchaseDate || ''))) {
+    throw Object.assign(new Error('A valid Bazaar purchase date is required'), { status: 400 })
+  }
+  const { data: purchases, error } = await supabase
+    .from('bazaar_purchases')
+    .select(`
+      id,
+      purchase_date,
+      total_amount,
+      entry_source,
+      bazaar_purchase_items (
+        id,
+        product_name,
+        quantity,
+        unit,
+        line_total,
+        sort_order
+      )
+    `)
+    .eq('purchase_date', purchaseDate)
+    .eq('entry_source', 'daily_bazaar')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  const availablePurchases = (purchases || []).filter(purchase => (
+    (purchase.bazaar_purchase_items || []).length > 0
+  ))
+  if (availablePurchases.length === 0) {
+    throw Object.assign(new Error('No Daily Bazaar entries found for the selected date'), { status: 404 })
+  }
+
+  const target = await loadSalaryGroupTarget(supabase)
+  if (!target.chatId) {
+    throw Object.assign(new Error('Salary Events Telegram channel is not configured'), { status: 503 })
+  }
+  const text = buildDailyBazaarGroupMessage(availablePurchases, purchaseDate, target.language)
+  const response = await sendTelegramMessage(target.chatId, text)
+  return {
+    ok: true,
+    target: 'salary_events',
+    telegramMessageId: getTelegramMessageId(response),
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
   try {
-    const { type, fineId, paymentId, bonusId, absenceId, rateId, expenseId } = await readJson(req)
+    const { type, fineId, paymentId, bonusId, absenceId, rateId, expenseId, purchaseDate } = await readJson(req)
     const notificationType = type
       || (paymentId
         ? 'payment'
@@ -1039,6 +1096,8 @@ export default async function handler(req, res) {
                 ? 'rate'
                 : expenseId
                   ? 'investor_income'
+                  : purchaseDate
+                    ? 'daily_bazaar'
                 : '')
     const eventIds = {
       payment: paymentId,
@@ -1047,17 +1106,23 @@ export default async function handler(req, res) {
       absence: absenceId,
       rate: rateId,
       investor_income: expenseId,
+      daily_bazaar: purchaseDate,
     }
-    if (!['fine', 'payment', 'bonus', 'absence', 'rate', 'investor_income'].includes(notificationType)) {
+    if (!['fine', 'payment', 'bonus', 'absence', 'rate', 'investor_income', 'daily_bazaar'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (!eventIds[notificationType]) {
       return json(res, 400, { error: `${notificationType}Id is required` })
     }
 
-    const { supabase, user, actorName } = await requireExpensesWriteAccess(req)
+    const auth = notificationType === 'daily_bazaar'
+      ? await requireBazaarWriteAccess(req)
+      : await requireExpensesWriteAccess(req)
+    const { supabase, user, actorName } = auth
     let result
-    if (notificationType === 'investor_income') {
+    if (notificationType === 'daily_bazaar') {
+      result = await notifyDailyBazaar(supabase, purchaseDate)
+    } else if (notificationType === 'investor_income') {
       result = await notifyInvestorIncome(supabase, user, expenseId)
     } else if (notificationType === 'payment') {
       result = await notifyPayment(supabase, user, paymentId)
