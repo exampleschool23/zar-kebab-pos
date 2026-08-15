@@ -11,6 +11,7 @@ test('Daily Bazaar Telegram message lists product quantity unit price and date t
     bazaar_purchase_items: [
       { product_name: 'Tomatoes <red>', quantity: 5, unit: 'kg', line_total: 60_000, sort_order: 0 },
       { product_name: 'Oil & spices', quantity: 2, unit: 'bottle', line_total: 90_000, sort_order: 1 },
+      { product_name: 'Chicken', quantity: 6700, unit: 'g', line_total: 247_900, sort_order: 2 },
     ],
   }], '2026-08-15', 'en')
 
@@ -20,7 +21,8 @@ test('Daily Bazaar Telegram message lists product quantity unit price and date t
   assert.match(message, /Quantity: 5 kg · Unit price: 12\D000 UZS \/ kg/)
   assert.match(message, /Oil &amp; spices/)
   assert.match(message, /Quantity: 2 bottle · Unit price: 45\D000 UZS \/ bottle/)
-  assert.match(message, /Bazaar total: <b>150\D000 UZS<\/b>/)
+  assert.match(message, /Quantity: 6\.7 kg · Unit price: 37\D000 UZS \/ kg/)
+  assert.match(message, /Bazaar total: <b>397\D900 UZS<\/b>/)
 })
 
 test('Daily Bazaar selected-date action uses the authenticated shared endpoint and Salary Events target', () => {

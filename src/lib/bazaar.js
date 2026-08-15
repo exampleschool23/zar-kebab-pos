@@ -134,6 +134,15 @@ export function normalizeBazaarQuantityToBase(quantity, unit) {
   return { quantity: normalizedQuantity, unit: normalizedUnit }
 }
 
+export function getBazaarDisplayQuantity(quantity, unit) {
+  const normalizedQuantity = normalizeBazaarQuantity(quantity)
+  const normalizedUnit = normalizeBazaarUnit(unit)
+  if ((normalizedUnit === 'g' || normalizedUnit === 'ml') && normalizedQuantity >= 1000) {
+    return normalizeBazaarQuantityToBase(normalizedQuantity, normalizedUnit)
+  }
+  return { quantity: normalizedQuantity, unit: normalizedUnit }
+}
+
 export function normalizeBazaarItem(item = {}, index = 0) {
   const productName = normalizeBazaarText(item.product_name ?? item.productName ?? item.name)
   const productKey = normalizeBazaarProductKey(item.product_key || productName)

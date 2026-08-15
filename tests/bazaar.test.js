@@ -15,6 +15,7 @@ import {
   getBazaarRange,
   getBazaarSubmissionAttempt,
   getBazaarUnitCost,
+  getBazaarDisplayQuantity,
   normalizeBazaarMoney,
   normalizeBazaarProductKey,
   normalizeBazaarQuantity,
@@ -216,6 +217,13 @@ test('unit prices normalize weight to kilograms and preserve item units', () => 
   assert.equal(getBazaarUnitCost({ quantity: 4, unit: 'kg', line_total: 60_000 }), 15_000)
   assert.equal(getBazaarUnitCost({ quantity: 500, unit: 'g', line_total: 30_000 }), 60_000)
   assert.equal(getBazaarUnitCost({ quantity: 1, unit: 'pcs', line_total: 70_000 }), 70_000)
+})
+
+test('large gram and millilitre quantities promote to readable base units for display', () => {
+  assert.deepEqual(getBazaarDisplayQuantity(6700, 'g'), { quantity: 6.7, unit: 'kg' })
+  assert.deepEqual(getBazaarDisplayQuantity(6700, 'ml'), { quantity: 6.7, unit: 'l' })
+  assert.deepEqual(getBazaarDisplayQuantity(400, 'g'), { quantity: 400, unit: 'g' })
+  assert.deepEqual(getBazaarDisplayQuantity(750, 'ml'), { quantity: 750, unit: 'ml' })
 })
 
 test('product price changes compare aggregate unit costs across distinct purchases', () => {

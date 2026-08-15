@@ -4,6 +4,7 @@ import {
   bazaarUnitLabel,
   calculateBazaarTotal,
   formatBazaarQuantity,
+  getBazaarDisplayQuantity,
   getBazaarUnitCost,
   normalizeBazaarPurchase,
   normalizeBazaarQuantityToBase,
@@ -54,10 +55,11 @@ export function buildDailyBazaarGroupMessage(purchases = [], purchaseDate = '', 
 
   for (const [index, item] of items.entries()) {
     const baseUnit = normalizeBazaarQuantityToBase(item.quantity, item.unit).unit
+    const displayQuantity = getBazaarDisplayQuantity(item.quantity, item.unit)
     lines.push(
       '',
       `${index + 1}. <b>${escapeTelegramHtml(item.product_name)}</b>`,
-      `${copy.quantity}: ${escapeTelegramHtml(formatBazaarQuantity(item.quantity))} ${escapeTelegramHtml(bazaarUnitLabel(item.unit, lang))} · ${copy.unitPrice}: ${escapeTelegramHtml(formatCurrency(Math.round(getBazaarUnitCost(item))))} / ${escapeTelegramHtml(bazaarUnitLabel(baseUnit, lang))}`,
+      `${copy.quantity}: ${escapeTelegramHtml(formatBazaarQuantity(displayQuantity.quantity))} ${escapeTelegramHtml(bazaarUnitLabel(displayQuantity.unit, lang))} · ${copy.unitPrice}: ${escapeTelegramHtml(formatCurrency(Math.round(getBazaarUnitCost(item))))} / ${escapeTelegramHtml(bazaarUnitLabel(baseUnit, lang))}`,
     )
   }
 

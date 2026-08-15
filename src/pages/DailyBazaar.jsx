@@ -49,6 +49,7 @@ import {
   formatBazaarQuantity,
   getBazaarPurchaseScopedItems,
   getBazaarPurchaseScopedTotal,
+  getBazaarDisplayQuantity,
   getBazaarRange,
   getBazaarSubmissionAttempt,
   getBazaarUnitCost,
@@ -1335,54 +1336,66 @@ function BazaarHistory({
               </tr>
             </thead>
             <tbody>
-              {purchases.flatMap(purchase => {
+              {purchases.map((purchase, purchaseIndex) => {
                 const items = getBazaarPurchaseScopedItems(purchase, categoryFilter, query)
                 const total = getBazaarPurchaseScopedTotal(purchase, categoryFilter, query)
                 const MethodIcon = methodIcon(purchase.payment_method)
-                return items.map((item, index) => {
-                  const first = index === 0
-                  const rowSpan = items.length
-                  const unitCost = getBazaarUnitCost(item)
-                  const baseUnit = normalizeBazaarQuantityToBase(item.quantity, item.unit).unit
-                  return (
-                    <tr key={`${purchase.id}-${item.id || index}`} className={`${first ? 'border-t border-[#E5E7EB]' : 'border-t border-[#F3F4F6]'} text-xs text-[#4B5563] first:border-t-0`}>
-                      {first && (
-                        <td rowSpan={rowSpan} className="align-middle whitespace-nowrap px-3 py-2.5 font-black text-[#1F2937]">
-                          {formatLongDate(purchase.purchase_date, lang, purchase.purchase_date)}
-                        </td>
-                      )}
-                      <td className="px-3 py-2.5" title={item.notes || undefined}>
-                        <p className="truncate font-black text-[#1F2937]">{item.product_name}</p>
+                const columnCount = canManage ? 9 : 8
+                return (
+                  <React.Fragment key={purchase.id}>
+                    {purchaseIndex > 0 && (
+                      <tr aria-hidden="true">
+                        <td colSpan={columnCount} className="h-3 border-y border-[#E5E7EB] bg-[#FAF7F0] p-0" />
+                      </tr>
+                    )}
+                    {items.map((item, index) => {
+                      const unitCost = getBazaarUnitCost(item)
+                      const baseUnit = normalizeBazaarQuantityToBase(item.quantity, item.unit).unit
+                      const displayQuantity = getBazaarDisplayQuantity(item.quantity, item.unit)
+                      return (
+                        <tr key={`${purchase.id}-${item.id || index}`} className="border-t border-[#F3F4F6] text-xs text-[#4B5563] first:border-t-0">
+                          <td className="bg-[#FCFCFD] px-3 py-2.5" />
+                          <td className="px-3 py-2.5" title={item.notes || undefined}>
+                            <p className="truncate font-black text-[#1F2937]">{item.product_name}</p>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 font-black text-[#1F2937]">
+                            {formatBazaarQuantity(displayQuantity.quantity)} {bazaarUnitLabel(displayQuantity.unit, lang)}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-black text-[#1F2937] tabular-nums">
+                            {unitCost > 0 ? `${formatCurrency(Math.round(unitCost))} / ${bazaarUnitLabel(baseUnit, lang)}` : '—'}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-black text-[#1F2937] tabular-nums">
+                            {formatCurrency(item.line_total)}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-[11px] font-black text-[#6B7280]">{bazaarCategoryLabel(item.category, lang)}</span>
+                          </td>
+                          <td className="bg-[#FCFCFD] px-3 py-2.5" />
+                          <td className="bg-[#FCFCFD] px-3 py-2.5" />
+                          {canManage && <td className="bg-[#FCFCFD] px-3 py-2.5" />}
+                        </tr>
+                      )
+                    })}
+                    <tr data-bazaar-purchase-summary="true" className="border-t-2 border-[#DDE2E8] bg-[#F7F9FC] text-xs text-[#4B5563]">
+                      <td className="whitespace-nowrap px-3 py-3 font-black text-[#1F2937]">
+                        {formatLongDate(purchase.purchase_date, lang, purchase.purchase_date)}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 font-black text-[#1F2937]">
-                        {formatBazaarQuantity(item.quantity)} {bazaarUnitLabel(item.unit, lang)}
+                      <td colSpan={5} className="px-3 py-3 text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">
+                        {l.itemCount}: {items.length}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-black text-[#1F2937] tabular-nums">
-                        {unitCost > 0 ? `${formatCurrency(Math.round(unitCost))} / ${bazaarUnitLabel(baseUnit, lang)}` : '—'}
+                      <td className="px-3 py-3" title={purchase.notes || undefined}>
+                        <p className="truncate font-black text-[#1F2937]">{purchase.created_by_name || '—'}</p>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right text-sm font-black text-[#1F2937] tabular-nums">
-                        {formatCurrency(item.line_total)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-[11px] font-black text-[#6B7280]">{bazaarCategoryLabel(item.category, lang)}</span>
-                      </td>
-                      {first && (
-                        <td rowSpan={rowSpan} className="align-middle px-3 py-2.5" title={purchase.notes || undefined}>
-                          <p className="truncate font-black text-[#1F2937]">{purchase.created_by_name || '—'}</p>
-                        </td>
-                      )}
-                      {first && (
-                        <td rowSpan={rowSpan} className="align-middle px-3 py-2.5">
-                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                            <p className="text-sm font-black text-[#1F2937] tabular-nums">{formatCurrency(total)}</p>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-[#ff5a00]">
+                      <td className="px-3 py-3">
+                        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                          <p className="text-sm font-black text-[#1F2937] tabular-nums">{formatCurrency(total)}</p>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-[#ff5a00]">
                             <MethodIcon size={10} />{bazaarPaymentMethodLabel(purchase.payment_method, lang)}
-                            </span>
-                          </div>
-                        </td>
-                      )}
-                      {canManage && first && (
-                        <td rowSpan={rowSpan} className="align-middle px-3 py-2.5">
+                          </span>
+                        </div>
+                      </td>
+                      {canManage && (
+                        <td className="px-3 py-3">
                           <div className="flex justify-end gap-1.5">
                             <button type="button" onClick={() => onEdit(purchase)} aria-label={l.edit} title={l.edit} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">
                               <Edit3 size={13} />
@@ -1396,8 +1409,8 @@ function BazaarHistory({
                         </td>
                       )}
                     </tr>
-                  )
-                })
+                  </React.Fragment>
+                )
               })}
             </tbody>
           </table>
