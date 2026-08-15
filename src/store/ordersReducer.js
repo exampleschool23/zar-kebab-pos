@@ -87,7 +87,8 @@ export function ordersReducer(state, action) {
         : cartItems
       const addedSubtotal = newCartItems.reduce((s, i) => s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1), 0)
       const subtotal = (Number(activeOrder?.subtotal) || 0) + addedSubtotal
-      const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(activeOrder?.service_rate_pct))
+      const activeOrderMatchesPriceMode = !activeOrder || normalizePriceMode(activeOrder.price_mode) === priceMode
+      const serviceRatePct = isOffPremise ? 0 : activeOrderMatchesPriceMode && Number.isFinite(Number(activeOrder?.service_rate_pct))
         ? Number(activeOrder.service_rate_pct)
         : Number.isFinite(Number(action._serviceRatePct))
           ? Number(action._serviceRatePct)

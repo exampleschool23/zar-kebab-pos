@@ -124,6 +124,32 @@ test('a retained kitchen attempt uses its captured service-rate snapshot', () =>
   assert.equal(next.orders[0].service_fee, 24_000)
 })
 
+test('a stale Regular order shell cannot carry 15 percent into a Tourist submission', () => {
+  const next = ordersReducer(state({
+    orders: [{
+      id: 'stale-order-shell',
+      table_id: 't1',
+      order_type: 'dine_in',
+      payment_status: 'unpaid',
+      price_mode: 'regular',
+      service_rate_pct: 15,
+      subtotal: 0,
+      items: [],
+    }],
+    cart: [menuRow({ unit_price: 120_000, price: 120_000, price_mode: 'tourist' })],
+  }), {
+    type: 'SEND_TO_KITCHEN',
+    _orderId: 'stale-order-shell',
+    _serviceRatePct: 20,
+    payload: { orderType: 'dine_in', priceMode: 'tourist' },
+  })
+
+  assert.equal(next.orders[0].price_mode, 'tourist')
+  assert.equal(next.orders[0].service_rate_pct, 20)
+  assert.equal(next.orders[0].service_fee, 24_000)
+  assert.equal(next.orders[0].total, 144_000)
+})
+
 test('explicitly changing an unpaid order price mode also snapshots its matching service rate', () => {
   const next = ordersReducer(state({
     orders: [{
@@ -195,7 +221,13 @@ test('all operational and historical fallbacks use the price-mode service settin
   assert.match(cashier, /getConfiguredServiceRatePct\(state\.settings, firstOrder\.price_mode\)/)
   assert.match(receipt, /getConfiguredServiceRatePct\(settings, combinedOrder\.price_mode\)/)
   assert.match(reports, /getConfiguredServiceRatePct\(serviceRateSettings, order\.price_mode\)/)
+  assert.match(reports, /function PriceModeBadge/)
+  assert.match(reports, /<Globe2|tourist \? Globe2/)
+  assert.match(reports, /<PriceModeBadge mode=\{order\.price_mode\} lang=\{lang\} \/>/)
+  assert.match(appContext, /activeOrderMatchesPriceMode/)
   assert.match(appContext, /_serviceRatePct: serviceRatePct/)
   assert.match(db, /tourist_service_rate_pct: touristServiceRatePct/)
+  assert.match(db, /existingOrderMatchesPriceMode/)
+  assert.match(db, /serviceRatePctFromSettings\(state\.settings, priceMode\)/)
   assert.match(db, /isMissingTouristServiceRateColumn\(error\)[\s\S]*?legacySettingsRow/)
 })

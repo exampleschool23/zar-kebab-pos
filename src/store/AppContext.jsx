@@ -339,9 +339,10 @@ export function AppProvider({ children }) {
           o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
         )
         const priceMode = normalizePriceMode(action.payload?.priceMode || activeOrder?.price_mode || DEFAULT_PRICE_MODE)
+        const activeOrderMatchesPriceMode = !activeOrder || normalizePriceMode(activeOrder.price_mode) === priceMode
         const serviceRatePct = isOffPremise
           ? 0
-          : Number.isFinite(Number(activeOrder?.service_rate_pct))
+          : activeOrderMatchesPriceMode && Number.isFinite(Number(activeOrder?.service_rate_pct))
             ? Number(activeOrder.service_rate_pct)
             : getConfiguredServiceRatePct(stateRef.current.settings, priceMode)
         const kitchenRoundId = action._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`

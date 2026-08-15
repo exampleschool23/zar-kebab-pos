@@ -343,6 +343,12 @@ These bugs were recently fixed and are now protected by tests:
    - The Salary group receives the detailed automatic KPI calculation, including restaurant dine-in sales base and KPI percentage.
    - ZarKebab Team receives only the employee name, paid KPI bonus amount, and date. It must never receive the restaurant sales base, KPI percentage, salary due, or manager identity.
 
+42. A stale order shell must not leak the wrong service rate into a new price mode.
+   - Reuse an unpaid order's saved service-rate snapshot only when its saved `price_mode` matches the submitted mode.
+   - An empty or stale Regular shell must never carry 15% into a Tourist submission; the new Tourist order uses the configured Tourist rate.
+   - Paid orders remain immutable historical snapshots even if an earlier bug saved the wrong rate.
+   - Reports show the saved Regular/Tourist mode from `orders.price_mode` in desktop rows, mobile cards, and order details.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:

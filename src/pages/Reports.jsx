@@ -30,7 +30,7 @@ import {
   Download, X, Printer, Eye, ChevronLeft, ChevronRight,
   Search, SlidersHorizontal, CreditCard,
   Monitor, Banknote, UtensilsCrossed,
-  BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck, Pencil,
+  BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck, Pencil, Globe2, UserRound,
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
@@ -62,6 +62,22 @@ function applyIndividualPaymentMethodChanges(order, changes) {
     payment_method: methods.length > 1 ? 'mixed' : (methods[0] || order.payment_method),
     payments,
   }
+}
+
+function PriceModeBadge({ mode, lang }) {
+  const normalized = normalizePriceMode(mode)
+  const tourist = normalized === 'tourist'
+  const Icon = tourist ? Globe2 : UserRound
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ring-1 ${
+      tourist
+        ? 'bg-violet-50 text-violet-700 ring-violet-200'
+        : 'bg-slate-50 text-slate-600 ring-slate-200'
+    }`}>
+      <Icon size={11} aria-hidden="true" />
+      {getPriceModeLabel(normalized, lang)}
+    </span>
+  )
 }
 
 function addDays(isoDate, n) {
@@ -1311,6 +1327,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateS
             )}
           </span>
           <StatusBadge status={order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')} lang={lang} />
+          <PriceModeBadge mode={order.price_mode} lang={lang} />
         </div>
         <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-[#6B7280]">
           <X size={16} />
@@ -1324,6 +1341,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateS
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: lang === 'uz' ? 'Stol'      : lang === 'ru' ? 'Стол'      : 'Table',    value: orderTableLabel(order, lang) },
+            { label: lang === 'uz' ? 'Mijoz turi' : lang === 'ru' ? 'Тип клиента' : 'Customer Type', value: <PriceModeBadge mode={order.price_mode} lang={lang} /> },
             { label: lang === 'uz' ? 'Ochgan'    : lang === 'ru' ? 'Открыл'    : 'Opened By', value: order.opened_by_name || order.waiter_name || '—' },
             { label: lang === 'uz' ? "To'lov"    : lang === 'ru' ? 'Оплата'    : 'Payment',  value: <PaymentMethodBadges order={order} lang={lang} showAmounts />, fullWidth: true },
             { label: lang === 'uz' ? 'Yopgan'    : lang === 'ru' ? 'Закрыл'    : 'Completed By', value: order.completed_by_name || '—' },
@@ -1588,11 +1606,12 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
         <EmptyState label={lang === 'uz' ? 'Buyurtmalar topilmadi' : lang === 'ru' ? 'Заказы не найдены' : 'No orders found'} lang={lang} />
       ) : (
         <div className="w-full overflow-x-auto rounded-2xl border border-[#E5E7EB] shadow-sm">
-        <div className="bg-white rounded-2xl overflow-hidden min-w-[1230px]">
+        <div className="bg-white rounded-2xl overflow-hidden min-w-[1320px]">
           {/* Desktop header */}
-          <div className="hidden lg:grid grid-cols-[80px_90px_120px_120px_145px_90px_140px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
+          <div className="hidden lg:grid grid-cols-[80px_90px_90px_120px_120px_145px_90px_140px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
             <span>{lang === 'uz' ? 'Buyurtma' : lang === 'ru' ? 'Заказ' : 'Order ID'}</span>
             <span>{lang === 'uz' ? 'Stol' : lang === 'ru' ? 'Стол' : 'Table'}</span>
+            <span>{lang === 'uz' ? 'Mijoz' : lang === 'ru' ? 'Клиент' : 'Customer'}</span>
             <span>{lang === 'uz' ? 'Ochgan' : lang === 'ru' ? 'Открыл' : 'Opened by'}</span>
             <span>{lang === 'uz' ? 'Yopgan' : lang === 'ru' ? 'Закрыл' : 'Completed by'}</span>
             <span>{lang === 'uz' ? 'Sana va vaqt' : lang === 'ru' ? 'Дата и время' : 'Date & Time'}</span>
@@ -1623,7 +1642,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                   className={`px-4 py-3 transition-colors cursor-pointer ${isSelected ? 'bg-orange-50/60' : 'hover:bg-gray-50/60'}`}
                 >
                   {/* Desktop row */}
-                  <div className="hidden lg:grid grid-cols-[80px_90px_120px_120px_145px_90px_140px_60px_60px_110px_100px] gap-2 items-center">
+                  <div className="hidden lg:grid grid-cols-[80px_90px_90px_120px_120px_145px_90px_140px_60px_60px_110px_100px] gap-2 items-center">
                     <span className="font-black text-[#ff5a00] text-sm flex items-center gap-1">
                       {orderNum}
                       {sessionCnt > 1 && (
@@ -1631,6 +1650,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                       )}
                     </span>
                     <span className="text-sm font-medium text-[#1F2937] truncate">{orderTableLabel(order, lang)}</span>
+                    <span><PriceModeBadge mode={order.price_mode} lang={lang} /></span>
                     <span className="text-sm text-[#6B7280] truncate">{(order.opened_by_name || order.waiter_name || '—').split(' ')[0]}</span>
                     <span className="text-sm text-[#6B7280] truncate">{(order.completed_by_name || '—').split(' ')[0]}</span>
                     <span className="text-[12px] text-[#6B7280]">{fmtDate(getOrderDate(order), lang)}</span>
@@ -1659,6 +1679,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-black text-[#ff5a00] text-sm">{orderNum}</span>
                         <StatusBadge status={status} lang={lang} />
+                        <PriceModeBadge mode={order.price_mode} lang={lang} />
                       </div>
                       <p className="text-sm font-medium text-[#1F2937]">{orderTableLabel(order, lang)} · {(order.opened_by_name || order.waiter_name || '').split(' ')[0]}</p>
                       {order.completed_by_name && (

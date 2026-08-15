@@ -776,11 +776,12 @@ export async function writeToSupabase(action, state, options = {}) {
       if (existingOrderError) throw existingOrderError
 
       const subtotal    = (Number(existingOrder?.subtotal) || 0) + addedSubtotal
-      const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(existingOrder?.service_rate_pct))
+      const existingOrderMatchesPriceMode = !existingOrder || normalizePriceMode(existingOrder.price_mode) === priceMode
+      const serviceRatePct = isOffPremise ? 0 : existingOrderMatchesPriceMode && Number.isFinite(Number(existingOrder?.service_rate_pct))
         ? Number(existingOrder.service_rate_pct)
         : Number.isFinite(Number(action._serviceRatePct))
           ? Number(action._serviceRatePct)
-          : serviceRatePctFromSettings(state.settings, existingOrder?.price_mode || priceMode)
+          : serviceRatePctFromSettings(state.settings, priceMode)
       const paymentFields = getOrderPaymentFields(
         { subtotal, order_type: orderType, service_rate_pct: serviceRatePct },
         [],
