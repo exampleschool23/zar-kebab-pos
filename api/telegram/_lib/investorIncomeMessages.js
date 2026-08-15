@@ -43,15 +43,16 @@ export function buildInvestorIncomeGroupMessage(expense, language = 'ru', curren
   const lines = [
     `💰 <b>${copy.title}</b>`,
     `${copy.amount}: <b>${escapeTelegramHtml(formatCurrency(expense?.amount || 0))}</b>`,
+    '',
   ]
-  if (Number.isFinite(Number(currentMonthTotal))) {
-    lines.push(`${copy.currentMonthTotal}: <b>${escapeTelegramHtml(formatCurrency(currentMonthTotal))}</b>`)
-  }
   lines.push(
     `${copy.date}: ${escapeTelegramHtml(formatLongDate(expense?.expense_date, lang, expense?.expense_date || '—'))}`,
     `${copy.method}: ${escapeTelegramHtml(expensePaymentMethodLabel(expense?.payment_method, lang))}`,
   )
   if (expense?.vendor) lines.push(`${copy.source}: ${escapeTelegramHtml(expense.vendor)}`)
   if (expense?.description) lines.push(`${copy.description}: ${escapeTelegramHtml(expense.description)}`)
+  if (Number.isFinite(Number(currentMonthTotal))) {
+    lines.push('', `${copy.currentMonthTotal}: <b>${escapeTelegramHtml(formatCurrency(currentMonthTotal))}</b>`)
+  }
   return lines.join('\n')
 }
