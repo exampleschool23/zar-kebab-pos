@@ -18,6 +18,7 @@ import { canEditFeature } from '../lib/permissions'
 import { getTableGuestEntryContext } from '../lib/tableGuestEntry'
 import { getTableZoneName, getTableZoneVisual, groupTableInfosByZone } from '../lib/tableZoneColors'
 import { TableGuestEntryDialog } from '../components/GuestModeUI'
+import { cancelBillPrintWindow, completeBillHandoff, prepareBillPrintWindow } from '../lib/billHandoff'
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
@@ -744,9 +745,14 @@ export default function WaiterTables() {
   }
 
   async function moveTableToCashier(table) {
+    const autoPrint = !!state.settings?.autoPrint
+    const printWindow = prepareBillPrintWindow(autoPrint)
     const result = await dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: table.id })
-    if (result?.error || !state.settings?.autoPrint) return
-    navigate(`/receipt/table/${encodeURIComponent(table.id)}?print=1`)
+    if (result?.error) {
+      cancelBillPrintWindow(printWindow)
+      return
+    }
+    completeBillHandoff({ navigate, tableId: table.id, autoPrint, printWindow })
   }
 
   function handleCardAction(status, table) {

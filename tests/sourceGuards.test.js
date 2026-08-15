@@ -2192,7 +2192,7 @@ test('WaiterTables lets occupied tables request the bill from the card action', 
 
   assert.match(source, /status === 'occupied'\) return \{ label: tr\(lang, 'requestBill'\)/)
   assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'occupied'\) \{[\s\S]*moveTableToCashier\(table\)/)
-  assert.match(functionBody(source, 'moveTableToCashier'), /MARK_TABLE_NEEDS_BILL[\s\S]*result\?\.error[\s\S]*state\.settings\?\.autoPrint[\s\S]*\/receipt\/table\//)
+  assert.match(functionBody(source, 'moveTableToCashier'), /state\.settings\?\.autoPrint[\s\S]*prepareBillPrintWindow[\s\S]*MARK_TABLE_NEEDS_BILL[\s\S]*result\?\.error[\s\S]*completeBillHandoff/)
 })
 
 test('WaiterTables lets waiting kitchen orders move to cashier from the card action', () => {
@@ -2868,6 +2868,7 @@ test('AdminSettings does not expose receipt footer editing', () => {
 test('Auto-print bill saves immediately and prints after a successful move to cashier', () => {
   const app = readSource('src/App.jsx')
   const settings = readSource('src/pages/AdminSettings.jsx')
+  const billHandoff = readSource('src/lib/billHandoff.js')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
   const receipt = readSource('src/pages/Receipt.jsx')
@@ -2876,10 +2877,12 @@ test('Auto-print bill saves immediately and prints after a successful move to ca
   assert.match(settings, /await saveSettings\(\{ autoPrint: nextValue \}\)/)
   assert.match(settings, /onChange=\{handleAutoPrintChange\}/)
   assert.match(settings, /Print the bill immediately when an order moves to cashier/)
-  assert.match(waiterTables, /navigate\(`\/receipt\/table\/\$\{encodeURIComponent\(table\.id\)\}\?print=1`\)/)
-  assert.match(waiterOrder, /if \(!result\?\.error\) onMovedToCashier\?\.\(\)/)
-  assert.match(waiterOrder, /navigate\(`\/receipt\/table\/\$\{encodeURIComponent\(tableId\)\}\?print=1`\)/)
+  assert.match(billHandoff, /navigate\(`\/cashier\/bill\/\$\{encodedTableId\}`\)/)
+  assert.match(billHandoff, /\/receipt\/table\/\$\{encodedTableId\}\?print=1/)
+  assert.match(waiterTables, /prepareBillPrintWindow\(autoPrint\)[\s\S]*MARK_TABLE_NEEDS_BILL[\s\S]*completeBillHandoff/)
+  assert.match(waiterOrder, /prepareBillPrintWindow\(autoPrintBill\)[\s\S]*MARK_TABLE_NEEDS_BILL[\s\S]*onMovedToCashier\?\.\(printWindow\)/)
   assert.match(receipt, /new URLSearchParams\(location\.search\)\.get\('print'\) === '1'/)
+  assert.match(app, /path="\/cashier\/bill\/:tableId"[\s\S]*page=\{\['cashier', 'tables'\]\}><CashierBill \/>/)
   assert.match(app, /page=\{\['cashier', 'tables'\]\}><Receipt \/>/)
   assert.match(app, /page=\{\['cashier', 'tables'\]\}><TableReceipt \/>/)
   assert.match(functionBody(app, 'ProtectedRoute'), /Array\.isArray\(page\)[\s\S]*page\.some\(pageKey => canViewPage\(profile, pageKey\)\)/)

@@ -364,7 +364,7 @@ function InternalAppRoutes({ adminHost = false }) {
           <LazyProtectedRoute page="cashier"><CashierTables /></LazyProtectedRoute>
         } />
         <Route path="/cashier/bill/:tableId" element={
-          <LazyProtectedRoute page="cashier"><CashierBill /></LazyProtectedRoute>
+          <LazyProtectedRoute page={['cashier', 'tables']}><CashierBill /></LazyProtectedRoute>
         } />
         <Route path="/cashier/bill/order/:orderId" element={
           <LazyProtectedRoute page="cashier"><CashierBill /></LazyProtectedRoute>

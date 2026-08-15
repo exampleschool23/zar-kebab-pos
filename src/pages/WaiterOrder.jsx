@@ -40,6 +40,7 @@ import {
 import { useGuestModeSession } from '../hooks/useGuestModeSession'
 import { GuestModeUtilities, GuestPinDialog, GuestSelectionReady, guestModeCopy } from '../components/GuestModeUI'
 import { formatWriteError } from '../lib/writeErrorMessage'
+import { cancelBillPrintWindow, completeBillHandoff, prepareBillPrintWindow } from '../lib/billHandoff'
 import {
   changeMenuQuantity,
   formatMenuQuantity,
@@ -48,7 +49,7 @@ import {
 } from '../lib/menuSaleUnits'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
-function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, canEditOrder, onPrintKitchenCheck, onMovedToCashier }) {
+function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, canEditOrder, autoPrintBill, onPrintKitchenCheck, onMovedToCashier }) {
   const [busy, setBusy] = useState(false)
   const [updatingItemId, setUpdatingItemId] = useState(null)
 
@@ -250,9 +251,11 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
   }
   async function handleRequestBill() {
     if (busy || !canEditOrder) return
+    const printWindow = prepareBillPrintWindow(autoPrintBill)
     setBusy(true)
     const result = await dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: tableId })
-    if (!result?.error) onMovedToCashier?.()
+    if (!result?.error) onMovedToCashier?.(printWindow)
+    else cancelBillPrintWindow(printWindow)
     setBusy(false)
   }
 
@@ -1627,12 +1630,14 @@ export default function WaiterOrder() {
                   cartCount={cartCount}
                   menuItemMap={menuItemMap}
                   canEditOrder={canEditTables && !orderLocked}
+                  autoPrintBill={!!state.settings?.autoPrint}
                   onPrintKitchenCheck={orderLocked ? () => {} : handlePrintKitchenCheck}
-                  onMovedToCashier={() => {
-                    if (state.settings?.autoPrint) {
-                      navigate(`/receipt/table/${encodeURIComponent(tableId)}?print=1`)
-                    }
-                  }}
+                  onMovedToCashier={printWindow => completeBillHandoff({
+                    navigate,
+                    tableId,
+                    autoPrint: !!state.settings?.autoPrint,
+                    printWindow,
+                  })}
                 />
               </div>
             )}
