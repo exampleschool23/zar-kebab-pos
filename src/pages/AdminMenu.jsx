@@ -29,7 +29,7 @@ import {
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
-  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock,
+  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock, Users,
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -40,6 +40,7 @@ import {
   canChangeMenuItemAvailability,
   canChangeMenuItemPublicVisibility,
   canEditMenu as canEditMenuForProfile,
+  normalizeRole,
 } from '../lib/permissions'
 import { getSaleProfitSummary } from '../lib/profit'
 import { getRequiredMenuItemCost, hasRequiredMenuItemCost } from '../lib/menuItemCosts'
@@ -1201,6 +1202,12 @@ const blankCat = {
   waiter_hidden: false,
   visible_from_time: '',
   visible_until_time: '',
+  always_visible_profile_ids: [],
+}
+
+function normalizeCategoryAlwaysVisibleProfileIds(value) {
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.map(profileId => String(profileId || '').trim()).filter(Boolean))].sort()
 }
 
 function getCategoryFormFingerprint(value = {}) {
@@ -1215,6 +1222,7 @@ function getCategoryFormFingerprint(value = {}) {
     waiter_hidden: !!value.waiter_hidden,
     visible_from_time: nullableMenuTime(value.visible_from_time),
     visible_until_time: nullableMenuTime(value.visible_until_time),
+    always_visible_profile_ids: normalizeCategoryAlwaysVisibleProfileIds(value.always_visible_profile_ids),
   })
 }
 
@@ -1605,6 +1613,7 @@ export default function AdminMenu() {
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
   const canEditMenu = canEditMenuForProfile(profile || { role: state.user?.role })
+  const isOwner = normalizeRole(profile?.role || state.user?.role) === 'owner'
   const canChangeAvailability = canChangeMenuItemAvailability(profile || { role: state.user?.role })
   const canChangePublicVisibility = canChangeMenuItemPublicVisibility(profile || { role: state.user?.role })
   const scheduleLabels = menuScheduleLabels(lang)
@@ -1634,6 +1643,9 @@ export default function AdminMenu() {
   const [originalItemFormFingerprint, setOriginalItemFormFingerprint] = useState('')
   const [originalCatFormFingerprint, setOriginalCatFormFingerprint] = useState('')
   const [menuNotice, setMenuNotice] = useState(null)
+  const [categoryOverrideProfiles, setCategoryOverrideProfiles] = useState([])
+  const [categoryOverrideProfilesLoading, setCategoryOverrideProfilesLoading] = useState(false)
+  const [categoryOverrideProfilesError, setCategoryOverrideProfilesError] = useState('')
   const uploadedItemImageUrlsRef = useRef(new Set())
   const uploadedCatImageUrlsRef = useRef(new Set())
   const productEditorInitializedRef = useRef('')
@@ -1673,6 +1685,36 @@ export default function AdminMenu() {
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
     }
   }, [deleteItemCandidate?.id])
+
+  useEffect(() => {
+    if (!isCategoryEditorPage || !isOwner) return undefined
+    let active = true
+    setCategoryOverrideProfilesLoading(true)
+    setCategoryOverrideProfilesError('')
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, role, status')
+      .eq('status', 'active')
+      .neq('role', 'guest')
+      .order('full_name')
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) {
+          setCategoryOverrideProfiles([])
+          setCategoryOverrideProfilesError(error.message || 'Could not load users')
+        } else {
+          setCategoryOverrideProfiles(data || [])
+        }
+        setCategoryOverrideProfilesLoading(false)
+      })
+      .catch(error => {
+        if (!active) return
+        setCategoryOverrideProfiles([])
+        setCategoryOverrideProfilesError(error?.message || 'Could not load users')
+        setCategoryOverrideProfilesLoading(false)
+      })
+    return () => { active = false }
+  }, [isCategoryEditorPage, isOwner])
 
   function handleDeleteDialogKeyDown(event) {
     if (event.key === 'Escape') {
@@ -1861,6 +1903,7 @@ export default function AdminMenu() {
       waiter_hidden: !!(category.waiter_hidden || category.waiterHidden || category.hide_from_waiter || category.hideFromWaiter),
       visible_from_time: String(category.visible_from_time || category.visibleFromTime || '').slice(0, 5),
       visible_until_time: String(category.visible_until_time || category.visibleUntilTime || '').slice(0, 5),
+      always_visible_profile_ids: normalizeCategoryAlwaysVisibleProfileIds(category.always_visible_profile_ids),
     }
     setCatForm(nextForm)
     setOriginalCatFormFingerprint(getCategoryFormFingerprint(nextForm))
@@ -2094,10 +2137,11 @@ export default function AdminMenu() {
       const oldImageUrl = catModal === 'edit'
         ? state.categories.find(category => category.id === catForm.id)?.image_url
         : ''
+      const { always_visible_profile_ids: _scheduleOverrides, ...categoryFormFields } = catForm
       const result = await dispatch({
         type: catModal === 'new' ? 'ADD_CATEGORY' : 'UPDATE_CATEGORY',
         payload: {
-          ...catForm,
+          ...categoryFormFields,
           name_uz: trimMenuItemTextValue(catForm.name_uz),
           name_ru: trimMenuItemTextValue(catForm.name_ru),
           name_en: trimMenuItemTextValue(catForm.name_en),
@@ -2106,6 +2150,9 @@ export default function AdminMenu() {
           waiter_hidden: !!catForm.waiter_hidden,
           visible_from_time: nullableMenuTime(catForm.visible_from_time),
           visible_until_time: nullableMenuTime(catForm.visible_until_time),
+          ...(isOwner ? {
+            always_visible_profile_ids: normalizeCategoryAlwaysVisibleProfileIds(catForm.always_visible_profile_ids),
+          } : {}),
         },
       })
       if (result?.error) {
@@ -2153,6 +2200,14 @@ export default function AdminMenu() {
   function trimF(key) { return () => setForm(f => ({ ...f, [key]: trimMenuItemTextValue(f[key]) })) }
   function setCF(key) { return e => setCatForm(f => ({ ...f, [key]: e.target.value })) }
   function trimCF(key) { return () => setCatForm(f => ({ ...f, [key]: trimMenuItemTextValue(f[key]) })) }
+  function toggleCategoryScheduleOverride(profileId) {
+    setCatForm(current => {
+      const selectedProfileIds = new Set(normalizeCategoryAlwaysVisibleProfileIds(current.always_visible_profile_ids))
+      if (selectedProfileIds.has(profileId)) selectedProfileIds.delete(profileId)
+      else selectedProfileIds.add(profileId)
+      return { ...current, always_visible_profile_ids: [...selectedProfileIds].sort() }
+    })
+  }
 
   // ── DnD handlers ──────────────────────────────────────────────────────────
 
@@ -2365,6 +2420,75 @@ export default function AdminMenu() {
                       </div>
                       <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
                     </div>
+
+                    {isOwner && <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+                      <div className="flex items-start gap-2">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-600">
+                          <Users size={16} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-black text-gray-900">
+                              {lang === 'uz' ? 'Vaqtdan tashqari ko‘rsatish' : lang === 'ru' ? 'Показывать вне расписания' : 'Visible outside schedule'}
+                            </p>
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-blue-700">
+                              {normalizeCategoryAlwaysVisibleProfileIds(catForm.always_visible_profile_ids).length}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] font-semibold leading-relaxed text-gray-500">
+                            {lang === 'uz'
+                              ? 'Tanlangan xodimlar bu kategoriyani ofitsiant menyusida belgilangan vaqtdan tashqari ham ko‘radi. Ommaviy menyuga ta’sir qilmaydi.'
+                              : lang === 'ru'
+                                ? 'Выбранные сотрудники увидят категорию в меню официанта даже вне указанного времени. Публичное меню не изменится.'
+                                : 'Selected staff see this category in the waiter menu outside its scheduled hours. The public menu is unaffected.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 max-h-52 space-y-1 overflow-y-auto pr-1">
+                        {categoryOverrideProfilesLoading && (
+                          <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-500">
+                            <Loader2 size={14} className="animate-spin" />
+                            {lang === 'uz' ? 'Xodimlar yuklanmoqda…' : lang === 'ru' ? 'Загрузка сотрудников…' : 'Loading staff…'}
+                          </div>
+                        )}
+                        {!categoryOverrideProfilesLoading && categoryOverrideProfilesError && (
+                          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                            {categoryOverrideProfilesError}
+                          </p>
+                        )}
+                        {!categoryOverrideProfilesLoading && !categoryOverrideProfilesError && categoryOverrideProfiles.length === 0 && (
+                          <p className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-500">
+                            {lang === 'uz' ? 'Faol xodimlar topilmadi.' : lang === 'ru' ? 'Активные сотрудники не найдены.' : 'No active staff found.'}
+                          </p>
+                        )}
+                        {!categoryOverrideProfilesLoading && !categoryOverrideProfilesError && categoryOverrideProfiles.map(staffProfile => {
+                          const checked = normalizeCategoryAlwaysVisibleProfileIds(catForm.always_visible_profile_ids).includes(staffProfile.id)
+                          return (
+                            <label
+                              key={staffProfile.id}
+                              className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 transition-colors ${checked ? 'border-blue-300 bg-white' : 'border-transparent bg-white/70 hover:border-blue-200'}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleCategoryScheduleOverride(staffProfile.id)}
+                                disabled={savingCatForm}
+                                className="h-4 w-4 shrink-0 accent-blue-600 disabled:cursor-wait"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-xs font-black text-gray-800">
+                                  {staffProfile.full_name || staffProfile.email || staffProfile.id}
+                                </span>
+                                <span className="block truncate text-[10px] font-semibold text-gray-400">
+                                  {[staffProfile.role, staffProfile.email].filter(Boolean).join(' · ')}
+                                </span>
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>}
                   </section>
 
                   <section className="space-y-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">

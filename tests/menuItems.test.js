@@ -119,3 +119,18 @@ test('scheduled categories and items are hidden outside their time window', () =
   assert.equal(isCustomerMenuItem(breakfast, now), false)
   assert.equal(isWaiterMenuItem(breakfast, now), false)
 })
+
+test('selected staff can see a waiter category outside its schedule without exposing it publicly', () => {
+  const afterLunch = new Date('2026-07-10T18:00:00')
+  const businessLunch = {
+    visible_from_time: '11:00',
+    visible_until_time: '15:00',
+    always_visible_profile_ids: ['game-club-user'],
+  }
+
+  assert.equal(isWaiterMenuCategory(businessLunch, afterLunch, 'game-club-user'), true)
+  assert.equal(isWaiterMenuCategory(businessLunch, afterLunch, 'other-user'), false)
+  assert.equal(isCustomerMenuCategory(businessLunch, afterLunch), false)
+  assert.equal(isWaiterMenuCategory({ ...businessLunch, waiter_hidden: true }, afterLunch, 'game-club-user'), false)
+  assert.equal(isWaiterMenuCategory({ ...businessLunch, deleted_at: '2026-07-10T12:00:00Z' }, afterLunch, 'game-club-user'), false)
+})

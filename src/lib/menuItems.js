@@ -76,16 +76,30 @@ export function isWaiterHiddenMenuCategory(category) {
   )
 }
 
+export function getMenuCategoryAlwaysVisibleProfileIds(category) {
+  const value = category?.always_visible_profile_ids ?? category?.alwaysVisibleProfileIds
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.map(profileId => String(profileId || '').trim()).filter(Boolean))]
+}
+
+export function hasMenuCategoryScheduleOverride(category, profileId) {
+  const normalizedProfileId = String(profileId || '').trim()
+  return normalizedProfileId !== '' && getMenuCategoryAlwaysVisibleProfileIds(category).includes(normalizedProfileId)
+}
+
 export function isCustomerMenuCategory(category, date = new Date()) {
   return isActiveMenuCategory(category) &&
     !isHiddenMenuCategory(category) &&
     isWithinMenuTimeWindow(category, date)
 }
 
-export function isWaiterMenuCategory(category, date = new Date()) {
+export function isWaiterMenuCategory(category, date = new Date(), profileId = '') {
   return isActiveMenuCategory(category) &&
     !isWaiterHiddenMenuCategory(category) &&
-    isWithinMenuTimeWindow(category, date)
+    (
+      isWithinMenuTimeWindow(category, date) ||
+      hasMenuCategoryScheduleOverride(category, profileId)
+    )
 }
 
 export function isDeletedMenuItem(item) {

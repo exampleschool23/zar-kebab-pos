@@ -928,7 +928,7 @@ test('hidden menu categories are hidden from customer-facing menus only', () => 
   assert.match(publicMenu, /categoryIds\.has\(item\.category_id\)/)
   assert.match(menuItems, /function isWaiterHiddenMenuCategory/)
   assert.match(menuItems, /function isWaiterMenuCategory/)
-  assert.match(waiterOrder, /isWaiterMenuCategory\(category, visibilityNow\)/)
+  assert.match(waiterOrder, /isWaiterMenuCategory\(category, visibilityNow, staffUserId\)/)
   assert.match(waiterOrder, /visibleCategoryIds\.has\(item\.category_id\)/)
   assert.match(telegram, /isCustomerMenuCategory\(category, now\)/)
   assert.match(migration, /add column if not exists hidden boolean not null default false/)
@@ -956,7 +956,7 @@ test('waiter-hidden menu categories are hidden from waiter table ordering only',
   assert.match(adminMenu, /Waiter menu/)
   assert.match(adminMenu, /Hidden from waiter menu/)
   assert.match(waiterOrder, /isWaiterMenuCategory/)
-  assert.match(waiterOrder, /isWaiterMenuCategory\(category, visibilityNow\)/)
+  assert.match(waiterOrder, /isWaiterMenuCategory\(category, visibilityNow, staffUserId\)/)
   assert.match(publicMenu, /isCustomerMenuCategory\(category, now\)/)
   assert.match(telegram, /isCustomerMenuCategory\(category, now\)/)
   assert.match(migration, /add column if not exists waiter_hidden boolean not null default false/)
@@ -982,7 +982,7 @@ test('menu item availability controls waiter visibility without a redundant wait
   assert.doesNotMatch(adminMenu, /filterAvail === 'waiter_hidden'/)
   assert.doesNotMatch(adminMenu, /id="(?:modal-product-)?waiter-hidden"/i)
   assert.match(waiterOrder, /isWaiterMenuItem\(item, visibilityNow\)/)
-  assert.match(waiterOrder, /isWaiterMenuCategory\(category, visibilityNow\)/)
+  assert.match(waiterOrder, /isWaiterMenuCategory\(category, visibilityNow, staffUserId\)/)
   assert.match(publicMenu, /isCustomerMenuItem\(item, now\)/)
   assert.match(publicMenu, /isCustomerMenuCategory\(category, now\)/)
   assert.match(telegram, /isCustomerMenuItem\(item, now\)/)
@@ -992,6 +992,35 @@ test('menu item availability controls waiter visibility without a redundant wait
   assert.match(migration, /menu_time_window_is_visible/)
   assert.match(migration, /timezone\('Asia\/Tashkent', now\(\)\)::time/)
   assert.match(health, /waiter_hidden, visible_from_time, visible_until_time/)
+})
+
+test('selected staff can bypass category schedules only in waiter ordering', () => {
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const telegram = readSource('src/pages/TelegramMiniApp.jsx')
+  const menuItems = readSource('src/lib/menuItems.js')
+  const db = readSource('src/lib/db.js')
+  const migration = readSource('supabase/132_menu_category_user_schedule_overrides.sql')
+  const health = readSource('scripts/check-db-health.js')
+
+  assert.match(migration, /create table if not exists public\.menu_category_user_schedule_overrides/)
+  assert.match(migration, /primary key \(category_id, profile_id\)/)
+  assert.match(migration, /viewer\.role::text = 'owner'/)
+  assert.match(migration, /actor\.role::text = 'owner'/)
+  assert.match(migration, /Only owners can manage category schedule overrides/)
+  assert.match(migration, /set_menu_category_user_schedule_overrides/)
+  assert.match(db, /menu_category_user_schedule_overrides/)
+  assert.match(db, /always_visible_profile_ids/)
+  assert.match(adminMenu, /Visible outside schedule/)
+  assert.match(adminMenu, /\{isOwner && <div className="rounded-xl border border-blue-200/)
+  assert.match(adminMenu, /toggleCategoryScheduleOverride/)
+  assert.match(adminMenu, /\.\.\.\(isOwner \? \{[\s\S]*always_visible_profile_ids/)
+  assert.match(waiterOrder, /isWaiterMenuCategory\(category, visibilityNow, staffUserId\)/)
+  assert.match(menuItems, /hasMenuCategoryScheduleOverride\(category, profileId\)/)
+  assert.match(publicMenu, /isCustomerMenuCategory\(category, now\)/)
+  assert.match(telegram, /isCustomerMenuCategory\(category, now\)/)
+  assert.match(health, /menu_category_user_schedule_overrides/)
 })
 
 test('availability affects only waiter visibility while public-hidden remains customer-only', () => {
@@ -1221,8 +1250,12 @@ test('menu and category writes surface Supabase errors', () => {
   assert.match(mediaGalleryMigration, /public\.create_menu_item_with_cost\(/)
   assert.match(mediaGalleryMigration, /image_url = coalesce\(normalized_media_urls\[1\], ''\)/)
   assert.match(mediaGalleryMigration, /media_urls = normalized_media_urls/)
-  assert.match(db, /case 'ADD_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.insert\(action\.payload\)[\s\S]*if \(error\) throw error/)
+  assert.match(db, /case 'ADD_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.insert\(categoryFields\)[\s\S]*if \(error\) throw error/)
+  assert.match(db, /case 'ADD_CATEGORY': \{[\s\S]*set_menu_category_user_schedule_overrides[\s\S]*if \(overrideError\) throw overrideError/)
+  assert.match(db, /case 'ADD_CATEGORY': \{[\s\S]*if \(hasScheduleOverrides\) \{[\s\S]*set_menu_category_user_schedule_overrides/)
   assert.match(db, /case 'UPDATE_CATEGORY': \{[\s\S]*const \{ error \} = await supabase\.from\('menu_categories'\)\.update\(fields\)\.eq\('id', id\)[\s\S]*if \(error\) throw error/)
+  assert.match(db, /case 'UPDATE_CATEGORY': \{[\s\S]*set_menu_category_user_schedule_overrides[\s\S]*if \(overrideError\) throw overrideError/)
+  assert.match(db, /case 'UPDATE_CATEGORY': \{[\s\S]*if \(hasScheduleOverrides\) \{[\s\S]*set_menu_category_user_schedule_overrides/)
   assert.match(db, /const results = await Promise\.all\(updates\.map\(update =>[\s\S]*supabase\.from\('menu_items'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
   assert.match(db, /const results = await Promise\.all\(updates\.map\(update =>[\s\S]*supabase\.from\('menu_categories'\)\.update\(\{ sort_order:[\s\S]*const error = results\.find\(result => result\.error\)\?\.error[\s\S]*if \(error\) throw error/)
 })
@@ -1891,7 +1924,6 @@ test('AdminDashboard recent orders show explicit colored order context badges', 
 test('elapsed labels use timezone-safe instant parsing instead of browser-local timestamp math', () => {
   const files = [
     'src/pages/WaiterTables.jsx',
-    'src/pages/Kitchen.jsx',
     'src/pages/CashierTables.jsx',
     'src/pages/CashierBill.jsx',
     'src/pages/AdminDashboard.jsx',
@@ -1915,6 +1947,13 @@ test('AdminDashboard defaults to today period', () => {
   assert.doesNotMatch(source, /icon=\{DollarSign\}/)
   assert.doesNotMatch(source, /avgOrderValue|previousAvgOrder|avgChange/)
   assert.match(analytics, /export function getDashboardPeriodCafeIncome\(orders, period, now = new Date\(\)\)/)
+})
+
+test('AdminDashboard omits the Items Today KPI card', () => {
+  const source = readSource('src/pages/AdminDashboard.jsx')
+
+  assert.doesNotMatch(source, /periodItemsSold/)
+  assert.match(source, /2xl:grid-cols-5/)
 })
 
 test('AdminDashboard offers a rolling Month from 4 July to the 5 August boundary', () => {
@@ -2099,7 +2138,6 @@ test('delivery order type is wired through POS surfaces and reports', () => {
   const reducer = readSource('src/store/ordersReducer.js')
   const db = readSource('src/lib/db.js')
   const reports = readSource('src/pages/Reports.jsx')
-  const kitchen = readSource('src/pages/Kitchen.jsx')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
   const migration = readSource('supabase/045_delivery_order_type.sql')
@@ -2112,7 +2150,6 @@ test('delivery order type is wired through POS surfaces and reports', () => {
   assert.match(reports, /key: 'order_types'/)
   assert.match(reports, /function OrderTypesTab/)
   assert.match(reports, /\['dine_in', 'take_away', 'delivery'\]/)
-  assert.match(kitchen, /deliveryItems/)
   assert.match(waiterTables, /deliveryOrder: 'Delivery Order'/)
   assert.match(waiterTables, /function handleDelivery\(\)/)
   assert.match(waiterTables, /navigate\('\/waiter\/take-away\?orderType=delivery'\)/)
@@ -2352,8 +2389,7 @@ test('WaiterOrder prints cook checks by submitted order round', () => {
   assert.doesNotMatch(panel, /window\.open/)
 })
 
-test('Kitchen can cancel unavailable items without billing them', () => {
-  const kitchen = readSource('src/pages/Kitchen.jsx')
+test('cancelled kitchen items stay excluded from billing and operational totals', () => {
   const analytics = readSource('src/lib/analytics.js')
   const cashierBill = readSource('src/pages/CashierBill.jsx')
   const ordersReducer = readSource('src/store/ordersReducer.js')
@@ -2361,15 +2397,6 @@ test('Kitchen can cancel unavailable items without billing them', () => {
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
   const migration = readSource('supabase/023_order_item_cancel_status.sql')
 
-  assert.match(kitchen, /handleMark\('cancelled', \{ reason \}\)/)
-  assert.match(kitchen, /unavailableLabel\(lang\)/)
-  assert.match(kitchen, /cancelReason/)
-  assert.doesNotMatch(kitchen, /markMenuUnavailable/)
-  assert.doesNotMatch(kitchen, /Also mark unavailable in menu/)
-  assert.doesNotMatch(kitchen, /Menyuda ham mavjud emas qilish/)
-  assert.doesNotMatch(kitchen, /Также скрыть из меню/)
-  assert.match(kitchen, /XCircle/)
-  assert.match(kitchen, /!\['served', 'cancelled'\]\.includes\(i\.status\)/)
   assert.match(analytics, /function isCancelledOrderItem/)
   assert.match(analytics, /billableItems = sourceItems\.filter\(item => !isCancelledOrderItem\(item\)\)/)
   assert.match(analytics, /if \(isCancelledOrderItem\(item\)\) return/)
@@ -3657,7 +3684,6 @@ test('menu items support and display nutrition values', () => {
   const categoryScroller = readSource('src/components/MenuCategoryScroller.jsx')
   const productCards = readSource('src/components/MenuProductCards.jsx')
   const cartPanel = readSource('src/components/CartPanel.jsx')
-  const kitchen = readSource('src/pages/Kitchen.jsx')
   const cashierBill = readSource('src/pages/CashierBill.jsx')
   const reports = readSource('src/pages/Reports.jsx')
   const telegramMiniApp = readSource('src/pages/TelegramMiniApp.jsx')
@@ -3699,7 +3725,7 @@ test('menu items support and display nutrition values', () => {
   assert.match(adminMenu, /stock_count: i\.stock_count \?\? i\.stockCount \?\? 0/)
   assert.match(adminMenu, /Shelf count/)
   assert.match(categoryScroller, /text-\[12px\] font-black tabular-nums/)
-  for (const source of [adminMenu, productCards, cartPanel, kitchen, cashierBill, reports, telegramMiniApp]) {
+  for (const source of [adminMenu, productCards, cartPanel, cashierBill, reports, telegramMiniApp]) {
     assert.match(source, /kcalLabel/)
     assert.match(source, /gramsLabel/)
     assert.match(source, /millilitresLabel/)
@@ -3720,7 +3746,6 @@ test('menu items support required option variants with parent product ids', () =
   const cashierBill = readSource('src/pages/CashierBill.jsx')
   const cashierTables = readSource('src/pages/CashierTables.jsx')
   const kitchenCheckReceipt = readSource('src/pages/KitchenCheckReceipt.jsx')
-  const kitchen = readSource('src/pages/Kitchen.jsx')
   const db = readSource('src/lib/db.js')
   const rpc = readSource('supabase/070_price_modes.sql')
 
@@ -3794,8 +3819,6 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(cashierBill, /getOrderItemOptionLines\(item, mi, lang\)/)
   assert.match(cashierBill, /getManualOrderNotes\(item, mi, lang\)/)
   assert.match(cashierTables, /getOrderItemOptionLines\(item, mi, lang\)/)
-  assert.match(kitchen, /getOrderItemOptionLines\(item, menuItem, lang\)/)
-  assert.match(kitchen, /getManualOrderNotes\(item, menuItem, lang\)/)
   assert.match(db, /selected_options: i\.selected_options \|\| i\.selectedOptions \|\| \{\}/)
   assert.match(rpc, /selected_options/)
 })

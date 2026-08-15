@@ -793,7 +793,6 @@ export default function AdminDashboard() {
     periodRevenue, periodLoyaltyIncome, previousKpiRevenue, revenueChange,
     periodNetProfit, periodProfitMargin, previousKpiNetProfit, netProfitChange,
     periodOrderCount, previousOrderCount, orderChange,
-    periodItemsSold,
   } = useMemo(() => {
     const currentRevenue = periodPaidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
     const currentLoyaltyIncome = periodPaidOrders.reduce((sum, order) => sum + getOrderLoyaltyIncomeTotal(order), 0)
@@ -802,10 +801,6 @@ export default function AdminDashboard() {
     const previousNetProfit = getOrdersNetProfit(previousPeriodOrders, menuItemMap)
     const currentOrderCount = periodPaidOrders.length
     const previousCount = previousPeriodOrders.length
-    const itemsSold = periodPaidOrders
-      .flatMap(order => getSoldOrderItems(order))
-      .reduce((sum, item) => sum + (Number(item.quantity) || 1), 0)
-
     return {
       periodRevenue: currentRevenue,
       periodLoyaltyIncome: currentLoyaltyIncome,
@@ -827,7 +822,6 @@ export default function AdminDashboard() {
       orderChange: previousCount > 0
         ? Math.round(((currentOrderCount - previousCount) / previousCount) * 100)
         : null,
-      periodItemsSold: itemsSold,
     }
   }, [periodPaidOrders, previousPeriodOrders, menuItemMap])
 
@@ -1114,7 +1108,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
             label={`${l.revenue} · ${currentKpiPeriodLabel}`}
@@ -1142,12 +1136,6 @@ export default function AdminDashboard() {
             value={periodOrderCount}
             sub={`${previousKpiPeriodLabel}: ${previousOrderCount}`}
             badge={pctBadge(orderChange)}
-          />
-          <KpiCard
-            icon={Package}
-            label={`${l.items} · ${currentKpiPeriodLabel}`}
-            value={periodItemsSold}
-            sub={currentKpiPeriodLabel}
           />
           <KpiCard
             icon={Receipt}

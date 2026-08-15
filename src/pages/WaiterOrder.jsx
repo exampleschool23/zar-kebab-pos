@@ -859,9 +859,9 @@ export default function WaiterOrder() {
     [...state.categories]
       .filter(category => isGuestTabletMode
         ? isCustomerMenuCategory(category, visibilityNow)
-        : isWaiterMenuCategory(category, visibilityNow))
+        : isWaiterMenuCategory(category, visibilityNow, staffUserId))
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
-    [state.categories, isGuestTabletMode, visibilityNow]
+    [state.categories, isGuestTabletMode, visibilityNow, staffUserId]
   )
 
   const visibleCategoryIds = useMemo(

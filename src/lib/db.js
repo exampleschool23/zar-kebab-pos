@@ -101,6 +101,22 @@ function isMissingVariantCostsColumn(error) {
   )
 }
 
+function isMissingCategoryScheduleOverridesTable(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('menu_category_user_schedule_overrides') && (
+    message.includes('does not exist') ||
+    message.includes('schema cache') ||
+    message.includes('could not find') ||
+    message.includes('42p01') ||
+    message.includes('pgrst205')
+  )
+}
+
+function isCategoryScheduleOverridesPermissionError(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('42501') || message.includes('permission denied')
+}
+
 function isMissingTouristServiceRateColumn(error) {
   const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
   return message.includes('tourist_service_rate_pct') && (
@@ -469,13 +485,21 @@ async function loadTableZones(dbClient = supabase) {
 }
 
 export async function loadMenuCatalog(dbClient = supabase) {
-  const [categoriesRes, menuItemsRes, initialMenuItemCostsRes] = await Promise.all([
+  const [categoriesRes, menuItemsRes, initialMenuItemCostsRes, categoryScheduleOverridesRes] = await Promise.all([
     dbClient.from('menu_categories').select('*').order('sort_order'),
     dbClient.from('menu_items').select('*').order('sort_order'),
     dbClient.from('menu_item_costs').select('menu_item_id, cost_price, variant_costs'),
+    dbClient.from('menu_category_user_schedule_overrides').select('category_id, profile_id'),
   ])
   if (categoriesRes.error) throw categoriesRes.error
   if (menuItemsRes.error) throw menuItemsRes.error
+  if (
+    categoryScheduleOverridesRes.error &&
+    !isMissingCategoryScheduleOverridesTable(categoryScheduleOverridesRes.error) &&
+    !isCategoryScheduleOverridesPermissionError(categoryScheduleOverridesRes.error)
+  ) {
+    throw categoryScheduleOverridesRes.error
+  }
 
   let menuItemCostsRes = initialMenuItemCostsRes
   if (isMissingVariantCostsColumn(menuItemCostsRes.error)) {
@@ -485,9 +509,21 @@ export async function loadMenuCatalog(dbClient = supabase) {
   const costsByMenuItemId = menuItemCostsRes.error
     ? new Map()
     : new Map((menuItemCostsRes.data || []).map(row => [row.menu_item_id, row]))
+  const scheduleOverridesByCategoryId = new Map()
+  for (const row of categoryScheduleOverridesRes.data || []) {
+    const categoryId = String(row?.category_id || '').trim()
+    const profileId = String(row?.profile_id || '').trim()
+    if (!categoryId || !profileId) continue
+    const profileIds = scheduleOverridesByCategoryId.get(categoryId) || []
+    profileIds.push(profileId)
+    scheduleOverridesByCategoryId.set(categoryId, profileIds)
+  }
 
   return {
-    categories: categoriesRes.data || [],
+    categories: (categoriesRes.data || []).map(category => ({
+      ...category,
+      always_visible_profile_ids: scheduleOverridesByCategoryId.get(category.id) || [],
+    })),
     menuItems: (menuItemsRes.data || []).map(item => {
       const protectedCosts = costsByMenuItemId.get(item.id)
       return {
@@ -708,6 +744,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, scheduleReloadMenu)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_item_costs' }, scheduleReloadMenu)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_categories' }, scheduleReloadMenu)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_category_user_schedule_overrides' }, scheduleReloadMenu)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurant_tables' }, reloadTables)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'table_zones' }, reloadTableZones)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'business_settings' }, scheduleReloadSettings)
@@ -1546,15 +1583,32 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'ADD_CATEGORY': {
-      const { error } = await supabase.from('menu_categories').insert(action.payload)
+      const hasScheduleOverrides = Object.prototype.hasOwnProperty.call(action.payload, 'always_visible_profile_ids')
+      const { always_visible_profile_ids: profileIds = [], ...categoryFields } = action.payload
+      const { error } = await supabase.from('menu_categories').insert(categoryFields)
       if (error) throw error
+      if (hasScheduleOverrides) {
+        const { error: overrideError } = await supabase.rpc('set_menu_category_user_schedule_overrides', {
+          p_category_id: categoryFields.id,
+          p_profile_ids: profileIds,
+        })
+        if (overrideError) throw overrideError
+      }
       break
     }
 
     case 'UPDATE_CATEGORY': {
-      const { id, ...fields } = action.payload
+      const hasScheduleOverrides = Object.prototype.hasOwnProperty.call(action.payload, 'always_visible_profile_ids')
+      const { id, always_visible_profile_ids: profileIds = [], ...fields } = action.payload
       const { error } = await supabase.from('menu_categories').update(fields).eq('id', id)
       if (error) throw error
+      if (hasScheduleOverrides) {
+        const { error: overrideError } = await supabase.rpc('set_menu_category_user_schedule_overrides', {
+          p_category_id: id,
+          p_profile_ids: profileIds,
+        })
+        if (overrideError) throw overrideError
+      }
       break
     }
 

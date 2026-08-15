@@ -49,7 +49,7 @@ Public:
 
 Protected:
 - Waiter: `/waiter/tables`, `/waiter/order/:tableId`, `/waiter/take-away`
-- Kitchen: `/kitchen`
+- Kitchen checks: `/kitchen-check/:orderId` (print-only; the retired `/kitchen` screen redirects to `/admin`)
 - Cashier: `/cashier/tables`, `/cashier/bill/:tableId`, `/cashier/bill/order/:orderId`, receipt routes
 - Admin/reporting: `/admin`, `/admin/menu`, `/admin/tables`, `/admin/users`, `/admin/reports`, `/admin/audit`, `/admin/settings`
 - Daily bazaar: `/admin/bazaar` (receipt-level purchases, product quantities, spend analytics)
@@ -641,7 +641,7 @@ If these tests fail, understand why before changing the guard. They exist becaus
 
 ## Frontend Verification Notes
 
-Unauthenticated browser checks redirect protected routes to `/menu`. To verify `/kitchen` or `/admin/menu` visually, use an authenticated profile with the right role.
+Unauthenticated browser checks redirect protected routes to `/menu`. To verify `/kitchen-check/:orderId` or `/admin/menu` visually, use an authenticated profile with the right role.
 
 The Vite build currently emits a large chunk warning. That warning is known and not the same as a failing build.
 
