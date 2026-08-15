@@ -39,6 +39,17 @@ test('menu item price mode projection keeps the original base price', () => {
   assert.equal(item.price_mode, 'tourist')
 })
 
+test('menu item Tourist projection also recalculates the crossed-out old price', () => {
+  const tourist = getMenuItemForPriceMode({ id: 'set', price: 59000, old_price: 90000 }, 'tourist')
+  assert.equal(tourist.price, 71000)
+  assert.equal(tourist.old_price, 108000)
+  assert.equal(tourist.base_old_price, 90000)
+
+  const regular = getMenuItemForPriceMode(tourist, 'regular')
+  assert.equal(regular.price, 59000)
+  assert.equal(regular.old_price, 90000)
+})
+
 test('cart pricing mode remains authoritative before a kitchen order exists', () => {
   const touristCart = [{ menu_item_id: 'beef', price_mode: 'tourist', base_price: 30000, unit_price: 36000 }]
   assert.equal(resolveOrderingPriceMode(null, touristCart), 'tourist')

@@ -47,7 +47,17 @@ export function withPriceModeFields(item, priceMode = DEFAULT_PRICE_MODE) {
 }
 
 export function getMenuItemForPriceMode(item, priceMode = DEFAULT_PRICE_MODE) {
-  return withPriceModeFields(item, priceMode)
+  const normalized = normalizePriceMode(priceMode)
+  const pricedItem = withPriceModeFields(item, normalized)
+  const baseOldPrice = Math.max(0, Math.round(Number(
+    item?.base_old_price ?? item?.baseOldPrice ?? item?.old_price ?? item?.oldPrice ?? 0
+  ) || 0))
+
+  return {
+    ...pricedItem,
+    base_old_price: baseOldPrice,
+    old_price: calculateUnitPrice(baseOldPrice, normalized),
+  }
 }
 
 export function resolveOrderingPriceMode(activeOrder, cart = []) {
