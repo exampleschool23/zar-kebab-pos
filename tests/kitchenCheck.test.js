@@ -2,9 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildKitchenCheckHtml,
+  formatKitchenOrderNumber,
   getKitchenCheckGroup,
   getKitchenCheckGroups,
 } from '../src/lib/kitchenCheck.js'
+
+test('cook checks shorten long database ids to a four-digit display number', () => {
+  assert.equal(formatKitchenOrderNumber({ orderId: '1786802387273' }), '#7273')
+  assert.equal(formatKitchenOrderNumber({ orderNumber: '#1786802387273' }), '#7273')
+  assert.equal(formatKitchenOrderNumber({ orderNumber: 'TA-0173' }), '#0173')
+  assert.equal(formatKitchenOrderNumber({ orderId: '173' }), '#173')
+})
 
 const item = (overrides = {}) => ({
   id: overrides.id || 'i1',

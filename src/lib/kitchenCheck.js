@@ -42,9 +42,9 @@ export function formatKitchenOrderNumber(group) {
   const raw = group?.orderNumber || group?.orderId || ''
   if (!raw) return ''
   const text = String(raw)
-  if (text.startsWith('#')) return text
   const numericSuffix = text.match(/\d+$/)?.[0]
-  return `#${numericSuffix || text}`
+  if (numericSuffix) return `#${numericSuffix.slice(-4)}`
+  return text.startsWith('#') ? text : `#${text}`
 }
 
 export function formatKitchenTableName(value) {

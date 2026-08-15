@@ -65,7 +65,7 @@ const PRINT_CSS = `
     width: 80mm !important;
     max-width: 80mm !important;
     margin: 0 !important;
-    padding: 5mm 4mm !important;
+    padding: 3mm !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -74,8 +74,8 @@ const PRINT_CSS = `
     background: #fff !important;
     color: #000 !important;
     font-family: "Courier New", monospace !important;
-    font-size: 15px !important;
-    line-height: 1.35 !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
     font-weight: 700 !important;
   }
   .kitchen-check-print-area * {
@@ -85,8 +85,6 @@ const PRINT_CSS = `
   }
 }
 `
-
-const SEPARATOR = '━━━━━━━━━━━━━━━━━━━━'
 
 function sanitizeBackPath(value) {
   const raw = String(value || '').trim()
@@ -128,40 +126,45 @@ function KitchenCheckPaper({ group }) {
       style={{
         width: '320px',
         maxWidth: '100%',
-        padding: '26px 20px',
+        padding: '14px 12px',
         fontFamily: '"Courier New", monospace',
         color: '#000',
-        fontSize: '15px',
-        lineHeight: 1.35,
+        fontSize: '14px',
+        lineHeight: 1.2,
         fontWeight: 700,
       }}
     >
-      <h1 style={{ margin: '0 0 14px', textAlign: 'center', fontSize: '18px', lineHeight: 1.1, fontWeight: 900 }}>
+      <h1 style={{ margin: '0 0 8px', textAlign: 'center', fontSize: '17px', lineHeight: 1.05, fontWeight: 900 }}>
         ЧЕК ДЛЯ КУХНИ
       </h1>
 
-      <div style={{ marginBottom: '13px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'grid', gap: '2px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px', whiteSpace: 'nowrap' }}>
           <span>{tableName}</span>
           <span>{orderNumber}</span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '6px', whiteSpace: 'nowrap' }}>
           <span>{time}</span>
           <span>{waiterName}</span>
         </div>
       </div>
 
-      <div style={{ margin: '12px 0', textAlign: 'center', fontWeight: 900 }}>{SEPARATOR}</div>
+      <div aria-hidden="true" style={{ margin: '7px 0', borderTop: '2px solid #000' }} />
 
-      <div>
+      <div style={{ display: 'grid', gap: '6px' }}>
         {(group?.items || []).map(item => (
-          <div key={item.id || `${item.menu_item_id}-${item.name}`} style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 900 }}>
-            {isMenuItemSoldByWeight(item)
-              ? `${formatMenuQuantity(item.quantity, item)} · `
-              : `${formatMenuQuantity(item.quantity, item)} × `}
-            {kitchenItemName(item)}
+          <div
+            key={item.id || `${item.menu_item_id}-${item.name}`}
+            style={{ display: 'grid', gridTemplateColumns: 'max-content minmax(0, 1fr)', columnGap: '7px', fontSize: '15px', fontWeight: 900 }}
+          >
+            <span style={{ whiteSpace: 'nowrap' }}>
+              {isMenuItemSoldByWeight(item)
+                ? `${formatMenuQuantity(item.quantity, item)} ·`
+                : `${formatMenuQuantity(item.quantity, item)} ×`}
+            </span>
+            <span>{kitchenItemName(item)}</span>
             {item.notes && (
-              <div style={{ margin: '3px 0 0 28px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase' }}>
+              <div style={{ gridColumn: '2', marginTop: '1px', fontSize: '11px', lineHeight: 1.15, fontWeight: 700, textTransform: 'uppercase' }}>
                 {item.notes}
               </div>
             )}
@@ -169,7 +172,7 @@ function KitchenCheckPaper({ group }) {
         ))}
       </div>
 
-      <div style={{ margin: '12px 0', textAlign: 'center', fontWeight: 900 }}>{SEPARATOR}</div>
+      <div aria-hidden="true" style={{ margin: '7px 0 0', borderTop: '2px solid #000' }} />
     </div>
   )
 }
@@ -299,7 +302,7 @@ export default function KitchenCheckReceipt() {
         </button>
       </div>
 
-      <div className="kitchen-check-bg flex min-h-screen justify-center px-4 py-10">
+      <div className="kitchen-check-bg flex min-h-screen justify-center px-4 py-4">
         <KitchenCheckPaper group={group} />
       </div>
     </div>
