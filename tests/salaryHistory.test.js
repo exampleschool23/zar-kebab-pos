@@ -72,6 +72,7 @@ test('salary history decorates automatic KPI bonuses with their immutable formul
   assert.equal(entry.kpiResult.baseAmountUzs, 9_775_000)
   assert.equal(entry.kpiResult.rateBps, 100)
   assert.equal(entry.kpiResult.bonusAmountUzs, 97_750)
+  assert.equal(summarizeSalaryHistoryMonth([entry], '2026-08').kpiBonusAmount, 97_750)
 })
 
 test('salary history calendar is Monday-first, fixed-height, and marks activity and today', () => {
@@ -114,6 +115,7 @@ test('salary history month and day filters preserve grouped newest-first activit
   assert.deepEqual(summary, {
     paymentAmount: 500000,
     bonusAmount: 100000,
+    kpiBonusAmount: 0,
     fineAmount: 25000,
     absenceCount: 1,
     entryCount: 4,

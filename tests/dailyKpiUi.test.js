@@ -17,7 +17,8 @@ test('Salaries configures effective-dated KPI rules behind Accounting write acce
 test('only owners see the touch-safe KPI rule removal flow and zero-row deletes are rejected', () => {
   assert.match(salaries, /const canRemoveKpiRules = role === 'owner'/)
   assert.match(salaries, /canRemoveRules=\{canRemoveKpiRules\}/)
-  assert.match(salaries, /canRemoveRules && \([\s\S]*?touch-manipulation[\s\S]*?<Trash2/)
+  assert.match(salaries, /const canRemoveSelectedRule = canRemoveRules && selectedKpiProfile && selectedRule/)
+  assert.match(salaries, /canRemoveSelectedRule && \([\s\S]*?touch-manipulation[\s\S]*?<Trash2/)
   assert.match(salaries, /role="dialog"[\s\S]*?aria-modal="true"[\s\S]*?labels\.kpiRemoveWarning/)
   assert.match(salaries, /\.from\('employee_kpi_rules'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', rule\.id\)[\s\S]*?\.select\('id'\)/)
   assert.match(salaries, /!Array\.isArray\(deletedRules\) \|\| deletedRules\.length !== 1/)
@@ -25,13 +26,23 @@ test('only owners see the touch-safe KPI rule removal flow and zero-row deletes 
   assert.doesNotMatch(salaries, /window\.confirm\(/)
 })
 
-test('Salaries KPI history is date-bounded, server-paginated, and cannot generate payouts', () => {
-  assert.match(salaries, /\.from\('employee_daily_kpi_results'\)/)
-  assert.match(salaries, /\.gte\('business_date', kpiDateFrom\)/)
-  assert.match(salaries, /\.lte\('business_date', kpiDateTo\)/)
-  assert.match(salaries, /\.range\(from, from \+ KPI_RESULT_PAGE_SIZE - 1\)/)
-  assert.match(salaries, /result\.baseAmountUzs[\s\S]*result\.rateBps[\s\S]*result\.bonusAmountUzs/)
+test('Salaries keeps only KPI configuration while result history stays on employee history', () => {
+  assert.match(salaries, /selectedRule=\{selectedKpiRule\}/)
+  assert.doesNotMatch(salaries, /\.from\('employee_daily_kpi_results'\)/)
+  assert.doesNotMatch(salaries, /labels\.kpiHistory/)
+  assert.doesNotMatch(salaries, /labels\.kpiCurrent/)
   assert.doesNotMatch(salaries, /generate_daily_kpi_bonuses/)
+})
+
+test('Add employee salary and Employee KPI share the salary settings grid', () => {
+  const settingsSection = salaries.slice(
+    salaries.indexOf('aria-labelledby="salary-settings-heading"'),
+    salaries.indexOf('function DailyKpiSection')
+  )
+
+  assert.match(settingsSection, /<CardHeading icon=\{Plus\} title=\{l\.add\}[\s\S]*?<DailyKpiSection/)
+  assert.match(settingsSection, /<DailyKpiSection[\s\S]*?<CardHeading icon=\{Save\} title=\{l\.changeSalary\}/)
+  assert.doesNotMatch(salaries, /<section className="mb-7" aria-labelledby="daily-kpi-heading">/)
 })
 
 test('automatic KPI bonuses are identified and show their immutable formula in employee history', () => {
@@ -40,6 +51,7 @@ test('automatic KPI bonuses are identified and show their immutable formula in e
   assert.match(employeeHistory, /entry\.kpiResult\.baseAmountUzs/)
   assert.match(employeeHistory, /formatKpiRatePercent\(entry\.kpiResult\.rateBps, lang\)/)
   assert.match(employeeHistory, /entry\.kpiResult\.bonusAmountUzs/)
+  assert.match(employeeHistory, /label=\{l\.kpiBonusTotal\}[\s\S]*monthSummary\.kpiBonusAmount/)
 })
 
 test('employee cards show the current effective KPI percentage and enabled state', () => {

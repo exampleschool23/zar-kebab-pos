@@ -329,6 +329,9 @@ These bugs were recently fixed and are now protected by tests:
    - Removal targets the exact displayed rule and requires one returned deleted row. Rules referenced by finalized KPI results remain protected and must never be deleted or rewritten.
    - Employee cards show the rule effective on the current Tashkent date, including enabled or disabled state. A future scheduled rule must not appear as the employee's current KPI.
    - If migration `129` is not available, the KPI row reports that state without preventing salary employee cards from loading.
+   - The Salaries page contains only the Employee KPI configuration form; it does not duplicate a Saved settings list or aggregate Automatic KPI history. Current KPI is visible on the employee card, and each generated day is inspected through that employee's Salary History.
+   - Add employee salary and Employee KPI percentage share the same two-column Salary settings grid to use the available space, while keeping their save actions independent.
+   - Salary History includes a separate selected-month KPI bonus total alongside the all-bonuses total; automatic KPI remains part of the all-bonuses amount and is also broken out for visibility.
 
 40. Daily salary and automatic KPI Telegram delivery is Russian-first.
    - The employee's combined daily Salary + Bonus summary is always rendered in Russian, regardless of the private link's saved language preference.

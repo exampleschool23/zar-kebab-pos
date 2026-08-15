@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Gift,
   Loader2,
+  Percent,
   RefreshCw,
   Trash2,
   UserRound,
@@ -133,6 +134,7 @@ export default function EmployeeSalaryHistory() {
       absence: 'Kelmagan',
       paidTotal: 'To‘langan',
       bonusTotal: 'Bonuslar',
+      kpiBonusTotal: 'KPI bonuslari',
       fineTotal: 'Jarimalar',
       absenceTotal: 'Kelmagan kunlar',
       empty: 'Bu davrda yozuvlar yo‘q.',
@@ -182,6 +184,7 @@ export default function EmployeeSalaryHistory() {
       absence: 'Отсутствовал',
       paidTotal: 'Выплачено',
       bonusTotal: 'Бонусы',
+      kpiBonusTotal: 'KPI-бонусы',
       fineTotal: 'Штрафы',
       absenceTotal: 'Дни отсутствия',
       empty: 'За этот период записей нет.',
@@ -231,6 +234,7 @@ export default function EmployeeSalaryHistory() {
       absence: 'Absent',
       paidTotal: 'Paid',
       bonusTotal: 'Bonuses',
+      kpiBonusTotal: 'KPI bonuses',
       fineTotal: 'Fines',
       absenceTotal: 'Absent days',
       empty: 'There are no records for this period.',
@@ -487,9 +491,10 @@ export default function EmployeeSalaryHistory() {
             </div>
           )}
 
-          <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label={formatMonthYear(visibleMonth, lang, visibleMonth)}>
+          <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5" aria-label={formatMonthYear(visibleMonth, lang, visibleMonth)}>
             <SummaryCard icon={Banknote} label={l.paidTotal} value={formatCurrency(monthSummary.paymentAmount)} tone="orange" />
             <SummaryCard icon={Gift} label={l.bonusTotal} value={formatCurrency(monthSummary.bonusAmount)} tone="blue" />
+            <SummaryCard icon={Percent} label={l.kpiBonusTotal} value={formatCurrency(monthSummary.kpiBonusAmount)} tone="emerald" />
             <SummaryCard icon={BadgeMinus} label={l.fineTotal} value={formatCurrency(monthSummary.fineAmount)} tone="red" />
             <SummaryCard icon={CalendarX2} label={l.absenceTotal} value={monthSummary.absenceCount} tone="violet" />
           </section>
@@ -701,6 +706,7 @@ function SummaryCard({ icon: Icon, label, value, tone }) {
   const tones = {
     orange: 'border-orange-200 bg-orange-50 text-[#ff5a00]',
     blue: 'border-blue-200 bg-blue-50 text-blue-700',
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     red: 'border-red-200 bg-red-50 text-red-700',
     violet: 'border-violet-200 bg-violet-50 text-violet-700',
   }

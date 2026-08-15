@@ -131,6 +131,7 @@ export function summarizeSalaryHistoryMonth(entries = [], month = '') {
   const summary = {
     paymentAmount: 0,
     bonusAmount: 0,
+    kpiBonusAmount: 0,
     fineAmount: 0,
     absenceCount: 0,
     entryCount: 0,
@@ -139,7 +140,11 @@ export function summarizeSalaryHistoryMonth(entries = [], month = '') {
   for (const entry of filterSalaryHistoryEntries(entries, { month })) {
     summary.entryCount += 1
     if (entry.entryType === 'payment') summary.paymentAmount += normalizeAmount(entry.amount)
-    if (entry.entryType === 'bonus') summary.bonusAmount += normalizeAmount(entry.amount)
+    if (entry.entryType === 'bonus') {
+      const amount = normalizeAmount(entry.amount)
+      summary.bonusAmount += amount
+      if (entry.automaticKpi) summary.kpiBonusAmount += amount
+    }
     if (entry.entryType === 'fine') summary.fineAmount += normalizeAmount(entry.amount)
     if (entry.entryType === 'absence') summary.absenceCount += 1
   }
