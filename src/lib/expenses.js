@@ -71,6 +71,9 @@ export const INCOME_CATEGORIES = [
     key: 'investor_support',
     labels: { uz: 'Investor yordami', ru: 'Поддержка инвестора', en: 'Investor support' },
   },
+]
+
+const LEGACY_INCOME_CATEGORIES = [
   {
     key: 'other_income',
     labels: { uz: 'Boshqa daromad', ru: 'Другой доход', en: 'Other income' },
@@ -109,7 +112,7 @@ export function getAccountingHistoryRange(period = 'thisMonth', today = todayExp
 }
 
 export function expenseCategoryLabel(category, lang = 'en') {
-  const cfg = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES]
+  const cfg = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES, ...LEGACY_INCOME_CATEGORIES]
     .find(item => item.key === category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1]
   return cfg.labels[lang] || cfg.labels.en
 }

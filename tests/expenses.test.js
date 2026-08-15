@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   EXPENSE_CATEGORIES,
+  INCOME_CATEGORIES,
   MANUAL_EXPENSE_CATEGORIES,
   DEFAULT_MONTHLY_RENT_UZS,
   DEFAULT_MONTHLY_UTILITIES_UZS,
@@ -176,6 +177,11 @@ test('manual expense categories offer specific tracking choices without removing
   assert.equal(manualKeys.includes('products_bazaar'), false)
   assert.equal(manualKeys.includes('salary_one_time'), true)
   assert.equal(manualKeys.includes('charcoal'), true)
+})
+
+test('new income entry offers investor support only while retaining legacy labels', () => {
+  assert.deepEqual(INCOME_CATEGORIES.map(category => category.key), ['investor_support'])
+  assert.equal(expenseCategoryLabel('other_income', 'en'), 'Other income')
 })
 
 test('employee salary ledger generates effective-dated daily expense rows and due balance', () => {
