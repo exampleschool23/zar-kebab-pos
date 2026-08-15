@@ -8,6 +8,7 @@ import {
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
+import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import { notifyAutomaticKpiBonus } from './employee-notification.js'
 
 const KPI_CATCH_UP_DAYS = 7
@@ -58,6 +59,156 @@ function getOptionalTashkentDate(value) {
   if (!value) return ''
   const timestamp = new Date(value)
   return Number.isFinite(timestamp.getTime()) ? getTashkentDate(timestamp) : ''
+}
+
+async function loadSalaryEventsTarget(supabase) {
+  const fallback = {
+    chatId: String(process.env.TELEGRAM_SALARY_PAYMENTS_CHAT_ID || '').trim(),
+    language: String(process.env.TELEGRAM_SALARY_PAYMENTS_LANGUAGE || 'ru').trim(),
+  }
+  const { data, error } = await supabase
+    .from('telegram_notification_targets')
+    .select('chat_id, language, is_enabled')
+    .eq('target_key', 'salary_events')
+    .maybeSingle()
+  if (error) throw error
+  if (!data?.is_enabled) return { chatId: '', language: data?.language || fallback.language }
+  return {
+    chatId: String(data.chat_id || fallback.chatId).trim(),
+    language: String(data.language || fallback.language || 'ru').trim(),
+  }
+}
+
+async function loadDailyBazaarPurchases(supabase, purchaseDate) {
+  const { data, error } = await supabase
+    .from('bazaar_purchases')
+    .select(`
+      id,
+      purchase_date,
+      total_amount,
+      entry_source,
+      bazaar_purchase_items (
+        id,
+        product_name,
+        quantity,
+        unit,
+        line_total,
+        sort_order
+      )
+    `)
+    .eq('purchase_date', purchaseDate)
+    .eq('entry_source', 'daily_bazaar')
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return (data || []).filter(purchase => (
+    (purchase.bazaar_purchase_items || []).length > 0
+  ))
+}
+
+async function claimDailyBazaarDelivery(supabase, purchaseDate) {
+  const { data: existing, error: existingError } = await supabase
+    .from('daily_bazaar_telegram_deliveries')
+    .select('*')
+    .eq('purchase_date', purchaseDate)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (existing?.status === 'sent' || existing?.status === 'skipped') return null
+  if (existing?.status === 'pending' && !canRetryPending(existing.attempted_at)) return null
+
+  const now = new Date().toISOString()
+  if (!existing) {
+    const created = await supabase
+      .from('daily_bazaar_telegram_deliveries')
+      .insert({
+        purchase_date: purchaseDate,
+        target_key: 'salary_events',
+        status: 'pending',
+        error_message: '',
+        attempted_at: now,
+        sent_at: null,
+        updated_at: now,
+      })
+      .select('*')
+      .single()
+    if (created.error?.code === '23505') return null
+    if (created.error) throw created.error
+    return created.data
+  }
+
+  let claim = supabase
+    .from('daily_bazaar_telegram_deliveries')
+    .update({
+      status: 'pending',
+      telegram_chat_id: null,
+      telegram_message_id: null,
+      error_message: '',
+      attempted_at: now,
+      sent_at: null,
+      updated_at: now,
+    })
+    .eq('purchase_date', purchaseDate)
+    .eq('status', existing.status)
+  if (existing.attempted_at) claim = claim.eq('attempted_at', existing.attempted_at)
+  else claim = claim.is('attempted_at', null)
+  const claimed = await claim.select('*').maybeSingle()
+  if (claimed.error) throw claimed.error
+  return claimed.data || null
+}
+
+async function markDailyBazaarDeliverySent(supabase, purchaseDate, target, messageId) {
+  let lastError = null
+  const sentAt = new Date().toISOString()
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const updated = await supabase
+      .from('daily_bazaar_telegram_deliveries')
+      .update({
+        status: 'sent',
+        telegram_chat_id: target.chatId,
+        telegram_message_id: messageId,
+        error_message: '',
+        sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('purchase_date', purchaseDate)
+      .select('purchase_date')
+      .maybeSingle()
+    if (!updated.error && updated.data) return
+    lastError = updated.error || new Error('Daily Bazaar delivery row disappeared')
+  }
+  throw lastError
+}
+
+async function sendDailyBazaarNotification(supabase, purchaseDate) {
+  const purchases = await loadDailyBazaarPurchases(supabase, purchaseDate)
+  if (purchases.length === 0) return { businessDate: purchaseDate, status: 'empty' }
+
+  const target = await loadSalaryEventsTarget(supabase)
+  if (!target.chatId) throw new Error('Salary Events Telegram channel is not configured')
+  const delivery = await claimDailyBazaarDelivery(supabase, purchaseDate)
+  if (!delivery) return { businessDate: purchaseDate, status: 'duplicate' }
+
+  let telegramMessageId = ''
+  try {
+    const response = await sendTelegramMessage(
+      target.chatId,
+      buildDailyBazaarGroupMessage(purchases, purchaseDate, target.language)
+    )
+    telegramMessageId = getTelegramMessageId(response)
+    await markDailyBazaarDeliverySent(supabase, purchaseDate, target, telegramMessageId)
+    return { businessDate: purchaseDate, status: 'sent' }
+  } catch (error) {
+    if (!telegramMessageId) {
+      await supabase.from('daily_bazaar_telegram_deliveries').update({
+        status: 'failed',
+        telegram_chat_id: target.chatId,
+        error_message: String(error?.message || error).slice(0, 1000),
+        updated_at: new Date().toISOString(),
+      }).eq('purchase_date', purchaseDate)
+    } else {
+      console.error('[telegram/daily-salary] Bazaar message sent but delivery status was not persisted:', error)
+    }
+    throw error
+  }
 }
 
 async function markDailySalaryDeliverySent(supabase, deliveryId, telegramMessageId, sentAt) {
@@ -297,6 +448,7 @@ export default async function handler(req, res) {
     const notificationKpiRun = kpiRuns.find(run => run.businessDate === notificationDate)
     const kpiFinalizationFailed = notificationKpiRun?.status !== 'completed'
     const dailySummaryRuns = []
+    const dailyBazaarRuns = []
 
     for (const kpiRun of kpiRuns) {
       if (kpiRun.status !== 'completed') continue
@@ -306,14 +458,31 @@ export default async function handler(req, res) {
           kpiRun.businessDate
         )
         const failedCount = summaryResults.filter(result => result.status === 'failed').length
+        let bazaarResult
+        try {
+          bazaarResult = await sendDailyBazaarNotification(supabase, kpiRun.businessDate)
+        } catch (error) {
+          bazaarResult = {
+            businessDate: kpiRun.businessDate,
+            status: 'failed',
+            error: String(error?.message || error).slice(0, 1000),
+          }
+        }
+        dailyBazaarRuns.push(bazaarResult)
         dailySummaryRuns.push({
           businessDate: kpiRun.businessDate,
-          status: failedCount > 0 ? 'partial' : 'completed',
+          status: failedCount > 0 || bazaarResult.status === 'failed' ? 'partial' : 'completed',
           sentCount: summaryResults.filter(result => result.status === 'sent').length,
           failedCount,
+          bazaarStatus: bazaarResult.status,
           results: summaryResults,
         })
       } catch (error) {
+        dailyBazaarRuns.push({
+          businessDate: kpiRun.businessDate,
+          status: 'deferred',
+          error: 'Daily salary notifications could not be prepared',
+        })
         dailySummaryRuns.push({
           businessDate: kpiRun.businessDate,
           status: 'failed',
@@ -346,6 +515,9 @@ export default async function handler(req, res) {
       kpiUnavailable,
       kpiRuns,
       dailySummaryRuns,
+      dailyBazaarRuns,
+      dailyBazaarSentCount: dailyBazaarRuns.filter(result => result.status === 'sent').length,
+      dailyBazaarFailedCount: dailyBazaarRuns.filter(result => result.status === 'failed').length,
       kpiDeliverySentCount: kpiDeliveries.filter(result => result.status === 'sent').length,
       kpiDeliveryPartialCount: kpiDeliveries.filter(result => result.status === 'partial').length,
       kpiDeliveryFailedCount: kpiDeliveries.filter(result => result.status === 'failed').length,

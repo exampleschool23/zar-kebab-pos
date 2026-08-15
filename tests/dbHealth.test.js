@@ -122,6 +122,19 @@ test('database health requires auditable salary payment notifications', async ()
   assert.match(cliHealthSource, /checkTable\('employee_salary_payment_notification_deliveries'/)
 })
 
+test('database health requires duplicate-safe Daily Bazaar Telegram delivery tracking', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    missingTable: 'daily_bazaar_telegram_deliveries',
+  }))
+
+  assert.equal(result.ok, false)
+  assert.match(
+    result.failed.find(check => check.name === 'daily_bazaar_telegram_deliveries').hint,
+    /131_daily_bazaar_telegram_deliveries/
+  )
+  assert.match(cliHealthSource, /checkTable\('daily_bazaar_telegram_deliveries'/)
+})
+
 test('database health requires the salary group target and event delivery history', async () => {
   const missingTarget = await runDbHealthChecks(makeClient({
     missingTable: 'telegram_notification_targets',

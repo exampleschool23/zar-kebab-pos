@@ -154,6 +154,7 @@ const checks = await Promise.all([
   checkTable('bazaar_purchase_items', 'id, purchase_id, product_name, product_key, category, quantity, unit, line_total, sort_order, notes, created_at'),
   checkTable('bazaar_product_catalog', 'product_key, product_name, category, unit, last_purchase_date, created_at, updated_at'),
   checkTable('bazaar_purchase_audit', 'id, purchase_id, action, old_snapshot, new_snapshot, changed_by, changed_by_name, changed_at'),
+  checkTable('daily_bazaar_telegram_deliveries', 'purchase_date, target_key, status, telegram_chat_id, telegram_message_id, error_message, attempted_at, sent_at, updated_at'),
   checkRpc(
     'get_public_menu_data()',
     () => supabase.rpc('get_public_menu_data'),

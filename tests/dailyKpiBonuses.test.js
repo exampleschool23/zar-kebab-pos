@@ -264,6 +264,7 @@ test('current daily summary exposes per-employee delivery failures as a partial 
   )
   const runMarksPartial = (
     /status:\s*failedCount > 0\s*\?\s*'partial'\s*:\s*'completed'/.test(summaryFlow)
+    || /status:\s*failedCount > 0 \|\| bazaarResult\.status === 'failed'\s*\?\s*'partial'/.test(summaryFlow)
     || /status:\s*summaryResults\.some\([\s\S]*?'failed'[\s\S]*?\)\s*\?\s*'partial'/.test(summaryFlow)
   )
   const currentFailureChecksCount = (

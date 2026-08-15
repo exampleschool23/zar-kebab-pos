@@ -15,7 +15,6 @@ import {
   Save,
   Scale,
   Search,
-  Send,
   ShoppingBasket,
   Terminal,
   Trash2,
@@ -189,11 +188,6 @@ const EN = {
   priceUp: 'up',
   priceDown: 'down',
   selectedCategory: 'Analytics are scoped to the selected category.',
-  sendTelegram: 'Send selected date to Telegram',
-  sendingTelegram: 'Sending…',
-  telegramSent: 'Selected date’s Bazaar was sent to Telegram.',
-  telegramSendFailed: 'Could not send the selected date’s Bazaar to Telegram.',
-  selectSingleDate: 'Select one date containing Bazaar entries.',
   validation: {
     purchase_date_required: 'Choose the purchase date.',
     buyer_profile_id_required: 'Choose the employee who made the purchase.',
@@ -240,9 +234,6 @@ const LABELS = {
     dailySpend: 'Kunlar bo‘yicha xarajat', categorySpend: 'Kategoriya bo‘yicha', paymentSpend: 'To‘lov turlari', buyerSpend: 'Xarid qilgan xodim bo‘yicha', topProducts: 'Eng ko‘p xarajatli mahsulotlar',
     ofTotal: 'jami ichida', purchasesShort: 'yozuv', averageUnitCost: 'O‘rtacha birlik narxi', latestUnitCost: 'Oxirgi', priceUp: 'oshdi', priceDown: 'tushdi',
     selectedCategory: 'Tahlil tanlangan kategoriya bo‘yicha hisoblandi.',
-    sendTelegram: 'Tanlangan sanani Telegramga yuborish', sendingTelegram: 'Yuborilmoqda…',
-    telegramSent: 'Tanlangan sanadagi bozor Telegramga yuborildi.', telegramSendFailed: 'Tanlangan sanadagi bozorni Telegramga yuborib bo‘lmadi.',
-    selectSingleDate: 'Bozor yozuvlari bor bitta sanani tanlang.',
     validation: {
       purchase_date_required: 'Xarid sanasini tanlang.', buyer_profile_id_required: 'Xarid qilgan xodimni tanlang.', payment_method_required: 'To‘g‘ri to‘lov turini tanlang.', items_required: 'Kamida bitta mahsulot qo‘shing.',
       product_name_required: 'Mahsulot nomini kiriting.', category_required: 'To‘g‘ri kategoriyani tanlang.', unit_required: 'To‘g‘ri birlikni tanlang.',
@@ -279,9 +270,6 @@ const LABELS = {
     dailySpend: 'Расходы по дням', categorySpend: 'По категориям', paymentSpend: 'Способы оплаты', buyerSpend: 'Расходы по закупщику', topProducts: 'Главные продукты по расходам',
     ofTotal: 'от общей суммы', purchasesShort: 'записей', averageUnitCost: 'Средняя цена за ед.', latestUnitCost: 'Последняя', priceUp: 'выше', priceDown: 'ниже',
     selectedCategory: 'Аналитика рассчитана по выбранной категории.',
-    sendTelegram: 'Отправить выбранную дату в Telegram', sendingTelegram: 'Отправляется…',
-    telegramSent: 'Базар за выбранную дату отправлен в Telegram.', telegramSendFailed: 'Не удалось отправить базар за выбранную дату в Telegram.',
-    selectSingleDate: 'Выберите одну дату, за которую есть записи базара.',
     validation: {
       purchase_date_required: 'Выберите дату покупки.', buyer_profile_id_required: 'Выберите сотрудника, который сделал закупку.', payment_method_required: 'Выберите корректный способ оплаты.', items_required: 'Добавьте хотя бы один продукт.',
       product_name_required: 'Введите название продукта.', category_required: 'Выберите корректную категорию.', unit_required: 'Выберите корректную единицу.',
@@ -382,22 +370,6 @@ function bazaarErrorMessage(error, l, fallback) {
   return missing ? l.migrationMissing : (error?.message || fallback)
 }
 
-async function sendBazaarDateToTelegram(purchaseDate) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const token = session?.access_token || ''
-  const response = await fetch('/api/telegram/employee-notification', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ type: 'daily_bazaar', purchaseDate }),
-  })
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok || !data.ok) throw new Error(data.error || 'Daily Bazaar notification failed')
-  return data
-}
-
 function validationMessage(validationError, l) {
   const message = l.validation[validationError?.code] || l.saveFailed
   return Number.isInteger(validationError?.index)
@@ -423,7 +395,6 @@ export default function DailyBazaar() {
   const [purchases, setPurchases] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [sendingTelegram, setSendingTelegram] = useState(false)
   const [deletingId, setDeletingId] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState('')
   const [historyPage, setHistoryPage] = useState(1)
@@ -596,9 +567,6 @@ export default function DailyBazaar() {
   }), [purchases, dateFrom, dateTo, categoryFilter, paymentFilter])
 
   const formTotal = useMemo(() => calculateBazaarTotal(form.items), [form.items])
-  const canSendSelectedDate = dateFrom === dateTo && purchases.some(purchase => (
-    purchase.entry_source === 'daily_bazaar' && purchase.purchase_date === dateFrom
-  ))
 
   function selectRange(key) {
     const range = getBazaarRange(key)
@@ -619,22 +587,6 @@ export default function DailyBazaar() {
     setRangeKey('custom')
     setDateTo(value)
     if (value < dateFrom) setDateFrom(value)
-  }
-
-  async function sendSelectedDateToTelegram() {
-    if (!canManage || sendingTelegram || !canSendSelectedDate) return
-    setError('')
-    setNotice('')
-    setSendingTelegram(true)
-    try {
-      await sendBazaarDateToTelegram(dateFrom)
-      setNotice(l.telegramSent)
-    } catch (sendError) {
-      console.error('[daily-bazaar] Telegram notification failed:', sendError)
-      setError(l.telegramSendFailed)
-    } finally {
-      setSendingTelegram(false)
-    }
   }
 
   function updateForm(field, value) {
@@ -881,10 +833,6 @@ export default function DailyBazaar() {
               paymentFilter={paymentFilter}
               onPayment={setPaymentFilter}
               showSearch={tab === 'history'}
-              canSendTelegram={canManage}
-              canSendSelectedDate={canSendSelectedDate}
-              sendingTelegram={sendingTelegram}
-              onSendTelegram={sendSelectedDateToTelegram}
             />
           )}
 
@@ -997,10 +945,6 @@ function RangeAndFilters({
   paymentFilter,
   onPayment,
   showSearch,
-  canSendTelegram,
-  canSendSelectedDate,
-  sendingTelegram,
-  onSendTelegram,
 }) {
   const rangeSummary = dateFrom === dateTo
     ? formatLongDate(dateFrom, lang, dateFrom)
@@ -1021,23 +965,9 @@ function RangeAndFilters({
           </span>
           {l.dateRange}
         </h2>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <p className="rounded-lg bg-[#F8F9FB] px-2.5 py-1.5 text-[11px] font-black text-[#7B8494]">
-            {rangeSummary}
-          </p>
-          {canSendTelegram && (
-            <button
-              type="button"
-              onClick={onSendTelegram}
-              disabled={!canSendSelectedDate || sendingTelegram}
-              title={!canSendSelectedDate ? l.selectSingleDate : l.sendTelegram}
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-3 text-xs font-black text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
-            >
-              {sendingTelegram ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              {sendingTelegram ? l.sendingTelegram : l.sendTelegram}
-            </button>
-          )}
-        </div>
+        <p className="rounded-lg bg-[#F8F9FB] px-2.5 py-1.5 text-[11px] font-black text-[#7B8494]">
+          {rangeSummary}
+        </p>
       </div>
 
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(380px,520px)] xl:items-center">
