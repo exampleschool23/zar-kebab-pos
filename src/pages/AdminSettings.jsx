@@ -102,7 +102,7 @@ export default function AdminSettings() {
   }, [settings.restaurantName, settings.serviceRate, settings.touristServiceRate, settings.monthlyRentUzs, settings.monthlyUtilitiesUzs, settings.autoPrint, settings.autoPrintKitchenCheck, settings.receiptMarketing])
 
   async function saveSettings(overrides = {}) {
-    if (!canManageSettings) return
+    if (!canManageSettings) return { error: new Error('Settings write access is required') }
     setSaving(true)
     setError('')
     const nextSettings = {
@@ -123,14 +123,22 @@ export default function AdminSettings() {
     setSaving(false)
     if (result?.error) {
       setError(result.error.message || 'Failed to save settings')
-      return
+      return result
     }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+    return result
   }
 
   async function handleSave() {
     await saveSettings()
+  }
+
+  async function handleAutoPrintChange(nextValue) {
+    if (!canManageSettings || saving) return
+    setAutoPrint(nextValue)
+    const result = await saveSettings({ autoPrint: nextValue })
+    if (result?.error) setAutoPrint(!!settings.autoPrint)
   }
 
   async function handleServiceRateChange(nextRate) {
@@ -178,8 +186,8 @@ export default function AdminSettings() {
       tableManagementSub: 'Restoran stollari, zonalari va sig‘imini boshqarish',
       language:        'Til',
       languageSub:     'Interfeys tili',
-      autoPrint:       'Avtomatik bosib chiqarish',
-      autoPrintSub:    'To\'lovdan keyin chekni avtomatik bosib chiqarish',
+      autoPrint:       'Hisobni avtomatik chop etish',
+      autoPrintSub:    'Buyurtma kassirga yuborilganda hisobni darhol chop etish',
       autoPrintKitchenCheck: 'Oshxona chekini avtomatik chop etish',
       autoPrintKitchenCheckSub: 'Buyurtma oshxonaga yuborilganda darhol oshxona cheki chiqadi',
       receiptMarketing: 'Chek marketingi',
@@ -244,8 +252,8 @@ export default function AdminSettings() {
       tableManagementSub: 'Управление столами, зонами и вместимостью',
       language:        'Язык',
       languageSub:     'Язык интерфейса',
-      autoPrint:       'Автоматическая печать',
-      autoPrintSub:    'Печатать чек автоматически после оплаты',
+      autoPrint:       'Автопечать счёта',
+      autoPrintSub:    'Печатать счёт сразу при передаче заказа кассиру',
       autoPrintKitchenCheck: 'Автопечать кухонного чека',
       autoPrintKitchenCheckSub: 'Печатать кухонный чек сразу после отправки заказа',
       receiptMarketing: 'Маркетинг в чеке',
@@ -310,8 +318,8 @@ export default function AdminSettings() {
       tableManagementSub: 'Manage restaurant tables, zones, and capacity',
       language:        'Language',
       languageSub:     'Interface language',
-      autoPrint:       'Auto-print Receipt',
-      autoPrintSub:    'Print receipt automatically after payment',
+      autoPrint:       'Auto-print bill',
+      autoPrintSub:    'Print the bill immediately when an order moves to cashier',
       autoPrintKitchenCheck: 'Auto-print kitchen check',
       autoPrintKitchenCheckSub: 'Print the kitchen check immediately when an order is submitted',
       receiptMarketing: 'Receipt marketing',
@@ -481,7 +489,7 @@ export default function AdminSettings() {
             </div>
           </SettingRow>
           <SettingRow icon={Printer} label={l.autoPrint} sub={l.autoPrintSub}>
-            <Toggle value={autoPrint} onChange={setAutoPrint} disabled={!canManageSettings} />
+            <Toggle value={autoPrint} onChange={handleAutoPrintChange} disabled={!canManageSettings || saving} />
           </SettingRow>
           <SettingRow icon={ChefHat} label={l.autoPrintKitchenCheck} sub={l.autoPrintKitchenCheckSub}>
             <Toggle value={autoPrintKitchenCheck} onChange={setAutoPrintKitchenCheck} disabled={!canManageSettings} />

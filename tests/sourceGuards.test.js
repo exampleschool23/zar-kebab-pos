@@ -2191,14 +2191,15 @@ test('WaiterTables lets occupied tables request the bill from the card action', 
   const source = readSource('src/pages/WaiterTables.jsx')
 
   assert.match(source, /status === 'occupied'\) return \{ label: tr\(lang, 'requestBill'\)/)
-  assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'occupied'\) \{[\s\S]*MARK_TABLE_NEEDS_BILL/)
+  assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'occupied'\) \{[\s\S]*moveTableToCashier\(table\)/)
+  assert.match(functionBody(source, 'moveTableToCashier'), /MARK_TABLE_NEEDS_BILL[\s\S]*result\?\.error[\s\S]*state\.settings\?\.autoPrint[\s\S]*\/receipt\/table\//)
 })
 
 test('WaiterTables lets waiting kitchen orders move to cashier from the card action', () => {
   const source = readSource('src/pages/WaiterTables.jsx')
 
   assert.match(source, /status === 'waiting_kitchen'\) return \{ label: tr\(lang, 'requestBill'\)/)
-  assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'waiting_kitchen'\) \{[\s\S]*MARK_TABLE_NEEDS_BILL/)
+  assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'waiting_kitchen'\) \{[\s\S]*moveTableToCashier\(table\)/)
 })
 
 test('WaiterTables keeps an explicit manage path for active waiting orders', () => {
@@ -2862,6 +2863,26 @@ test('AdminSettings does not expose receipt footer editing', () => {
   assert.doesNotMatch(settings, /receiptFooterL/)
   assert.doesNotMatch(settings, /setReceiptFooter/)
   assert.doesNotMatch(settings, /payload: \{ restaurantName, serviceRate, receiptFooter, autoPrint \}/)
+})
+
+test('Auto-print bill saves immediately and prints after a successful move to cashier', () => {
+  const app = readSource('src/App.jsx')
+  const settings = readSource('src/pages/AdminSettings.jsx')
+  const waiterTables = readSource('src/pages/WaiterTables.jsx')
+  const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
+  const receipt = readSource('src/pages/Receipt.jsx')
+
+  assert.match(settings, /async function handleAutoPrintChange\(nextValue\)/)
+  assert.match(settings, /await saveSettings\(\{ autoPrint: nextValue \}\)/)
+  assert.match(settings, /onChange=\{handleAutoPrintChange\}/)
+  assert.match(settings, /Print the bill immediately when an order moves to cashier/)
+  assert.match(waiterTables, /navigate\(`\/receipt\/table\/\$\{encodeURIComponent\(table\.id\)\}\?print=1`\)/)
+  assert.match(waiterOrder, /if \(!result\?\.error\) onMovedToCashier\?\.\(\)/)
+  assert.match(waiterOrder, /navigate\(`\/receipt\/table\/\$\{encodeURIComponent\(tableId\)\}\?print=1`\)/)
+  assert.match(receipt, /new URLSearchParams\(location\.search\)\.get\('print'\) === '1'/)
+  assert.match(app, /page=\{\['cashier', 'tables'\]\}><Receipt \/>/)
+  assert.match(app, /page=\{\['cashier', 'tables'\]\}><TableReceipt \/>/)
+  assert.match(functionBody(app, 'ProtectedRoute'), /Array\.isArray\(page\)[\s\S]*page\.some\(pageKey => canViewPage\(profile, pageKey\)\)/)
 })
 
 test('Receipt hides payment method rows and uses paid timestamp when available', () => {

@@ -196,7 +196,10 @@ function ProtectedRoute({ children, page }) {
   if (profile?.status === 'disabled') return null // handled by RoleRedirect
   if (profile?.status === 'pending')  return <Navigate to="/pending-approval" replace />
 
-  if (page && !canViewPage(profile, page)) {
+  const allowed = Array.isArray(page)
+    ? page.some(pageKey => canViewPage(profile, pageKey))
+    : !page || canViewPage(profile, page)
+  if (!allowed) {
     return <Navigate to={defaultPathForHost(profile)} replace />
   }
 
@@ -367,10 +370,10 @@ function InternalAppRoutes({ adminHost = false }) {
           <LazyProtectedRoute page="cashier"><CashierBill /></LazyProtectedRoute>
         } />
         <Route path="/receipt/:orderId" element={
-          <LazyProtectedRoute page="cashier"><Receipt /></LazyProtectedRoute>
+          <LazyProtectedRoute page={['cashier', 'tables']}><Receipt /></LazyProtectedRoute>
         } />
         <Route path="/receipt/table/:tableId" element={
-          <LazyProtectedRoute page="cashier"><TableReceipt /></LazyProtectedRoute>
+          <LazyProtectedRoute page={['cashier', 'tables']}><TableReceipt /></LazyProtectedRoute>
         } />
 
         {/* Dashboard: visible to profiles with the dashboard feature. */}

@@ -743,6 +743,12 @@ export default function WaiterTables() {
     navigate(`/waiter/order/${table.id}?panel=order`)
   }
 
+  async function moveTableToCashier(table) {
+    const result = await dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: table.id })
+    if (result?.error || !state.settings?.autoPrint) return
+    navigate(`/receipt/table/${encodeURIComponent(table.id)}?print=1`)
+  }
+
   function handleCardAction(status, table) {
     if (!canEditTables) return
     if (status === 'ready') {
@@ -755,11 +761,11 @@ export default function WaiterTables() {
       return
     }
     if (status === 'waiting_kitchen') {
-      dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: table.id })
+      moveTableToCashier(table)
       return
     }
     if (status === 'occupied') {
-      dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: table.id })
+      moveTableToCashier(table)
       return
     }
     if (status === 'reserved') {

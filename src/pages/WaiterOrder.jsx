@@ -48,7 +48,7 @@ import {
 } from '../lib/menuSaleUnits'
 
 // ── OrderActionPanel ───────────────────────────────────────────────────────────
-function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, canEditOrder, onPrintKitchenCheck }) {
+function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemMap, canEditOrder, onPrintKitchenCheck, onMovedToCashier }) {
   const [busy, setBusy] = useState(false)
   const [updatingItemId, setUpdatingItemId] = useState(null)
 
@@ -248,11 +248,12 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
     dispatch({ type: 'CONFIRM_ORDER_DELIVERED', payload: tableId })
     setTimeout(() => setBusy(false), 700)
   }
-  function handleRequestBill() {
+  async function handleRequestBill() {
     if (busy || !canEditOrder) return
     setBusy(true)
-    dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: tableId })
-    setTimeout(() => setBusy(false), 700)
+    const result = await dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: tableId })
+    if (!result?.error) onMovedToCashier?.()
+    setBusy(false)
   }
 
   if (inPreparation) {
@@ -1627,6 +1628,11 @@ export default function WaiterOrder() {
                   menuItemMap={menuItemMap}
                   canEditOrder={canEditTables && !orderLocked}
                   onPrintKitchenCheck={orderLocked ? () => {} : handlePrintKitchenCheck}
+                  onMovedToCashier={() => {
+                    if (state.settings?.autoPrint) {
+                      navigate(`/receipt/table/${encodeURIComponent(tableId)}?print=1`)
+                    }
+                  }}
                 />
               </div>
             )}
