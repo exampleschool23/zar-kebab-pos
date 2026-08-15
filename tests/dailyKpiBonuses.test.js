@@ -71,7 +71,7 @@ test('daily KPI finalization is date-idempotent and excludes absent or ineligibl
   assert.doesNotMatch(migration, /v_rule\.is_active\s*=\s*false/i)
   assert.match(migration, /insert into public\.employee_salary_bonuses/i)
   assert.match(migration, /created_by,[\s\S]*?created_by_name,[\s\S]*?source_type,[\s\S]*?source_metadata/i)
-  assert.match(migration, /'Automatic KPI'[\s\S]*?'daily_kpi'[\s\S]*?jsonb_build_object/i)
+  assert.match(migration, /'Автоматический KPI'[\s\S]*?'daily_kpi'[\s\S]*?jsonb_build_object/i)
 })
 
 test('automatic bonuses queue group and Team delivery but fold private delivery into the daily summary', () => {
@@ -309,12 +309,12 @@ test('authenticated retries accept only automatic KPI null-creator bonuses', () 
   assert.match(employeeNotification, /legacySelect:[\s\S]*?isMissingKpiBonusSourceColumns\(error\)/)
 })
 
-test('automatic KPI group announcements show the paid amount, gross base, and configured percentage', () => {
+test('Salary group gets KPI details while Team receives only the bonus amount and date', () => {
   const event = {
     employee_name: 'Aziz <waiter>',
     bonus_date: '2026-08-14',
     amount: 97_750,
-    created_by_name: 'Automatic KPI',
+    created_by_name: 'Автоматический KPI',
     source_type: 'daily_kpi',
     source_metadata: {
       sales_base_amount: 9_775_000,
@@ -324,15 +324,37 @@ test('automatic KPI group announcements show the paid amount, gross base, and co
   const group = buildSalaryGroupEventMessage('bonus', event, 0, 'en')
   const team = buildSalaryTeamEventMessage('bonus', event, 'en')
 
-  for (const message of [group, team]) {
-    assert.match(message, /Daily KPI bonus/)
-    assert.match(message, /97 750 UZS/)
-    assert.match(message, /9 775 000 UZS/)
-    assert.match(message, /1%/)
-    assert.doesNotMatch(message, /<waiter>/)
-  }
+  assert.match(group, /Daily KPI bonus/)
+  assert.match(group, /97 750 UZS/)
+  assert.match(group, /9 775 000 UZS/)
+  assert.match(group, /1%/)
   assert.match(group, /Sales base/)
+
+  assert.match(team, /Daily KPI bonus/)
+  assert.match(team, /97 750 UZS/)
   assert.match(team, /^🎯/)
+  assert.doesNotMatch(team, /9 775 000 UZS/)
+  assert.doesNotMatch(team, /1%/)
+  assert.doesNotMatch(team, /<waiter>/)
+})
+
+test('combined salary and automatic KPI deliveries are forced to Russian', () => {
+  const salaryDelivery = dailyCron.slice(
+    dailyCron.indexOf('async function sendDailySalaryNotifications'),
+    dailyCron.indexOf('export default async function handler')
+  )
+  const groupDelivery = employeeNotification.slice(
+    employeeNotification.indexOf('async function deliverSalaryGroupEvent'),
+    employeeNotification.indexOf('async function deliverSalaryTeamEvent')
+  )
+  const teamDelivery = employeeNotification.slice(
+    employeeNotification.indexOf('async function deliverSalaryTeamEvent'),
+    employeeNotification.indexOf('async function deliverEmployeeSalaryEvent')
+  )
+
+  assert.match(salaryDelivery, /buildDailySalaryMessage\([\s\S]*?notificationDate,\s*'ru'\s*\)/)
+  assert.match(groupDelivery, /source_type === 'daily_kpi'[\s\S]*?\? 'ru'/)
+  assert.match(teamDelivery, /source_type === 'daily_kpi'[\s\S]*?\? 'ru'/)
 })
 
 test('one private daily summary contains both salary and the automatic KPI bonus fields', () => {
@@ -353,7 +375,7 @@ test('one private daily summary contains both salary and the automatic KPI bonus
       bonus_date: '2026-08-14',
       amount: 97_750,
       payment_method: 'cash',
-      note: 'Automatic daily KPI: 1.00% of dine-in subtotal + service (2026-08-14)',
+      note: 'Автоматический ежедневный KPI: 1.00% от dine-in продаж с сервисом (2026-08-14)',
       source_type: 'daily_kpi',
     }],
   }, '2026-08-14', 'en')
@@ -361,6 +383,6 @@ test('one private daily summary contains both salary and the automatic KPI bonus
   assert.match(message, /Daily salary summary/)
   assert.match(message, /Earned today:<\/b> 100 000 UZS/)
   assert.match(message, /Bonuses today:<\/b> 97 750 UZS/)
-  assert.match(message, /Automatic daily KPI: 1\.00% of dine-in subtotal \+ service/)
+  assert.match(message, /Автоматический ежедневный KPI: 1\.00% от dine-in продаж с сервисом/)
   assert.equal((message.match(/Daily salary summary/g) || []).length, 1)
 })

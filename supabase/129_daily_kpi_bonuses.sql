@@ -52,7 +52,7 @@ begin
     if new.source_type = 'daily_kpi' and (
       auth.uid() is not null
       or new.created_by is not null
-      or new.created_by_name <> 'Automatic KPI'
+      or new.created_by_name <> 'Автоматический KPI'
     ) then
       raise exception 'Daily KPI bonuses can be created only by the automatic finalizer';
     end if;
@@ -526,12 +526,12 @@ begin
         v_bonus_amount_bigint::integer,
         v_payment_method,
         format(
-          'Automatic daily KPI: %s%% of dine-in subtotal + service (%s)',
+          'Автоматический ежедневный KPI: %s%% от dine-in продаж с сервисом (%s)',
           trim(to_char(v_rule.rate_bps::numeric / 100, 'FM999990.00')),
           p_business_date::text
         ),
         null,
-        'Automatic KPI',
+        'Автоматический KPI',
         'daily_kpi',
         jsonb_build_object(
           'result_id', v_result_id,

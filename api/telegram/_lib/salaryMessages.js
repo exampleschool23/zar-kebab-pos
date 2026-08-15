@@ -162,14 +162,6 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
   const bonusLines = summary.bonuses.length > 0
     ? summary.bonuses.map(transactionLine)
     : [`  • ${copy.none}`]
-  const fineLines = summary.fines.length > 0
-    ? summary.fines.map(fine => (
-        `  • ${formatSalaryNotificationAmount(fine.amount)} ${copy.currency} — ${escapeTelegramHtml(fine.reason || '-')}`
-      ))
-    : [`  • ${copy.none}`]
-  const paymentLines = summary.payments.length > 0
-    ? summary.payments.map(transactionLine)
-    : [`  • ${copy.none}`]
   const employeeName = escapeTelegramHtml(
     salaryProfile?.employee_name
       || salaryProfile?.profile?.full_name
@@ -185,18 +177,6 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
   ]
   if (summary.bonusTotal > 0) {
     moneySections.push(...bonusLines)
-  }
-  if (summary.fineTotal > 0) {
-    moneySections.push(
-      `<b>${copy.fines}:</b> ${formatSalaryNotificationAmount(summary.fineTotal)} ${copy.currency}`,
-      ...fineLines
-    )
-  }
-  if (summary.paymentTotal > 0) {
-    moneySections.push(
-      `<b>${copy.payments}:</b> ${formatSalaryNotificationAmount(summary.paymentTotal)} ${copy.currency}`,
-      ...paymentLines
-    )
   }
   if (summary.due !== 0) {
     moneySections.push('', `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(summary.due)} ${copy.currency}`)

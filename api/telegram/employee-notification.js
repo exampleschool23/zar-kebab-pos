@@ -304,9 +304,12 @@ async function deliverSalaryGroupEvent(supabase, type, event, remainingDue) {
   }
 
   try {
+    const eventLanguage = type === 'bonus' && event?.source_type === 'daily_kpi'
+      ? 'ru'
+      : target.language
     const text = type === 'rate'
       ? buildSalaryRateGroupMessage(event, remainingDue, target.language)
-      : buildSalaryGroupEventMessage(type, event, remainingDue, target.language)
+      : buildSalaryGroupEventMessage(type, event, remainingDue, eventLanguage)
     const response = await sendTelegramMessage(target.chatId, text)
     const sentAt = new Date().toISOString()
     const telegramMessageId = getTelegramMessageId(response)
@@ -401,7 +404,10 @@ async function deliverSalaryTeamEvent(supabase, type, event) {
   }
 
   try {
-    const text = buildSalaryTeamEventMessage(type, event, target.language)
+    const eventLanguage = type === 'bonus' && event?.source_type === 'daily_kpi'
+      ? 'ru'
+      : target.language
+    const text = buildSalaryTeamEventMessage(type, event, eventLanguage)
     const response = await sendTelegramMessage(target.chatId, text)
     const sentAt = new Date().toISOString()
     const telegramMessageId = getTelegramMessageId(response)
@@ -628,7 +634,7 @@ export async function notifyAutomaticKpiBonus(supabase, bonusId) {
     { id: null },
     'bonus',
     bonusId,
-    'Automatic KPI'
+    'Автоматический KPI'
   )
   if (event.source_type !== 'daily_kpi' || event.created_by != null) {
     throw Object.assign(new Error('Automatic KPI bonus not found'), { status: 404 })

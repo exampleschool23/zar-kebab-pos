@@ -58,7 +58,7 @@ test('daily salary summary uses shared accrual, fine, and due calculations', () 
   assert.equal(summary.due, 3_930_000)
 })
 
-test('daily salary message formats date and shows bonuses, fines, and salary payments', () => {
+test('daily salary message shows salary and bonuses without repeating fines or payments', () => {
   const message = buildDailySalaryMessage(salaryProfile, '2026-07-29', 'ru')
   assert.match(message, /Ежедневный отчёт по зарплате/)
   assert.match(message, /📅 29\.07\.2026/)
@@ -67,13 +67,12 @@ test('daily salary message formats date and shows bonuses, fines, and salary pay
   assert.match(message, /Статус дня:<\/b> Рабочий день/)
   assert.match(message, /150 000 UZS/)
   assert.match(message, /Бонусы за день:<\/b> 50 000 UZS/)
-  assert.match(message, /20 000 UZS/)
-  assert.match(message, /Выплачено за день:<\/b> 100 000 UZS/)
-  assert.match(message, /Аванс/)
   assert.match(message, /&lt;Good work&gt;/)
-  assert.match(message, /&lt;Late arrival&gt;/)
   assert.doesNotMatch(message, /<Good work>/)
-  assert.doesNotMatch(message, /<Late arrival>/)
+  assert.doesNotMatch(message, /Штрафы за день/)
+  assert.doesNotMatch(message, /Выплачено за день/)
+  assert.doesNotMatch(message, /Аванс/)
+  assert.doesNotMatch(message, /Late arrival/)
 })
 
 test('salary payment notification includes the saved payment and remaining due', () => {

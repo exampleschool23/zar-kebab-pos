@@ -379,11 +379,6 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
     }</b>`,
     `👤 <b>${escapeTelegramHtml(event?.employee_name || '-')}</b> · <b>${formatSalaryNotificationAmount(event?.amount)} UZS</b>`,
   ]
-  if (isDailyKpiBonus(event)) {
-    lines.push(
-      `📊 ${formatSalaryNotificationAmount(event?.source_metadata?.sales_base_amount)} UZS × ${escapeTelegramHtml(formatKpiRate(event?.source_metadata?.rate_bps))}`
-    )
-  }
   lines.push(`🗓 ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
   if (!isDailyKpiBonus(event) && String(detail || '').trim()) {
     const detailLabel = normalizedType === 'fine' ? copy.reason : copy.note

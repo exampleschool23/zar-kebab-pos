@@ -213,7 +213,7 @@ async function sendDailySalaryNotifications(supabase, notificationDate) {
         buildDailySalaryMessage(
           salaryProfile,
           notificationDate,
-          link.preferred_language || 'ru'
+          'ru'
         )
       )
       telegramMessageId = getTelegramMessageId(response)

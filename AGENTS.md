@@ -330,6 +330,16 @@ These bugs were recently fixed and are now protected by tests:
    - Employee cards show the rule effective on the current Tashkent date, including enabled or disabled state. A future scheduled rule must not appear as the employee's current KPI.
    - If migration `129` is not available, the KPI row reports that state without preventing salary employee cards from loading.
 
+40. Daily salary and automatic KPI Telegram delivery is Russian-first.
+   - The employee's combined daily Salary + Bonus summary is always rendered in Russian, regardless of the private link's saved language preference.
+   - Automatic KPI announcements to the Salary group and ZarKebab Team are also always rendered in Russian, regardless of each target's configured language.
+   - Other manually recorded salary events retain their existing employee or target language behavior.
+
+41. Daily payroll Telegram messages expose only the information each audience needs.
+   - The employee's combined daily summary shows attendance, salary earned, bonuses, and current due. It does not repeat fines or salary payments, which retain their own immediate notifications and history records.
+   - The Salary group receives the detailed automatic KPI calculation, including restaurant dine-in sales base and KPI percentage.
+   - ZarKebab Team receives only the employee name, paid KPI bonus amount, and date. It must never receive the restaurant sales base, KPI percentage, salary due, or manager identity.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
