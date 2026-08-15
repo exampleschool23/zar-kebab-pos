@@ -135,6 +135,19 @@ test('database health requires duplicate-safe Daily Bazaar Telegram delivery tra
   assert.match(cliHealthSource, /checkTable\('daily_bazaar_telegram_deliveries'/)
 })
 
+test('database health requires duplicate-safe daily payroll group delivery tracking', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    missingTable: 'daily_payroll_group_notification_deliveries',
+  }))
+
+  assert.equal(result.ok, false)
+  assert.match(
+    result.failed.find(check => check.name === 'daily_payroll_group_notification_deliveries').hint,
+    /134_daily_payroll_group_notifications/
+  )
+  assert.match(cliHealthSource, /checkTable\('daily_payroll_group_notification_deliveries'/)
+})
+
 test('database health requires waiter category schedule overrides', async () => {
   const result = await runDbHealthChecks(makeClient({
     missingTable: 'menu_category_user_schedule_overrides',

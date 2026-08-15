@@ -23,6 +23,10 @@ const salariesPage = fs.readFileSync(
   new URL('../src/pages/Salaries.jsx', import.meta.url),
   'utf8'
 )
+const payrollGroupMigration = fs.readFileSync(
+  new URL('../supabase/134_daily_payroll_group_notifications.sql', import.meta.url),
+  'utf8'
+)
 
 test('daily KPI migration stores effective-dated rules and immutable result snapshots', () => {
   assert.match(migration, /create table if not exists public\.employee_kpi_rules/i)
@@ -263,7 +267,7 @@ test('current daily summary exposes per-employee delivery failures as a partial 
     dailyCron.indexOf('// Never permanently claim a salary summary')
   )
   const runMarksPartial = (
-    /status:\s*failedCount > 0\s*\?\s*'partial'\s*:\s*'completed'/.test(summaryFlow)
+    /status:\s*failedCount > 0[\s\S]*?\?\s*'partial'/.test(summaryFlow)
     || /status:\s*failedCount > 0 \|\| bazaarResult\.status === 'failed'\s*\?\s*'partial'/.test(summaryFlow)
     || /status:\s*summaryResults\.some\([\s\S]*?'failed'[\s\S]*?\)\s*\?\s*'partial'/.test(summaryFlow)
   )
@@ -386,4 +390,20 @@ test('one private daily summary contains both salary and the automatic KPI bonus
   assert.match(message, /Bonuses today:<\/b> 97 750 UZS/)
   assert.match(message, /Автоматический ежедневный KPI: 1\.00% от dine-in продаж с сервисом/)
   assert.equal((message.match(/Daily salary summary/g) || []).length, 1)
+})
+
+test('daily cron sends one duplicate-safe aggregate salary and KPI message to Salary Events', () => {
+  assert.match(dailyCron, /sendDailyPayrollGroupNotification/)
+  assert.match(dailyCron, /buildDailyPayrollGroupMessage\(summary, businessDate, 'ru'\)/)
+  assert.match(dailyCron, /daily_payroll_group_notification_deliveries/)
+  assert.match(dailyCron, /\.eq\('target_key', 'salary_events'\)/)
+  assert.match(dailyCron, /kpiResultsByDate\.get\(kpiRun\.businessDate\)/)
+  assert.match(dailyCron, /\.from\('business_settings'\)[\s\S]*?monthly_rent_uzs, monthly_utilities_uzs/)
+  assert.match(dailyCron, /convertSalaryAmountToDaily\([\s\S]*?monthly_rent_uzs[\s\S]*?'monthly'/)
+  assert.match(dailyCron, /convertSalaryAmountToDaily\([\s\S]*?monthly_utilities_uzs[\s\S]*?'monthly'/)
+  assert.match(dailyCron, /getOrderRevenueTotal/)
+  assert.match(dailyCron, /getOrdersCostTotal/)
+  assert.match(payrollGroupMigration, /business_date\s+date primary key/i)
+  assert.match(payrollGroupMigration, /Historical delivery skipped during migration/i)
+  assert.match(payrollGroupMigration, /revoke all[\s\S]*from anon, authenticated/i)
 })

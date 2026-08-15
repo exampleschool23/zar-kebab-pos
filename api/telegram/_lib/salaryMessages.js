@@ -4,7 +4,7 @@ import {
   getSalaryBalance,
   normalizeExpenseAmount,
 } from '../../../src/lib/expenses.js'
-import { formatDateOnly } from '../../../src/lib/dateFormat.js'
+import { formatDateOnly, formatLongDate } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml } from './telegram.js'
 
 const COPY = {
@@ -22,6 +22,14 @@ const COPY = {
     none: 'Yo‘q',
     due: 'To‘lanishi kerak',
     currency: 'UZS',
+    groupTitle: 'Kunlik umumiy maosh va KPI hisoboti',
+    groupSalary: 'Hisoblangan umumiy maosh',
+    groupKpi: 'Avtomatik KPI bonuslari',
+    groupTotal: 'Umumiy summa',
+    groupRent: 'Ijara',
+    groupUtilities: 'Kommunal xarajatlar',
+    groupNetProfit: 'Kunlik sof foyda',
+    unavailable: 'Mavjud emas',
   },
   ru: {
     title: 'Ежедневный отчёт по зарплате',
@@ -37,6 +45,14 @@ const COPY = {
     none: 'Нет',
     due: 'К выплате',
     currency: 'UZS',
+    groupTitle: 'Общий отчёт по зарплате и KPI',
+    groupSalary: 'Начисленная зарплата',
+    groupKpi: 'Автоматические KPI-бонусы',
+    groupTotal: 'Общая сумма',
+    groupRent: 'Аренда',
+    groupUtilities: 'Коммуналка',
+    groupNetProfit: 'Чистая прибыль за день',
+    unavailable: 'Недоступно',
   },
   en: {
     title: 'Daily salary summary',
@@ -52,6 +68,14 @@ const COPY = {
     none: 'None',
     due: 'Current salary due',
     currency: 'UZS',
+    groupTitle: 'Daily salary and KPI totals',
+    groupSalary: 'Salary earned',
+    groupKpi: 'Automatic KPI bonuses',
+    groupTotal: 'Combined total',
+    groupRent: 'Rent',
+    groupUtilities: 'Utilities',
+    groupNetProfit: 'Daily net profit',
+    unavailable: 'Unavailable',
   },
 }
 
@@ -191,6 +215,69 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
     `<b>${copy.attendance}:</b> ${attendanceValue}`,
     '',
     ...moneySections,
+  ].join('\n').trim()
+}
+
+export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
+  grossProfit = null,
+  rent = 0,
+  utilities = 0,
+} = {}) {
+  const profiles = Array.isArray(salaryProfiles) ? salaryProfiles : []
+  const results = Array.isArray(kpiResults) ? kpiResults : []
+  const salaryTotal = profiles.reduce(
+    (total, salaryProfile) => total + getSalaryAccruedAmount(salaryProfile, date, date),
+    0
+  )
+  const kpiBonusTotal = results
+    .filter(result => result?.status === 'generated')
+    .reduce((total, result) => total + normalizeExpenseAmount(result?.bonus_amount), 0)
+  const rentTotal = normalizeExpenseAmount(rent)
+  const utilitiesTotal = normalizeExpenseAmount(utilities)
+  const normalizedGrossProfit = Number.isFinite(Number(grossProfit))
+    ? Math.round(Number(grossProfit))
+    : null
+
+  return {
+    date,
+    salaryTotal,
+    kpiBonusTotal,
+    combinedTotal: salaryTotal + kpiBonusTotal,
+    rentTotal,
+    utilitiesTotal,
+    netProfit: normalizedGrossProfit == null
+      ? null
+      : normalizedGrossProfit - salaryTotal - kpiBonusTotal - rentTotal - utilitiesTotal,
+  }
+}
+
+export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
+  const lang = normalizeSalaryNotificationLanguage(language)
+  const copy = COPY[lang]
+  const salaryTotal = normalizeExpenseAmount(summary?.salaryTotal)
+  const kpiBonusTotal = normalizeExpenseAmount(summary?.kpiBonusTotal)
+  const combinedTotal = salaryTotal + kpiBonusTotal
+  const rentTotal = normalizeExpenseAmount(summary?.rentTotal)
+  const utilitiesTotal = normalizeExpenseAmount(summary?.utilitiesTotal)
+  const netProfit = Number.isFinite(Number(summary?.netProfit))
+    ? Math.round(Number(summary.netProfit))
+    : null
+  const compactRussianDate = formatLongDate(date, 'ru', date, { includeYear: false })
+    .replace(/\s+/, '-')
+
+  return [
+    `💼 <b>${copy.groupTitle}</b>`,
+    `📅 ${escapeTelegramHtml(compactRussianDate)}`,
+    '',
+    `<b>${copy.groupSalary}:</b> ${formatSalaryNotificationAmount(salaryTotal)} ${copy.currency}`,
+    `<b>${copy.groupKpi}:</b> ${formatSalaryNotificationAmount(kpiBonusTotal)} ${copy.currency}`,
+    `<b>${copy.groupTotal}:</b> ${formatSalaryNotificationAmount(combinedTotal)} ${copy.currency}`,
+    `<b>${copy.groupRent}:</b> ${formatSalaryNotificationAmount(rentTotal)} ${copy.currency}`,
+    `<b>${copy.groupUtilities}:</b> ${formatSalaryNotificationAmount(utilitiesTotal)} ${copy.currency}`,
+    '',
+    `<b>${copy.groupNetProfit}:</b> ${netProfit == null
+      ? copy.unavailable
+      : `${formatSalaryNotificationAmount(netProfit)} ${copy.currency}`}`,
   ].join('\n').trim()
 }
 

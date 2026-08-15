@@ -2,11 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import {
+  buildDailyPayrollGroupMessage,
   buildDailySalaryMessage,
   formatSalaryNotificationAmount,
   getCompletedTashkentDate,
   getCompletedTashkentDates,
   getDailySalaryNotificationSummary,
+  getDailyPayrollGroupSummary,
   getTashkentDate,
   parseEmployeeStartToken,
 } from '../api/telegram/_lib/salaryMessages.js'
@@ -73,6 +75,47 @@ test('daily salary message shows salary and bonuses without repeating fines or p
   assert.doesNotMatch(message, /Выплачено за день/)
   assert.doesNotMatch(message, /Аванс/)
   assert.doesNotMatch(message, /Late arrival/)
+})
+
+test('daily payroll group message reports aggregate earned salary and automatic KPI totals', () => {
+  const summary = getDailyPayrollGroupSummary([
+    salaryProfile,
+    {
+      ...salaryProfile,
+      id: 'salary-2',
+      rates: [{ effective_from: '2026-07-01', amount: 100_000, rate_unit: 'daily' }],
+      absences: [{ absence_date: '2026-07-29' }],
+    },
+  ], [
+    { status: 'generated', bonus_amount: 75_000 },
+    { status: 'skipped_absent', bonus_amount: 0 },
+  ], '2026-07-29', {
+    grossProfit: 2_000_000,
+    rent: 800_000,
+    utilities: 700_000,
+  })
+
+  assert.deepEqual(summary, {
+    date: '2026-07-29',
+    salaryTotal: 150_000,
+    kpiBonusTotal: 75_000,
+    combinedTotal: 225_000,
+    rentTotal: 800_000,
+    utilitiesTotal: 700_000,
+    netProfit: 275_000,
+  })
+
+  const message = buildDailyPayrollGroupMessage(summary, '2026-07-29', 'ru')
+  assert.match(message, /Общий отчёт по зарплате и KPI/)
+  assert.match(message, /📅 29-июля/)
+  assert.doesNotMatch(message, /29\.07\.2026/)
+  assert.match(message, /Начисленная зарплата:<\/b> 150 000 UZS/)
+  assert.match(message, /Автоматические KPI-бонусы:<\/b> 75 000 UZS/)
+  assert.match(message, /Общая сумма:<\/b> 225 000 UZS/)
+  assert.match(message, /Аренда:<\/b> 800 000 UZS/)
+  assert.match(message, /Коммуналка:<\/b> 700 000 UZS/)
+  assert.match(message, /Чистая прибыль за день:<\/b> 275 000 UZS/)
+  assert.doesNotMatch(message, /Иван Петров/)
 })
 
 test('salary payment notification includes the saved payment and remaining due', () => {

@@ -1,7 +1,10 @@
 import { json, methodNotAllowed, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import {
+  buildDailyPayrollGroupMessage,
   buildDailySalaryMessage,
+  addSalaryDateDays,
+  getDailyPayrollGroupSummary,
   getCompletedTashkentDate,
   getCompletedTashkentDates,
   getTashkentDate,
@@ -10,6 +13,9 @@ import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
 import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import { notifyAutomaticKpiBonus } from './employee-notification.js'
+import { getOrderRevenueTotal } from '../../src/lib/analytics.js'
+import { getOrdersCostTotal, hasOrdersCostCoverage } from '../../src/lib/profit.js'
+import { convertSalaryAmountToDaily } from '../../src/lib/expenses.js'
 
 const KPI_CATCH_UP_DAYS = 7
 const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
@@ -206,6 +212,184 @@ async function sendDailyBazaarNotification(supabase, purchaseDate) {
       }).eq('purchase_date', purchaseDate)
     } else {
       console.error('[telegram/daily-salary] Bazaar message sent but delivery status was not persisted:', error)
+    }
+    throw error
+  }
+}
+
+async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) {
+  const { data: profileRows, error: profilesError } = await supabase
+    .from('employee_salary_profiles')
+    .select('id, employee_name, joined_at, ended_at, deleted_at, is_active')
+  if (profilesError) throw profilesError
+
+  const eligibleProfiles = (profileRows || []).filter(profile => (
+    isEligibleForSalaryDate(profile, businessDate)
+  ))
+  const profileIds = eligibleProfiles.map(profile => profile.id)
+  const emptyRelatedResult = { data: [], error: null }
+  const [ratesResult, absencesResult, salesResult, settingsResult] = await Promise.all([
+    profileIds.length > 0
+      ? supabase
+          .from('employee_salary_rates')
+          .select('id, salary_profile_id, effective_from, amount, rate_unit')
+          .in('salary_profile_id', profileIds)
+          .lte('effective_from', businessDate)
+      : Promise.resolve(emptyRelatedResult),
+    profileIds.length > 0
+      ? supabase
+          .from('employee_salary_absences')
+          .select('id, salary_profile_id, absence_date')
+          .in('salary_profile_id', profileIds)
+          .eq('absence_date', businessDate)
+      : Promise.resolve(emptyRelatedResult),
+    supabase
+      .from('orders')
+      .select('status, order_type, subtotal, service_fee, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, items:order_items(quantity, sale_unit, price, unit_price, base_price, item_type, is_counter_item, cost_price, status)')
+      .eq('payment_status', 'paid')
+      .gte('paid_at', `${businessDate}T00:00:00+05:00`)
+      .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
+    supabase
+      .from('business_settings')
+      .select('monthly_rent_uzs, monthly_utilities_uzs')
+      .eq('id', 'default')
+      .maybeSingle(),
+  ])
+  if (ratesResult.error) throw ratesResult.error
+  if (absencesResult.error) throw absencesResult.error
+  if (salesResult.error) throw salesResult.error
+  if (settingsResult.error) throw settingsResult.error
+
+  const salaryProfiles = eligibleProfiles.map(profile => ({
+    ...profile,
+    rates: (ratesResult.data || []).filter(rate => rate.salary_profile_id === profile.id),
+    absences: (absencesResult.data || []).filter(absence => absence.salary_profile_id === profile.id),
+  }))
+  const paidOrders = (salesResult.data || []).filter(order => order?.status !== 'cancelled')
+  const grossProfit = hasOrdersCostCoverage(paidOrders)
+    ? paidOrders.reduce((total, order) => total + getOrderRevenueTotal(order), 0)
+      - getOrdersCostTotal(paidOrders)
+    : null
+  const dailyRent = convertSalaryAmountToDaily(
+    settingsResult.data?.monthly_rent_uzs,
+    'monthly'
+  )
+  const dailyUtilities = convertSalaryAmountToDaily(
+    settingsResult.data?.monthly_utilities_uzs,
+    'monthly'
+  )
+  return getDailyPayrollGroupSummary(salaryProfiles, kpiResults, businessDate, {
+    grossProfit,
+    rent: dailyRent,
+    utilities: dailyUtilities,
+  })
+}
+
+async function claimDailyPayrollGroupDelivery(supabase, businessDate) {
+  const { data: existing, error: existingError } = await supabase
+    .from('daily_payroll_group_notification_deliveries')
+    .select('*')
+    .eq('business_date', businessDate)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (existing?.status === 'sent' || existing?.status === 'skipped') return null
+  if (existing?.status === 'pending' && !canRetryPending(existing.attempted_at)) return null
+
+  const now = new Date().toISOString()
+  if (!existing) {
+    const created = await supabase
+      .from('daily_payroll_group_notification_deliveries')
+      .insert({
+        business_date: businessDate,
+        target_key: 'salary_events',
+        status: 'pending',
+        error_message: '',
+        attempted_at: now,
+        sent_at: null,
+        updated_at: now,
+      })
+      .select('*')
+      .single()
+    if (created.error?.code === '23505') return null
+    if (created.error) throw created.error
+    return created.data
+  }
+
+  let claim = supabase
+    .from('daily_payroll_group_notification_deliveries')
+    .update({
+      status: 'pending',
+      telegram_chat_id: null,
+      telegram_message_id: null,
+      error_message: '',
+      attempted_at: now,
+      sent_at: null,
+      updated_at: now,
+    })
+    .eq('business_date', businessDate)
+    .eq('status', existing.status)
+  if (existing.attempted_at) claim = claim.eq('attempted_at', existing.attempted_at)
+  else claim = claim.is('attempted_at', null)
+  const claimed = await claim.select('*').maybeSingle()
+  if (claimed.error) throw claimed.error
+  return claimed.data || null
+}
+
+async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResults) {
+  const delivery = await claimDailyPayrollGroupDelivery(supabase, businessDate)
+  if (!delivery) return { businessDate, status: 'duplicate' }
+
+  const target = await loadSalaryEventsTarget(supabase)
+  if (!target.chatId) {
+    const updatedAt = new Date().toISOString()
+    await supabase.from('daily_payroll_group_notification_deliveries').update({
+      status: 'skipped',
+      error_message: 'Salary Events Telegram channel is not configured',
+      updated_at: updatedAt,
+    }).eq('business_date', businessDate)
+    return { businessDate, status: 'skipped' }
+  }
+
+  let telegramMessageId = ''
+  try {
+    const summary = await loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults)
+    const response = await sendTelegramMessage(
+      target.chatId,
+      buildDailyPayrollGroupMessage(summary, businessDate, 'ru')
+    )
+    telegramMessageId = getTelegramMessageId(response)
+    const sentAt = new Date().toISOString()
+    let lastError = null
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const updated = await supabase
+        .from('daily_payroll_group_notification_deliveries')
+        .update({
+          status: 'sent',
+          telegram_chat_id: target.chatId,
+          telegram_message_id: telegramMessageId,
+          error_message: '',
+          sent_at: sentAt,
+          updated_at: sentAt,
+        })
+        .eq('business_date', businessDate)
+        .select('business_date')
+        .maybeSingle()
+      if (!updated.error && updated.data) {
+        return { businessDate, status: 'sent' }
+      }
+      lastError = updated.error || new Error('Daily payroll group delivery row disappeared')
+    }
+    throw lastError
+  } catch (error) {
+    if (!telegramMessageId) {
+      await supabase.from('daily_payroll_group_notification_deliveries').update({
+        status: 'failed',
+        telegram_chat_id: target.chatId,
+        error_message: String(error?.message || error).slice(0, 1000),
+        updated_at: new Date().toISOString(),
+      }).eq('business_date', businessDate)
+    } else {
+      console.error('[telegram/daily-salary] Payroll group message sent but delivery status was not persisted:', error)
     }
     throw error
   }
@@ -414,11 +598,13 @@ export default async function handler(req, res) {
     const catchUpDates = getCompletedTashkentDates(now, KPI_CATCH_UP_DAYS)
     const kpiRuns = []
     const kpiDeliveries = []
+    const kpiResultsByDate = new Map()
     let kpiUnavailable = false
 
     for (const businessDate of catchUpDates) {
       try {
         const results = await finalizeDailyKpiDate(supabase, businessDate)
+        kpiResultsByDate.set(businessDate, results)
         const deliveries = await deliverAutomaticKpiBonuses(supabase, results)
         kpiRuns.push({
           businessDate,
@@ -449,6 +635,7 @@ export default async function handler(req, res) {
     const kpiFinalizationFailed = notificationKpiRun?.status !== 'completed'
     const dailySummaryRuns = []
     const dailyBazaarRuns = []
+    const dailyPayrollGroupRuns = []
 
     for (const kpiRun of kpiRuns) {
       if (kpiRun.status !== 'completed') continue
@@ -458,6 +645,21 @@ export default async function handler(req, res) {
           kpiRun.businessDate
         )
         const failedCount = summaryResults.filter(result => result.status === 'failed').length
+        let payrollGroupResult
+        try {
+          payrollGroupResult = await sendDailyPayrollGroupNotification(
+            supabase,
+            kpiRun.businessDate,
+            kpiResultsByDate.get(kpiRun.businessDate) || []
+          )
+        } catch (error) {
+          payrollGroupResult = {
+            businessDate: kpiRun.businessDate,
+            status: 'failed',
+            error: String(error?.message || error).slice(0, 1000),
+          }
+        }
+        dailyPayrollGroupRuns.push(payrollGroupResult)
         let bazaarResult
         try {
           bazaarResult = await sendDailyBazaarNotification(supabase, kpiRun.businessDate)
@@ -471,13 +673,23 @@ export default async function handler(req, res) {
         dailyBazaarRuns.push(bazaarResult)
         dailySummaryRuns.push({
           businessDate: kpiRun.businessDate,
-          status: failedCount > 0 || bazaarResult.status === 'failed' ? 'partial' : 'completed',
+          status: failedCount > 0
+            ? 'partial'
+            : payrollGroupResult.status === 'failed' || bazaarResult.status === 'failed'
+              ? 'partial'
+              : 'completed',
           sentCount: summaryResults.filter(result => result.status === 'sent').length,
           failedCount,
+          payrollGroupStatus: payrollGroupResult.status,
           bazaarStatus: bazaarResult.status,
           results: summaryResults,
         })
       } catch (error) {
+        dailyPayrollGroupRuns.push({
+          businessDate: kpiRun.businessDate,
+          status: 'deferred',
+          error: 'Daily payroll group notification could not be prepared',
+        })
         dailyBazaarRuns.push({
           businessDate: kpiRun.businessDate,
           status: 'deferred',
@@ -515,6 +727,9 @@ export default async function handler(req, res) {
       kpiUnavailable,
       kpiRuns,
       dailySummaryRuns,
+      dailyPayrollGroupRuns,
+      dailyPayrollGroupSentCount: dailyPayrollGroupRuns.filter(result => result.status === 'sent').length,
+      dailyPayrollGroupFailedCount: dailyPayrollGroupRuns.filter(result => result.status === 'failed').length,
       dailyBazaarRuns,
       dailyBazaarSentCount: dailyBazaarRuns.filter(result => result.status === 'sent').length,
       dailyBazaarFailedCount: dailyBazaarRuns.filter(result => result.status === 'failed').length,
