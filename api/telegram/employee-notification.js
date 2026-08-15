@@ -996,7 +996,23 @@ async function notifyInvestorIncome(supabase, user, expenseId) {
   if (!target.chatId) {
     throw Object.assign(new Error('Salary Events Telegram channel is not configured'), { status: 503 })
   }
-  const text = buildInvestorIncomeGroupMessage(expense, target.language)
+  const currentDate = getTashkentDate()
+  const currentMonthStart = `${currentDate.slice(0, 7)}-01`
+  const [year, month] = currentMonthStart.split('-').map(Number)
+  const nextMonthStart = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10)
+  const { data: currentMonthEntries, error: currentMonthError } = await supabase
+    .from('expenses')
+    .select('amount')
+    .eq('entry_type', 'income')
+    .eq('category', 'investor_support')
+    .gte('expense_date', currentMonthStart)
+    .lt('expense_date', nextMonthStart)
+  if (currentMonthError) throw currentMonthError
+  const currentMonthTotal = (currentMonthEntries || []).reduce(
+    (total, entry) => total + (Number(entry?.amount) || 0),
+    0
+  )
+  const text = buildInvestorIncomeGroupMessage(expense, target.language, currentMonthTotal)
   const response = await sendTelegramMessage(target.chatId, text)
   return {
     ok: true,

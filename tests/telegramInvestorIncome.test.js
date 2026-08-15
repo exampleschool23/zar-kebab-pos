@@ -12,10 +12,11 @@ test('investor income Telegram message contains saved accounting details and esc
     vendor: 'Investor <One>',
     description: 'New equipment & repairs',
     created_by_name: 'Owner',
-  }, 'en')
+  }, 'en', 12_930_000)
 
   assert.match(message, /Investor support/)
   assert.match(message, /2\D500\D000 UZS/)
+  assert.match(message, /Investor support this month: <b>12\D930\D000 UZS<\/b>/)
   assert.match(message, /Investor &lt;One&gt;/)
   assert.match(message, /New equipment &amp; repairs/)
   assert.doesNotMatch(message, /Recorded by|Оформил|Rasmiylashtirdi/)
@@ -31,6 +32,8 @@ test('new investor income calls the shared authenticated Telegram endpoint and s
   assert.match(endpoint, /notifyInvestorIncome/)
   assert.match(endpoint, /loadSalaryGroupTarget\(supabase\)/)
   assert.match(endpoint, /target: 'salary_events'/)
+  assert.match(endpoint, /\.eq\('category', 'investor_support'\)/)
+  assert.match(endpoint, /currentMonthTotal/)
   assert.match(endpoint, /expense\.entry_type !== 'income'/)
   assert.match(endpoint, /expense\.category !== 'investor_support'/)
 })
