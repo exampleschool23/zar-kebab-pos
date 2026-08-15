@@ -1307,37 +1307,35 @@ function BazaarHistory({
                       )
                     })}
                     <tr data-bazaar-purchase-summary="true" className="border-t-2 border-[#DDE2E8] bg-[#F7F9FC] text-xs text-[#4B5563]">
-                      <td className="whitespace-nowrap px-3 py-3 font-black text-[#1F2937]">
-                        {formatLongDate(purchase.purchase_date, lang, purchase.purchase_date)}
-                      </td>
-                      <td colSpan={5} className="px-3 py-3 text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">
-                        {l.itemCount}: {items.length}
-                      </td>
-                      <td className="px-3 py-3" title={purchase.notes || undefined}>
-                        <p className="truncate font-black text-[#1F2937]">{purchase.created_by_name || '—'}</p>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
-                          <p className="text-sm font-black text-[#1F2937] tabular-nums">{formatCurrency(total)}</p>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-[#ff5a00]">
+                      <td colSpan={columnCount} className="px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                          <p className="whitespace-nowrap font-black text-[#1F2937]">
+                            {formatLongDate(purchase.purchase_date, lang, purchase.purchase_date)}
+                          </p>
+                          <p className="whitespace-nowrap text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">
+                            {l.itemCount}: {items.length}
+                          </p>
+                          <p className="max-w-[220px] truncate font-black text-[#1F2937]" title={purchase.notes || undefined}>
+                            {purchase.created_by_name || '—'}
+                          </p>
+                          <p className="whitespace-nowrap text-sm font-black text-[#1F2937] tabular-nums">{formatCurrency(total)}</p>
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-[#ff5a00]">
                             <MethodIcon size={10} />{bazaarPaymentMethodLabel(purchase.payment_method, lang)}
                           </span>
+                          {canManage && (
+                            <div className="flex gap-1.5">
+                              <button type="button" onClick={() => onEdit(purchase)} aria-label={l.edit} title={l.edit} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">
+                                <Edit3 size={13} />
+                              </button>
+                              <button type="button" disabled={deletingId === purchase.id} onClick={() => onDelete(purchase)} aria-label={confirmDeleteId === purchase.id ? l.confirmDelete : l.delete} title={confirmDeleteId === purchase.id ? l.confirmDelete : l.delete} className={`inline-flex h-8 items-center justify-center rounded-lg border px-2 text-[10px] font-black transition-colors disabled:opacity-60 ${
+                                confirmDeleteId === purchase.id ? 'border-red-200 bg-red-50 text-red-600' : 'w-8 border-[#E5E7EB] text-[#6B7280] hover:border-red-200 hover:text-red-600'
+                              }`}>
+                                {deletingId === purchase.id ? <Loader2 size={13} className="animate-spin" /> : confirmDeleteId === purchase.id ? l.confirmDelete : <Trash2 size={13} />}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
-                      {canManage && (
-                        <td className="px-3 py-3">
-                          <div className="flex justify-end gap-1.5">
-                            <button type="button" onClick={() => onEdit(purchase)} aria-label={l.edit} title={l.edit} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100">
-                              <Edit3 size={13} />
-                            </button>
-                            <button type="button" disabled={deletingId === purchase.id} onClick={() => onDelete(purchase)} aria-label={confirmDeleteId === purchase.id ? l.confirmDelete : l.delete} title={confirmDeleteId === purchase.id ? l.confirmDelete : l.delete} className={`inline-flex h-8 items-center justify-center rounded-lg border px-2 text-[10px] font-black transition-colors disabled:opacity-60 ${
-                              confirmDeleteId === purchase.id ? 'border-red-200 bg-red-50 text-red-600' : 'w-8 border-[#E5E7EB] text-[#6B7280] hover:border-red-200 hover:text-red-600'
-                            }`}>
-                              {deletingId === purchase.id ? <Loader2 size={13} className="animate-spin" /> : confirmDeleteId === purchase.id ? l.confirmDelete : <Trash2 size={13} />}
-                            </button>
-                          </div>
-                        </td>
-                      )}
                     </tr>
                   </React.Fragment>
                 )

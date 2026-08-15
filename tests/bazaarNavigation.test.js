@@ -93,6 +93,7 @@ test('Daily Bazaar history defaults to today and shows only structured entries i
   assert.match(page, /purchase\.created_by_name \|\| '—'/)
   assert.match(page, /formatCurrency\(item\.line_total\)/)
   assert.match(page, /data-bazaar-purchase-summary="true"/)
+  assert.doesNotMatch(page, /<td colSpan=\{5\}/)
   assert.match(page, /colSpan=\{columnCount\} className="h-3 border-y/)
   assert.doesNotMatch(page, /rowSpan=\{rowSpan\}/)
   assert.match(page, /pageCount > 1/)
