@@ -2012,6 +2012,7 @@ test('WaiterTables groups available tables into ordered zone sections', () => {
   assert.match(source, /groupTableInfosByZone\(items, visibleZones\)/)
   assert.match(source, /availableZoneGroups\.map\(\(\{ zone: zoneItem, items: zoneItems \}\)/)
   assert.match(source, /tableCountLabel\(lang, zoneItems\.length\)/)
+  assert.match(source, /status === 'available' \? zone\.border : cfg\.border/)
 })
 
 test('CashierTables groups bills by cashier urgency', () => {

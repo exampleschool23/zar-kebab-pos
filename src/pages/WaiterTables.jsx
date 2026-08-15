@@ -351,6 +351,8 @@ function TableCard({ table, zones, status, counts, lang, canEdit, onClick, onAct
   const cfg = STATUS_CFG[status] || STATUS_CFG.available
   const zone = getTableZoneVisual(table, zones)
   const zoneName = getTableZoneName(table)
+  const cardBorder = status === 'available' ? zone.border : cfg.border
+  const cardHoverBorder = status === 'available' ? zone.hoverBorder : cfg.hoverBorder
   const StatusIcon = cfg.icon
   const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt, lang) : null
   const action = actionForStatus(lang, status)
@@ -364,7 +366,7 @@ function TableCard({ table, zones, status, counts, lang, canEdit, onClick, onAct
       role={canEdit ? 'button' : undefined}
       tabIndex={canEdit ? 0 : undefined}
       onKeyDown={e => canEdit && e.key === 'Enter' && onClick()}
-      className={`group relative flex min-h-[116px] w-full flex-col overflow-hidden rounded-xl border border-[#E5E7EB] border-l-4 bg-white p-3 pt-4 text-left shadow-sm transition-all ${canEdit ? `cursor-pointer hover:-translate-y-0.5 hover:shadow-md ${cfg.hoverBorder}` : ''} ${cfg.border}`}
+      className={`group relative flex min-h-[116px] w-full flex-col overflow-hidden rounded-xl border border-[#E5E7EB] border-l-4 bg-white p-3 pt-4 text-left shadow-sm transition-all ${canEdit ? `cursor-pointer hover:-translate-y-0.5 hover:shadow-md ${cardHoverBorder}` : ''} ${cardBorder}`}
     >
       <span className={`absolute inset-x-0 top-0 h-1 ${zone.bar}`} aria-hidden="true" />
       {/* Header */}

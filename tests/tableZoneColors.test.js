@@ -13,6 +13,7 @@ test('table zones receive distinct colors in their configured order', () => {
   const visuals = zones.map(zone => getTableZoneVisual(zone, zones))
 
   assert.equal(new Set(visuals.map(visual => visual.bar)).size, zones.length)
+  assert.equal(new Set(visuals.map(visual => visual.border)).size, zones.length)
   assert.equal(getTableZoneVisual({ zone_id: 'vip', zone_name: 'VIP' }, zones), visuals[1])
   assert.equal(getTableZoneVisual({ zone_name: 'Main Hall' }, zones), visuals[0])
 })
