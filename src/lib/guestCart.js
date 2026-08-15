@@ -1,5 +1,5 @@
 import { getItemName } from './i18n.js'
-import { isCustomerMenuCategory, isCustomerMenuItem } from './menuItems.js'
+import { isCustomerMenuCategory, isCustomerMenuItem, isTouristHiddenMenuCategory } from './menuItems.js'
 import { normalizeMenuQuantity, normalizeMenuSaleUnit } from './menuSaleUnits.js'
 import { PRICE_MODE_REGULAR, PRICE_MODE_TOURIST, calculateUnitPrice, getOrderItemBasePrice } from './priceModes.js'
 
@@ -107,7 +107,10 @@ export function rebuildGuestCartFromCatalog({
 } = {}) {
   const normalizedPriceMode = normalizeGuestCartPriceMode(priceMode)
   const visibleCategoryIds = new Set(categories
-    .filter(category => isCustomerMenuCategory(category, now))
+    .filter(category => (
+      isCustomerMenuCategory(category, now) &&
+      (normalizedPriceMode !== PRICE_MODE_TOURIST || !isTouristHiddenMenuCategory(category))
+    ))
     .map(category => String(category.id)))
   const menuItemMap = new Map(menuItems.flatMap(item => {
     const categoryId = item?.category_id ?? item?.categoryId

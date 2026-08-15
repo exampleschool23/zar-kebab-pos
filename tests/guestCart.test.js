@@ -82,6 +82,28 @@ test('guest cart rebuild applies the selected Regular mode to configured variant
   assert.deepEqual(row.selected_options, { variants: 'large' })
 })
 
+test('guest cart excludes Tourist-hidden categories only in Tourist mode', () => {
+  const touristOnlyCategories = [{ id: 'lunch', tourist_hidden: true }]
+  const lunch = { id: 'lunch-set', category_id: 'lunch', name_en: 'Lunch set', price: 50_000, available: true }
+  const cart = [{ menu_item_id: 'lunch-set', quantity: 1 }]
+
+  assert.deepEqual(rebuildGuestCartFromCatalog({
+    cart,
+    menuItems: [lunch],
+    categories: touristOnlyCategories,
+    now,
+    priceMode: 'tourist',
+  }), [])
+
+  assert.equal(rebuildGuestCartFromCatalog({
+    cart,
+    menuItems: [lunch],
+    categories: touristOnlyCategories,
+    now,
+    priceMode: 'regular',
+  }).length, 1)
+})
+
 test('guest cart rebuild drops non-public products, categories, unavailable rows, and invalid options', () => {
   const menuItems = [
     variantItem,

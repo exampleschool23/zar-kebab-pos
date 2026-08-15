@@ -1617,6 +1617,7 @@ export async function writeToSupabase(action, state, options = {}) {
       const { error } = await supabase.from('menu_categories').update({
         hidden: true,
         waiter_hidden: true,
+        tourist_hidden: true,
         deleted_at: deletedAt,
       }).eq('id', action.payload)
       if (error) throw error

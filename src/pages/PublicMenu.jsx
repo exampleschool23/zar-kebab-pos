@@ -14,7 +14,7 @@ import {
   normalizeMenuCurrency,
   saveMenuCurrency,
 } from '../lib/menuCurrency'
-import { isCustomerMenuCategory, isCustomerMenuItem } from '../lib/menuItems'
+import { isCustomerMenuCategory, isCustomerMenuItem, isTouristHiddenMenuCategory } from '../lib/menuItems'
 import { useApp } from '../store/AppContext'
 import { findMenuItemByLinkKey, getMenuItemPublicPath } from '../lib/menuLinks'
 import { getMenuItemForPriceMode } from '../lib/priceModes'
@@ -404,19 +404,6 @@ export default function PublicMenu({ premium = false }) {
   }, [refreshPublicMenu])
 
   useEffect(() => {
-    if (loading) return
-    if (!itemId) {
-      setDetailItem(null)
-      setMissingItemLink(false)
-      return
-    }
-    const linkedItems = premium ? items.map(item => getMenuItemForPriceMode(item, 'tourist')) : items
-    const linkedItem = findMenuItemByLinkKey(linkedItems, itemId)
-    setDetailItem(linkedItem)
-    setMissingItemLink(!linkedItem)
-  }, [itemId, items, loading, premium])
-
-  useEffect(() => {
     if (menuCurrency === DEFAULT_MENU_CURRENCY) return
     let cancelled = false
     loadMenuCurrencyRates()
@@ -427,18 +414,38 @@ export default function PublicMenu({ premium = false }) {
   }, [menuCurrency])
 
   const searchQuery = search.trim().toLowerCase()
-  const displayItems = useMemo(
-    () => premium ? items.map(item => getMenuItemForPriceMode(item, 'tourist')) : items,
-    [items, premium]
+  const displayCategories = useMemo(
+    () => premium ? categories.filter(category => !isTouristHiddenMenuCategory(category)) : categories,
+    [categories, premium]
   )
+  const displayItems = useMemo(() => {
+    const categoryIds = new Set(displayCategories.map(category => category.id))
+    const visibleItems = items.filter(item => !item.category_id || categoryIds.has(item.category_id))
+    return premium
+      ? visibleItems.map(item => getMenuItemForPriceMode(item, 'tourist'))
+      : visibleItems
+  }, [displayCategories, items, premium])
+
+  useEffect(() => {
+    if (loading) return
+    if (!itemId) {
+      setDetailItem(null)
+      setMissingItemLink(false)
+      return
+    }
+    const linkedItem = findMenuItemByLinkKey(displayItems, itemId)
+    setDetailItem(linkedItem)
+    setMissingItemLink(!linkedItem)
+  }, [displayItems, itemId, loading])
+
   const itemCounts = useMemo(() => {
     const counts = { all: displayItems.length }
     displayItems.forEach(item => { counts[item.category_id] = (counts[item.category_id] || 0) + 1 })
     return counts
   }, [displayItems])
   const categoryCards = useMemo(
-    () => [{ id: 'all' }, ...categories.filter(category => (itemCounts[category.id] || 0) > 0)],
-    [categories, itemCounts]
+    () => [{ id: 'all' }, ...displayCategories.filter(category => (itemCounts[category.id] || 0) > 0)],
+    [displayCategories, itemCounts]
   )
 
   const searchResults = useMemo(() => {
@@ -450,14 +457,14 @@ export default function PublicMenu({ premium = false }) {
   }, [displayItems, searchQuery])
 
   const groupedSections = useMemo(() => {
-    const sections = categories
+    const sections = displayCategories
       .map(cat => ({
         cat,
         items: displayItems.filter(item => item.category_id === cat.id),
       }))
       .filter(section => section.items.length > 0)
 
-    const categoryIds = new Set(categories.map(cat => cat.id))
+    const categoryIds = new Set(displayCategories.map(cat => cat.id))
     const uncategorized = displayItems.filter(item => !categoryIds.has(item.category_id))
     if (uncategorized.length > 0) {
       sections.push({
@@ -467,7 +474,7 @@ export default function PublicMenu({ premium = false }) {
     }
 
     return sections
-  }, [categories, displayItems, visibilityNow])
+  }, [displayCategories, displayItems])
 
   const dealItems = useMemo(() =>
     displayItems.filter(item => getMenuPricing(item).discounted),
@@ -484,9 +491,9 @@ export default function PublicMenu({ premium = false }) {
     : (lang === 'uz' ? 'Menyu' : lang === 'ru' ? 'Меню' : 'Menu')
   const categoryMap = useMemo(() => {
     const map = {}
-    categories.forEach(cat => { map[cat.id] = cat })
+    displayCategories.forEach(cat => { map[cat.id] = cat })
     return map
-  }, [categories])
+  }, [displayCategories])
 
   function openDetail(item) {
     savedScrollRef.current = window.scrollY

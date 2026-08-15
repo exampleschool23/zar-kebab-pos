@@ -13,6 +13,7 @@ import {
   isHiddenMenuCategory,
   isMenuItemOrderable,
   isPublicHiddenMenuItem,
+  isTouristHiddenMenuCategory,
   isWaiterHiddenMenuCategory,
   isWaiterMenuCategory,
   isWaiterMenuItem,
@@ -93,6 +94,15 @@ test('waiter-hidden categories are excluded from waiter ordering only', () => {
   assert.equal(isWaiterMenuCategory({ waiter_hidden: true }), false)
   assert.equal(isWaiterMenuCategory({ hidden: true, waiter_hidden: false }), true)
   assert.equal(isCustomerMenuCategory({ hidden: false, waiter_hidden: true }), true)
+})
+
+test('Tourist-hidden category flag is independent from public and waiter visibility', () => {
+  const category = { hidden: false, waiter_hidden: false, tourist_hidden: true }
+
+  assert.equal(isTouristHiddenMenuCategory(category), true)
+  assert.equal(isTouristHiddenMenuCategory({ touristHidden: true }), true)
+  assert.equal(isCustomerMenuCategory(category), true)
+  assert.equal(isWaiterMenuCategory(category), true)
 })
 
 test('menu time windows include normal, open-ended, and overnight intervals', () => {

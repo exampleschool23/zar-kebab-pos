@@ -20,8 +20,8 @@ import { OperationalError, OperationalLoading } from '../components/OperationalS
 import { useAppDataStatus } from '../store/appHooks'
 import { getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { isCustomerMenuCategory, isCustomerMenuItem, isWaiterMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
-import { DEFAULT_PRICE_MODE, calculateUnitPrice, getMenuItemForPriceMode, normalizePriceMode, resolveOrderingPriceMode } from '../lib/priceModes'
+import { isCustomerMenuCategory, isCustomerMenuItem, isTouristHiddenMenuCategory, isWaiterMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
+import { DEFAULT_PRICE_MODE, PRICE_MODE_TOURIST, calculateUnitPrice, getMenuItemForPriceMode, normalizePriceMode, resolveOrderingPriceMode } from '../lib/priceModes'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canEditFeature } from '../lib/permissions'
 import { rebuildGuestCartFromCatalog } from '../lib/guestCart'
@@ -784,7 +784,11 @@ export default function WaiterOrder() {
     const currentCategory = state.categories.find(category => category.id === currentItem?.category_id)
     const remainsVisible = currentItem &&
       isCustomerMenuItem(currentItem, visibilityNow) &&
-      (!currentItem.category_id || (currentCategory && isCustomerMenuCategory(currentCategory, visibilityNow)))
+      (!currentItem.category_id || (
+        currentCategory &&
+        isCustomerMenuCategory(currentCategory, visibilityNow) &&
+        (guestSessionPriceMode !== PRICE_MODE_TOURIST || !isTouristHiddenMenuCategory(currentCategory))
+      ))
     if (!remainsVisible) {
       setDetailItem(null)
     } else {
@@ -861,11 +865,16 @@ export default function WaiterOrder() {
   // Categories
   const sortedCategories = useMemo(() =>
     [...state.categories]
-      .filter(category => isGuestTabletMode
-        ? isCustomerMenuCategory(category, visibilityNow)
-        : isWaiterMenuCategory(category, visibilityNow, staffUserId))
+      .filter(category => {
+        const visibleForAudience = isGuestTabletMode
+          ? isCustomerMenuCategory(category, visibilityNow)
+          : isWaiterMenuCategory(category, visibilityNow, staffUserId)
+        return visibleForAudience && (
+          priceMode !== PRICE_MODE_TOURIST || !isTouristHiddenMenuCategory(category)
+        )
+      })
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
-    [state.categories, isGuestTabletMode, visibilityNow, staffUserId]
+    [state.categories, isGuestTabletMode, visibilityNow, staffUserId, priceMode]
   )
 
   const visibleCategoryIds = useMemo(

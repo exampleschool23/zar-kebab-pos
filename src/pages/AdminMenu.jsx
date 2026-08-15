@@ -758,6 +758,10 @@ function hiddenFromWaiterMenuLabel(lang) {
   return lang === 'uz' ? 'Ofitsiant menyusida yashirin' : lang === 'ru' ? 'Скрыто в меню официанта' : 'Hidden from waiter menu'
 }
 
+function hiddenFromTouristMenuLabel(lang) {
+  return lang === 'uz' ? 'Turist menyusida yashirin' : lang === 'ru' ? 'Скрыто в туристическом меню' : 'Hidden from Tourist menu'
+}
+
 function visibilityActionLabel(lang, visible, kind = 'item') {
   if (kind === 'category') {
     if (visible) return lang === 'uz' ? 'Kategoriyani ommaviy menyudan yashirish' : lang === 'ru' ? 'Скрыть категорию из публичного меню' : 'Hide category from public menu'
@@ -1105,11 +1109,16 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
            lang === 'ru' ? `${itemCount} позиций` :
            `${itemCount} item${itemCount !== 1 ? 's' : ''}`}
         </p>
-        {(cat.waiter_hidden || scheduleLabel) && (
+        {(cat.waiter_hidden || cat.tourist_hidden || scheduleLabel) && (
           <div className="mt-1 flex flex-wrap gap-1.5">
             {cat.waiter_hidden && (
               <span className="rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-black text-purple-700">
                 {hiddenFromWaiterMenuLabel(lang)}
+              </span>
+            )}
+            {cat.tourist_hidden && (
+              <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-black text-sky-700">
+                {hiddenFromTouristMenuLabel(lang)}
               </span>
             )}
             {scheduleLabel && (
@@ -1200,6 +1209,7 @@ const blankCat = {
   sort_order: '',
   hidden: false,
   waiter_hidden: false,
+  tourist_hidden: false,
   visible_from_time: '',
   visible_until_time: '',
   always_visible_profile_ids: [],
@@ -1220,6 +1230,7 @@ function getCategoryFormFingerprint(value = {}) {
     sort_order: Number(value.sort_order) || 0,
     hidden: !!value.hidden,
     waiter_hidden: !!value.waiter_hidden,
+    tourist_hidden: !!value.tourist_hidden,
     visible_from_time: nullableMenuTime(value.visible_from_time),
     visible_until_time: nullableMenuTime(value.visible_until_time),
     always_visible_profile_ids: normalizeCategoryAlwaysVisibleProfileIds(value.always_visible_profile_ids),
@@ -1901,6 +1912,7 @@ export default function AdminMenu() {
       sort_order: category.sort_order ?? 0,
       hidden: !!category.hidden,
       waiter_hidden: !!(category.waiter_hidden || category.waiterHidden || category.hide_from_waiter || category.hideFromWaiter),
+      tourist_hidden: !!(category.tourist_hidden || category.touristHidden || category.hide_from_tourist || category.hideFromTourist),
       visible_from_time: String(category.visible_from_time || category.visibleFromTime || '').slice(0, 5),
       visible_until_time: String(category.visible_until_time || category.visibleUntilTime || '').slice(0, 5),
       always_visible_profile_ids: normalizeCategoryAlwaysVisibleProfileIds(category.always_visible_profile_ids),
@@ -2148,6 +2160,7 @@ export default function AdminMenu() {
           sort_order: Number(catForm.sort_order) || 0,
           hidden: !!catForm.hidden,
           waiter_hidden: !!catForm.waiter_hidden,
+          tourist_hidden: !!catForm.tourist_hidden,
           visible_from_time: nullableMenuTime(catForm.visible_from_time),
           visible_until_time: nullableMenuTime(catForm.visible_until_time),
           ...(isOwner ? {
@@ -2289,6 +2302,7 @@ export default function AdminMenu() {
     const categoryItemCount = catModal === 'edit' ? (itemCountByCat[catForm.id] || 0) : 0
     const publicVisible = !catForm.hidden
     const waiterVisible = !catForm.waiter_hidden
+    const touristVisible = !catForm.tourist_hidden
 
     return (
       <AppShell title={editorTitle}>
@@ -2384,6 +2398,11 @@ export default function AdminMenu() {
                             {waiterVisible
                               ? (lang === 'uz' ? 'Ofitsiant menyusida' : lang === 'ru' ? 'В меню официанта' : 'Waiter menu')
                               : (lang === 'uz' ? 'Ofitsiantdan yashirin' : lang === 'ru' ? 'Скрыто от официанта' : 'Hidden from waiter')}
+                          </span>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-black ${touristVisible ? 'bg-sky-50 text-sky-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {touristVisible
+                              ? (lang === 'uz' ? 'Turist menyusida' : lang === 'ru' ? 'В туристическом меню' : 'Tourist menu')
+                              : hiddenFromTouristMenuLabel(lang)}
                           </span>
                         </div>
                       </div>
@@ -2545,6 +2564,29 @@ export default function AdminMenu() {
                           {waiterVisible
                             ? (lang === 'uz' ? 'Ofitsiantlarga ko‘rinadi' : lang === 'ru' ? 'Видно официантам' : 'Visible to waiters')
                             : (lang === 'uz' ? 'Ofitsiantlardan yashirin' : lang === 'ru' ? 'Скрыто от официантов' : 'Hidden from waiters')}
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors ${touristVisible ? 'border-sky-200 bg-sky-50/60' : 'border-gray-200 bg-gray-50'}`}>
+                      <input
+                        type="checkbox"
+                        checked={touristVisible}
+                        onChange={event => setCatForm(current => ({ ...current, tourist_hidden: !event.target.checked }))}
+                        disabled={savingCatForm}
+                        className="h-4 w-4 accent-[#ff5a00] disabled:cursor-wait"
+                      />
+                      <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${touristVisible ? 'bg-white text-sky-600' : 'bg-white text-gray-400'}`}>
+                        {touristVisible ? <Eye size={15} /> : <EyeOff size={15} />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black text-gray-800">
+                          {lang === 'uz' ? 'Turist menyusi' : lang === 'ru' ? 'Туристическое меню' : 'Tourist menu'}
+                        </span>
+                        <span className="block text-[11px] font-semibold text-gray-400">
+                          {touristVisible
+                            ? (lang === 'uz' ? 'Turist narxida ko‘rinadi' : lang === 'ru' ? 'Видно при туристических ценах' : 'Visible with Tourist pricing')
+                            : (lang === 'uz' ? 'Turist narxidan yashirin' : lang === 'ru' ? 'Скрыто при туристических ценах' : 'Hidden with Tourist pricing')}
                         </span>
                       </span>
                     </label>
@@ -2994,6 +3036,11 @@ export default function AdminMenu() {
                                 {cat.waiter_hidden && (
                                   <span className="rounded-full bg-purple-50 px-2 py-1 text-[10px] font-black text-purple-700 ring-1 ring-purple-200">
                                     {hiddenFromWaiterMenuLabel(lang)}
+                                  </span>
+                                )}
+                                {cat.tourist_hidden && (
+                                  <span className="rounded-full bg-sky-50 px-2 py-1 text-[10px] font-black text-sky-700 ring-1 ring-sky-200">
+                                    {hiddenFromTouristMenuLabel(lang)}
                                   </span>
                                 )}
                               </div>

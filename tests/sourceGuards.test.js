@@ -936,7 +936,7 @@ test('hidden menu categories are hidden from customer-facing menus only', () => 
   assert.match(migration, /exists \([\s\S]*from public\.menu_categories c[\s\S]*c\.id = menu_items\.category_id/)
   assert.match(schema, /hidden\s+boolean\s+not null default false/)
   assert.match(schema, /waiter_hidden\s+boolean\s+not null default false/)
-  assert.match(health, /menu_categories', 'id, name_uz, name_ru, name_en, hidden, waiter_hidden, visible_from_time, visible_until_time, sort_order, deleted_at'/)
+  assert.match(health, /menu_categories', 'id, name_uz, name_ru, name_en, hidden, waiter_hidden, tourist_hidden, visible_from_time, visible_until_time, sort_order, deleted_at'/)
 })
 
 test('waiter-hidden menu categories are hidden from waiter table ordering only', () => {
@@ -961,6 +961,27 @@ test('waiter-hidden menu categories are hidden from waiter table ordering only',
   assert.match(telegram, /isCustomerMenuCategory\(category, now\)/)
   assert.match(migration, /add column if not exists waiter_hidden boolean not null default false/)
   assert.match(health, /waiter_hidden/)
+})
+
+test('selected categories can be hidden only from Tourist-priced menus', () => {
+  const adminMenu = readSource('src/pages/AdminMenu.jsx')
+  const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const guestCart = readSource('src/lib/guestCart.js')
+  const menuItems = readSource('src/lib/menuItems.js')
+  const schema = readSource('supabase/003_pos_schema.sql')
+  const migration = readSource('supabase/133_menu_category_tourist_visibility.sql')
+  const health = readSource('src/lib/dbHealth.js')
+
+  assert.match(menuItems, /function isTouristHiddenMenuCategory/)
+  assert.match(adminMenu, /tourist_hidden: !event\.target\.checked/)
+  assert.match(adminMenu, /Tourist menu/)
+  assert.match(waiterOrder, /priceMode !== PRICE_MODE_TOURIST \|\| !isTouristHiddenMenuCategory\(category\)/)
+  assert.match(publicMenu, /premium \? categories\.filter\(category => !isTouristHiddenMenuCategory\(category\)\) : categories/)
+  assert.match(guestCart, /normalizedPriceMode !== PRICE_MODE_TOURIST \|\| !isTouristHiddenMenuCategory\(category\)/)
+  assert.match(schema, /tourist_hidden\s+boolean\s+not null default false/)
+  assert.match(migration, /add column if not exists tourist_hidden boolean not null default false/)
+  assert.match(health, /tourist_hidden/)
 })
 
 test('menu item availability controls waiter visibility without a redundant waiter-hide setting', () => {
@@ -1374,7 +1395,7 @@ test('PublicMenu supports direct product links and copyable item URLs', () => {
   assert.match(app, /path="\/menu\/item\/:itemId"/)
   assert.match(app, /path="\/premium-menu\/item\/:itemId"/)
   assert.match(publicMenu, /useParams/)
-  assert.match(publicMenu, /findMenuItemByLinkKey\(linkedItems, itemId\)/)
+  assert.match(publicMenu, /findMenuItemByLinkKey\(displayItems, itemId\)/)
   assert.match(publicMenu, /navigate\(getMenuItemPublicPath\(item, menuBasePath\)\)/)
   assert.match(publicMenu, /premium \? '\/premium-menu' : '\/menu'/)
   assert.match(publicMenu, /const showDetailOverlay = Boolean\(detailItem\)/)
@@ -1499,7 +1520,7 @@ test('PublicMenu enables tappable fixed collapsed categories', () => {
   assert.doesNotMatch(source, /className="hidden sm:flex sm:max-w-\[420px\]"/)
   assert.doesNotMatch(source, /floatingMaxWidth=\{720\}/)
   assert.doesNotMatch(source, /variant="overlay"/)
-  assert.match(source, /categories\.filter\(category => \(itemCounts\[category\.id\] \|\| 0\) > 0\)/)
+  assert.match(source, /displayCategories\.filter\(category => \(itemCounts\[category\.id\] \|\| 0\) > 0\)/)
   assert.doesNotMatch(source, /px-4 py-5 sm:px-6/)
   assert.doesNotMatch(source, /className="mb-7 mt-3 rounded-\[28px\]/)
 })

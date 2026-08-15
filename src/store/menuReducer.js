@@ -113,6 +113,7 @@ export function menuReducer(state, action) {
                 ...category,
                 hidden: true,
                 waiter_hidden: true,
+                tourist_hidden: true,
                 deleted_at: deletedAt,
               }
             : category

@@ -76,6 +76,15 @@ export function isWaiterHiddenMenuCategory(category) {
   )
 }
 
+export function isTouristHiddenMenuCategory(category) {
+  return !!(
+    category?.tourist_hidden ||
+    category?.touristHidden ||
+    category?.hide_from_tourist ||
+    category?.hideFromTourist
+  )
+}
+
 export function getMenuCategoryAlwaysVisibleProfileIds(category) {
   const value = category?.always_visible_profile_ids ?? category?.alwaysVisibleProfileIds
   if (!Array.isArray(value)) return []

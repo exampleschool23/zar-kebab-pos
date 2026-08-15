@@ -21,6 +21,7 @@ create table if not exists public.menu_categories (
   image_url  text        default '',
   hidden     boolean     not null default false,
   waiter_hidden boolean  not null default false,
+  tourist_hidden boolean not null default false,
   visible_from_time time,
   visible_until_time time,
   sort_order integer     not null default 0,
