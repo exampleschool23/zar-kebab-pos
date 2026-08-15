@@ -62,6 +62,22 @@ const RANGE_DATE_INPUT_CLASS = 'h-6 w-full min-w-0 bg-transparent text-sm text-t
 const ACCOUNTING_SECTION_GRID = 'grid items-start gap-5 lg:grid-cols-2'
 const HISTORY_SECTION_GRID = 'grid items-stretch gap-5 lg:grid-cols-2'
 
+async function notifyInvestorIncome(expenseId) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token || ''
+  const response = await fetch('/api/telegram/employee-notification', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ type: 'investor_income', expenseId }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok || !data.ok) throw new Error(data.error || 'Investor notification failed')
+  return data
+}
+
 function methodIcon(method) {
   if (method === 'card') return CreditCard
   if (method === 'terminal') return Terminal
@@ -284,6 +300,7 @@ export default function Expenses() {
       showLess: 'Kamroq ko‘rsatish',
       empty: 'Bu davrda xarajat yozilmagan',
       emptyInvestor: 'Bu davrda investor yordami yo‘q',
+      investorNotificationFailed: 'Investor yordami saqlandi, lekin Salary Events kanaliga xabar yuborilmadi.',
       salaryBonus: 'Maosh bonusi',
       required: 'Sana, kategoriya, to‘lov turi va summa kerak.',
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
@@ -366,6 +383,7 @@ export default function Expenses() {
       showLess: 'Свернуть',
       empty: 'За этот период расходов нет',
       emptyInvestor: 'За этот период поддержки инвестора нет',
+      investorNotificationFailed: 'Поддержка инвестора сохранена, но сообщение в канал Salary Events не отправлено.',
       salaryBonus: 'Бонус к зарплате',
       required: 'Нужны дата, категория, способ оплаты и сумма.',
       saveFailed: 'Не удалось сохранить расход.',
@@ -448,6 +466,7 @@ export default function Expenses() {
       showLess: 'Show less',
       empty: 'No expenses in this period',
       emptyInvestor: 'No investor support in this period',
+      investorNotificationFailed: 'Investor support was saved, but the Salary Events channel notification was not sent.',
       salaryBonus: 'Salary bonus',
       required: 'Date, category, payment method, and amount are required.',
       saveFailed: 'Could not save expense.',
@@ -679,9 +698,13 @@ export default function Expenses() {
       created_by: profile?.id || null,
       created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
     }
-    const { error: saveError } = await supabase.from('expenses').insert(payload)
-    setSaving(false)
+    const { data: savedExpense, error: saveError } = await supabase
+      .from('expenses')
+      .insert(payload)
+      .select('id')
+      .single()
     if (saveError) {
+      setSaving(false)
       setError(isMissingExpensesMigration(saveError) ? l.migrationMissing : saveError.message || l.saveFailed)
       return
     }
@@ -693,6 +716,15 @@ export default function Expenses() {
       description: '',
     }))
     setMessage(entryType === 'income' ? l.incomeSaved : l.expenseSaved)
+    if (entryType === 'income') {
+      try {
+        await notifyInvestorIncome(savedExpense.id)
+      } catch (notificationError) {
+        console.error('[accounting] investor Telegram notification failed:', notificationError)
+        setError(l.investorNotificationFailed)
+      }
+    }
+    setSaving(false)
     await loadExpenses()
   }
 

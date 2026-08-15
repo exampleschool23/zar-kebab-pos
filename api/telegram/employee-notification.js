@@ -14,6 +14,7 @@ import {
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
+import { buildInvestorIncomeGroupMessage } from './_lib/investorIncomeMessages.js'
 import {
   getSalaryEventRetryTargets,
   getSalaryPaymentRetryTargets,
@@ -975,11 +976,40 @@ async function notifyPayment(supabase, user, paymentId) {
   }
 }
 
+async function notifyInvestorIncome(supabase, user, expenseId) {
+  const { data: expense, error } = await supabase
+    .from('expenses')
+    .select('id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name')
+    .eq('id', expenseId)
+    .maybeSingle()
+  if (error) throw error
+  if (
+    !expense ||
+    expense.created_by !== user.id ||
+    expense.entry_type !== 'income' ||
+    expense.category !== 'investor_support'
+  ) {
+    throw Object.assign(new Error('Investor income entry not found'), { status: 404 })
+  }
+
+  const target = await loadSalaryGroupTarget(supabase)
+  if (!target.chatId) {
+    throw Object.assign(new Error('Salary Events Telegram channel is not configured'), { status: 503 })
+  }
+  const text = buildInvestorIncomeGroupMessage(expense, target.language)
+  const response = await sendTelegramMessage(target.chatId, text)
+  return {
+    ok: true,
+    target: 'salary_events',
+    telegramMessageId: getTelegramMessageId(response),
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
   try {
-    const { type, fineId, paymentId, bonusId, absenceId, rateId } = await readJson(req)
+    const { type, fineId, paymentId, bonusId, absenceId, rateId, expenseId } = await readJson(req)
     const notificationType = type
       || (paymentId
         ? 'payment'
@@ -991,6 +1021,8 @@ export default async function handler(req, res) {
               ? 'absence'
               : rateId
                 ? 'rate'
+                : expenseId
+                  ? 'investor_income'
                 : '')
     const eventIds = {
       payment: paymentId,
@@ -998,9 +1030,10 @@ export default async function handler(req, res) {
       bonus: bonusId,
       absence: absenceId,
       rate: rateId,
+      investor_income: expenseId,
     }
-    if (!['fine', 'payment', 'bonus', 'absence', 'rate'].includes(notificationType)) {
-      return json(res, 400, { error: 'type must be payment, fine, bonus, absence, or rate' })
+    if (!['fine', 'payment', 'bonus', 'absence', 'rate', 'investor_income'].includes(notificationType)) {
+      return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (!eventIds[notificationType]) {
       return json(res, 400, { error: `${notificationType}Id is required` })
@@ -1008,7 +1041,9 @@ export default async function handler(req, res) {
 
     const { supabase, user, actorName } = await requireExpensesWriteAccess(req)
     let result
-    if (notificationType === 'payment') {
+    if (notificationType === 'investor_income') {
+      result = await notifyInvestorIncome(supabase, user, expenseId)
+    } else if (notificationType === 'payment') {
       result = await notifyPayment(supabase, user, paymentId)
     } else {
       result = await notifySalaryEvent(
