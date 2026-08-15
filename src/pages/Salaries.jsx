@@ -836,6 +836,7 @@ export default function Salaries() {
       if (!event) return null
       const employeeIncludedInDailySummary = delivery.event_type === 'bonus'
         && event?.source_type === 'daily_kpi'
+      const groupExcludedForAutomaticKpi = employeeIncludedInDailySummary
       return {
         ...delivery,
         eventType: delivery.event_type,
@@ -853,6 +854,7 @@ export default function Salaries() {
         employeeMessageId: delivery.employee_telegram_message_id,
         employeeError: delivery.employee_error_message,
         employeeIncludedInDailySummary,
+        groupExcludedForAutomaticKpi,
         groupStatus: delivery.status,
         groupTimestamp: delivery.sent_at || delivery.attempted_at,
         groupMessageId: delivery.telegram_message_id,
@@ -1796,7 +1798,9 @@ export default function Salaries() {
                               ...(!delivery.employeeIncludedInDailySummary
                                 ? [delivery.employeeStatus]
                                 : []),
-                              delivery.groupStatus,
+                              ...(!delivery.groupExcludedForAutomaticKpi
+                                ? [delivery.groupStatus]
+                                : []),
                               ...(delivery.showTeamDelivery ? [delivery.teamStatus] : []),
                             ].some(status => ['not_attempted', 'failed', 'skipped'].includes(status))
                             return (

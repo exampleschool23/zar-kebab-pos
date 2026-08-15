@@ -2,7 +2,6 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import {
-  buildSalaryGroupEventMessage,
   buildSalaryTeamEventMessage,
 } from '../api/telegram/_lib/paymentMessages.js'
 import { buildDailySalaryMessage } from '../api/telegram/_lib/salaryMessages.js'
@@ -25,6 +24,10 @@ const salariesPage = fs.readFileSync(
 )
 const payrollGroupMigration = fs.readFileSync(
   new URL('../supabase/134_daily_payroll_group_notifications.sql', import.meta.url),
+  'utf8'
+)
+const skipAutomaticKpiGroupMigration = fs.readFileSync(
+  new URL('../supabase/136_skip_automatic_kpi_salary_group.sql', import.meta.url),
   'utf8'
 )
 
@@ -78,7 +81,7 @@ test('daily KPI finalization is date-idempotent and excludes absent or ineligibl
   assert.match(migration, /'Автоматический KPI'[\s\S]*?'daily_kpi'[\s\S]*?jsonb_build_object/i)
 })
 
-test('automatic bonuses queue group and Team delivery but fold private delivery into the daily summary', () => {
+test('automatic bonuses queue Team delivery but skip private and Salary-group detail delivery', () => {
   const queueFunction = migration.slice(
     migration.indexOf('create or replace function public.queue_salary_event_telegram_delivery'),
     migration.indexOf('-- Atomic and idempotent date finalization')
@@ -98,32 +101,23 @@ test('automatic bonuses queue group and Team delivery but fold private delivery 
   assert.match(migration, /references public\.employee_salary_bonuses\(id\) on delete set null/i)
   assert.match(migration, /create or replace function public\.void_deleted_daily_kpi_bonus/i)
   assert.match(migration, /set status = 'voided',[\s\S]*?bonus_id = null/i)
+  assert.match(skipAutomaticKpiGroupMigration, /case when is_automatic_kpi then 'skipped' else 'not_attempted' end/i)
+  assert.match(skipAutomaticKpiGroupMigration, /Automatic KPI details are sent only to ZarKebab Team/i)
+  assert.match(skipAutomaticKpiGroupMigration, /team_status[\s\S]*?'not_attempted'/i)
 })
 
-test('automatic KPI runtime explicitly suppresses the private receipt while retaining group and Team delivery', () => {
+test('automatic KPI runtime suppresses private and Salary-group detail while retaining Team delivery', () => {
   const automaticNotification = employeeNotification.slice(
     employeeNotification.indexOf('export async function notifyAutomaticKpiBonus'),
     employeeNotification.indexOf('async function notifyPayment')
   )
-  const hasDirectGroupAndTeamOnly = (
-    /deliverSalaryGroupEvent/.test(automaticNotification)
-    && /deliverSalaryTeamEvent/.test(automaticNotification)
-    && !/deliverEmployeeSalaryEvent/.test(automaticNotification)
-  )
-  const hasExplicitPrivateOptOut = (
-    /notifyLoadedSalaryEvent/.test(automaticNotification)
-    && /(?:skipEmployee\s*:\s*true|(?:send|deliver|include|notify)Employee\s*:\s*false)/i
-      .test(automaticNotification)
-  )
-
-  assert.ok(
-    hasDirectGroupAndTeamOnly || hasExplicitPrivateOptOut,
-    'automatic KPI delivery must explicitly omit the separate private employee message'
-  )
+  assert.match(automaticNotification, /notifyLoadedSalaryEvent/)
+  assert.match(automaticNotification, /includeEmployee:\s*false/)
+  assert.match(automaticNotification, /includeGroup:\s*false/)
   assert.match(automaticNotification, /source_type !== 'daily_kpi'|source_type === 'daily_kpi'/)
 })
 
-test('automatic KPI delivery treats the combined summary as satisfying the employee destination', () => {
+test('automatic KPI delivery treats private summary and excluded Salary group as satisfied destinations', () => {
   const loadedNotification = employeeNotification.slice(
     employeeNotification.indexOf('async function notifyLoadedSalaryEvent'),
     employeeNotification.indexOf('export async function notifyAutomaticKpiBonus')
@@ -135,13 +129,14 @@ test('automatic KPI delivery treats the combined summary as satisfying the emplo
     /includeEmployee\s*\?\s*deliverEmployeeSalaryEvent[\s\S]*?:\s*Promise\.resolve\([\s\S]*?status: 'skipped'/
   )
   assert.match(loadedNotification, /employeeSatisfied\s*=\s*!includeEmployee\s*\|\|\s*employeeSent/)
+  assert.match(loadedNotification, /groupSatisfied\s*=\s*!includeGroup\s*\|\|\s*groupSent/)
   assert.match(
     loadedNotification,
-    /allSent:\s*employeeSatisfied\s*&&\s*groupSent\s*&&\s*\(!teamRequired\s*\|\|\s*teamSent\)/
+    /allSent:\s*employeeSatisfied\s*&&\s*groupSatisfied\s*&&\s*\(!teamRequired\s*\|\|\s*teamSent\)/
   )
 })
 
-test('Salaries status keeps automatic KPI private delivery terminal while group and Team remain retryable', () => {
+test('Salaries status keeps automatic KPI private and Salary-group delivery terminal while Team remains retryable', () => {
   const deliveryRows = salariesPage.slice(
     salariesPage.indexOf('const groupEventDeliveryRows'),
     salariesPage.indexOf('const telegramDeliveryRows')
@@ -157,7 +152,7 @@ test('Salaries status keeps automatic KPI private delivery terminal while group 
   )
   assert.match(retryDecision, /!delivery\.employeeIncludedInDailySummary/)
   assert.match(retryDecision, /\? \[delivery\.employeeStatus\][\s\S]*?: \[\]/)
-  assert.match(retryDecision, /delivery\.groupStatus/)
+  assert.match(retryDecision, /!delivery\.groupExcludedForAutomaticKpi[\s\S]*?delivery\.groupStatus/)
   assert.match(retryDecision, /delivery\.teamStatus/)
 })
 
@@ -174,7 +169,7 @@ test('only the server finalizer can create or mutate an automatic KPI bonus', ()
   assert.doesNotMatch(protectionFunction, /before delete/i)
 })
 
-test('daily cron catches up seven completed dates and sends group and Team KPI destinations before the summary', () => {
+test('daily cron catches up seven completed dates and sends Team KPI before the aggregate summary', () => {
   assert.match(dailyCron, /const KPI_CATCH_UP_DAYS = 7/)
   assert.match(dailyCron, /getCompletedTashkentDate\(now\)/)
   assert.match(dailyCron, /getCompletedTashkentDates\(now, KPI_CATCH_UP_DAYS\)/)
@@ -314,7 +309,7 @@ test('authenticated retries accept only automatic KPI null-creator bonuses', () 
   assert.match(employeeNotification, /legacySelect:[\s\S]*?isMissingKpiBonusSourceColumns\(error\)/)
 })
 
-test('Salary group gets KPI details while Team receives only the bonus amount and date', () => {
+test('Team KPI message contains only the bonus amount and date', () => {
   const event = {
     employee_name: 'Aziz <waiter>',
     bonus_date: '2026-08-14',
@@ -326,14 +321,7 @@ test('Salary group gets KPI details while Team receives only the bonus amount an
       rate_bps: 100,
     },
   }
-  const group = buildSalaryGroupEventMessage('bonus', event, 0, 'en')
   const team = buildSalaryTeamEventMessage('bonus', event, 'en')
-
-  assert.match(group, /Daily KPI bonus/)
-  assert.match(group, /97 750 UZS/)
-  assert.match(group, /9 775 000 UZS/)
-  assert.match(group, /1%/)
-  assert.match(group, /Sales base/)
 
   assert.match(team, /Daily KPI bonus/)
   assert.match(team, /97 750 UZS/)
@@ -343,14 +331,10 @@ test('Salary group gets KPI details while Team receives only the bonus amount an
   assert.doesNotMatch(team, /<waiter>/)
 })
 
-test('combined salary and automatic KPI deliveries are forced to Russian', () => {
+test('combined salary and Team automatic KPI deliveries are forced to Russian', () => {
   const salaryDelivery = dailyCron.slice(
     dailyCron.indexOf('async function sendDailySalaryNotifications'),
     dailyCron.indexOf('export default async function handler')
-  )
-  const groupDelivery = employeeNotification.slice(
-    employeeNotification.indexOf('async function deliverSalaryGroupEvent'),
-    employeeNotification.indexOf('async function deliverSalaryTeamEvent')
   )
   const teamDelivery = employeeNotification.slice(
     employeeNotification.indexOf('async function deliverSalaryTeamEvent'),
@@ -358,7 +342,6 @@ test('combined salary and automatic KPI deliveries are forced to Russian', () =>
   )
 
   assert.match(salaryDelivery, /buildDailySalaryMessage\([\s\S]*?notificationDate,\s*'ru'\s*\)/)
-  assert.match(groupDelivery, /source_type === 'daily_kpi'[\s\S]*?\? 'ru'/)
   assert.match(teamDelivery, /source_type === 'daily_kpi'[\s\S]*?\? 'ru'/)
 })
 
@@ -403,6 +386,8 @@ test('daily cron sends one duplicate-safe aggregate salary and KPI message to Sa
   assert.match(dailyCron, /convertSalaryAmountToDaily\([\s\S]*?monthly_utilities_uzs[\s\S]*?'monthly'/)
   assert.match(dailyCron, /getOrderRevenueTotal/)
   assert.match(dailyCron, /getOrdersCostTotal/)
+  assert.match(dailyCron, /const cafeIncome = paidOrders\.reduce/)
+  assert.match(dailyCron, /cafeIncome - getOrdersCostTotal\(paidOrders\)/)
   assert.match(payrollGroupMigration, /business_date\s+date primary key/i)
   assert.match(payrollGroupMigration, /Historical delivery skipped during migration/i)
   assert.match(payrollGroupMigration, /revoke all[\s\S]*from anon, authenticated/i)

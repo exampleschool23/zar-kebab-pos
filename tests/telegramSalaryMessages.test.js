@@ -90,6 +90,7 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     { status: 'generated', bonus_amount: 75_000 },
     { status: 'skipped_absent', bonus_amount: 0 },
   ], '2026-07-29', {
+    cafeIncome: 3_500_000,
     grossProfit: 2_000_000,
     rent: 800_000,
     utilities: 700_000,
@@ -97,6 +98,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
 
   assert.deepEqual(summary, {
     date: '2026-07-29',
+    cafeIncomeTotal: 3_500_000,
+    cafeNetProfit: 2_000_000,
     salaryTotal: 150_000,
     kpiBonusTotal: 75_000,
     combinedTotal: 225_000,
@@ -109,6 +112,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
   assert.match(message, /Общий отчёт по зарплате и KPI/)
   assert.match(message, /📅 29-июля/)
   assert.doesNotMatch(message, /29\.07\.2026/)
+  assert.match(message, /Выручка кафе за день:<\/b> 3 500 000 UZS/)
+  assert.match(message, /Чистая прибыль кафе:<\/b> 2 000 000 UZS/)
   assert.match(message, /Начисленная зарплата:<\/b> 150 000 UZS/)
   assert.match(message, /Автоматические KPI-бонусы:<\/b> 75 000 UZS/)
   assert.match(message, /Общая сумма:<\/b> 225 000 UZS/)

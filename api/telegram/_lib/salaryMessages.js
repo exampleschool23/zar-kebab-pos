@@ -23,6 +23,8 @@ const COPY = {
     due: 'To‘lanishi kerak',
     currency: 'UZS',
     groupTitle: 'Kunlik umumiy maosh va KPI hisoboti',
+    groupCafeIncome: 'Kunlik kafe daromadi',
+    groupCafeNetProfit: 'Kafening sof foydasi',
     groupSalary: 'Hisoblangan umumiy maosh',
     groupKpi: 'Avtomatik KPI bonuslari',
     groupTotal: 'Umumiy summa',
@@ -46,6 +48,8 @@ const COPY = {
     due: 'К выплате',
     currency: 'UZS',
     groupTitle: 'Общий отчёт по зарплате и KPI',
+    groupCafeIncome: 'Выручка кафе за день',
+    groupCafeNetProfit: 'Чистая прибыль кафе',
     groupSalary: 'Начисленная зарплата',
     groupKpi: 'Автоматические KPI-бонусы',
     groupTotal: 'Общая сумма',
@@ -69,6 +73,8 @@ const COPY = {
     due: 'Current salary due',
     currency: 'UZS',
     groupTitle: 'Daily salary and KPI totals',
+    groupCafeIncome: 'Daily cafe income',
+    groupCafeNetProfit: 'Cafe net profit',
     groupSalary: 'Salary earned',
     groupKpi: 'Automatic KPI bonuses',
     groupTotal: 'Combined total',
@@ -219,6 +225,7 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
 }
 
 export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
+  cafeIncome = 0,
   grossProfit = null,
   rent = 0,
   utilities = 0,
@@ -237,9 +244,12 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   const normalizedGrossProfit = Number.isFinite(Number(grossProfit))
     ? Math.round(Number(grossProfit))
     : null
+  const cafeIncomeTotal = normalizeExpenseAmount(cafeIncome)
 
   return {
     date,
+    cafeIncomeTotal,
+    cafeNetProfit: normalizedGrossProfit,
     salaryTotal,
     kpiBonusTotal,
     combinedTotal: salaryTotal + kpiBonusTotal,
@@ -259,6 +269,10 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
   const combinedTotal = salaryTotal + kpiBonusTotal
   const rentTotal = normalizeExpenseAmount(summary?.rentTotal)
   const utilitiesTotal = normalizeExpenseAmount(summary?.utilitiesTotal)
+  const cafeIncomeTotal = normalizeExpenseAmount(summary?.cafeIncomeTotal)
+  const cafeNetProfit = Number.isFinite(Number(summary?.cafeNetProfit))
+    ? Math.round(Number(summary.cafeNetProfit))
+    : null
   const netProfit = Number.isFinite(Number(summary?.netProfit))
     ? Math.round(Number(summary.netProfit))
     : null
@@ -268,6 +282,11 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
   return [
     `💼 <b>${copy.groupTitle}</b>`,
     `📅 ${escapeTelegramHtml(compactRussianDate)}`,
+    '',
+    `<b>${copy.groupCafeIncome}:</b> ${formatSalaryNotificationAmount(cafeIncomeTotal)} ${copy.currency}`,
+    `<b>${copy.groupCafeNetProfit}:</b> ${cafeNetProfit == null
+      ? copy.unavailable
+      : `${formatSalaryNotificationAmount(cafeNetProfit)} ${copy.currency}`}`,
     '',
     `<b>${copy.groupSalary}:</b> ${formatSalaryNotificationAmount(salaryTotal)} ${copy.currency}`,
     `<b>${copy.groupKpi}:</b> ${formatSalaryNotificationAmount(kpiBonusTotal)} ${copy.currency}`,

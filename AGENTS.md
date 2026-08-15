@@ -315,7 +315,7 @@ These bugs were recently fixed and are now protected by tests:
    - Each enabled effective-dated rule receives its full basis-point percentage of restaurant-wide paid dine-in `subtotal + service_fee` for the completed Tashkent date; loyalty never reduces this base.
    - Absent employees and dates outside the employee's joined/ended employment window are skipped.
    - Date runs and per-employee calculation snapshots are immutable and duplicate-safe. Cron retries KPI finalization and unsent combined salary summaries for the last seven completed dates in the 01:00 Tashkent hour.
-   - Generated rows are immediate `employee_salary_bonuses` expenses using the salary profile payment method. The employee receives Salary and Bonus together in one private daily summary; a separate private KPI event is terminally skipped, while Salary-group and Team KPI announcements remain independently retryable.
+   - Generated rows are immediate `employee_salary_bonuses` expenses using the salary profile payment method. The employee receives Salary and Bonus together in one private daily summary; separate private and Salary-group KPI events are terminally skipped, while the Team KPI announcement remains independently retryable.
    - Only the service-role finalizer may create a `daily_kpi` bonus, and generated financial fields cannot be updated. A failed date finalization must defer its daily salary summary.
    - Deleting a generated bonus marks its calculation result `voided` and never causes a retry to recreate it.
 
@@ -335,12 +335,12 @@ These bugs were recently fixed and are now protected by tests:
 
 40. Daily salary and automatic KPI Telegram delivery is Russian-first.
    - The employee's combined daily Salary + Bonus summary is always rendered in Russian, regardless of the private link's saved language preference.
-   - Automatic KPI announcements to the Salary group and ZarKebab Team are also always rendered in Russian, regardless of each target's configured language.
+   - Automatic KPI announcements to ZarKebab Team are always rendered in Russian, regardless of the target's configured language.
    - Other manually recorded salary events retain their existing employee or target language behavior.
 
 41. Daily payroll Telegram messages expose only the information each audience needs.
    - The employee's combined daily summary shows attendance, salary earned, bonuses, and current due. It does not repeat fines or salary payments, which retain their own immediate notifications and history records.
-   - The Salary group receives the detailed automatic KPI calculation, including restaurant dine-in sales base and KPI percentage.
+   - The Salary group receives only the aggregate daily salary/KPI report; it does not receive per-employee automatic KPI details.
    - ZarKebab Team receives only the employee name, paid KPI bonus amount, and date. It must never receive the restaurant sales base, KPI percentage, salary due, or manager identity.
 
 42. A stale order shell must not leak the wrong service rate into a new price mode.

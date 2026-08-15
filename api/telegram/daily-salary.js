@@ -266,9 +266,12 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     absences: (absencesResult.data || []).filter(absence => absence.salary_profile_id === profile.id),
   }))
   const paidOrders = (salesResult.data || []).filter(order => order?.status !== 'cancelled')
+  const cafeIncome = paidOrders.reduce(
+    (total, order) => total + getOrderRevenueTotal(order),
+    0
+  )
   const grossProfit = hasOrdersCostCoverage(paidOrders)
-    ? paidOrders.reduce((total, order) => total + getOrderRevenueTotal(order), 0)
-      - getOrdersCostTotal(paidOrders)
+    ? cafeIncome - getOrdersCostTotal(paidOrders)
     : null
   const dailyRent = convertSalaryAmountToDaily(
     settingsResult.data?.monthly_rent_uzs,
@@ -279,6 +282,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     'monthly'
   )
   return getDailyPayrollGroupSummary(salaryProfiles, kpiResults, businessDate, {
+    cafeIncome,
     grossProfit,
     rent: dailyRent,
     utilities: dailyUtilities,

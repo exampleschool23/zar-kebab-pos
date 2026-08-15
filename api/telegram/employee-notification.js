@@ -25,6 +25,7 @@ const FEATURE_ACCESS_MANAGER_EMAILS = new Set(['dangerhoggish@gmail.com'])
 const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
 const TEAM_EVENT_TYPES = new Set(['bonus', 'fine', 'absence'])
 const COMBINED_DAILY_KPI_EMPLOYEE_REASON = 'Automatic KPI is included in the combined daily salary summary'
+const DAILY_KPI_GROUP_REASON = 'Automatic KPI details are sent only to ZarKebab Team'
 const GROUP_EVENT_CONFIG = {
   bonus: {
     table: 'employee_salary_bonuses',
@@ -580,13 +581,16 @@ async function requireQueuedSalaryRateDelivery(supabase, eventId) {
 
 async function notifySalaryEvent(supabase, user, actorName, type, eventId) {
   const event = await loadOwnedSalaryEvent(supabase, user, type, eventId, actorName)
+  const isAutomaticKpi = type === 'bonus' && event.source_type === 'daily_kpi'
   return notifyLoadedSalaryEvent(supabase, type, event, {
-    includeEmployee: !(type === 'bonus' && event.source_type === 'daily_kpi'),
+    includeEmployee: !isAutomaticKpi,
+    includeGroup: !isAutomaticKpi,
   })
 }
 
 async function notifyLoadedSalaryEvent(supabase, type, event, {
   includeEmployee = true,
+  includeGroup = true,
 } = {}) {
   if (type === 'rate') {
     await requireQueuedSalaryRateDelivery(supabase, event.id)
@@ -596,9 +600,35 @@ async function notifyLoadedSalaryEvent(supabase, type, event, {
   const remainingDue = salaryProfile
     ? getDailySalaryNotificationSummary(salaryProfile, getTashkentDate()).due
     : 0
-  const [groupSettled] = await Promise.allSettled([
-    deliverSalaryGroupEvent(supabase, type, event, remainingDue),
-  ])
+  const groupDelivery = includeGroup
+    ? deliverSalaryGroupEvent(supabase, type, event, remainingDue)
+    : supabase
+        .from('employee_salary_group_notification_deliveries')
+        .update({
+          status: 'skipped',
+          telegram_chat_id: null,
+          telegram_message_id: null,
+          error_message: DAILY_KPI_GROUP_REASON,
+          sent_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('event_type', type)
+        .eq('event_id', event.id)
+        .neq('status', 'sent')
+        .select('*')
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) throw error
+          return data
+            ? savedGroupDeliveryResult(data, false)
+            : {
+                status: 'skipped',
+                telegramMessageId: null,
+                sentAt: null,
+                errorMessage: DAILY_KPI_GROUP_REASON,
+              }
+        })
+  const [groupSettled] = await Promise.allSettled([groupDelivery])
   const employeeDelivery = includeEmployee
     ? deliverEmployeeSalaryEvent(supabase, type, event, remainingDue)
     : Promise.resolve({
@@ -617,12 +647,14 @@ async function notifyLoadedSalaryEvent(supabase, type, event, {
   const employeeSent = employee.status === 'sent'
   const employeeSatisfied = !includeEmployee || employeeSent
   const groupSent = group.status === 'sent'
+  const groupSatisfied = !includeGroup || groupSent
   const teamSent = team.status === 'sent'
   const teamRequired = TEAM_EVENT_TYPES.has(type)
   return {
     ok: employeeSatisfied || groupSent || teamSent,
-    allSent: employeeSatisfied && groupSent && (!teamRequired || teamSent),
+    allSent: employeeSatisfied && groupSatisfied && (!teamRequired || teamSent),
     employeeIncludedInDailySummary: !includeEmployee,
+    groupExcludedForAutomaticKpi: !includeGroup,
     employee,
     group,
     team,
@@ -642,6 +674,7 @@ export async function notifyAutomaticKpiBonus(supabase, bonusId) {
   }
   return notifyLoadedSalaryEvent(supabase, 'bonus', event, {
     includeEmployee: false,
+    includeGroup: false,
   })
 }
 
