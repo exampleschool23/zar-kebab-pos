@@ -1,17 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import {
   Plus, Edit2, Trash2, X, Table2, MapPin, Users, Hash, Power, PowerOff,
-  CalendarClock, Phone, CheckCircle2, ArrowUp, ArrowDown,
+  CalendarClock, Phone, CheckCircle2, GripVertical,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import AppShell from '../components/AppShell'
 import { canDeleteTable, canDisableTable } from '../lib/tableManagement'
-import { clearReservationPatch, compactTimelineLabels, getTodaysReservations } from '../lib/tableActivity'
+import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
 import { formatDateTime, formatTime } from '../lib/dateFormat'
 import { canEditFeature } from '../lib/permissions'
 import { loadTableOrderHistoryIds } from '../lib/db'
+import { getTableZoneVisual } from '../lib/tableZoneColors'
 
 const DEFAULT_ZONES = ['Main Hall', 'VIP', 'Outdoor', 'Second Floor']
 
@@ -89,7 +95,6 @@ const L = {
     seat: 'Seat',
     cancelReservation: 'Cancel reservation',
     call: 'Call',
-    activity: 'Activity',
     select: 'Select',
     selected: count => `${count} selected`,
     bulkActions: 'Bulk actions',
@@ -99,8 +104,8 @@ const L = {
     renumberSelected: 'Renumber',
     clearSelection: 'Clear',
     bulkUpdated: 'Tables updated',
-    moveUp: 'Move up',
-    moveDown: 'Move down',
+    dragTable: 'Drag to reorder table',
+    reorderFailed: 'Could not save the new table order',
   },
   ru: {
     title: 'Столы',
@@ -175,7 +180,6 @@ const L = {
     seat: 'Посадить',
     cancelReservation: 'Отменить бронь',
     call: 'Позвонить',
-    activity: 'История',
     select: 'Выбрать',
     selected: count => `Выбрано: ${count}`,
     bulkActions: 'Массовые действия',
@@ -185,8 +189,8 @@ const L = {
     renumberSelected: 'Перенумеровать',
     clearSelection: 'Очистить',
     bulkUpdated: 'Столы обновлены',
-    moveUp: 'Вверх',
-    moveDown: 'Вниз',
+    dragTable: 'Перетащите, чтобы изменить порядок',
+    reorderFailed: 'Не удалось сохранить новый порядок столов',
   },
   uz: {
     title: 'Stollar',
@@ -261,7 +265,6 @@ const L = {
     seat: 'Joylashtirish',
     cancelReservation: 'Bronni bekor qilish',
     call: 'Qo‘ng‘iroq',
-    activity: 'Faollik',
     select: 'Tanlash',
     selected: count => `${count} tanlandi`,
     bulkActions: 'Ommaviy amallar',
@@ -271,8 +274,8 @@ const L = {
     renumberSelected: 'Raqamlash',
     clearSelection: 'Tozalash',
     bulkUpdated: 'Stollar yangilandi',
-    moveUp: 'Yuqoriga',
-    moveDown: 'Pastga',
+    dragTable: 'Tartibni o‘zgartirish uchun torting',
+    reorderFailed: 'Stollarning yangi tartibi saqlanmadi',
   },
 }
 
@@ -450,17 +453,25 @@ function ReservationStrip({ reservations, labels, canEdit, onSeat, onCancel, onC
   )
 }
 
-function ActivityTimeline({ labels, table, orders }) {
-  const items = compactTimelineLabels(table, orders, 5)
-  if (items.length === 0) return null
+function SortableTableRow({ tableId, disabled, className, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tableId,
+    disabled,
+  })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    position: 'relative',
+    zIndex: isDragging ? 20 : undefined,
+  }
+
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1">
-      <span className="text-[10px] font-black uppercase tracking-wide text-gray-400">{labels.activity}</span>
-      {items.map(item => (
-        <span key={item} className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
-          {item}
-        </span>
-      ))}
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`${className} ${isDragging ? 'bg-blue-50 shadow-xl ring-2 ring-blue-300' : ''}`}
+    >
+      {children({ attributes, listeners, isDragging })}
     </div>
   )
 }
@@ -483,6 +494,10 @@ export default function AdminTables() {
   const [bulkZoneId, setBulkZoneId] = useState('')
   const [bulkCapacity, setBulkCapacity] = useState('')
   const [historicalTableIds, setHistoricalTableIds] = useState(null)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -789,16 +804,19 @@ export default function AdminTables() {
     setNotice({ tone: 'success', message: l.bulkUpdated })
   }
 
-  async function moveTable(table, direction) {
-    if (!canManageTables) return
-    const zoneTables = sortedTables
-      .filter(row => (row.zone_id || row.zone_name) === (table.zone_id || table.zone_name))
-      .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0))
-    const index = zoneTables.findIndex(row => row.id === table.id)
-    const other = zoneTables[index + direction]
-    if (!other) return
-    await dispatch({ type: 'UPDATE_TABLE', payload: { ...table, sort_order: Number(other.sort_order) || 0 } })
-    await dispatch({ type: 'UPDATE_TABLE', payload: { ...other, sort_order: Number(table.sort_order) || 0 } })
+  async function handleTableDragEnd({ active, over }) {
+    if (!canManageTables || !over || active.id === over.id) return
+    const oldIndex = sortedTables.findIndex(table => table.id === active.id)
+    const newIndex = sortedTables.findIndex(table => table.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const updates = arrayMove(sortedTables, oldIndex, newIndex).map((table, index) => ({
+      id: table.id,
+      sort_order: index + 1,
+    }))
+    const result = await dispatch({ type: 'REORDER_TABLES', payload: { updates } })
+    if (result?.error) {
+      setNotice({ tone: 'error', message: result.error.message || l.reorderFailed })
+    }
   }
 
   function seatReservation(table) {
@@ -871,7 +889,8 @@ export default function AdminTables() {
           </div>
           <div className="mb-3 flex flex-wrap gap-2">
             {tableZones.map(zone => (
-              <span key={zone.id} className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+              <span key={zone.id} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${getTableZoneVisual(zone, tableZones).badge}`}>
+                <span className={`h-2 w-2 rounded-full ${getTableZoneVisual(zone, tableZones).dot}`} aria-hidden="true" />
                 {zone.name}
               </span>
             ))}
@@ -936,7 +955,7 @@ export default function AdminTables() {
         )}
 
         <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
-          <div className="hidden grid-cols-[40px_1.3fr_1fr_0.7fr_1fr_0.7fr_150px] gap-3 border-b border-[#F3F4F6] bg-gray-50 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-gray-400 md:grid">
+          <div className="hidden grid-cols-[64px_1.3fr_1fr_0.7fr_1fr_0.7fr_150px] gap-3 border-b border-[#F3F4F6] bg-gray-50 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-gray-400 md:grid">
             <button onClick={toggleAllSelected} className="text-left">{l.select}</button>
             <span>{l.tableName}</span>
             <span>{l.zoneSection}</span>
@@ -945,8 +964,11 @@ export default function AdminTables() {
             <span>{l.sortOrder}</span>
             <span className="text-right">{l.actions}</span>
           </div>
-          <div className="divide-y divide-[#F3F4F6]">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTableDragEnd}>
+            <SortableContext items={sortedTables.map(table => table.id)} strategy={verticalListSortingStrategy}>
+              <div className="divide-y divide-[#F3F4F6]">
             {sortedTables.map(table => {
+              const zoneVisual = getTableZoneVisual(table, tableZones)
               const activeOrders = orderStats.active.has(table.id)
               const hasHistory = orderStats.history.has(table.id)
               const canHardDelete = historicalTableIds !== null && !activeOrders && !hasHistory
@@ -959,8 +981,25 @@ export default function AdminTables() {
                   : l.delete
               const selected = selectedIds.includes(table.id)
               return (
-                <div key={table.id} className={`grid gap-3 px-4 py-4 md:grid-cols-[40px_1.3fr_1fr_0.7fr_1fr_0.7fr_150px] md:items-center ${table.is_active === false ? 'bg-gray-50/70' : selected ? 'bg-blue-50/40' : 'bg-white'}`}>
-                  <div>
+                <SortableTableRow
+                  key={table.id}
+                  tableId={table.id}
+                  disabled={!canManageTables}
+                  className={`grid gap-3 px-4 py-4 md:grid-cols-[64px_1.3fr_1fr_0.7fr_1fr_0.7fr_150px] md:items-center ${table.is_active === false ? 'bg-gray-50/70' : selected ? 'bg-blue-50/40' : 'bg-white'}`}
+                >
+                  {({ attributes, listeners }) => <>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      {...attributes}
+                      {...listeners}
+                      disabled={!canManageTables}
+                      className="touch-none cursor-grab rounded-lg p-1 text-gray-300 transition-colors hover:bg-blue-50 hover:text-blue-600 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
+                      title={l.dragTable}
+                      aria-label={`${l.dragTable}: ${table.name}`}
+                    >
+                      <GripVertical size={17} />
+                    </button>
                     <input
                       type="checkbox"
                       checked={selected}
@@ -978,10 +1017,9 @@ export default function AdminTables() {
                     {table.status === 'reserved' && table.reserved_for_name && (
                       <p className="mt-1 text-xs font-bold text-purple-600">{table.reserved_for_name}</p>
                     )}
-                    <ActivityTimeline labels={l} table={table} orders={state.orders} />
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">
-                    <MapPin size={14} className="text-gray-300" />
+                  <div className={`flex w-fit items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-bold ${zoneVisual.badge}`}>
+                    <MapPin size={12} />
                     {table.zone_name || 'Main Hall'}
                   </div>
                   <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">
@@ -1001,20 +1039,6 @@ export default function AdminTables() {
                   <div className="flex items-center justify-end gap-1">
                     {canManageTables ? (
                       <>
-                        <button
-                          onClick={() => moveTable(table, -1)}
-                          className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                          title={l.moveUp}
-                        >
-                          <ArrowUp size={15} />
-                        </button>
-                        <button
-                          onClick={() => moveTable(table, 1)}
-                          className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                          title={l.moveDown}
-                        >
-                          <ArrowDown size={15} />
-                        </button>
                         <button
                           onClick={() => openEdit(table)}
                           className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-orange-50 hover:text-[#ff5a00]"
@@ -1052,10 +1076,13 @@ export default function AdminTables() {
                       <span className="text-xs font-bold text-gray-300">—</span>
                     )}
                   </div>
-                </div>
+                  </>}
+                </SortableTableRow>
               )
             })}
-          </div>
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
       </div>
 

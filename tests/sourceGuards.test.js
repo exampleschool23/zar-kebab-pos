@@ -2005,6 +2005,15 @@ test('WaiterTables uses responsive section grids instead of one flat table grid'
   assert.match(source, /sections\.map\(\(\{ status, items \}\)/)
 })
 
+test('WaiterTables groups available tables into ordered zone sections', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+
+  assert.match(source, /status === 'available'/)
+  assert.match(source, /groupTableInfosByZone\(items, visibleZones\)/)
+  assert.match(source, /availableZoneGroups\.map\(\(\{ zone: zoneItem, items: zoneItems \}\)/)
+  assert.match(source, /tableCountLabel\(lang, zoneItems\.length\)/)
+})
+
 test('CashierTables groups bills by cashier urgency', () => {
   const source = readSource('src/pages/CashierTables.jsx')
   const cashierBills = readSource('src/lib/cashierBills.js')
@@ -2472,6 +2481,21 @@ test('AdminTables protects table history and manages zones', () => {
   assert.match(db, /case 'DELETE_TABLE':[\s\S]*\.from\('orders'\)[\s\S]*\.eq\('table_id', action\.payload\)[\s\S]*\.limit\(1\)/)
   assert.match(db, /Disable it instead of deleting it/)
   assert.match(appContext, /'DELETE_TABLE'/)
+})
+
+test('AdminTables removes activity badges and supports persisted drag ordering', () => {
+  const source = readSource('src/pages/AdminTables.jsx')
+  const db = readSource('src/lib/db.js')
+
+  assert.match(source, /DndContext/)
+  assert.match(source, /SortableContext/)
+  assert.match(source, /useSortable/)
+  assert.match(source, /TouchSensor/)
+  assert.match(source, /type: 'REORDER_TABLES'/)
+  assert.doesNotMatch(source, /ActivityTimeline/)
+  assert.doesNotMatch(source, /compactTimelineLabels/)
+  assert.match(db, /case 'REORDER_TABLES':/)
+  assert.match(db, /from\('restaurant_tables'\)[\s\S]*sort_order: Number\(update\.sort_order\)/)
 })
 
 test('CashierBill uses loyalty wallet controls instead of percent card discounts', () => {

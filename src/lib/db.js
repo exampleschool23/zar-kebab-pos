@@ -1371,6 +1371,22 @@ export async function writeToSupabase(action, state, options = {}) {
       break
     }
 
+    case 'REORDER_TABLES': {
+      const updates = (action.payload?.updates || []).filter(update =>
+        update?.id && Number.isFinite(Number(update.sort_order))
+      )
+      const updatedAt = new Date().toISOString()
+      const results = await Promise.all(updates.map(update =>
+        supabase
+          .from('restaurant_tables')
+          .update({ sort_order: Number(update.sort_order), updated_at: updatedAt })
+          .eq('id', update.id)
+      ))
+      const error = results.find(result => result.error)?.error
+      if (error) throw error
+      break
+    }
+
     case 'DELETE_TABLE': {
       const { data: history, error: historyError } = await supabase
         .from('orders')

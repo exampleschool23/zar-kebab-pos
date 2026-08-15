@@ -409,3 +409,29 @@ test('admin reservation and disable flow keeps history-safe table lifecycle', ()
   })
   assert.equal(disabled.tables[0].is_active, false)
 })
+
+test('admin table drag reorder applies every persisted sort position', () => {
+  const reordered = tablesReducer({
+    ...state(),
+    tables: [
+      { id: 't1', name: 'Table 1', sort_order: 1 },
+      { id: 't2', name: 'Table 2', sort_order: 2 },
+      { id: 't3', name: 'Table 3', sort_order: 3 },
+    ],
+  }, {
+    type: 'REORDER_TABLES',
+    payload: {
+      updates: [
+        { id: 't2', sort_order: 1 },
+        { id: 't3', sort_order: 2 },
+        { id: 't1', sort_order: 3 },
+      ],
+    },
+  })
+
+  assert.deepEqual(reordered.tables.map(table => [table.id, table.sort_order]), [
+    ['t1', 3],
+    ['t2', 1],
+    ['t3', 2],
+  ])
+})

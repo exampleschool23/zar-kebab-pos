@@ -16,6 +16,7 @@ import { formatDateTime, formatElapsedSince, formatTime } from '../lib/dateForma
 import { earliestReliableTime, getReliableOrderItemTime } from '../lib/orderTimestamps'
 import { canEditFeature } from '../lib/permissions'
 import { getTableGuestEntryContext } from '../lib/tableGuestEntry'
+import { getTableZoneName, getTableZoneVisual, groupTableInfosByZone } from '../lib/tableZoneColors'
 import { TableGuestEntryDialog } from '../components/GuestModeUI'
 
 // ── Localization ──────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ const L = {
     deliveryOrder: 'Delivery Order',
     manageTables: 'Manage tables',
     todaysReservations: 'Today’s Reservations',
+    zones: 'Zones',
     seat: 'Seat',
     cancelReservation: 'Cancel',
     call: 'Call',
@@ -88,6 +90,7 @@ const L = {
     deliveryOrder: 'Доставка',
     manageTables: 'Управление столами',
     todaysReservations: 'Брони сегодня',
+    zones: 'Зоны',
     seat: 'Посадить',
     cancelReservation: 'Отменить',
     call: 'Позвонить',
@@ -125,6 +128,7 @@ const L = {
     deliveryOrder: 'Yetkazib berish',
     manageTables: 'Stollarni boshqarish',
     todaysReservations: 'Bugungi bronlar',
+    zones: 'Zonalar',
     seat: 'Joylashtirish',
     cancelReservation: 'Bekor qilish',
     call: 'Qo‘ng‘iroq',
@@ -343,8 +347,10 @@ function actionForStatus(lang, status) {
   return null
 }
 
-function TableCard({ table, status, counts, lang, canEdit, onClick, onAction, onManage }) {
+function TableCard({ table, zones, status, counts, lang, canEdit, onClick, onAction, onManage }) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.available
+  const zone = getTableZoneVisual(table, zones)
+  const zoneName = getTableZoneName(table)
   const StatusIcon = cfg.icon
   const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt, lang) : null
   const action = actionForStatus(lang, status)
@@ -358,12 +364,17 @@ function TableCard({ table, status, counts, lang, canEdit, onClick, onAction, on
       role={canEdit ? 'button' : undefined}
       tabIndex={canEdit ? 0 : undefined}
       onKeyDown={e => canEdit && e.key === 'Enter' && onClick()}
-      className={`group relative flex min-h-[116px] w-full flex-col rounded-xl border border-[#E5E7EB] border-l-4 bg-white p-3 text-left shadow-sm transition-all ${canEdit ? `cursor-pointer hover:-translate-y-0.5 hover:shadow-md ${cfg.hoverBorder}` : ''} ${cfg.border}`}
+      className={`group relative flex min-h-[116px] w-full flex-col overflow-hidden rounded-xl border border-[#E5E7EB] border-l-4 bg-white p-3 pt-4 text-left shadow-sm transition-all ${canEdit ? `cursor-pointer hover:-translate-y-0.5 hover:shadow-md ${cfg.hoverBorder}` : ''} ${cfg.border}`}
     >
+      <span className={`absolute inset-x-0 top-0 h-1 ${zone.bar}`} aria-hidden="true" />
       {/* Header */}
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-base font-black leading-none text-gray-900">{table.name}</p>
+          <span className={`mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black ${zone.badge}`}>
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${zone.dot}`} aria-hidden="true" />
+            <span className="truncate">{zoneName}</span>
+          </span>
           {elapsed && status !== 'available' && (
             <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-gray-400">
               <Clock size={11} />
@@ -595,6 +606,29 @@ export default function WaiterTables() {
       }),
     [state.tables, state.orders]
   )
+
+  const visibleZones = useMemo(() => {
+    const zones = (state.tableZones || []).filter(zone => zone.is_active !== false)
+    tableInfos.forEach(({ table }) => {
+      const tableZoneId = String(table.zone_id || '').toLowerCase()
+      const tableZoneName = getTableZoneName(table).toLowerCase()
+      const alreadyKnown = zones.some(zone =>
+        (tableZoneId && String(zone.id || '').toLowerCase() === tableZoneId) ||
+        String(zone.name || '').toLowerCase() === tableZoneName
+      )
+      if (!alreadyKnown) {
+        zones.push({
+          id: table.zone_id || tableZoneName,
+          name: getTableZoneName(table),
+          sort_order: 999,
+        })
+      }
+    })
+    return zones.sort((a, b) =>
+      (Number(a.sort_order) || 999) - (Number(b.sort_order) || 999) ||
+      String(a.name || '').localeCompare(String(b.name || ''))
+    )
+  }, [state.tableZones, tableInfos])
 
   const countsPerStatus = useMemo(() => {
     const c = { all: tableInfos.length }
@@ -848,11 +882,30 @@ export default function WaiterTables() {
             })}
           </div>
 
+          {/* Zone color legend */}
+          {visibleZones.length > 0 && (
+            <div className="mb-6 flex items-center gap-2 overflow-x-auto rounded-2xl border border-[#E5E7EB] bg-white px-3 py-2.5 shadow-sm scrollbar-hide">
+              <span className="shrink-0 text-[11px] font-black uppercase tracking-wide text-gray-400">{tr(lang, 'zones')}</span>
+              {visibleZones.map(zoneItem => {
+                const zone = getTableZoneVisual(zoneItem, visibleZones)
+                return (
+                  <span key={zoneItem.id || zoneItem.name} className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-black ${zone.badge}`}>
+                    <span className={`h-2 w-2 rounded-full ${zone.dot}`} aria-hidden="true" />
+                    {zoneItem.name}
+                  </span>
+                )
+              })}
+            </div>
+          )}
+
           {/* Status sections */}
           <div className="space-y-9">
             {sections.map(({ status, items }) => {
               const cfg = STATUS_CFG[status]
               const Icon = cfg.icon
+              const availableZoneGroups = status === 'available'
+                ? groupTableInfosByZone(items, visibleZones)
+                : []
               return (
                 <section key={status} className="border-t border-[#E5E7EB] pt-5 first:border-t-0 first:pt-0">
                   <div className="sticky top-0 z-10 -mx-1 mb-3 flex items-center gap-3 rounded-2xl bg-[#faf9f7]/95 px-1 py-2 backdrop-blur">
@@ -864,21 +917,57 @@ export default function WaiterTables() {
                       <p className="text-xs font-semibold text-[#8A94A6]">{tableCountLabel(lang, items.length)}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-5">
-                    {items.map(({ table, status: itemStatus, counts }) => (
-                      <TableCard
-                        key={table.id}
-                        table={table}
-                        status={itemStatus}
-                        counts={counts}
-                        lang={lang}
-                        canEdit={canEditTables}
-                        onClick={() => handleTable(table)}
-                        onAction={handleCardAction}
-                        onManage={handleManageOrder}
-                      />
-                    ))}
-                  </div>
+                  {status === 'available' ? (
+                    <div className="space-y-6">
+                      {availableZoneGroups.map(({ zone: zoneItem, items: zoneItems }) => {
+                        const zone = getTableZoneVisual(zoneItem, visibleZones)
+                        return (
+                          <div key={zoneItem.id || zoneItem.name}>
+                            <div className={`mb-2.5 flex items-center justify-between rounded-xl border px-3 py-2 ${zone.badge}`}>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${zone.dot}`} aria-hidden="true" />
+                                <h4 className="truncate text-sm font-black uppercase tracking-wide">{zoneItem.name}</h4>
+                              </div>
+                              <span className="shrink-0 text-xs font-bold opacity-75">{tableCountLabel(lang, zoneItems.length)}</span>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-5">
+                              {zoneItems.map(({ table, status: itemStatus, counts }) => (
+                                <TableCard
+                                  key={table.id}
+                                  table={table}
+                                  zones={visibleZones}
+                                  status={itemStatus}
+                                  counts={counts}
+                                  lang={lang}
+                                  canEdit={canEditTables}
+                                  onClick={() => handleTable(table)}
+                                  onAction={handleCardAction}
+                                  onManage={handleManageOrder}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-5">
+                      {items.map(({ table, status: itemStatus, counts }) => (
+                        <TableCard
+                          key={table.id}
+                          table={table}
+                          zones={visibleZones}
+                          status={itemStatus}
+                          counts={counts}
+                          lang={lang}
+                          canEdit={canEditTables}
+                          onClick={() => handleTable(table)}
+                          onAction={handleCardAction}
+                          onManage={handleManageOrder}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </section>
               )
             })}
