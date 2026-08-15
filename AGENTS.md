@@ -349,6 +349,11 @@ These bugs were recently fixed and are now protected by tests:
    - Paid orders remain immutable historical snapshots even if an earlier bug saved the wrong rate.
    - Reports show the saved Regular/Tourist mode from `orders.price_mode` in desktop rows, mobile cards, and order details.
 
+43. Dashboard ranking cards should use their available height.
+   - Sales by Category shows every category represented by sold items in the selected period.
+   - Best-Selling Dishes shows up to ten ranked sold products instead of stopping at five, with internal scrolling when needed.
+   - Never fabricate empty categories or unsold products merely to fill visual space.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:

@@ -1331,7 +1331,7 @@ export default function AdminDashboard() {
             ) : bestSelling.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
             ) : (
-              <div className="space-y-2">
+              <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
                 {bestSelling.map((item, i) => (
                   <div key={item.menuItemId || i} className="flex items-center gap-2.5 py-1.5 border-b border-[#F9FAFB] last:border-0">
                     <span className="w-5 text-center text-xs font-black text-[#9CA3AF] flex-shrink-0">

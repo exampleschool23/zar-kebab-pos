@@ -392,6 +392,18 @@ test('cancelled items never contribute to sold-item dashboard or report metrics'
   assert.deepEqual(staff.map(row => [row.name, row.items, row.revenue]), [['Jasurbek', 2, 50000]])
 })
 
+test('dashboard best sellers use the available card space for up to ten sold products', () => {
+  const manyItems = Array.from({ length: 12 }, (_, index) =>
+    item(`dish-${index + 1}`, `Dish ${index + 1}`, 12 - index, 10_000)
+  )
+  const rows = getDashboardBestSelling([
+    order({ id: 'many-dishes', items: manyItems, total: 780_000 }),
+  ], {})
+
+  assert.equal(rows.length, 10)
+  assert.deepEqual(rows.map(row => row.menuItemId), manyItems.slice(0, 10).map(row => row.menu_item_id))
+})
+
 test('dashboard period change from month to year updates all widgets to year data', () => {
   const year = analyticsFor('year')
 

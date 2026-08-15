@@ -119,7 +119,7 @@ export function getDashboardBestSelling(orders, menuItemMap) {
 
   return Object.values(map)
     .sort((a, b) => b.qty - a.qty)
-    .slice(0, 5)
+    .slice(0, 10)
     .map(row => ({ ...row, image_url: menuItemMap[row.menuItemId]?.image_url || '' }))
 }
 
