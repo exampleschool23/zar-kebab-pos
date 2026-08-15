@@ -23,10 +23,12 @@ const EDITOR_ROLES = new Set(['owner', 'admin'])
 const FEATURE_ACCESS_MANAGER_EMAILS = new Set(['dangerhoggish@gmail.com'])
 const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
 const TEAM_EVENT_TYPES = new Set(['bonus', 'fine', 'absence'])
+const COMBINED_DAILY_KPI_EMPLOYEE_REASON = 'Automatic KPI is included in the combined daily salary summary'
 const GROUP_EVENT_CONFIG = {
   bonus: {
     table: 'employee_salary_bonuses',
-    select: 'id, salary_profile_id, bonus_date, amount, payment_method, note, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)',
+    select: 'id, salary_profile_id, bonus_date, amount, payment_method, note, created_by, created_by_name, source_type, source_metadata, salary_profile:employee_salary_profiles(employee_name)',
+    legacySelect: 'id, salary_profile_id, bonus_date, amount, payment_method, note, created_by, created_by_name, salary_profile:employee_salary_profiles(employee_name)',
   },
   fine: {
     table: 'employee_salary_fines',
@@ -40,6 +42,16 @@ const GROUP_EVENT_CONFIG = {
     table: 'employee_salary_rates',
     select: 'id, salary_profile_id, effective_from, amount, rate_unit, note, created_by, created_at, salary_profile:employee_salary_profiles(employee_name)',
   },
+}
+
+function isMissingKpiBonusSourceColumns(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (message.includes('source_type') || message.includes('source_metadata')) && (
+    message.includes('schema cache') ||
+    message.includes('column') ||
+    message.includes('42703') ||
+    message.includes('pgrst204')
+  )
 }
 
 function normalizeRole(role) {
@@ -135,13 +147,23 @@ async function loadSalaryTeamTarget(supabase) {
 async function loadOwnedSalaryEvent(supabase, user, type, eventId, actorName = '') {
   const config = GROUP_EVENT_CONFIG[type]
   if (!config) throw Object.assign(new Error('Unsupported salary event type'), { status: 400 })
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from(config.table)
     .select(config.select)
     .eq('id', eventId)
     .maybeSingle()
+  if (error && config.legacySelect && isMissingKpiBonusSourceColumns(error)) {
+    ;({ data, error } = await supabase
+      .from(config.table)
+      .select(config.legacySelect)
+      .eq('id', eventId)
+      .maybeSingle())
+  }
   if (error) throw error
-  if (!data || data.created_by !== user.id) {
+  const isAutomaticKpiBonus = type === 'bonus'
+    && data?.created_by == null
+    && data?.source_type === 'daily_kpi'
+  if (!data || (data.created_by !== user.id && !isAutomaticKpiBonus)) {
     throw Object.assign(new Error('Salary event not found'), { status: 404 })
   }
   let previousRate = null
@@ -551,6 +573,14 @@ async function requireQueuedSalaryRateDelivery(supabase, eventId) {
 
 async function notifySalaryEvent(supabase, user, actorName, type, eventId) {
   const event = await loadOwnedSalaryEvent(supabase, user, type, eventId, actorName)
+  return notifyLoadedSalaryEvent(supabase, type, event, {
+    includeEmployee: !(type === 'bonus' && event.source_type === 'daily_kpi'),
+  })
+}
+
+async function notifyLoadedSalaryEvent(supabase, type, event, {
+  includeEmployee = true,
+} = {}) {
   if (type === 'rate') {
     await requireQueuedSalaryRateDelivery(supabase, event.id)
   }
@@ -562,24 +592,50 @@ async function notifySalaryEvent(supabase, user, actorName, type, eventId) {
   const [groupSettled] = await Promise.allSettled([
     deliverSalaryGroupEvent(supabase, type, event, remainingDue),
   ])
+  const employeeDelivery = includeEmployee
+    ? deliverEmployeeSalaryEvent(supabase, type, event, remainingDue)
+    : Promise.resolve({
+        status: 'skipped',
+        telegramMessageId: null,
+        sentAt: null,
+        errorMessage: COMBINED_DAILY_KPI_EMPLOYEE_REASON,
+      })
   const [employeeSettled, teamSettled] = await Promise.allSettled([
-    deliverEmployeeSalaryEvent(supabase, type, event, remainingDue),
+    employeeDelivery,
     deliverSalaryTeamEvent(supabase, type, event),
   ])
   const employee = normalizeDeliverySettlement(employeeSettled)
   const group = normalizeDeliverySettlement(groupSettled)
   const team = normalizeDeliverySettlement(teamSettled)
   const employeeSent = employee.status === 'sent'
+  const employeeSatisfied = !includeEmployee || employeeSent
   const groupSent = group.status === 'sent'
   const teamSent = team.status === 'sent'
   const teamRequired = TEAM_EVENT_TYPES.has(type)
   return {
-    ok: employeeSent || groupSent || teamSent,
-    allSent: employeeSent && groupSent && (!teamRequired || teamSent),
+    ok: employeeSatisfied || groupSent || teamSent,
+    allSent: employeeSatisfied && groupSent && (!teamRequired || teamSent),
+    employeeIncludedInDailySummary: !includeEmployee,
     employee,
     group,
     team,
   }
+}
+
+export async function notifyAutomaticKpiBonus(supabase, bonusId) {
+  const event = await loadOwnedSalaryEvent(
+    supabase,
+    { id: null },
+    'bonus',
+    bonusId,
+    'Automatic KPI'
+  )
+  if (event.source_type !== 'daily_kpi' || event.created_by != null) {
+    throw Object.assign(new Error('Automatic KPI bonus not found'), { status: 404 })
+  }
+  return notifyLoadedSalaryEvent(supabase, 'bonus', event, {
+    includeEmployee: false,
+  })
 }
 
 async function notifyPayment(supabase, user, paymentId) {

@@ -76,6 +76,7 @@ export default function AdminSettings() {
 
   const [restaurantName, setRestaurantName] = useState(settings.restaurantName)
   const [serviceRate,    setServiceRate]    = useState(settings.serviceRate)
+  const [touristServiceRate, setTouristServiceRate] = useState(settings.touristServiceRate)
   const [monthlyRentUzs, setMonthlyRentUzs] = useState(String(settings.monthlyRentUzs || ''))
   const [monthlyUtilitiesUzs, setMonthlyUtilitiesUzs] = useState(String(settings.monthlyUtilitiesUzs || ''))
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
@@ -92,12 +93,13 @@ export default function AdminSettings() {
   useEffect(() => {
     setRestaurantName(settings.restaurantName)
     setServiceRate(settings.serviceRate)
+    setTouristServiceRate(settings.touristServiceRate)
     setMonthlyRentUzs(String(settings.monthlyRentUzs || ''))
     setMonthlyUtilitiesUzs(String(settings.monthlyUtilitiesUzs || ''))
     setAutoPrint(settings.autoPrint)
     setAutoPrintKitchenCheck(!!settings.autoPrintKitchenCheck)
     setReceiptMarketing(settings.receiptMarketing || 'compactFooter')
-  }, [settings.restaurantName, settings.serviceRate, settings.monthlyRentUzs, settings.monthlyUtilitiesUzs, settings.autoPrint, settings.autoPrintKitchenCheck, settings.receiptMarketing])
+  }, [settings.restaurantName, settings.serviceRate, settings.touristServiceRate, settings.monthlyRentUzs, settings.monthlyUtilitiesUzs, settings.autoPrint, settings.autoPrintKitchenCheck, settings.receiptMarketing])
 
   async function saveSettings(overrides = {}) {
     if (!canManageSettings) return
@@ -106,6 +108,7 @@ export default function AdminSettings() {
     const nextSettings = {
       restaurantName,
       serviceRate,
+      touristServiceRate,
       monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0),
       monthlyUtilitiesUzs: Number(normalizeMoneyInput(monthlyUtilitiesUzs) || 0),
       autoPrint,
@@ -136,6 +139,12 @@ export default function AdminSettings() {
     await saveSettings({ serviceRate: nextRate })
   }
 
+  async function handleTouristServiceRateChange(nextRate) {
+    if (!canManageSettings) return
+    setTouristServiceRate(nextRate)
+    await saveSettings({ touristServiceRate: nextRate })
+  }
+
   async function checkHealth() {
     setHealthLoading(true)
     setHealthError('')
@@ -156,8 +165,10 @@ export default function AdminSettings() {
       restaurantName:  'Restoran nomi',
       restaurantNameSub: 'Cheklarda va hisobotlarda ko\'rsatiladi',
       billing:         'Hisob-kitob',
-      serviceCharge:   'Xizmat to\'lovi',
-      serviceChargeSub: 'Barcha buyurtmalarga qo\'shiladi',
+      serviceCharge:   'Oddiy xizmat to\'lovi',
+      serviceChargeSub: 'Oddiy narxdagi zal buyurtmalariga qo\'shiladi',
+      touristServiceCharge: 'Turist xizmat to\'lovi',
+      touristServiceChargeSub: 'Turist narxidagi zal buyurtmalariga qo\'shiladi',
       monthlyRent:     'Oylik ijara',
       monthlyRentSub:  'Buxgalteriya taxminida UZS ko‘rinadi',
       monthlyUtilities: 'Oylik kommunal',
@@ -220,8 +231,10 @@ export default function AdminSettings() {
       restaurantName:  'Название ресторана',
       restaurantNameSub: 'Отображается на чеках и в отчётах',
       billing:         'Выставление счётов',
-      serviceCharge:   'Сервисный сбор',
-      serviceChargeSub: 'Добавляется ко всем заказам',
+      serviceCharge:   'Обычный сервисный сбор',
+      serviceChargeSub: 'Добавляется к заказам в зале с обычной ценой',
+      touristServiceCharge: 'Сервисный сбор для туристов',
+      touristServiceChargeSub: 'Добавляется к заказам в зале с туристической ценой',
       monthlyRent:     'Ежемесячная аренда',
       monthlyRentSub:  'Показывается в прогнозе бухгалтерии в UZS',
       monthlyUtilities: 'Ежемесячная коммуналка',
@@ -284,8 +297,10 @@ export default function AdminSettings() {
       restaurantName:  'Restaurant Name',
       restaurantNameSub: 'Shown on receipts and reports',
       billing:         'Billing',
-      serviceCharge:   'Service Charge',
-      serviceChargeSub: 'Added to all orders',
+      serviceCharge:   'Regular Service Charge',
+      serviceChargeSub: 'Added to Regular dine-in orders',
+      touristServiceCharge: 'Tourist Service Charge',
+      touristServiceChargeSub: 'Added to Tourist dine-in orders',
       monthlyRent:     'Monthly rent',
       monthlyRentSub:  'Shown in accounting estimate as UZS',
       monthlyUtilities: 'Monthly utilities bill',
@@ -379,6 +394,26 @@ export default function AdminSettings() {
                     disabled={!canManageSettings}
                     className={`px-2.5 py-1.5 rounded-lg text-[12px] font-bold transition-all ${
                       serviceRate === v
+                        ? 'bg-[#ff5a00] text-white'
+                        : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-gray-200'
+                    }`}
+                  >
+                    {v}%
+                  </button>
+                ))}
+              </div>
+            </div>
+          </SettingRow>
+          <SettingRow icon={Percent} label={l.touristServiceCharge} sub={l.touristServiceChargeSub}>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                {[0, 10, 15, 20].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => handleTouristServiceRateChange(v)}
+                    disabled={!canManageSettings}
+                    className={`px-2.5 py-1.5 rounded-lg text-[12px] font-bold transition-all ${
+                      touristServiceRate === v
                         ? 'bg-[#ff5a00] text-white'
                         : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-gray-200'
                     }`}

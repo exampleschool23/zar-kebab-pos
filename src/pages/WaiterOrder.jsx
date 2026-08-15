@@ -10,7 +10,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
+import { getOrderPaymentSummary } from '../lib/analytics'
 import CartPanel from '../components/CartPanel'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import AnimatedSearch from '../components/AnimatedSearch'
@@ -22,6 +22,7 @@ import { getKitchenCheckGroups } from '../lib/kitchenCheck'
 import { isOffPremiseOrderType, normalizeOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { isCustomerMenuCategory, isCustomerMenuItem, isWaiterMenuCategory, isWaiterMenuItem } from '../lib/menuItems'
 import { DEFAULT_PRICE_MODE, calculateUnitPrice, getMenuItemForPriceMode, normalizePriceMode, resolveOrderingPriceMode } from '../lib/priceModes'
+import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canEditFeature } from '../lib/permissions'
 import { rebuildGuestCartFromCatalog } from '../lib/guestCart'
 import {
@@ -422,7 +423,7 @@ function OrderActionPanel({ order, tableId, lang, dispatch, cartCount, menuItemM
 }
 
 // ── BottomTableChips ───────────────────────────────────────────────────────────
-function BottomTableChips({ currentTableId, onNewOrder }) {
+function BottomTableChips({ currentTableId, onNewOrder, disabled = false }) {
   const { state } = useApp()
   const navigate  = useNavigate()
 
@@ -468,8 +469,9 @@ function BottomTableChips({ currentTableId, onNewOrder }) {
           return (
             <button
               key={chip.table_id}
-              onClick={() => navigate(`/waiter/order/${chip.table_id}`)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all flex-shrink-0 ${
+              onClick={() => { if (!disabled) navigate(`/waiter/order/${chip.table_id}`) }}
+              disabled={disabled}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all flex-shrink-0 disabled:cursor-wait disabled:opacity-50 ${
                 isActive
                   ? 'bg-[#fff1e8] border-[#ff5a00]/40 text-[#ff5a00]'
                   : 'bg-gray-50 border-[#E5E7EB] text-[#6B7280] hover:border-orange-200 hover:bg-orange-50/30'
@@ -494,7 +496,8 @@ function BottomTableChips({ currentTableId, onNewOrder }) {
         {/* New Order button */}
         <button
           onClick={onNewOrder}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[#ff5a00]/40 text-[#ff5a00] text-[11px] font-bold hover:bg-orange-50 transition-colors flex-shrink-0"
+          disabled={disabled}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[#ff5a00]/40 text-[#ff5a00] text-[11px] font-bold hover:bg-orange-50 transition-colors flex-shrink-0 disabled:cursor-wait disabled:opacity-50"
         >
           <Plus size={12} />
           {lang === 'uz' ? 'Yangi buyurtma' : lang === 'ru' ? 'Новый заказ' : 'New Order'}
@@ -605,7 +608,7 @@ export default function WaiterOrder() {
   const location            = useLocation()
   const [searchParams]      = useSearchParams()
   const requestedPriceMode  = normalizePriceMode(searchParams.get('priceMode'))
-  const { state, dispatch } = useApp()
+  const { state, dispatch, pendingKitchenSubmission } = useApp()
   const { loaded, loadError } = useAppDataStatus()
   const { profile, signOut } = useAuth()
   const role                = (profile?.role || state.user?.role || '').toLowerCase()
@@ -627,6 +630,9 @@ export default function WaiterOrder() {
   const [cartOpen,      setCartOpen]     = useState(false)
   const [sidebarOpen,   setSidebarOpen]  = useState(false)
   const [isSendingOrder,setSendingOrder] = useState(false)
+  const orderLocked = isSendingOrder || !!pendingKitchenSubmission
+  const orderLockedRef = useRef(orderLocked)
+  useEffect(() => { orderLockedRef.current = orderLocked }, [orderLocked])
   const isTakeAwayFlow = !tableId
   const [orderType,     setOrderType]    = useState(isTakeAwayFlow ? 'take_away' : 'dine_in')
   const [priceMode,     setPriceMode]    = useState(isGuestTabletMode ? guestSessionPriceMode : requestedPriceMode)
@@ -654,6 +660,21 @@ export default function WaiterOrder() {
     ? normalizeOrderType(searchParams.get('orderType') || searchParams.get('type') || 'take_away')
     : 'dine_in'
   const menuAudience = isGuestTabletMode ? 'public' : 'waiter'
+
+  useEffect(() => {
+    if (!pendingKitchenSubmission) return
+    const pendingOrderType = normalizeOrderType(pendingKitchenSubmission.payload?.orderType)
+    const pendingIsOffPremise = isOffPremiseOrderType(pendingOrderType)
+    const pendingTableId = String(pendingKitchenSubmission._tableId || '').trim()
+    setOrderType(pendingOrderType)
+    setPriceMode(normalizePriceMode(pendingKitchenSubmission._priceMode || pendingKitchenSubmission.payload?.priceMode))
+    if (isSendingOrder) return
+    if (pendingIsOffPremise && !isTakeAwayFlow) {
+      navigate(`/waiter/take-away?orderType=${encodeURIComponent(pendingOrderType)}`, { replace: true })
+    } else if (!pendingIsOffPremise && pendingTableId && pendingTableId !== tableId) {
+      navigate(`/waiter/order/${encodeURIComponent(pendingTableId)}`, { replace: true })
+    }
+  }, [pendingKitchenSubmission?._kitchenRoundId, pendingKitchenSubmission?._tableId, isSendingOrder, isTakeAwayFlow, tableId, navigate])
 
   const table = isTakeAwayFlow ? null : state.tables.find(t => t.id === tableId)
   const orderTitle = isTakeAwayFlow
@@ -710,11 +731,11 @@ export default function WaiterOrder() {
       setPriceMode(preserveUnlockedGuestPriceModeRef.current)
       return
     }
-    if (isSendingOrder) return
+    if (orderLocked) return
     setPriceMode(activeOrder || state.cart.length > 0
       ? resolveOrderingPriceMode(activeOrder, state.cart)
       : requestedPriceMode)
-  }, [activeOrder?.id, activeOrder?.price_mode, guestSessionPriceMode, isGuestTabletMode, isSendingOrder, requestedPriceMode, state.cart.length])
+  }, [activeOrder?.id, activeOrder?.price_mode, guestSessionPriceMode, isGuestTabletMode, orderLocked, requestedPriceMode, state.cart.length])
 
   useEffect(() => {
     if (!isGuestTabletMode) {
@@ -805,9 +826,9 @@ export default function WaiterOrder() {
   }, [guestUnlockOpen])
 
   useEffect(() => {
-    if (!shouldOpenOrderPanel || detailItem) return
+    if ((!shouldOpenOrderPanel && !pendingKitchenSubmission) || detailItem) return
     setCartOpen(true)
-  }, [shouldOpenOrderPanel, detailItem, activeOrder?.id])
+  }, [shouldOpenOrderPanel, detailItem, activeOrder?.id, pendingKitchenSubmission?._kitchenRoundId])
 
   // Cart lookups
   const cartQtyMap = useMemo(() => {
@@ -826,8 +847,8 @@ export default function WaiterOrder() {
   }, [state.cart])
 
   const cartCount = state.cart.reduce((s, i) => s + i.quantity, 0)
-  const isManageOrderOnly = !isGuestTabletMode && isManageOrderPanel && cartCount === 0
-  const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
+  const isManageOrderOnly = !isGuestTabletMode && isManageOrderPanel && cartCount === 0 && !pendingKitchenSubmission
+  const configuredServiceRatePct = getConfiguredServiceRatePct(state.settings, priceMode)
   const cartSummary = useMemo(() => {
     const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : configuredServiceRatePct
     return getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, state.cart, configuredServiceRatePct)
@@ -958,7 +979,7 @@ export default function WaiterOrder() {
   }
 
   function handleAdd(item, animation) {
-    if (isSendingOrder || !canEditTables) return
+    if (orderLocked || !canEditTables) return
     if (item?.available === false) return
     if (menuItemRequiresOptions(item, menuAudience) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
@@ -969,7 +990,7 @@ export default function WaiterOrder() {
   }
 
   function handleIncrement(item, animation) {
-    if (isSendingOrder || !canEditTables) return
+    if (orderLocked || !canEditTables) return
     if (item?.available === false) return
     if (menuItemRequiresOptions(item, menuAudience) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
@@ -980,7 +1001,7 @@ export default function WaiterOrder() {
   }
 
   function handleDecrement(item) {
-    if (isSendingOrder || !canEditTables) return
+    if (orderLocked || !canEditTables) return
     if (menuItemRequiresOptions(item, menuAudience) || isMenuItemSoldByWeight(item)) {
       openDetail(item)
       return
@@ -993,7 +1014,7 @@ export default function WaiterOrder() {
   // ── Modal handlers ─────────────────────────────────────────────────────────
 
   function openDetail(item) {
-    if (isSendingOrder || !canEditTables) return
+    if (orderLocked || !canEditTables) return
     savedMenuScrollRef.current = productScrollRef.current?.scrollTop ?? 0
     setDetailItem(item)
   }
@@ -1022,7 +1043,7 @@ export default function WaiterOrder() {
   }
 
   function handleProductDetailAdd(item, qty, notes, selectedOptions = {}, selectedOptionBasePrice = null) {
-    if (isSendingOrder || !canEditTables) return
+    if (orderLocked || !canEditTables) return
     if (item?.available === false) return
     const payload = makeCartPayload(item, { selectedOptions, selectedOptionBasePrice })
     const isOptionProduct = getMenuItemOptionGroups(item, lang, { audience: menuAudience }).length > 0
@@ -1197,6 +1218,7 @@ export default function WaiterOrder() {
   }
 
   function handleSignOut() {
+    if (orderLocked) return
     clearGuestModeSession()
     dispatch({ type: 'LOGOUT' })
     signOut?.()
@@ -1215,9 +1237,10 @@ export default function WaiterOrder() {
   React.useEffect(() => {
     dispatch({ type: 'SET_TABLE', payload: isTakeAwayFlow ? null : tableId })
     if (isTakeAwayFlow) setOrderType(routeOrderType)
-    return () => dispatch({ type: 'CLEAR_CART' })
-    // dispatch is intentionally omitted because AppContext recreates dbDispatch after state updates.
-    // Including it here would clear the cart after every add/increment render.
+    return () => {
+      if (!orderLockedRef.current) dispatch({ type: 'CLEAR_CART' })
+    }
+    // dispatch is stable; omitting it keeps this cleanup scoped only to route identity changes.
   }, [isTakeAwayFlow, tableId, routeOrderType])
 
   if (!loaded || loadError) {
@@ -1225,7 +1248,7 @@ export default function WaiterOrder() {
       <div className="flex overflow-hidden bg-[#FAF7F0]" style={{ height: '100dvh' }}>
         {shouldShowSidebar && (
           <div className="hidden lg:block flex-shrink-0 h-full">
-            <UnifiedSidebar />
+            <UnifiedSidebar navigationDisabled={orderLocked} />
           </div>
         )}
         <div className="flex-1 overflow-y-auto">
@@ -1284,7 +1307,11 @@ export default function WaiterOrder() {
               <LockKeyhole size={15} /> {guestModeCopy(staffLang).staff}
             </button>
           ) : (
-            <button onClick={() => navigate('/waiter/tables')} className="text-[#ff5a00] font-semibold hover:underline text-sm">
+            <button
+              onClick={() => { if (!orderLocked) navigate('/waiter/tables') }}
+              disabled={orderLocked}
+              className="text-[#ff5a00] font-semibold hover:underline text-sm disabled:cursor-wait disabled:opacity-50"
+            >
               {t(lang, 'back')}
             </button>
           )}
@@ -1367,16 +1394,16 @@ export default function WaiterOrder() {
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
       {shouldShowSidebar && !detailItem && (
       <div className="hidden lg:block flex-shrink-0 h-full">
-        <UnifiedSidebar />
+        <UnifiedSidebar navigationDisabled={orderLocked} />
       </div>
       )}
 
       {/* ── Mobile sidebar overlay ───────────────────────────────────────── */}
       {shouldShowSidebar && !detailItem && sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setSidebarOpen(false)} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => { if (!orderLocked) setSidebarOpen(false) }} />
           <div className="relative z-10 h-full">
-            <UnifiedSidebar onClose={() => setSidebarOpen(false)} />
+            <UnifiedSidebar navigationDisabled={orderLocked} onClose={() => setSidebarOpen(false)} />
           </div>
         </div>
       )}
@@ -1443,15 +1470,16 @@ export default function WaiterOrder() {
               <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
                 {shouldShowSidebar && (
                   <button
-                    onClick={() => setSidebarOpen(true)}
-                    className="-ml-1 flex-shrink-0 rounded-xl p-2 transition-colors hover:bg-gray-100 lg:hidden"
+                    onClick={() => { if (!orderLocked) setSidebarOpen(true) }}
+                    disabled={orderLocked}
+                    className="-ml-1 flex-shrink-0 rounded-xl p-2 transition-colors hover:bg-gray-100 disabled:cursor-wait disabled:opacity-50 lg:hidden"
                   >
                     <MenuIcon size={20} className="text-[#6B7280]" />
                   </button>
                 )}
                 <button
-                  onClick={() => { if (!isSendingOrder) navigate('/waiter/tables') }}
-                  disabled={isSendingOrder}
+                  onClick={() => { if (!orderLocked) navigate('/waiter/tables') }}
+                  disabled={orderLocked}
                   className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-[#ff5a00]"
                   title={lang === 'uz' ? 'Stollar' : lang === 'ru' ? 'Столы' : 'Tables'}
                 >
@@ -1478,7 +1506,8 @@ export default function WaiterOrder() {
                     ))}
                     <button
                       onClick={handleSignOut}
-                      className="p-2 rounded-xl text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors"
+                      disabled={orderLocked}
+                      className="p-2 rounded-xl text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-wait disabled:opacity-50"
                       title={lang === 'uz' ? 'Chiqish' : lang === 'ru' ? 'Выйти' : 'Logout'}
                     >
                       <LogOut size={16} />
@@ -1559,7 +1588,8 @@ export default function WaiterOrder() {
         {!isGuestTabletMode && !isTakeAwayFlow && (
           <BottomTableChips
             currentTableId={tableId}
-            onNewOrder={() => { if (!isSendingOrder) navigate('/waiter/tables') }}
+            disabled={orderLocked}
+            onNewOrder={() => { if (!orderLocked) navigate('/waiter/tables') }}
           />
         )}
           </>
@@ -1573,13 +1603,13 @@ export default function WaiterOrder() {
       {/* ── Cart drawer ─────────────────────────────────────────────────── */}
       {!detailItem && cartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/30" onClick={() => { if (!isSendingOrder) setCartOpen(false) }} />
+          <div className="absolute inset-0 bg-slate-900/30" onClick={() => { if (!orderLocked) setCartOpen(false) }} />
           <div className="relative flex h-full w-full max-w-full flex-col overflow-hidden bg-white shadow-[-12px_0_32px_rgba(15,23,42,0.16)] sm:max-w-[420px] lg:max-w-[460px]">
             {isManageOrderOnly && (
               <button
                 type="button"
-                onClick={() => { if (!isSendingOrder) setCartOpen(false) }}
-                disabled={isSendingOrder}
+                onClick={() => { if (!orderLocked) setCartOpen(false) }}
+                disabled={orderLocked}
                 className="absolute left-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-xl bg-white/90 text-[#9CA3AF] shadow-sm ring-1 ring-gray-100 transition-colors hover:bg-gray-100 hover:text-[#6B7280] disabled:cursor-wait disabled:opacity-50"
                 title={lang === 'uz' ? 'Yopish' : lang === 'ru' ? 'Закрыть' : 'Close'}
               >
@@ -1595,8 +1625,8 @@ export default function WaiterOrder() {
                   dispatch={dispatch}
                   cartCount={cartCount}
                   menuItemMap={menuItemMap}
-                  canEditOrder={canEditTables}
-                  onPrintKitchenCheck={handlePrintKitchenCheck}
+                  canEditOrder={canEditTables && !orderLocked}
+                  onPrintKitchenCheck={orderLocked ? () => {} : handlePrintKitchenCheck}
                 />
               </div>
             )}
@@ -1616,7 +1646,7 @@ export default function WaiterOrder() {
                 onGuestFinish={finishGuestSelection}
                 reviewWarning={guestReviewWarning}
                 reviewKey={guestExpectedOrderIds ? `${guestExpectedOrderIds.join('|')}=>${activeTableOrderIds.join('|')}` : ''}
-                onClose={() => { if (!isSendingOrder) setCartOpen(false) }}
+                onClose={() => setCartOpen(false)}
               />
             </div>
             )}

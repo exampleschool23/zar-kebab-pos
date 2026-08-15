@@ -19,6 +19,11 @@ import {
   orderTypeLabel,
   orderTypePrefix,
 } from './orderTypes.js'
+import {
+  DEFAULT_REGULAR_SERVICE_RATE_PCT,
+  DEFAULT_TOURIST_SERVICE_RATE_PCT,
+  getConfiguredServiceRatePct,
+} from './serviceRates.js'
 import { collectPagedRows, loadActiveOrders, loadPaidOrdersForRange } from './orderHistory.js'
 import { getRequiredMenuItemCost } from './menuItemCosts.js'
 import { trimMenuItemTextFields } from './menuItemText.js'
@@ -26,8 +31,8 @@ import { normalizeMenuQuantity, normalizeMenuSaleUnit } from './menuSaleUnits.js
 
 // ── Loaders ───────────────────────────────────────────────────────────────────
 
-function serviceRatePctFromSettings(settings) {
-  return normalizeServiceRatePct(settings?.serviceRate)
+function serviceRatePctFromSettings(settings, priceMode) {
+  return getConfiguredServiceRatePct(settings, priceMode)
 }
 
 function isMissingOptionalOrderTypeColumn(error) {
@@ -96,6 +101,16 @@ function isMissingVariantCostsColumn(error) {
   )
 }
 
+function isMissingTouristServiceRateColumn(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('tourist_service_rate_pct') && (
+    message.includes('schema cache') ||
+    message.includes('column') ||
+    message.includes('42703') ||
+    message.includes('pgrst204')
+  )
+}
+
 function normalizeVariantCosts(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return Object.fromEntries(Object.entries(value).flatMap(([variantId, rawCost]) => {
@@ -160,7 +175,11 @@ function normalizeBusinessSettings(row) {
   if (!row) return null
   return {
     restaurantName: row.restaurant_name || 'Zar Kebab',
-    serviceRate: normalizeServiceRatePct(row.service_rate_pct),
+    serviceRate: normalizeServiceRatePct(row.service_rate_pct, DEFAULT_REGULAR_SERVICE_RATE_PCT),
+    touristServiceRate: normalizeServiceRatePct(
+      row.tourist_service_rate_pct,
+      DEFAULT_TOURIST_SERVICE_RATE_PCT
+    ),
     monthlyRentUzs: Math.max(0, Math.round(Number(row.monthly_rent_uzs) || 0)),
     monthlyUtilitiesUzs: Math.max(0, Math.round(Number(row.monthly_utilities_uzs) || 0)),
     receiptFooter: row.receipt_footer || '',
@@ -250,6 +269,134 @@ async function submitOrderToKitchenRpc({ orderId, table, tableId, orderType, ite
 function withAbortSignal(query, signal) {
   if (signal && typeof query?.abortSignal === 'function') return query.abortSignal(signal)
   return query
+}
+
+function kitchenSubmissionIdentity(action) {
+  const orderId = String(action?._orderId || '').trim()
+  const kitchenRoundId = String(action?._kitchenRoundId || '').trim()
+  const items = Array.isArray(action?._items) ? action._items : []
+  const itemIds = items.map(item => String(item?.id || '').trim())
+  if (!orderId || !kitchenRoundId || itemIds.length === 0 || itemIds.some(id => !id)) return null
+  const uniqueItemIds = [...new Set(itemIds)]
+  if (uniqueItemIds.length !== itemIds.length) return null
+  return { orderId, kitchenRoundId, itemIds: uniqueItemIds }
+}
+
+function isMissingKitchenRoundReceiptTable(error) {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return text.includes('order_kitchen_rounds') && (
+    text.includes('does not exist') ||
+    text.includes('schema cache') ||
+    text.includes('could not find') ||
+    text.includes('42p01') ||
+    text.includes('pgrst205')
+  )
+}
+
+export async function confirmKitchenRoundSubmission(action, { dbClient = supabase, signal } = {}) {
+  const identity = kitchenSubmissionIdentity(action)
+  if (!identity) return false
+
+  const { data: receipt, error: receiptError } = await withAbortSignal(dbClient
+    .from('order_kitchen_rounds')
+    .select('item_ids')
+    .eq('order_id', identity.orderId)
+    .eq('kitchen_round_id', identity.kitchenRoundId)
+    .maybeSingle(), signal)
+  if (receiptError && !isMissingKitchenRoundReceiptTable(receiptError)) throw receiptError
+  const savedItemIds = new Set(
+    (Array.isArray(receipt?.item_ids) ? receipt.item_ids : [])
+      .map(id => String(id || '').trim())
+      .filter(Boolean)
+  )
+  if (receipt && identity.itemIds.every(id => savedItemIds.has(id))) return true
+
+  const { data, error } = await withAbortSignal(dbClient
+    .from('order_items')
+    .select('id')
+    .eq('order_id', identity.orderId)
+    .eq('kitchen_round_id', identity.kitchenRoundId)
+    .in('id', identity.itemIds), signal)
+  if (error) throw error
+
+  for (const row of data || []) {
+    const savedItemId = String(row?.id || '').trim()
+    if (savedItemId) savedItemIds.add(savedItemId)
+  }
+  const missingItemIds = identity.itemIds.filter(id => !savedItemIds.has(id))
+  if (missingItemIds.length === 0) return true
+
+  const { data: cancellations, error: cancellationError } = await withAbortSignal(dbClient
+    .from('order_item_cancellations')
+    .select('order_item_id')
+    .eq('order_id', identity.orderId)
+    .in('order_item_id', missingItemIds), signal)
+  if (cancellationError) throw cancellationError
+  for (const row of cancellations || []) {
+    const cancelledItemId = String(row?.order_item_id || '').trim()
+    if (cancelledItemId) savedItemIds.add(cancelledItemId)
+  }
+  if (identity.itemIds.every(id => savedItemIds.has(id))) return true
+  if (!receipt) return false
+
+  const integrityError = new Error('The saved kitchen-round receipt does not match every submitted item.')
+  integrityError.code = 'POS_KITCHEN_RECEIPT_MISMATCH'
+  integrityError.kitchenSubmissionUnresolved = true
+  throw integrityError
+}
+
+function waitForKitchenConfirmationDelay(delayMs, signal) {
+  const delay = Math.max(0, Number(delayMs) || 0)
+  if (delay === 0) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    let timeoutId
+    const handleAbort = () => {
+      clearTimeout(timeoutId)
+      reject(signal?.reason || new Error('Kitchen submission confirmation was cancelled'))
+    }
+    if (signal?.aborted) {
+      handleAbort()
+      return
+    }
+    timeoutId = setTimeout(() => {
+      signal?.removeEventListener?.('abort', handleAbort)
+      resolve()
+    }, delay)
+    signal?.addEventListener?.('abort', handleAbort, { once: true })
+  })
+}
+
+export async function waitForKitchenRoundSubmission(action, {
+  dbClient = supabase,
+  signal,
+  attempts,
+  delayMs = 500,
+} = {}) {
+  if (!kitchenSubmissionIdentity(action)) return false
+  const requestedAttempts = Number(attempts)
+  const attemptCount = Number.isFinite(requestedAttempts) && requestedAttempts > 0
+    ? Math.max(1, Math.min(20, Math.floor(requestedAttempts)))
+    : signal
+      ? Number.POSITIVE_INFINITY
+      : 3
+  const pollDelayMs = Math.max(0, Number(delayMs) || 0)
+  let hadSuccessfulCheck = false
+  let lastError = null
+
+  for (let attempt = 0; attempt < attemptCount; attempt += 1) {
+    if (signal?.aborted) throw signal.reason || new Error('Kitchen submission confirmation was cancelled')
+    if (attempt > 0) await waitForKitchenConfirmationDelay(pollDelayMs, signal)
+    try {
+      if (await confirmKitchenRoundSubmission(action, { dbClient, signal })) return true
+      hadSuccessfulCheck = true
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason || error
+      lastError = error
+    }
+  }
+
+  if (!hadSuccessfulCheck && lastError) throw lastError
+  return false
 }
 
 export function buildAtomicPaymentPayload(action) {
@@ -595,7 +742,7 @@ export async function writeToSupabase(action, state, options = {}) {
 
     case 'SEND_TO_KITCHEN': {
       const orderId  = action._orderId
-      const tableId  = state.currentTableId
+      const tableId  = action._tableId ?? state.currentTableId
       const orderType = normalizeOrderType(action.payload?.orderType)
       const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
       const isOffPremise = isOffPremiseOrderType(orderType)
@@ -620,17 +767,20 @@ export async function writeToSupabase(action, state, options = {}) {
       }))
       if ((!isOffPremise && !table) || items.length === 0) return
       const addedSubtotal = items.reduce((s, i) => s + getOrderItemUnitPrice(i) * (Number(i.quantity) || 1), 0)
-      const { data: existingOrder } = await withAbortSignal(supabase
+      const { data: existingOrder, error: existingOrderError } = await withAbortSignal(supabase
         .from('orders')
-        .select('id, subtotal, service_rate_pct')
+        .select('id, subtotal, service_rate_pct, price_mode')
         .eq('id', orderId)
         .neq('payment_status', 'paid')
         .maybeSingle(), options.signal)
+      if (existingOrderError) throw existingOrderError
 
       const subtotal    = (Number(existingOrder?.subtotal) || 0) + addedSubtotal
       const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(existingOrder?.service_rate_pct))
         ? Number(existingOrder.service_rate_pct)
-        : serviceRatePctFromSettings(state.settings)
+        : Number.isFinite(Number(action._serviceRatePct))
+          ? Number(action._serviceRatePct)
+          : serviceRatePctFromSettings(state.settings, existingOrder?.price_mode || priceMode)
       const paymentFields = getOrderPaymentFields(
         { subtotal, order_type: orderType, service_rate_pct: serviceRatePct },
         [],
@@ -775,7 +925,7 @@ export async function writeToSupabase(action, state, options = {}) {
       if (order) {
         const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
           ? Number(order.service_rate_pct)
-          : serviceRatePctFromSettings(state.settings)
+          : serviceRatePctFromSettings(state.settings, order.price_mode)
         const paymentFields = getOrderPaymentFields(
           { order_type: order.order_type, service_rate_pct: serviceRatePct },
           order.items || [],
@@ -958,7 +1108,7 @@ export async function writeToSupabase(action, state, options = {}) {
 
       const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
         ? Number(order.service_rate_pct)
-        : serviceRatePctFromSettings(state.settings)
+        : serviceRatePctFromSettings(state.settings, order.price_mode)
       const paymentFields = getOrderPaymentFields(
         { order_type: order.order_type, service_rate_pct: serviceRatePct },
         nextItems,
@@ -1035,9 +1185,12 @@ export async function writeToSupabase(action, state, options = {}) {
           if (error) throw error
         }
 
-        const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
-          ? Number(order.service_rate_pct)
-          : serviceRatePctFromSettings(state.settings)
+        const priceModeChanged = normalizePriceMode(order.price_mode) !== priceMode
+        const serviceRatePct = isOffPremiseOrderType(order.order_type)
+          ? 0
+          : !priceModeChanged && Number.isFinite(Number(order.service_rate_pct))
+            ? Number(order.service_rate_pct)
+            : serviceRatePctFromSettings(state.settings, priceMode)
         const paymentFields = getOrderPaymentFields(
           { ...order, order_type: order.order_type, service_rate_pct: serviceRatePct, price_mode: priceMode },
           nextItems,
@@ -1109,7 +1262,7 @@ export async function writeToSupabase(action, state, options = {}) {
           })
       const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
         ? Number(order.service_rate_pct)
-        : serviceRatePctFromSettings(state.settings)
+        : serviceRatePctFromSettings(state.settings, order.price_mode)
       const paymentFields = getOrderPaymentFields(
         { order_type: order.order_type, service_rate_pct: serviceRatePct },
         nextItems,
@@ -1176,21 +1329,30 @@ export async function writeToSupabase(action, state, options = {}) {
 
     case 'SET_SETTINGS': {
       const settings = action.payload || {}
-      const serviceRatePct = serviceRatePctFromSettings({ serviceRate: settings.serviceRate })
+      const serviceRatePct = serviceRatePctFromSettings(settings, 'regular')
+      const touristServiceRatePct = serviceRatePctFromSettings(settings, 'tourist')
+      const settingsRow = {
+        id: 'default',
+        restaurant_name: settings.restaurantName || 'Zar Kebab',
+        service_rate_pct: serviceRatePct,
+        tourist_service_rate_pct: touristServiceRatePct,
+        monthly_rent_uzs: Math.max(0, Math.round(Number(settings.monthlyRentUzs) || 0)),
+        monthly_utilities_uzs: Math.max(0, Math.round(Number(settings.monthlyUtilitiesUzs) || 0)),
+        receipt_footer: settings.receiptFooter || '',
+        receipt_marketing: normalizeReceiptMarketing(settings.receiptMarketing),
+        auto_print: !!settings.autoPrint,
+        auto_print_kitchen_check: !!settings.autoPrintKitchenCheck,
+        updated_at: new Date().toISOString(),
+      }
       let { error } = await supabase
         .from('business_settings')
-        .upsert({
-          id: 'default',
-          restaurant_name: settings.restaurantName || 'Zar Kebab',
-          service_rate_pct: serviceRatePct,
-          monthly_rent_uzs: Math.max(0, Math.round(Number(settings.monthlyRentUzs) || 0)),
-          monthly_utilities_uzs: Math.max(0, Math.round(Number(settings.monthlyUtilitiesUzs) || 0)),
-          receipt_footer: settings.receiptFooter || '',
-          receipt_marketing: normalizeReceiptMarketing(settings.receiptMarketing),
-          auto_print: !!settings.autoPrint,
-          auto_print_kitchen_check: !!settings.autoPrintKitchenCheck,
-          updated_at: new Date().toISOString(),
-        })
+        .upsert(settingsRow)
+      if (error && isMissingTouristServiceRateColumn(error)) {
+        const { tourist_service_rate_pct, ...legacySettingsRow } = settingsRow
+        ;({ error } = await supabase
+          .from('business_settings')
+          .upsert(legacySettingsRow))
+      }
       if (error) throw error
       break
     }
@@ -1294,7 +1456,11 @@ export async function writeToSupabase(action, state, options = {}) {
         show_in_cashier_quick_items: false,
         deleted_at: deletedAt,
       }
-      const { error } = await supabase.from('menu_items').update(payload).eq('id', action.payload)
+      const { data, error } = await supabase
+        .from('menu_items')
+        .update(payload)
+        .eq('id', action.payload)
+        .select('id, deleted_at')
       if (error) {
         const text = `${error.code || ''} ${error.message || ''} ${error.details || ''}`.toLowerCase()
         const missingDeletedAt = text.includes('deleted_at') && (
@@ -1302,14 +1468,12 @@ export async function writeToSupabase(action, state, options = {}) {
           text.includes('schema cache') ||
           text.includes('42703')
         )
-        if (!missingDeletedAt) throw error
-
-        const fallback = await supabase
-          .from('menu_items')
-          .update({ available: false, show_in_cashier_quick_items: false })
-          .eq('id', action.payload)
-        if (fallback.error) throw fallback.error
+        if (missingDeletedAt) {
+          throw new Error('Menu archive migration is missing. Apply migrations 078 and 115, then try again.')
+        }
+        throw error
       }
+      if (!data?.length) throw new Error('Menu item was not archived. Refresh permissions and try again.')
       action.meta = { ...(action.meta || {}), deleted_at: deletedAt }
       break
     }

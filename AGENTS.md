@@ -201,7 +201,7 @@ These bugs were recently fixed and are now protected by tests:
    - Employee and group delivery statuses are recorded separately so either destination can fail or retry without duplicating the other.
 
 20. Every recorded salary operation must notify the dedicated salary group.
-   - Payment, bonus, fine, absence, and salary-rate change records notify both the salary group and the linked employee.
+   - Payment, bonus, fine, absence, and salary-rate change records notify both the salary group and the linked employee, except an automatic daily KPI bonus whose employee amount is folded into the one combined daily salary summary.
    - All five types reuse `api/telegram/employee-notification.js` so the Vercel Hobby deployment stays within its function limit.
    - Bonus, fine, absence, and rate-change employee/group delivery is duplicate-safe and independently auditable through `employee_salary_group_notification_deliveries`.
    - A rate-change message includes the applicable previous rate when available, the new amount and unit, and its effective date; initial salary setup is not treated as a change.
@@ -235,7 +235,7 @@ These bugs were recently fixed and are now protected by tests:
    - Team announcements include the saved amount and the full fine reason or absence note, but omit the employee's remaining salary balance and the manager identity.
    - Team announcements stay compact: no promotional intro/closing paragraphs or blank spacer lines; optional empty notes are omitted.
    - Bonus notifications omit payment method for the employee, salary group, and Team; the method remains stored in Accounting.
-   - Private employee, salary-group, and Team bonus/fine/absence dates use the shared localized long-date formatter (for example, `12 августа 2026` in Russian).
+   - Private employee, salary-group, and Team bonus/fine/absence dates use the shared localized long-date formatter (for example, `12 августа 2026` in Russian); automatic KPI has no separate private event message.
    - Historical events are marked `skipped` during migration so deployment never broadcasts old salary events unexpectedly.
    - Salary payments and salary-rate changes are not Team events; their Team status remains non-retryable `skipped`.
    - Employee, salary-group, and Team retries must remain independent and duplicate-safe.
@@ -288,13 +288,47 @@ These bugs were recently fixed and are now protected by tests:
    - The correction restores that day's salary accrual and is captured in the immutable Accounting audit. Telegram messages already delivered cannot be recalled.
    - Deleted bonus, fine, absence, and salary-rate events remove their polymorphic Telegram delivery rows so they cannot remain retryable.
 
-34. Monthly Estimate focuses on selected-month actuals.
+34. Menu-item deletion must work reliably on touch devices.
+   - Product trash buttons stop pointer propagation from the sortable grid and use explicit touch-manipulation behavior.
+   - Deletion uses an in-app confirmation dialog, never `window.confirm()`, so mobile Safari cannot lose the action behind browser UI.
+   - The confirmed action remains a history-safe archive through `DELETE_MENU_ITEM`; it never physically deletes catalog history.
+   - Failed archives stay visible and retryable inside the dialog, and a zero-row database update is never reported as success.
+   - Archived products in stale waiter/cashier sessions are blocked both by refreshed catalog checks and at the `order_items` database boundary, including quantity increases.
+
+35. Monthly Estimate focuses on selected-month actuals.
    - Do not restore the removed all-time Main numbers section; the page is for the selected month.
    - Expenses at a glance combines payments already recorded in the selected month with the salary, rent, and utilities still expected for that same month.
    - Never add salary arrears or other liabilities carried from previous months to the selected-month forecast.
    - Calculate selected-month salary operating cost per employee so an advance or older-debt payment for one employee cannot reduce or inflate another employee's selected-month salary cost.
    - Fines remain visible as payroll deductions but never become cash expenses. Absences remain visible as days.
    - Monthly utilities are configured in `business_settings.monthly_utilities_uzs`; only recorded `utilities` expenses appear in the monthly actuals.
+
+36. A kitchen-submit timeout is an unknown outcome until its exact round is reconciled.
+   - `SEND_TO_KITCHEN` keeps immutable table, order, item, and kitchen-round ids for every retry.
+   - If the browser response exceeds its deadline, query the durable round receipt first, then use live `order_items` and cancellation history as a rolling-deployment fallback; every expected item id must match before reporting success.
+   - A fully committed round is treated as success so the sent cart clears locally even when the response was lost.
+   - A missing or partially visible round remains an error and retains the same duplicate-safe retry action in provider state and session storage.
+   - While an outcome is unresolved, table navigation and cart mutation stay locked; retrying reuses the saved identity instead of generating another order.
+   - Durable `order_kitchen_rounds` receipts are the database idempotency boundary. They survive payment, cancellation, and order/item deletion so a retry can never resurrect an old round.
+
+37. Daily employee KPI bonuses are paid from finalized dine-in gross sales.
+   - Each enabled effective-dated rule receives its full basis-point percentage of restaurant-wide paid dine-in `subtotal + service_fee` for the completed Tashkent date; loyalty never reduces this base.
+   - Absent employees and dates outside the employee's joined/ended employment window are skipped.
+   - Date runs and per-employee calculation snapshots are immutable and duplicate-safe. Cron retries KPI finalization and unsent combined salary summaries for the last seven completed dates in the 01:00 Tashkent hour.
+   - Generated rows are immediate `employee_salary_bonuses` expenses using the salary profile payment method. The employee receives Salary and Bonus together in one private daily summary; a separate private KPI event is terminally skipped, while Salary-group and Team KPI announcements remain independently retryable.
+   - Only the service-role finalizer may create a `daily_kpi` bonus, and generated financial fields cannot be updated. A failed date finalization must defer its daily salary summary.
+   - Deleting a generated bonus marks its calculation result `voided` and never causes a retry to recreate it.
+
+38. Regular and Tourist dine-in service rates are separate order snapshots.
+   - `business_settings.service_rate_pct` configures Regular service (15% default), while `tourist_service_rate_pct` configures Tourist service (20% default).
+   - New dine-in orders select the configured rate from their authoritative `price_mode` and save it in `orders.service_rate_pct`; active and paid orders keep that snapshot when settings later change.
+   - Pending kitchen retries retain the originally selected service rate. Take-away and delivery service remain zero regardless of price mode.
+
+39. KPI assignment removal and employee-card display preserve effective-dated history.
+   - Only owners may remove an unused KPI rule, enforced both by the Salaries UI and the `employee_kpi_rules` delete RLS policy. Accounting writers may still create and update rules.
+   - Removal targets the exact displayed rule and requires one returned deleted row. Rules referenced by finalized KPI results remain protected and must never be deleted or rewritten.
+   - Employee cards show the rule effective on the current Tashkent date, including enabled or disabled state. A future scheduled rule must not appear as the employee's current KPI.
+   - If migration `129` is not available, the KPI row reports that state without preventing salary employee cards from loading.
 
 ## Database Migrations
 
@@ -405,6 +439,18 @@ Run migrations in order. Important recent files:
 - `supabase/126_business_settings_monthly_utilities.sql`
   Adds the monthly utilities plan used by the Accounting monthly estimate.
 
+- `supabase/127_reject_archived_order_items.sql`
+  Rejects new order-item rows and quantity increases that reference archived or missing menu products while preserving historical status updates and quantity reductions.
+
+- `supabase/128_durable_kitchen_round_receipts.sql`
+  Persists immutable order/round/item receipts in the same transaction as kitchen submission, records inserts and deletes during rollout, exposes a protocol-version health marker, and makes every exact retry a no-op even after mutable order rows are paid, cancelled, or deleted.
+
+- `supabase/129_daily_kpi_bonuses.sql`
+  Adds effective-dated employee KPI percentages, immutable date/result snapshots, atomic immediate bonus generation from paid dine-in subtotal plus service, combined private daily salary delivery, and independent Salary-group/Team KPI tracking.
+
+- `supabase/130_tourist_service_rate.sql`
+  Adds the separate Tourist dine-in service setting with a 20% default/backfill, keeps the Regular setting independent, and preserves historical order-rate snapshots.
+
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
 ## Supabase Notes
@@ -446,6 +492,8 @@ Expected behavior:
 - Only sent snapshot items are removed after success.
 - New cart items added after the submitted snapshot must survive.
 - Paid orders must not receive late kitchen inserts.
+- Archived menu items must be rejected from stale carts before submission and again by the database insert trigger.
+- Every submission round must leave a durable receipt; never use only live `order_items` rows as the retry/idempotency marker.
 
 ## Daily Bazaar Flow
 
@@ -563,6 +611,7 @@ npm run build
 - Returning to `WaiterTables` refreshes orders/tables and renews realtime without clearing the visible grid.
 - Initial/realtime operational loading never downloads current-year paid history and still includes all active orders.
 - Waiter table entry requires only R/T, carries that mode into ordering, and clears legacy Guest locks.
+- Mobile menu-item archive actions use a touch-safe in-app dialog, surface retryable failures, and reject archived stale-cart submissions.
 
 If these tests fail, understand why before changing the guard. They exist because these exact failures reached the user.
 

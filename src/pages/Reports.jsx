@@ -19,7 +19,6 @@ import {
   isCancelledOrderItem,
   isPaidOrder,
   matchesRange,
-  normalizeServiceRatePct,
   toLocalDateStr,
 } from '../lib/analytics'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
@@ -39,6 +38,7 @@ import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderT
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenseCashflow, summarizeExpenses } from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
+import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canChangeCompletedOrderPaymentMethod, canDeletePaidOrders, canViewPage } from '../lib/permissions'
 import { collectPagedRows, loadOrdersForRange, mergeOrderHistory } from '../lib/orderHistory'
 
@@ -1264,7 +1264,7 @@ function WaiterPerformanceTab({ orders, lang }) {
 // TAB 6 — ORDER HISTORY
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRatePct, canDeleteOrder, onDeleteOrder, deletingOrderId, confirmDeleteOrderId, onCancelDeleteOrder, canChangePaymentMethod, paymentMethodOrderId, paymentMethodDraft, onStartPaymentMethodChange, onPaymentMethodDraftChange, onSavePaymentMethod, onCancelPaymentMethod, savingPaymentOrderId }) {
+function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateSettings, canDeleteOrder, onDeleteOrder, deletingOrderId, confirmDeleteOrderId, onCancelDeleteOrder, canChangePaymentMethod, paymentMethodOrderId, paymentMethodDraft, onStartPaymentMethodChange, onPaymentMethodDraftChange, onSavePaymentMethod, onCancelPaymentMethod, savingPaymentOrderId }) {
   const [fetchedItems, setFetchedItems] = useState(null)
 
   useEffect(() => {
@@ -1281,7 +1281,11 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
   if (!order) return null
 
   const items    = (fetchedItems || getOrderItems(order)).filter(item => !isCancelledOrderItem(item))
-  const payment = getOrderPaymentSummary(order, items, serviceRatePct)
+  const payment = getOrderPaymentSummary(
+    order,
+    items,
+    getConfiguredServiceRatePct(serviceRateSettings, order.price_mode)
+  )
   const subtotal = payment.subtotal
   const loyaltyUsed = payment.loyaltyUsedAmount || payment.discountAmount
   const servicePct = payment.serviceRatePct
@@ -1533,7 +1537,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateP
   )
 }
 
-function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selectedOrder, onSelect, serviceRatePct }) {
+function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selectedOrder, onSelect, serviceRateSettings }) {
   const [page,      setPage]      = useState(1)
   const [search,    setSearch]    = useState('')
   const [filterPay, setFilterPay] = useState('all')
@@ -1605,7 +1609,11 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
               const orderNum    = order.id ? `#${String(order.id).slice(-4).toUpperCase()}` : '—'
               const sessionCnt  = order._orderCount || 1
               const loyaltyUsed = Number(order.loyalty_used_amount ?? order.loyalty_redeem_amount ?? order.loyalty_discount_amount ?? 0) || 0
-              const servicePct  = getOrderPaymentSummary(order, getOrderItems(order), serviceRatePct).serviceRatePct
+              const servicePct  = getOrderPaymentSummary(
+                order,
+                getOrderItems(order),
+                getConfiguredServiceRatePct(serviceRateSettings, order.price_mode)
+              ).serviceRatePct
               const status      = order.payment_status || (isPaidOrder(order) ? 'paid' : 'unpaid')
               const isSelected  = selectedOrder?.id === order.id
               return (
@@ -1705,7 +1713,6 @@ export default function Reports() {
   const { loaded, loadError } = useAppDataStatus()
   const navigate     = useNavigate()
   const lang         = state.lang
-  const serviceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
   const canChangePaymentMethod = canChangeCompletedOrderPaymentMethod(profile || { role: state.user?.role })
   const canViewExpenses = canViewPage(profile || { role: state.user?.role }, 'expenses')
@@ -2221,7 +2228,7 @@ export default function Reports() {
                 navigate={navigate}
                 selectedOrder={selectedOrder}
                 onSelect={setSelectedOrder}
-                serviceRatePct={serviceRatePct}
+                serviceRateSettings={state.settings}
               />
             )}
 
@@ -2243,7 +2250,7 @@ export default function Reports() {
                 }}
                 navigate={navigate}
                 lang={lang}
-                serviceRatePct={serviceRatePct}
+                serviceRateSettings={state.settings}
                 canDeleteOrder={canDeleteOrder}
                 onDeleteOrder={deleteOrder}
                 deletingOrderId={deletingOrderId}

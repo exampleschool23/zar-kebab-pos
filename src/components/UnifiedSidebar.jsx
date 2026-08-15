@@ -107,7 +107,7 @@ function activeKey(pathname) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function UnifiedSidebar({ onClose }) {
+export default function UnifiedSidebar({ onClose, navigationDisabled = false }) {
   const navigate   = useNavigate()
   const { pathname } = useLocation()
   const { state, dispatch } = useApp()
@@ -123,11 +123,13 @@ export default function UnifiedSidebar({ onClose }) {
   const visibleNav = NAV.filter(item => canViewPage(profile || { role }, item.key))
 
   function handleNav(item) {
+    if (navigationDisabled) return
     navigate(item.path)
     onClose?.()
   }
 
   function handleSignOut() {
+    if (navigationDisabled) return
     dispatch({ type: 'LOGOUT' })
     signOut?.()
   }
@@ -162,7 +164,8 @@ export default function UnifiedSidebar({ onClose }) {
             <button
               key={item.key}
               onClick={() => handleNav(item)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all text-left ${
+              disabled={navigationDisabled}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all text-left disabled:cursor-wait disabled:opacity-50 ${
                 active
                   ? 'bg-[#fff1e8] text-[#ff5a00]'
                   : 'text-[#6B7280] hover:text-[#1F2937] hover:bg-gray-50'
@@ -210,7 +213,8 @@ export default function UnifiedSidebar({ onClose }) {
         </div>
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors text-left"
+          disabled={navigationDisabled}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold text-[#6B7280] hover:text-red-500 hover:bg-red-50 transition-colors text-left disabled:cursor-wait disabled:opacity-50"
         >
           <LogOut size={15} className="flex-shrink-0" />
           {lang === 'uz' ? 'Chiqish' : lang === 'ru' ? 'Выйти' : 'Logout'}

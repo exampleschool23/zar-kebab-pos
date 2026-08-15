@@ -42,6 +42,7 @@ test('database health passes when tables exist and RPC responds with a validatio
   assert.equal(result.ok, true)
   assert.equal(result.failed.length, 0)
   assert.equal(result.checks.some(check => check.name === 'submit_order_to_kitchen' && check.ok), true)
+  assert.equal(result.checks.some(check => check.name === 'kitchen_round_receipts_version' && check.ok), true)
   assert.equal(result.checks.find(check => check.name === 'restaurant_tables').messageKey, 'ok')
   assert.equal(result.checks.find(check => check.name === 'submit_order_to_kitchen').messageKey, 'available')
 })
@@ -82,6 +83,18 @@ test('database health requires private menu costs and order cost snapshots', asy
   }))
   assert.equal(missingSnapshot.ok, false)
   assert.equal(missingSnapshot.failed.find(check => check.name === 'order_items').detail, 'cost_price')
+})
+
+test('database health requires durable kitchen-round retry receipts', async () => {
+  const result = await runDbHealthChecks(makeClient({ missingTable: 'order_kitchen_rounds' }))
+
+  assert.equal(result.ok, false)
+  assert.match(
+    result.failed.find(check => check.name === 'order_kitchen_rounds').hint,
+    /128_durable_kitchen_round_receipts/
+  )
+  assert.match(cliHealthSource, /checkTable\('order_kitchen_rounds'/)
+  assert.match(cliHealthSource, /kitchen_round_receipts_version\(\)/)
 })
 
 test('database health requires the employee salary fines migration', async () => {
@@ -153,6 +166,21 @@ test('database health requires independent ZarKebab Team salary-event delivery t
   assert.match(cliHealthSource, /team_telegram_message_id/)
 })
 
+test('database health requires daily KPI calculation and source tracking', async () => {
+  const result = await runDbHealthChecks(makeClient({ missingTable: 'employee_daily_kpi_results' }))
+
+  assert.equal(result.ok, false)
+  assert.match(
+    result.failed.find(check => check.name === 'employee_daily_kpi_results').hint,
+    /129_daily_kpi_bonuses/
+  )
+  assert.match(cliHealthSource, /checkTable\('employee_kpi_rules'/)
+  assert.match(cliHealthSource, /checkTable\('employee_daily_kpi_runs'/)
+  assert.match(cliHealthSource, /checkTable\('employee_daily_kpi_results'/)
+  assert.match(cliHealthSource, /generate_daily_kpi_bonuses\(p_business_date\)/)
+  assert.match(cliHealthSource, /p_business_date: null/)
+})
+
 test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)
@@ -165,7 +193,9 @@ test('database health reports missing tables and missing RPC', async () => {
     'current_staff_can_view_menu_catalog',
     'current_staff_can_write',
     'delete_bazaar_purchase',
+    'generate_daily_kpi_bonuses',
     'get_accounting_paid_order_summary',
+    'kitchen_round_receipts_version',
     'order_payments',
     'recall_table_from_cashier',
     'save_bazaar_purchase',
@@ -187,6 +217,7 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.match(result.failed.find(check => check.name === 'save_bazaar_purchase').hint, /097_daily_bazaar/)
   assert.match(result.failed.find(check => check.name === 'delete_bazaar_purchase').hint, /097_daily_bazaar/)
   assert.match(result.failed.find(check => check.name === 'get_accounting_paid_order_summary').hint, /109_accounting_paid_order_summary/)
+  assert.match(result.failed.find(check => check.name === 'generate_daily_kpi_bonuses').hint, /129_daily_kpi_bonuses/)
 })
 
 test('database health requires the lightweight Accounting summary RPC', async () => {

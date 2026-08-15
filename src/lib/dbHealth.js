@@ -5,8 +5,9 @@ const TABLE_CHECKS = [
   { name: 'table_zones', columns: ['id', 'name', 'sort_order', 'is_active'] },
   { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned', 'price_mode', 'opened_by_name', 'completed_by_name', 'stock_deducted_at'] },
   { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity', 'sale_unit', 'base_price', 'unit_price', 'price_mode', 'selected_options', 'cost_price'] },
+  { name: 'order_kitchen_rounds', columns: ['order_id', 'kitchen_round_id', 'item_ids', 'table_id', 'submitted_by', 'submitted_at', 'created_at'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
-  { name: 'business_settings', columns: ['id', 'service_rate_pct', 'restaurant_name', 'monthly_rent_uzs', 'monthly_utilities_uzs', 'receipt_marketing', 'auto_print', 'auto_print_kitchen_check'] },
+  { name: 'business_settings', columns: ['id', 'service_rate_pct', 'tourist_service_rate_pct', 'restaurant_name', 'monthly_rent_uzs', 'monthly_utilities_uzs', 'receipt_marketing', 'auto_print', 'auto_print_kitchen_check'] },
   { name: 'loyalty_cards', columns: ['id', 'card_number', 'cashback_type', 'balance', 'total_earned', 'total_redeemed', 'is_active'] },
   { name: 'loyalty_transactions', columns: ['id', 'loyalty_card_id', 'type', 'amount', 'balance_before', 'balance_after', 'cashback_percent_used', 'card_type_at_transaction', 'card_number_at_transaction', 'customer_name_at_transaction', 'phone_number_at_transaction'] },
   { name: 'expenses', columns: ['id', 'entry_type', 'expense_date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by_name'] },
@@ -21,7 +22,10 @@ const TABLE_CHECKS = [
   { name: 'employee_salary_profiles', columns: ['id', 'profile_id', 'employee_name', 'joined_at', 'ended_at', 'deleted_at', 'pay_schedule', 'payment_method', 'is_active'] },
   { name: 'employee_salary_rates', columns: ['id', 'salary_profile_id', 'effective_from', 'amount', 'rate_unit'] },
   { name: 'employee_salary_payments', columns: ['id', 'salary_profile_id', 'paid_date', 'amount', 'payment_method'] },
-  { name: 'employee_salary_bonuses', columns: ['id', 'salary_profile_id', 'bonus_date', 'amount', 'payment_method'] },
+  { name: 'employee_salary_bonuses', columns: ['id', 'salary_profile_id', 'bonus_date', 'amount', 'payment_method', 'source_type', 'source_metadata'] },
+  { name: 'employee_kpi_rules', columns: ['id', 'salary_profile_id', 'effective_from', 'rate_bps', 'is_enabled'] },
+  { name: 'employee_daily_kpi_runs', columns: ['business_date', 'sales_base_amount', 'completed_at'] },
+  { name: 'employee_daily_kpi_results', columns: ['id', 'business_date', 'salary_profile_id', 'rule_id', 'sales_base_amount', 'rate_bps', 'bonus_amount', 'payment_method', 'status', 'bonus_id'] },
   { name: 'employee_salary_fines', columns: ['id', 'salary_profile_id', 'fine_date', 'amount', 'reason', 'created_by_name'] },
   { name: 'employee_salary_absences', columns: ['id', 'salary_profile_id', 'absence_date'] },
   { name: 'employee_salary_telegram_links', columns: ['salary_profile_id', 'telegram_user_id', 'chat_id', 'preferred_language', 'notifications_enabled', 'linked_at'] },
@@ -36,7 +40,7 @@ const TABLE_CHECKS = [
 
 const MIGRATION_HINTS = {
   order_payments: 'Run supabase/012_split_order_payments.sql',
-  business_settings: 'Run supabase/011_business_settings.sql, supabase/073_business_settings_monthly_rent.sql, supabase/074_receipt_marketing_setting.sql, supabase/081_auto_print_kitchen_check_setting.sql, and supabase/126_business_settings_monthly_utilities.sql',
+  business_settings: 'Run supabase/011_business_settings.sql, supabase/073_business_settings_monthly_rent.sql, supabase/074_receipt_marketing_setting.sql, supabase/081_auto_print_kitchen_check_setting.sql, supabase/126_business_settings_monthly_utilities.sql, and supabase/130_tourist_service_rate.sql',
   table_zones: 'Run supabase/019_table_management.sql',
   loyalty_cards: 'Run supabase/022_loyalty_cashback_wallet.sql and supabase/061_loyalty_special_card.sql',
   loyalty_transactions: 'Run supabase/022_loyalty_cashback_wallet.sql, supabase/051_remove_loyalty_cards_preserve_history.sql, and supabase/061_loyalty_special_card.sql',
@@ -47,6 +51,7 @@ const MIGRATION_HINTS = {
   bazaar_product_catalog: 'Run supabase/097_daily_bazaar.sql',
   bazaar_purchase_audit: 'Run supabase/097_daily_bazaar.sql',
   order_items: 'Run supabase/070_price_modes.sql, supabase/072_order_item_selected_options.sql, supabase/098_menu_item_costs_and_profit.sql, supabase/105_menu_items_sold_by_weight.sql, and supabase/114_freeze_historical_order_prices_and_costs.sql',
+  order_kitchen_rounds: 'Run supabase/128_durable_kitchen_round_receipts.sql',
   order_payment_audit: 'Run supabase/010_order_payment_audit_and_guards.sql',
   orders: 'Run supabase/075_order_actor_tracking.sql and supabase/106_atomic_paid_order_stock_deduction.sql',
   profile_audit: 'Run supabase/028_profile_role_audit.sql',
@@ -56,7 +61,10 @@ const MIGRATION_HINTS = {
   employee_salary_profiles: 'Run supabase/054_employee_salary_profiles.sql, supabase/056_employee_salary_profile_end_date.sql, supabase/060_employee_salary_manual_names.sql, and supabase/076_employee_salary_safe_delete.sql',
   employee_salary_rates: 'Run supabase/054_employee_salary_profiles.sql, supabase/055_employee_salary_rate_amount_upgrade.sql, supabase/058_employee_salary_daily_amount_compat.sql, and supabase/116_salary_rate_change_telegram_notifications.sql',
   employee_salary_payments: 'Run supabase/054_employee_salary_profiles.sql and supabase/062_drop_salary_payment_period_columns.sql',
-  employee_salary_bonuses: 'Run supabase/057_employee_salary_bonuses.sql',
+  employee_salary_bonuses: 'Run supabase/057_employee_salary_bonuses.sql and supabase/129_daily_kpi_bonuses.sql',
+  employee_kpi_rules: 'Run supabase/129_daily_kpi_bonuses.sql',
+  employee_daily_kpi_runs: 'Run supabase/129_daily_kpi_bonuses.sql',
+  employee_daily_kpi_results: 'Run supabase/129_daily_kpi_bonuses.sql',
   employee_salary_fines: 'Run supabase/099_employee_salary_fines.sql',
   employee_salary_absences: 'Run supabase/063_employee_salary_absences.sql',
   employee_salary_telegram_links: 'Run supabase/107_employee_salary_telegram_notifications.sql',
@@ -66,6 +74,7 @@ const MIGRATION_HINTS = {
   employee_salary_group_notification_deliveries: 'Run supabase/111_salary_group_event_notifications.sql, supabase/112_salary_event_employee_notifications.sql, supabase/113_salary_notification_attempt_tracking.sql, supabase/116_salary_rate_change_telegram_notifications.sql, and supabase/119_salary_event_team_notifications.sql',
   accounting_record_audit: 'Run supabase/084_accounting_record_audit.sql',
   submit_order_to_kitchen: 'Run supabase/018_submit_order_to_kitchen_rpc.sql',
+  kitchen_round_receipts_version: 'Run supabase/128_durable_kitchen_round_receipts.sql completely',
   settle_loyalty_wallet_payment: 'Run supabase/027_atomic_loyalty_wallet_settlement.sql',
   settle_orders_payment: 'Run supabase/083_atomic_order_payment_settlement.sql',
   change_paid_order_payment_method_owner: 'Run supabase/090_owner_change_completed_order_payment_method.sql',
@@ -77,6 +86,7 @@ const MIGRATION_HINTS = {
   save_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
   delete_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
   create_employee_salary_telegram_link: 'Run supabase/107_employee_salary_telegram_notifications.sql',
+  generate_daily_kpi_bonuses: 'Run supabase/129_daily_kpi_bonuses.sql',
   create_menu_item_with_cost: 'Run supabase/102_atomic_menu_item_cost_creation.sql',
   create_menu_item_with_media_and_cost: 'Run supabase/103_menu_item_media_gallery.sql',
   get_accounting_paid_order_summary: 'Run supabase/109_accounting_paid_order_summary.sql',
@@ -132,6 +142,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
   const startedAt = new Date().toISOString()
   const checks = await Promise.all(TABLE_CHECKS.map(check => checkTable(dbClient, check)))
   checks.push(await checkRpc(dbClient, 'submit_order_to_kitchen'))
+  checks.push(await checkRpc(dbClient, 'kitchen_round_receipts_version', {}))
   checks.push(await checkRpc(dbClient, 'create_menu_item_with_cost'))
   checks.push(await checkRpc(dbClient, 'create_menu_item_with_media_and_cost'))
   checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))
@@ -148,6 +159,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
     p_date_from: '2000-01-01',
     p_date_to: '2000-01-01',
   }))
+  checks.push(await checkRpc(dbClient, 'generate_daily_kpi_bonuses', { p_business_date: null }))
   const failed = checks.filter(check => !check.ok)
   return {
     ok: failed.length === 0,

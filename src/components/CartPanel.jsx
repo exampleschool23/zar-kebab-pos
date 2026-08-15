@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { X, ShoppingCart, Minus, Plus, Trash2, UtensilsCrossed, Loader2, CheckCircle2 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { t, getItemDesc, getItemName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { getOrderPaymentSummary, normalizeServiceRatePct } from '../lib/analytics'
+import { getOrderPaymentSummary } from '../lib/analytics'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { ORDER_TYPE_LABELS, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { DEFAULT_PRICE_MODE, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { isWriteTimeoutError } from '../lib/writeTimeout'
+import { isMenuItemOrderable } from '../lib/menuItems'
+import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { getManualOrderNotes, getOrderItemOptionLines } from './MenuProductCards'
 import {
   changeMenuQuantity,
@@ -40,21 +42,6 @@ function getCartItemKey(item) {
   return item?.cart_item_key || item?.cartItemKey || item?.menu_item_id
 }
 
-function cartSubmissionFingerprint(cart, orderType, priceMode) {
-  const items = cart.map(item => ({
-    key: getCartItemKey(item),
-    menuItemId: item.menu_item_id,
-    quantity: Number(item.quantity) || 0,
-    notes: item.notes || '',
-    price: Number(item.price) || 0,
-    basePrice: Number(item.base_price) || 0,
-    unitPrice: Number(item.unit_price) || 0,
-    selectedOptions: item.selected_options || item.selectedOptions || {},
-    saleUnit: item.sale_unit || item.saleUnit || 'piece',
-  })).sort((a, b) => String(a.key).localeCompare(String(b.key)))
-  return JSON.stringify({ orderType, priceMode, items })
-}
-
 function CartItemRow({ item, lang, dispatch, menuItem }) {
   const desc = menuItem ? getItemDesc(menuItem, lang) : null
   const grams = gramsLabel(menuItem, lang)
@@ -66,7 +53,7 @@ function CartItemRow({ item, lang, dispatch, menuItem }) {
   const displayName = menuItem ? getItemName(menuItem, lang) : item.name
   const quantitySource = { ...menuItem, sale_unit: item.sale_unit || menuItem?.sale_unit }
   const soldByWeight = isMenuItemSoldByWeight(quantitySource)
-  const unavailable = !menuItem || menuItem.available === false
+  const unavailable = !isMenuItemOrderable(menuItem)
   const unavailableLabel = lang === 'uz' ? 'Mavjud emas' : lang === 'ru' ? 'Недоступно' : 'Unavailable'
 
   function decrement() {
@@ -213,13 +200,14 @@ export default function CartPanel({
   reviewWarning = '',
   reviewKey = '',
 }) {
-  const { state, dispatch } = useApp()
+  const { state, dispatch, pendingKitchenSubmission } = useApp()
   const lang    = langProp || state.lang
   const cart    = state.cart
   const normalizedPriceMode = normalizePriceMode(priceMode)
   const [message, setMessage] = useState(null)
   const [reviewConfirmed, setReviewConfirmed] = useState(false)
-  const retrySubmissionRef = useRef(null)
+  const hasPendingSubmission = !guestMode && !!pendingKitchenSubmission
+  const cartIsLocked = isSending || hasPendingSubmission
 
   useEffect(() => {
     setReviewConfirmed(false)
@@ -233,7 +221,7 @@ export default function CartPanel({
   const unavailableCartItems = useMemo(
     () => cart.filter(item => {
       const menuItem = menuItemMap[item.menu_item_id]
-      return !menuItem || menuItem.available === false
+      return !isMenuItemOrderable(menuItem)
     }),
     [cart, menuItemMap]
   )
@@ -244,7 +232,7 @@ export default function CartPanel({
       ? 'Удалите недоступные блюда из корзины. Их нельзя отправить в заказ.'
       : 'Remove unavailable meals from the cart. They cannot be submitted with the order.'
 
-  const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
+  const configuredServiceRatePct = getConfiguredServiceRatePct(state.settings, normalizedPriceMode)
   const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : configuredServiceRatePct
   const payment = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, cart, configuredServiceRatePct)
   const subtotal  = payment.subtotal
@@ -253,22 +241,17 @@ export default function CartPanel({
   const itemCount = cart.length
 
   async function handleSend() {
-    if (cart.length === 0 || isSending) return
-    if (reviewWarning && !reviewConfirmed) return
-    if (hasUnavailableCartItems) {
+    if ((cart.length === 0 && !hasPendingSubmission) || isSending) return
+    if (!hasPendingSubmission && reviewWarning && !reviewConfirmed) return
+    if (!hasPendingSubmission && hasUnavailableCartItems) {
       setMessage({ tone: 'error', text: unavailableCartMessage })
       return
     }
     setMessage(null)
     onSendingChange?.(true)
-    const fingerprint = cartSubmissionFingerprint(cart, orderType, normalizedPriceMode)
-    const retainedAttempt = retrySubmissionRef.current?.fingerprint === fingerprint
-      ? retrySubmissionRef.current.action
-      : null
-    if (!retainedAttempt) retrySubmissionRef.current = null
-    const submittedAt = retainedAttempt?._submittedAt || new Date().toISOString()
-    const kitchenRoundId = retainedAttempt?._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
-    const submitAction = retainedAttempt || {
+    const submittedAt = pendingKitchenSubmission?._submittedAt || new Date().toISOString()
+    const kitchenRoundId = pendingKitchenSubmission?._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
+    const submitAction = pendingKitchenSubmission || {
       type: 'SEND_TO_KITCHEN',
       payload: { orderType, priceMode: normalizedPriceMode },
       _kitchenRoundId: kitchenRoundId,
@@ -277,16 +260,12 @@ export default function CartPanel({
     try {
       const result = await dispatch(submitAction)
       if (result?.error) {
-        if (result.action) {
-          retrySubmissionRef.current = { fingerprint, action: result.action }
-        }
         setMessage({
           tone: 'error',
           text: submitErrorMessage(lang, result.error),
         })
         return
       }
-      retrySubmissionRef.current = null
       const completedAction = result?.action || submitAction
       setMessage({
         tone: 'success',
@@ -300,7 +279,7 @@ export default function CartPanel({
         orderId: completedAction._orderId,
         kitchenRoundId: completedAction._kitchenRoundId || kitchenRoundId,
         submittedAt: completedAction._submittedAt || submittedAt,
-        orderType,
+        orderType: completedAction.payload?.orderType || orderType,
       })
       onClose?.()
     } finally {
@@ -318,7 +297,7 @@ export default function CartPanel({
             {onClose && (
               <button
                 onClick={onClose}
-                disabled={isSending}
+                disabled={cartIsLocked}
                 className="p-1.5 rounded-xl hover:bg-gray-100 disabled:cursor-wait disabled:opacity-50 transition-colors flex-shrink-0"
               >
                 <X size={16} className="text-[#9CA3AF]" />
@@ -352,7 +331,7 @@ export default function CartPanel({
               <button
                 key={ot.key}
                 onClick={() => onOrderTypeChange?.(ot.key)}
-                disabled={isSending}
+                disabled={cartIsLocked}
                 className={`flex-1 py-1.5 text-[12px] font-bold rounded-lg transition-all ${
                   orderType === ot.key
                     ? 'bg-white text-[#1F2937] shadow-sm'
@@ -386,7 +365,7 @@ export default function CartPanel({
               key={getCartItemKey(item)}
               item={item}
               lang={lang}
-              dispatch={isSending ? () => {} : dispatch}
+              dispatch={cartIsLocked ? () => {} : dispatch}
               menuItem={menuItemMap[item.menu_item_id]}
             />
           ))
@@ -395,13 +374,22 @@ export default function CartPanel({
 
       {/* ── Summary + Send button ──────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-t border-[#F3F4F6] px-4 pt-4 pb-5">
+        {hasPendingSubmission && (
+          <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-bold leading-5 text-amber-900">
+            {lang === 'uz'
+              ? 'Oldingi yuborish natijasi tasdiqlanmadi. Xuddi shu buyurtmani xavfsiz tekshirish uchun qayta urinib ko‘ring.'
+              : lang === 'ru'
+                ? 'Результат прошлой отправки не подтверждён. Повторите попытку — будет проверен тот же заказ без дублирования.'
+                : 'The previous send was not confirmed. Retry safely to check the same order without duplicating it.'}
+          </div>
+        )}
         {reviewWarning && (
           <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] font-bold leading-5 text-amber-900">
             <p>{reviewWarning}</p>
             <button
               type="button"
               onClick={() => setReviewConfirmed(true)}
-              disabled={reviewConfirmed}
+              disabled={reviewConfirmed || cartIsLocked}
               className={`mt-2 inline-flex h-9 w-full items-center justify-center rounded-lg px-3 text-[11px] font-black transition-colors ${
                 reviewConfirmed
                   ? 'bg-green-100 text-green-800'
@@ -464,9 +452,11 @@ export default function CartPanel({
 
         <button
           onClick={guestMode ? onGuestFinish : handleSend}
-          disabled={cart.length === 0 || isSending || hasUnavailableCartItems || (!!reviewWarning && !reviewConfirmed)}
+          disabled={isSending || (!hasPendingSubmission && (cart.length === 0 || hasUnavailableCartItems || (!!reviewWarning && !reviewConfirmed)))}
           className={`w-full rounded-xl font-black text-[14px] active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
-            cart.length > 0 && !isSending && !hasUnavailableCartItems && (!reviewWarning || reviewConfirmed)
+            hasPendingSubmission && !isSending
+              ? 'bg-amber-600 text-white hover:bg-amber-700 shadow-lg shadow-amber-200'
+              : cart.length > 0 && !isSending && !hasUnavailableCartItems && (!reviewWarning || reviewConfirmed)
               ? 'bg-[#ff5a00] text-white hover:bg-[#cc4800] shadow-lg shadow-orange-200'
               : cart.length > 0 && isSending
                 ? 'bg-[#ff5a00] text-white opacity-80 cursor-wait shadow-lg shadow-orange-200'
@@ -485,6 +475,8 @@ export default function CartPanel({
               ? (lang === 'uz' ? 'Avval tekshiruvni tasdiqlang' : lang === 'ru' ? 'Сначала подтвердите проверку' : 'Confirm the review first')
             : isSending
             ? (lang === 'uz' ? 'Yuborilmoqda...' : lang === 'ru' ? 'Отправка...' : 'Sending...')
+            : hasPendingSubmission
+              ? (lang === 'uz' ? 'Yuborishni qayta tekshirish' : lang === 'ru' ? 'Повторить отправку' : 'Retry submission')
             : hasUnavailableCartItems
               ? (lang === 'uz' ? 'Mavjud bo‘lmagan taomni olib tashlang' : lang === 'ru' ? 'Удалите недоступное блюдо' : 'Remove unavailable meal')
               : (lang === 'uz' ? 'Buyurtmani yuborish' : lang === 'ru' ? 'Отправить заказ' : 'Submit order')}

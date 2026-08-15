@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react'
-import { isRecoverableIdleError, loadOperationalTableData, loadPOSData, refreshSupabaseSession, writeToSupabase, subscribeToRealtime } from '../lib/db'
+import { isRecoverableIdleError, loadOperationalTableData, loadPOSData, refreshSupabaseSession, waitForKitchenRoundSubmission, writeToSupabase, subscribeToRealtime } from '../lib/db'
 import { appMetaReducer } from './appMetaReducer'
 import { cartReducer } from './cartReducer'
 import { menuReducer } from './menuReducer'
@@ -12,8 +12,100 @@ import { DEFAULT_PRICE_MODE, normalizePriceMode, withPriceModeFields } from '../
 import { isWriteTimeoutError, withWriteTimeout } from '../lib/writeTimeout'
 import { formatWriteError } from '../lib/writeErrorMessage'
 import { useAuth } from '../contexts/AuthContext'
+import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 
 const AppContext = createContext(null)
+const KITCHEN_SUBMISSION_CONFIRM_TIMEOUT_MS = 10000
+const KITCHEN_SUBMISSION_FINAL_CHECK_TIMEOUT_MS = 3000
+const PENDING_KITCHEN_SUBMISSION_STORAGE_KEY = 'zar-kebab-pending-kitchen-submission-v1'
+
+function isValidPendingKitchenSubmission(action) {
+  const items = Array.isArray(action?._items) ? action._items : []
+  return action?.type === 'SEND_TO_KITCHEN' &&
+    String(action?._submittedByUserId || '').trim() !== '' &&
+    String(action?._orderId || '').trim() !== '' &&
+    String(action?._kitchenRoundId || '').trim() !== '' &&
+    items.length > 0 &&
+    items.every(item => String(item?.id || '').trim() !== '')
+}
+
+function readPendingKitchenSubmission(userId) {
+  if (!userId || typeof window === 'undefined') return null
+  try {
+    const storageKey = `${PENDING_KITCHEN_SUBMISSION_STORAGE_KEY}:${userId}`
+    const saved = JSON.parse(window.sessionStorage.getItem(storageKey) || 'null')
+    return saved?.userId === userId && saved?.action?._submittedByUserId === userId && isValidPendingKitchenSubmission(saved?.action)
+      ? saved.action
+      : null
+  } catch {
+    return null
+  }
+}
+
+function storePendingKitchenSubmission(userId, action) {
+  if (!userId || typeof window === 'undefined') return
+  try {
+    const storageKey = `${PENDING_KITCHEN_SUBMISSION_STORAGE_KEY}:${userId}`
+    if (!isValidPendingKitchenSubmission(action)) {
+      window.sessionStorage.removeItem(storageKey)
+      return
+    }
+    window.sessionStorage.setItem(storageKey, JSON.stringify({ userId, action }))
+  } catch {
+    // The in-memory attempt still keeps retry identity when browser storage is unavailable.
+  }
+}
+
+function isAmbiguousKitchenHttpFailure(error) {
+  const candidates = [
+    error?.status,
+    error?.statusCode,
+    error?.code,
+    error?.message,
+    error?.details,
+  ]
+  const ambiguousStatus = /(?:^|[^0-9])(408|425|429|5\d{2})(?:[^0-9]|$)/
+
+  return candidates.some(value => ambiguousStatus.test(String(value ?? ''))) ||
+    /bad gateway|gateway timeout|service unavailable|upstream (?:connect|connection|request|response|server)|internal server error/i.test(
+      `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`
+    )
+}
+
+export function isKitchenWriteOutcomeUnknown(error) {
+  if (isWriteTimeoutError(error)) return true
+  if (isAmbiguousKitchenHttpFailure(error)) return true
+  const text = `${error?.name || ''} ${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (
+    text.includes('failed to fetch') ||
+    text.includes('fetch failed') ||
+    text.includes('load failed') ||
+    text.includes('network') ||
+    text.includes('offline') ||
+    text.includes('connection') ||
+    text.includes('timed out') ||
+    text.includes('timeout') ||
+    text.includes('abort')
+  )
+}
+
+function pendingKitchenCartSnapshot(action) {
+  if (Array.isArray(action?._cart) && action._cart.length > 0) {
+    return action._cart.map(item => ({ ...item }))
+  }
+  return (Array.isArray(action?._items) ? action._items : []).map(item => {
+    const {
+      id: _submittedItemId,
+      status: _submittedStatus,
+      order_type: _submittedOrderType,
+      kitchen_round_id: _submittedRoundId,
+      submitted_at: _submittedAt,
+      created_at: _createdAt,
+      ...cartItem
+    } = item || {}
+    return cartItem
+  })
+}
 
 const WRITE_BEFORE_LOCAL_ACTIONS = new Set([
   'UPDATE_ORDER_ITEM_STATUS',
@@ -78,6 +170,44 @@ export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const { loading: authLoading, session } = useAuth()
   const sessionUserId = session?.user?.id || null
+  const [pendingKitchenSubmission, setPendingKitchenSubmission] = React.useState(null)
+  const pendingKitchenSubmissionRef = useRef(null)
+  const sessionUserIdRef = useRef(sessionUserId)
+  sessionUserIdRef.current = sessionUserId
+
+  useEffect(() => {
+    sessionUserIdRef.current = sessionUserId
+    if (authLoading) return
+    const restored = readPendingKitchenSubmission(sessionUserId)
+    pendingKitchenSubmissionRef.current = restored
+    setPendingKitchenSubmission(restored)
+  }, [authLoading, sessionUserId])
+
+  function rememberPendingKitchenSubmission(action) {
+    if (!isValidPendingKitchenSubmission(action)) return
+    pendingKitchenSubmissionRef.current = action
+    setPendingKitchenSubmission(action)
+    storePendingKitchenSubmission(action?._submittedByUserId || sessionUserIdRef.current, action)
+  }
+
+  function clearPendingKitchenSubmission(action) {
+    const pending = pendingKitchenSubmissionRef.current
+    if (action && pending && action._kitchenRoundId !== pending._kitchenRoundId) return
+    pendingKitchenSubmissionRef.current = null
+    setPendingKitchenSubmission(null)
+    storePendingKitchenSubmission(action?._submittedByUserId || pending?._submittedByUserId || sessionUserIdRef.current, null)
+  }
+
+  function assertKitchenSubmissionUser(action) {
+    const expectedUserId = String(action?._submittedByUserId || '').trim()
+    const currentUserId = String(sessionUserIdRef.current || '').trim()
+    if (expectedUserId && currentUserId === expectedUserId) return
+
+    const identityError = new Error('The signed-in waiter changed while the order result was unresolved. Sign back in with the original account to retry safely.')
+    identityError.code = 'POS_KITCHEN_SUBMISSION_USER_CHANGED'
+    identityError.kitchenSubmissionUnresolved = true
+    throw identityError
+  }
 
   // Always-current state reference for async callbacks (avoids stale closures)
   const stateRef = useRef(state)
@@ -106,53 +236,146 @@ export function AppProvider({ children }) {
       })
   }, [])
 
-  async function writeWithIdleRecovery(action, stateSnapshot) {
+  async function writeKitchenAttempt(action, stateSnapshot) {
+    assertKitchenSubmissionUser(action)
+    if (action._kitchenSubmissionRetry) {
+      try {
+        const alreadyCommitted = await withWriteTimeout(
+          signal => waitForKitchenRoundSubmission(action, { signal, attempts: 1 }),
+          'CONFIRM_KITCHEN_SUBMISSION',
+          KITCHEN_SUBMISSION_FINAL_CHECK_TIMEOUT_MS
+        )
+        if (alreadyCommitted) return { reconciled: true }
+      } catch (preflightError) {
+        assertKitchenSubmissionUser(action)
+        preflightError.kitchenSubmissionUnresolved = true
+        throw preflightError
+      }
+    }
     try {
       await withWriteTimeout(signal => writeToSupabase(action, stateSnapshot, { signal }), action.type)
+      return { reconciled: false }
+    } catch (error) {
+      assertKitchenSubmissionUser(action)
+      const outcomeUnknown = isKitchenWriteOutcomeUnknown(error)
+      try {
+        const committed = await withWriteTimeout(
+          signal => waitForKitchenRoundSubmission(action, {
+            signal,
+            ...(outcomeUnknown ? {} : { attempts: 1 }),
+          }),
+          'CONFIRM_KITCHEN_SUBMISSION',
+          outcomeUnknown
+            ? KITCHEN_SUBMISSION_CONFIRM_TIMEOUT_MS
+            : KITCHEN_SUBMISSION_FINAL_CHECK_TIMEOUT_MS
+        )
+        if (committed) {
+          console.warn('[db] kitchen submission was confirmed after its response was lost')
+          return { reconciled: true }
+        }
+      } catch (confirmationError) {
+        if (confirmationError?.kitchenSubmissionUnresolved) throw confirmationError
+        console.warn('[db] kitchen submission could not yet be reconciled:', confirmationError)
+      }
+      if (!outcomeUnknown) throw error
+      error.kitchenSubmissionUnresolved = true
+      throw error
+    }
+  }
+
+  async function writeWithIdleRecovery(action, stateSnapshot) {
+    const writeAttempt = action.type === 'SEND_TO_KITCHEN'
+      ? writeKitchenAttempt
+      : async (nextAction, nextState) => {
+          await withWriteTimeout(signal => writeToSupabase(nextAction, nextState, { signal }), nextAction.type)
+        }
+
+    try {
+      return await writeAttempt(action, stateSnapshot)
     } catch (error) {
       if (isWriteTimeoutError(error)) throw error
       if (!isRecoverableIdleError(error)) throw error
-      await withWriteTimeout(refreshSupabaseSession(), 'REFRESH_SESSION')
+      let refreshedSession
+      try {
+        refreshedSession = await withWriteTimeout(refreshSupabaseSession(), 'REFRESH_SESSION')
+      } catch (refreshError) {
+        if (action.type === 'SEND_TO_KITCHEN' && error?.kitchenSubmissionUnresolved) {
+          refreshError.kitchenSubmissionUnresolved = true
+        }
+        throw refreshError
+      }
+      if (action.type === 'SEND_TO_KITCHEN') {
+        const expectedUserId = String(action._submittedByUserId || '').trim()
+        const refreshedUserId = String(refreshedSession?.user?.id || '').trim()
+        if (!expectedUserId || refreshedUserId !== expectedUserId) {
+          const identityError = new Error('The signed-in waiter changed while the order result was unresolved. Sign back in with the original account to retry safely.')
+          identityError.code = 'POS_KITCHEN_SUBMISSION_USER_CHANGED'
+          identityError.kitchenSubmissionUnresolved = true
+          throw identityError
+        }
+      }
       recoverFromIdleRef.current?.()
-      await withWriteTimeout(signal => writeToSupabase(action, stateRef.current, { signal }), action.type)
+      const retryResult = await writeAttempt(action, stateRef.current)
+      return action.type === 'SEND_TO_KITCHEN' && error?.kitchenSubmissionUnresolved
+        ? { ...retryResult, recoveredAfterUnknown: true }
+        : retryResult
     }
   }
 
   // dbDispatch: optimistic local update + async Supabase write
   const dbDispatch = useCallback(function dbDispatch(action) {
     let enriched = action
+    let reusedPendingKitchenSubmission = false
     if (action.type === 'SEND_TO_KITCHEN') {
-      const orderType = normalizeOrderType(action.payload?.orderType)
-      const isOffPremise = isOffPremiseOrderType(orderType)
-      const submittedAt = action._submittedAt || new Date().toISOString()
-      const activeOrder = stateRef.current.orders.find(o =>
-        o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
-      )
-      const priceMode = normalizePriceMode(action.payload?.priceMode || activeOrder?.price_mode || DEFAULT_PRICE_MODE)
-      const kitchenRoundId = action._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
-      const submissionCart = Array.isArray(action._cart) ? action._cart : stateRef.current.cart
-      enriched = {
-        ...action,
-        _priceMode: priceMode,
-        _submittedAt: submittedAt,
-        _kitchenRoundId: kitchenRoundId,
-        _orderId: action._orderId || (isOffPremise
-          ? `${orderType === 'delivery' ? 'dl' : 'ta'}-${Date.now()}`
-          : stateRef.current.orders.find(o =>
-            o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
-          )?.id || 'o' + Date.now()),
-        _orderNumber: action._orderNumber || (isOffPremise
-          ? makeOrderNumber(Date.now(), orderType)
-          : undefined),
-        _items: action._items || submissionCart.map(i => ({
-          ...withPriceModeFields(i, i.price_mode || priceMode),
-          id: makeLocalId('oi'),
-          status: 'new',
-          order_type: orderType,
-          kitchen_round_id: kitchenRoundId,
-          submitted_at: submittedAt,
-          created_at: submittedAt,
-        })),
+      const pendingAttempt = pendingKitchenSubmissionRef.current
+      if (pendingAttempt) {
+        reusedPendingKitchenSubmission = true
+        enriched = { ...pendingAttempt, _kitchenSubmissionRetry: true }
+      } else {
+        const orderType = normalizeOrderType(action.payload?.orderType)
+        const isOffPremise = isOffPremiseOrderType(orderType)
+        const submittedAt = action._submittedAt || new Date().toISOString()
+        const activeOrder = stateRef.current.orders.find(o =>
+          o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
+        )
+        const priceMode = normalizePriceMode(action.payload?.priceMode || activeOrder?.price_mode || DEFAULT_PRICE_MODE)
+        const serviceRatePct = isOffPremise
+          ? 0
+          : Number.isFinite(Number(activeOrder?.service_rate_pct))
+            ? Number(activeOrder.service_rate_pct)
+            : getConfiguredServiceRatePct(stateRef.current.settings, priceMode)
+        const kitchenRoundId = action._kitchenRoundId || `round-${submittedAt}-${Math.random().toString(36).slice(2, 8)}`
+        const submissionCart = Array.isArray(action._cart) ? action._cart : stateRef.current.cart
+        enriched = {
+          ...action,
+          _submittedByUserId: sessionUserIdRef.current,
+          _tableId: isOffPremise ? null : stateRef.current.currentTableId,
+          _priceMode: priceMode,
+          _serviceRatePct: serviceRatePct,
+          _submittedAt: submittedAt,
+          _kitchenRoundId: kitchenRoundId,
+          _orderId: action._orderId || (isOffPremise
+            ? `${orderType === 'delivery' ? 'dl' : 'ta'}-${Date.now()}`
+            : stateRef.current.orders.find(o =>
+              o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
+            )?.id || 'o' + Date.now()),
+          _orderNumber: action._orderNumber || (isOffPremise
+            ? makeOrderNumber(Date.now(), orderType)
+            : undefined),
+          _cart: Array.isArray(action._cart)
+            ? action._cart.map(item => ({ ...item }))
+            : submissionCart.map(item => ({ ...item })),
+          _items: action._items || submissionCart.map(i => ({
+            ...withPriceModeFields(i, i.price_mode || priceMode),
+            id: makeLocalId('oi'),
+            status: 'new',
+            order_type: orderType,
+            kitchen_round_id: kitchenRoundId,
+            submitted_at: submittedAt,
+            created_at: submittedAt,
+          })),
+        }
+        rememberPendingKitchenSubmission(enriched)
       }
     } else if (action.type === 'ADD_QUICK_ITEM_TO_ORDER') {
       enriched = {
@@ -177,12 +400,41 @@ export function AppProvider({ children }) {
 
     if (WRITE_BEFORE_LOCAL_ACTIONS.has(enriched.type)) {
       return writeWithIdleRecovery(enriched, stateRef.current)
-        .then(() => {
-          dispatch(enriched)
+        .then(writeResult => {
+          if (enriched.type === 'SEND_TO_KITCHEN') {
+            const expectedUserId = String(enriched._submittedByUserId || '').trim()
+            if (!expectedUserId || sessionUserIdRef.current !== expectedUserId) {
+              const identityError = new Error('The signed-in waiter changed before the order result was applied. Sign back in with the original account to recover it safely.')
+              identityError.code = 'POS_KITCHEN_SUBMISSION_USER_CHANGED'
+              identityError.kitchenSubmissionUnresolved = true
+              throw identityError
+            }
+            clearPendingKitchenSubmission(enriched)
+          }
+          const requiresAuthoritativeKitchenRefresh = enriched.type === 'SEND_TO_KITCHEN' && (
+            writeResult?.reconciled ||
+            writeResult?.recoveredAfterUnknown ||
+            reusedPendingKitchenSubmission
+          )
+          const completedAction = requiresAuthoritativeKitchenRefresh
+            ? { ...enriched, _kitchenSubmissionReconciled: true }
+            : enriched
+          dispatch(completedAction)
+          if (completedAction._kitchenSubmissionReconciled) refreshPOSData()
           dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
-          return { error: null, action: enriched }
+          return { error: null, action: completedAction }
         })
         .catch(err => {
+          if (enriched.type === 'SEND_TO_KITCHEN') {
+            const expectedUserId = String(enriched._submittedByUserId || '').trim()
+            const initiatingUserStillActive = expectedUserId && sessionUserIdRef.current === expectedUserId
+            if (!initiatingUserStillActive) err.kitchenSubmissionUnresolved = true
+            if (initiatingUserStillActive && !err?.kitchenSubmissionUnresolved) {
+              const cartSnapshot = pendingKitchenCartSnapshot(enriched)
+              if (cartSnapshot.length > 0) dispatch({ type: 'REPLACE_CART', payload: cartSnapshot })
+              clearPendingKitchenSubmission(enriched)
+            }
+          }
           console.error('[db] write failed:', action.type, err)
           dispatch({
             type: 'SET_CONNECTION_NOTICE',
@@ -392,7 +644,7 @@ export function AppProvider({ children }) {
   }, [authLoading, sessionUserId])
 
   return (
-    <AppContext.Provider value={{ state, dispatch: dbDispatch, refreshPOSData }}>
+    <AppContext.Provider value={{ state, dispatch: dbDispatch, refreshPOSData, pendingKitchenSubmission }}>
       {state.connectionNotice && (
         <div role="alert" className={`fixed top-3 left-1/2 z-[9999] max-w-[calc(100vw-2rem)] -translate-x-1/2 break-words rounded-xl px-4 py-2 text-center text-sm font-semibold shadow-lg ${
           state.connectionNotice.tone === 'error'

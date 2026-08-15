@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BadgeMinus, CalendarX2, ChevronLeft, ChevronRight, Copy, Loader2, Plus, Save, Send, Users, WalletCards } from 'lucide-react'
+import { ArrowLeft, BadgeMinus, CalendarX2, ChevronLeft, ChevronRight, Copy, Loader2, Percent, Plus, Save, Send, Trash2, Users, WalletCards } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { OperationalLoading } from '../components/OperationalState'
@@ -8,6 +8,16 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatDateTime, formatLongDate } from '../lib/dateFormat'
+import {
+  calculateDailyKpiBonus,
+  formatKpiRateInput,
+  formatKpiRatePercent,
+  getDefaultKpiHistoryRange,
+  getEffectiveKpiRule,
+  getKpiRuleEditDate,
+  normalizeKpiResult,
+  parseKpiPercentToBps,
+} from '../lib/dailyKpi'
 import { canEditFeature } from '../lib/permissions'
 import {
   EXPENSE_PAYMENT_METHODS,
@@ -36,6 +46,8 @@ const FIELD = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text
 const SECTION_GRID = 'grid items-stretch gap-4 lg:grid-cols-2'
 const PAGE_SIZE = 12
 const TELEGRAM_DELIVERY_PAGE_SIZE = 5
+const KPI_RESULT_PAGE_SIZE = 8
+const KPI_PREVIEW_BASE_AMOUNT = 10_000_000
 
 function isMissingSalaryMigration(error) {
   const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
@@ -47,6 +59,22 @@ function isMissingSalaryMigration(error) {
     text.includes('schema cache') ||
     text.includes('42p01')
   )
+}
+
+function isMissingKpiMigration(error) {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return (text.includes('employee_kpi_rules') || text.includes('employee_daily_kpi_results')) && (
+    text.includes('does not exist') ||
+    text.includes('could not find the') ||
+    text.includes('schema cache') ||
+    text.includes('42p01')
+  )
+}
+
+function isFinalizedKpiRuleError(error) {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return text.includes('kpi rule used by a finalized day')
+    || text.includes('employee_daily_kpi_results_rule_id_fkey')
 }
 
 function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], fines = [], absences = [], profiles = []) {
@@ -109,6 +137,7 @@ export default function Salaries() {
   const lang = state.lang || 'ru'
   const role = (profile?.role || state.user?.role || 'guest').toLowerCase()
   const canManage = canEditFeature(profile || { role }, 'expenses')
+  const canRemoveKpiRules = role === 'owner'
   const today = todayExpenseDate()
 
   const L = {
@@ -192,6 +221,45 @@ export default function Salaries() {
       empty: 'Maosh sozlamalari yo‘q',
       migration: 'Maosh jadvallari yangilanmagan. supabase/054_employee_salary_profiles.sql dan supabase/063_employee_salary_absences.sql gacha va supabase/099_employee_salary_fines.sql migratsiyalarini ishga tushiring.',
       readOnly: 'Bu sahifa faqat egasi uchun.',
+      kpiTitle: 'Kunlik KPI bonuslari',
+      kpiHelp: 'Tanlangan xodimga butun restoranning to‘langan dine-in savdosi va xizmat haqidan to‘liq foiz belgilang.',
+      kpiRuleTitle: 'Xodim KPI foizi',
+      kpiRuleHelp: 'Yangi sana yangi sozlama yaratadi. Hali hisoblanmagan sanani qayta saqlab tuzatish mumkin.',
+      kpiRate: 'KPI foizi',
+      kpiEnabled: 'KPI faol',
+      kpiDisabled: 'KPI o‘chirilgan',
+      kpiSave: 'KPI sozlamasini saqlash',
+      kpiSaved: 'KPI sozlamasi saqlandi',
+      kpiRemove: 'KPI sozlamasini olib tashlash',
+      kpiRemoveTitle: 'KPI sozlamasini olib tashlaysizmi?',
+      kpiRemoveWarning: 'Faqat ushbu sanadan kuchga kirgan sozlama o‘chiriladi. Yakunlangan KPI tarixi va to‘langan bonuslar saqlanadi.',
+      kpiRemoveConfirm: 'Olib tashlash',
+      kpiRemoveCancel: 'Bekor qilish',
+      kpiRemoved: 'KPI sozlamasi olib tashlandi',
+      kpiRemoveUsedError: 'Bu KPI sozlamasi yakunlangan kun hisobida ishlatilgan va o‘chirilmaydi. Keyingi sanadan KPI’ni o‘chirish uchun yangi nofaol sozlama saqlang.',
+      kpiRemoveOwnerOnly: 'KPI sozlamasini faqat egasi olib tashlashi mumkin.',
+      kpiRemoveFailed: 'KPI sozlamasini olib tashlab bo‘lmadi.',
+      kpiCurrent: 'Saqlangan sozlamalar',
+      kpiNotConfigured: 'Hali KPI belgilanmagan',
+      kpiPreview: 'Hisoblash namunasi',
+      kpiBaseStatement: 'Asos: butun restoranning kun davomida to‘langan dine-in subtotal summasi + xizmat haqi. Har bir xodimga uning to‘liq foizi alohida hisoblanadi.',
+      kpiPaidImmediately: 'Natija darhol to‘langan Bonus sifatida yoziladi. Xodim uni kunlik maosh xabarida oladi; Maosh guruhi va ZarKebab Team alohida xabardor qilinadi.',
+      kpiHistory: 'Avtomatik KPI tarixi',
+      kpiHistoryHelp: 'Tanlangan sanalar bo‘yicha hisoblangan va o‘tkazib yuborilgan natijalar.',
+      kpiAutomatic: 'Avtomatik KPI',
+      kpiSalesBase: 'Dine-in + xizmat',
+      kpiBonusAmount: 'Bonus',
+      kpiHistoryEmpty: 'Bu sanalarda KPI natijalari yo‘q.',
+      kpiMigration: 'Kunlik KPI uchun 129-migratsiyani ishga tushiring.',
+      kpiLoadFailed: 'KPI ma’lumotlarini yuklab bo‘lmadi.',
+      kpiInvalidRange: 'Boshlanish sanasi tugash sanasidan keyin bo‘lishi mumkin emas.',
+      kpiStatusGenerated: 'Bonus to‘landi',
+      kpiStatusAbsent: 'Kelmagan — o‘tkazildi',
+      kpiStatusIneligible: 'Mos emas — o‘tkazildi',
+      kpiStatusNoSales: 'Savdo yo‘q — o‘tkazildi',
+      kpiStatusVoided: 'Bekor qilindi',
+      dateFrom: 'Boshlanish sanasi',
+      dateTo: 'Tugash sanasi',
       telegramTitle: 'Telegram xabarnomalari',
       telegramHelp: 'Xodimga 30 daqiqada muddati tugaydigan shaxsiy ulanish havolasini yuboring.',
       telegramCreateLink: 'Ulanish havolasini yaratish',
@@ -216,6 +284,7 @@ export default function Salaries() {
       telegramStatusFailed: 'Xato',
       telegramStatusSkipped: 'O‘tkazib yuborildi',
       telegramStatusConfirmed: 'Qabul qilindi',
+      telegramKpiCombined: 'KPI bonusi kunlik maosh xabariga qo‘shildi.',
       telegramMessageId: 'Xabar',
       previous: 'Oldingi',
       next: 'Keyingi',
@@ -301,6 +370,45 @@ export default function Salaries() {
       empty: 'Настроек зарплаты пока нет',
       migration: 'Таблицы зарплат не обновлены. Запустите миграции с supabase/054_employee_salary_profiles.sql по supabase/063_employee_salary_absences.sql и supabase/099_employee_salary_fines.sql.',
       readOnly: 'Эта страница доступна только владельцу.',
+      kpiTitle: 'Ежедневные KPI-бонусы',
+      kpiHelp: 'Назначьте выбранному сотруднику полный процент от оплаченных dine-in продаж и сервиса всего ресторана.',
+      kpiRuleTitle: 'KPI-процент сотрудника',
+      kpiRuleHelp: 'Новая дата создаёт новую настройку. Настройку ещё не рассчитанного дня можно исправить той же датой.',
+      kpiRate: 'Процент KPI',
+      kpiEnabled: 'KPI включён',
+      kpiDisabled: 'KPI выключен',
+      kpiSave: 'Сохранить настройку KPI',
+      kpiSaved: 'Настройка KPI сохранена',
+      kpiRemove: 'Удалить настройку KPI',
+      kpiRemoveTitle: 'Удалить настройку KPI?',
+      kpiRemoveWarning: 'Будет удалена только настройка с этой датой начала действия. Завершённая история KPI и выплаченные бонусы сохранятся.',
+      kpiRemoveConfirm: 'Удалить',
+      kpiRemoveCancel: 'Отмена',
+      kpiRemoved: 'Настройка KPI удалена',
+      kpiRemoveUsedError: 'Эта настройка KPI уже использована в расчёте завершённого дня и не может быть удалена. Чтобы отключить KPI, сохраните новую выключенную настройку с будущей датой.',
+      kpiRemoveOwnerOnly: 'Удалить настройку KPI может только владелец.',
+      kpiRemoveFailed: 'Не удалось удалить настройку KPI.',
+      kpiCurrent: 'Сохранённые настройки',
+      kpiNotConfigured: 'KPI ещё не настроен',
+      kpiPreview: 'Пример расчёта',
+      kpiBaseStatement: 'База: оплаченный dine-in subtotal всего ресторана за день + сервис. Каждый сотрудник получает свой полный процент отдельно.',
+      kpiPaidImmediately: 'Результат сразу записывается как выплаченный Бонус. Сотрудник получает его в ежедневном сообщении о зарплате; группа зарплат и ZarKebab Team уведомляются отдельно.',
+      kpiHistory: 'История автоматических KPI',
+      kpiHistoryHelp: 'Рассчитанные и пропущенные результаты за выбранные даты.',
+      kpiAutomatic: 'Автоматический KPI',
+      kpiSalesBase: 'Dine-in + сервис',
+      kpiBonusAmount: 'Бонус',
+      kpiHistoryEmpty: 'За выбранные даты результатов KPI нет.',
+      kpiMigration: 'Запустите миграцию 129 для ежедневных KPI.',
+      kpiLoadFailed: 'Не удалось загрузить данные KPI.',
+      kpiInvalidRange: 'Начальная дата не может быть позже конечной.',
+      kpiStatusGenerated: 'Бонус выплачен',
+      kpiStatusAbsent: 'Отсутствовал — пропущено',
+      kpiStatusIneligible: 'Не подходит — пропущено',
+      kpiStatusNoSales: 'Нет продаж — пропущено',
+      kpiStatusVoided: 'Отменено',
+      dateFrom: 'Начальная дата',
+      dateTo: 'Конечная дата',
       telegramTitle: 'Telegram-уведомления',
       telegramHelp: 'Отправьте сотруднику личную ссылку, которая действует 30 минут.',
       telegramCreateLink: 'Создать ссылку',
@@ -325,6 +433,7 @@ export default function Salaries() {
       telegramStatusFailed: 'Ошибка',
       telegramStatusSkipped: 'Пропущено',
       telegramStatusConfirmed: 'Получено',
+      telegramKpiCombined: 'KPI-бонус включён в ежедневное сообщение о зарплате.',
       telegramMessageId: 'Сообщение',
       previous: 'Назад',
       next: 'Далее',
@@ -410,6 +519,45 @@ export default function Salaries() {
       empty: 'No salary settings yet',
       migration: 'Salary tables are not up to date. Run migrations from supabase/054_employee_salary_profiles.sql through supabase/063_employee_salary_absences.sql, plus supabase/099_employee_salary_fines.sql.',
       readOnly: 'Only the owner can manage this page.',
+      kpiTitle: 'Daily KPI bonuses',
+      kpiHelp: "Give a selected employee their full percentage of the whole restaurant's paid dine-in sales and service.",
+      kpiRuleTitle: 'Employee KPI percentage',
+      kpiRuleHelp: 'A new date creates a new setting. An unprocessed date can be corrected by saving the same date.',
+      kpiRate: 'KPI percentage',
+      kpiEnabled: 'KPI enabled',
+      kpiDisabled: 'KPI disabled',
+      kpiSave: 'Save KPI setting',
+      kpiSaved: 'KPI setting saved',
+      kpiRemove: 'Remove KPI setting',
+      kpiRemoveTitle: 'Remove this KPI setting?',
+      kpiRemoveWarning: 'Only this effective-dated setting will be removed. Finalized KPI history and paid bonuses will remain unchanged.',
+      kpiRemoveConfirm: 'Remove',
+      kpiRemoveCancel: 'Cancel',
+      kpiRemoved: 'KPI setting removed',
+      kpiRemoveUsedError: 'This KPI setting was already used for a finalized day and cannot be removed. To stop KPI, save a new disabled setting with a later effective date.',
+      kpiRemoveOwnerOnly: 'Only an owner can remove a KPI setting.',
+      kpiRemoveFailed: 'Could not remove the KPI setting.',
+      kpiCurrent: 'Saved settings',
+      kpiNotConfigured: 'KPI is not configured yet',
+      kpiPreview: 'Calculation example',
+      kpiBaseStatement: "Base: the whole restaurant's paid dine-in subtotal for the day + service. Every employee receives their full percentage independently.",
+      kpiPaidImmediately: 'The result is recorded immediately as a paid Bonus. The employee receives it in the daily salary message; Salary group and ZarKebab Team are notified separately.',
+      kpiHistory: 'Automatic KPI history',
+      kpiHistoryHelp: 'Generated and skipped results for the selected dates.',
+      kpiAutomatic: 'Automatic KPI',
+      kpiSalesBase: 'Dine-in + service',
+      kpiBonusAmount: 'Bonus',
+      kpiHistoryEmpty: 'No KPI results were found for these dates.',
+      kpiMigration: 'Run migration 129 to enable daily KPI bonuses.',
+      kpiLoadFailed: 'Could not load KPI data.',
+      kpiInvalidRange: 'The start date cannot be after the end date.',
+      kpiStatusGenerated: 'Bonus paid',
+      kpiStatusAbsent: 'Absent — skipped',
+      kpiStatusIneligible: 'Ineligible — skipped',
+      kpiStatusNoSales: 'No sales — skipped',
+      kpiStatusVoided: 'Voided',
+      dateFrom: 'Start date',
+      dateTo: 'End date',
       telegramTitle: 'Telegram notifications',
       telegramHelp: 'Send the employee a private link that expires after 30 minutes.',
       telegramCreateLink: 'Create link',
@@ -434,6 +582,7 @@ export default function Salaries() {
       telegramStatusFailed: 'Failed',
       telegramStatusSkipped: 'Skipped',
       telegramStatusConfirmed: 'Received',
+      telegramKpiCombined: 'The KPI Bonus is included in the daily salary message.',
       telegramMessageId: 'Message',
       previous: 'Previous',
       next: 'Next',
@@ -441,6 +590,7 @@ export default function Salaries() {
     },
   }
   const l = L[lang] || L.en
+  const defaultKpiHistoryRange = getDefaultKpiHistoryRange(today)
 
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [telegramLinks, setTelegramLinks] = useState([])
@@ -485,6 +635,84 @@ export default function Salaries() {
     absence_date: today,
     note: '',
   })
+  const [kpiRules, setKpiRules] = useState([])
+  const [kpiRulesLoading, setKpiRulesLoading] = useState(true)
+  const [kpiRulesError, setKpiRulesError] = useState('')
+  const [kpiResults, setKpiResults] = useState([])
+  const [kpiResultCount, setKpiResultCount] = useState(0)
+  const [kpiResultsLoading, setKpiResultsLoading] = useState(true)
+  const [kpiResultsError, setKpiResultsError] = useState('')
+  const [kpiRuleToRemove, setKpiRuleToRemove] = useState(null)
+  const [kpiRuleRemoveError, setKpiRuleRemoveError] = useState('')
+  const [kpiResultPage, setKpiResultPage] = useState(1)
+  const [kpiDateFrom, setKpiDateFrom] = useState(defaultKpiHistoryRange.dateFrom)
+  const [kpiDateTo, setKpiDateTo] = useState(defaultKpiHistoryRange.dateTo)
+  const [kpiForm, setKpiForm] = useState({
+    salary_profile_id: '',
+    effective_from: today,
+    rate_percentage: '1',
+    is_enabled: true,
+  })
+
+  async function loadKpiRules() {
+    setKpiRulesLoading(true)
+    setKpiRulesError('')
+    try {
+      const { data, error: loadError } = await supabase
+        .from('employee_kpi_rules')
+        .select('*')
+        .order('effective_from', { ascending: false })
+        .order('created_at', { ascending: false })
+      if (loadError) {
+        setKpiRules([])
+        setKpiRulesError(isMissingKpiMigration(loadError) ? l.kpiMigration : loadError.message || l.kpiLoadFailed)
+        return
+      }
+      setKpiRules(data || [])
+    } catch (loadError) {
+      setKpiRules([])
+      setKpiRulesError(isMissingKpiMigration(loadError) ? l.kpiMigration : loadError?.message || l.kpiLoadFailed)
+    } finally {
+      setKpiRulesLoading(false)
+    }
+  }
+
+  async function loadKpiResults() {
+    if (!kpiDateFrom || !kpiDateTo || kpiDateFrom > kpiDateTo) {
+      setKpiResults([])
+      setKpiResultCount(0)
+      setKpiResultsLoading(false)
+      setKpiResultsError(l.kpiInvalidRange)
+      return
+    }
+    setKpiResultsLoading(true)
+    setKpiResultsError('')
+    const from = (kpiResultPage - 1) * KPI_RESULT_PAGE_SIZE
+    try {
+      const { data, error: loadError, count } = await supabase
+        .from('employee_daily_kpi_results')
+        .select('*', { count: 'exact' })
+        .gte('business_date', kpiDateFrom)
+        .lte('business_date', kpiDateTo)
+        .order('business_date', { ascending: false })
+        .order('calculated_at', { ascending: false })
+        .range(from, from + KPI_RESULT_PAGE_SIZE - 1)
+      if (loadError) {
+        setKpiResults([])
+        setKpiResultCount(0)
+        setKpiResultsError(isMissingKpiMigration(loadError) ? l.kpiMigration : loadError.message || l.kpiLoadFailed)
+        return
+      }
+      setKpiResults((data || []).map(normalizeKpiResult))
+      setKpiResultCount(Number(count) || 0)
+    } catch (loadError) {
+      setKpiResults([])
+      setKpiResultCount(0)
+      setKpiResultsError(isMissingKpiMigration(loadError) ? l.kpiMigration : loadError?.message || l.kpiLoadFailed)
+    } finally {
+      setKpiResultsLoading(false)
+    }
+  }
 
   async function loadTelegramDeliveryData() {
     try {
@@ -543,7 +771,14 @@ export default function Salaries() {
     }
   }
 
-  useEffect(() => { loadData({ showLoader: true }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void loadData({ showLoader: true })
+    void loadKpiRules()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    void loadKpiResults()
+  }, [kpiDateFrom, kpiDateTo, kpiResultPage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function runTelegramNotificationInBackground(eventType, eventId, {
     retryKey = '',
@@ -568,13 +803,15 @@ export default function Salaries() {
     void send(eventId)
       .then(telegramResult => {
         const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
+        const employeeTelegramSatisfied = employeeTelegramSent
+          || telegramResult?.employeeIncludedInDailySummary === true
         const groupTelegramSent = telegramResult?.group?.status === 'sent'
         const teamDeliveryRequired = ['bonus', 'fine', 'absence'].includes(eventType)
         const teamTelegramSent = telegramResult?.team?.status === 'sent'
-        const allRequiredDestinationsSent = employeeTelegramSent
+        const allRequiredDestinationsSent = employeeTelegramSatisfied
           && groupTelegramSent
           && (!teamDeliveryRequired || teamTelegramSent)
-        const anyDestinationSent = employeeTelegramSent
+        const anyDestinationSent = employeeTelegramSatisfied
           || groupTelegramSent
           || (teamDeliveryRequired && teamTelegramSent)
         if (!announceResult) {
@@ -650,6 +887,18 @@ export default function Salaries() {
   const activeSalaryProfiles = useMemo(() => (
     sortedSalaryProfiles.filter(item => item.is_active !== false)
   ), [sortedSalaryProfiles])
+  const selectedKpiProfile = activeSalaryProfiles.find(item => item.id === kpiForm.salary_profile_id)
+  const currentKpiAssignments = useMemo(() => (
+    activeSalaryProfiles
+      .map(salaryProfile => ({
+        salaryProfile,
+        rule: getEffectiveKpiRule(kpiRules, salaryProfile.id, '9999-12-31'),
+      }))
+      .filter(item => item.rule)
+  ), [activeSalaryProfiles, kpiRules])
+  const kpiPreviewRateBps = parseKpiPercentToBps(kpiForm.rate_percentage)
+  const kpiPreviewBonus = calculateDailyKpiBonus(KPI_PREVIEW_BASE_AMOUNT, kpiPreviewRateBps)
+  const kpiResultPageCount = Math.max(1, Math.ceil(kpiResultCount / KPI_RESULT_PAGE_SIZE))
   const paymentDeliveryRows = useMemo(() => {
     const salaryProfileMap = new Map(salaryProfiles.map(item => [item.id, item]))
     return paymentDeliveries.map(delivery => {
@@ -694,6 +943,8 @@ export default function Salaries() {
       const event = salaryProfile?.[collections[delivery.event_type]]
         ?.find(item => item.id === delivery.event_id)
       if (!event) return null
+      const employeeIncludedInDailySummary = delivery.event_type === 'bonus'
+        && event?.source_type === 'daily_kpi'
       return {
         ...delivery,
         eventType: delivery.event_type,
@@ -710,6 +961,7 @@ export default function Salaries() {
         employeeTimestamp: delivery.employee_sent_at || delivery.employee_attempted_at,
         employeeMessageId: delivery.employee_telegram_message_id,
         employeeError: delivery.employee_error_message,
+        employeeIncludedInDailySummary,
         groupStatus: delivery.status,
         groupTimestamp: delivery.sent_at || delivery.attempted_at,
         groupMessageId: delivery.telegram_message_id,
@@ -812,6 +1064,111 @@ export default function Salaries() {
   useEffect(() => {
     setTelegramDeliveryPage(current => Math.min(current, telegramDeliveryPageCount))
   }, [telegramDeliveryPageCount])
+
+  useEffect(() => {
+    setKpiResultPage(current => Math.min(current, kpiResultPageCount))
+  }, [kpiResultPageCount])
+
+  function selectKpiEmployee(salaryProfileId, requestedRule = null) {
+    const currentRule = requestedRule || getEffectiveKpiRule(kpiRules, salaryProfileId, today)
+    setKpiForm({
+      salary_profile_id: salaryProfileId,
+      effective_from: getKpiRuleEditDate(requestedRule?.effective_from, today),
+      rate_percentage: currentRule ? formatKpiRateInput(currentRule.rate_bps) : '1',
+      is_enabled: currentRule?.is_enabled !== false,
+    })
+  }
+
+  async function saveKpiRule() {
+    const salaryProfile = activeSalaryProfiles.find(item => item.id === kpiForm.salary_profile_id)
+    const rateBps = parseKpiPercentToBps(kpiForm.rate_percentage)
+    if (!canManage || !salaryProfile || !kpiForm.effective_from || rateBps <= 0) return
+
+    setSaving('kpi-rule')
+    setKpiRulesError('')
+    setError('')
+    setMessage('')
+    const { error: saveError } = await supabase
+      .from('employee_kpi_rules')
+      .upsert({
+        salary_profile_id: salaryProfile.id,
+        effective_from: kpiForm.effective_from,
+        rate_bps: rateBps,
+        is_enabled: Boolean(kpiForm.is_enabled),
+        created_by: profile?.id || null,
+        created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
+      }, { onConflict: 'salary_profile_id,effective_from' })
+      .select('id')
+      .single()
+    setSaving('')
+    if (saveError) {
+      setKpiRulesError(isMissingKpiMigration(saveError) ? l.kpiMigration : saveError.message || l.kpiLoadFailed)
+      return
+    }
+    setMessage(l.kpiSaved)
+    await loadKpiRules()
+  }
+
+  function requestRemoveKpiRule(salaryProfile, rule) {
+    if (!canRemoveKpiRules || !salaryProfile?.id || !rule?.id) return
+    setKpiRulesError('')
+    setKpiRuleRemoveError('')
+    setKpiRuleToRemove({ salaryProfile, rule })
+  }
+
+  function cancelRemoveKpiRule() {
+    if (saving === `kpi-rule-delete-${kpiRuleToRemove?.rule?.id}`) return
+    setKpiRuleToRemove(null)
+    setKpiRuleRemoveError('')
+  }
+
+  async function removeKpiRule() {
+    const rule = kpiRuleToRemove?.rule
+    if (!canRemoveKpiRules || !rule?.id) {
+      setKpiRuleRemoveError(l.kpiRemoveOwnerOnly)
+      return
+    }
+
+    const savingKey = `kpi-rule-delete-${rule.id}`
+    setSaving(savingKey)
+    setKpiRuleRemoveError('')
+    setKpiRulesError('')
+    setError('')
+    setMessage('')
+
+    const { data: deletedRules, error: deleteError } = await supabase
+      .from('employee_kpi_rules')
+      .delete()
+      .eq('id', rule.id)
+      .select('id')
+
+    setSaving('')
+    if (deleteError) {
+      setKpiRuleRemoveError(
+        isMissingKpiMigration(deleteError)
+          ? l.kpiMigration
+          : isFinalizedKpiRuleError(deleteError)
+            ? l.kpiRemoveUsedError
+            : l.kpiRemoveFailed
+      )
+      return
+    }
+    if (!Array.isArray(deletedRules) || deletedRules.length !== 1) {
+      setKpiRuleRemoveError(l.kpiRemoveOwnerOnly)
+      return
+    }
+
+    setKpiRuleToRemove(null)
+    setKpiRuleRemoveError('')
+    setKpiForm({
+      salary_profile_id: '',
+      effective_from: today,
+      rate_percentage: '1',
+      is_enabled: true,
+    })
+    setMessage(l.kpiRemoved)
+    await loadKpiRules()
+  }
 
   async function createSalaryProfile(event) {
     event.preventDefault()
@@ -1356,6 +1713,49 @@ export default function Salaries() {
             </div>
           </section>
 
+          <DailyKpiSection
+            labels={l}
+            lang={lang}
+            canManage={canManage}
+            canRemoveRules={canRemoveKpiRules}
+            loading={loading}
+            activeSalaryProfiles={activeSalaryProfiles}
+            selectedKpiProfile={selectedKpiProfile}
+            form={kpiForm}
+            onSelectEmployee={selectKpiEmployee}
+            onFormChange={setKpiForm}
+            onSave={saveKpiRule}
+            saving={saving === 'kpi-rule'}
+            ruleToRemove={kpiRuleToRemove}
+            ruleRemoveError={kpiRuleRemoveError}
+            removingRuleId={saving.startsWith('kpi-rule-delete-') ? saving.slice('kpi-rule-delete-'.length) : ''}
+            onRequestRemoveRule={requestRemoveKpiRule}
+            onCancelRemoveRule={cancelRemoveKpiRule}
+            onConfirmRemoveRule={removeKpiRule}
+            rulesLoading={kpiRulesLoading}
+            rulesError={kpiRulesError}
+            currentAssignments={currentKpiAssignments}
+            previewRateBps={kpiPreviewRateBps}
+            previewBonus={kpiPreviewBonus}
+            historyDateFrom={kpiDateFrom}
+            historyDateTo={kpiDateTo}
+            onHistoryDateFromChange={value => {
+              setKpiDateFrom(value)
+              setKpiResultPage(1)
+            }}
+            onHistoryDateToChange={value => {
+              setKpiDateTo(value)
+              setKpiResultPage(1)
+            }}
+            results={kpiResults}
+            resultsLoading={kpiResultsLoading}
+            resultsError={kpiResultsError}
+            resultCount={kpiResultCount}
+            resultPage={kpiResultPage}
+            resultPageCount={kpiResultPageCount}
+            onResultPageChange={setKpiResultPage}
+          />
+
           <section className="mb-5" aria-labelledby="salary-settings-heading">
             <SectionHeading
               id="salary-settings-heading"
@@ -1523,7 +1923,9 @@ export default function Salaries() {
                               ? formatLongDate(delivery.eventDate, lang, delivery.eventDate)
                               : ''
                             const canRetry = [
-                              delivery.employeeStatus,
+                              ...(!delivery.employeeIncludedInDailySummary
+                                ? [delivery.employeeStatus]
+                                : []),
                               delivery.groupStatus,
                               ...(delivery.showTeamDelivery ? [delivery.teamStatus] : []),
                             ].some(status => ['not_attempted', 'failed', 'skipped'].includes(status))
@@ -1564,7 +1966,9 @@ export default function Salaries() {
                                       status: delivery.employeeStatus,
                                       timestamp: delivery.employeeTimestamp,
                                       messageId: delivery.employeeMessageId,
-                                      error: delivery.employeeError,
+                                      error: delivery.employeeIncludedInDailySummary
+                                        ? l.telegramKpiCombined
+                                        : delivery.employeeError,
                                     },
                                     {
                                       key: 'group',
@@ -1654,6 +2058,351 @@ export default function Salaries() {
   )
 }
 
+function DailyKpiSection({
+  labels,
+  lang,
+  canManage,
+  canRemoveRules,
+  loading,
+  activeSalaryProfiles,
+  selectedKpiProfile,
+  form,
+  onSelectEmployee,
+  onFormChange,
+  onSave,
+  saving,
+  ruleToRemove,
+  ruleRemoveError,
+  removingRuleId,
+  onRequestRemoveRule,
+  onCancelRemoveRule,
+  onConfirmRemoveRule,
+  rulesLoading,
+  rulesError,
+  currentAssignments,
+  previewRateBps,
+  previewBonus,
+  historyDateFrom,
+  historyDateTo,
+  onHistoryDateFromChange,
+  onHistoryDateToChange,
+  results,
+  resultsLoading,
+  resultsError,
+  resultCount,
+  resultPage,
+  resultPageCount,
+  onResultPageChange,
+}) {
+  const employeeLabel = salaryProfile => (
+    salaryProfile?.employee_name || salaryProfile?.profile?.full_name || salaryProfile?.profile?.email || '—'
+  )
+  const resultStatusLabels = {
+    generated: labels.kpiStatusGenerated,
+    skipped_absent: labels.kpiStatusAbsent,
+    skipped_ineligible: labels.kpiStatusIneligible,
+    skipped_no_sales: labels.kpiStatusNoSales,
+    voided: labels.kpiStatusVoided,
+  }
+  const resultStatusClasses = {
+    generated: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    skipped_absent: 'border-violet-200 bg-violet-50 text-violet-700',
+    skipped_ineligible: 'border-gray-200 bg-gray-50 text-gray-600',
+    skipped_no_sales: 'border-amber-200 bg-amber-50 text-amber-700',
+    voided: 'border-red-200 bg-red-50 text-red-700',
+  }
+
+  return (
+    <section className="mb-7" aria-labelledby="daily-kpi-heading">
+      <SectionHeading id="daily-kpi-heading" title={labels.kpiTitle} description={labels.kpiHelp} />
+
+      <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 text-sm font-semibold leading-relaxed text-violet-900 shadow-sm">
+        <p>{labels.kpiBaseStatement}</p>
+        <p className="mt-2 font-black">{labels.kpiPaidImmediately}</p>
+      </div>
+
+      <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <div className="h-full rounded-2xl border border-violet-100 bg-white p-4 shadow-sm sm:p-5">
+          <CardHeading icon={Percent} title={labels.kpiRuleTitle} description={labels.kpiRuleHelp} tone="violet" />
+          {rulesError && (
+            <p role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+              {rulesError}
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Field label={labels.employee}>
+                <select
+                  value={form.salary_profile_id}
+                  onChange={event => onSelectEmployee(event.target.value)}
+                  className={FIELD}
+                  disabled={!canManage || loading || rulesLoading}
+                >
+                  <option value="">{labels.selectEmployee}</option>
+                  {activeSalaryProfiles.map(item => (
+                    <option key={item.id} value={item.id}>{employeeLabel(item)}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <Field label={labels.effectiveDate}>
+              <DateInput
+                value={form.effective_from}
+                lang={lang}
+                onChange={value => onFormChange(current => ({ ...current, effective_from: value }))}
+                disabled={!canManage || loading || rulesLoading}
+              />
+            </Field>
+            <Field label={labels.kpiRate}>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form.rate_percentage}
+                  onChange={event => {
+                    const value = event.target.value.replace(',', '.').replace(/[^\d.]/g, '')
+                    if (/^\d{0,3}(?:\.\d{0,2})?$/.test(value)) {
+                      onFormChange(current => ({ ...current, rate_percentage: value }))
+                    }
+                  }}
+                  placeholder="1"
+                  className={`${FIELD} pr-10`}
+                  disabled={!canManage || loading || rulesLoading}
+                  aria-describedby="daily-kpi-rate-preview"
+                />
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-black text-violet-600">%</span>
+              </div>
+            </Field>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_enabled}
+              onClick={() => onFormChange(current => ({ ...current, is_enabled: !current.is_enabled }))}
+              disabled={!canManage || loading || rulesLoading}
+              className={`flex h-11 items-center justify-between rounded-xl border px-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                form.is_enabled
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-gray-200 bg-gray-100 text-gray-600'
+              }`}
+            >
+              <span>{form.is_enabled ? labels.kpiEnabled : labels.kpiDisabled}</span>
+              <span className={`relative h-6 w-11 rounded-full transition-colors ${form.is_enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden="true">
+                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.is_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </span>
+            </button>
+            <div id="daily-kpi-rate-preview" className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 sm:col-span-2">
+              <p className="text-[10px] font-black uppercase tracking-wide text-violet-600">{labels.kpiPreview}</p>
+              <p className="mt-1 text-sm font-black text-[#1F2937]">
+                {formatCurrency(KPI_PREVIEW_BASE_AMOUNT)} × {previewRateBps > 0 ? formatKpiRatePercent(previewRateBps, lang) : '—'} = {previewRateBps > 0 ? formatCurrency(previewBonus) : '—'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={!canManage || loading || rulesLoading || !selectedKpiProfile || !form.effective_from || previewRateBps <= 0 || saving}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 sm:col-span-2"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}
+              {labels.kpiSave}
+            </button>
+          </div>
+        </div>
+
+        <div className="h-full rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+          <CardHeading icon={Users} title={labels.kpiCurrent} description={labels.kpiBaseStatement} tone="dark" />
+          {rulesLoading ? (
+            <div className="flex min-h-40 items-center justify-center"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
+          ) : currentAssignments.length === 0 ? (
+            <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-[#E5E7EB] bg-[#F9FAFB] px-4 text-center text-sm font-bold text-[#9CA3AF]">
+              {labels.kpiNotConfigured}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {currentAssignments.map(({ salaryProfile, rule }) => (
+                <div
+                  key={salaryProfile.id}
+                  className={`flex w-full items-center gap-1 rounded-xl border p-1 transition-colors ${
+                    form.salary_profile_id === salaryProfile.id
+                      ? 'border-violet-300 bg-violet-50 ring-2 ring-violet-100'
+                      : 'border-[#E5E7EB] bg-[#F9FAFB] hover:border-violet-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSelectEmployee(salaryProfile.id, rule)}
+                    className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-2 py-2 text-left"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-black text-[#1F2937]">{employeeLabel(salaryProfile)}</span>
+                      <span className="mt-0.5 block text-[11px] font-semibold text-[#6B7280]">
+                        {labels.effectiveDate}: {formatLongDate(rule.effective_from, lang, rule.effective_from)}
+                      </span>
+                    </span>
+                    <span className="flex flex-shrink-0 flex-col items-end gap-1">
+                      <span className="text-base font-black text-violet-700">{formatKpiRatePercent(rule.rate_bps, lang)}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${rule.is_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600'}`}>
+                        {rule.is_enabled ? labels.kpiEnabled : labels.kpiDisabled}
+                      </span>
+                    </span>
+                  </button>
+                  {canRemoveRules && (
+                    <button
+                      type="button"
+                      onClick={() => onRequestRemoveRule(salaryProfile, rule)}
+                      aria-label={`${labels.kpiRemove}: ${employeeLabel(salaryProfile)}`}
+                      title={labels.kpiRemove}
+                      disabled={Boolean(removingRuleId)}
+                      className="inline-flex h-10 w-10 flex-shrink-0 touch-manipulation items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {removingRuleId === rule.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {ruleToRemove && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 px-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="remove-kpi-rule-title"
+            className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 shadow-2xl"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                <Trash2 size={18} />
+              </span>
+              <div className="min-w-0">
+                <h3 id="remove-kpi-rule-title" className="text-base font-black text-[#1F2937]">{labels.kpiRemoveTitle}</h3>
+                <p className="mt-1 truncate text-sm font-black text-[#1F2937]">{employeeLabel(ruleToRemove.salaryProfile)}</p>
+                <p className="mt-0.5 text-xs font-semibold text-[#6B7280]">
+                  {formatKpiRatePercent(ruleToRemove.rule.rate_bps, lang)} · {labels.effectiveDate}: {formatLongDate(ruleToRemove.rule.effective_from, lang, ruleToRemove.rule.effective_from)}
+                </p>
+              </div>
+            </div>
+            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-bold leading-relaxed text-amber-800">
+              {labels.kpiRemoveWarning}
+            </p>
+            {ruleRemoveError && (
+              <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-bold leading-relaxed text-red-700">
+                {ruleRemoveError}
+              </p>
+            )}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={onCancelRemoveRule}
+                disabled={removingRuleId === ruleToRemove.rule.id}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white px-4 text-sm font-black text-[#6B7280] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {labels.kpiRemoveCancel}
+              </button>
+              <button
+                type="button"
+                onClick={onConfirmRemoveRule}
+                disabled={removingRuleId === ruleToRemove.rule.id}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+              >
+                {removingRuleId === ruleToRemove.rule.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={15} />}
+                {labels.kpiRemoveConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h3 className="text-base font-black text-[#1F2937]">{labels.kpiHistory}</h3>
+            <p className="mt-0.5 text-xs font-semibold text-[#6B7280]">{labels.kpiHistoryHelp} · {resultCount}</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field label={labels.dateFrom}>
+              <DateInput value={historyDateFrom} lang={lang} onChange={onHistoryDateFromChange} />
+            </Field>
+            <Field label={labels.dateTo}>
+              <DateInput value={historyDateTo} lang={lang} onChange={onHistoryDateToChange} />
+            </Field>
+          </div>
+        </div>
+
+        {resultsError ? (
+          <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-800">{resultsError}</p>
+        ) : resultsLoading ? (
+          <div className="flex min-h-40 items-center justify-center"><Loader2 size={24} className="animate-spin text-gray-300" /></div>
+        ) : results.length === 0 ? (
+          <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-[#E5E7EB] bg-[#F9FAFB] px-4 text-center text-sm font-bold text-[#9CA3AF]">
+            {labels.kpiHistoryEmpty}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {results.map(result => {
+              const generated = result.status === 'generated'
+              return (
+                <article key={result.id} className="rounded-xl border border-l-4 border-[#E5E7EB] border-l-violet-500 bg-violet-50/30 px-3 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-black text-[#1F2937]">{result.employee_name_snapshot || '—'}</p>
+                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-violet-700">{labels.kpiAutomatic}</span>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-[#6B7280]">{formatLongDate(result.business_date, lang, result.business_date)}</p>
+                    </div>
+                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black ${resultStatusClasses[result.status] || resultStatusClasses.skipped_ineligible}`}>
+                      {resultStatusLabels[result.status] || result.status || '—'}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <div className="rounded-lg border border-violet-100 bg-white px-3 py-2">
+                      <p className="text-[10px] font-black uppercase tracking-wide text-violet-600">{labels.kpiSalesBase}</p>
+                      <p className="mt-0.5 text-xs font-black text-[#1F2937]">
+                        {formatCurrency(result.baseAmountUzs)} × {formatKpiRatePercent(result.rateBps, lang)} = {formatCurrency(result.bonusAmountUzs)}
+                      </p>
+                    </div>
+                    <div className="sm:text-right">
+                      <p className="text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{labels.kpiBonusAmount}</p>
+                      <p className={`mt-0.5 text-sm font-black ${generated ? 'text-emerald-700' : 'text-[#6B7280]'}`}>{formatCurrency(result.bonusAmountUzs)}</p>
+                      {generated && result.payment_method && <p className="mt-0.5 text-[10px] font-semibold text-[#9CA3AF]">{expensePaymentMethodLabel(result.payment_method, lang)}</p>}
+                    </div>
+                  </div>
+                  {result.calculated_at && <p className="mt-2 text-[10px] font-semibold text-[#9CA3AF]">{formatDateTime(result.calculated_at, '—')}</p>}
+                </article>
+              )
+            })}
+          </div>
+        )}
+
+        {resultPageCount > 1 && (
+          <nav aria-label={labels.kpiHistory} className="mt-4 flex items-center justify-between gap-3 border-t border-[#E5E7EB] pt-4">
+            <button
+              type="button"
+              disabled={resultPage <= 1 || resultsLoading}
+              onClick={() => onResultPageChange(current => Math.max(1, current - 1))}
+              className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft size={14} />{labels.previous}
+            </button>
+            <span className="text-xs font-black text-[#6B7280]">{labels.page} {resultPage} {labels.of} {resultPageCount}</span>
+            <button
+              type="button"
+              disabled={resultPage >= resultPageCount || resultsLoading}
+              onClick={() => onResultPageChange(current => Math.min(resultPageCount, current + 1))}
+              className="inline-flex h-9 items-center gap-1 rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {labels.next}<ChevronRight size={14} />
+            </button>
+          </nav>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function MetricCard({ icon: Icon, label, value, tone = 'orange' }) {
   const tones = {
     orange: {
@@ -1693,6 +2442,10 @@ function SectionHeading({ id, title, description }) {
 function CardHeading({ icon: Icon, title, description, tone = 'orange' }) {
   const iconTone = tone === 'red'
     ? 'bg-red-50 text-red-600'
+    : tone === 'blue'
+      ? 'bg-blue-50 text-blue-600'
+      : tone === 'violet'
+        ? 'bg-violet-50 text-violet-600'
     : tone === 'dark'
       ? 'bg-gray-100 text-[#1F2937]'
       : 'bg-orange-50 text-[#ff5a00]'

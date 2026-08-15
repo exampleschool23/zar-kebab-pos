@@ -21,14 +21,13 @@ import {
   getMaxPaymentAmount,
   isCancelledOrderItem,
   calculateLoyaltyCashback,
-  normalizeServiceRatePct,
   normalizeSplitPayments,
 } from '../lib/analytics'
 import { supabase } from '../lib/supabase'
 import { getLoyaltyCardCashbackPercent, getLoyaltyCardCashbackType } from '../lib/loyalty'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import StatusBadge from '../components/StatusBadge'
-import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
+import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem } from '../lib/menuItems'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
@@ -37,6 +36,7 @@ import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '..
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 import { formatElapsedSince } from '../lib/dateFormat'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
+import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -84,8 +84,6 @@ export default function CashierBill() {
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
   const canEditCashier = canEditFeature(profile || { role: state.user?.role }, 'cashier')
 
-  const configuredServiceRatePct = normalizeServiceRatePct(state.settings?.serviceRate)
-
   const [payMethod,  setPayMethod]  = useState('cash')
   const [splitPayments, setSplitPayments] = useState([{ id: 'payment-1', method: 'cash', amount: '' }])
   const [activePaymentId, setActivePaymentId] = useState('payment-1')
@@ -122,10 +120,11 @@ export default function CashierBill() {
     const mergedItems = getGroupedOrderItems(billableItems)
     const firstOrder = orders[0]
     const orderType = inferOrderType(firstOrder)
+    const fallbackServiceRatePct = getConfiguredServiceRatePct(state.settings, firstOrder.price_mode)
     const serviceRatePct = isOffPremiseOrderType(orderType)
       ? 0
-      : orders.find(o => o.service_rate_pct != null)?.service_rate_pct ?? configuredServiceRatePct
-    const summary = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, billableItems, configuredServiceRatePct)
+      : orders.find(o => o.service_rate_pct != null)?.service_rate_pct ?? fallbackServiceRatePct
+    const summary = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, billableItems, fallbackServiceRatePct)
     return {
       ...orders[0],
       order_type: orderType,
@@ -136,11 +135,12 @@ export default function CashierBill() {
       service_rate_pct: summary.serviceRatePct,
       total:       summary.total,
     }
-  }, [state.orders, tableId, orderId, configuredServiceRatePct, menuItemMap])
+  }, [state.orders, state.settings, tableId, orderId, menuItemMap])
 
   const table = state.tables.find(t => t.id === tableId)
   const orderType = inferOrderType(order)
   const orderPriceMode = normalizePriceMode(order?.price_mode)
+  const configuredServiceRatePct = getConfiguredServiceRatePct(state.settings, orderPriceMode)
   const isOffPremise = isOffPremiseOrderType(orderType)
   const orderLabel = isOffPremise
     ? `${orderTypeLabel(orderType, lang)} · ${order?.order_number || order?.id || ''}`
@@ -148,6 +148,7 @@ export default function CashierBill() {
 
   const quickItems = useMemo(() =>
     state.menuItems
+      .filter(isActiveMenuItem)
       .filter(isCashierQuickItem)
       .sort((a, b) => getQuickItemSortOrder(a) - getQuickItemSortOrder(b))
       .slice(0, 8),

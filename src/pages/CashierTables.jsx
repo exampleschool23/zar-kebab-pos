@@ -25,7 +25,7 @@ import { isCashierVisibleBill, isTakeAwayBill } from '../lib/cashierBills'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { getItemName } from '../lib/i18n'
-import { getQuickItemSortOrder, isCashierQuickItem } from '../lib/menuItems'
+import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem } from '../lib/menuItems'
 import { formatDateTime, formatElapsedSince, formatTime, parseInstantDate } from '../lib/dateFormat'
 import { canDeletePaidOrders, canEditFeature, canMoveBackToTable } from '../lib/permissions'
 import { getOrderItemOptionLines } from '../components/MenuProductCards'
@@ -657,6 +657,7 @@ export default function CashierTables() {
 
   const quickItems = useMemo(() =>
     state.menuItems
+      .filter(isActiveMenuItem)
       .filter(isCashierQuickItem)
       .sort((a, b) => getQuickItemSortOrder(a) - getQuickItemSortOrder(b))
       .slice(0, 6),

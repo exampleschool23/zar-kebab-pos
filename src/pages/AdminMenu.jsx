@@ -944,15 +944,18 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
             <button
               onClick={() => onEdit(item)}
               disabled={visibilityPending}
-              className="flex-1 flex h-10 items-center justify-center gap-1 rounded-xl border border-[#ff5a00]/20 bg-[#fff1e8] text-[#ff5a00] hover:bg-[#ff5a00] hover:text-white transition-colors text-[12px] font-bold disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-11 flex-1 items-center justify-center gap-1 rounded-xl border border-[#ff5a00]/20 bg-[#fff1e8] text-[12px] font-bold text-[#ff5a00] transition-colors hover:bg-[#ff5a00] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Edit2 size={11} />
               {lang === 'uz' ? 'Tahrirl' : lang === 'ru' ? 'Ред.' : 'Edit'}
             </button>
             <button
-              onClick={() => onDelete(item.id)}
+              type="button"
+              onPointerDown={event => event.stopPropagation()}
+              onClick={() => onDelete(item)}
               disabled={visibilityPending}
-              className="h-10 w-10 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={lang === 'uz' ? 'Mahsulotni o‘chirish' : lang === 'ru' ? 'Удалить товар' : 'Delete item'}
+              className="touch-manipulation flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-300 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Trash2 size={12} />
             </button>
@@ -982,7 +985,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
+      className="flex flex-wrap items-center gap-3 px-3 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 sm:flex-nowrap sm:gap-4 sm:px-5"
     >
       {!readOnly && <DragHandle listeners={listeners} attributes={attributes} />}
       <SafeMenuImage
@@ -1016,7 +1019,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
         {itemVisibilityStatusLabel(lang, item.available)}
       </span>
       {!readOnly && (
-        <div className="flex gap-1.5 flex-shrink-0">
+        <div className="flex w-full flex-shrink-0 justify-end gap-1.5 border-t border-gray-100 pt-2 sm:w-auto sm:border-0 sm:pt-0">
           {canChangeAvailability ? (
             <VisibilityToggleButton
               visible={!!item.available}
@@ -1043,9 +1046,12 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
             {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Редакт.' : 'Edit'}
           </button>
           <button
-            onClick={() => onDelete(item.id)}
+            type="button"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={() => onDelete(item)}
             disabled={visibilityPending}
-            className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={lang === 'uz' ? 'Mahsulotni o‘chirish' : lang === 'ru' ? 'Удалить товар' : 'Delete item'}
+            className="touch-manipulation flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Trash2 size={14} />
           </button>
@@ -1620,6 +1626,8 @@ export default function AdminMenu() {
   const [gridView,   setGridView]   = useState(true)
   const [activeId,   setActiveId]   = useState(null) // drag overlay
   const [savingItemId, setSavingItemId] = useState('')
+  const [deleteItemCandidate, setDeleteItemCandidate] = useState(null)
+  const [deleteItemError, setDeleteItemError] = useState('')
   const [savingCatId, setSavingCatId] = useState('')
   const [savingItemForm, setSavingItemForm] = useState(false)
   const [savingCatForm, setSavingCatForm] = useState(false)
@@ -1631,6 +1639,8 @@ export default function AdminMenu() {
   const productEditorInitializedRef = useRef('')
   const categoryEditorInitializedRef = useRef('')
   const shellScrollRef = useRef(null)
+  const deleteDialogRef = useRef(null)
+  const deleteCancelButtonRef = useRef(null)
   const currentItemFormFingerprint = useMemo(() => getItemFormFingerprint(form), [form])
   const isItemFormDirty = itemModal === 'new'
     || (itemModal === 'edit' && !!originalItemFormFingerprint && currentItemFormFingerprint !== originalItemFormFingerprint)
@@ -1649,6 +1659,40 @@ export default function AdminMenu() {
     && canEditMenu
     && !!trimMenuItemTextValue(catForm.name_uz)
     && isCatFormDirty
+
+  useEffect(() => {
+    if (!deleteItemCandidate) return undefined
+    const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const frame = window.requestAnimationFrame(() => deleteCancelButtonRef.current?.focus())
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.body.style.overflow = previousOverflow
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+    }
+  }, [deleteItemCandidate?.id])
+
+  function handleDeleteDialogKeyDown(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      if (savingItemId !== deleteItemCandidate?.id) closeDeleteItemDialog()
+      return
+    }
+    if (event.key !== 'Tab') return
+    const focusable = Array.from(deleteDialogRef.current?.querySelectorAll('button:not([disabled])') || [])
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   // Sensors: pointer (mouse/trackpad) + touch
   const sensors = useSensors(
@@ -1985,17 +2029,38 @@ export default function AdminMenu() {
   }
   async function deleteItem(id) {
     if (!canEditMenu || savingItemId) return
-    if (!window.confirm('Delete this item?')) return
     setSavingItemId(id)
     setMenuNotice(null)
+    setDeleteItemError('')
     try {
       const result = await dispatch({ type: 'DELETE_MENU_ITEM', payload: id })
       if (result?.error) {
-        setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
+        const message = result.error.message || saveFailedLabel(lang)
+        setMenuNotice({ tone: 'error', message })
+        setDeleteItemError(message)
+        return
       }
+      setDeleteItemCandidate(null)
+      setDeleteItemError('')
+    } catch (error) {
+      const message = error?.message || saveFailedLabel(lang)
+      setMenuNotice({ tone: 'error', message })
+      setDeleteItemError(message)
     } finally {
       setSavingItemId('')
     }
+  }
+
+  function requestDeleteItem(item) {
+    if (!canEditMenu || savingItemId || !item?.id) return
+    setDeleteItemError('')
+    setDeleteItemCandidate(item)
+  }
+
+  function closeDeleteItemDialog() {
+    if (savingItemId === deleteItemCandidate?.id) return
+    setDeleteItemCandidate(null)
+    setDeleteItemError('')
   }
 
   // ── Category CRUD ──────────────────────────────────────────────────────────
@@ -2817,7 +2882,7 @@ export default function AdminMenu() {
                                       item={item}
                                       lang={lang}
                                       onEdit={openEditItem}
-                                      onDelete={deleteItem}
+                                      onDelete={requestDeleteItem}
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
@@ -2834,7 +2899,7 @@ export default function AdminMenu() {
                                       item={item}
                                       lang={lang}
                                       onEdit={openEditItem}
-                                      onDelete={deleteItem}
+                                      onDelete={requestDeleteItem}
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
@@ -2866,7 +2931,7 @@ export default function AdminMenu() {
                                       item={item}
                                       lang={lang}
                                       onEdit={openEditItem}
-                                      onDelete={deleteItem}
+                                      onDelete={requestDeleteItem}
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
@@ -2883,7 +2948,7 @@ export default function AdminMenu() {
                                       item={item}
                                       lang={lang}
                                       onEdit={openEditItem}
-                                      onDelete={deleteItem}
+                                      onDelete={requestDeleteItem}
                                       onToggleVisibility={toggleItemVisibility}
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
@@ -2906,7 +2971,7 @@ export default function AdminMenu() {
                                 item={item}
                                 lang={lang}
                                 onEdit={openEditItem}
-                                onDelete={deleteItem}
+                                onDelete={requestDeleteItem}
                                 onToggleVisibility={toggleItemVisibility}
                                 visibilityPending={savingItemId === item.id}
                                 categories={realSortedCats}
@@ -2923,7 +2988,7 @@ export default function AdminMenu() {
                                 item={item}
                                 lang={lang}
                                 onEdit={openEditItem}
-                                onDelete={deleteItem}
+                                onDelete={requestDeleteItem}
                                 onToggleVisibility={toggleItemVisibility}
                                 visibilityPending={savingItemId === item.id}
                                 categories={realSortedCats}
@@ -3116,7 +3181,7 @@ export default function AdminMenu() {
                             item={item}
                             lang={lang}
                             onEdit={openEditItem}
-                            onDelete={deleteItem}
+                            onDelete={requestDeleteItem}
                             onToggleVisibility={toggleItemVisibility}
                             visibilityPending={savingItemId === item.id}
                             categories={realSortedCats}
@@ -3149,6 +3214,75 @@ export default function AdminMenu() {
           )}
         </div>
       </div>
+
+      {deleteItemCandidate && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6">
+          <button
+            type="button"
+            aria-label={lang === 'uz' ? 'Yopish' : lang === 'ru' ? 'Закрыть' : 'Close'}
+            onClick={closeDeleteItemDialog}
+            disabled={savingItemId === deleteItemCandidate.id}
+            className="absolute inset-0 h-full w-full cursor-default bg-slate-950/55 backdrop-blur-sm disabled:cursor-wait"
+          />
+          <div
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-menu-item-title"
+            aria-describedby="delete-menu-item-description"
+            aria-busy={savingItemId === deleteItemCandidate.id}
+            onKeyDown={handleDeleteDialogKeyDown}
+            tabIndex={-1}
+            className="relative max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-[24px] border border-white/70 bg-white p-5 shadow-2xl"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <Trash2 size={22} />
+            </div>
+            <h2 id="delete-menu-item-title" className="mt-4 text-xl font-black text-[#1F2937]">
+              {lang === 'uz' ? 'Mahsulotni o‘chirasizmi?' : lang === 'ru' ? 'Удалить товар?' : 'Delete item?'}
+            </h2>
+            <p className="mt-2 break-words text-sm font-semibold leading-6 text-[#6B7280]">
+              {getItemName(deleteItemCandidate, lang)}
+            </p>
+            <p id="delete-menu-item-description" className="mt-2 text-xs leading-5 text-[#9CA3AF]">
+              {lang === 'uz'
+                ? 'Mahsulot menyudan arxivlanadi. Oldingi buyurtmalar tarixi saqlanadi.'
+                : lang === 'ru'
+                  ? 'Товар будет архивирован из меню. История прошлых заказов сохранится.'
+                  : 'The item will be archived from the menu. Previous order history will remain.'}
+            </p>
+            {deleteItemError && (
+              <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">
+                {deleteItemError}
+              </p>
+            )}
+            <div className="mt-5 flex gap-3">
+              <button
+                ref={deleteCancelButtonRef}
+                type="button"
+                onClick={closeDeleteItemDialog}
+                disabled={savingItemId === deleteItemCandidate.id}
+                className="h-12 flex-1 rounded-xl border border-[#E5E7EB] bg-white text-sm font-black text-[#6B7280] disabled:opacity-50"
+              >
+                {lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteItem(deleteItemCandidate.id)}
+                disabled={savingItemId === deleteItemCandidate.id}
+                className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 text-sm font-black text-white shadow-lg shadow-red-100 disabled:opacity-50"
+              >
+                {savingItemId === deleteItemCandidate.id
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : <Trash2 size={16} />}
+                {savingItemId === deleteItemCandidate.id
+                  ? (lang === 'uz' ? 'O‘chirilmoqda…' : lang === 'ru' ? 'Удаление…' : 'Deleting…')
+                  : (lang === 'uz' ? 'O‘chirish' : lang === 'ru' ? 'Удалить' : 'Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Item modal ──────────────────────────────────────────────────────── */}
       {itemModal && (

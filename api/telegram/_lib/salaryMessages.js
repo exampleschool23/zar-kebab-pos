@@ -81,6 +81,32 @@ export function getTashkentDate(now = new Date()) {
   return `${values.year}-${values.month}-${values.day}`
 }
 
+export function addSalaryDateDays(date, dayCount) {
+  const normalizedDate = String(date || '').slice(0, 10)
+  const match = normalizedDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return ''
+  const value = new Date(Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]) + Number(dayCount || 0),
+    12
+  ))
+  return value.toISOString().slice(0, 10)
+}
+
+export function getCompletedTashkentDate(now = new Date()) {
+  return addSalaryDateDays(getTashkentDate(now), -1)
+}
+
+export function getCompletedTashkentDates(now = new Date(), limit = 7) {
+  const completedDate = getCompletedTashkentDate(now)
+  const boundedLimit = Math.max(1, Math.min(31, Math.trunc(Number(limit) || 1)))
+  return Array.from(
+    { length: boundedLimit },
+    (_, index) => addSalaryDateDays(completedDate, index - boundedLimit + 1)
+  )
+}
+
 export function getDailySalaryNotificationSummary(salaryProfile, date) {
   const absence = (salaryProfile?.absences || []).find(
     item => String(item?.absence_date || item?.date || '').slice(0, 10) === date
@@ -153,15 +179,12 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
   const attendanceValue = summary.absence
     ? `${copy.absent}${summary.absence.note ? ` — ${escapeTelegramHtml(summary.absence.note)}` : ''}`
     : copy.present
-  const moneySections = []
-  if (summary.earned > 0) {
-    moneySections.push(`<b>${copy.earned}:</b> ${formatSalaryNotificationAmount(summary.earned)} ${copy.currency}`)
-  }
+  const moneySections = [
+    `<b>${copy.earned}:</b> ${formatSalaryNotificationAmount(summary.earned)} ${copy.currency}`,
+    `<b>${copy.bonuses}:</b> ${formatSalaryNotificationAmount(summary.bonusTotal)} ${copy.currency}`,
+  ]
   if (summary.bonusTotal > 0) {
-    moneySections.push(
-      `<b>${copy.bonuses}:</b> ${formatSalaryNotificationAmount(summary.bonusTotal)} ${copy.currency}`,
-      ...bonusLines
-    )
+    moneySections.push(...bonusLines)
   }
   if (summary.fineTotal > 0) {
     moneySections.push(

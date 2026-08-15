@@ -1,4 +1,5 @@
 import { compareSalaryTransactionsNewestFirst } from './salaryTransactions.js'
+import { indexKpiResultsByBonusId } from './dailyKpi.js'
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const MONTH_PATTERN = /^(\d{4})-(\d{2})$/
@@ -43,7 +44,9 @@ export function buildSalaryHistoryEntries({
   bonuses = [],
   fines = [],
   absences = [],
+  kpiResults = [],
 } = {}) {
+  const kpiResultsByBonusId = indexKpiResultsByBonusId(kpiResults)
   const entries = [
     ...payments.map(payment => ({
       id: payment.id,
@@ -54,15 +57,20 @@ export function buildSalaryHistoryEntries({
       detail: payment.note || '',
       paymentMethod: payment.payment_method || '',
     })),
-    ...bonuses.map(bonus => ({
-      id: bonus.id,
-      entryType: 'bonus',
-      date: normalizeEntryDate(bonus.bonus_date),
-      createdAt: bonus.created_at || '',
-      amount: normalizeAmount(bonus.amount),
-      detail: bonus.note || '',
-      paymentMethod: bonus.payment_method || '',
-    })),
+    ...bonuses.map(bonus => {
+      const kpiResult = kpiResultsByBonusId.get(bonus.id)
+      return {
+        id: bonus.id,
+        entryType: 'bonus',
+        date: normalizeEntryDate(bonus.bonus_date),
+        createdAt: bonus.created_at || '',
+        amount: normalizeAmount(bonus.amount),
+        detail: bonus.note || '',
+        paymentMethod: bonus.payment_method || '',
+        automaticKpi: bonus.source_type === 'daily_kpi' || Boolean(kpiResult),
+        kpiResult: kpiResult || null,
+      }
+    }),
     ...fines.map(fine => ({
       id: fine.id,
       entryType: 'fine',

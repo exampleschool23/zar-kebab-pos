@@ -5,6 +5,7 @@ import {
   getOrderPaymentSummary,
   getPaymentMethodSummary,
   isCancelledOrderItem,
+  isPaidOrder,
   normalizeSplitPayments,
   removeSentCartItems,
 } from '../lib/analytics.js'
@@ -40,8 +41,8 @@ export function ordersReducer(state, action) {
     case 'SEND_TO_KITCHEN': {
       const orderType = normalizeOrderType(action.payload?.orderType)
       const isOffPremise = isOffPremiseOrderType(orderType)
-      const table = isOffPremise ? null : state.tables.find(t => t.id === state.currentTableId)
-      if ((!isOffPremise && !table) || state.cart.length === 0) return state
+      const tableId = isOffPremise ? null : (action._tableId || state.currentTableId)
+      const table = isOffPremise ? null : state.tables.find(t => t.id === tableId)
       const orderId = action._orderId || ('o' + Date.now())
       const opener = orderActorFields(state.user, 'Waiter')
       const priceMode = normalizePriceMode(action.payload?.priceMode || action._priceMode || DEFAULT_PRICE_MODE)
@@ -63,9 +64,22 @@ export function ordersReducer(state, action) {
         submitted_at: i.submitted_at || submittedAt,
         created_at: i.created_at || submittedAt,
       }))
-      const activeOrder = state.orders.find(o =>
-        o.id === orderId ||
-        (!isOffPremise && o.table_id === state.currentTableId && o.payment_status !== 'paid')
+      if (cartItems.length === 0) return state
+      if (action._kitchenSubmissionReconciled) {
+        return { ...state, cart: removeSentCartItems(state.cart, cartItems) }
+      }
+
+      const exactOrder = state.orders.find(o => o.id === orderId)
+      const exactOrderItemIds = new Set((exactOrder?.items || []).map(item => item.id).filter(Boolean))
+      const exactRoundAlreadyLoaded = !!exactOrder && cartItems.every(item => item.id && exactOrderItemIds.has(item.id))
+      if (exactRoundAlreadyLoaded) {
+        return { ...state, cart: removeSentCartItems(state.cart, cartItems) }
+      }
+      if (exactOrder && isPaidOrder(exactOrder)) return state
+      if (!isOffPremise && !table) return state
+
+      const activeOrder = exactOrder || state.orders.find(o =>
+        (!isOffPremise && o.table_id === tableId && o.payment_status !== 'paid')
       )
       const existingItemIds = new Set((activeOrder?.items || []).map(item => item.id).filter(Boolean))
       const newCartItems = activeOrder
@@ -75,7 +89,9 @@ export function ordersReducer(state, action) {
       const subtotal = (Number(activeOrder?.subtotal) || 0) + addedSubtotal
       const serviceRatePct = isOffPremise ? 0 : Number.isFinite(Number(activeOrder?.service_rate_pct))
         ? Number(activeOrder.service_rate_pct)
-        : serviceRatePctFromSettings(state.settings)
+        : Number.isFinite(Number(action._serviceRatePct))
+          ? Number(action._serviceRatePct)
+          : serviceRatePctFromSettings(state.settings, priceMode)
       const paymentFields = getOrderPaymentFields(
         { subtotal, order_type: orderType, service_rate_pct: serviceRatePct },
         [],
@@ -97,7 +113,7 @@ export function ordersReducer(state, action) {
             order_number: isOffPremise ? (action._orderNumber || makeOrderNumber(orderId, orderType)) : undefined,
             order_type: orderType,
             price_mode: priceMode,
-            table_id: isOffPremise ? null : state.currentTableId,
+            table_id: tableId,
             table_name: isOffPremise ? orderTypeLabel(orderType, 'en') : table.name,
             waiter_name: opener.name,
             opened_by: opener.id,
@@ -109,7 +125,7 @@ export function ordersReducer(state, action) {
             created_at: new Date().toISOString(),
           }]
       const updatedTables = isOffPremise ? state.tables : state.tables.map(t =>
-        t.id === state.currentTableId
+        t.id === tableId
           ? {
               ...t,
               status: 'occupied',
@@ -261,6 +277,12 @@ export function ordersReducer(state, action) {
         orders: state.orders.map(order => {
           const matches = orderId ? order.id === orderId : order.table_id === tableId
           if (!matches || order.payment_status === 'paid') return order
+          const priceModeChanged = normalizePriceMode(order.price_mode) !== priceMode
+          const nextServiceRatePct = isOffPremiseOrderType(order.order_type)
+            ? 0
+            : !priceModeChanged && Number.isFinite(Number(order.service_rate_pct))
+              ? Number(order.service_rate_pct)
+              : serviceRatePctFromSettings(state.settings, priceMode)
           const nextItems = (order.items || []).map(item => {
             const basePrice = getOrderItemBasePrice(item)
             const unitPrice = calculateUnitPrice(basePrice, priceMode)
@@ -272,7 +294,12 @@ export function ordersReducer(state, action) {
               price_mode: priceMode,
             }
           })
-          return recalcOrderTotals({ ...order, price_mode: priceMode, items: nextItems }, state.settings)
+          return recalcOrderTotals({
+            ...order,
+            price_mode: priceMode,
+            service_rate_pct: nextServiceRatePct,
+            items: nextItems,
+          }, state.settings)
         }),
       }
     }
@@ -339,7 +366,7 @@ export function ordersReducer(state, action) {
             ? Number(loyalty.service_rate_pct)
             : Number.isFinite(Number(o.service_rate_pct))
               ? Number(o.service_rate_pct)
-              : serviceRatePctFromSettings(state.settings)
+              : serviceRatePctFromSettings(state.settings, o.price_mode)
           const gross = getOrderPaymentSummary({ ...o, service_rate_pct: serviceRatePct }, o.items || [], serviceRatePct)
           const loyaltyUsedAmount = Math.min(remainingLoyalty, gross.total)
           remainingLoyalty -= loyaltyUsedAmount
@@ -414,7 +441,7 @@ export function ordersReducer(state, action) {
             ? Number(loyalty.service_rate_pct)
             : Number.isFinite(Number(o.service_rate_pct))
               ? Number(o.service_rate_pct)
-              : serviceRatePctFromSettings(state.settings)
+              : serviceRatePctFromSettings(state.settings, o.price_mode)
           const activeSummary = activeOrderSummaries.find(row => row.id === o.id)
           const paymentFields = activeSummary?.fields || getOrderPaymentFields(
             { ...o, ...(loyalty || {}), service_rate_pct: serviceRatePct },

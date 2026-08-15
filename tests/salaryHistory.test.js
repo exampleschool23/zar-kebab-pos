@@ -49,6 +49,31 @@ test('salary history maps all record types and sorts by effective date then reco
   assert.equal(entries[3].amount, 0)
 })
 
+test('salary history decorates automatic KPI bonuses with their immutable formula snapshot', () => {
+  const [entry] = buildSalaryHistoryEntries({
+    bonuses: [{
+      id: 'bonus-kpi',
+      bonus_date: '2026-08-14',
+      amount: 97_750,
+      source_type: 'daily_kpi',
+    }],
+    kpiResults: [{
+      id: 'kpi-result',
+      bonus_id: 'bonus-kpi',
+      business_date: '2026-08-14',
+      sales_base_amount: 9_775_000,
+      rate_bps: 100,
+      bonus_amount: 97_750,
+      status: 'generated',
+    }],
+  })
+
+  assert.equal(entry.automaticKpi, true)
+  assert.equal(entry.kpiResult.baseAmountUzs, 9_775_000)
+  assert.equal(entry.kpiResult.rateBps, 100)
+  assert.equal(entry.kpiResult.bonusAmountUzs, 97_750)
+})
+
 test('salary history calendar is Monday-first, fixed-height, and marks activity and today', () => {
   const entries = buildSalaryHistoryEntries({
     payments: [{ id: 'payment', paid_date: '2026-08-08', amount: 500000 }],

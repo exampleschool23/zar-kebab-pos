@@ -4,6 +4,8 @@ import fs from 'node:fs'
 import {
   buildDailySalaryMessage,
   formatSalaryNotificationAmount,
+  getCompletedTashkentDate,
+  getCompletedTashkentDates,
   getDailySalaryNotificationSummary,
   getTashkentDate,
   parseEmployeeStartToken,
@@ -585,18 +587,19 @@ test('employee salary notifications share one endpoint within the Hobby function
   assert.ok(countApiFunctions(apiRoot) <= 12)
 })
 
-test('daily salary message clearly shows a recorded absence and its note', () => {
+test('daily salary message shows absence while retaining the daily salary and bonus fields', () => {
   const message = buildDailySalaryMessage({
     ...salaryProfile,
     absences: [{ absence_date: '2026-07-29', note: '<Болезнь>' }],
   }, '2026-07-29', 'ru')
 
   assert.match(message, /Статус дня:<\/b> Отсутствовал — &lt;Болезнь&gt;/)
-  assert.doesNotMatch(message, /Начислено за день/)
+  assert.match(message, /Начислено за день:<\/b> 0 UZS/)
+  assert.match(message, /Бонусы за день:<\/b> 50 000 UZS/)
   assert.doesNotMatch(message, /<Болезнь>/)
 })
 
-test('daily salary message omits every zero-value money section including amount due', () => {
+test('daily salary message always shows salary and bonus fields while omitting other zero-value sections', () => {
   const message = buildDailySalaryMessage({
     id: 'salary-zero',
     employee_name: 'Новый сотрудник',
@@ -611,12 +614,11 @@ test('daily salary message omits every zero-value money section including amount
 
   assert.match(message, /Здравствуйте, Новый сотрудник!/)
   assert.match(message, /Статус дня:<\/b> Отсутствовал — Болезнь/)
-  assert.doesNotMatch(message, /Начислено за день/)
-  assert.doesNotMatch(message, /Бонусы за день/)
+  assert.match(message, /Начислено за день:<\/b> 0 UZS/)
+  assert.match(message, /Бонусы за день:<\/b> 0 UZS/)
   assert.doesNotMatch(message, /Штрафы за день/)
   assert.doesNotMatch(message, /Выплачено за день/)
   assert.doesNotMatch(message, /К выплате/)
-  assert.doesNotMatch(message, /0 UZS/)
 })
 
 test('employee start links accept only the expected token shape', () => {
@@ -654,12 +656,18 @@ test('current employee status uses the Tashkent calendar date', () => {
   assert.equal(getTashkentDate(new Date('2026-07-28T19:00:00Z')), '2026-07-29')
 })
 
-test('daily salary cron targets 22:30 Tashkent and reports the current day', () => {
+test('daily salary cron runs in the 01:00 Tashkent hour and reports the completed day', () => {
   const vercelConfig = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
   const dailySalaryCron = vercelConfig.crons.find(cron => cron.path === '/api/telegram/daily-salary')
   const dailySalaryEndpoint = fs.readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
 
-  assert.equal(dailySalaryCron?.schedule, '30 17 * * *')
-  assert.match(dailySalaryEndpoint, /const notificationDate = getTashkentDate\(\)/)
-  assert.doesNotMatch(dailySalaryEndpoint, /completedTashkentDate/)
+  assert.equal(dailySalaryCron?.schedule, '0 20 * * *')
+  assert.equal(getCompletedTashkentDate(new Date('2026-07-29T20:00:00Z')), '2026-07-29')
+  assert.deepEqual(
+    getCompletedTashkentDates(new Date('2026-07-29T20:00:00Z'), 3),
+    ['2026-07-27', '2026-07-28', '2026-07-29']
+  )
+  assert.match(dailySalaryEndpoint, /const notificationDate = getCompletedTashkentDate\(now\)/)
+  assert.match(dailySalaryEndpoint, /getCompletedTashkentDates\(now, KPI_CATCH_UP_DAYS\)/)
+  assert.match(dailySalaryEndpoint, /finalizeDailyKpiDate[\s\S]*?sendDailySalaryNotifications/)
 })

@@ -16,6 +16,7 @@ import { formatDateTime } from '../lib/dateFormat'
 import { loadReceiptOrderGroup } from '../lib/db'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { formatMenuQuantity } from '../lib/menuSaleUnits'
+import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -557,10 +558,11 @@ export function TableReceipt() {
     const table    = state.tables.find(t => t.id === tableId)
     const allItems = normalizeReceiptItems(orders.flatMap(o => o.items || []), menuItemMap)
     const items = getReceiptItems(allItems, menuItemMap, lang)
+    const combinedOrder = combineReceiptOrders(orders)
     const summary = getOrderPaymentSummary(
-      combineReceiptOrders(orders),
+      combinedOrder,
       allItems,
-      settings.serviceRate ?? 20
+      getConfiguredServiceRatePct(settings, combinedOrder.price_mode)
     )
 
     return {
@@ -578,7 +580,7 @@ export function TableReceipt() {
       total: summary.total,
       payments: getOrderPaymentBreakdown(combineReceiptOrders(orders)),
     }
-  }, [state.orders, state.tables, tableId, settings.serviceRate, menuItemMap, lang])
+  }, [state.orders, state.tables, tableId, settings, menuItemMap, lang])
 
   if (!data) return <NotFound onBack={() => navigate(-1)} />
 
@@ -673,10 +675,11 @@ export default function Receipt() {
 
     const allItems = normalizeReceiptItems(allOrders.flatMap(o => o.items || []), menuItemMap)
     const items = getReceiptItems(allItems, menuItemMap, lang)
+    const combinedOrder = combineReceiptOrders(allOrders)
     const summary = getOrderPaymentSummary(
-      combineReceiptOrders(allOrders),
+      combinedOrder,
       allItems,
-      settings.serviceRate ?? 20
+      getConfiguredServiceRatePct(settings, combinedOrder.price_mode)
     )
     const table      = state.tables.find(t => t.id === order.table_id)
 
@@ -695,7 +698,7 @@ export default function Receipt() {
       total: summary.total,
       payments: getOrderPaymentBreakdown(combineReceiptOrders(allOrders)),
     }
-  }, [receiptOrders, state.tables, orderId, settings.serviceRate, menuItemMap, lang])
+  }, [receiptOrders, state.tables, orderId, settings, menuItemMap, lang])
 
   if (!localOrder && lookupState.loading) {
     return <OperationalLoading title={t(lang, 'loading')} description="" />

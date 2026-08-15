@@ -1,18 +1,21 @@
-import {
-  getOrderPaymentFields,
-  normalizeServiceRatePct,
-} from '../lib/analytics.js'
+import { getOrderPaymentFields } from '../lib/analytics.js'
 import {
   isOffPremiseOrderType,
   normalizeOrderType,
   orderTypePrefix,
 } from '../lib/orderTypes.js'
+import {
+  DEFAULT_REGULAR_SERVICE_RATE_PCT,
+  DEFAULT_TOURIST_SERVICE_RATE_PCT,
+  getConfiguredServiceRatePct,
+} from '../lib/serviceRates.js'
 
 export { normalizeOrderType }
 
 export const DEFAULT_SETTINGS = {
   restaurantName: 'Zar Kebab',
-  serviceRate:    20,
+  serviceRate:    DEFAULT_REGULAR_SERVICE_RATE_PCT,
+  touristServiceRate: DEFAULT_TOURIST_SERVICE_RATE_PCT,
   monthlyRentUzs: 0,
   monthlyUtilitiesUzs: 0,
   receiptFooter:  '',
@@ -41,8 +44,8 @@ export function loadInitialLang() {
   }
 }
 
-export function serviceRatePctFromSettings(settings) {
-  return normalizeServiceRatePct(settings?.serviceRate)
+export function serviceRatePctFromSettings(settings, priceMode) {
+  return getConfiguredServiceRatePct(settings, priceMode)
 }
 
 export function makeLocalId() {
@@ -58,7 +61,7 @@ export function recalcOrderTotals(order, settings) {
   const orderType = normalizeOrderType(order?.order_type || order?.orderType)
   const serviceRatePct = isOffPremiseOrderType(orderType) ? 0 : Number.isFinite(Number(order?.service_rate_pct))
     ? Number(order.service_rate_pct)
-    : serviceRatePctFromSettings(settings)
+    : serviceRatePctFromSettings(settings, order?.price_mode || order?.priceMode)
   const paymentFields = getOrderPaymentFields(
     { ...order, order_type: orderType, service_rate_pct: serviceRatePct },
     order?.items || [],

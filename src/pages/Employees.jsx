@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CalendarCheck2, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Power, RefreshCw, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { ArrowLeft, CalendarCheck2, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Percent, Power, RefreshCw, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -9,6 +9,7 @@ import { formatLongDate } from '../lib/dateFormat'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
 import { compareSalaryAbsencesNewestFirst } from '../lib/salaryTransactions'
+import { formatKpiRatePercent, getEffectiveKpiRule } from '../lib/dailyKpi'
 import {
   getDailySalaryAmount,
   getSalaryAbsenceForDate,
@@ -75,6 +76,11 @@ export default function Employees() {
       joined: 'Ishga kirgan',
       ended: 'Tugagan',
       daily: 'Kunlik',
+      kpi: 'KPI',
+      kpiEnabled: 'Faol',
+      kpiDisabled: 'O‘chirilgan',
+      kpiNotConfigured: 'Belgilanmagan',
+      kpiUnavailable: 'Mavjud emas',
       activeDaily: 'Kunlik faol',
       absentToday: 'Bugun kelmagan',
       undoAbsence: 'Yo‘qlikni bekor qilish',
@@ -115,6 +121,11 @@ export default function Employees() {
       joined: 'Дата выхода',
       ended: 'Дата окончания',
       daily: 'За день',
+      kpi: 'KPI',
+      kpiEnabled: 'Включён',
+      kpiDisabled: 'Выключен',
+      kpiNotConfigured: 'Не настроен',
+      kpiUnavailable: 'Недоступно',
       activeDaily: 'Активные за день',
       absentToday: 'Сегодня отсутствует',
       undoAbsence: 'Отменить отсутствие',
@@ -155,6 +166,11 @@ export default function Employees() {
       joined: 'Joined',
       ended: 'Ended',
       daily: 'Daily',
+      kpi: 'KPI',
+      kpiEnabled: 'Enabled',
+      kpiDisabled: 'Disabled',
+      kpiNotConfigured: 'Not configured',
+      kpiUnavailable: 'Unavailable',
       activeDaily: 'Active daily',
       absentToday: 'Absent today',
       undoAbsence: 'Undo absence',
@@ -187,6 +203,8 @@ export default function Employees() {
   const l = L[lang] || L.en
 
   const [employees, setEmployees] = useState([])
+  const [kpiRules, setKpiRules] = useState([])
+  const [kpiRulesAvailable, setKpiRulesAvailable] = useState(true)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState('')
   const [confirmActionKey, setConfirmActionKey] = useState('')
@@ -199,14 +217,22 @@ export default function Employees() {
   async function loadEmployees() {
     setLoading(true)
     setError('')
-    const [teamRes, profileRes, rateRes, paymentRes, fineRes, absenceRes] = await Promise.all([
+    const [teamRes, profileRes, rateRes, paymentRes, fineRes, absenceRes, kpiRuleRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
       supabase.from('employee_salary_profiles').select('*').order('employee_name'),
       supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
       supabase.from('employee_salary_payments').select('*'),
       supabase.from('employee_salary_fines').select('*'),
       supabase.from('employee_salary_absences').select('*'),
+      supabase.from('employee_kpi_rules')
+        .select('id, salary_profile_id, effective_from, rate_bps, is_enabled, created_at, updated_at')
+        .lte('effective_from', today)
+        .order('effective_from', { ascending: false })
+        .order('updated_at', { ascending: false }),
     ])
+
+    setKpiRules(kpiRuleRes.error ? [] : kpiRuleRes.data || [])
+    setKpiRulesAvailable(!kpiRuleRes.error)
 
     const salaryError = profileRes.error || rateRes.error || paymentRes.error || absenceRes.error
     if (salaryError) {
@@ -450,6 +476,7 @@ export default function Employees() {
                 const nameSavingKey = `employee-name-${employee.id}`
                 const joinedDate = String(employee.joined_at || '').slice(0, 10)
                 const deactivateDate = normalizeSalaryEndDate(employee, deactivateDates[employee.id], today)
+                const effectiveKpiRule = getEffectiveKpiRule(kpiRules, employee.id, today)
                 return (
                   <section key={employee.id} className={`rounded-2xl border p-4 shadow-sm ${
                     inactive
@@ -540,6 +567,16 @@ export default function Employees() {
                       <Row label={l.joined} value={formatLongDate(employee.joined_at, lang, employee.joined_at)} icon={CalendarDays} />
                       {inactive && employee.ended_at && <Row label={l.ended} value={formatLongDate(employee.ended_at, lang, employee.ended_at)} icon={CalendarDays} />}
                       <Row label={l.daily} value={formatCurrency(getDailySalaryAmount(employee, activeUntil))} />
+                      <EmployeeKpiRow
+                        label={l.kpi}
+                        rule={effectiveKpiRule}
+                        lang={lang}
+                        available={kpiRulesAvailable}
+                        enabledLabel={l.kpiEnabled}
+                        disabledLabel={l.kpiDisabled}
+                        notConfiguredLabel={l.kpiNotConfigured}
+                        unavailableLabel={l.kpiUnavailable}
+                      />
                       <Row
                         label={l.balance}
                         value={formatCurrency(salaryBalance)}
@@ -639,6 +676,49 @@ function Row({ icon: Icon, label, value, hot = false, negative = false }) {
     <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] px-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-[#9CA3AF]">{Icon && <Icon size={13} />}{label}</span>
       <span className={`text-right font-black ${negative ? 'text-red-600' : hot ? 'text-[#ff5a00]' : 'text-[#1F2937]'}`}>{value}</span>
+    </div>
+  )
+}
+
+function EmployeeKpiRow({
+  label,
+  rule,
+  lang,
+  available,
+  enabledLabel,
+  disabledLabel,
+  notConfiguredLabel,
+  unavailableLabel,
+}) {
+  const configured = Boolean(rule)
+  const enabled = configured && rule.is_enabled !== false
+  const statusLabel = !available
+    ? unavailableLabel
+    : !configured
+      ? notConfiguredLabel
+      : enabled
+        ? enabledLabel
+        : disabledLabel
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] px-3 py-2">
+      <span className="inline-flex items-center gap-1.5 text-[#9CA3AF]"><Percent size={13} />{label}</span>
+      <span className="flex min-w-0 items-center justify-end gap-2 text-right">
+        {configured && available && (
+          <span className={`font-black ${enabled ? 'text-violet-600' : 'text-[#6B7280]'}`}>
+            {formatKpiRatePercent(rule.rate_bps, lang)}
+          </span>
+        )}
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+          enabled
+            ? 'bg-violet-100 text-violet-700'
+            : configured && available
+              ? 'bg-gray-200 text-[#6B7280]'
+              : 'bg-gray-100 text-[#9CA3AF]'
+        }`}>
+          {statusLabel}
+        </span>
+      </span>
     </div>
   )
 }

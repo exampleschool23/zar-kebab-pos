@@ -22,6 +22,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate, formatMonthYear, formatTime } from '../lib/dateFormat'
+import { formatKpiRatePercent } from '../lib/dailyKpi'
 import { expensePaymentMethodLabel, todayExpenseDate } from '../lib/expenses'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
 import {
@@ -139,6 +140,8 @@ export default function EmployeeSalaryHistory() {
       confirm: 'Tasdiqlash',
       cancel: 'Bekor qilish',
       deleteFailed: 'Yozuvni o‘chirib bo‘lmadi.',
+      automaticKpi: 'Avtomatik KPI',
+      kpiFormula: 'Restoran dine-in savdosi + xizmat haqi',
       previous: 'Oldingi',
       next: 'Keyingi',
       page: 'Sahifa',
@@ -186,6 +189,8 @@ export default function EmployeeSalaryHistory() {
       confirm: 'Подтвердить',
       cancel: 'Отмена',
       deleteFailed: 'Не удалось удалить запись.',
+      automaticKpi: 'Автоматический KPI',
+      kpiFormula: 'Dine-in продажи ресторана + сервис',
       previous: 'Назад',
       next: 'Далее',
       page: 'Страница',
@@ -233,6 +238,8 @@ export default function EmployeeSalaryHistory() {
       confirm: 'Confirm',
       cancel: 'Cancel',
       deleteFailed: 'Could not delete the record.',
+      automaticKpi: 'Automatic KPI',
+      kpiFormula: 'Restaurant dine-in sales + service',
       previous: 'Previous',
       next: 'Next',
       page: 'Page',
@@ -255,12 +262,15 @@ export default function EmployeeSalaryHistory() {
     if (showLoader) setLoading(true)
     setError('')
     try {
-      const [employeeRes, paymentRes, bonusRes, fineRes, absenceRes] = await Promise.all([
+      const [employeeRes, paymentRes, bonusRes, fineRes, absenceRes, kpiResultRes] = await Promise.all([
         supabase.from('employee_salary_profiles').select('*').eq('id', employeeId).maybeSingle(),
         supabase.from('employee_salary_payments').select('*').eq('salary_profile_id', employeeId),
         supabase.from('employee_salary_bonuses').select('*').eq('salary_profile_id', employeeId),
         supabase.from('employee_salary_fines').select('*').eq('salary_profile_id', employeeId),
         supabase.from('employee_salary_absences').select('*').eq('salary_profile_id', employeeId),
+        supabase.from('employee_daily_kpi_results')
+          .select('id, business_date, salary_profile_id, sales_base_amount, rate_bps, bonus_amount, bonus_id, status')
+          .eq('salary_profile_id', employeeId),
       ])
       const loadError = employeeRes.error || paymentRes.error || bonusRes.error || absenceRes.error
       if (loadError) throw loadError
@@ -277,6 +287,7 @@ export default function EmployeeSalaryHistory() {
         bonuses: bonusRes.data || [],
         fines: fineRes.error ? [] : fineRes.data || [],
         absences: absenceRes.data || [],
+        kpiResults: kpiResultRes.error ? [] : kpiResultRes.data || [],
       }))
       if (fineRes.error) setError(isMissingSalaryMigration(fineRes.error) ? l.migration : fineRes.error.message)
     } catch (loadError) {
@@ -754,6 +765,11 @@ function HistoryEntryCard({ entry, lang, labels, canDelete, confirming, saving, 
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${style.pill}`}>{label}</span>
+              {entry.automaticKpi && (
+                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700">
+                  {labels.automaticKpi}
+                </span>
+              )}
               {entry.createdAt && <span className="text-[10px] font-bold tabular-nums text-[#9CA3AF]">{formatTime(entry.createdAt, '—')}</span>}
             </div>
             {entry.entryType === 'absence' ? (
@@ -765,6 +781,11 @@ function HistoryEntryCard({ entry, lang, labels, canDelete, confirming, saving, 
             )}
           </div>
           {detail && <p className="mt-1.5 break-words text-xs font-semibold leading-relaxed text-[#6B7280]">{detail}</p>}
+          {entry.automaticKpi && entry.kpiResult && (
+            <p className="mt-1.5 break-words rounded-lg border border-violet-100 bg-white/80 px-2.5 py-2 text-[11px] font-bold leading-relaxed text-violet-700">
+              {labels.kpiFormula}: {formatCurrency(entry.kpiResult.baseAmountUzs)} × {formatKpiRatePercent(entry.kpiResult.rateBps, lang)} = {formatCurrency(entry.kpiResult.bonusAmountUzs)}
+            </p>
+          )}
           {canDelete && (
             <div className="mt-2 flex items-center justify-end gap-2">
               {confirming && (

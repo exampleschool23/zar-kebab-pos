@@ -101,7 +101,8 @@ Run `supabase/111_salary_group_event_notifications.sql` to configure the
 salary-events group and track duplicate-safe bonus, fine, and absence delivery.
 Run `supabase/112_salary_event_employee_notifications.sql` to track private
 employee delivery for bonus, fine, and absence notifications independently
-from the salary-group delivery.
+from the salary-group delivery. Migration `129` intentionally marks the private
+automatic-KPI event destination as combined with the daily salary summary.
 Run `supabase/113_salary_notification_attempt_tracking.sql` so every saved
 payment, bonus, fine, or absence immediately creates a delivery-status row,
 even when a stale browser or failed request never reaches Telegram. The
@@ -112,7 +113,13 @@ tracked private/group delivery for genuine salary-rate changes; an employee's
 first salary rate is intentionally treated as setup rather than a change. Run
 `supabase/119_salary_event_team_notifications.sql` to queue and audit the third
 ZarKebab Team destination for new bonuses, fines, and absences. Historical
-events are not replayed when that migration is installed.
+events are not replayed when that migration is installed. Run
+`supabase/129_daily_kpi_bonuses.sql` to add effective-dated employee KPI rates,
+immutable daily calculation snapshots, automatic paid bonuses, and their
+database-first Telegram delivery queue. Automatic KPI bonuses do not send a
+second private receipt: the employee sees Salary and Bonus together in the
+daily salary summary, while the Salary group and ZarKebab Team receive their
+own independently retryable KPI announcements.
 
 ### Daily employee salary notifications
 
@@ -121,12 +128,17 @@ is applied and `VITE_TELEGRAM_BOT_USERNAME` is configured. The employee opens
 that link and presses Start. The token expires after 30 minutes and can be used
 only once.
 
-`vercel.json` invokes `/api/telegram/daily-salary` once per day at `19:00 UTC`,
-which is midnight in `Asia/Tashkent`. Vercel automatically sends `CRON_SECRET` as a
-Bearer token. Each message includes salary earned that day, that day's fines
-and reasons, and the current amount due. The midnight message summarizes the
-Tashkent calendar day that just finished. A unique delivery row prevents a
-duplicate message for the same employee and date.
+`vercel.json` invokes `/api/telegram/daily-salary` in the `20:00 UTC` hour,
+which is the `01:00` hour in `Asia/Tashkent`. Vercel automatically sends
+`CRON_SECRET` as a Bearer token. The job first idempotently finalizes KPI
+bonuses for the previous completed Tashkent date (and retries the last seven
+completed dates as bounded catch-up), then sends or retries the combined salary
+summary for each finalized date. Each private message always includes Salary
+and Bonus fields together, plus any fines, payments, and the current amount
+due. Unique run, result, and delivery rows prevent duplicate bonuses or
+messages when the cron is retried.
+If the completed date cannot be finalized, its salary summary is left unclaimed
+and the endpoint returns an error so a retry cannot permanently omit the KPI.
 
 The Vercel Hobby scheduler may start at any point during the configured hour.
 For exact timing, remove the Vercel cron entry and call the same endpoint from

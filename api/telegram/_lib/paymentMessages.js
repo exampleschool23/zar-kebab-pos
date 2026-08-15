@@ -66,6 +66,7 @@ const GROUP_COPY = {
 const GROUP_EVENT_COPY = {
   uz: {
     bonus: 'Xodim bonusi',
+    kpiBonus: 'Kunlik KPI bonusi',
     fine: 'Xodim jarimasi',
     absence: 'Xodim yo‘qligi',
     employee: 'Xodim',
@@ -75,9 +76,12 @@ const GROUP_EVENT_COPY = {
     reason: 'Sabab',
     due: 'To‘lanishi kerak',
     createdBy: 'Rasmiylashtirdi',
+    salesBase: 'Savdo bazasi',
+    kpiRate: 'KPI foizi',
   },
   ru: {
     bonus: 'Бонус сотруднику',
+    kpiBonus: 'Ежедневный KPI-бонус',
     fine: 'Штраф сотрудника',
     absence: 'Отсутствие сотрудника',
     employee: 'Сотрудник',
@@ -87,9 +91,12 @@ const GROUP_EVENT_COPY = {
     reason: 'Причина',
     due: 'К выплате',
     createdBy: 'Оформил',
+    salesBase: 'База продаж',
+    kpiRate: 'Процент KPI',
   },
   en: {
     bonus: 'Employee bonus',
+    kpiBonus: 'Daily KPI bonus',
     fine: 'Employee fine',
     absence: 'Employee absence',
     employee: 'Employee',
@@ -99,12 +106,15 @@ const GROUP_EVENT_COPY = {
     reason: 'Reason',
     due: 'Salary due',
     createdBy: 'Recorded by',
+    salesBase: 'Sales base',
+    kpiRate: 'KPI rate',
   },
 }
 
 const TEAM_EVENT_COPY = {
   uz: {
     bonusTitle: 'Xodim bonusi',
+    kpiBonusTitle: 'Kunlik KPI bonusi',
     fineTitle: 'Xodim jarimasi',
     absenceTitle: 'Xodim yo\u2018qligi',
     note: 'Izoh',
@@ -112,6 +122,7 @@ const TEAM_EVENT_COPY = {
   },
   ru: {
     bonusTitle: 'Бонус сотруднику',
+    kpiBonusTitle: 'Ежедневный KPI-бонус',
     fineTitle: 'Штраф сотрудника',
     absenceTitle: 'Отсутствие сотрудника',
     note: 'Примечание',
@@ -119,6 +130,7 @@ const TEAM_EVENT_COPY = {
   },
   en: {
     bonusTitle: 'Employee bonus',
+    kpiBonusTitle: 'Daily KPI bonus',
     fineTitle: 'Employee fine',
     absenceTitle: 'Employee absence',
     note: 'Note',
@@ -130,18 +142,38 @@ const EMPLOYEE_EVENT_COPY = {
   uz: {
     greeting: name => `Assalomu alaykum, ${name}!`,
     bonusRecorded: 'Sizga bonus hisoblandi.',
+    kpiBonusRecorded: 'Sizga kunlik KPI bonusi hisoblandi va to‘landi.',
     absenceRecorded: 'Sizning yo‘qligingiz qayd etildi.',
   },
   ru: {
     greeting: name => `Здравствуйте, ${name}!`,
     bonusRecorded: 'Вам начислен бонус.',
+    kpiBonusRecorded: 'Вам рассчитан и сразу выплачен ежедневный KPI-бонус.',
     absenceRecorded: 'Ваше отсутствие зарегистрировано.',
   },
   en: {
     greeting: name => `Hello, ${name}!`,
     bonusRecorded: 'A bonus was recorded for you.',
+    kpiBonusRecorded: 'Your daily KPI bonus was calculated and paid.',
     absenceRecorded: 'Your absence was recorded.',
   },
+}
+
+function isDailyKpiBonus(event) {
+  return event?.source_type === 'daily_kpi'
+}
+
+function formatKpiRate(rateBps) {
+  const value = Number(rateBps || 0) / 100
+  return `${value.toFixed(2).replace(/\.00$/, '')}%`
+}
+
+function appendDailyKpiDetails(lines, event, copy) {
+  if (!isDailyKpiBonus(event)) return
+  lines.push(
+    `<b>${copy.salesBase}:</b> ${formatSalaryNotificationAmount(event?.source_metadata?.sales_base_amount)} UZS`,
+    `<b>${copy.kpiRate}:</b> ${escapeTelegramHtml(formatKpiRate(event?.source_metadata?.rate_bps))}`
+  )
 }
 
 const SALARY_RATE_COPY = {
@@ -298,17 +330,21 @@ export function buildSalaryGroupEventMessage(type, event, remainingDue = 0, lang
   const copy = GROUP_EVENT_COPY[lang]
   const normalizedType = ['bonus', 'fine', 'absence'].includes(type) ? type : 'absence'
   const date = event?.bonus_date || event?.fine_date || event?.absence_date
+  const eventTitle = normalizedType === 'bonus' && isDailyKpiBonus(event)
+    ? copy.kpiBonus
+    : copy[normalizedType]
   const lines = [
-    `${normalizedType === 'bonus' ? '🎁' : normalizedType === 'fine' ? '⚠️' : '📅'} <b>${copy[normalizedType]}</b>`,
+    `${normalizedType === 'bonus' ? isDailyKpiBonus(event) ? '🎯' : '🎁' : normalizedType === 'fine' ? '⚠️' : '📅'} <b>${eventTitle}</b>`,
     '',
     `<b>${copy.employee}:</b> ${escapeTelegramHtml(event?.employee_name || '-')}`,
   ]
   if (normalizedType !== 'absence') {
     lines.push(`<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`)
   }
+  appendDailyKpiDetails(lines, event, copy)
   lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
   const detail = normalizedType === 'fine' ? event?.reason : event?.note
-  if (String(detail || '').trim()) {
+  if (!isDailyKpiBonus(event) && String(detail || '').trim()) {
     lines.push(`<b>${normalizedType === 'fine' ? copy.reason : copy.note}:</b> ${escapeTelegramHtml(detail)}`)
   }
   lines.push(
@@ -336,11 +372,20 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
     return lines.join('\n')
   }
   const lines = [
-    `${normalizedType === 'bonus' ? '🎁' : normalizedType === 'fine' ? '⚠️' : '📅'} <b>${copy[`${normalizedType}Title`]}</b>`,
+    `${normalizedType === 'bonus' ? isDailyKpiBonus(event) ? '🎯' : '🎁' : normalizedType === 'fine' ? '⚠️' : '📅'} <b>${
+      normalizedType === 'bonus' && isDailyKpiBonus(event)
+        ? copy.kpiBonusTitle
+        : copy[`${normalizedType}Title`]
+    }</b>`,
     `👤 <b>${escapeTelegramHtml(event?.employee_name || '-')}</b> · <b>${formatSalaryNotificationAmount(event?.amount)} UZS</b>`,
   ]
+  if (isDailyKpiBonus(event)) {
+    lines.push(
+      `📊 ${formatSalaryNotificationAmount(event?.source_metadata?.sales_base_amount)} UZS × ${escapeTelegramHtml(formatKpiRate(event?.source_metadata?.rate_bps))}`
+    )
+  }
   lines.push(`🗓 ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
-  if (String(detail || '').trim()) {
+  if (!isDailyKpiBonus(event) && String(detail || '').trim()) {
     const detailLabel = normalizedType === 'fine' ? copy.reason : copy.note
     lines.push(`📝 <b>${detailLabel}:</b> ${escapeTelegramHtml(String(detail).trim())}`)
   }
@@ -354,22 +399,30 @@ export function buildEmployeeSalaryEventMessage(type, event, remainingDue = 0, l
   const normalizedType = type === 'bonus' ? 'bonus' : 'absence'
   const date = normalizedType === 'bonus' ? event?.bonus_date : event?.absence_date
   const employeeName = escapeTelegramHtml(event?.employee_name || '-')
+  const eventTitle = normalizedType === 'bonus' && isDailyKpiBonus(event)
+    ? copy.kpiBonus
+    : copy[normalizedType]
   const lines = [
-    `${normalizedType === 'bonus' ? '🎁' : '📅'} <b>${copy[normalizedType]}</b>`,
+    `${normalizedType === 'bonus' ? isDailyKpiBonus(event) ? '🎯' : '🎁' : '📅'} <b>${eventTitle}</b>`,
     '',
     `<b>${employeeCopy.greeting(employeeName)}</b>`,
-    normalizedType === 'bonus' ? employeeCopy.bonusRecorded : employeeCopy.absenceRecorded,
+    normalizedType === 'bonus'
+      ? isDailyKpiBonus(event)
+        ? employeeCopy.kpiBonusRecorded
+        : employeeCopy.bonusRecorded
+      : employeeCopy.absenceRecorded,
     '',
   ]
   if (normalizedType === 'bonus') {
     lines.push(
       `<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(event?.amount)} UZS`,
-      `<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`
     )
+    appendDailyKpiDetails(lines, event, copy)
+    lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
   } else {
     lines.push(`<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(date, lang, '-'))}`)
   }
-  if (String(event?.note || '').trim()) {
+  if (!isDailyKpiBonus(event) && String(event?.note || '').trim()) {
     lines.push(`<b>${copy.note}:</b> ${escapeTelegramHtml(event.note)}`)
   }
   lines.push(
