@@ -17,6 +17,7 @@ import { loadReceiptOrderGroup } from '../lib/db'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { formatMenuQuantity } from '../lib/menuSaleUnits'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
+import { getReceiptFooterVisibility, normalizeReceiptMarketing } from '../lib/receiptMarketing'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -229,7 +230,7 @@ const PRINT_CSS = `
     box-shadow: none !important;
     border-radius: 0 !important;
     margin: 0 !important;
-    padding: 3mm !important;
+    padding: 2mm !important;
     border: none !important;
     overflow: visible !important;
     box-sizing: border-box !important;
@@ -264,42 +265,49 @@ function handlePrintReceipt(delay = 300) {
 
 // ── ReceiptPaper ──────────────────────────────────────────────────────────────
 
-const RECEIPT_MARKETING_MODES = new Set(['none', 'compactFooter', 'loyaltyOnly', 'instagramOnly', 'full'])
 const LOYALTY_LEVELS = 'Bronze 3% | Silver 5% | Gold 7% | Premium 10%'
 
-function normalizeReceiptMarketing(value) {
-  return RECEIPT_MARKETING_MODES.has(value) ? value : 'compactFooter'
-}
-
-function ReceiptMarketingFooter({ labels, mode }) {
-  const marketingMode = normalizeReceiptMarketing(mode)
-  if (marketingMode === 'none') return null
-
-  const showThanks = ['compactFooter', 'full'].includes(marketingMode)
-  const showLoyalty = ['compactFooter', 'loyaltyOnly', 'full'].includes(marketingMode)
-  const showInstagram = ['compactFooter', 'instagramOnly', 'full'].includes(marketingMode)
+function ReceiptMarketingFooter({ labels, mode, priceMode, receiptFooter }) {
+  const {
+    mode: marketingMode,
+    showCustomFooter,
+    showLoyalty,
+    showInstagram,
+  } = getReceiptFooterVisibility(mode, priceMode)
+  const hasMarketingContent = (showCustomFooter && !!receiptFooter) || showLoyalty || showInstagram
 
   return (
     <>
-      <Divider dashed style={{ margin: '8px 0 6px' }} />
+      <Divider dashed style={{ margin: '5px 0 4px' }} />
       <div className={`receipt-marketing receipt-marketing-${marketingMode}`} style={{
         textAlign: 'center',
         fontFamily: INTER,
-        fontSize: '11px',
-        lineHeight: 1.32,
+        fontSize: '9.5px',
+        lineHeight: 1.2,
         color: '#111',
         pageBreakInside: 'avoid',
       }}>
-        {showThanks && <div style={{ fontSize: '11.5px', fontWeight: 700, marginBottom: '5px' }}>{labels.thanks1}</div>}
+        {showCustomFooter && receiptFooter && (
+          <div style={{ fontSize: '9px', fontWeight: 400, color: '#333', marginBottom: '3px' }}>
+            {receiptFooter}
+          </div>
+        )}
         {showLoyalty && (
           <>
-            <div style={{ fontSize: '11.2px', fontWeight: 700, marginBottom: '4px' }}>{labels.cashbackPromo}</div>
-            <div style={{ fontSize: '10.4px', color: '#333', marginBottom: showInstagram ? '6px' : 0 }}>{LOYALTY_LEVELS}</div>
+            <div style={{ fontSize: '9.5px', fontWeight: 700, marginBottom: '2px' }}>{labels.cashbackPromo}</div>
+            <div style={{ fontSize: '8.8px', color: '#333', marginBottom: showInstagram ? '3px' : 0 }}>{LOYALTY_LEVELS}</div>
           </>
         )}
         {showInstagram && (
           <div style={{ fontWeight: 600 }}>Instagram: @zarkebab</div>
         )}
+        <div style={{
+          fontSize: '10px',
+          fontWeight: 700,
+          marginTop: hasMarketingContent ? '4px' : 0,
+        }}>
+          {labels.thanks1}
+        </div>
       </div>
     </>
   )
@@ -315,7 +323,7 @@ function firstNonEmpty(orders, keys, fallback = '—') {
   return fallback
 }
 
-function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
+function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
   const marketingMode = normalizeReceiptMarketing(receiptMarketing)
 
   return (
@@ -324,31 +332,31 @@ function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, 
       style={{
         width: '320px',
         maxWidth: '100%',
-        padding: '18px 22px 22px',
+        padding: '12px 16px 14px',
         fontFamily: INTER,
         fontVariantNumeric: 'tabular-nums',
         color: '#111',
-        fontSize: '12px',
-        lineHeight: 1.32,
+        fontSize: '11px',
+        lineHeight: 1.22,
       }}
     >
 
       {/* ── Brand header ─────────────────────────────────────────────────── */}
-      <div style={{ textAlign: 'center', marginBottom: '6px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '3px' }}>
         <div style={{
           fontFamily: INTER,
-          fontSize: '23px',
+          fontSize: '19px',
           fontWeight: 800,
           color: '#111',
           letterSpacing: '0',
           lineHeight: 1.05,
-          marginBottom: '4px',
+          marginBottom: '2px',
         }}>
           ZarKebab
         </div>
         <div style={{
           fontFamily: INTER,
-          fontSize: '10.5px',
+          fontSize: '9px',
           fontWeight: 500,
           color: '#333',
         }}>
@@ -356,10 +364,10 @@ function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, 
         </div>
       </div>
 
-      <Divider dashed style={{ margin: '7px 0' }} />
+      <Divider dashed style={{ margin: '4px 0' }} />
 
       {/* ── Order meta ───────────────────────────────────────────────────── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3px' }}>
         <tbody>
           <MetaRow label={labels.table} value={tableName} />
           <MetaRow label={labels.waiter} value={waiterName} />
@@ -368,17 +376,17 @@ function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, 
         </tbody>
       </table>
 
-      <Divider dashed style={{ margin: '0 0 6px' }} />
+      <Divider dashed style={{ margin: '0 0 4px' }} />
 
       {/* ── Items table header ───────────────────────────────────────────── */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 48px 74px',
         fontFamily: INTER,
-        fontSize: '11px',
+        fontSize: '9.5px',
         fontWeight: 700,
         color: '#111',
-        paddingBottom: '4px',
+        paddingBottom: '2px',
         borderBottom: '1px solid #ddd',
         marginBottom: '2px',
       }}>
@@ -388,16 +396,16 @@ function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, 
       </div>
 
       {/* ── Item rows ────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: '6px' }}>
+      <div style={{ marginBottom: '3px' }}>
         {items.map((item, i) => (
           <div key={i} style={{
             display: 'grid',
             gridTemplateColumns: '1fr 48px 74px',
             alignItems: 'baseline',
-            padding: '3px 0',
+            padding: '2px 0',
             borderBottom: '1px solid #eee',
             fontFamily: INTER,
-            fontSize: '12px',
+            fontSize: '10.5px',
             fontWeight: 400,
           }}>
             <span style={{ paddingRight: '6px', lineHeight: 1.25, color: '#111', fontStyle: 'italic' }}>{item.name}</span>
@@ -410,7 +418,7 @@ function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, 
       </div>
 
       {/* ── Subtotals ────────────────────────────────────────────────────── */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4px' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2px' }}>
         <tbody>
           <TotalRow label={labels.orderAmount} value={fmtUZS(subtotal)} />
           <TotalRow label={labels.servicePct(serviceRate)} value={fmtUZS(serviceFee)} />
@@ -423,7 +431,7 @@ function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, 
         </tbody>
       </table>
 
-      <Divider solid style={{ margin: '7px 0' }} />
+      <Divider solid style={{ margin: '4px 0' }} />
 
       {/* ── Grand total ──────────────────────────────────────────────────── */}
       <div style={{
@@ -431,30 +439,22 @@ function ReceiptPaper({ tableName, waiterName, completedByName, dateStr, items, 
         justifyContent: 'space-between',
         alignItems: 'baseline',
         fontFamily: POPPINS,
-        fontSize: '16px',
+        fontSize: '14px',
         fontWeight: 800,
         color: '#111',
-        marginBottom: marketingMode === 'none' ? '0' : '4px',
+        marginBottom: 0,
         fontVariantNumeric: 'tabular-nums',
       }}>
         <span>{labels.total}</span>
         <span>{fmtUZS(total)}</span>
       </div>
 
-      {receiptFooter && marketingMode !== 'none' && (
-        <div style={{
-          textAlign: 'center',
-          fontFamily: INTER,
-          fontSize: '10px',
-          fontWeight: 400,
-          color: '#333',
-          marginTop: '4px',
-        }}>
-          {receiptFooter}
-        </div>
-      )}
-
-      <ReceiptMarketingFooter labels={labels} mode={marketingMode} />
+      <ReceiptMarketingFooter
+        labels={labels}
+        mode={marketingMode}
+        priceMode={priceMode}
+        receiptFooter={receiptFooter}
+      />
     </div>
   )
 }
@@ -481,22 +481,22 @@ function MetaRow({ label, value }) {
     <tr>
       <td style={{
         fontFamily: INTER,
-        fontSize: '14px',
+        fontSize: '12px',
         fontWeight: 500,
         color: '#555',
         paddingRight: '8px',
-        paddingBottom: '4px',
+        paddingBottom: '2px',
         whiteSpace: 'nowrap',
       }}>
         {label}:
       </td>
       <td style={{
         fontFamily: INTER,
-        fontSize: '14px',
+        fontSize: '12px',
         fontWeight: 600,
         color: '#111',
         textAlign: 'right',
-        paddingBottom: '4px',
+        paddingBottom: '2px',
       }}>
         {value}
       </td>
@@ -509,20 +509,20 @@ function TotalRow({ label, value, color }) {
     <tr>
       <td style={{
         fontFamily: INTER,
-        fontSize: '13px',
+        fontSize: '11px',
         fontWeight: 500,
         color: color || '#555',
-        paddingBottom: '4px',
+        paddingBottom: '2px',
       }}>
         {label}:
       </td>
       <td style={{
         fontFamily: INTER,
-        fontSize: '13px',
+        fontSize: '11px',
         fontWeight: 600,
         color: color || '#111',
         textAlign: 'right',
-        paddingBottom: '4px',
+        paddingBottom: '2px',
         whiteSpace: 'nowrap',
         fontVariantNumeric: 'tabular-nums',
       }}>

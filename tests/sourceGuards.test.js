@@ -2096,6 +2096,7 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(source, /isDeliveryOrderType/)
   assert.match(source, /function PaidTodaySummary/)
   assert.match(source, /showPaidToday/)
+  assert.match(source, /latest\.map\(order => \{[\s\S]*normalizePriceMode\(order\.price_mode\)[\s\S]*getPriceModeLabel\(priceMode, lang\)/)
   assert.match(source, /recallTable/)
   assert.match(source, /canMoveBackToTable/)
   assert.match(source, /onRecall=\{canEditCashier && canRecallTable \? handleRecallTable : null\}/)

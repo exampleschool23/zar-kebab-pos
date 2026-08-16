@@ -590,6 +590,7 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle, onOpenReceipt }) {
           ) : (
             latest.map(order => {
               const orderType = inferOrderType(order)
+              const priceMode = normalizePriceMode(order.price_mode)
               return (
                 <div key={order.id} className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[#F3F4F6] last:border-b-0">
                   <button
@@ -597,9 +598,18 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle, onOpenReceipt }) {
                     onClick={() => onOpenReceipt(order)}
                     className="min-w-0 text-left flex-1 rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-[#F9FAFB]"
                   >
-                    <p className="font-bold text-[#1F2937] text-[13px] truncate">
-                      {isOffPremiseOrderType(orderType) ? `${orderTypeLabel(orderType, lang)} · ${order.order_number || order.id}` : order.table_name}
-                    </p>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate font-bold text-[#1F2937] text-[13px]">
+                        {isOffPremiseOrderType(orderType) ? `${orderTypeLabel(orderType, lang)} · ${order.order_number || order.id}` : order.table_name}
+                      </p>
+                      <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${
+                        priceMode === 'tourist'
+                          ? 'bg-orange-50 text-[#ff5a00] ring-1 ring-orange-100'
+                          : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'
+                      }`}>
+                        {getPriceModeLabel(priceMode, lang)}
+                      </span>
+                    </div>
                     <p className="text-[11px] text-[#9CA3AF]">
                       {dateTimeLabel(order.paid_at || getOrderDate(order))}
                       {order.waiter_name ? ` · ${order.waiter_name}` : ''}
