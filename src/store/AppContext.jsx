@@ -600,6 +600,7 @@ export function AppProvider({ children }) {
         dispatch({ type: 'SET_ORDERS', payload: orders })
         dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
         connectRealtime()
+        return { tables, orders }
       })()
       const trackedRequest = request.finally(() => {
         if (tableRefreshPromise === trackedRequest) tableRefreshPromise = null

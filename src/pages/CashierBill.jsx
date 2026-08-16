@@ -37,6 +37,7 @@ import { getManualOrderNotes, getOrderItemOptionLines } from '../components/Menu
 import { formatElapsedSince } from '../lib/dateFormat'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
+import { canConfirmCashierCheckout, getFreshCashierPaymentQuote } from '../lib/cashierCheckout'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -77,7 +78,7 @@ function getCashierItemName(item, menuItem, lang) {
 export default function CashierBill() {
   const { tableId, orderId }  = useParams()
   const navigate     = useNavigate()
-  const { state, dispatch } = useApp()
+  const { state, dispatch, refreshPOSData } = useApp()
   const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
@@ -93,6 +94,8 @@ export default function CashierBill() {
   const [loyaltyLookupMessage, setLoyaltyLookupMessage] = useState('')
   const [isCheckingLoyalty, setCheckingLoyalty] = useState(false)
   const [isProcessingPayment, setProcessingPayment] = useState(false)
+  const [isRefreshingBill, setRefreshingBill] = useState(true)
+  const [paymentRefreshMessage, setPaymentRefreshMessage] = useState('')
   const [isDeletingOrder, setDeletingOrder] = useState(false)
   const [confirmDeleteOrder, setConfirmDeleteOrder] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -201,9 +204,52 @@ export default function CashierBill() {
   const loyaltyReady = loyaltyAmt <= 0
     ? (!hasLoyaltyCardEntry || !!loyaltyCard)
     : (loyaltyCard && loyaltyValidation.ok)
-  const canProcess = canEditCashier && paymentValidation.canConfirmPayment && loyaltyReady && !isProcessingPayment
+  const canProcess = canConfirmCashierCheckout({
+    canEditCashier,
+    paymentValidation,
+    loyaltyReady,
+    grossAmount: basePayment.grossAmount,
+    loyaltyUsedAmount: loyaltyAmt,
+    isProcessingPayment,
+    isRefreshingBill,
+  })
   const isOverpaid = paymentValidation.isOverpaid
-  const isFullyPaid = paymentValidation.isFullyPaid
+  const isFullyPaid = paymentValidation.isFullyPaid || (
+    basePayment.grossAmount > 0 && loyaltyAmt >= basePayment.grossAmount && total === 0
+  )
+
+  useEffect(() => {
+    let active = true
+
+    async function refreshBill() {
+      setRefreshingBill(true)
+      try {
+        await refreshPOSData()
+      } catch (error) {
+        if (active) {
+          setPaymentRefreshMessage(error?.message || (
+            lang === 'uz' ? 'Hisobni yangilab bo‘lmadi.' :
+              lang === 'ru' ? 'Не удалось обновить счёт.' :
+                'Could not refresh the bill.'
+          ))
+        }
+      } finally {
+        if (active) setRefreshingBill(false)
+      }
+    }
+
+    refreshBill()
+
+    function handlePageShow(event) {
+      if (event.persisted) refreshBill()
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    return () => {
+      active = false
+      window.removeEventListener('pageshow', handlePageShow)
+    }
+  }, [refreshPOSData, tableId, orderId, lang])
 
   useEffect(() => {
     setSplitPayments(prev => {
@@ -354,7 +400,36 @@ export default function CashierBill() {
   async function handlePaid() {
     if (!canProcess) return
     setProcessingPayment(true)
+    setPaymentRefreshMessage('')
     try {
+      const refreshed = await refreshPOSData()
+      const freshQuote = getFreshCashierPaymentQuote({
+        orders: refreshed?.orders || state.orders,
+        menuItems: state.menuItems,
+        settings: state.settings,
+        tableId,
+        orderId,
+        loyaltyUsedAmount: loyaltyAmt,
+      })
+      if (freshQuote.orderIds.length === 0) {
+        setPaymentRefreshMessage(lang === 'uz'
+          ? 'Buyurtma allaqachon yopilgan yoki o‘zgargan. Kassir sahifasiga qayting.'
+          : lang === 'ru'
+            ? 'Заказ уже закрыт или изменился. Вернитесь на страницу кассира.'
+            : 'The order was already closed or changed. Return to the cashier page.')
+        return
+      }
+      if (freshQuote.total !== total) {
+        if (splitPayments.length === 1 && paymentValidation.canConfirmPayment) {
+          setSplitPayments(prev => prev.map(row => ({ ...row, amount: freshQuote.total > 0 ? String(freshQuote.total) : '' })))
+        }
+        setPaymentRefreshMessage(lang === 'uz'
+          ? `Hisob yangilandi: ${formatCurrency(freshQuote.total)}. Summani tekshirib, to‘lovni yana tasdiqlang.`
+          : lang === 'ru'
+            ? `Счёт обновлён: ${formatCurrency(freshQuote.total)}. Проверьте сумму и подтвердите оплату ещё раз.`
+            : `The bill was refreshed to ${formatCurrency(freshQuote.total)}. Check the amount and confirm again.`)
+        return
+      }
       const result = await dispatch({
         type: 'MARK_ORDER_PAID',
         payload: {
@@ -378,6 +453,12 @@ export default function CashierBill() {
       })
       if (result?.error) return
       navigate('/cashier/tables')
+    } catch (error) {
+      setPaymentRefreshMessage(error?.message || (
+        lang === 'uz' ? 'Hisobni yangilab bo‘lmadi. Qayta urinib ko‘ring.' :
+          lang === 'ru' ? 'Не удалось обновить счёт. Попробуйте ещё раз.' :
+            'Could not refresh the bill. Please try again.'
+      ))
     } finally {
       setProcessingPayment(false)
     }
@@ -1255,7 +1336,11 @@ export default function CashierBill() {
                   <CheckCircle2 size={19} />
                   {isProcessingPayment ? lbl.processingPay : lbl.confirmPay}
                 </button>
-
+                {paymentRefreshMessage && (
+                  <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+                    {paymentRefreshMessage}
+                  </p>
+                )}
                 <button
                   onClick={() => navigate(orderId ? `/receipt/${orderId}` : `/receipt/table/${tableId}`)}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#E5E7EB] text-[#1F2937] font-bold text-sm hover:bg-gray-50 transition-colors"
@@ -1308,6 +1393,11 @@ export default function CashierBill() {
             <CheckCircle2 size={19} />
             {isProcessingPayment ? lbl.processingPay : lbl.confirmPay}
           </button>
+          {paymentRefreshMessage && (
+            <p role="alert" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+              {paymentRefreshMessage}
+            </p>
+          )}
         </div>
       </div>
     </div>
