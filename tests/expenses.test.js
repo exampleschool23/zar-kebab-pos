@@ -164,6 +164,9 @@ test('expense helpers normalize values and labels for accountant entry', () => {
   assert.equal(expenseCategoryLabel('salary_manager', 'ru'), 'Зарплата менеджера')
   assert.equal(expenseCategoryLabel('salary_one_time', 'en'), 'One-time employee salary')
   assert.equal(expenseCategoryLabel('charcoal', 'uz'), 'Ko‘mir')
+  assert.equal(expenseCategoryLabel('tax', 'uz'), 'Soliq')
+  assert.equal(expenseCategoryLabel('tax', 'ru'), 'Налоги')
+  assert.equal(expenseCategoryLabel('tax', 'en'), 'Taxes')
   assert.equal(expensePaymentMethodLabel('terminal', 'uz'), 'Terminal')
   assert.equal(expenseMatchesRange({ expense_date: '2026-06-15' }, '2026-06-01', '2026-06-30'), true)
   assert.equal(expenseMatchesRange({ expense_date: '2026-07-01' }, '2026-06-01', '2026-06-30'), false)
@@ -177,6 +180,7 @@ test('manual expense categories offer specific tracking choices without removing
   assert.equal(manualKeys.includes('products_bazaar'), false)
   assert.equal(manualKeys.includes('salary_one_time'), true)
   assert.equal(manualKeys.includes('charcoal'), true)
+  assert.equal(manualKeys.includes('tax'), true)
 })
 
 test('new income entry offers investor support only while retaining legacy labels', () => {

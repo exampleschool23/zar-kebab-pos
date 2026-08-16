@@ -45,6 +45,10 @@ export const EXPENSE_CATEGORIES = [
     labels: { uz: 'Kommunal', ru: 'Коммунальные', en: 'Utilities' },
   },
   {
+    key: 'tax',
+    labels: { uz: 'Soliq', ru: 'Налоги', en: 'Taxes' },
+  },
+  {
     key: 'rent',
     labels: { uz: 'Ijara', ru: 'Аренда', en: 'Rent' },
   },
