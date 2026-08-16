@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutGrid, UtensilsCrossed } from 'lucide-react'
 import { getCategoryName } from '../lib/i18n'
+import { getMenuCategoryScrollTarget } from '../lib/menuCategoryScroll'
 import ImageLoadShimmer from './ImageLoadShimmer'
 
 export function menuCategorySectionId(prefix, categoryId) {
@@ -133,10 +134,16 @@ export default function MenuCategoryScroller({
   const [fixedInsets, setFixedInsets] = useState(null)
   const sentinelRef = useRef(null)
   const activeRef = useRef(activeCategoryId)
+  const pendingCategoryRef = useRef(null)
+  const pendingCategoryTimerRef = useRef(null)
 
   useEffect(() => {
     activeRef.current = activeCategoryId
   }, [activeCategoryId])
+
+  useEffect(() => () => {
+    window.clearTimeout(pendingCategoryTimerRef.current)
+  }, [])
 
   const cards = useMemo(() => categories || [], [categories])
 
@@ -158,6 +165,9 @@ export default function MenuCategoryScroller({
   function scrollToCategory(categoryId) {
     const root = getScrollRoot()
     const scroller = getScrollElement()
+    const stickyBarOffset = collapsed && collapsedPosition === 'sticky'
+      ? COLLAPSED_BAR_HEIGHT
+      : 0
     if (categoryId === 'all') {
       if (root === window) {
         window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -171,18 +181,36 @@ export default function MenuCategoryScroller({
     if (!section) return false
 
     if (root === window) {
-      const target = section.getBoundingClientRect().top + window.scrollY - topOffset - scrollOffset
-      window.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+      const target = getMenuCategoryScrollTarget({
+        sectionTop: section.getBoundingClientRect().top,
+        rootTop: topOffset,
+        scrollTop: window.scrollY,
+        scrollOffset,
+        stickyBarOffset,
+      })
+      window.scrollTo({ top: target, behavior: 'smooth' })
     } else {
       const rootRect = scroller.getBoundingClientRect()
-      const target = section.getBoundingClientRect().top - rootRect.top + scroller.scrollTop - scrollOffset
-      scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+      const target = getMenuCategoryScrollTarget({
+        sectionTop: section.getBoundingClientRect().top,
+        rootTop: rootRect.top,
+        scrollTop: scroller.scrollTop,
+        scrollOffset,
+        stickyBarOffset,
+      })
+      scroller.scrollTo({ top: target, behavior: 'smooth' })
     }
     return true
   }
 
   function handleClick(category) {
     if (scrollToCategory(category.id)) {
+      pendingCategoryRef.current = category.id
+      window.clearTimeout(pendingCategoryTimerRef.current)
+      pendingCategoryTimerRef.current = window.setTimeout(() => {
+        pendingCategoryRef.current = null
+      }, 180)
+      activeRef.current = category.id
       onCategoryClick?.(category.id)
     }
   }
@@ -228,6 +256,16 @@ export default function MenuCategoryScroller({
 
       if (!onActiveCategoryChange || !sectionPrefix) return
       const threshold = (root === window ? topOffset : scroller.getBoundingClientRect().top) + scrollOffset + 8
+      const pendingCategory = pendingCategoryRef.current
+
+      if (pendingCategory) {
+        window.clearTimeout(pendingCategoryTimerRef.current)
+        pendingCategoryTimerRef.current = window.setTimeout(() => {
+          pendingCategoryRef.current = null
+        }, 180)
+        return
+      }
+
       let nextActive = 'all'
 
       for (const category of cards) {

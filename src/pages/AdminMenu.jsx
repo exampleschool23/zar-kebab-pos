@@ -13,7 +13,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
-import { DEFAULT_MENU_PREP_MINUTES, normalizeMenuPrepMinutes } from '../lib/menuPrepTime'
+import { DEFAULT_MENU_PREP_MINUTES, menuPrepTimeLabel, normalizeMenuPrepMinutes } from '../lib/menuPrepTime'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
 import { generateMenuExternalId } from '../lib/menuExternalId'
@@ -29,7 +29,7 @@ import {
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
-  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock, Users,
+  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock, Users, Clock3,
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -887,6 +887,10 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
         </div>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <MenuPrice item={item} />
+          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[11px] font-black text-orange-700 ring-1 ring-orange-200">
+            <Clock3 size={12} />
+            {menuPrepTimeLabel(item, lang)}
+          </span>
           {gramsLabel(item, lang) && (
             <span className="rounded-full bg-[#F8FAFC] px-2 py-1 text-[11px] font-black text-[#64748B] ring-1 ring-[#E5E7EB]">
               {gramsLabel(item, lang)}
@@ -1004,6 +1008,10 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
         <p className="font-bold text-gray-900 text-sm truncate">{getItemName(item, lang)}</p>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
           {cat && <p className="text-xs text-gray-400">{getCategoryName(cat, lang)}</p>}
+          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-black text-orange-700">
+            <Clock3 size={11} />
+            {menuPrepTimeLabel(item, lang)}
+          </span>
           <ExternalIdBadge item={item} compact />
           {item.public_hidden && (
             <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-700">

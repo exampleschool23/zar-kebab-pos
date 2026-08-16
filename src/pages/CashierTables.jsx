@@ -103,8 +103,6 @@ const L = {
     items:           'mahsulot',
     noActiveBills:   'Faol hisoblar yo\'q',
     noActiveSub:     "Hech qanday stol to'lov kutmaydi",
-    infoBar:         "Buyurtma tafsilotlarini ko'rish, to'lovni qayta ishlash va chek chiqarish uchun stol hisobini tanlang.",
-    viewAllTables:   "Barcha stollarni ko'rish",
     noPayData:       "To'lov ma'lumotlari yo'q",
     deleteOrder:     "Buyurtmani o'chirish",
     confirmDelete:   "O'chirishni tasdiqlash",
@@ -160,8 +158,6 @@ const L = {
     items:           'позиций',
     noActiveBills:   'Нет активных счетов',
     noActiveSub:     'Ни один стол не ожидает оплаты',
-    infoBar:         'Выберите счёт стола, чтобы просмотреть детали заказа, обработать оплату и распечатать чек.',
-    viewAllTables:   'Все столы',
     noPayData:       'Нет данных об оплате',
     deleteOrder:     'Удалить заказ',
     confirmDelete:   'Подтвердить удаление',
@@ -216,8 +212,6 @@ const L = {
     items:           'items',
     noActiveBills:   'No active bills',
     noActiveSub:     'No tables need payment right now',
-    infoBar:         'Select a table bill to view order details, process payment and print receipt.',
-    viewAllTables:   'View All Tables',
     noPayData:       'No payments today yet',
     deleteOrder:     'Delete order',
     confirmDelete:   'Confirm delete',
@@ -649,7 +643,7 @@ export default function CashierTables() {
   const [filterWaiter,setFilterWaiter]= useState('all')
   const [filterStatus,setFilterStatus]= useState('all')
   const [sortKey,     setSortKey]     = useState('newest')
-  const [showPaidToday, setShowPaidToday] = useState(false)
+  const [showPaidToday, setShowPaidToday] = useState(true)
   const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
   const [deletingOrderId, setDeletingOrderId] = useState('')
   const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
@@ -1124,23 +1118,6 @@ export default function CashierTables() {
             onToggle={() => setShowPaidToday(value => !value)}
             onOpenReceipt={order => navigate(`/receipt/${order.id}`)}
           />
-
-          {/* ── Bottom info bar ── */}
-          <div className="mt-6 bg-white border border-[#E5E7EB] rounded-2xl px-5 py-4 flex items-center justify-between gap-4 shadow-sm">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-                <Receipt size={15} className="text-[#ff5a00]" />
-              </div>
-              <p className="text-[13px] text-[#6B7280] leading-snug">{l.infoBar}</p>
-            </div>
-            <button
-              onClick={() => navigate('/waiter/tables')}
-              className="flex items-center gap-1.5 px-4 py-2 bg-gray-50 border border-[#E5E7EB] rounded-xl text-[13px] text-[#1F2937] font-semibold hover:bg-gray-100 transition-colors flex-shrink-0"
-            >
-              <Table2 size={14} />
-              {l.viewAllTables}
-            </button>
-          </div>
 
         </main>
       </div>

@@ -7,6 +7,7 @@ import {
   menuPrepTimeLabel,
   normalizeMenuPrepMinutes,
 } from '../src/lib/menuPrepTime.js'
+import fs from 'node:fs'
 
 test('menu preparation time defaults, rounds, and stays within its supported range', () => {
   assert.equal(normalizeMenuPrepMinutes(''), DEFAULT_MENU_PREP_MINUTES)
@@ -21,4 +22,12 @@ test('menu preparation time is localized for customer and waiter badges', () => 
   assert.equal(menuPrepTimeLabel(item, 'ru'), '~25 мин')
   assert.equal(menuPrepTimeLabel(item, 'uz'), '~25 daq')
   assert.equal(menuPrepTimeLabel({}, 'en'), '~15 min')
+})
+
+test('admin menu grid and list cards show the saved preparation estimate', () => {
+  const source = fs.readFileSync(new URL('../src/pages/AdminMenu.jsx', import.meta.url), 'utf8')
+  const matches = source.match(/\{menuPrepTimeLabel\(item, lang\)\}/g) || []
+
+  assert.equal(matches.length, 2)
+  assert.match(source, /Clock3/)
 })
