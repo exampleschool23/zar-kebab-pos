@@ -49,8 +49,10 @@ export function sortWaiterTableInfosByOpenedTime(tableInfos = [], status = '') {
   if (!['waiting_kitchen', 'needs_bill'].includes(status)) return tableInfos
 
   return [...tableInfos].sort((a, b) => {
-    const openedAtA = parseInstantDate(a?.counts?.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY
-    const openedAtB = parseInstantDate(b?.counts?.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY
-    return openedAtA - openedAtB
+    const openedAtA = parseInstantDate(a?.counts?.createdAt)?.getTime() ?? null
+    const openedAtB = parseInstantDate(b?.counts?.createdAt)?.getTime() ?? null
+    if (openedAtA === null) return openedAtB === null ? 0 : 1
+    if (openedAtB === null) return -1
+    return openedAtB - openedAtA
   })
 }

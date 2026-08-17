@@ -66,7 +66,7 @@ test('waiter table status shows reserved only when there are no active orders', 
   assert.equal(getWaiterTableStatus(table(), [], () => 'available'), 'available')
 })
 
-test('waiting and needs-bill tables are ordered by oldest opened time first', () => {
+test('waiting and needs-bill tables are ordered by latest opened time first', () => {
   const infos = [
     { table: { id: 'newer' }, counts: { createdAt: '2026-08-17T15:00:00+05:00' } },
     { table: { id: 'unknown' }, counts: { createdAt: null } },
@@ -75,11 +75,11 @@ test('waiting and needs-bill tables are ordered by oldest opened time first', ()
 
   assert.deepEqual(
     sortWaiterTableInfosByOpenedTime(infos, 'waiting_kitchen').map(info => info.table.id),
-    ['older', 'newer', 'unknown']
+    ['newer', 'older', 'unknown']
   )
   assert.deepEqual(
     sortWaiterTableInfosByOpenedTime(infos, 'needs_bill').map(info => info.table.id),
-    ['older', 'newer', 'unknown']
+    ['newer', 'older', 'unknown']
   )
 })
 

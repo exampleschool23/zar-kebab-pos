@@ -1873,7 +1873,7 @@ test('WaiterTables orders waiting and needs-bill cards by opened time', () => {
   assert.match(source, /sortWaiterTableInfosByOpenedTime\(/)
   assert.match(sorter, /\['waiting_kitchen', 'needs_bill'\]\.includes\(status\)/)
   assert.match(sorter, /counts\?\.createdAt/)
-  assert.match(sorter, /openedAtA - openedAtB/)
+  assert.match(sorter, /openedAtB - openedAtA/)
 })
 
 test('WaiterTables refreshes operational data whenever the waiter returns', () => {
