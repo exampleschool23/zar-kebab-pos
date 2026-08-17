@@ -5,7 +5,7 @@ import { runDbHealthChecks } from '../src/lib/dbHealth.js'
 
 const cliHealthSource = readFileSync(new URL('../scripts/check-db-health.js', import.meta.url), 'utf8')
 
-function makeClient({ missingTable = null, missingColumnTable = null, missingColumn = null, missingRpc = false } = {}) {
+function makeClient({ missingTable = null, missingColumnTable = null, missingColumn = null, missingRpc = false, permissionDeniedTables = [] } = {}) {
   return {
     from(name) {
       return {
@@ -19,6 +19,14 @@ function makeClient({ missingTable = null, missingColumnTable = null, missingCol
                 return Promise.resolve({
                   error: {
                     message: `column ${name}.${missingColumn} does not exist`,
+                  },
+                })
+              }
+              if (permissionDeniedTables.includes(name)) {
+                return Promise.resolve({
+                  error: {
+                    code: '42501',
+                    message: `permission denied for table ${name}`,
                   },
                 })
               }
@@ -45,6 +53,34 @@ test('database health passes when tables exist and RPC responds with a validatio
   assert.equal(result.checks.some(check => check.name === 'kitchen_round_receipts_version' && check.ok), true)
   assert.equal(result.checks.find(check => check.name === 'restaurant_tables').messageKey, 'ok')
   assert.equal(result.checks.find(check => check.name === 'submit_order_to_kitchen').messageKey, 'available')
+})
+
+test('browser health treats expected service-only delivery tables as protected and healthy', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    permissionDeniedTables: [
+      'daily_bazaar_telegram_deliveries',
+      'daily_payroll_group_notification_deliveries',
+    ],
+  }))
+
+  assert.equal(result.ok, true)
+  assert.equal(
+    result.checks.find(check => check.name === 'daily_bazaar_telegram_deliveries').messageKey,
+    'protected'
+  )
+  assert.equal(
+    result.checks.find(check => check.name === 'daily_payroll_group_notification_deliveries').messageKey,
+    'protected'
+  )
+})
+
+test('browser health still reports unexpected permission failures', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    permissionDeniedTables: ['orders'],
+  }))
+
+  assert.equal(result.ok, false)
+  assert.equal(result.failed.find(check => check.name === 'orders').messageKey, 'rawError')
 })
 
 test('database health reports the actual missing schema-cache column', async () => {

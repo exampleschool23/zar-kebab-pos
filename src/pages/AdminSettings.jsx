@@ -54,6 +54,7 @@ function Toggle({ value, onChange, disabled = false }) {
 function healthMessage(check, labels) {
   if (check.messageKey === 'ok') return labels.healthOk
   if (check.messageKey === 'available') return labels.healthAvailable
+  if (check.messageKey === 'protected') return labels.healthProtected
   if (check.messageKey === 'missingColumn') return labels.healthMissingColumn(check.detail)
   return check.detail || labels.healthUnknownError
 }
@@ -208,6 +209,7 @@ export default function AdminSettings() {
       unhealthy:       'Muammo bor',
       healthOk:         'OK',
       healthAvailable:  'Mavjud',
+      healthProtected:  'Himoyalangan',
       healthMissingColumn: column => `Ustun yo‘q: ${column}`,
       healthUnknownError: 'Noma’lum xatolik',
       healthNames: {
@@ -274,6 +276,7 @@ export default function AdminSettings() {
       unhealthy:       'Есть проблемы',
       healthOk:         'OK',
       healthAvailable:  'Доступно',
+      healthProtected:  'Защищено',
       healthMissingColumn: column => `Нет колонки: ${column}`,
       healthUnknownError: 'Неизвестная ошибка',
       healthNames: {
@@ -340,6 +343,7 @@ export default function AdminSettings() {
       unhealthy:       'Needs attention',
       healthOk:         'OK',
       healthAvailable:  'Available',
+      healthProtected:  'Protected',
       healthMissingColumn: column => `Missing column: ${column}`,
       healthUnknownError: 'Unknown error',
       healthNames: {

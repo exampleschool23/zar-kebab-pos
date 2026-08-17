@@ -15,8 +15,8 @@ const TABLE_CHECKS = [
   { name: 'bazaar_purchase_items', columns: ['id', 'purchase_id', 'product_name', 'product_key', 'category', 'quantity', 'unit', 'line_total', 'sort_order', 'notes'] },
   { name: 'bazaar_product_catalog', columns: ['product_key', 'product_name', 'category', 'unit', 'last_purchase_date', 'created_at', 'updated_at'] },
   { name: 'bazaar_purchase_audit', columns: ['id', 'purchase_id', 'action', 'old_snapshot', 'new_snapshot', 'changed_by', 'changed_by_name', 'changed_at'] },
-  { name: 'daily_bazaar_telegram_deliveries', columns: ['purchase_date', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'updated_at'] },
-  { name: 'daily_payroll_group_notification_deliveries', columns: ['business_date', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'updated_at'] },
+  { name: 'daily_bazaar_telegram_deliveries', columns: ['purchase_date', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'updated_at'], access: 'service_only' },
+  { name: 'daily_payroll_group_notification_deliveries', columns: ['business_date', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'updated_at'], access: 'service_only' },
   { name: 'menu_items', columns: ['id', 'external_id', 'name_uz', 'name_ru', 'name_en', 'price', 'old_price', 'sale_unit', 'grams', 'millilitres', 'kcal', 'stock_count', 'image_url', 'media_urls', 'option_groups', 'cashier_only', 'public_hidden', 'waiter_hidden', 'visible_from_time', 'visible_until_time', 'sort_order', 'deleted_at'] },
   { name: 'menu_item_costs', columns: ['menu_item_id', 'cost_price', 'variant_costs', 'updated_at'] },
   { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'hidden', 'waiter_hidden', 'tourist_hidden', 'visible_from_time', 'visible_until_time', 'sort_order', 'deleted_at'] },
@@ -115,6 +115,11 @@ async function checkTable(dbClient, check) {
     .limit(1)
 
   if (!error) return { type: 'table', name: check.name, ok: true, messageKey: 'ok' }
+
+  const permissionDenied = error?.code === '42501' || /permission denied/i.test(String(error?.message || ''))
+  if (check.access === 'service_only' && permissionDenied) {
+    return { type: 'table', name: check.name, ok: true, messageKey: 'protected' }
+  }
 
   const missingColumn = missingColumnMessage(error)
   return {
