@@ -131,6 +131,7 @@ const LOCAL_ONLY_ACTIONS = new Set([
   'UPDATE_CART_PRICE_MODE',
   'REPLACE_CART',
   'CLEAR_CART',
+  'SYNC_CASHIER_BILL_ORDERS',
 ])
 
 const initialState = {

@@ -38,6 +38,27 @@ export function ordersReducer(state, action) {
     case 'SET_ORDERS':
       return { ...state, orders: action.payload }
 
+    case 'SYNC_CASHIER_BILL_ORDERS': {
+      const freshOrders = Array.isArray(action.payload?.orders) ? action.payload.orders : []
+      const freshOrderIds = new Set(freshOrders.map(order => order?.id).filter(Boolean))
+      const tableId = action.payload?.tableId || null
+      const orderId = action.payload?.orderId || null
+      const isTargetActiveOrder = order => {
+        const matchesTarget = orderId ? order.id === orderId : order.table_id === tableId
+        return matchesTarget &&
+          order.payment_status !== 'paid' &&
+          !order.paid_at &&
+          !['paid', 'completed', 'cancelled'].includes(String(order.status || '').toLowerCase())
+      }
+      return {
+        ...state,
+        orders: [
+          ...state.orders.filter(order => !freshOrderIds.has(order.id) && !isTargetActiveOrder(order)),
+          ...freshOrders,
+        ],
+      }
+    }
+
     case 'SEND_TO_KITCHEN': {
       const orderType = normalizeOrderType(action.payload?.orderType)
       const isOffPremise = isOffPremiseOrderType(orderType)

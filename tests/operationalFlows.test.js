@@ -54,6 +54,26 @@ test('end-to-end floor flow: waiter sends, kitchen marks ready, waiter requests 
   assert.equal(paid.orders[0].payment_method, 'cash')
 })
 
+test('cashier bill refresh replaces only the targeted active order', () => {
+  const current = {
+    ...state(),
+    orders: [
+      { id: 'target', table_id: null, status: 'sent_to_kitchen', payment_status: 'unpaid', total: 40_000 },
+      { id: 'other', table_id: null, status: 'sent_to_kitchen', payment_status: 'unpaid', total: 25_000 },
+      { id: 'paid', table_id: 't1', status: 'paid', payment_status: 'paid', total: 80_000 },
+    ],
+  }
+  const refreshed = { id: 'target', table_id: null, status: 'sent_to_kitchen', payment_status: 'unpaid', total: 50_000 }
+
+  const next = ordersReducer(current, {
+    type: 'SYNC_CASHIER_BILL_ORDERS',
+    payload: { orderId: 'target', orders: [refreshed] },
+  })
+
+  assert.deepEqual(next.orders.map(order => order.id), ['other', 'paid', 'target'])
+  assert.equal(next.orders.find(order => order.id === 'target').total, 50_000)
+})
+
 test('replaying an already-loaded kitchen attempt clears the cart without duplicating items or totals', () => {
   const base = {
     ...state(),

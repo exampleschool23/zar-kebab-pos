@@ -2997,6 +2997,27 @@ test('table payment atomically skips empty unpaid order shells', () => {
   assert.match(migration, /revoke all on function public\.settle_orders_payment_strict\(jsonb\) from authenticated/)
 })
 
+test('cashier bill verification is targeted bounded and explains disabled checkout', () => {
+  const cashier = readSource('src/pages/CashierBill.jsx')
+  const db = readSource('src/lib/db.js')
+  const timeout = readSource('src/lib/writeTimeout.js')
+  const appContext = readSource('src/store/AppContext.jsx')
+
+  assert.match(cashier, /loadCashierBillOrders\(\{ tableId, orderId, signal \}\)/)
+  assert.match(cashier, /withReadTimeout\(/)
+  assert.doesNotMatch(cashier, /refreshPOSData\(\)/)
+  assert.match(cashier, /SYNC_CASHIER_BILL_ORDERS/)
+  assert.match(cashier, /resolveLoyaltyBeforePayment/)
+  assert.match(cashier, /clearLoyaltyEntry/)
+  assert.match(cashier, /checkoutBlockMessage/)
+  assert.match(cashier, /value=\{formatMoneyInput\(row\.amount\)\}/)
+  assert.match(cashier, /amount: normalizeMoneyInput\(e\.target\.value\)/)
+  assert.match(db, /export async function loadCashierBillOrders/)
+  assert.match(timeout, /export const POS_READ_TIMEOUT_MS = \d+/)
+  assert.match(timeout, /POSReadTimeoutError/)
+  assert.match(appContext, /'SYNC_CASHIER_BILL_ORDERS'/)
+})
+
 test('paid order deletion is routed through feature-gated RPC and wired to cashier and reports', () => {
   const appContext = readSource('src/store/AppContext.jsx')
   const reducer = readSource('src/store/ordersReducer.js')

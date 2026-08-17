@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useCallback, useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Printer, CheckCircle2, Banknote,
@@ -38,6 +38,9 @@ import { formatElapsedSince } from '../lib/dateFormat'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canConfirmCashierCheckout, getFreshCashierPaymentQuote } from '../lib/cashierCheckout'
+import { loadCashierBillOrders } from '../lib/db'
+import { withReadTimeout } from '../lib/writeTimeout'
+import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CASH_PRESETS    = [
@@ -74,11 +77,24 @@ function getCashierItemName(item, menuItem, lang) {
   return menuItem ? getItemName(menuItem, lang) : item.name
 }
 
+function cashierRefreshErrorMessage(error, lang) {
+  if (error?.code === 'POS_READ_TIMEOUT') {
+    return lang === 'uz' ? 'Hisobni tekshirish juda uzoq davom etdi. Ulanishni tekshirib, qayta urinib ko‘ring.' :
+      lang === 'ru' ? 'Проверка счёта заняла слишком много времени. Проверьте соединение и попробуйте снова.' :
+        'Checking the bill took too long. Check the connection and try again.'
+  }
+  return error?.message || (
+    lang === 'uz' ? 'Hisobni yangilab bo‘lmadi.' :
+      lang === 'ru' ? 'Не удалось обновить счёт.' :
+        'Could not refresh the bill.'
+  )
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 export default function CashierBill() {
   const { tableId, orderId }  = useParams()
   const navigate     = useNavigate()
-  const { state, dispatch, refreshPOSData } = useApp()
+  const { state, dispatch } = useApp()
   const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
@@ -213,26 +229,41 @@ export default function CashierBill() {
     isProcessingPayment,
     isRefreshingBill,
   })
+  const checkoutBlockReason = !canEditCashier
+    ? 'access'
+    : !loyaltyReady
+      ? 'loyalty'
+      : isRefreshingBill
+        ? 'refresh'
+        : null
   const isOverpaid = paymentValidation.isOverpaid
   const isFullyPaid = paymentValidation.isFullyPaid || (
     basePayment.grossAmount > 0 && loyaltyAmt >= basePayment.grossAmount && total === 0
   )
+
+  const refreshCurrentBill = useCallback(async () => {
+    const freshOrders = await withReadTimeout(
+      signal => loadCashierBillOrders({ tableId, orderId, signal }),
+      'REFRESH_CASHIER_BILL'
+    )
+    const syncResult = await dispatch({
+      type: 'SYNC_CASHIER_BILL_ORDERS',
+      payload: { tableId, orderId, orders: freshOrders },
+    })
+    if (syncResult?.error) throw syncResult.error
+    return freshOrders
+  }, [dispatch, tableId, orderId])
 
   useEffect(() => {
     let active = true
 
     async function refreshBill() {
       setRefreshingBill(true)
+      setPaymentRefreshMessage('')
       try {
-        await refreshPOSData()
+        await refreshCurrentBill()
       } catch (error) {
-        if (active) {
-          setPaymentRefreshMessage(error?.message || (
-            lang === 'uz' ? 'Hisobni yangilab bo‘lmadi.' :
-              lang === 'ru' ? 'Не удалось обновить счёт.' :
-                'Could not refresh the bill.'
-          ))
-        }
+        if (active) setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
       } finally {
         if (active) setRefreshingBill(false)
       }
@@ -249,7 +280,7 @@ export default function CashierBill() {
       active = false
       window.removeEventListener('pageshow', handlePageShow)
     }
-  }, [refreshPOSData, tableId, orderId, lang])
+  }, [refreshCurrentBill, lang])
 
   useEffect(() => {
     setSplitPayments(prev => {
@@ -397,14 +428,21 @@ export default function CashierBill() {
     setLoyaltyLookupMessage('')
   }
 
+  function clearLoyaltyEntry() {
+    setLoyaltyCardNumber('')
+    setLoyaltyCard(null)
+    setLoyaltyRedeemAmount('')
+    setLoyaltyLookupMessage('')
+  }
+
   async function handlePaid() {
     if (!canProcess) return
     setProcessingPayment(true)
     setPaymentRefreshMessage('')
     try {
-      const refreshed = await refreshPOSData()
+      const freshOrders = await refreshCurrentBill()
       const freshQuote = getFreshCashierPaymentQuote({
-        orders: refreshed?.orders || state.orders,
+        orders: freshOrders,
         menuItems: state.menuItems,
         settings: state.settings,
         tableId,
@@ -454,11 +492,7 @@ export default function CashierBill() {
       if (result?.error) return
       navigate('/cashier/tables')
     } catch (error) {
-      setPaymentRefreshMessage(error?.message || (
-        lang === 'uz' ? 'Hisobni yangilab bo‘lmadi. Qayta urinib ko‘ring.' :
-          lang === 'ru' ? 'Не удалось обновить счёт. Попробуйте ещё раз.' :
-            'Could not refresh the bill. Please try again.'
-      ))
+      setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
     } finally {
       setProcessingPayment(false)
     }
@@ -547,6 +581,10 @@ export default function CashierBill() {
     exact:        lang === 'uz' ? 'Aniq' : lang === 'ru' ? 'Точно' : 'Exact',
     confirmPay:   lang === 'uz' ? "To'lovni tasdiqlash" : lang === 'ru' ? 'Подтвердить оплату' : 'Confirm Payment',
     processingPay: lang === 'uz' ? "To'lov saqlanmoqda" : lang === 'ru' ? 'Сохранение оплаты' : 'Saving payment',
+    refreshingBill: lang === 'uz' ? 'Hisob tekshirilmoqda' : lang === 'ru' ? 'Проверка счёта' : 'Checking bill',
+    cashierAccessRequired: lang === 'uz' ? 'To‘lovni yakunlash uchun Kassa tahrirlash ruxsati kerak.' : lang === 'ru' ? 'Для завершения оплаты нужен доступ на изменение кассы.' : 'Cashier write access is required to complete payment.',
+    resolveLoyaltyBeforePayment: lang === 'uz' ? 'Sodiqlik kartasini tekshiring yoki karta raqamini tozalang.' : lang === 'ru' ? 'Проверьте карту лояльности или очистите номер карты.' : 'Check the loyalty card or clear its number.',
+    clearLoyalty: lang === 'uz' ? 'Kartani tozalash' : lang === 'ru' ? 'Очистить карту' : 'Clear card',
     printBill:    lang === 'uz' ? 'Hisob chiqarish' : lang === 'ru' ? 'Распечатать счёт' : 'Print Bill',
     printReceipt: lang === 'uz' ? 'Chek chiqarish' : lang === 'ru' ? 'Распечатать чек' : 'Print Receipt',
     deleteOrder:  lang === 'uz' ? 'Buyurtmani o‘chirish' : lang === 'ru' ? 'Удалить заказ' : 'Delete order',
@@ -582,6 +620,13 @@ export default function CashierBill() {
     noTable:      lang === 'uz' ? 'Stol tanlanmagan' : lang === 'ru' ? 'Стол не выбран' : 'No table selected',
     removePayment: t(lang, 'removePayment'),
   }
+  const checkoutBlockMessage = checkoutBlockReason === 'access'
+    ? lbl.cashierAccessRequired
+    : checkoutBlockReason === 'loyalty'
+      ? lbl.resolveLoyaltyBeforePayment
+      : checkoutBlockReason === 'refresh'
+        ? lbl.refreshingBill
+        : ''
 
   if (!loaded || loadError) {
     return (
@@ -1062,6 +1107,15 @@ export default function CashierBill() {
                 {loyaltyLookupMessage && (
                   <p className="mt-2 text-[11px] font-bold text-[#6B7280]">{loyaltyLookupMessage}</p>
                 )}
+                {hasLoyaltyCardEntry && !loyaltyCard && (
+                  <button
+                    type="button"
+                    onClick={clearLoyaltyEntry}
+                    className="mt-2 text-[11px] font-black text-[#ff5a00] underline underline-offset-2"
+                  >
+                    {lbl.clearLoyalty}
+                  </button>
+                )}
                 {loyaltyCard && (
                   <div className="mt-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
                     <div className="flex items-center justify-between gap-4">
@@ -1231,8 +1285,8 @@ export default function CashierBill() {
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9]*"
-                              value={row.amount}
-                              onChange={e => updatePayment(row.id, { amount: e.target.value })}
+                              value={formatMoneyInput(row.amount)}
+                              onChange={e => updatePayment(row.id, { amount: normalizeMoneyInput(e.target.value) })}
                               onFocus={() => {
                                 setActivePaymentId(row.id)
                                 setPayMethod(row.method)
@@ -1334,8 +1388,13 @@ export default function CashierBill() {
                   }`}
                 >
                   <CheckCircle2 size={19} />
-                  {isProcessingPayment ? lbl.processingPay : lbl.confirmPay}
+                  {isProcessingPayment ? lbl.processingPay : isRefreshingBill ? lbl.refreshingBill : lbl.confirmPay}
                 </button>
+                {checkoutBlockMessage && !isProcessingPayment && (
+                  <p className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-[#6B7280]">
+                    {checkoutBlockMessage}
+                  </p>
+                )}
                 {paymentRefreshMessage && (
                   <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
                     {paymentRefreshMessage}
@@ -1391,8 +1450,13 @@ export default function CashierBill() {
             }`}
           >
             <CheckCircle2 size={19} />
-            {isProcessingPayment ? lbl.processingPay : lbl.confirmPay}
+            {isProcessingPayment ? lbl.processingPay : isRefreshingBill ? lbl.refreshingBill : lbl.confirmPay}
           </button>
+          {checkoutBlockMessage && !isProcessingPayment && (
+            <p className="mt-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-[#6B7280]">
+              {checkoutBlockMessage}
+            </p>
+          )}
           {paymentRefreshMessage && (
             <p role="alert" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
               {paymentRefreshMessage}

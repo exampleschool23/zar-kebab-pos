@@ -1,4 +1,5 @@
 export const POS_WRITE_TIMEOUT_MS = 15000
+export const POS_READ_TIMEOUT_MS = 8000
 
 export function createWriteTimeoutError(actionType = 'write') {
   const error = new Error('Saving changes took too long. Please check the connection and try again.')
@@ -11,6 +12,52 @@ export function createWriteTimeoutError(actionType = 'write') {
 
 export function isWriteTimeoutError(error) {
   return error?.isPOSWriteTimeout === true || error?.code === 'POS_WRITE_TIMEOUT'
+}
+
+export function createReadTimeoutError(actionType = 'read') {
+  const error = new Error('Refreshing data took too long. Please check the connection and try again.')
+  error.name = 'POSReadTimeoutError'
+  error.code = 'POS_READ_TIMEOUT'
+  error.actionType = actionType
+  error.isPOSReadTimeout = true
+  return error
+}
+
+export function isReadTimeoutError(error) {
+  return error?.isPOSReadTimeout === true || error?.code === 'POS_READ_TIMEOUT'
+}
+
+export function withReadTimeout(operation, actionType = 'read', timeoutMs = POS_READ_TIMEOUT_MS) {
+  const delay = Number(timeoutMs)
+  if (!Number.isFinite(delay) || delay <= 0) {
+    return Promise.resolve(typeof operation === 'function' ? operation() : operation)
+  }
+
+  let timeoutId
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+  const timeoutError = createReadTimeoutError(actionType)
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller?.abort(timeoutError)
+      reject(timeoutError)
+    }, delay)
+  })
+
+  let operationPromise
+  try {
+    operationPromise = Promise.resolve(typeof operation === 'function' ? operation(controller?.signal) : operation)
+  } catch (error) {
+    clearTimeout(timeoutId)
+    return Promise.reject(error)
+  }
+
+  const guardedOperation = operationPromise.catch(error => {
+    if (controller?.signal?.aborted && !isReadTimeoutError(error)) throw timeoutError
+    throw error
+  })
+
+  return Promise.race([guardedOperation, timeout])
+    .finally(() => clearTimeout(timeoutId))
 }
 
 export function withWriteTimeout(operation, actionType = 'write', timeoutMs = POS_WRITE_TIMEOUT_MS) {

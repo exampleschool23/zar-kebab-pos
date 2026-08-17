@@ -562,6 +562,27 @@ export async function loadOperationalTableData() {
   return { tables, orders }
 }
 
+export async function loadCashierBillOrders({ tableId = null, orderId = null, signal, dbClient = supabase } = {}) {
+  if ((!tableId && !orderId) || (tableId && orderId)) {
+    throw new Error('Cashier bill refresh requires exactly one order or table.')
+  }
+
+  let query = dbClient
+    .from('orders')
+    .select('*, items:order_items(*)')
+    .or('payment_status.neq.paid,payment_status.is.null')
+    .is('paid_at', null)
+    .or('status.not.in.(paid,completed,cancelled),status.is.null')
+
+  query = orderId ? query.eq('id', orderId) : query.eq('table_id', tableId)
+  const { data, error } = await withAbortSignal(
+    query.order('created_at', { ascending: true }),
+    signal
+  )
+  if (error) throw error
+  return data || []
+}
+
 export async function loadTableOrderHistoryIds(dbClient = supabase) {
   const rows = await collectPagedRows((from, to) => dbClient
     .from('orders')
