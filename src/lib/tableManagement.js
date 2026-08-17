@@ -1,3 +1,5 @@
+import { parseInstantDate } from './dateFormat.js'
+
 export function hasActiveOrders(tableId, orders = []) {
   return orders.some(order =>
     order.table_id === tableId &&
@@ -41,4 +43,14 @@ export function getReservationSummary(table) {
 export function getWaiterTableStatus(table, activeOrders, deriveActiveStatus) {
   if (activeOrders.length === 0 && isReservedTable(table)) return 'reserved'
   return deriveActiveStatus()
+}
+
+export function sortWaiterTableInfosByOpenedTime(tableInfos = [], status = '') {
+  if (!['waiting_kitchen', 'needs_bill'].includes(status)) return tableInfos
+
+  return [...tableInfos].sort((a, b) => {
+    const openedAtA = parseInstantDate(a?.counts?.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY
+    const openedAtB = parseInstantDate(b?.counts?.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY
+    return openedAtA - openedAtB
+  })
 }

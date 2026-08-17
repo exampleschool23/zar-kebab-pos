@@ -8,6 +8,7 @@ import {
   hasActiveOrders,
   hasOrderHistory,
   isReservedTable,
+  sortWaiterTableInfosByOpenedTime,
 } from '../src/lib/tableManagement.js'
 
 const table = (overrides = {}) => ({ id: 't1', name: 'Table 1', status: 'available', is_active: true, ...overrides })
@@ -63,4 +64,30 @@ test('waiter table status shows reserved only when there are no active orders', 
   assert.equal(getWaiterTableStatus(reserved, [], () => 'available'), 'reserved')
   assert.equal(getWaiterTableStatus(reserved, [order()], () => 'waiting_kitchen'), 'waiting_kitchen')
   assert.equal(getWaiterTableStatus(table(), [], () => 'available'), 'available')
+})
+
+test('waiting and needs-bill tables are ordered by oldest opened time first', () => {
+  const infos = [
+    { table: { id: 'newer' }, counts: { createdAt: '2026-08-17T15:00:00+05:00' } },
+    { table: { id: 'unknown' }, counts: { createdAt: null } },
+    { table: { id: 'older' }, counts: { createdAt: '2026-08-17T12:00:00+05:00' } },
+  ]
+
+  assert.deepEqual(
+    sortWaiterTableInfosByOpenedTime(infos, 'waiting_kitchen').map(info => info.table.id),
+    ['older', 'newer', 'unknown']
+  )
+  assert.deepEqual(
+    sortWaiterTableInfosByOpenedTime(infos, 'needs_bill').map(info => info.table.id),
+    ['older', 'newer', 'unknown']
+  )
+})
+
+test('other waiter table sections keep their configured table order', () => {
+  const infos = [
+    { table: { id: 'newer' }, counts: { createdAt: '2026-08-17T15:00:00+05:00' } },
+    { table: { id: 'older' }, counts: { createdAt: '2026-08-17T12:00:00+05:00' } },
+  ]
+
+  assert.equal(sortWaiterTableInfosByOpenedTime(infos, 'preparing'), infos)
 })

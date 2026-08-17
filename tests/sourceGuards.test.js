@@ -1865,6 +1865,17 @@ test('WaiterTables keeps urgent status sections before available tables', () => 
   assert.match(source, /SECTION_ORDER\s*\n\s*\.map\(status =>/)
 })
 
+test('WaiterTables orders waiting and needs-bill cards by opened time', () => {
+  const source = readSource('src/pages/WaiterTables.jsx')
+  const tableManagement = readSource('src/lib/tableManagement.js')
+  const sorter = functionBody(tableManagement, 'sortWaiterTableInfosByOpenedTime')
+
+  assert.match(source, /sortWaiterTableInfosByOpenedTime\(/)
+  assert.match(sorter, /\['waiting_kitchen', 'needs_bill'\]\.includes\(status\)/)
+  assert.match(sorter, /counts\?\.createdAt/)
+  assert.match(sorter, /openedAtA - openedAtB/)
+})
+
 test('WaiterTables refreshes operational data whenever the waiter returns', () => {
   const appContext = readSource('src/store/AppContext.jsx')
   const db = readSource('src/lib/db.js')

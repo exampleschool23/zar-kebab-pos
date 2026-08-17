@@ -10,7 +10,7 @@ import {
   Search, CreditCard, Settings, CalendarClock, Phone,
 } from 'lucide-react'
 import { getOrderTotal } from '../lib/analytics'
-import { getReservationSummary, getWaiterTableStatus } from '../lib/tableManagement'
+import { getReservationSummary, getWaiterTableStatus, sortWaiterTableInfosByOpenedTime } from '../lib/tableManagement'
 import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
 import { formatDateTime, formatElapsedSince, formatTime } from '../lib/dateFormat'
 import { earliestReliableTime, getReliableOrderItemTime } from '../lib/orderTimestamps'
@@ -650,7 +650,10 @@ export default function WaiterTables() {
     SECTION_ORDER
       .map(status => ({
         status,
-        items: filtered.filter(info => info.status === status),
+        items: sortWaiterTableInfosByOpenedTime(
+          filtered.filter(info => info.status === status),
+          status
+        ),
       }))
       .filter(section => section.items.length > 0),
     [filtered]
