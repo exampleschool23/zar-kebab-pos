@@ -18,6 +18,7 @@ import {
   getOrderTotal,
   groupOrdersBySession,
   isPaidOrder,
+  normalizePaymentMethod,
   toLocalDateStr,
 } from '../lib/analytics'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
@@ -235,8 +236,30 @@ const PAY_METHOD_CONFIG = [
   { key: 'cash',     icon: Banknote,    color: '#16A34A', labelEn: 'Cash',     labelUz: 'Naqd',      labelRu: 'Наличные'    },
   { key: 'card',     icon: CreditCard,  color: '#7C3AED', labelEn: 'Card',     labelUz: 'Karta',     labelRu: 'Карта'       },
   { key: 'terminal', icon: Monitor,     color: '#2563EB', labelEn: 'Terminal', labelUz: 'Terminal',  labelRu: 'Терминал'    },
+  { key: 'loyalty_card', icon: CreditCard, color: '#D97706', labelEn: 'Loyalty', labelUz: 'Loyallik', labelRu: 'Лояльность' },
+  { key: 'mixed',    icon: CreditCard,  color: '#475569', labelEn: 'Mixed',    labelUz: 'Aralash',   labelRu: 'Смешанный'   },
   { key: 'unknown',  icon: HelpCircle,  color: '#9CA3AF', labelEn: 'Unknown',  labelUz: "Noma'lum",  labelRu: 'Неизвестно'  },
 ]
+
+function getPaymentMethodConfig(method) {
+  const key = normalizePaymentMethod(method)
+  return PAY_METHOD_CONFIG.find(config => config.key === key)
+    || PAY_METHOD_CONFIG.find(config => config.key === 'unknown')
+}
+
+function getPaymentMethodLabel(config, lang) {
+  if (lang === 'uz') return config.labelUz
+  if (lang === 'ru') return config.labelRu
+  return config.labelEn
+}
+
+function getPaidOrderPaymentMethods(order) {
+  const breakdown = getOrderPaymentBreakdown(order)
+  const methods = breakdown.length > 0
+    ? breakdown.filter(row => Number(row.amount) > 0).map(row => row.method)
+    : [order.payment_method]
+  return [...new Set(methods.map(normalizePaymentMethod))].map(getPaymentMethodConfig)
+}
 
 const SORT_OPTIONS = (l) => [
   { key: 'newest',  label: l.newestFirst },
@@ -585,6 +608,7 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle, onOpenReceipt }) {
             latest.map(order => {
               const orderType = inferOrderType(order)
               const priceMode = normalizePriceMode(order.price_mode)
+              const paymentMethods = getPaidOrderPaymentMethods(order)
               return (
                 <div key={order.id} className="flex items-center justify-between gap-4 px-5 py-3 border-b border-[#F3F4F6] last:border-b-0">
                   <button
@@ -603,6 +627,19 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle, onOpenReceipt }) {
                       }`}>
                         {getPriceModeLabel(priceMode, lang)}
                       </span>
+                      {paymentMethods.map(config => {
+                        const PaymentIcon = config.icon
+                        return (
+                          <span
+                            key={config.key}
+                            className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ring-1 ring-inset ring-current/20"
+                            style={{ color: config.color }}
+                          >
+                            <PaymentIcon size={10} />
+                            {getPaymentMethodLabel(config, lang)}
+                          </span>
+                        )
+                      })}
                     </div>
                     <p className="text-[11px] text-[#9CA3AF]">
                       {dateTimeLabel(order.paid_at || getOrderDate(order))}

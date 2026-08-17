@@ -2,6 +2,7 @@ import { getOrderPaymentSummary, isCancelledOrderItem } from './analytics.js'
 import { isCashierQuickItem } from './menuItems.js'
 import { inferOrderType, isOffPremiseOrderType } from './orderTypes.js'
 import { getConfiguredServiceRatePct } from './serviceRates.js'
+import { normalizePriceMode } from './priceModes.js'
 
 function isOpenSettlementOrder(order) {
   return order &&
@@ -30,7 +31,11 @@ export function getFreshCashierPaymentQuote({
 
   let subtotal = 0
   let serviceFee = 0
+  let counterItemsSubtotal = 0
   let grossAmount = 0
+  let primaryOrderId = null
+  const contributingPriceModes = new Set()
+  const contributingServiceRates = new Set()
 
   for (const order of targets) {
     const orderType = inferOrderType(order)
@@ -56,7 +61,13 @@ export function getFreshCashierPaymentQuote({
     )
     subtotal += summary.subtotal
     serviceFee += summary.serviceFee
+    counterItemsSubtotal += Number(summary.counterItemsSubtotal) || 0
     grossAmount += summary.grossAmount
+    if (summary.grossAmount > 0) {
+      if (!primaryOrderId) primaryOrderId = order.id
+      contributingPriceModes.add(normalizePriceMode(order.price_mode))
+      contributingServiceRates.add(summary.serviceRatePct)
+    }
   }
 
   const loyalty = Math.min(
@@ -68,6 +79,28 @@ export function getFreshCashierPaymentQuote({
     orderIds: targets.map(order => order.id),
     subtotal,
     serviceFee,
+    counterItemsSubtotal,
+    grossAmount,
+    primaryOrderId,
+    priceMode: contributingPriceModes.size === 1 ? [...contributingPriceModes][0] : null,
+    serviceRatePct: contributingServiceRates.size === 1 ? [...contributingServiceRates][0] : null,
+    loyaltyUsedAmount: loyalty,
+    total: Math.max(0, grossAmount - loyalty),
+  }
+}
+
+export function applyLoyaltyToCashierPaymentQuote(quote, loyaltyUsedAmount = 0) {
+  const grossAmount = Math.max(0, Math.round(Number(quote?.grossAmount) || 0))
+  const loyalty = Math.min(
+    grossAmount,
+    Math.max(0, Math.round(Number(loyaltyUsedAmount) || 0))
+  )
+
+  return {
+    subtotal: Math.max(0, Math.round(Number(quote?.subtotal) || 0)),
+    serviceFee: Math.max(0, Math.round(Number(quote?.serviceFee) || 0)),
+    serviceRatePct: quote?.serviceRatePct ?? null,
+    counterItemsSubtotal: Math.max(0, Math.round(Number(quote?.counterItemsSubtotal) || 0)),
     grossAmount,
     loyaltyUsedAmount: loyalty,
     total: Math.max(0, grossAmount - loyalty),

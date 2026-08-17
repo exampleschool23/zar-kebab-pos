@@ -37,7 +37,7 @@ import { getManualOrderNotes, getOrderItemOptionLines } from '../components/Menu
 import { formatElapsedSince } from '../lib/dateFormat'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
-import { canConfirmCashierCheckout, getFreshCashierPaymentQuote } from '../lib/cashierCheckout'
+import { applyLoyaltyToCashierPaymentQuote, canConfirmCashierCheckout, getFreshCashierPaymentQuote } from '../lib/cashierCheckout'
 import { loadCashierBillOrders } from '../lib/db'
 import { withReadTimeout } from '../lib/writeTimeout'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
@@ -137,22 +137,29 @@ export default function CashierBill() {
     }))
     const billableItems = allItems.filter(item => !isCancelledOrderItem(item))
     const mergedItems = getGroupedOrderItems(billableItems)
-    const firstOrder = orders[0]
-    const orderType = inferOrderType(firstOrder)
-    const fallbackServiceRatePct = getConfiguredServiceRatePct(state.settings, firstOrder.price_mode)
-    const serviceRatePct = isOffPremiseOrderType(orderType)
-      ? 0
-      : orders.find(o => o.service_rate_pct != null)?.service_rate_pct ?? fallbackServiceRatePct
-    const summary = getOrderPaymentSummary({ order_type: orderType, service_rate_pct: serviceRatePct }, billableItems, fallbackServiceRatePct)
+    const cashierQuote = getFreshCashierPaymentQuote({
+      orders,
+      menuItems: state.menuItems,
+      settings: state.settings,
+      tableId,
+      orderId,
+    })
+    const primaryOrder = orders.find(candidate => candidate.id === cashierQuote.primaryOrderId) || orders[0]
+    const orderType = inferOrderType(primaryOrder)
+    const fallbackServiceRatePct = getConfiguredServiceRatePct(state.settings, primaryOrder.price_mode)
+    const serviceRatePct = cashierQuote.serviceRatePct ?? (
+      isOffPremiseOrderType(orderType) ? 0 : fallbackServiceRatePct
+    )
     return {
-      ...orders[0],
+      ...primaryOrder,
       order_type: orderType,
-      price_mode: normalizePriceMode(firstOrder.price_mode),
+      price_mode: cashierQuote.priceMode || normalizePriceMode(primaryOrder.price_mode),
       items:       mergedItems,
-      subtotal:    summary.subtotal,
-      service_fee: summary.serviceFee,
-      service_rate_pct: summary.serviceRatePct,
-      total:       summary.total,
+      subtotal:    cashierQuote.subtotal,
+      service_fee: cashierQuote.serviceFee,
+      service_rate_pct: serviceRatePct,
+      total:       cashierQuote.grossAmount,
+      cashier_quote: { ...cashierQuote, serviceRatePct },
     }
   }, [state.orders, state.settings, tableId, orderId, menuItemMap])
 
@@ -177,7 +184,7 @@ export default function CashierBill() {
   // ── Totals ─────────────────────────────────────────────────────────────────
   const requestedLoyaltyUsed = Math.max(0, Math.round(Number(loyaltyRedeemAmount) || 0))
   const basePayment = order
-    ? getOrderPaymentSummary(order, order.items, configuredServiceRatePct)
+    ? applyLoyaltyToCashierPaymentQuote(order.cashier_quote, 0)
     : getOrderPaymentSummary({ service_rate_pct: configuredServiceRatePct }, [], configuredServiceRatePct)
   const loyaltyValidation = validateLoyaltyRedeemAmount(
     requestedLoyaltyUsed,
@@ -186,7 +193,7 @@ export default function CashierBill() {
   )
   const effectiveLoyaltyUsed = loyaltyValidation.ok ? loyaltyValidation.amount : requestedLoyaltyUsed
   const payment       = order
-    ? getOrderPaymentSummary({ ...order, loyalty_used_amount: effectiveLoyaltyUsed }, order.items, configuredServiceRatePct)
+    ? applyLoyaltyToCashierPaymentQuote(order.cashier_quote, effectiveLoyaltyUsed)
     : getOrderPaymentSummary({ service_rate_pct: configuredServiceRatePct }, [], configuredServiceRatePct)
   const subtotal      = payment.subtotal
   const counterItemsSubtotal = payment.counterItemsSubtotal

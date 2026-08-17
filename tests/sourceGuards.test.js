@@ -2114,6 +2114,8 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(source, /const \[showPaidToday, setShowPaidToday\] = useState\(true\)/)
   assert.doesNotMatch(source, /l\.infoBar/)
   assert.match(source, /latest\.map\(order => \{[\s\S]*normalizePriceMode\(order\.price_mode\)[\s\S]*getPriceModeLabel\(priceMode, lang\)/)
+  assert.match(source, /getPaidOrderPaymentMethods\(order\)[\s\S]*getOrderPaymentBreakdown\(order\)/)
+  assert.match(source, /paymentMethods\.map\(config =>/)
   assert.match(source, /recallTable/)
   assert.match(source, /canMoveBackToTable/)
   assert.match(source, /onRecall=\{canEditCashier && canRecallTable \? handleRecallTable : null\}/)
