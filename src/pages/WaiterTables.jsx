@@ -14,7 +14,7 @@ import { getReservationSummary, getWaiterTableStatus, sortWaiterTableInfosByOpen
 import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivity'
 import { formatDateTime, formatElapsedSince, formatTime } from '../lib/dateFormat'
 import { earliestReliableTime, getReliableOrderItemTime } from '../lib/orderTimestamps'
-import { canEditFeature } from '../lib/permissions'
+import { canEditFeature, canUseOffPremiseOrders } from '../lib/permissions'
 import { getTableGuestEntryContext } from '../lib/tableGuestEntry'
 import { getTableZoneName, getTableZoneVisual, groupTableInfosByZone } from '../lib/tableZoneColors'
 import { TableGuestEntryDialog } from '../components/GuestModeUI'
@@ -592,6 +592,7 @@ export default function WaiterTables() {
   const waiterName = profile?.full_name || state.user?.name || 'Waiter'
   const role = (profile?.role || state.user?.role || '').toLowerCase()
   const canEditTables = canEditFeature(profile || { role }, 'tables')
+  const canCreateOffPremiseOrders = canUseOffPremiseOrders(profile || { role })
   const canManageTables = canEditFeature(profile || { role }, 'settings')
 
   const tableInfos = useMemo(() =>
@@ -800,14 +801,14 @@ export default function WaiterTables() {
   }
 
   function handleTakeAway() {
-    if (!canEditTables) return
+    if (!canCreateOffPremiseOrders) return
     dispatch({ type: 'SET_TABLE', payload: null })
     dispatch({ type: 'CLEAR_CART' })
     navigate('/waiter/take-away')
   }
 
   function handleDelivery() {
-    if (!canEditTables) return
+    if (!canCreateOffPremiseOrders) return
     dispatch({ type: 'SET_TABLE', payload: null })
     dispatch({ type: 'CLEAR_CART' })
     navigate('/waiter/take-away?orderType=delivery')
@@ -830,7 +831,7 @@ export default function WaiterTables() {
               <p className="text-sm text-gray-400 mt-0.5">{tr(lang, 'welcome')}, {waiterName}</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-              {canEditTables && (
+              {canCreateOffPremiseOrders && (
                 <>
                   <button
                     onClick={handleTakeAway}

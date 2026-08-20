@@ -28,6 +28,13 @@ export const FEATURE_DEFINITIONS = [
     description: { uz: 'Tahrirlashga ruxsat; belgilanmasa faqat ko‘rish', ru: 'Разрешить редактирование; без отметки только просмотр', en: 'Allow editing; unchecked users remain read-only' },
   },
   {
+    key: 'off_premise_orders',
+    kind: 'action',
+    requires: ['tables'],
+    labels: { uz: 'Olib ketish va yetkazib berish', ru: 'Заказы навынос и доставка', en: 'Take Away & Delivery orders' },
+    description: { uz: 'Olib ketish va yetkazib berish buyurtmalarini yaratish', ru: 'Создание заказов навынос и на доставку', en: 'Create Take Away and Delivery orders' },
+  },
+  {
     key: 'cashier',
     kind: 'page',
     labels: { uz: 'Kassir', ru: 'Кассир', en: 'Cashier' },
@@ -180,6 +187,11 @@ export function canChangeMenuItemPublicVisibility(profileOrRole) {
 
 export function canMoveBackToTable(profileOrRole) {
   return canEditFeature(profileOrRole, 'cashier')
+}
+
+export function canUseOffPremiseOrders(profileOrRole) {
+  return canEditFeature(profileOrRole, 'tables')
+    && canEditFeature(profileOrRole, 'off_premise_orders')
 }
 
 export function canEditFeature(profileOrRole, featureKey) {

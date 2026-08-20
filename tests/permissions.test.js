@@ -13,6 +13,7 @@ import {
   canEditTeamMember,
   canManageFeatureAccess,
   canMoveBackToTable,
+  canUseOffPremiseOrders,
   canViewPage,
   defaultFeaturesForRole,
   defaultPath,
@@ -96,6 +97,20 @@ test('feature selection keeps sensitive actions attached to relevant pages', () 
     updateFeatureAccessSelection([], 'delete_paid_orders', true),
     ['dashboard', 'delete_paid_orders']
   )
+})
+
+test('take away and delivery orders require their explicit action plus Tables write access', () => {
+  const offPremiseEditor = { role: 'admin', feature_access: ['tables', 'off_premise_orders'] }
+
+  assert.equal(canUseOffPremiseOrders(offPremiseEditor), true)
+  assert.equal(canUseOffPremiseOrders({ role: 'admin', feature_access: ['tables'] }), false)
+  assert.equal(canUseOffPremiseOrders({ role: 'admin', feature_access: ['off_premise_orders'] }), false)
+  assert.equal(canUseOffPremiseOrders({ role: 'viewer', feature_access: ['tables', 'off_premise_orders'] }), false)
+  assert.deepEqual(
+    updateFeatureAccessSelection([], 'off_premise_orders', true),
+    ['tables', 'off_premise_orders']
+  )
+  assert.equal(FEATURE_DEFINITIONS.find(feature => feature.key === 'off_premise_orders')?.kind, 'action')
 })
 
 test('cashier access lets owners and admins move bills back without an extra permission', () => {

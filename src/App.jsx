@@ -351,7 +351,7 @@ function InternalAppRoutes({ adminHost = false }) {
           <LazyProtectedRoute page="tables"><WaiterOrder /></LazyProtectedRoute>
         } />
         <Route path="/waiter/take-away" element={
-          <LazyProtectedRoute page="tables"><WaiterOrder /></LazyProtectedRoute>
+          <LazyProtectedRoute page="off_premise_orders"><WaiterOrder /></LazyProtectedRoute>
         } />
         <Route path="/kitchen-check/:orderId" element={
           <LazyProtectedRoute page="tables"><KitchenCheckReceipt /></LazyProtectedRoute>
