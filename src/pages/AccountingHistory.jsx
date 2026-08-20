@@ -22,6 +22,7 @@ import {
   buildSalaryPaymentExpenseRows,
   EXPENSE_CATEGORIES,
   expenseCategoryLabel,
+  expenseDescriptionLabel,
   expensePaymentMethodLabel,
   getAccountingHistoryRange,
   normalizeExpenseEntryType,
@@ -314,7 +315,7 @@ export default function AccountingHistory() {
                           <td className={`whitespace-nowrap px-4 py-3 text-right text-sm font-black ${tone.text}`}>{formatCurrency(row.amount)}</td>
                           <td className="px-4 py-3 text-sm font-bold text-[#4B5563]">{expensePaymentMethodLabel(row.payment_method, lang)}</td>
                           <td className="max-w-[220px] px-4 py-3 text-sm font-semibold text-[#4B5563]">{row.vendor || '—'}</td>
-                          <td className="max-w-[260px] break-words px-4 py-3 text-sm font-semibold text-[#4B5563]">{row.description || (row.is_salary_payment ? l.salaryPayment : row.is_salary_bonus ? l.salaryBonus : '—')}</td>
+                          <td className="max-w-[260px] break-words px-4 py-3 text-sm font-semibold text-[#4B5563]">{expenseDescriptionLabel(row.description, lang) || (row.is_salary_payment ? l.salaryPayment : row.is_salary_bonus ? l.salaryBonus : '—')}</td>
                           <td className="px-4 py-3 text-sm font-semibold text-[#6B7280]">{row.created_by_name || '—'}</td>
                           {canDelete && <td className="px-4 py-3">
                             {dailyBazaarTotal ? (

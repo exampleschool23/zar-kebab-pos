@@ -36,7 +36,17 @@ import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
 import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
-import { buildSalaryBonusExpenseRows, buildSalaryPaymentExpenseRows, getNetIncome, summarizeExpenseCashflow, summarizeExpenses } from '../lib/expenses'
+import {
+  buildSalaryBonusExpenseRows,
+  buildSalaryPaymentExpenseRows,
+  expenseCategoryLabel,
+  expenseDescriptionLabel,
+  expensePaymentMethodLabel,
+  normalizeExpenseAmount,
+  normalizeExpenseEntryType,
+  summarizeExpenseCashflow,
+  summarizeExpenses,
+} from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canChangeCompletedOrderPaymentMethod, canDeletePaidOrders, canViewPage } from '../lib/permissions'
@@ -299,9 +309,104 @@ function SummaryRow({ label, value, bold, valueClass }) {
   return (
     <div className="flex justify-between items-center">
       <span className={`text-sm ${bold ? 'font-black text-[#1F2937]' : 'text-[#6B7280] font-medium'}`}>{label}</span>
-      <span className={`text-sm tabular-nums ${bold ? 'font-black text-[#ff5a00]' : `font-semibold text-[#1F2937] ${valueClass || ''}`}`}>
+      <span className={`text-sm tabular-nums ${bold ? `font-black ${valueClass || 'text-[#ff5a00]'}` : `font-semibold text-[#1F2937] ${valueClass || ''}`}`}>
         {value}
       </span>
+    </div>
+  )
+}
+
+function ExpenseBreakdownDialog({ rows, expenseSummary, expenseCashflow, cashflowLeft, dateFrom, dateTo, lang, labels, onClose }) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [onClose])
+
+  const periodLabel = dateFrom === dateTo
+    ? formatLongDate(dateTo, lang, dateTo)
+    : `${formatLongDate(dateFrom, lang, dateFrom)} — ${formatLongDate(dateTo, lang, dateTo)}`
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 sm:items-center sm:p-5" onClick={onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="expense-breakdown-title"
+        onClick={event => event.stopPropagation()}
+        className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl bg-[#FAF7F0] shadow-2xl sm:max-w-2xl sm:rounded-3xl"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] bg-white px-5 py-4">
+          <div>
+            <h2 id="expense-breakdown-title" className="text-lg font-black text-[#1F2937]">{labels.expenseDetails}</h2>
+            <p className="mt-0.5 text-xs font-semibold text-[#9CA3AF]">{periodLabel}</p>
+          </div>
+          <button
+            type="button"
+            aria-label={labels.close}
+            onClick={onClose}
+            className="flex h-10 w-10 flex-shrink-0 touch-manipulation items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-[#6B7280] transition-colors hover:bg-gray-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto overscroll-contain p-4 sm:p-5">
+          <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <p className="mb-3 text-sm font-black text-[#1F2937]">{labels.leftAfterExpenses}</p>
+            <div className="grid gap-3 text-sm sm:grid-cols-2">
+              <SummaryRow label={labels.cash} value={formatCurrency(expenseCashflow.byMethod.cash.left)} />
+              <SummaryRow label={labels.card} value={formatCurrency(expenseCashflow.byMethod.card.left)} />
+              <SummaryRow label={labels.terminal} value={formatCurrency(expenseCashflow.byMethod.terminal.left)} />
+              <SummaryRow label={labels.totalLeft} value={formatCurrency(cashflowLeft)} bold valueClass={cashflowLeft < 0 ? 'text-red-600' : 'text-emerald-700'} />
+            </div>
+          </div>
+
+          <div className="mb-3 flex items-center justify-between gap-3 px-1">
+            <div>
+              <p className="text-sm font-black text-[#1F2937]">{labels.periodExpenses}</p>
+              <p className="text-xs font-semibold text-[#9CA3AF]">{rows.length} {labels.entries}</p>
+            </div>
+            <p className="text-lg font-black tabular-nums text-red-600">{formatCurrency(expenseSummary.total)}</p>
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#D1D5DB] bg-white px-4 py-12 text-center text-sm font-bold text-[#9CA3AF]">
+              {labels.noExpenses}
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white">
+              {rows.map(expense => {
+                const title = expense.is_salary_payment
+                  ? labels.salaryPayment
+                  : expense.is_salary_bonus
+                    ? labels.salaryBonus
+                    : expenseCategoryLabel(expense.category, lang)
+                const details = [expense.vendor, expenseDescriptionLabel(expense.description, lang)].filter(Boolean).join(' · ')
+                return (
+                  <div key={expense.id} className="flex items-start justify-between gap-3 border-b border-[#F3F4F6] px-4 py-4 last:border-b-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-[#1F2937]">{title}</p>
+                      <p className="mt-1 text-xs font-bold text-[#9CA3AF]">
+                        {formatLongDate(expense.expense_date, lang, expense.expense_date)} · {expensePaymentMethodLabel(expense.payment_method, lang)}
+                      </p>
+                      {details && <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">{details}</p>}
+                    </div>
+                    <p className="flex-shrink-0 text-sm font-black tabular-nums text-red-600">−{formatCurrency(expense.amount)}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   )
 }
@@ -1752,6 +1857,7 @@ export default function Reports() {
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [expensesError, setExpensesError] = useState('')
+  const [expenseBreakdownOpen, setExpenseBreakdownOpen] = useState(false)
   const [historyOrders, setHistoryOrders] = useState([])
   const [ordersError, setOrdersError] = useState('')
 
@@ -1827,16 +1933,25 @@ export default function Reports() {
     buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
   ), [salaryProfiles, dateFrom, dateTo])
   const allExpenses = useMemo(() => [...salaryExpenses, ...salaryBonusExpenses, ...expenses], [salaryExpenses, salaryBonusExpenses, expenses])
+  const expenseBreakdownRows = useMemo(() => (
+    allExpenses
+      .filter(expense => (
+        normalizeExpenseEntryType(expense?.entry_type) === 'expense' &&
+        normalizeExpenseAmount(expense?.amount) > 0
+      ))
+      .sort((a, b) => (
+        String(b.expense_date || '').localeCompare(String(a.expense_date || '')) ||
+        String(b.created_at || '').localeCompare(String(a.created_at || '')) ||
+        String(b.id || '').localeCompare(String(a.id || ''))
+      ))
+  ), [allExpenses])
   const expenseSummary = useMemo(() => summarizeExpenses(allExpenses), [allExpenses])
   const expenseCashflow = useMemo(
-    () => summarizeExpenseCashflow(filteredForAnalytics, allExpenses),
+    () => summarizeExpenseCashflow(filteredForAnalytics, allExpenses, { includeIncomeEntries: false }),
     [filteredForAnalytics, allExpenses]
   )
-  const cashflowLeft = ['cash', 'card', 'terminal'].reduce(
-    (sum, method) => sum + (expenseCashflow.byMethod[method]?.left || 0),
-    0
-  )
-  const netIncome = getNetIncome(kpiRevenue, allExpenses)
+  const cashflowLeft = kpiRevenue - expenseSummary.total
+  const netIncome = cashflowLeft
 
   useEffect(() => {
     let cancelled = false
@@ -1864,7 +1979,7 @@ export default function Reports() {
       const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult] = await Promise.all([
         loadPagedResult((from, to) => supabase
           .from('expenses')
-          .select('id, entry_type, expense_date, category, payment_method, amount')
+          .select('id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_at')
           .gte('expense_date', dateFrom)
           .lte('expense_date', dateTo)
           .order('expense_date')
@@ -2010,9 +2125,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Jami qolgan', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'Итого осталось', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', leftAfterExpenses: 'Left after expenses', totalLeft: 'Total left', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Jami qolgan', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq', tapForDetails: 'Xarajatlarni ko‘rish', expenseDetails: 'Xarajatlar tafsiloti', periodExpenses: 'Davr xarajatlari', entries: 'ta yozuv', noExpenses: 'Bu davrda xarajatlar yo‘q', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi', close: 'Yopish' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'Итого осталось', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение', tapForDetails: 'Показать расходы', expenseDetails: 'Детализация расходов', periodExpenses: 'Расходы за период', entries: 'записей', noExpenses: 'За этот период расходов нет', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате', close: 'Закрыть' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', leftAfterExpenses: 'Left after expenses', totalLeft: 'Total left', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance', tapForDetails: 'View expenses', expenseDetails: 'Expense breakdown', periodExpenses: 'Expenses for the period', entries: 'entries', noExpenses: 'No expenses were recorded for this period', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus', close: 'Close' },
   }
   const l = L[lang] || L.en
 
@@ -2183,14 +2298,31 @@ export default function Reports() {
             </div>
 
             {canViewExpenses && (
-              <div className="mb-6 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-                <div className="mb-3">
-                  <p className="text-sm font-black text-[#1F2937]">{l.leftAfterExpenses}</p>
-                  <p className="text-xs font-semibold text-[#9CA3AF]">
-                    {closeout.dateFrom === closeout.dateTo
-                      ? formatLongDate(closeout.dateTo, lang, closeout.dateTo)
-                      : `${formatLongDate(closeout.dateFrom, lang, closeout.dateFrom)} — ${formatLongDate(closeout.dateTo, lang, closeout.dateTo)}`}
-                  </p>
+              <div
+                role="button"
+                tabIndex={0}
+                aria-haspopup="dialog"
+                aria-expanded={expenseBreakdownOpen}
+                onClick={() => setExpenseBreakdownOpen(true)}
+                onKeyDown={event => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  setExpenseBreakdownOpen(true)
+                }}
+                className="mb-6 block w-full cursor-pointer touch-manipulation rounded-2xl border border-[#E5E7EB] bg-white p-4 text-left shadow-sm transition-all hover:border-orange-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a00] active:scale-[0.995]"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-[#1F2937]">{l.leftAfterExpenses}</p>
+                    <p className="text-xs font-semibold text-[#9CA3AF]">
+                      {closeout.dateFrom === closeout.dateTo
+                        ? formatLongDate(closeout.dateTo, lang, closeout.dateTo)
+                        : `${formatLongDate(closeout.dateFrom, lang, closeout.dateFrom)} — ${formatLongDate(closeout.dateTo, lang, closeout.dateTo)}`}
+                    </p>
+                  </div>
+                  <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-black text-[#ff5a00]">
+                    {l.tapForDetails}<ChevronRight size={15} />
+                  </span>
                 </div>
                 <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                   <SummaryRow label={l.cash} value={formatCurrency(expenseCashflow.byMethod.cash.left)} />
@@ -2288,6 +2420,20 @@ export default function Reports() {
               />
             </div>
           </>
+        )}
+
+        {expenseBreakdownOpen && (
+          <ExpenseBreakdownDialog
+            rows={expenseBreakdownRows}
+            expenseSummary={expenseSummary}
+            expenseCashflow={expenseCashflow}
+            cashflowLeft={cashflowLeft}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            lang={lang}
+            labels={l}
+            onClose={() => setExpenseBreakdownOpen(false)}
+          />
         )}
       </div>
     </AppShell>

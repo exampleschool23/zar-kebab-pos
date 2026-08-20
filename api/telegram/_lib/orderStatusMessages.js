@@ -1,4 +1,4 @@
-import { orderTypeLabel } from '../../../src/lib/orderTypes.js'
+import { inferOrderType, orderTypeLabel } from '../../../src/lib/orderTypes.js'
 import { formatDateTime } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml, TELEGRAM_STATUS_MESSAGES } from './telegram.js'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../../../src/lib/menuSaleUnits.js'
@@ -144,8 +144,15 @@ function isPaidOrder(order) {
 }
 
 function isOffPremiseOrder(order) {
-  const type = String(order?.order_type || '').toLowerCase()
+  const type = inferOrderType(order)
   return type === 'take_away' || type === 'delivery'
+}
+
+function orderTypeIcon(order) {
+  const type = inferOrderType(order)
+  if (type === 'delivery') return '🚚'
+  if (type === 'take_away') return '🥡'
+  return '🍽️'
 }
 
 function getOrderItems(order) {
@@ -275,10 +282,11 @@ export function buildCompletedOrderGroupMessage(order) {
   const loyaltyUsed = getLoyaltyUsedAmount(order)
   const loyaltyOwnerNames = getLoyaltyOwnerNames(order)
   const closedAt = formatTelegramDateTime(order?.paid_at || order?.updated_at || order?.created_at)
+  const typeIcon = orderTypeIcon(order)
   const lines = [
     isOffPremiseOrder(order)
-      ? `Тип: ${escapeTelegramHtml(orderTypeLabel(order?.order_type, 'ru'))}`
-      : `Стол: ${escapeTelegramHtml(order?.table_name || '-')}`,
+      ? `${typeIcon} Тип: ${escapeTelegramHtml(orderTypeLabel(inferOrderType(order), 'ru'))}`
+      : `${typeIcon} Стол: ${escapeTelegramHtml(order?.table_name || '-')}`,
     `Дата: ${escapeTelegramHtml(closedAt)}`,
     escapeTelegramHtml(formatPriceModeLine(order)),
   ]

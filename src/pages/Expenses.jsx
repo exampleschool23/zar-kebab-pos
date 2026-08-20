@@ -45,6 +45,7 @@ import {
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
+  expenseDescriptionLabel,
   expensePaymentMethodLabel,
   getExpenseHistoryDeleteTarget,
   getSalaryMonthEndDate,
@@ -1177,7 +1178,7 @@ function ExpenseHistorySection({
                   </p>
                   {(expense.vendor || expense.description) && (
                     <p className="mt-1 break-words text-sm font-semibold text-[#4B5563]">
-                      {[expense.vendor, expense.description].filter(Boolean).join(' · ')}
+                      {[expense.vendor, expenseDescriptionLabel(expense.description, lang)].filter(Boolean).join(' · ')}
                     </p>
                   )}
                 </div>

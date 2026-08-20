@@ -105,7 +105,7 @@ test('completed table rounds merge into one Telegram order summary', () => {
   )
   assert.equal(message.endsWith('Чистая прибыль: 310 000 UZS · 62%'), true)
   assert.doesNotMatch(message, /· Заказ|· Сегодня|Маржа прибыли/)
-  assert.equal((message.match(/Стол: Table 3/g) || []).length, 1)
+  assert.equal((message.match(/🍽️ Стол: Table 3/g) || []).length, 1)
 })
 
 test('completed order group chat ids parse comma-separated env values', () => {
@@ -166,14 +166,14 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
 
   assert.doesNotMatch(message, /Заказ закрыт/)
   assert.doesNotMatch(message, /Заказ: A&amp;B&lt;2&gt;/)
-  assert.equal(message.startsWith('Тип: Заказ с собой'), true)
+  assert.equal(message.startsWith('🥡 Тип: Заказ с собой'), true)
   assert.doesNotMatch(message, /Стол: Table &lt;1&gt;/)
   assert.doesNotMatch(message, /Официант:/)
   assert.doesNotMatch(message, /Закрыл:/)
   assert.match(message, /Дата: 09\.07\.2026, 00:09/)
   assert.match(message, /Тип меню: 🧳 Турист/)
   assert.doesNotMatch(message, /Итого: 163 300 UZS/)
-  assert.equal((message.match(/Тип: Заказ с собой/g) || []).length, 1)
+  assert.equal((message.match(/🥡 Тип: Заказ с собой/g) || []).length, 1)
   assert.match(message, /Шашлык &lt;говяжий&gt;/)
   assert.doesNotMatch(message, /Beef &lt;Shashlik&gt;/)
   assert.doesNotMatch(message, /Cancelled item/)
@@ -203,7 +203,7 @@ test('completed group message omits profit margin when protected costs are unava
   assert.doesNotMatch(message, /Маржа прибыли/)
 })
 
-test('completed dine-in group message starts with table and hides separate type line', () => {
+test('completed dine-in group message starts with a dine-in icon and table', () => {
   const message = buildCompletedOrderGroupMessage({
     table_name: 'Terassa stol 1',
     waiter_name: 'Jasurbek',
@@ -216,9 +216,20 @@ test('completed dine-in group message starts with table and hides separate type 
     items: [],
   })
 
-  assert.equal(message.startsWith('Стол: Terassa stol 1'), true)
+  assert.equal(message.startsWith('🍽️ Стол: Terassa stol 1'), true)
   assert.doesNotMatch(message, /Тип: В зале/)
   assert.match(message, /Тип меню: Обычное/)
+})
+
+test('completed delivery group message starts with a delivery icon and type', () => {
+  const message = buildCompletedOrderGroupMessage({
+    order_type: 'delivery',
+    payment_status: 'paid',
+    total: 69000,
+    items: [],
+  })
+
+  assert.equal(message.startsWith('🚚 Тип: Доставка'), true)
 })
 
 test('completed group message shows split payment methods with amounts', () => {

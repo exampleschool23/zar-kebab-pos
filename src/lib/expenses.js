@@ -137,6 +137,39 @@ export function expensePaymentMethodLabel(method, lang = 'en') {
   return cfg[lang] || cfg.en
 }
 
+export function expenseDescriptionLabel(value, lang = 'en') {
+  const description = String(value || '').trim()
+  if (!description) return ''
+
+  const selectedLang = ['uz', 'ru', 'en'].includes(lang) ? lang : 'en'
+  const systemLabels = {
+    'Salary payment': {
+      uz: 'Maosh to‘lovi',
+      ru: 'Выплата зарплаты',
+      en: 'Salary payment',
+    },
+    'Employee bonus': {
+      uz: 'Xodim bonusi',
+      ru: 'Бонус сотруднику',
+      en: 'Employee bonus',
+    },
+    'Automatic daily salary': {
+      uz: 'Avtomatik kunlik maosh',
+      ru: 'Автоматическая дневная зарплата',
+      en: 'Automatic daily salary',
+    },
+  }
+  if (systemLabels[description]) return systemLabels[description][selectedLang]
+
+  const dailyBazaarMatch = description.match(/^Daily Bazaar purchase \((\d+) items?\)$/)
+  if (!dailyBazaarMatch) return description
+
+  const count = Number(dailyBazaarMatch[1]) || 0
+  if (selectedLang === 'uz') return `Kunlik bozor xaridi (${count} ta mahsulot)`
+  if (selectedLang === 'ru') return `Покупка на ежедневном базаре (${count} поз.)`
+  return `Daily Bazaar purchase (${count} ${count === 1 ? 'item' : 'items'})`
+}
+
 export function normalizeExpenseAmount(value) {
   const normalizedValue = typeof value === 'string'
     ? value.replace(/\s+/g, '').replace(/,/g, '')
@@ -649,7 +682,7 @@ export function summarizeExpenses(expenses = []) {
   return summary
 }
 
-export function summarizeExpenseCashflow(paidOrders = [], expenses = []) {
+export function summarizeExpenseCashflow(paidOrders = [], expenses = [], options = {}) {
   const orderIncomeByMethod = {}
 
   for (const order of paidOrders || []) {
@@ -670,10 +703,10 @@ export function summarizeExpenseCashflow(paidOrders = [], expenses = []) {
     }
   }
 
-  return summarizeExpenseCashflowFromIncome(orderIncomeByMethod, expenses)
+  return summarizeExpenseCashflowFromIncome(orderIncomeByMethod, expenses, options)
 }
 
-export function summarizeExpenseCashflowFromIncome(orderIncomeByMethod = {}, expenses = []) {
+export function summarizeExpenseCashflowFromIncome(orderIncomeByMethod = {}, expenses = [], options = {}) {
   const byMethod = ACCOUNTING_CASHFLOW_METHODS.reduce((acc, method) => {
     acc[method] = {
       income: normalizeExpenseAmount(orderIncomeByMethod?.[method]),
@@ -683,9 +716,11 @@ export function summarizeExpenseCashflowFromIncome(orderIncomeByMethod = {}, exp
     return acc
   }, {})
 
-  const incomeSummary = summarizeIncomeEntries(expenses)
-  for (const method of ACCOUNTING_CASHFLOW_METHODS) {
-    byMethod[method].income += incomeSummary.byMethod[method] || 0
+  if (options.includeIncomeEntries !== false) {
+    const incomeSummary = summarizeIncomeEntries(expenses)
+    for (const method of ACCOUNTING_CASHFLOW_METHODS) {
+      byMethod[method].income += incomeSummary.byMethod[method] || 0
+    }
   }
 
   const expenseSummary = summarizeExpenses(expenses)

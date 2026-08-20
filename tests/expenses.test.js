@@ -15,6 +15,7 @@ import {
   canRecordSalaryTransaction,
   convertSalaryAmountToDaily,
   expenseCategoryLabel,
+  expenseDescriptionLabel,
   expenseMatchesRange,
   expensePaymentMethodLabel,
   getDailySalaryAmount,
@@ -58,6 +59,21 @@ test('accounting history presets cover this month, last month, and all time', ()
     getAccountingHistoryRange('allTime', '2026-07-14'),
     { dateFrom: '2000-01-01', dateTo: '2026-07-14' }
   )
+})
+
+test('system-generated expense descriptions follow the selected language', () => {
+  assert.equal(expenseDescriptionLabel('Salary payment', 'ru'), 'Выплата зарплаты')
+  assert.equal(expenseDescriptionLabel('Salary payment', 'uz'), 'Maosh to‘lovi')
+  assert.equal(expenseDescriptionLabel('Employee bonus', 'ru'), 'Бонус сотруднику')
+  assert.equal(
+    expenseDescriptionLabel('Daily Bazaar purchase (12 items)', 'ru'),
+    'Покупка на ежедневном базаре (12 поз.)'
+  )
+  assert.equal(
+    expenseDescriptionLabel('Daily Bazaar purchase (1 item)', 'uz'),
+    'Kunlik bozor xaridi (1 ta mahsulot)'
+  )
+  assert.equal(expenseDescriptionLabel('Manager-entered note', 'ru'), 'Manager-entered note')
 })
 
 test('expense summary totals category and payment method spending', () => {
@@ -139,6 +155,20 @@ test('expense cashflow does not double count explicit loyalty payment rows', () 
 
   assert.equal(cashflow.byMethod.cash.income, 90_000)
   assert.equal(cashflow.byMethod.loyalty_card.income, 30_000)
+})
+
+test('report cashflow can start from cafe sales without adding investor support', () => {
+  const cashflow = summarizeExpenseCashflow([
+    { payment_status: 'paid', payment_method: 'cash', total: 6_449_513 },
+  ], [
+    { entry_type: 'income', category: 'investor_support', payment_method: 'card', amount: 1_820_000 },
+    { entry_type: 'expense', category: 'products_bazaar', payment_method: 'cash', amount: 1_215_500 },
+    { entry_type: 'expense', category: 'salary_waiter', payment_method: 'cash', amount: 250_000 },
+  ], { includeIncomeEntries: false })
+
+  assert.equal(cashflow.byMethod.cash.income, 6_449_513)
+  assert.equal(cashflow.byMethod.cash.left, 4_984_013)
+  assert.equal(cashflow.byMethod.card.income, 0)
 })
 
 test('income summary tracks investor support separately from cafe sales', () => {
