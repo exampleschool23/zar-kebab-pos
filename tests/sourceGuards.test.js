@@ -2116,6 +2116,9 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(source, /latest\.map\(order => \{[\s\S]*normalizePriceMode\(order\.price_mode\)[\s\S]*getPriceModeLabel\(priceMode, lang\)/)
   assert.match(source, /getPaidOrderPaymentMethods\(order\)[\s\S]*getOrderPaymentBreakdown\(order\)/)
   assert.match(source, /paymentMethods\.map\(config =>/)
+  assert.match(source, /cashier_total: getOrderTotal\(order, getConfiguredServiceRatePct\(state\.settings, order\.price_mode\)\)/)
+  assert.match(source, /order\.cashier_total \?\? getOrderTotal\(order\)/)
+  assert.match(source, /getCashierBillableItems\(order\)\.length > 0/)
   assert.match(source, /recallTable/)
   assert.match(source, /canMoveBackToTable/)
   assert.match(source, /onRecall=\{canEditCashier && canRecallTable \? handleRecallTable : null\}/)
@@ -2131,13 +2134,13 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(appContext, /'RECALL_TABLE_FROM_CASHIER'/)
 })
 
-test('CashierTables shows today net profit from shared paid-order cost math', () => {
+test('CashierTables shows today net profit from exact paid revenue and shared cost math', () => {
   const source = readSource('src/pages/CashierTables.jsx')
 
-  assert.match(source, /import \{ getOrdersNetProfit, getSaleProfitSummary, hasOrdersCostCoverage \} from '\.\.\/lib\/profit'/)
+  assert.match(source, /import \{ getOrdersCostTotal, getSaleProfitSummary, hasOrdersCostCoverage \} from '\.\.\/lib\/profit'/)
   assert.match(source, /formatCurrencyWithPercentage/)
   assert.match(source, /hasOrdersCostCoverage\(paidTodayOrders, menuItemMap\)/)
-  assert.match(source, /getOrdersNetProfit\(paidTodayOrders, menuItemMap\)/)
+  assert.match(source, /todayRevenue - getOrdersCostTotal\(paidTodayOrders, menuItemMap\)/)
   assert.match(source, /getSaleProfitSummary\(todayRevenue, todayRevenue - value\)\?\.marginPct/)
   assert.match(source, /function formatProfitKpiValue\(summary, lang\)/)
   assert.match(source, /formatCurrencyWithPercentage\(summary\.value, summary\.marginPct, lang\)/)
@@ -2912,6 +2915,7 @@ test('Auto-print bill saves immediately and prints after a successful move to ca
   const billHandoff = readSource('src/lib/billHandoff.js')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
+  const cashierBill = readSource('src/pages/CashierBill.jsx')
   const receipt = readSource('src/pages/Receipt.jsx')
 
   assert.match(settings, /async function handleAutoPrintChange\(nextValue\)/)
@@ -2923,13 +2927,16 @@ test('Auto-print bill saves immediately and prints after a successful move to ca
   assert.match(waiterTables, /prepareBillPrintWindow\(autoPrint\)[\s\S]*MARK_TABLE_NEEDS_BILL[\s\S]*completeBillHandoff/)
   assert.match(waiterOrder, /prepareBillPrintWindow\(autoPrintBill\)[\s\S]*MARK_TABLE_NEEDS_BILL[\s\S]*onMovedToCashier\?\.\(printWindow\)/)
   assert.match(receipt, /new URLSearchParams\(location\.search\)\.get\('print'\) === '1'/)
+  assert.doesNotMatch(receipt, /settings\.autoPrint \|\| new URLSearchParams/)
+  assert.match(cashierBill, /async function handlePrintBill\(\)[\s\S]*refreshCurrentBill\(\)[\s\S]*getFreshCashierPaymentQuote\([\s\S]*\?print=1/)
+  assert.match(cashierBill, /onClick=\{handlePrintBill\}/)
   assert.match(app, /path="\/cashier\/bill\/:tableId"[\s\S]*page=\{\['cashier', 'tables'\]\}><CashierBill \/>/)
   assert.match(app, /page=\{\['cashier', 'tables'\]\}><Receipt \/>/)
   assert.match(app, /page=\{\['cashier', 'tables'\]\}><TableReceipt \/>/)
   assert.match(functionBody(app, 'ProtectedRoute'), /Array\.isArray\(page\)[\s\S]*page\.some\(pageKey => canViewPage\(profile, pageKey\)\)/)
 })
 
-test('Receipt hides payment method rows and uses paid timestamp when available', () => {
+test('Receipt hides payment methods and uses contributing order metadata with paid timestamps', () => {
   const receipt = readSource('src/pages/Receipt.jsx')
   const db = readSource('src/lib/db.js')
   const receiptPaper = functionBody(receipt, 'ReceiptPaper')
@@ -2944,7 +2951,11 @@ test('Receipt hides payment method rows and uses paid timestamp when available',
   assert.match(receipt, /const allOrders = isOffPremise\s*\?\s*\[order\]/)
   assert.match(receipt, /o\.table_id === order\.table_id && o\.payment_status !== 'paid'/)
   assert.match(receipt, /receiptAt:\s+order\.paid_at \|\| order\.created_at/)
-  assert.match(tableReceiptRoute, /receiptAt:\s+orders\[0\]\?\.paid_at \|\| orders\[0\]\?\.created_at/)
+  assert.match(tableReceiptRoute, /receiptAt:\s+primaryOrder\?\.paid_at \|\| primaryOrder\?\.created_at/)
+  assert.match(receiptPaper, /labels\.menuType/)
+  assert.match(receiptPaper, /getPriceModeLabel\(priceMode, lang\)/)
+  assert.match(receipt, /filter\(item => !isCancelledOrderItem\(item\)\)/)
+  assert.match(receipt, /getOrderGroupPaymentQuote/)
   assert.match(receipt, /import \{ formatDateTime \} from '\.\.\/lib\/dateFormat'/)
   assert.match(receipt, /dateStr=\{formatDateTime\(data\.receiptAt\)\}/)
   assert.match(receipt, /loadReceiptOrderGroup\(orderId\)/)

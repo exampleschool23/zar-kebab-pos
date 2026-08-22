@@ -22,7 +22,7 @@ import {
   toLocalDateStr,
 } from '../lib/analytics'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
-import { isCashierVisibleBill, isTakeAwayBill } from '../lib/cashierBills'
+import { getCashierBillableItems, isCashierVisibleBill, isTakeAwayBill } from '../lib/cashierBills'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { getItemName } from '../lib/i18n'
@@ -32,8 +32,9 @@ import { canDeletePaidOrders, canEditFeature, canMoveBackToTable } from '../lib/
 import { getOrderItemOptionLines } from '../components/MenuProductCards'
 import { useAppDataStatus } from '../store/appHooks'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
-import { getOrdersNetProfit, getSaleProfitSummary, hasOrdersCostCoverage } from '../lib/profit'
+import { getOrdersCostTotal, getSaleProfitSummary, hasOrdersCostCoverage } from '../lib/profit'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
+import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -392,7 +393,7 @@ function BillCard({
       {/* Total */}
       <div className="px-5 pt-4 pb-3">
         <p className={`font-black text-[26px] leading-none mb-4 ${readyForCashier ? 'text-[#ff5a00]' : 'text-[#9CA3AF]'}`}>
-          {formatCurrency(getOrderTotal(order))}
+          {formatCurrency(order.cashier_total ?? getOrderTotal(order))}
         </p>
 
         {/* Item preview */}
@@ -569,7 +570,7 @@ function BillsSection({ title, count, icon: Icon, tone, children }) {
 
 function PaidTodaySummary({ orders, lang, expanded, onToggle, onOpenReceipt }) {
   const l = L[lang] || L.en
-  const total = orders.reduce((sum, order) => sum + getOrderTotal(order), 0)
+  const total = orders.reduce((sum, order) => sum + (order.cashier_total ?? getOrderTotal(order)), 0)
   const latest = [...orders]
     .sort((a, b) => parseInstantDate(getOrderDate(b)) - parseInstantDate(getOrderDate(a)))
     .slice(0, 8)
@@ -647,7 +648,7 @@ function PaidTodaySummary({ orders, lang, expanded, onToggle, onOpenReceipt }) {
                     </p>
                   </button>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <p className="font-black text-[#16A34A] text-[13px] whitespace-nowrap">{formatCurrency(getOrderTotal(order))}</p>
+                    <p className="font-black text-[#16A34A] text-[13px] whitespace-nowrap">{formatCurrency(order.cashier_total ?? getOrderTotal(order))}</p>
                     <button
                       type="button"
                       onClick={() => onOpenReceipt(order)}
@@ -717,11 +718,12 @@ export default function CashierTables() {
         grouped[key] = {
           ...order,
           items: [...(order.items || [])],
-          total: getOrderTotal(order),
+          cashier_total: getOrderTotal(order, getConfiguredServiceRatePct(state.settings, order.price_mode)),
         }
       } else {
         grouped[key].items  = [...grouped[key].items, ...(order.items || [])]
-        grouped[key].total  = (grouped[key].total || 0) + getOrderTotal(order)
+        grouped[key].cashier_total = (grouped[key].cashier_total || 0) +
+          getOrderTotal(order, getConfiguredServiceRatePct(state.settings, order.price_mode))
         // Keep earliest created_at
         if (parseInstantDate(order.created_at) < parseInstantDate(grouped[key].created_at)) {
           grouped[key].created_at = order.created_at
@@ -731,12 +733,12 @@ export default function CashierTables() {
       }
     })
     return Object.values(grouped)
-  }, [state.orders])
+  }, [state.orders, state.settings])
 
   const paidTodayOrders = useMemo(() =>
-    groupOrdersBySession(state.orders).filter(o =>
-      isPaidOrder(o) && toLocalDateStr(getOrderDate(o)) === toLocalDateStr(new Date().toISOString())
-    ),
+    groupOrdersBySession(state.orders.filter(order => !isPaidOrder(order) || getCashierBillableItems(order).length > 0))
+      .filter(o => isPaidOrder(o) && toLocalDateStr(getOrderDate(o)) === toLocalDateStr(new Date().toISOString()))
+      .map(order => ({ ...order, cashier_total: Number(order.total) || 0 })),
     [state.orders]
   )
 
@@ -745,13 +747,13 @@ export default function CashierTables() {
   const paidTodayCount = useMemo(() => {
     return paidTodayOrders.length
   }, [paidTodayOrders])
-  const todayRevenue   = paidTodayOrders.reduce((s, o) => s + getOrderRevenueTotal(o), 0)
+  const todayRevenue   = paidTodayOrders.reduce((s, o) => s + (o.cashier_total ?? getOrderRevenueTotal(o)), 0)
   const todayLoyaltyIncome = paidTodayOrders.reduce((s, o) => s + getOrderLoyaltyIncomeTotal(o), 0)
   const todayProfitSummary = useMemo(() => {
     if (!hasOrdersCostCoverage(paidTodayOrders, menuItemMap)) {
       return { value: null, marginPct: null, available: false }
     }
-    const value = getOrdersNetProfit(paidTodayOrders, menuItemMap)
+    const value = todayRevenue - getOrdersCostTotal(paidTodayOrders, menuItemMap)
     return {
       value,
       marginPct: getSaleProfitSummary(todayRevenue, todayRevenue - value)?.marginPct ?? null,

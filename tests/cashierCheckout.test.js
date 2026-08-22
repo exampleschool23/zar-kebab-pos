@@ -5,6 +5,7 @@ import {
   applyLoyaltyToCashierPaymentQuote,
   canConfirmCashierCheckout,
   getFreshCashierPaymentQuote,
+  getOrderGroupPaymentQuote,
 } from '../src/lib/cashierCheckout.js'
 
 test('fresh cashier quote preserves the saved Tourist service-rate snapshot', () => {
@@ -62,11 +63,12 @@ test('empty Regular shell cannot replace a real Tourist cashier bill snapshot', 
     orders: [
       {
         id: 'empty-regular', table_id: 't5', status: 'needs_bill', payment_status: 'unpaid',
-        price_mode: 'regular', service_rate_pct: 15, items: [],
+        price_mode: 'regular', service_rate_pct: 15, subtotal: 83_000, service_fee: 12_450,
+        total: 95_450, opened_by_name: 'Manager', items: [],
       },
       {
         id: 'real-tourist', table_id: 't5', status: 'needs_bill', payment_status: 'unpaid',
-        price_mode: 'tourist', service_rate_pct: 20,
+        price_mode: 'tourist', service_rate_pct: 20, opened_by_name: 'Zilola',
         items: [{ id: 'item-1', quantity: 1, unit_price: 131_000, status: 'new' }],
       },
     ],
@@ -76,6 +78,77 @@ test('empty Regular shell cannot replace a real Tourist cashier bill snapshot', 
   assert.equal(quote.priceMode, 'tourist')
   assert.equal(quote.serviceRatePct, 20)
   assert.equal(quote.total, 157_200)
+  assert.deepEqual(quote.contributingOrderIds, ['real-tourist'])
+})
+
+test('receipt quote reproduces the photographed Tourist bill and ignores the stale Regular shell', () => {
+  const quote = getOrderGroupPaymentQuote({
+    settings: { serviceRate: 15, touristServiceRate: 20 },
+    orders: [
+      {
+        id: 'empty-regular', price_mode: 'regular', service_rate_pct: 15,
+        subtotal: 83_000, service_fee: 12_450, total: 95_450, items: [],
+      },
+      {
+        id: 'tourist-bill', price_mode: 'tourist', service_rate_pct: 20,
+        items: [
+          { id: 'chicken', quantity: 1, unit_price: 29_000 },
+          { id: 'mince', quantity: 1, unit_price: 30_000 },
+          { id: 'achichuk', quantity: 1, unit_price: 24_000 },
+        ],
+      },
+    ],
+  })
+
+  assert.equal(quote.primaryOrderId, 'tourist-bill')
+  assert.deepEqual(quote.contributingOrderIds, ['tourist-bill'])
+  assert.equal(quote.priceMode, 'tourist')
+  assert.equal(quote.serviceRatePct, 20)
+  assert.equal(quote.subtotal, 83_000)
+  assert.equal(quote.serviceFee, 16_600)
+  assert.equal(quote.total, 99_600)
+})
+
+test('receipt quote sums each saved service rate and loyalty amount before printing', () => {
+  const quote = getOrderGroupPaymentQuote({
+    orders: [
+      {
+        id: 'regular', price_mode: 'regular', service_rate_pct: 15,
+        payment_status: 'paid', loyalty_used_amount: 5_000, cashback_earned: 1_000,
+        items: [{ id: 'r1', quantity: 1, unit_price: 100_000 }],
+      },
+      {
+        id: 'tourist', price_mode: 'tourist', service_rate_pct: 20,
+        payment_status: 'paid', loyalty_used_amount: 10_000, cashback_earned: 2_000,
+        items: [{ id: 't1', quantity: 1, unit_price: 100_000 }],
+      },
+    ],
+  })
+
+  assert.equal(quote.subtotal, 200_000)
+  assert.equal(quote.serviceFee, 35_000)
+  assert.equal(quote.loyaltyUsedAmount, 15_000)
+  assert.equal(quote.cashbackEarned, 3_000)
+  assert.equal(quote.total, 220_000)
+  assert.equal(quote.serviceRatePct, null)
+  assert.equal(quote.priceMode, null)
+})
+
+test('cancelled, zero-quantity, and zero-price rows cannot make an empty shell printable', () => {
+  const quote = getOrderGroupPaymentQuote({
+    orders: [{
+      id: 'empty', price_mode: 'regular', service_rate_pct: 15, total: 100_000,
+      items: [
+        { id: 'cancelled', quantity: 1, unit_price: 50_000, status: 'cancelled' },
+        { id: 'zero-quantity', quantity: 0, unit_price: 50_000 },
+        { id: 'zero-price', quantity: 1, unit_price: 0 },
+      ],
+    }],
+  })
+
+  assert.equal(quote.primaryOrderId, null)
+  assert.deepEqual(quote.contributingOrderIds, [])
+  assert.equal(quote.total, 0)
 })
 
 test('cashier quote applies loyalty without flattening saved service fees', () => {

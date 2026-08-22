@@ -6,18 +6,17 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import {
   getGroupedOrderItems,
   getOrderItemProductId,
-  getOrderPaymentBreakdown,
-  getOrderPaymentSummary,
+  isCancelledOrderItem,
 } from '../lib/analytics'
-import { getOrderItemUnitPrice, normalizePriceMode } from '../lib/priceModes'
+import { getOrderItemUnitPrice, getPriceModeLabel } from '../lib/priceModes'
 import { isCashierQuickItem } from '../lib/menuItems'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatDateTime } from '../lib/dateFormat'
 import { loadReceiptOrderGroup } from '../lib/db'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { formatMenuQuantity } from '../lib/menuSaleUnits'
-import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { getReceiptFooterVisibility, normalizeReceiptMarketing } from '../lib/receiptMarketing'
+import { getFreshCashierPaymentQuote, getOrderGroupPaymentQuote } from '../lib/cashierCheckout'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
 
@@ -34,7 +33,8 @@ const L = {
     qtyCol:      'Soni',
     amountCol:   'Summa',
     orderAmount: 'Buyurtma summasi',
-    servicePct:  n => `Xizmat haqi ${n}%`,
+    servicePct:  n => n == null ? 'Xizmat haqi' : `Xizmat haqi ${n}%`,
+    mixed:       'Aralash',
     loyaltyUsed: 'Sodiqlik ishlatildi',
     cashbackEarned: 'Cashback hisoblandi',
     total:       "To'lovga jami",
@@ -59,7 +59,8 @@ const L = {
     qtyCol:      'Кол-во',
     amountCol:   'Сумма',
     orderAmount: 'Сумма заказа',
-    servicePct:  n => `Обслуживание ${n}%`,
+    servicePct:  n => n == null ? 'Обслуживание' : `Обслуживание ${n}%`,
+    mixed:       'Смешанный',
     loyaltyUsed: 'Использовано с карты',
     cashbackEarned: 'Начислен кешбэк',
     total:       'Итого к оплате',
@@ -84,7 +85,8 @@ const L = {
     qtyCol:      'Qty',
     amountCol:   'Amount',
     orderAmount: 'Order amount',
-    servicePct:  n => `Service ${n}%`,
+    servicePct:  n => n == null ? 'Service' : `Service ${n}%`,
+    mixed:       'Mixed',
     loyaltyUsed: 'Loyalty used',
     cashbackEarned: 'Cashback earned',
     total:       'Total to pay',
@@ -128,33 +130,6 @@ function getReceiptItems(rawItems, menuItemMap, lang) {
     const menuItem = productId != null ? menuItemMap[productId] : null
     return (menuItem && getItemName(menuItem, lang)) || item.name
   })
-}
-
-function combineReceiptOrders(orders) {
-  return {
-    ...orders[0],
-    subtotal: orders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0),
-    service_fee: orders.reduce((s, o) => s + (Number(o.service_fee) || 0), 0),
-    total: orders.reduce((s, o) => s + (Number(o.total) || 0), 0),
-    loyalty_discount_amount: orders.reduce(
-      (s, o) => s + (Number(o.loyalty_used_amount) || Number(o.loyalty_redeem_amount) || Number(o.loyalty_discount_amount) || Number(o.discount_amount) || 0),
-      0
-    ),
-    loyalty_used_amount: orders.reduce(
-      (s, o) => s + (Number(o.loyalty_used_amount) || Number(o.loyalty_redeem_amount) || Number(o.loyalty_discount_amount) || Number(o.discount_amount) || 0),
-      0
-    ),
-    cashback_earned: orders.reduce((s, o) => s + (Number(o.cashback_earned) || 0), 0),
-    loyalty_discount_pct: orders.find(o => o.loyalty_discount_pct != null)?.loyalty_discount_pct ??
-      orders.find(o => o.discount_percent != null)?.discount_percent ??
-      orders[0]?.loyalty_discount_pct ??
-      0,
-    service_rate_pct: orders.find(o => o.service_rate_pct != null)?.service_rate_pct ??
-      orders.find(o => o.service_percent != null)?.service_percent ??
-      orders[0]?.service_rate_pct,
-    price_mode: normalizePriceMode(orders[0]?.price_mode),
-    payments: orders.flatMap(o => getOrderPaymentBreakdown(o)),
-  }
 }
 
 function receiptTableLabel(order, table, lang, fallback) {
@@ -323,7 +298,7 @@ function firstNonEmpty(orders, keys, fallback = '—') {
   return fallback
 }
 
-function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
+function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, lang, receiptFooter, receiptMarketing }) {
   const marketingMode = normalizeReceiptMarketing(receiptMarketing)
 
   return (
@@ -370,6 +345,7 @@ function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateS
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3px' }}>
         <tbody>
           <MetaRow label={labels.table} value={tableName} />
+          <MetaRow label={labels.menuType} value={priceMode ? getPriceModeLabel(priceMode, lang) : labels.mixed} />
           <MetaRow label={labels.waiter} value={waiterName} />
           {completedByName && completedByName !== '—' && <MetaRow label={labels.completedBy} value={completedByName} />}
           <MetaRow label={labels.date} value={dateStr} />
@@ -550,35 +526,43 @@ export function TableReceipt() {
   }, [state.menuItems])
 
   const data = useMemo(() => {
-    const orders = state.orders.filter(
+    const candidateOrders = state.orders.filter(
       o => o.table_id === tableId && o.payment_status !== 'paid'
     )
-    if (orders.length === 0) return null
+    if (candidateOrders.length === 0) return null
+
+    const quote = getFreshCashierPaymentQuote({
+      orders: candidateOrders,
+      menuItems: state.menuItems,
+      settings,
+      tableId,
+    })
+    if (!quote.primaryOrderId) return null
+
+    const contributingIds = new Set(quote.contributingOrderIds)
+    const orders = candidateOrders.filter(order => contributingIds.has(order.id))
+    const primaryOrder = orders.find(order => order.id === quote.primaryOrderId) || orders[0]
 
     const table    = state.tables.find(t => t.id === tableId)
-    const allItems = normalizeReceiptItems(orders.flatMap(o => o.items || []), menuItemMap)
-    const items = getReceiptItems(allItems, menuItemMap, lang)
-    const combinedOrder = combineReceiptOrders(orders)
-    const summary = getOrderPaymentSummary(
-      combinedOrder,
-      allItems,
-      getConfiguredServiceRatePct(settings, combinedOrder.price_mode)
+    const allItems = normalizeReceiptItems(
+      orders.flatMap(o => o.items || []).filter(item => !isCancelledOrderItem(item)),
+      menuItemMap
     )
+    const items = getReceiptItems(allItems, menuItemMap, lang)
 
     return {
-      tableName:  receiptTableLabel(orders[0], table, lang, tableId),
-      priceMode: normalizePriceMode(orders[0]?.price_mode),
+      tableName:  receiptTableLabel(primaryOrder, table, lang, tableId),
+      priceMode: quote.priceMode,
       waiterName: firstNonEmpty(orders, ['opened_by_name', 'waiter_name']),
       completedByName: firstNonEmpty(orders, ['completed_by_name']),
-      receiptAt:  orders[0]?.paid_at || orders[0]?.created_at,
+      receiptAt:  primaryOrder?.paid_at || primaryOrder?.created_at,
       items,
-      subtotal: summary.subtotal,
-      serviceFee: summary.serviceFee,
-      serviceRate: summary.serviceRatePct,
-      loyaltyAmt:  summary.discountAmount,
-      cashbackEarned: summary.cashbackEarned,
-      total: summary.total,
-      payments: getOrderPaymentBreakdown(combineReceiptOrders(orders)),
+      subtotal: quote.subtotal,
+      serviceFee: quote.serviceFee,
+      serviceRate: quote.serviceRatePct,
+      loyaltyAmt: quote.loyaltyUsedAmount,
+      cashbackEarned: quote.cashbackEarned,
+      total: quote.total,
     }
   }, [state.orders, state.tables, tableId, settings, menuItemMap, lang])
 
@@ -589,7 +573,7 @@ export function TableReceipt() {
       lang={lang}
       dispatch={dispatch}
       onBack={() => navigate(-1)}
-      autoPrint={settings.autoPrint || new URLSearchParams(location.search).get('print') === '1'}
+      autoPrint={new URLSearchParams(location.search).get('print') === '1'}
     >
       <ReceiptPaper
         {...data}
@@ -673,30 +657,39 @@ export default function Receipt() {
             return siblings.length > 0 ? siblings : [order]
           })()
 
-    const allItems = normalizeReceiptItems(allOrders.flatMap(o => o.items || []), menuItemMap)
-    const items = getReceiptItems(allItems, menuItemMap, lang)
-    const combinedOrder = combineReceiptOrders(allOrders)
-    const summary = getOrderPaymentSummary(
-      combinedOrder,
-      allItems,
-      getConfiguredServiceRatePct(settings, combinedOrder.price_mode)
+    const quote = order.payment_status === 'paid'
+      ? getOrderGroupPaymentQuote({ orders: allOrders, menuItems: state.menuItems, settings })
+      : getFreshCashierPaymentQuote({
+          orders: allOrders,
+          menuItems: state.menuItems,
+          settings,
+          ...(isOffPremise ? { orderId } : { tableId: order.table_id }),
+        })
+    if (!quote.primaryOrderId) return null
+
+    const contributingIds = new Set(quote.contributingOrderIds)
+    const contributingOrders = allOrders.filter(candidate => contributingIds.has(candidate.id))
+    const primaryOrder = contributingOrders.find(candidate => candidate.id === quote.primaryOrderId) || contributingOrders[0]
+    const allItems = normalizeReceiptItems(
+      contributingOrders.flatMap(o => o.items || []).filter(item => !isCancelledOrderItem(item)),
+      menuItemMap
     )
+    const items = getReceiptItems(allItems, menuItemMap, lang)
     const table      = state.tables.find(t => t.id === order.table_id)
 
     return {
-      tableName:  receiptTableLabel(order, table, lang, '—'),
-      priceMode: normalizePriceMode(order.price_mode),
-      waiterName: firstNonEmpty(allOrders, ['opened_by_name', 'waiter_name']),
-      completedByName: firstNonEmpty(allOrders, ['completed_by_name']),
+      tableName:  receiptTableLabel(primaryOrder, table, lang, '—'),
+      priceMode: quote.priceMode,
+      waiterName: firstNonEmpty(contributingOrders, ['opened_by_name', 'waiter_name']),
+      completedByName: firstNonEmpty(contributingOrders, ['completed_by_name']),
       receiptAt:  order.paid_at || order.created_at,
       items,
-      subtotal: summary.subtotal,
-      serviceFee: summary.serviceFee,
-      serviceRate: summary.serviceRatePct,
-      loyaltyAmt: summary.discountAmount,
-      cashbackEarned: summary.cashbackEarned,
-      total: summary.total,
-      payments: getOrderPaymentBreakdown(combineReceiptOrders(allOrders)),
+      subtotal: quote.subtotal,
+      serviceFee: quote.serviceFee,
+      serviceRate: quote.serviceRatePct,
+      loyaltyAmt: quote.loyaltyUsedAmount,
+      cashbackEarned: quote.cashbackEarned,
+      total: quote.total,
     }
   }, [receiptOrders, state.tables, orderId, settings, menuItemMap, lang])
 
@@ -722,7 +715,7 @@ export default function Receipt() {
       lang={lang}
       dispatch={dispatch}
       onBack={() => navigate(-1)}
-      autoPrint={settings.autoPrint || new URLSearchParams(location.search).get('print') === '1'}
+      autoPrint={new URLSearchParams(location.search).get('print') === '1'}
     >
       <ReceiptPaper
         {...data}

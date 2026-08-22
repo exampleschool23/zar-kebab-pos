@@ -110,6 +110,7 @@ export default function CashierBill() {
   const [loyaltyLookupMessage, setLoyaltyLookupMessage] = useState('')
   const [isCheckingLoyalty, setCheckingLoyalty] = useState(false)
   const [isProcessingPayment, setProcessingPayment] = useState(false)
+  const [isPrintingBill, setPrintingBill] = useState(false)
   const [isRefreshingBill, setRefreshingBill] = useState(true)
   const [paymentRefreshMessage, setPaymentRefreshMessage] = useState('')
   const [isDeletingOrder, setDeletingOrder] = useState(false)
@@ -144,7 +145,8 @@ export default function CashierBill() {
       tableId,
       orderId,
     })
-    const primaryOrder = orders.find(candidate => candidate.id === cashierQuote.primaryOrderId) || orders[0]
+    const primaryOrder = orders.find(candidate => candidate.id === cashierQuote.primaryOrderId)
+    if (!primaryOrder) return null
     const orderType = inferOrderType(primaryOrder)
     const fallbackServiceRatePct = getConfiguredServiceRatePct(state.settings, primaryOrder.price_mode)
     const serviceRatePct = cashierQuote.serviceRatePct ?? (
@@ -505,6 +507,34 @@ export default function CashierBill() {
     }
   }
 
+  async function handlePrintBill() {
+    if (isPrintingBill || isRefreshingBill) return
+    setPrintingBill(true)
+    setPaymentRefreshMessage('')
+    try {
+      const freshOrders = await refreshCurrentBill()
+      const freshQuote = getFreshCashierPaymentQuote({
+        orders: freshOrders,
+        menuItems: state.menuItems,
+        settings: state.settings,
+        tableId,
+        orderId,
+      })
+      if (!freshQuote.primaryOrderId) {
+        setPaymentRefreshMessage(lbl.noOrder)
+        return
+      }
+      const receiptPath = orderId
+        ? `/receipt/${encodeURIComponent(orderId)}?print=1`
+        : `/receipt/table/${encodeURIComponent(tableId)}?print=1`
+      navigate(receiptPath)
+    } catch (error) {
+      setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
+    } finally {
+      setPrintingBill(false)
+    }
+  }
+
   async function handleDeleteOrder() {
     if (!canDeleteOrder || !order?.id || isDeletingOrder) return
     if (!confirmDeleteOrder) {
@@ -594,6 +624,7 @@ export default function CashierBill() {
     clearLoyalty: lang === 'uz' ? 'Kartani tozalash' : lang === 'ru' ? 'Очистить карту' : 'Clear card',
     printBill:    lang === 'uz' ? 'Hisob chiqarish' : lang === 'ru' ? 'Распечатать счёт' : 'Print Bill',
     printReceipt: lang === 'uz' ? 'Chek chiqarish' : lang === 'ru' ? 'Распечатать чек' : 'Print Receipt',
+    printingBill: lang === 'uz' ? 'Hisob tayyorlanmoqda…' : lang === 'ru' ? 'Подготовка счёта…' : 'Preparing bill…',
     deleteOrder:  lang === 'uz' ? 'Buyurtmani o‘chirish' : lang === 'ru' ? 'Удалить заказ' : 'Delete order',
     confirmDeleteOrder: lang === 'uz' ? 'O‘chirishni tasdiqlash' : lang === 'ru' ? 'Подтвердить удаление' : 'Confirm delete',
     deletingOrder: lang === 'uz' ? 'O‘chirilmoqda...' : lang === 'ru' ? 'Удаление...' : 'Deleting...',
@@ -791,11 +822,12 @@ export default function CashierBill() {
 
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
-                        onClick={() => navigate(orderId ? `/receipt/${orderId}` : `/receipt/table/${tableId}`)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#E5E7EB] text-[#1F2937] text-[12px] font-semibold hover:bg-gray-100 transition-colors"
+                        onClick={handlePrintBill}
+                        disabled={isPrintingBill || isRefreshingBill}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#E5E7EB] text-[#1F2937] text-[12px] font-semibold hover:bg-gray-100 transition-colors disabled:cursor-wait disabled:opacity-50"
                       >
                         <Printer size={14} />
-                        {lbl.printBill}
+                        {isPrintingBill ? lbl.printingBill : lbl.printBill}
                       </button>
                       <button className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#E5E7EB] hover:bg-gray-100 text-[#6B7280] transition-colors">
                         <MoreHorizontal size={16} />
@@ -1408,11 +1440,12 @@ export default function CashierBill() {
                   </p>
                 )}
                 <button
-                  onClick={() => navigate(orderId ? `/receipt/${orderId}` : `/receipt/table/${tableId}`)}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#E5E7EB] text-[#1F2937] font-bold text-sm hover:bg-gray-50 transition-colors"
+                  onClick={handlePrintBill}
+                  disabled={isPrintingBill || isRefreshingBill}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-[#E5E7EB] text-[#1F2937] font-bold text-sm hover:bg-gray-50 transition-colors disabled:cursor-wait disabled:opacity-50"
                 >
                   <Printer size={16} />
-                  {lbl.printReceipt}
+                  {isPrintingBill ? lbl.printingBill : lbl.printReceipt}
                 </button>
 
                 {canDeleteOrder && (

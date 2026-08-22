@@ -2,13 +2,107 @@ import { getOrderPaymentSummary, isCancelledOrderItem } from './analytics.js'
 import { isCashierQuickItem } from './menuItems.js'
 import { inferOrderType, isOffPremiseOrderType } from './orderTypes.js'
 import { getConfiguredServiceRatePct } from './serviceRates.js'
-import { normalizePriceMode } from './priceModes.js'
+import { getOrderItemUnitPrice, normalizePriceMode } from './priceModes.js'
 
 function isOpenSettlementOrder(order) {
   return order &&
     order.payment_status !== 'paid' &&
     !order.paid_at &&
     !['paid', 'completed', 'cancelled'].includes(String(order.status || '').toLowerCase())
+}
+
+function getQuoteOrderItems(order, menuById) {
+  return (order.items || order.order_items || [])
+    .filter(item => (
+      !isCancelledOrderItem(item) &&
+      Number(item.quantity) > 0 &&
+      getOrderItemUnitPrice(item) > 0
+    ))
+    .map(item => {
+      const menuItem = menuById.get(item.menu_item_id)
+      const isCounter = isCashierQuickItem(menuItem) || item.is_counter_item || item.isCounterItem
+      return isCounter
+        ? { ...item, item_type: item.item_type || item.itemType || 'counter', is_counter_item: true }
+        : item
+    })
+}
+
+/**
+ * Sum an order group without flattening its saved service-rate snapshots.
+ * Empty/cancelled shells never contribute metadata or stale stored totals.
+ */
+export function getOrderGroupPaymentQuote({
+  orders = [],
+  menuItems = [],
+  settings = {},
+  ignoreStoredLoyalty = false,
+} = {}) {
+  const menuById = new Map(menuItems.map(item => [item.id, item]))
+  let subtotal = 0
+  let serviceFee = 0
+  let counterItemsSubtotal = 0
+  let grossAmount = 0
+  let loyaltyUsedAmount = 0
+  let cashbackEarned = 0
+  let total = 0
+  let primaryOrderId = null
+  const contributingOrderIds = []
+  const contributingPriceModes = new Set()
+  const contributingServiceRates = new Set()
+
+  for (const order of orders) {
+    const orderType = inferOrderType(order)
+    const fallbackServiceRatePct = getConfiguredServiceRatePct(settings, order.price_mode)
+    const serviceRatePct = isOffPremiseOrderType(orderType)
+      ? 0
+      : Number.isFinite(Number(order.service_rate_pct))
+        ? Number(order.service_rate_pct)
+        : fallbackServiceRatePct
+    const items = getQuoteOrderItems(order, menuById)
+
+    // Item rows are authoritative. This rejects empty shells whose old stored
+    // subtotal or total columns were never cleared.
+    if (items.length === 0) continue
+
+    const summary = getOrderPaymentSummary(
+      {
+        ...order,
+        order_type: orderType,
+        service_rate_pct: serviceRatePct,
+        ...(ignoreStoredLoyalty ? { loyalty_used_amount: 0 } : {}),
+      },
+      items,
+      fallbackServiceRatePct
+    )
+    if (summary.grossAmount <= 0) continue
+
+    subtotal += summary.subtotal
+    serviceFee += summary.serviceFee
+    counterItemsSubtotal += Number(summary.counterItemsSubtotal) || 0
+    grossAmount += summary.grossAmount
+    loyaltyUsedAmount += summary.loyaltyUsedAmount
+    cashbackEarned += summary.cashbackEarned
+    total += summary.total
+    if (!primaryOrderId) primaryOrderId = order.id
+    contributingOrderIds.push(order.id)
+    contributingPriceModes.add(normalizePriceMode(order.price_mode))
+    contributingServiceRates.add(summary.serviceRatePct)
+  }
+
+  return {
+    subtotal,
+    serviceFee,
+    counterItemsSubtotal,
+    grossAmount,
+    loyaltyUsedAmount,
+    cashbackEarned,
+    total,
+    primaryOrderId,
+    contributingOrderIds,
+    priceMode: contributingPriceModes.size === 1 ? [...contributingPriceModes][0] : null,
+    priceModes: [...contributingPriceModes],
+    serviceRatePct: contributingServiceRates.size === 1 ? [...contributingServiceRates][0] : null,
+  }
 }
 
 /**
@@ -23,69 +117,28 @@ export function getFreshCashierPaymentQuote({
   orderId = null,
   loyaltyUsedAmount = 0,
 } = {}) {
-  const menuById = new Map(menuItems.map(item => [item.id, item]))
   const targets = orders.filter(order => (
     (orderId ? order.id === orderId : order.table_id === tableId) &&
     isOpenSettlementOrder(order)
   ))
 
-  let subtotal = 0
-  let serviceFee = 0
-  let counterItemsSubtotal = 0
-  let grossAmount = 0
-  let primaryOrderId = null
-  const contributingPriceModes = new Set()
-  const contributingServiceRates = new Set()
-
-  for (const order of targets) {
-    const orderType = inferOrderType(order)
-    const fallbackServiceRatePct = getConfiguredServiceRatePct(settings, order.price_mode)
-    const serviceRatePct = isOffPremiseOrderType(orderType)
-      ? 0
-      : Number.isFinite(Number(order.service_rate_pct))
-        ? Number(order.service_rate_pct)
-        : fallbackServiceRatePct
-    const items = (order.items || order.order_items || [])
-      .filter(item => !isCancelledOrderItem(item))
-      .map(item => {
-        const menuItem = menuById.get(item.menu_item_id)
-        const isCounter = isCashierQuickItem(menuItem) || item.is_counter_item || item.isCounterItem
-        return isCounter
-          ? { ...item, item_type: item.item_type || item.itemType || 'counter', is_counter_item: true }
-          : item
-      })
-    const summary = getOrderPaymentSummary(
-      { ...order, order_type: orderType, service_rate_pct: serviceRatePct, loyalty_used_amount: 0 },
-      items,
-      fallbackServiceRatePct
-    )
-    subtotal += summary.subtotal
-    serviceFee += summary.serviceFee
-    counterItemsSubtotal += Number(summary.counterItemsSubtotal) || 0
-    grossAmount += summary.grossAmount
-    if (summary.grossAmount > 0) {
-      if (!primaryOrderId) primaryOrderId = order.id
-      contributingPriceModes.add(normalizePriceMode(order.price_mode))
-      contributingServiceRates.add(summary.serviceRatePct)
-    }
-  }
+  const quote = getOrderGroupPaymentQuote({
+    orders: targets,
+    menuItems,
+    settings,
+    ignoreStoredLoyalty: true,
+  })
 
   const loyalty = Math.min(
-    grossAmount,
+    quote.grossAmount,
     Math.max(0, Math.round(Number(loyaltyUsedAmount) || 0))
   )
 
   return {
+    ...quote,
     orderIds: targets.map(order => order.id),
-    subtotal,
-    serviceFee,
-    counterItemsSubtotal,
-    grossAmount,
-    primaryOrderId,
-    priceMode: contributingPriceModes.size === 1 ? [...contributingPriceModes][0] : null,
-    serviceRatePct: contributingServiceRates.size === 1 ? [...contributingServiceRates][0] : null,
     loyaltyUsedAmount: loyalty,
-    total: Math.max(0, grossAmount - loyalty),
+    total: Math.max(0, quote.grossAmount - loyalty),
   }
 }
 
