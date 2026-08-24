@@ -9,7 +9,7 @@ const robots = fs.readFileSync(path.join(root, 'public/robots.txt'), 'utf8')
 const sitemap = fs.readFileSync(path.join(root, 'public/sitemap.xml'), 'utf8')
 
 test('public site metadata describes the restaurant instead of the POS', () => {
-  assert.match(html, /<html lang="ru">/)
+  assert.match(html, /<html lang="ru"/)
   assert.match(html, /<title>Zar Kebab — узбекская, уйгурская и турецкая кухня<\/title>/)
   assert.match(html, /name="description"/)
   assert.match(html, /Завтрак · Обед · Ужин\./)
@@ -18,6 +18,16 @@ test('public site metadata describes the restaurant instead of the POS', () => {
   assert.doesNotMatch(html, /<title>[^<]*POS[^<]*<\/title>/)
   assert.match(html, /<h1>Zar Kebab — ресторан узбекской, уйгурской и турецкой кухни в Ташкенте<\/h1>/)
   assert.match(html, /href="\/menu">Меню<\/a>/)
+})
+
+test('text entry disables browser autocorrection across the app', () => {
+  assert.match(html, /<html[^>]+autocorrect="off"/)
+  assert.match(html, /<html[^>]+autocapitalize="off"/)
+  assert.match(html, /<html[^>]+spellcheck="false"/)
+
+  const expenses = fs.readFileSync(path.join(root, 'src/pages/Expenses.jsx'), 'utf8')
+  assert.match(expenses, /value=\{form\.vendor\}[\s\S]*?autoCorrect="off"[\s\S]*?spellCheck=\{false\}/)
+  assert.match(expenses, /value=\{form\.description\}[\s\S]*?autoCorrect="off"[\s\S]*?spellCheck=\{false\}/)
 })
 
 test('public site metadata uses the Zar Kebab logo and canonical domain', () => {

@@ -986,12 +986,29 @@ export default function Expenses() {
                     </div>
                     <div className="sm:col-span-2">
                       <Field label={form.entry_type === 'income' ? l.source : l.vendor}>
-                        <input value={form.vendor} onChange={event => setForm(current => ({ ...current, vendor: event.target.value }))} className={FIELD_INPUT_CLASS} disabled={saving} />
+                        <input
+                          value={form.vendor}
+                          onChange={event => setForm(current => ({ ...current, vendor: event.target.value }))}
+                          className={FIELD_INPUT_CLASS}
+                          disabled={saving}
+                          autoCorrect="off"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                        />
                       </Field>
                     </div>
                     <div className="sm:col-span-2">
                       <Field label={l.description}>
-                        <textarea value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} rows={3} className={`${FIELD_INPUT_CLASS} min-h-[88px] resize-y py-3`} disabled={saving} />
+                        <textarea
+                          value={form.description}
+                          onChange={event => setForm(current => ({ ...current, description: event.target.value }))}
+                          rows={3}
+                          className={`${FIELD_INPUT_CLASS} min-h-[88px] resize-y py-3`}
+                          disabled={saving}
+                          autoCorrect="off"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                        />
                       </Field>
                     </div>
                     <button
