@@ -24,6 +24,9 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Kunlik umumiy maosh va KPI hisoboti',
     groupCafeIncome: 'Kunlik kafe daromadi',
+    groupDineInShare: 'Oddiy zaldagi savdo ulushi',
+    groupOffPremiseShare: 'Oddiy olib ketish + yetkazib berish ulushi',
+    groupTouristShare: 'Turist savdolari ulushi',
     groupCafeNetProfit: 'Kafening sof foydasi',
     groupSalary: 'Hisoblangan umumiy maosh',
     groupKpi: 'Avtomatik KPI bonuslari',
@@ -49,6 +52,9 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Общий отчёт по зарплате и KPI',
     groupCafeIncome: 'Выручка кафе за день',
+    groupDineInShare: 'Доля обычной выручки в зале',
+    groupOffPremiseShare: 'Доля обычной выручки с собой + доставка',
+    groupTouristShare: 'Доля туристической выручки',
     groupCafeNetProfit: 'Чистая прибыль кафе',
     groupSalary: 'Начисленная зарплата',
     groupKpi: 'Автоматические KPI-бонусы',
@@ -74,6 +80,9 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Daily salary and KPI totals',
     groupCafeIncome: 'Daily cafe income',
+    groupDineInShare: 'Regular dine-in revenue share',
+    groupOffPremiseShare: 'Regular take-away + delivery revenue share',
+    groupTouristShare: 'Tourist revenue share',
     groupCafeNetProfit: 'Cafe net profit',
     groupSalary: 'Salary earned',
     groupKpi: 'Automatic KPI bonuses',
@@ -98,6 +107,12 @@ export function formatSalaryNotificationAmount(value) {
   return new Intl.NumberFormat('ru-RU')
     .format(amount)
     .replace(/\s/g, ' ')
+}
+
+function formatSalaryNotificationPercent(value, language) {
+  const locale = language === 'uz' ? 'uz-UZ' : language === 'en' ? 'en-US' : 'ru-RU'
+  const percentage = Number.isFinite(Number(value)) ? Number(value) : 0
+  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(percentage)}%`
 }
 
 export function getTashkentDate(now = new Date()) {
@@ -226,6 +241,9 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
 
 export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   cafeIncome = 0,
+  regularDineInIncome = 0,
+  regularOffPremiseIncome = 0,
+  touristIncome = 0,
   grossProfit = null,
   rent = 0,
   utilities = 0,
@@ -245,10 +263,26 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     ? Math.round(Number(grossProfit))
     : null
   const cafeIncomeTotal = normalizeExpenseAmount(cafeIncome)
+  const dineInIncomeTotal = normalizeExpenseAmount(regularDineInIncome)
+  const offPremiseIncomeTotal = normalizeExpenseAmount(regularOffPremiseIncome)
+  const touristIncomeTotal = normalizeExpenseAmount(touristIncome)
+  const classifiedIncomeTotal = dineInIncomeTotal + offPremiseIncomeTotal + touristIncomeTotal
+  const dineInPercentage = classifiedIncomeTotal > 0
+    ? Math.round((dineInIncomeTotal / classifiedIncomeTotal) * 1000) / 10
+    : 0
+  const offPremisePercentage = classifiedIncomeTotal > 0
+    ? Math.round((offPremiseIncomeTotal / classifiedIncomeTotal) * 1000) / 10
+    : 0
+  const touristPercentage = classifiedIncomeTotal > 0
+    ? Math.round((100 - dineInPercentage - offPremisePercentage) * 10) / 10
+    : 0
 
   return {
     date,
     cafeIncomeTotal,
+    dineInPercentage,
+    offPremisePercentage,
+    touristPercentage,
     cafeNetProfit: normalizedGrossProfit,
     salaryTotal,
     kpiBonusTotal,
@@ -270,6 +304,9 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
   const rentTotal = normalizeExpenseAmount(summary?.rentTotal)
   const utilitiesTotal = normalizeExpenseAmount(summary?.utilitiesTotal)
   const cafeIncomeTotal = normalizeExpenseAmount(summary?.cafeIncomeTotal)
+  const dineInPercentage = Number(summary?.dineInPercentage) || 0
+  const offPremisePercentage = Number(summary?.offPremisePercentage) || 0
+  const touristPercentage = Number(summary?.touristPercentage) || 0
   const cafeNetProfit = Number.isFinite(Number(summary?.cafeNetProfit))
     ? Math.round(Number(summary.cafeNetProfit))
     : null
@@ -284,6 +321,9 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
     `📅 ${escapeTelegramHtml(compactRussianDate)}`,
     '',
     `<b>${copy.groupCafeIncome}:</b> ${formatSalaryNotificationAmount(cafeIncomeTotal)} ${copy.currency}`,
+    `<b>${copy.groupDineInShare}:</b> ${formatSalaryNotificationPercent(dineInPercentage, lang)}`,
+    `<b>${copy.groupOffPremiseShare}:</b> ${formatSalaryNotificationPercent(offPremisePercentage, lang)}`,
+    `<b>${copy.groupTouristShare}:</b> ${formatSalaryNotificationPercent(touristPercentage, lang)}`,
     `<b>${copy.groupCafeNetProfit}:</b> ${cafeNetProfit == null
       ? copy.unavailable
       : `${formatSalaryNotificationAmount(cafeNetProfit)} ${copy.currency}`}`,

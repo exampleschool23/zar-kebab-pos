@@ -16,6 +16,8 @@ import { notifyAutomaticKpiBonus } from './employee-notification.js'
 import { getOrderRevenueTotal } from '../../src/lib/analytics.js'
 import { getOrdersCostTotal, hasOrdersCostCoverage } from '../../src/lib/profit.js'
 import { convertSalaryAmountToDaily } from '../../src/lib/expenses.js'
+import { isDineInOrderType } from '../../src/lib/orderTypes.js'
+import { PRICE_MODE_TOURIST } from '../../src/lib/priceModes.js'
 
 const KPI_CATCH_UP_DAYS = 7
 const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
@@ -245,7 +247,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
       : Promise.resolve(emptyRelatedResult),
     supabase
       .from('orders')
-      .select('status, order_type, subtotal, service_fee, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, items:order_items(quantity, sale_unit, price, unit_price, base_price, item_type, is_counter_item, cost_price, status)')
+      .select('status, order_type, price_mode, subtotal, service_fee, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, items:order_items(quantity, sale_unit, price, unit_price, base_price, item_type, is_counter_item, cost_price, status)')
       .eq('payment_status', 'paid')
       .gte('paid_at', `${businessDate}T00:00:00+05:00`)
       .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
@@ -270,6 +272,19 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     (total, order) => total + getOrderRevenueTotal(order),
     0
   )
+  const touristIncome = paidOrders.reduce(
+    (total, order) => total + (order?.price_mode === PRICE_MODE_TOURIST ? getOrderRevenueTotal(order) : 0),
+    0
+  )
+  const regularDineInIncome = paidOrders.reduce(
+    (total, order) => total + (
+      order?.price_mode !== PRICE_MODE_TOURIST && isDineInOrderType(order?.order_type)
+        ? getOrderRevenueTotal(order)
+        : 0
+    ),
+    0
+  )
+  const regularOffPremiseIncome = cafeIncome - touristIncome - regularDineInIncome
   const grossProfit = hasOrdersCostCoverage(paidOrders)
     ? cafeIncome - getOrdersCostTotal(paidOrders)
     : null
@@ -283,6 +298,9 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
   )
   return getDailyPayrollGroupSummary(salaryProfiles, kpiResults, businessDate, {
     cafeIncome,
+    regularDineInIncome,
+    regularOffPremiseIncome,
+    touristIncome,
     grossProfit,
     rent: dailyRent,
     utilities: dailyUtilities,
