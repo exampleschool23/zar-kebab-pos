@@ -28,6 +28,23 @@ function shiftIsoDate(value, days) {
   return new Date(Date.UTC(year, month - 1, day + days, 12)).toISOString().slice(0, 10)
 }
 
+function startOfAccountingWeek(value) {
+  const [year, month, day] = normalizeIsoDate(value).split('-').map(Number)
+  const parsed = new Date(Date.UTC(year, month - 1, day, 12))
+  const mondayOffset = (parsed.getUTCDay() + 6) % 7
+  return shiftIsoDate(value, -mondayOffset)
+}
+
+function accountingMonthRange(value, monthOffset = 0) {
+  const [year, month] = normalizeIsoDate(value).split('-').map(Number)
+  const first = new Date(Date.UTC(year, month - 1 + monthOffset, 1, 12))
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0, 12))
+  return {
+    dateFrom: first.toISOString().slice(0, 10),
+    dateTo: last.toISOString().slice(0, 10),
+  }
+}
+
 export function getAccountingQuickRange(key = 'month', today = todayExpenseDate()) {
   const normalizedToday = normalizeIsoDate(today)
   if (key === 'today') return { dateFrom: normalizedToday, dateTo: normalizedToday }
@@ -36,10 +53,14 @@ export function getAccountingQuickRange(key = 'month', today = todayExpenseDate(
     return { dateFrom: yesterday, dateTo: yesterday }
   }
   if (key === 'week') return { dateFrom: shiftIsoDate(normalizedToday, -6), dateTo: normalizedToday }
-  if (key === 'previousMonth') {
-    const previousMonthEnd = shiftIsoDate(`${normalizedToday.slice(0, 8)}01`, -1)
-    return { dateFrom: `${previousMonthEnd.slice(0, 8)}01`, dateTo: previousMonthEnd }
-  }
+  const currentWeekStart = startOfAccountingWeek(normalizedToday)
+  if (key === 'previousWeek') return { dateFrom: shiftIsoDate(currentWeekStart, -7), dateTo: shiftIsoDate(currentWeekStart, -1) }
+  if (key === 'previousCurrentWeek') return { dateFrom: shiftIsoDate(currentWeekStart, -7), dateTo: shiftIsoDate(currentWeekStart, 6) }
+  if (key === 'currentWeek') return { dateFrom: currentWeekStart, dateTo: shiftIsoDate(currentWeekStart, 6) }
+  if (key === 'currentNextWeek') return { dateFrom: currentWeekStart, dateTo: shiftIsoDate(currentWeekStart, 13) }
+  if (key === 'nextWeek') return { dateFrom: shiftIsoDate(currentWeekStart, 7), dateTo: shiftIsoDate(currentWeekStart, 13) }
+  if (key === 'previousMonth') return accountingMonthRange(normalizedToday, -1)
+  if (key === 'nextMonth') return accountingMonthRange(normalizedToday, 1)
   return { dateFrom: `${normalizedToday.slice(0, 8)}01`, dateTo: normalizedToday }
 }
 

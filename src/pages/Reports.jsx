@@ -23,6 +23,7 @@ import {
 } from '../lib/analytics'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import AppShell from '../components/AppShell'
+import DateRangePicker from '../components/DateRangePicker'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import {
@@ -52,6 +53,7 @@ import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canChangeCompletedOrderPaymentMethod, canDeletePaidOrders, canViewPage } from '../lib/permissions'
 import { collectPagedRows, loadOrdersForRange, mergeOrderHistory } from '../lib/orderHistory'
+import { getAccountingQuickRange } from '../lib/accounting'
 
 /** Payment method with fallback */
 function getPaymentMethod(o) {
@@ -89,12 +91,6 @@ function PriceModeBadge({ mode, lang }) {
       {getPriceModeLabel(normalized, lang)}
     </span>
   )
-}
-
-function addDays(isoDate, n) {
-  const d = new Date(isoDate + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return toLocalDateStr(d.toISOString())
 }
 
 function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], absences = [], profiles = []) {
@@ -157,46 +153,6 @@ function todayStr() {
 
 function fmtDate(iso, lang) {
   return formatLongDateTime(iso, lang, '—')
-}
-
-function DateInput({ value, lang, onChange }) {
-  const inputRef = useRef(null)
-  const label = formatLongDate(value, lang, value)
-
-  function openPicker(event) {
-    if (event?.button && event.button !== 0) return
-    const input = inputRef.current
-    if (!input) return
-
-    input.focus()
-    if (typeof input.showPicker === 'function') {
-      try {
-        input.showPicker()
-        return
-      } catch {
-        // Fall back to focusing when showPicker is unavailable or blocked.
-      }
-    }
-  }
-
-  return (
-    <div
-      onPointerDown={openPicker}
-      className="relative h-6 w-[138px] cursor-pointer rounded-md focus-within:ring-2 focus-within:ring-orange-100"
-    >
-      <span className="pointer-events-none absolute inset-y-0 left-0 right-7 flex items-center overflow-hidden whitespace-nowrap text-sm text-[#1F2937]">
-        {label}
-      </span>
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        aria-label={label}
-        onChange={event => onChange(event.target.value)}
-        className="native-date-input absolute inset-0 h-full w-full cursor-pointer bg-transparent text-sm text-transparent caret-transparent outline-none"
-      />
-    </div>
-  )
 }
 
 function orderTableLabel(order, lang) {
@@ -1848,6 +1804,7 @@ export default function Reports() {
   const [activeTab,     setActiveTab]     = useState('order_history')
   const [dateFrom, setDateFrom] = useState(todayStr())
   const [dateTo,   setDateTo]   = useState(todayStr())
+  const [activeRangeKey, setActiveRangeKey] = useState('today')
   const [tableFilter,   setTableFilter]   = useState('all')
   const [waiterFilter,  setWaiterFilter]  = useState('all')
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -2036,6 +1993,20 @@ export default function Reports() {
     return () => { cancelled = true }
   }, [dateFrom, dateTo, canViewExpenses])
 
+  function selectQuickRange(key) {
+    const range = getAccountingQuickRange(key, todayStr())
+    setActiveRangeKey(key)
+    setDateFrom(range.dateFrom)
+    setDateTo(range.dateTo)
+  }
+
+  function setCustomRange(from, to) {
+    if (!from || !to) return
+    setActiveRangeKey('custom')
+    setDateFrom(from <= to ? from : to)
+    setDateTo(from <= to ? to : from)
+  }
+
   function exportCloseout() {
     const dateSuffix = closeout.dateFrom === closeout.dateTo
       ? closeout.dateTo
@@ -2139,9 +2110,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', employeeMeals: 'Xodimlar ovqati', employeeMealsSub: 'Davomat bo‘yicha hisoblangan', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Jami qolgan', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq', tapForDetails: 'Xarajatlarni ko‘rish', expenseDetails: 'Xarajatlar tafsiloti', periodExpenses: 'Davr xarajatlari', entries: 'ta yozuv', noExpenses: 'Bu davrda xarajatlar yo‘q', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi', close: 'Yopish' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', employeeMeals: 'Питание сотрудников', employeeMealsSub: 'Рассчитано по посещаемости', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'Итого осталось', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение', tapForDetails: 'Показать расходы', expenseDetails: 'Детализация расходов', periodExpenses: 'Расходы за период', entries: 'записей', noExpenses: 'За этот период расходов нет', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате', close: 'Закрыть' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', employeeMeals: 'Employees meal', employeeMealsSub: 'Calculated from attendance', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', leftAfterExpenses: 'Left after expenses', totalLeft: 'Total left', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance', tapForDetails: 'View expenses', expenseDetails: 'Expense breakdown', periodExpenses: 'Expenses for the period', entries: 'entries', noExpenses: 'No expenses were recorded for this period', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus', close: 'Close' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', employeeMeals: 'Xodimlar ovqati', employeeMealsSub: 'Davomat bo‘yicha hisoblangan', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', previousMonth: 'O‘tgan oy', previousWeek: 'O‘tgan hafta', previousCurrentWeek: 'O‘tgan va joriy hafta', currentWeek: 'Joriy hafta', currentNextWeek: 'Joriy va keyingi hafta', nextWeek: 'Keyingi hafta', nextMonth: 'Keyingi oy', presets: 'Tayyor davrlar', applyRange: 'Davrni qo‘llash', cancel: 'Bekor qilish', selectDateRange: 'Sana oralig‘ini tanlash', weekdays: ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Ya'], from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Jami qolgan', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq', tapForDetails: 'Xarajatlarni ko‘rish', expenseDetails: 'Xarajatlar tafsiloti', periodExpenses: 'Davr xarajatlari', entries: 'ta yozuv', noExpenses: 'Bu davrda xarajatlar yo‘q', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi', close: 'Yopish' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', employeeMeals: 'Питание сотрудников', employeeMealsSub: 'Рассчитано по посещаемости', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', previousMonth: 'Прошлый месяц', previousWeek: 'Прошлая неделя', previousCurrentWeek: 'Прошлая и текущая неделя', currentWeek: 'Текущая неделя', currentNextWeek: 'Текущая и следующая неделя', nextWeek: 'Следующая неделя', nextMonth: 'Следующий месяц', presets: 'Готовые периоды', applyRange: 'Применить период', cancel: 'Отмена', selectDateRange: 'Выбрать период', weekdays: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], from: 'С', to: 'По', closeout: 'Закрытие дня', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'Итого осталось', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение', tapForDetails: 'Показать расходы', expenseDetails: 'Детализация расходов', periodExpenses: 'Расходы за период', entries: 'записей', noExpenses: 'За этот период расходов нет', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате', close: 'Закрыть' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', employeeMeals: 'Employees meal', employeeMealsSub: 'Calculated from attendance', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', previousMonth: 'Previous month', previousWeek: 'Previous week', previousCurrentWeek: 'Previous & current week', currentWeek: 'Current week', currentNextWeek: 'Current & next week', nextWeek: 'Next week', nextMonth: 'Next month', presets: 'Presets', applyRange: 'Apply range', cancel: 'Cancel', selectDateRange: 'Select date range', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], from: 'From', to: 'To', closeout: 'Daily closeout', leftAfterExpenses: 'Left after expenses', totalLeft: 'Total left', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance', tapForDetails: 'View expenses', expenseDetails: 'Expense breakdown', periodExpenses: 'Expenses for the period', entries: 'entries', noExpenses: 'No expenses were recorded for this period', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus', close: 'Close' },
   }
   const l = L[lang] || L.en
 
@@ -2176,58 +2147,23 @@ export default function Reports() {
           <div className="max-w-[1200px] mx-auto px-5 py-6">
 
             {/* Heading + filters */}
-            <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+            <div className="mb-6">
               <div>
                 <h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1>
                 <p className="text-sm text-[#6B7280] mt-0.5">{l.sub}</p>
               </div>
-              <div className="flex flex-col gap-2 w-full sm:w-auto">
-                {/* Preset quick buttons */}
-                <div className="flex gap-1.5 flex-wrap">
-                  {[
-                    { key: 'today',     label: l.today     },
-                    { key: 'yesterday', label: l.yesterday },
-                    { key: 'week',      label: l.week      },
-                    { key: 'month',     label: l.month     },
-                  ].map(({ key, label }) => {
-                    const today = todayStr()
-                    const isActive = (() => {
-                      if (key === 'today')     return dateFrom === today && dateTo === today
-                      if (key === 'yesterday') { const y = addDays(today, -1); return dateFrom === y && dateTo === y }
-                      if (key === 'week')      return dateFrom === addDays(today, -6) && dateTo === today
-                      if (key === 'month')     { const m = today.slice(0, 8) + '01'; return dateFrom === m && dateTo === today }
-                      return false
-                    })()
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => {
-                          const today = todayStr()
-                          if (key === 'today')     { setDateFrom(today); setDateTo(today) }
-                          if (key === 'yesterday') { const y = addDays(today, -1); setDateFrom(y); setDateTo(y) }
-                          if (key === 'week')      { setDateFrom(addDays(today, -6)); setDateTo(today) }
-                          if (key === 'month')     { setDateFrom(today.slice(0, 8) + '01'); setDateTo(today) }
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all border ${
-                          isActive
-                            ? 'bg-[#ff5a00] text-white border-[#ff5a00] shadow-sm'
-                            : 'bg-white text-[#6B7280] border-[#E5E7EB] hover:border-orange-300 hover:text-[#ff5a00]'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
-                </div>
-                {/* Date range inputs + other filters */}
-                <div className="flex flex-wrap items-stretch gap-2 xl:flex-nowrap">
-                  <div className="flex h-11 items-center gap-1.5 bg-white border border-[#E5E7EB] rounded-xl px-3 shadow-sm">
-                    <span className="text-[11px] text-[#9CA3AF] font-semibold">{l.from}</span>
-                    <DateInput value={dateFrom} lang={lang} onChange={setDateFrom} />
-                    <span className="text-[11px] text-[#9CA3AF] font-semibold mx-1">—</span>
-                    <span className="text-[11px] text-[#9CA3AF] font-semibold">{l.to}</span>
-                    <DateInput value={dateTo} lang={lang} onChange={setDateTo} />
-                  </div>
+              <div className="mt-4">
+                <DateRangePicker
+                  l={l}
+                  lang={lang}
+                  rangeKey={activeRangeKey}
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  today={todayStr()}
+                  onPreset={selectQuickRange}
+                  onApply={setCustomRange}
+                />
+                <div className="mt-2 flex flex-wrap items-stretch justify-end gap-2">
                   <select value={tableFilter} onChange={e => setTableFilter(e.target.value)}
                     className="h-11 bg-white border border-[#E5E7EB] rounded-xl px-3 text-sm text-[#6B7280] focus:outline-none shadow-sm cursor-pointer">
                     <option value="all">{l.allTables}</option>

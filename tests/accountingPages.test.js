@@ -29,7 +29,7 @@ function paidOrder(id, date, total, paymentMethod = 'cash', overrides = {}) {
   }
 }
 
-test('Accounting quick ranges cover today, yesterday, seven days, month, previous month, and year rollover', () => {
+test('Accounting quick ranges cover the shared calendar presets and month rollovers', () => {
   assert.deepEqual(getAccountingQuickRange('today', '2026-07-14'), {
     dateFrom: '2026-07-14',
     dateTo: '2026-07-14',
@@ -57,6 +57,30 @@ test('Accounting quick ranges cover today, yesterday, seven days, month, previou
   assert.deepEqual(getAccountingQuickRange('previousMonth', '2024-03-01'), {
     dateFrom: '2024-02-01',
     dateTo: '2024-02-29',
+  })
+  assert.deepEqual(getAccountingQuickRange('previousWeek', '2026-07-14'), {
+    dateFrom: '2026-07-06',
+    dateTo: '2026-07-12',
+  })
+  assert.deepEqual(getAccountingQuickRange('previousCurrentWeek', '2026-07-14'), {
+    dateFrom: '2026-07-06',
+    dateTo: '2026-07-19',
+  })
+  assert.deepEqual(getAccountingQuickRange('currentWeek', '2026-07-14'), {
+    dateFrom: '2026-07-13',
+    dateTo: '2026-07-19',
+  })
+  assert.deepEqual(getAccountingQuickRange('currentNextWeek', '2026-07-14'), {
+    dateFrom: '2026-07-13',
+    dateTo: '2026-07-26',
+  })
+  assert.deepEqual(getAccountingQuickRange('nextWeek', '2026-07-14'), {
+    dateFrom: '2026-07-20',
+    dateTo: '2026-07-26',
+  })
+  assert.deepEqual(getAccountingQuickRange('nextMonth', '2026-12-14'), {
+    dateFrom: '2027-01-01',
+    dateTo: '2027-01-31',
   })
 })
 

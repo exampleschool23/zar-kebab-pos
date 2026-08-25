@@ -23,6 +23,7 @@ import {
   ShoppingBasket,
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
+import DateRangePicker from '../components/DateRangePicker'
 import { OperationalLoading } from '../components/OperationalState'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../store/AppContext'
@@ -61,7 +62,6 @@ import { collectPagedRows } from '../lib/orderHistory'
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 const FIELD_INPUT_CLASS = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
 const DATE_INPUT_CLASS = `${FIELD_INPUT_CLASS} text-transparent caret-transparent`
-const RANGE_DATE_INPUT_CLASS = 'h-6 w-full min-w-0 bg-transparent text-sm text-transparent caret-transparent outline-none'
 const ACCOUNTING_SECTION_GRID = 'grid items-start gap-5 lg:grid-cols-2'
 const HISTORY_SECTION_GRID = 'grid items-stretch gap-5 lg:grid-cols-2'
 
@@ -289,6 +289,17 @@ export default function Expenses() {
       week: '7 kun',
       month: 'Oy',
       previousMonth: 'O‘tgan oy',
+      presets: 'Tayyor davrlar',
+      previousWeek: 'O‘tgan hafta',
+      previousCurrentWeek: 'O‘tgan va joriy hafta',
+      currentWeek: 'Joriy hafta',
+      currentNextWeek: 'Joriy va keyingi hafta',
+      nextWeek: 'Keyingi hafta',
+      nextMonth: 'Keyingi oy',
+      applyRange: 'Davrni qo‘llash',
+      cancel: 'Bekor qilish',
+      selectDateRange: 'Sana oralig‘ini tanlash',
+      weekdays: ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Ya'],
       from: 'Dan',
       to: 'Gacha',
       methodBalances: 'To‘lov turi qoldig‘i',
@@ -374,6 +385,17 @@ export default function Expenses() {
       week: '7 дней',
       month: 'Месяц',
       previousMonth: 'Прошлый месяц',
+      presets: 'Готовые периоды',
+      previousWeek: 'Прошлая неделя',
+      previousCurrentWeek: 'Прошлая и текущая неделя',
+      currentWeek: 'Текущая неделя',
+      currentNextWeek: 'Текущая и следующая неделя',
+      nextWeek: 'Следующая неделя',
+      nextMonth: 'Следующий месяц',
+      applyRange: 'Применить период',
+      cancel: 'Отмена',
+      selectDateRange: 'Выбрать период',
+      weekdays: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
       from: 'С',
       to: 'По',
       methodBalances: 'Остаток по способам оплаты',
@@ -459,6 +481,17 @@ export default function Expenses() {
       week: '7 days',
       month: 'Month',
       previousMonth: 'Previous month',
+      presets: 'Presets',
+      previousWeek: 'Previous week',
+      previousCurrentWeek: 'Previous & current week',
+      currentWeek: 'Current week',
+      currentNextWeek: 'Current & next week',
+      nextWeek: 'Next week',
+      nextMonth: 'Next month',
+      applyRange: 'Apply range',
+      cancel: 'Cancel',
+      selectDateRange: 'Select date range',
+      weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
       from: 'From',
       to: 'To',
       methodBalances: 'Left by payment method',
@@ -668,21 +701,18 @@ export default function Expenses() {
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])
 
-  function setCustomDateFrom(value) {
-    setActiveRangeKey('')
-    setDateFrom(value)
-  }
-
-  function setCustomDateTo(value) {
-    setActiveRangeKey('')
-    setDateTo(value)
-  }
-
   function selectQuickRange(key) {
     const range = getAccountingQuickRange(key)
     setActiveRangeKey(key)
     setDateFrom(range.dateFrom)
     setDateTo(range.dateTo)
+  }
+
+  function setCustomRange(from, to) {
+    if (!from || !to) return
+    setActiveRangeKey('custom')
+    setDateFrom(from <= to ? from : to)
+    setDateTo(from <= to ? to : from)
   }
 
   function openCategoryHistory(category) {
@@ -807,43 +837,17 @@ export default function Expenses() {
                 {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}{l.refresh}
               </button>
             </div>
-            <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                {[
-                  { key: 'today', label: l.today },
-                  { key: 'yesterday', label: l.yesterday },
-                  { key: 'week', label: l.week },
-                  { key: 'month', label: l.month },
-                  { key: 'previousMonth', label: l.previousMonth },
-                ].map(option => {
-                  const selected = activeRangeKey === option.key
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => selectQuickRange(option.key)}
-                      aria-pressed={selected}
-                      className={`h-10 rounded-xl border px-3 text-xs font-black transition-colors ${
-                        selected
-                          ? 'border-[#ff5a00] bg-[#ff5a00] text-white shadow-sm shadow-orange-100'
-                          : 'border-[#E5E7EB] bg-[#FBFCFD] text-[#6B7280] hover:border-orange-200 hover:text-[#ff5a00]'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-[460px]">
-                <div className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#FBFCFD] px-3">
-                  <span className="flex-shrink-0 text-[11px] font-bold text-[#9CA3AF]">{l.from}</span>
-                  <div className="min-w-0 flex-1"><DateInput value={dateFrom} lang={lang} onChange={setCustomDateFrom} className={RANGE_DATE_INPUT_CLASS} /></div>
-                </div>
-                <div className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-[#FBFCFD] px-3">
-                  <span className="flex-shrink-0 text-[11px] font-bold text-[#9CA3AF]">{l.to}</span>
-                  <div className="min-w-0 flex-1"><DateInput value={dateTo} lang={lang} onChange={setCustomDateTo} className={RANGE_DATE_INPUT_CLASS} /></div>
-                </div>
-              </div>
+            <div className="mt-4">
+              <DateRangePicker
+                l={l}
+                lang={lang}
+                rangeKey={activeRangeKey}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                today={todayExpenseDate()}
+                onPreset={selectQuickRange}
+                onApply={setCustomRange}
+              />
             </div>
           </section>
 

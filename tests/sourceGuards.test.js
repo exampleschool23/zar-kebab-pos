@@ -2493,16 +2493,16 @@ test('completed order details do not show kitchen-cancelled items', () => {
   assert.match(reports, /Ordered Items'} \(\{items\.length\}\)/)
 })
 
-test('reports date range text opens the native calendar picker', () => {
+test('reports use the shared Daily Bazaar range calendar', () => {
   const reports = readSource('src/pages/Reports.jsx')
-  const dateInput = functionBody(reports, 'DateInput')
+  const rangePicker = readSource('src/components/DateRangePicker.jsx')
 
-  assert.match(dateInput, /const inputRef = useRef\(null\)/)
-  assert.match(dateInput, /onPointerDown=\{openPicker\}/)
-  assert.match(dateInput, /input\.showPicker\(\)/)
-  assert.match(dateInput, /formatLongDate\(value, lang, value\)/)
-  assert.match(dateInput, /text-transparent caret-transparent/)
-  assert.doesNotMatch(dateInput, /opacity-0/)
+  assert.match(reports, /import DateRangePicker from '\.\.\/components\/DateRangePicker'/)
+  assert.match(reports, /<DateRangePicker[\s\S]*rangeKey=\{activeRangeKey\}[\s\S]*onPreset=\{selectQuickRange\}[\s\S]*onApply=\{setCustomRange\}/)
+  assert.match(reports, /getAccountingQuickRange\(key, todayStr\(\)\)/)
+  assert.match(rangePicker, /role="dialog" aria-label=\{l\.selectDateRange\}/)
+  assert.match(rangePicker, /function MonthCalendar/)
+  assert.doesNotMatch(reports, /function DateInput/)
 })
 
 test('reports closeout localizes labels and date while filter controls stay aligned', () => {
@@ -2522,7 +2522,7 @@ test('reports closeout localizes labels and date while filter controls stay alig
   assert.match(reports, /formatLongDate\(closeout\.dateTo, lang, closeout\.dateTo\)/)
   assert.match(exportCloseout, /closeout\.dateFrom/)
   assert.match(exportCloseout, /closeout\.dateTo/)
-  assert.match(reports, /flex flex-wrap items-stretch gap-2 xl:flex-nowrap/)
+  assert.match(reports, /mt-2 flex flex-wrap items-stretch justify-end gap-2/)
   assert.match(reports, /className="flex h-11 items-center gap-1\.5 px-4/)
   assert.equal((reports.match(/className="h-11 bg-white border/g) || []).length, 2)
 })
@@ -2546,8 +2546,9 @@ test('QR is retired from payment, reporting, accounting, dashboard, and receipt 
   assert.doesNotMatch(closeout, /\['QR'/)
 })
 
-test('expenses date range text opens the native calendar picker', () => {
+test('expenses use the shared Daily Bazaar range calendar while entry dates stay native', () => {
   const expenses = readSource('src/pages/Expenses.jsx')
+  const rangePicker = readSource('src/components/DateRangePicker.jsx')
   const dateInput = functionBody(expenses, 'DateInput')
 
   assert.match(dateInput, /const inputRef = useRef\(null\)/)
@@ -2559,8 +2560,12 @@ test('expenses date range text opens the native calendar picker', () => {
   assert.match(dateInput, /left-3 right-9/)
   assert.match(dateInput, /overflow-hidden text-ellipsis whitespace-nowrap/)
   assert.match(expenses, /const DATE_INPUT_CLASS = .*text-transparent caret-transparent/)
-  assert.match(expenses, /const RANGE_DATE_INPUT_CLASS = .*text-transparent caret-transparent/)
-  assert.match(expenses, /grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:min-w-\[460px\]/)
+  assert.match(expenses, /import DateRangePicker from '\.\.\/components\/DateRangePicker'/)
+  assert.match(expenses, /<DateRangePicker[\s\S]*rangeKey=\{activeRangeKey\}[\s\S]*onPreset=\{selectQuickRange\}[\s\S]*onApply=\{setCustomRange\}/)
+  assert.match(rangePicker, /role="dialog" aria-label=\{l\.selectDateRange\}/)
+  assert.match(rangePicker, /function MonthCalendar/)
+  assert.match(rangePicker, /previousCurrentWeek/)
+  assert.match(rangePicker, /currentNextWeek/)
 })
 
 test('AdminTables protects table history and manages zones', () => {
@@ -3255,14 +3260,14 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(expenses, /setActiveRangeKey\(key\)/)
   assert.match(expenses, /previousMonth: 'Previous month'/)
   assert.match(expenses, /yesterday: 'Yesterday'/)
-  assert.match(expenses, /\{ key: 'yesterday', label: l\.yesterday \}/)
+  assert.match(expenses, /previousCurrentWeek: 'Previous & current week'/)
   assert.match(expenses, /const range = getAccountingQuickRange\(key\)/)
   assert.match(expenses, /setDateFrom\(range\.dateFrom\)/)
   assert.match(expenses, /setDateTo\(range\.dateTo\)/)
   assert.match(accountingLib, /export function getAccountingQuickRange/)
-  assert.match(expenses, /function setCustomDateFrom\(value\)/)
-  assert.match(expenses, /function setCustomDateTo\(value\)/)
-  assert.match(expenses, /selected\s*\?\s*'border-\[#ff5a00\] bg-\[#ff5a00\] text-white shadow-sm shadow-orange-100'/)
+  assert.match(expenses, /function setCustomRange\(from, to\)/)
+  assert.match(expenses, /setActiveRangeKey\('custom'\)/)
+  assert.match(expenses, /<DateRangePicker/)
   assert.match(expenses, /const canAdd = canEditFeature\(profile \|\| \{ role \}, 'expenses'\)/)
   assert.match(expenses, /const canDelete = canEditFeature\(profile \|\| \{ role \}, 'expenses'\)/)
   assert.match(expenses, /getAccountingPageSummaryFromOrderSummary\([\s\S]*paidOrderSummary,[\s\S]*filteredExpenses,[\s\S]*dateFrom,[\s\S]*dateTo/)
@@ -3295,7 +3300,7 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(expenses, /aria-labelledby="accounting-overview-heading"/)
   assert.match(expenses, /aria-labelledby="accounting-operations-heading"/)
   assert.match(expenses, /aria-labelledby="accounting-activity-heading"/)
-  assert.match(expenses, /aria-pressed=\{selected\}/)
+  assert.match(expenses, /<DateRangePicker[\s\S]*rangeKey=\{activeRangeKey\}/)
   assert.ok((expenses.match(/aria-pressed=\{active\}/g) || []).length >= 2)
   assert.match(expenses, /disabled=\{loading\}/)
   assert.match(expenses, /role="alert"/)
@@ -4010,6 +4015,7 @@ test('menu items support required option variants with parent product ids', () =
 
 test('Daily Bazaar filter toolbar uses one responsive range calendar with internal presets', () => {
   const source = readSource('src/pages/DailyBazaar.jsx')
+  const rangePicker = readSource('src/components/DateRangePicker.jsx')
   const toolbar = source.slice(
     source.indexOf('function RangeAndFilters'),
     source.indexOf('function BazaarEntryForm')
@@ -4018,13 +4024,14 @@ test('Daily Bazaar filter toolbar uses one responsive range calendar with intern
 
   assert.match(toolbar, /aria-labelledby="bazaar-range-heading"/)
   assert.match(toolbar, /rangeSummary = dateFrom === dateTo/)
-  assert.match(toolbar, /function DateRangePicker/)
-  assert.match(toolbar, /role="dialog" aria-label=\{l\.selectDateRange\}/)
-  assert.match(toolbar, /function MonthCalendar/)
-  assert.match(toolbar, /buildRangeCalendar\(monthKey\)/)
-  assert.match(toolbar, /previousCurrentWeek/)
-  assert.match(toolbar, /currentNextWeek/)
-  assert.match(toolbar, /onClick=\{applyDraft\}/)
+  assert.match(source, /import DateRangePicker from '\.\.\/components\/DateRangePicker'/)
+  assert.match(toolbar, /<DateRangePicker/)
+  assert.match(rangePicker, /role="dialog" aria-label=\{l\.selectDateRange\}/)
+  assert.match(rangePicker, /function MonthCalendar/)
+  assert.match(rangePicker, /buildRangeCalendar\(monthKey\)/)
+  assert.match(rangePicker, /previousCurrentWeek/)
+  assert.match(rangePicker, /currentNextWeek/)
+  assert.match(rangePicker, /onClick=\{applyDraft\}/)
   assert.match(toolbar, /border-t border-\[#EEF0F3\] pt-3/)
   assert.match(toolbar, /lg:grid-cols-\[minmax\(200px,260px\)_minmax\(220px,280px\)_minmax\(260px,1fr\)\]/)
   assert.match(toolbar, /id="bazaar-history-search"/)

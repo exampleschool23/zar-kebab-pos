@@ -69,13 +69,14 @@ test('Daily Bazaar entry uses active employees, cash/card entry methods, and dur
 
 test('Daily Bazaar dates display through shared formatters and the entry keeps a native date control', () => {
   const page = readSource('src/pages/DailyBazaar.jsx')
+  const rangePicker = readSource('src/components/DateRangePicker.jsx')
 
   assert.match(page, /function FormattedDateInput/)
   assert.match(page, /formatLongDate\(value, lang, value\)/)
   assert.match(page, /<FormattedDateInput value=\{form\.purchase_date\}/)
-  assert.match(page, /function DateRangePicker/)
-  assert.match(page, /formatLongDate\(dateFrom, lang, dateFrom\)/)
-  assert.match(page, /formatLongDate\(dateTo, lang, dateTo\)/)
+  assert.match(page, /import DateRangePicker from '\.\.\/components\/DateRangePicker'/)
+  assert.match(rangePicker, /formatLongDate\(dateFrom, lang, dateFrom\)/)
+  assert.match(rangePicker, /formatLongDate\(dateTo, lang, dateTo\)/)
 })
 
 test('Daily Bazaar history defaults to today and shows only structured entries in a compact paginated ledger', () => {
