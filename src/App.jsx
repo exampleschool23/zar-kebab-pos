@@ -31,6 +31,7 @@ const Receipt = lazy(() => import('./pages/Receipt'))
 const TableReceipt = lazy(() => import('./pages/Receipt').then(module => ({ default: module.TableReceipt })))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const AdminMenu = lazy(() => import('./pages/AdminMenu'))
+const TechCards = lazy(() => import('./pages/TechCards'))
 const AdminTables = lazy(() => import('./pages/AdminTables'))
 const AdminUsers = lazy(() => import('./pages/AdminUsers'))
 const AdminLoyalty = lazy(() => import('./pages/AdminLoyalty'))
@@ -388,6 +389,12 @@ function InternalAppRoutes({ adminHost = false }) {
         } />
         <Route path="/admin/menu/category/:categoryId" element={
           <LazyProtectedRoute page="menu"><AdminMenu /></LazyProtectedRoute>
+        } />
+        <Route path="/admin/tech-cards" element={
+          <LazyProtectedRoute page="menu"><TechCards /></LazyProtectedRoute>
+        } />
+        <Route path="/admin/tech-cards/:menuItemId" element={
+          <LazyProtectedRoute page="menu"><TechCards /></LazyProtectedRoute>
         } />
         <Route path="/admin/tables" element={
           <LazyProtectedRoute page="settings"><AdminTables /></LazyProtectedRoute>

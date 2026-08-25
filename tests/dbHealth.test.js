@@ -274,6 +274,7 @@ test('database health reports missing tables and missing RPC', async () => {
     'order_payments',
     'recall_table_from_cashier',
     'save_bazaar_purchase',
+    'save_menu_item_tech_card',
     'settle_loyalty_wallet_payment',
     'settle_orders_payment',
     'submit_order_to_kitchen',

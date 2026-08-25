@@ -143,6 +143,8 @@ const checks = await Promise.all([
   checkTable('menu_category_user_schedule_overrides', 'category_id, profile_id, created_by, created_at'),
   checkTable('menu_items', 'id, category_id, name_uz, name_ru, name_en, price, sale_unit, image_url, media_urls, available, cashier_only, public_hidden, waiter_hidden, visible_from_time, visible_until_time, sort_order, stock_count, option_groups, estimated_prep_minutes, deleted_at'),
   checkTable('menu_item_costs', 'menu_item_id, cost_price, variant_costs, updated_at'),
+  checkTable('menu_item_tech_cards', 'menu_item_id, portion_count, batch_output_quantity, batch_output_unit, preparation_steps, notes, updated_by, created_at, updated_at'),
+  checkTable('menu_item_tech_card_ingredients', 'id, menu_item_id, name, quantity, unit, unit_price_uzs, sort_order, created_at, updated_at'),
   checkTable('orders', 'id, table_id, table_name, status, payment_status, service_rate_pct, order_type, order_number, loyalty_card_number, loyalty_used_amount, cashback_earned, stock_deducted_at'),
   checkTable('order_items', 'id, order_id, menu_item_id, status, quantity, sale_unit, order_type, kitchen_round_id, submitted_at, item_type, is_counter_item, selected_options, cost_price'),
   checkTable('order_kitchen_rounds', 'order_id, kitchen_round_id, item_ids, table_id, submitted_by, submitted_at, created_at'),
@@ -182,6 +184,11 @@ const checks = await Promise.all([
     'create_menu_item_with_media_and_cost(payload)',
     () => supabase.rpc('create_menu_item_with_media_and_cost', { payload: {} }),
     'menu write access is required'
+  ),
+  checkRpc(
+    'save_menu_item_tech_card(payload)',
+    () => supabase.rpc('save_menu_item_tech_card', { payload: {} }),
+    'manage menu access is required'
   ),
   checkRpc(
     'settle_orders_payment(payload)',

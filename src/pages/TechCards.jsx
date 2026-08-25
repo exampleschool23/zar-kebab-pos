@@ -1,0 +1,616 @@
+import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import {
+  ArrowLeft,
+  BookOpenCheck,
+  CheckCircle2,
+  ChevronRight,
+  CircleDollarSign,
+  ClipboardList,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+  UtensilsCrossed,
+} from 'lucide-react'
+import AppShell from '../components/AppShell'
+import MenuMedia from '../components/MenuMedia'
+import { OperationalError, OperationalLoading } from '../components/OperationalState'
+import { useApp } from '../store/AppContext'
+import { useAuth } from '../contexts/AuthContext'
+import { useAppDataStatus } from '../store/appHooks'
+import { canEditMenu } from '../lib/permissions'
+import { formatCurrency } from '../lib/formatCurrency'
+import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
+import { getCategoryName, getItemName } from '../lib/i18n'
+import { isActiveMenuItem } from '../lib/menuItems'
+import { supabase } from '../lib/supabase'
+import {
+  TECH_CARD_UNITS,
+  buildTechCardPayload,
+  calculateTechCardSummary,
+  createBlankTechCard,
+  createBlankTechCardIngredient,
+  normalizeTechCard,
+  techCardFingerprint,
+  validateTechCard,
+} from '../lib/techCards'
+
+function labels(lang) {
+  if (lang === 'uz') return {
+    title: 'Texnologik kartalar', subtitle: 'Taom retseptlari, masalliqlar tannarxi va porsiya chiqishi',
+    search: 'Taomni qidirish…', all: 'Barchasi', ready: 'Tayyor', missing: 'To‘ldirilmagan',
+    total: 'Jami taomlar', configured: 'Tayyor kartalar', needSetup: 'To‘ldirish kerak', average: 'O‘rtacha porsiya tannarxi',
+    open: 'Kartani ochish', noResults: 'Mos taom topilmadi', noResultsHint: 'Qidiruv yoki filtrni o‘zgartiring.',
+    listError: 'Texnologik kartalarni yuklab bo‘lmadi', migration: 'Ma’lumotlar bazasiga 139-migratsiyani qo‘llang.',
+    editorSubtitle: 'Retsept, ishlab chiqarish chiqishi va haqiqiy masalliq tannarxi', ingredients: 'Masalliqlar',
+    ingredientHint: 'Har bir masalliq miqdori va tanlangan birlik uchun narxini kiriting.', addIngredient: 'Masalliq qo‘shish',
+    ingredient: 'Masalliq', quantity: 'Miqdor', unit: 'Birlik', unitPrice: 'Birlik narxi', lineCost: 'Jami',
+    batch: 'Partiya va porsiya', batchOutput: 'Tayyor mahsulot chiqishi', portions: 'Partiyadagi porsiyalar',
+    method: 'Tayyorlash usuli', methodPlaceholder: 'Tayyorlash bosqichlarini ketma-ket yozing…',
+    notes: 'Ichki izohlar', notesPlaceholder: 'Saqlash, harorat yoki oshpaz uchun boshqa eslatmalar…',
+    salePrice: 'Sotuv narxi', savedCost: 'Saqlangan real tannarx', batchCost: 'Partiya tannarxi',
+    portionCost: 'Bir porsiya tannarxi', outputPerPortion: 'Bir porsiya chiqishi', estimatedProfit: 'Taxminiy farq',
+    save: 'Kartani saqlash', saving: 'Saqlanmoqda…', saved: 'Texnologik karta saqlandi.', back: 'Kartalar ro‘yxatiga',
+    readOnly: 'Faqat ko‘rish', editProduct: 'Mahsulotni tahrirlash', productMissing: 'Taom topilmadi',
+    productMissingHint: 'Bu mahsulot o‘chirilgan yoki mavjud emas.', unsaved: 'Saqlanmagan karta',
+  }
+  if (lang === 'ru') return {
+    title: 'Техкарты', subtitle: 'Рецептуры блюд, стоимость ингредиентов и выход порций',
+    search: 'Поиск блюда…', all: 'Все', ready: 'Готовые', missing: 'Не заполнены',
+    total: 'Всего блюд', configured: 'Готовые техкарты', needSetup: 'Нужно заполнить', average: 'Средняя себестоимость порции',
+    open: 'Открыть техкарту', noResults: 'Подходящие блюда не найдены', noResultsHint: 'Измените поиск или фильтр.',
+    listError: 'Не удалось загрузить техкарты', migration: 'Примените миграцию базы данных 139.',
+    editorSubtitle: 'Рецептура, производственный выход и фактическая стоимость ингредиентов', ingredients: 'Ингредиенты',
+    ingredientHint: 'Укажите количество и цену каждого ингредиента за выбранную единицу.', addIngredient: 'Добавить ингредиент',
+    ingredient: 'Ингредиент', quantity: 'Количество', unit: 'Единица', unitPrice: 'Цена за единицу', lineCost: 'Сумма',
+    batch: 'Партия и порции', batchOutput: 'Выход готового продукта', portions: 'Порций из партии',
+    method: 'Технология приготовления', methodPlaceholder: 'Опишите этапы приготовления по порядку…',
+    notes: 'Внутренние примечания', notesPlaceholder: 'Хранение, температура или другие заметки для кухни…',
+    salePrice: 'Цена продажи', savedCost: 'Сохранённая себестоимость', batchCost: 'Стоимость партии',
+    portionCost: 'Себестоимость порции', outputPerPortion: 'Выход на порцию', estimatedProfit: 'Расчётная разница',
+    save: 'Сохранить техкарту', saving: 'Сохранение…', saved: 'Техкарта сохранена.', back: 'К списку техкарт',
+    readOnly: 'Только просмотр', editProduct: 'Редактировать товар', productMissing: 'Блюдо не найдено',
+    productMissingHint: 'Товар удалён или больше не существует.', unsaved: 'Техкарта не заполнена',
+  }
+  return {
+    title: 'Tech Cards', subtitle: 'Meal recipes, ingredient costs, and portion yield',
+    search: 'Search meals…', all: 'All', ready: 'Ready', missing: 'Not completed',
+    total: 'Total meals', configured: 'Completed cards', needSetup: 'Need setup', average: 'Average portion cost',
+    open: 'Open tech card', noResults: 'No matching meals', noResultsHint: 'Change the search or filter.',
+    listError: 'Could not load tech cards', migration: 'Apply database migration 139.',
+    editorSubtitle: 'Recipe, production yield, and actual ingredient cost', ingredients: 'Ingredients',
+    ingredientHint: 'Enter each ingredient quantity and its price for the selected unit.', addIngredient: 'Add ingredient',
+    ingredient: 'Ingredient', quantity: 'Quantity', unit: 'Unit', unitPrice: 'Unit price', lineCost: 'Total',
+    batch: 'Batch and portions', batchOutput: 'Finished batch output', portions: 'Portions per batch',
+    method: 'Preparation method', methodPlaceholder: 'Write the preparation steps in order…',
+    notes: 'Internal notes', notesPlaceholder: 'Storage, temperature, or other kitchen notes…',
+    salePrice: 'Selling price', savedCost: 'Saved real cost', batchCost: 'Batch cost',
+    portionCost: 'Cost per portion', outputPerPortion: 'Output per portion', estimatedProfit: 'Estimated difference',
+    save: 'Save tech card', saving: 'Saving…', saved: 'Tech card saved.', back: 'Back to tech cards',
+    readOnly: 'Read only', editProduct: 'Edit product', productMissing: 'Meal not found',
+    productMissingHint: 'This product was archived or no longer exists.', unsaved: 'Tech card not completed',
+  }
+}
+
+function unitLabel(unit, lang) {
+  const unitLabels = {
+    g: { uz: 'g', ru: 'г', en: 'g' },
+    kg: { uz: 'kg', ru: 'кг', en: 'kg' },
+    ml: { uz: 'ml', ru: 'мл', en: 'ml' },
+    l: { uz: 'l', ru: 'л', en: 'l' },
+    piece: { uz: 'dona', ru: 'шт', en: 'piece' },
+  }
+  return unitLabels[unit]?.[lang] || unitLabels[unit]?.en || unit
+}
+
+function formatDecimal(value, lang, maximumFractionDigits = 3) {
+  return new Intl.NumberFormat(lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ', {
+    maximumFractionDigits,
+  }).format(Number(value) || 0)
+}
+
+function formatOutputPerPortion(summary, unit, lang) {
+  if (summary.outputPerPortion == null) return '—'
+  let amount = summary.outputPerPortion
+  let displayUnit = unit
+  if (unit === 'kg' && amount < 1) {
+    amount *= 1000
+    displayUnit = 'g'
+  } else if (unit === 'l' && amount < 1) {
+    amount *= 1000
+    displayUnit = 'ml'
+  }
+  return `${formatDecimal(amount, lang)} ${unitLabel(displayUnit, lang)}`
+}
+
+function TechCardImage({ item, className = '' }) {
+  return (
+    <MenuMedia
+      src={item?.image_url}
+      alt=""
+      className={`h-full w-full object-cover object-center ${className}`}
+      containerClassName="h-full w-full"
+      fallback={
+        <div className="flex h-full w-full items-center justify-center bg-orange-50 text-orange-200">
+          <UtensilsCrossed size={28} />
+        </div>
+      }
+    />
+  )
+}
+
+async function loadTechCards() {
+  const [cardsResult, ingredientsResult] = await Promise.all([
+    supabase.from('menu_item_tech_cards').select('*').order('updated_at', { ascending: false }),
+    supabase.from('menu_item_tech_card_ingredients').select('*').order('sort_order', { ascending: true }),
+  ])
+  if (cardsResult.error) throw cardsResult.error
+  if (ingredientsResult.error) throw ingredientsResult.error
+
+  const ingredientsByItemId = new Map()
+  for (const ingredient of ingredientsResult.data || []) {
+    const rows = ingredientsByItemId.get(ingredient.menu_item_id) || []
+    rows.push(ingredient)
+    ingredientsByItemId.set(ingredient.menu_item_id, rows)
+  }
+
+  return Object.fromEntries((cardsResult.data || []).map(card => [
+    card.menu_item_id,
+    normalizeTechCard({ ...card, ingredients: ingredientsByItemId.get(card.menu_item_id) || [] }),
+  ]))
+}
+
+function SummaryTile({ label, value, icon: Icon, tone = 'orange' }) {
+  const tones = {
+    orange: 'bg-orange-50 text-orange-600',
+    green: 'bg-emerald-50 text-emerald-600',
+    amber: 'bg-amber-50 text-amber-600',
+    blue: 'bg-blue-50 text-blue-600',
+  }
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${tones[tone] || tones.orange}`}>
+        <Icon size={19} />
+      </div>
+      <p className="text-2xl font-black tabular-nums text-gray-900">{value}</p>
+      <p className="mt-0.5 text-xs font-bold text-gray-400">{label}</p>
+    </div>
+  )
+}
+
+export default function TechCards() {
+  const { state } = useApp()
+  const { profile } = useAuth()
+  const { loaded, loadError } = useAppDataStatus()
+  const { menuItemId } = useParams()
+  const navigate = useNavigate()
+  const lang = state.lang || 'ru'
+  const l = labels(lang)
+  const mayEdit = canEditMenu(profile || { role: state.user?.role })
+  const [cardsByItemId, setCardsByItemId] = useState({})
+  const [cardsLoading, setCardsLoading] = useState(true)
+  const [cardsError, setCardsError] = useState('')
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [form, setForm] = useState(null)
+  const [originalFingerprint, setOriginalFingerprint] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saveNotice, setSaveNotice] = useState('')
+
+  const activeItems = useMemo(() => state.menuItems
+    .filter(isActiveMenuItem)
+    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)), [state.menuItems])
+  const categoriesById = useMemo(() => new Map(state.categories.map(category => [category.id, category])), [state.categories])
+  const editorItem = menuItemId ? activeItems.find(item => item.id === menuItemId) : null
+
+  useEffect(() => {
+    if (!loaded || loadError) return undefined
+    let active = true
+    setCardsLoading(true)
+    setCardsError('')
+    loadTechCards()
+      .then(cards => {
+        if (active) setCardsByItemId(cards)
+      })
+      .catch(error => {
+        if (active) setCardsError(error?.message || l.listError)
+      })
+      .finally(() => {
+        if (active) setCardsLoading(false)
+      })
+    return () => { active = false }
+  }, [loaded, loadError])
+
+  useEffect(() => {
+    if (!menuItemId || cardsLoading) return
+    const nextForm = cardsByItemId[menuItemId]
+      ? normalizeTechCard(cardsByItemId[menuItemId])
+      : createBlankTechCard(menuItemId)
+    setForm(nextForm)
+    setOriginalFingerprint(techCardFingerprint(nextForm))
+    setSaveError('')
+    setSaveNotice('')
+  }, [menuItemId, cardsLoading, cardsByItemId])
+
+  const filteredItems = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return activeItems.filter(item => {
+      const hasCard = !!cardsByItemId[item.id]
+      if (filter === 'ready' && !hasCard) return false
+      if (filter === 'missing' && hasCard) return false
+      if (!needle) return true
+      return [item.name_uz, item.name_ru, item.name_en, item.external_id]
+        .some(value => String(value || '').toLowerCase().includes(needle))
+    })
+  }, [activeItems, cardsByItemId, filter, search])
+
+  const configuredCards = activeItems.filter(item => cardsByItemId[item.id])
+  const averagePortionCost = configuredCards.length
+    ? configuredCards.reduce((sum, item) => sum + calculateTechCardSummary(cardsByItemId[item.id]).portionCost, 0) / configuredCards.length
+    : 0
+
+  function updateIngredient(index, patch) {
+    setForm(current => ({
+      ...current,
+      ingredients: current.ingredients.map((ingredient, ingredientIndex) => (
+        ingredientIndex === index ? { ...ingredient, ...patch } : ingredient
+      )),
+    }))
+    setSaveNotice('')
+  }
+
+  function addIngredient() {
+    setForm(current => ({ ...current, ingredients: [...current.ingredients, createBlankTechCardIngredient()] }))
+    setSaveNotice('')
+  }
+
+  function removeIngredient(index) {
+    setForm(current => ({
+      ...current,
+      ingredients: current.ingredients.filter((_, ingredientIndex) => ingredientIndex !== index),
+    }))
+    setSaveNotice('')
+  }
+
+  async function saveCard() {
+    if (!mayEdit || !form || saving) return
+    const validationError = validateTechCard(form)
+    if (validationError) {
+      setSaveError(validationError)
+      return
+    }
+    const payload = buildTechCardPayload(form)
+    setSaving(true)
+    setSaveError('')
+    setSaveNotice('')
+    try {
+      const { error } = await supabase.rpc('save_menu_item_tech_card', { payload })
+      if (error) throw error
+      const savedCard = normalizeTechCard({ ...payload, updated_at: new Date().toISOString() })
+      setCardsByItemId(current => ({ ...current, [payload.menu_item_id]: savedCard }))
+      setForm(savedCard)
+      setOriginalFingerprint(techCardFingerprint(savedCard))
+      setSaveNotice(l.saved)
+    } catch (error) {
+      setSaveError(error?.message || l.listError)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!loaded || loadError) {
+    return (
+      <AppShell title={l.title}>
+        {!loaded ? (
+          <OperationalLoading title={l.title} description={l.subtitle} />
+        ) : (
+          <OperationalError title={l.listError} description={loadError} actionLabel="Reload" onAction={() => window.location.reload()} />
+        )}
+      </AppShell>
+    )
+  }
+
+  if (cardsLoading) {
+    return <AppShell title={l.title}><OperationalLoading title={l.title} description={l.subtitle} /></AppShell>
+  }
+
+  if (cardsError) {
+    return (
+      <AppShell title={l.title}>
+        <OperationalError
+          title={l.listError}
+          description={`${cardsError} ${l.migration}`}
+          actionLabel="Reload"
+          onAction={() => window.location.reload()}
+        />
+      </AppShell>
+    )
+  }
+
+  if (menuItemId) {
+    if (!editorItem || !form) {
+      return (
+        <AppShell title={l.title}>
+          <OperationalError
+            title={l.productMissing}
+            description={l.productMissingHint}
+            actionLabel={l.back}
+            onAction={() => navigate('/admin/tech-cards')}
+          />
+        </AppShell>
+      )
+    }
+
+    const summary = calculateTechCardSummary(form)
+    const category = categoriesById.get(editorItem.category_id)
+    const dirty = techCardFingerprint(form) !== originalFingerprint
+    const validationError = validateTechCard(form)
+    const price = Number(editorItem.price || 0)
+    const estimatedDifference = price - summary.portionCost
+
+    return (
+      <AppShell title={`${l.title} · ${getItemName(editorItem, lang)}`}>
+        <div className="min-h-full bg-[#FAF6EE]">
+          <div className="border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
+            <div className="mx-auto flex w-full max-w-[1180px] items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/admin/tech-cards')}
+                aria-label={l.back}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-xl font-black text-gray-900 sm:text-2xl">{getItemName(editorItem, lang)}</h1>
+                <p className="mt-0.5 truncate text-xs font-semibold text-gray-400 sm:text-sm">{l.editorSubtitle}</p>
+              </div>
+              {!mayEdit && <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-500">{l.readOnly}</span>}
+            </div>
+          </div>
+
+          <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
+            <div className="mb-5 flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl"><TechCardImage item={editorItem} /></div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-black text-gray-900">{getItemName(editorItem, lang)}</p>
+                <p className="text-xs font-bold text-gray-400">{category ? getCategoryName(category, lang) : '—'} · {editorItem.external_id || editorItem.id}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(`/admin/menu/product/${encodeURIComponent(editorItem.id)}`)}
+                className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-black text-gray-600 hover:bg-gray-50"
+              >
+                {l.editProduct}
+              </button>
+            </div>
+
+            {(saveError || saveNotice) && (
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-sm font-bold ${saveError ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                {saveError || saveNotice}
+              </div>
+            )}
+
+            <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_330px]">
+              <div className="min-w-0 space-y-5">
+                <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-black text-gray-900">{l.ingredients}</h2>
+                      <p className="mt-0.5 text-xs font-semibold text-gray-400">{l.ingredientHint}</p>
+                    </div>
+                    {mayEdit && (
+                      <button type="button" onClick={addIngredient} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-xl bg-orange-50 px-3 text-xs font-black text-[#ff5a00] hover:bg-orange-100 disabled:opacity-50">
+                        <Plus size={15} /> {l.addIngredient}
+                      </button>
+                    )}
+                  </div>
+
+                  {form.ingredients.length === 0 ? (
+                    <button type="button" onClick={mayEdit ? addIngredient : undefined} className="flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 px-4 py-10 text-center disabled:cursor-default" disabled={!mayEdit}>
+                      <ClipboardList size={28} className="mb-2 text-orange-300" />
+                      <span className="text-sm font-black text-gray-500">{l.addIngredient}</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      {form.ingredients.map((ingredient, index) => {
+                        const line = summary.ingredients[index]
+                        return (
+                          <div key={ingredient.id || index} className="grid min-w-0 gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-3 sm:grid-cols-[minmax(140px,1.5fr)_90px_90px_minmax(120px,1fr)_110px_40px] sm:items-end">
+                            <label className="min-w-0">
+                              <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.ingredient}</span>
+                              <input value={ingredient.name} onChange={event => updateIngredient(index, { name: event.target.value })} disabled={!mayEdit || saving} className="h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                            </label>
+                            <label>
+                              <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.quantity}</span>
+                              <input inputMode="decimal" value={ingredient.quantity} onChange={event => updateIngredient(index, { quantity: event.target.value })} disabled={!mayEdit || saving} className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm tabular-nums outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                            </label>
+                            <label>
+                              <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.unit}</span>
+                              <select value={ingredient.unit} onChange={event => updateIngredient(index, { unit: event.target.value })} disabled={!mayEdit || saving} className="h-10 w-full rounded-xl border border-gray-200 bg-white px-2 text-sm outline-none focus:border-[#ff5a00] disabled:bg-gray-100">
+                                {TECH_CARD_UNITS.map(unit => <option key={unit} value={unit}>{unitLabel(unit, lang)}</option>)}
+                              </select>
+                            </label>
+                            <label className="min-w-0">
+                              <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.unitPrice}</span>
+                              <input inputMode="numeric" value={formatMoneyInput(ingredient.unit_price_uzs)} onChange={event => updateIngredient(index, { unit_price_uzs: normalizeMoneyInput(event.target.value) })} disabled={!mayEdit || saving} className="h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 text-sm tabular-nums outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                            </label>
+                            <div>
+                              <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.lineCost}</span>
+                              <div className="flex h-10 items-center rounded-xl bg-white px-2 text-xs font-black tabular-nums text-gray-700 ring-1 ring-gray-200">{formatCurrency(Math.round(line?.lineCost || 0))}</div>
+                            </div>
+                            {mayEdit && (
+                              <button type="button" onClick={() => removeIngredient(index)} disabled={saving} aria-label="Remove ingredient" className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-white text-red-400 hover:bg-red-50 disabled:opacity-50">
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                  <h2 className="mb-4 text-lg font-black text-gray-900">{l.batch}</h2>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <label>
+                      <span className="mb-1.5 block text-xs font-bold text-gray-500">{l.batchOutput}</span>
+                      <input inputMode="decimal" value={form.batch_output_quantity} onChange={event => { setForm(current => ({ ...current, batch_output_quantity: event.target.value })); setSaveNotice('') }} disabled={!mayEdit || saving} placeholder="5" className="h-11 w-full rounded-xl border border-gray-200 px-3 text-sm tabular-nums outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                    </label>
+                    <label>
+                      <span className="mb-1.5 block text-xs font-bold text-gray-500">{l.unit}</span>
+                      <select value={form.batch_output_unit} onChange={event => { setForm(current => ({ ...current, batch_output_unit: event.target.value })); setSaveNotice('') }} disabled={!mayEdit || saving} className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#ff5a00] disabled:bg-gray-100">
+                        {TECH_CARD_UNITS.map(unit => <option key={unit} value={unit}>{unitLabel(unit, lang)}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="mb-1.5 block text-xs font-bold text-gray-500">{l.portions}</span>
+                      <input inputMode="decimal" value={form.portion_count} onChange={event => { setForm(current => ({ ...current, portion_count: event.target.value })); setSaveNotice('') }} placeholder="50" disabled={!mayEdit || saving} className="h-11 w-full rounded-xl border border-gray-200 px-3 text-sm tabular-nums outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-black text-gray-800">{l.method}</span>
+                    <textarea rows="8" value={form.preparation_steps} onChange={event => { setForm(current => ({ ...current, preparation_steps: event.target.value })); setSaveNotice('') }} disabled={!mayEdit || saving} placeholder={l.methodPlaceholder} className="w-full resize-y rounded-xl border border-gray-200 px-3 py-3 text-sm leading-relaxed outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                  </label>
+                  <label className="mt-4 block">
+                    <span className="mb-1.5 block text-sm font-black text-gray-800">{l.notes}</span>
+                    <textarea rows="3" value={form.notes} onChange={event => { setForm(current => ({ ...current, notes: event.target.value })); setSaveNotice('') }} disabled={!mayEdit || saving} placeholder={l.notesPlaceholder} className="w-full resize-y rounded-xl border border-gray-200 px-3 py-3 text-sm leading-relaxed outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                  </label>
+                </section>
+              </div>
+
+              <aside className="min-w-0 space-y-4 lg:sticky lg:top-5 lg:self-start">
+                <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <h2 className="mb-3 text-sm font-black uppercase tracking-wide text-gray-500">{l.title}</h2>
+                  <div className="space-y-2.5">
+                    {[
+                      [l.salePrice, formatCurrency(price)],
+                      [l.savedCost, editorItem.cost_price == null ? '—' : formatCurrency(editorItem.cost_price)],
+                      [l.batchCost, formatCurrency(Math.round(summary.batchCost))],
+                      [l.portionCost, formatCurrency(Math.round(summary.portionCost))],
+                      [l.outputPerPortion, formatOutputPerPortion(summary, form.batch_output_unit, lang)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
+                        <span className="text-xs font-bold text-gray-500">{label}</span>
+                        <span className="text-right text-sm font-black tabular-nums text-gray-900">{value}</span>
+                      </div>
+                    ))}
+                    <div className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${estimatedDifference >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                      <span className="text-xs font-bold">{l.estimatedProfit}</span>
+                      <span className="text-sm font-black tabular-nums">{formatCurrency(Math.round(estimatedDifference))}</span>
+                    </div>
+                  </div>
+                </section>
+
+                {mayEdit && (
+                  <button
+                    type="button"
+                    onClick={saveCard}
+                    disabled={saving || !dirty || !!validationError}
+                    title={validationError || ''}
+                    className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-md shadow-orange-200 hover:bg-[#dd4e00] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none"
+                  >
+                    {saving ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
+                    {saving ? l.saving : l.save}
+                  </button>
+                )}
+                {validationError && dirty && <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">{validationError}</p>}
+              </aside>
+            </div>
+          </div>
+        </div>
+      </AppShell>
+    )
+  }
+
+  return (
+    <AppShell title={l.title}>
+      <div className="min-h-full bg-[#FAF6EE]">
+        <div className="border-b border-gray-100 bg-white px-4 py-5 sm:px-6">
+          <div className="mx-auto w-full max-w-[1180px]">
+            <h1 className="text-2xl font-black text-gray-900">{l.title}</h1>
+            <p className="mt-1 text-sm font-semibold text-gray-400">{l.subtitle}</p>
+          </div>
+        </div>
+        <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
+          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <SummaryTile label={l.total} value={activeItems.length} icon={UtensilsCrossed} />
+            <SummaryTile label={l.configured} value={configuredCards.length} icon={BookOpenCheck} tone="green" />
+            <SummaryTile label={l.needSetup} value={activeItems.length - configuredCards.length} icon={ClipboardList} tone="amber" />
+            <SummaryTile label={l.average} value={formatCurrency(Math.round(averagePortionCost))} icon={CircleDollarSign} tone="blue" />
+          </div>
+
+          <div className="mb-5 flex flex-wrap gap-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+            <label className="relative min-w-[220px] flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={search} onChange={event => setSearch(event.target.value)} placeholder={l.search} className="h-11 w-full rounded-xl border border-gray-200 pl-9 pr-3 text-sm outline-none focus:border-[#ff5a00]" />
+            </label>
+            <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+              {[
+                ['all', l.all], ['ready', l.ready], ['missing', l.missing],
+              ].map(([key, label]) => (
+                <button key={key} type="button" onClick={() => setFilter(key)} className={`rounded-lg px-3 py-2 text-xs font-black transition-colors ${filter === key ? 'bg-white text-[#ff5a00] shadow-sm' : 'text-gray-500'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredItems.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-4 py-14 text-center">
+              <ClipboardList size={32} className="mx-auto mb-3 text-gray-300" />
+              <p className="font-black text-gray-600">{l.noResults}</p>
+              <p className="mt-1 text-xs font-semibold text-gray-400">{l.noResultsHint}</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredItems.map(item => {
+                const card = cardsByItemId[item.id]
+                const summary = card ? calculateTechCardSummary(card) : null
+                const category = categoriesById.get(item.category_id)
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => navigate(`/admin/tech-cards/${encodeURIComponent(item.id)}`)}
+                    className="group flex min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
+                  >
+                    <div className="h-auto w-28 shrink-0"><TechCardImage item={item} /></div>
+                    <div className="min-w-0 flex-1 p-4">
+                      <div className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-base font-black text-gray-900">{getItemName(item, lang)}</p>
+                          <p className="truncate text-[11px] font-bold text-gray-400">{category ? getCategoryName(category, lang) : '—'}</p>
+                        </div>
+                        <ChevronRight size={18} className="shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-[#ff5a00]" />
+                      </div>
+                      {card ? (
+                        <>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">{l.ready}</span>
+                            <span className="rounded-full bg-gray-100 px-2 py-1 text-[10px] font-black text-gray-600">{card.ingredients.length} {l.ingredients.toLowerCase()}</span>
+                            <span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-orange-700">{formatDecimal(card.portion_count, lang)} {l.portions.toLowerCase()}</span>
+                          </div>
+                          <p className="mt-3 text-xs font-bold text-gray-400">{l.portionCost}</p>
+                          <p className="text-sm font-black tabular-nums text-gray-900">{formatCurrency(Math.round(summary.portionCost))}</p>
+                        </>
+                      ) : (
+                        <div className="mt-4 rounded-xl border border-dashed border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700">{l.unsaved}</div>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  )
+}

@@ -354,6 +354,13 @@ These bugs were recently fixed and are now protected by tests:
    - Best-Selling Dishes shows up to ten ranked sold products instead of stopping at five, with internal scrolling when needed.
    - Never fabricate empty categories or unsold products merely to fill visual space.
 
+44. Menu tech cards describe the current recipe without rewriting sales history.
+   - Each active menu item may have one protected `menu_item_tech_cards` row and ordered `menu_item_tech_card_ingredients` rows.
+   - Ingredient quantity multiplied by its selected-unit price produces the batch cost; dividing by `portion_count` produces the current calculated portion cost.
+   - Tech-card edits use `save_menu_item_tech_card(payload jsonb)` so the card and full ingredient list save atomically.
+   - Tech-card ingredient prices are staff-only and follow Manage Menu read/write boundaries; they must never appear in public, Telegram, waiter, cashier, order, or receipt catalog payloads.
+   - A recipe edit must never rewrite `order_items.cost_price`, paid-order profit, or any historical report. The protected catalog `menu_item_costs` value remains separate unless an explicit future product decision links them.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:

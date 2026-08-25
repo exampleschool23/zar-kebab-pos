@@ -29,7 +29,7 @@ import {
 import {
   Plus, Edit2, Trash2, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
-  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock, Users, Clock3,
+  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock, Users, Clock3, ClipboardList,
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -2651,6 +2651,17 @@ export default function AdminMenu() {
                    'Manage product details, variant prices, and stock counts'}
                 </p>
               </div>
+              {itemModal === 'edit' && form.id && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/admin/tech-cards/${encodeURIComponent(form.id)}`)}
+                  disabled={savingItemForm}
+                  className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 text-xs font-black text-[#ff5a00] transition-colors hover:bg-orange-100 disabled:cursor-wait disabled:opacity-50"
+                >
+                  <ClipboardList size={16} />
+                  {lang === 'uz' ? 'Tex karta' : lang === 'ru' ? 'Техкарта' : 'Tech card'}
+                </button>
+              )}
             </div>
           </div>
 

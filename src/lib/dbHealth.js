@@ -19,6 +19,8 @@ const TABLE_CHECKS = [
   { name: 'daily_payroll_group_notification_deliveries', columns: ['business_date', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'updated_at'], access: 'service_only' },
   { name: 'menu_items', columns: ['id', 'external_id', 'name_uz', 'name_ru', 'name_en', 'price', 'old_price', 'sale_unit', 'grams', 'millilitres', 'kcal', 'stock_count', 'image_url', 'media_urls', 'option_groups', 'cashier_only', 'public_hidden', 'waiter_hidden', 'visible_from_time', 'visible_until_time', 'sort_order', 'deleted_at'] },
   { name: 'menu_item_costs', columns: ['menu_item_id', 'cost_price', 'variant_costs', 'updated_at'] },
+  { name: 'menu_item_tech_cards', columns: ['menu_item_id', 'portion_count', 'batch_output_quantity', 'batch_output_unit', 'preparation_steps', 'notes', 'updated_by', 'created_at', 'updated_at'] },
+  { name: 'menu_item_tech_card_ingredients', columns: ['id', 'menu_item_id', 'name', 'quantity', 'unit', 'unit_price_uzs', 'sort_order', 'created_at', 'updated_at'] },
   { name: 'menu_categories', columns: ['id', 'name_uz', 'name_ru', 'name_en', 'hidden', 'waiter_hidden', 'tourist_hidden', 'visible_from_time', 'visible_until_time', 'sort_order', 'deleted_at'] },
   { name: 'menu_category_user_schedule_overrides', columns: ['category_id', 'profile_id', 'created_by', 'created_at'] },
   { name: 'profiles', columns: ['id', 'role', 'full_name', 'feature_access'] },
@@ -62,6 +64,8 @@ const MIGRATION_HINTS = {
   profile_audit: 'Run supabase/028_profile_role_audit.sql',
   menu_items: 'Run supabase/103_menu_item_media_gallery.sql and supabase/105_menu_items_sold_by_weight.sql',
   menu_item_costs: 'Run supabase/098_menu_item_costs_and_profit.sql and supabase/100_menu_variant_costs_and_accounting_profit.sql',
+  menu_item_tech_cards: 'Run supabase/139_menu_item_tech_cards.sql',
+  menu_item_tech_card_ingredients: 'Run supabase/139_menu_item_tech_cards.sql',
   menu_categories: 'Run supabase/053_hidden_menu_categories.sql, supabase/080_menu_category_waiter_hidden.sql, supabase/082_menu_visibility_windows.sql, supabase/115_archive_menu_catalog_deletions.sql, and supabase/133_menu_category_tourist_visibility.sql',
   menu_category_user_schedule_overrides: 'Run supabase/132_menu_category_user_schedule_overrides.sql',
   employee_salary_profiles: 'Run supabase/054_employee_salary_profiles.sql, supabase/056_employee_salary_profile_end_date.sql, supabase/060_employee_salary_manual_names.sql, and supabase/076_employee_salary_safe_delete.sql',
@@ -95,6 +99,7 @@ const MIGRATION_HINTS = {
   generate_daily_kpi_bonuses: 'Run supabase/129_daily_kpi_bonuses.sql',
   create_menu_item_with_cost: 'Run supabase/102_atomic_menu_item_cost_creation.sql',
   create_menu_item_with_media_and_cost: 'Run supabase/103_menu_item_media_gallery.sql',
+  save_menu_item_tech_card: 'Run supabase/139_menu_item_tech_cards.sql',
   get_accounting_paid_order_summary: 'Run supabase/109_accounting_paid_order_summary.sql',
 }
 
@@ -156,6 +161,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'kitchen_round_receipts_version', {}))
   checks.push(await checkRpc(dbClient, 'create_menu_item_with_cost'))
   checks.push(await checkRpc(dbClient, 'create_menu_item_with_media_and_cost'))
+  checks.push(await checkRpc(dbClient, 'save_menu_item_tech_card'))
   checks.push(await checkRpc(dbClient, 'settle_loyalty_wallet_payment'))
   checks.push(await checkRpc(dbClient, 'settle_orders_payment'))
   checks.push(await checkRpc(dbClient, 'change_paid_order_payment_method_owner', { p_order_ids: [], p_payment_method: 'cash' }))
