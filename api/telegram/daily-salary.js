@@ -69,7 +69,9 @@ function getOptionalTashkentDate(value) {
   return Number.isFinite(timestamp.getTime()) ? getTashkentDate(timestamp) : ''
 }
 
-async function loadSalaryEventsTarget(supabase) {
+// `salary_events` is the legacy database key for the private ZarKebab Investor
+// group. Keep the key stable because existing delivery ledgers reference it.
+async function loadInvestorGroupTarget(supabase) {
   const fallback = {
     chatId: String(process.env.TELEGRAM_SALARY_PAYMENTS_CHAT_ID || '').trim(),
     language: String(process.env.TELEGRAM_SALARY_PAYMENTS_LANGUAGE || 'ru').trim(),
@@ -190,8 +192,8 @@ async function sendDailyBazaarNotification(supabase, purchaseDate) {
   const purchases = await loadDailyBazaarPurchases(supabase, purchaseDate)
   if (purchases.length === 0) return { businessDate: purchaseDate, status: 'empty' }
 
-  const target = await loadSalaryEventsTarget(supabase)
-  if (!target.chatId) throw new Error('Salary Events Telegram channel is not configured')
+  const target = await loadInvestorGroupTarget(supabase)
+  if (!target.chatId) throw new Error('ZarKebab Investor Telegram group is not configured')
   const delivery = await claimDailyBazaarDelivery(supabase, purchaseDate)
   if (!delivery) return { businessDate: purchaseDate, status: 'duplicate' }
 
@@ -362,12 +364,12 @@ async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResu
   const delivery = await claimDailyPayrollGroupDelivery(supabase, businessDate)
   if (!delivery) return { businessDate, status: 'duplicate' }
 
-  const target = await loadSalaryEventsTarget(supabase)
+  const target = await loadInvestorGroupTarget(supabase)
   if (!target.chatId) {
     const updatedAt = new Date().toISOString()
     await supabase.from('daily_payroll_group_notification_deliveries').update({
       status: 'skipped',
-      error_message: 'Salary Events Telegram channel is not configured',
+      error_message: 'ZarKebab Investor Telegram group is not configured',
       updated_at: updatedAt,
     }).eq('business_date', businessDate)
     return { businessDate, status: 'skipped' }

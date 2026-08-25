@@ -18,6 +18,7 @@ import {
   groupAccountingHistoryRows,
 } from '../lib/accounting'
 import {
+  buildEmployeeMealExpenseRows,
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   EXPENSE_CATEGORIES,
@@ -26,12 +27,14 @@ import {
   expensePaymentMethodLabel,
   getAccountingHistoryRange,
   normalizeExpenseEntryType,
+  todayExpenseDate,
 } from '../lib/expenses'
 
 const EXPENSE_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by_name, created_at'
-const SALARY_PROFILE_COLUMNS = 'id, profile_id, employee_name, payment_method'
+const SALARY_PROFILE_COLUMNS = 'id, profile_id, employee_name, payment_method, joined_at, ended_at, deleted_at, is_active'
 const SALARY_PAYMENT_COLUMNS = 'id, salary_profile_id, paid_date, amount, payment_method, note, created_by_name, created_at'
 const SALARY_BONUS_COLUMNS = 'id, salary_profile_id, bonus_date, amount, payment_method, note, created_by_name, created_at'
+const SALARY_ABSENCE_COLUMNS = 'id, salary_profile_id, absence_date'
 function expenseTone(row) {
   if (normalizeExpenseEntryType(row.entry_type) === 'income') {
     return { row: 'border-l-purple-500 bg-purple-50/30', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' }
@@ -45,13 +48,14 @@ function expenseTone(row) {
   return { row: 'border-l-orange-500 bg-orange-50/30', text: 'text-[#ff5a00]', badge: 'bg-orange-100 text-orange-700' }
 }
 
-function composeSalaryProfiles(profiles, payments, bonuses, team) {
+function composeSalaryProfiles(profiles, payments, bonuses, absences, team) {
   const teamById = Object.fromEntries(team.map(member => [member.id, member]))
   return profiles.map(profile => ({
     ...profile,
     profile: teamById[profile.profile_id] || null,
     payments: payments.filter(row => row.salary_profile_id === profile.id),
     bonuses: bonuses.filter(row => row.salary_profile_id === profile.id),
+    absences: absences.filter(row => row.salary_profile_id === profile.id),
   }))
 }
 
@@ -103,9 +107,9 @@ export default function AccountingHistory() {
   )
 
   const labels = {
-    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana va vaqt', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', actions: 'Amallar', remove: 'O‘chirish', confirmRemove: 'Tasdiqlash', removing: 'O‘chirilmoqda...', removeFailed: 'Yozuvni o‘chirib bo‘lmadi.', manageBazaar: 'Kunlik bozorda boshqarish', bazaarManaged: 'Kunlik bozorda boshqariladi', totalExpenses: 'Jami xarajat', salaryExpenses: 'Maosh xarajatlari', productBazaarExpenses: 'Mahsulot / bozor xarajatlari', otherExpenses: 'Boshqa xarajatlar', investorSupport: 'Investor yordami', cafeIncome: 'Kafe daromadi', loyaltyIncome: 'Loyallik daromadi', investorIncome: 'Investor yordami', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
-    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата и время', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', actions: 'Действия', remove: 'Удалить', confirmRemove: 'Подтвердить', removing: 'Удаление...', removeFailed: 'Не удалось удалить запись.', manageBazaar: 'Управлять в Ежедневном базаре', bazaarManaged: 'Управляется в Ежедневном базаре', totalExpenses: 'Всего расходов', salaryExpenses: 'Расходы на зарплаты', productBazaarExpenses: 'Расходы на продукты / базар', otherExpenses: 'Остальные расходы', investorSupport: 'Поддержка инвестора', cafeIncome: 'Доход кафе', loyaltyIncome: 'Доход по лояльности', investorIncome: 'Поддержка инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
-    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date and time', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', actions: 'Actions', remove: 'Delete', confirmRemove: 'Confirm', removing: 'Deleting...', removeFailed: 'Could not delete the entry.', manageBazaar: 'Manage in Daily Bazaar', bazaarManaged: 'Managed in Daily Bazaar', totalExpenses: 'Total expenses', salaryExpenses: 'Salary expenses', productBazaarExpenses: 'Products / bazaar expenses', otherExpenses: 'Other expenses', investorSupport: 'Investor support', cafeIncome: 'Cafe income', loyaltyIncome: 'Loyalty income', investorIncome: 'Investor support', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
+    uz: { title: 'Barcha buxgalteriya', back: 'Buxgalteriyaga qaytish', search: 'Qidirish', all: 'Barchasi', expense: 'Xarajat', income: 'Daromad', thisMonth: 'Bu oy', lastMonth: 'O‘tgan oy', allTime: 'Barcha vaqt', date: 'Sana va vaqt', category: 'Kategoriya', method: 'To‘lov turi', vendor: 'Yetkazuvchi / xodim', description: 'Izoh', author: 'Kiritgan', amount: 'Summa', actions: 'Amallar', remove: 'O‘chirish', confirmRemove: 'Tasdiqlash', removing: 'O‘chirilmoqda...', removeFailed: 'Yozuvni o‘chirib bo‘lmadi.', manageBazaar: 'Kunlik bozorda boshqarish', bazaarManaged: 'Kunlik bozorda boshqariladi', totalExpenses: 'Jami xarajat', salaryExpenses: 'Maosh xarajatlari', employeeMeals: 'Xodimlar ovqati', productBazaarExpenses: 'Mahsulot / bozor xarajatlari', otherExpenses: 'Boshqa xarajatlar', investorSupport: 'Investor yordami', cafeIncome: 'Kafe daromadi', loyaltyIncome: 'Loyallik daromadi', investorIncome: 'Investor yordami', empty: 'Yozuv topilmadi', loadFailed: 'Buxgalteriya tarixini yuklab bo‘lmadi', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi' },
+    ru: { title: 'Вся бухгалтерия', back: 'Назад к бухгалтерии', search: 'Поиск', all: 'Все', expense: 'Расход', income: 'Доход', thisMonth: 'Этот месяц', lastMonth: 'Прошлый месяц', allTime: 'За всё время', date: 'Дата и время', category: 'Категория', method: 'Способ оплаты', vendor: 'Поставщик / сотрудник', description: 'Описание', author: 'Добавил', amount: 'Сумма', actions: 'Действия', remove: 'Удалить', confirmRemove: 'Подтвердить', removing: 'Удаление...', removeFailed: 'Не удалось удалить запись.', manageBazaar: 'Управлять в Ежедневном базаре', bazaarManaged: 'Управляется в Ежедневном базаре', totalExpenses: 'Всего расходов', salaryExpenses: 'Расходы на зарплаты', employeeMeals: 'Питание сотрудников', productBazaarExpenses: 'Расходы на продукты / базар', otherExpenses: 'Остальные расходы', investorSupport: 'Поддержка инвестора', cafeIncome: 'Доход кафе', loyaltyIncome: 'Доход по лояльности', investorIncome: 'Поддержка инвестора', empty: 'Записей не найдено', loadFailed: 'Не удалось загрузить историю бухгалтерии', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате' },
+    en: { title: 'All accounting', back: 'Back to accounting', search: 'Search', all: 'All', expense: 'Expense', income: 'Income', thisMonth: 'This month', lastMonth: 'Last month', allTime: 'All time', date: 'Date and time', category: 'Category', method: 'Payment method', vendor: 'Vendor / employee', description: 'Description', author: 'Added by', amount: 'Amount', actions: 'Actions', remove: 'Delete', confirmRemove: 'Confirm', removing: 'Deleting...', removeFailed: 'Could not delete the entry.', manageBazaar: 'Manage in Daily Bazaar', bazaarManaged: 'Managed in Daily Bazaar', totalExpenses: 'Total expenses', salaryExpenses: 'Salary expenses', employeeMeals: 'Employees meal', productBazaarExpenses: 'Products / bazaar expenses', otherExpenses: 'Other expenses', investorSupport: 'Investor support', cafeIncome: 'Cafe income', loyaltyIncome: 'Loyalty income', investorIncome: 'Investor support', empty: 'No entries found', loadFailed: 'Could not load accounting history', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus' },
   }
   const l = labels[lang] || labels.en
 
@@ -121,6 +125,7 @@ export default function AccountingHistory() {
         loadPagedResult((from, to) => supabase.from('employee_salary_profiles').select(SALARY_PROFILE_COLUMNS).order('id').range(from, to)),
         loadPagedResult((from, to) => supabase.from('employee_salary_payments').select(SALARY_PAYMENT_COLUMNS).gte('paid_date', dateFrom).lte('paid_date', dateTo).order('id').range(from, to)),
         loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select(SALARY_BONUS_COLUMNS).gte('bonus_date', dateFrom).lte('bonus_date', dateTo).order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_salary_absences').select(SALARY_ABSENCE_COLUMNS).gte('absence_date', dateFrom).lte('absence_date', dateTo).order('id').range(from, to)),
         loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
       ])
       const orderPromise = loadPaidOrdersForRange(dateFrom, dateTo)
@@ -134,19 +139,31 @@ export default function AccountingHistory() {
           if (expenseResult.error) setError(expenseResult.error.message || 'Could not load accounting history')
           setLoading(false)
         }),
-        salaryPromise.then(([profileResult, paymentResult, bonusResult, teamResult]) => {
+        salaryPromise.then(([profileResult, paymentResult, bonusResult, absenceResult, teamResult]) => {
           if (!active) return
-          const salaryError = [profileResult, paymentResult, bonusResult, teamResult].find(result => result.error)?.error
+          const salaryError = [profileResult, paymentResult, bonusResult, absenceResult, teamResult].find(result => result.error)?.error
           if (salaryError) {
             setSalaryRows([])
             setError(salaryError.message || 'Could not load accounting history')
             setSalaryLoading(false)
             return
           }
-          const salaryProfiles = composeSalaryProfiles(profileResult.data || [], paymentResult.data || [], bonusResult.data || [], teamResult.data || [])
+          const salaryProfiles = composeSalaryProfiles(
+            profileResult.data || [],
+            paymentResult.data || [],
+            bonusResult.data || [],
+            absenceResult.data || [],
+            teamResult.data || [],
+          )
           const salaryPayments = buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
           const salaryBonuses = buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
-          setSalaryRows([...salaryPayments, ...salaryBonuses])
+          const employeeMeals = buildEmployeeMealExpenseRows(
+            salaryProfiles,
+            dateFrom,
+            dateTo < todayExpenseDate() ? dateTo : todayExpenseDate(),
+            state.settings?.averageDailyEmployeeMealUzs,
+          )
+          setSalaryRows([...salaryPayments, ...salaryBonuses, ...employeeMeals])
           setSalaryLoading(false)
         }),
         orderPromise.then(orderHistoryResult => {
@@ -159,7 +176,7 @@ export default function AccountingHistory() {
     }
     load()
     return () => { active = false }
-  }, [dateFrom, dateTo])
+  }, [dateFrom, dateTo, state.settings?.averageDailyEmployeeMealUzs])
 
   const rows = useMemo(() => (
     [...expenseRows, ...salaryRows]
@@ -182,6 +199,7 @@ export default function AccountingHistory() {
     cafeIncomeSummary,
     investorSupportTotal,
     salaryExpensesTotal,
+    employeeMealExpensesTotal,
     productBazaarExpensesTotal,
     otherExpensesTotal,
   } = useMemo(
@@ -268,10 +286,11 @@ export default function AccountingHistory() {
               {formatLongDate(dateFrom, lang, dateFrom)} — {formatLongDate(dateTo, lang, dateTo)}
             </div>
           )}
-          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.cafeIncome}</p><p className="mt-1 text-2xl font-black text-emerald-600">{orderLoading ? '—' : formatCurrency(cafeIncomeSummary.total)}</p><p className="mt-1 text-xs font-bold text-amber-700">{orderLoading ? '' : `${l.loyaltyIncome}: ${formatCurrency(cafeIncomeSummary.loyaltyTotal)}`}</p></div>
             <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.totalExpenses}</p><p className="mt-1 text-2xl font-black text-red-600">{loading || salaryLoading ? '—' : formatCurrency(expenseSummary.total)}</p></div>
             <div className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.salaryExpenses}</p><p className="mt-1 text-2xl font-black text-red-600">{salaryLoading ? '—' : formatCurrency(salaryExpensesTotal)}</p></div>
+            <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.employeeMeals}</p><p className="mt-1 text-2xl font-black text-amber-700">{salaryLoading ? '—' : formatCurrency(employeeMealExpensesTotal)}</p></div>
             <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.productBazaarExpenses}</p><p className="mt-1 text-2xl font-black text-purple-600">{loading ? '—' : formatCurrency(productBazaarExpensesTotal)}</p></div>
             <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.otherExpenses}</p><p className="mt-1 text-2xl font-black text-[#ff5a00]">{loading ? '—' : formatCurrency(otherExpensesTotal)}</p></div>
             <div className="rounded-2xl border border-purple-100 bg-white p-4 shadow-sm"><p className="text-xs font-black uppercase text-[#9CA3AF]">{l.investorSupport}</p><p className="mt-1 text-2xl font-black text-purple-600">{loading ? '—' : formatCurrency(investorSupportTotal)}</p></div>
@@ -326,7 +345,7 @@ export default function AccountingHistory() {
                               ) : (
                                 <span className="text-xs font-bold text-[#9CA3AF]">{l.manageBazaar}</span>
                               )
-                            ) : <button
+                            ) : getAccountingHistoryDeleteTarget(row) ? <button
                               type="button"
                               disabled={Boolean(deletingId)}
                               onClick={() => removeRow(row)}
@@ -336,7 +355,7 @@ export default function AccountingHistory() {
                             >
                               <Trash2 size={14} />
                               {deletingId === row.id ? l.removing : confirmDeleteId === row.id ? l.confirmRemove : l.remove}
-                            </button>}
+                            </button> : null}
                           </td>}
                         </tr>
                       })}

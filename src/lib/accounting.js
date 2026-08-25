@@ -161,10 +161,16 @@ export function getAccountingExpenseBreakdown(rows = []) {
   )
   const salaryRows = expenseRows.filter(isSalaryRow)
   const productBazaarRows = expenseRows.filter(row => !isSalaryRow(row) && row?.category === 'products_bazaar')
-  const otherRows = expenseRows.filter(row => !isSalaryRow(row) && row?.category !== 'products_bazaar')
+  const employeeMealRows = expenseRows.filter(row => !isSalaryRow(row) && row?.category === 'employee_meals')
+  const otherRows = expenseRows.filter(row => (
+    !isSalaryRow(row)
+    && row?.category !== 'products_bazaar'
+    && row?.category !== 'employee_meals'
+  ))
   return {
     salaryExpensesTotal: summarizeExpenses(salaryRows).total,
     productBazaarExpensesTotal: summarizeExpenses(productBazaarRows).total,
+    employeeMealExpensesTotal: summarizeExpenses(employeeMealRows).total,
     otherExpensesTotal: summarizeExpenses(otherRows).total,
   }
 }
@@ -246,6 +252,7 @@ export function filterAccountingHistoryRows(rows = [], { type = 'all', category 
 export function getAccountingHistoryDeleteTarget(row) {
   if (!row?.id) return null
   if (row.is_bazaar_daily_total) return null
+  if (row.is_employee_meal_estimate) return null
   if (row.is_salary_payment) {
     const id = row.source_id || String(row.id).replace(/^salary-payment-/, '')
     return id ? { table: 'employee_salary_payments', id } : null

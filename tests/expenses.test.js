@@ -8,6 +8,7 @@ import {
   DEFAULT_MONTHLY_RENT_UZS,
   DEFAULT_MONTHLY_UTILITIES_UZS,
   getAccountingHistoryRange,
+  buildEmployeeMealExpenseRows,
   buildSalaryBonusExpenseRows,
   buildSalaryExpenseRows,
   buildSalaryPaymentExpenseRows,
@@ -1070,7 +1071,7 @@ test('monthly expense estimate tracks employee paid amount, fines, remaining sal
 })
 
 test('employee meal estimate counts present employee-days inside employment windows', () => {
-  const summary = getEmployeeMealExpenseEstimate([
+  const salaryProfiles = [
     {
       id: 'meal-active',
       joined_at: '2026-08-02',
@@ -1084,13 +1085,24 @@ test('employee meal estimate counts present employee-days inside employment wind
       is_active: false,
       absences: [],
     },
-  ], '2026-08-01', '2026-08-04', 50_000)
+  ]
+  const summary = getEmployeeMealExpenseEstimate(salaryProfiles, '2026-08-01', '2026-08-04', 50_000)
 
   assert.deepEqual(summary, {
     averageDailyEmployeeMealUzs: 50_000,
     presentEmployeeDays: 4,
     total: 200_000,
   })
+
+  assert.deepEqual(
+    buildEmployeeMealExpenseRows(salaryProfiles, '2026-08-01', '2026-08-04', 50_000)
+      .map(row => [row.expense_date, row.present_employee_count, row.amount, row.payment_method]),
+    [
+      ['2026-08-01', 1, 50_000, 'calculated'],
+      ['2026-08-02', 2, 100_000, 'calculated'],
+      ['2026-08-04', 1, 50_000, 'calculated'],
+    ],
+  )
 })
 
 test('salary month-end debt projects the full remaining liability', () => {

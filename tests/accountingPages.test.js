@@ -330,6 +330,31 @@ test('All Accounting salary breakdown includes payments bonuses and legacy salar
   assert.deepEqual(summary, {
     salaryExpensesTotal: 250,
     productBazaarExpensesTotal: 500,
+    employeeMealExpensesTotal: 0,
     otherExpensesTotal: 100,
   })
+})
+
+test('Accounting reports employee meals as calculated operating cost without assigning cash payment', () => {
+  const summary = getAccountingPageSummary([
+    paidOrder('meal-day', '2026-07-12', 1_000),
+  ], [{
+    id: 'employee-meals-2026-07-12',
+    entry_type: 'expense',
+    expense_date: '2026-07-12',
+    category: 'employee_meals',
+    payment_method: 'calculated',
+    amount: 150,
+    is_employee_meal_estimate: true,
+  }], '2026-07-12', '2026-07-12')
+
+  assert.equal(summary.expenseSummary.total, 150)
+  assert.equal(summary.employeeMealExpensesTotal, 150)
+  assert.equal(summary.otherExpensesTotal, 0)
+  assert.equal(summary.netIncome, 850)
+  assert.equal(summary.cashflow.byMethod.cash.expenses, 0)
+  assert.equal(getAccountingHistoryDeleteTarget({
+    id: 'employee-meals-2026-07-12',
+    is_employee_meal_estimate: true,
+  }), null)
 })

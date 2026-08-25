@@ -375,8 +375,9 @@ test('one private daily summary contains both salary and the automatic KPI bonus
   assert.equal((message.match(/Daily salary summary/g) || []).length, 1)
 })
 
-test('daily cron sends one duplicate-safe aggregate salary and KPI message to Salary Events', () => {
+test('daily cron sends one duplicate-safe aggregate salary, KPI, and meal message to the Investor group', () => {
   assert.match(dailyCron, /sendDailyPayrollGroupNotification/)
+  assert.match(dailyCron, /loadInvestorGroupTarget/)
   assert.match(dailyCron, /buildDailyPayrollGroupMessage\(summary, businessDate, 'ru'\)/)
   assert.match(dailyCron, /daily_payroll_group_notification_deliveries/)
   assert.match(dailyCron, /\.eq\('target_key', 'salary_events'\)/)

@@ -33,6 +33,10 @@ export const EXPENSE_CATEGORIES = [
     labels: { uz: 'Bozor mahsulotlari', ru: 'Продукты / базар', en: 'Products / bazaar' },
   },
   {
+    key: 'employee_meals',
+    labels: { uz: 'Xodimlar ovqati', ru: 'Питание сотрудников', en: 'Employees meal' },
+  },
+  {
     key: 'charcoal',
     labels: { uz: 'Ko‘mir', ru: 'Уголь', en: 'Charcoal' },
   },
@@ -87,6 +91,7 @@ const LEGACY_INCOME_CATEGORIES = [
 export const MANUAL_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.filter(category => (
   (!category.key.startsWith('salary_') || category.key === 'salary_one_time') &&
   category.key !== 'products_bazaar' &&
+  category.key !== 'employee_meals' &&
   category.key !== 'other'
 ))
 
@@ -132,6 +137,7 @@ export function expensePaymentMethodLabel(method, lang = 'en') {
     terminal: { uz: 'Terminal', ru: 'Терминал', en: 'Terminal' },
     mixed: { uz: 'Aralash', ru: 'Смешанный', en: 'Mixed' },
     loyalty_card: { uz: 'Sodiqlik', ru: 'Лояльность', en: 'Loyalty' },
+    calculated: { uz: 'Hisoblangan', ru: 'Расчётный', en: 'Calculated' },
   }
   const cfg = labels[method] || labels.cash
   return cfg[lang] || cfg.en
@@ -157,6 +163,11 @@ export function expenseDescriptionLabel(value, lang = 'en') {
       uz: 'Avtomatik kunlik maosh',
       ru: 'Автоматическая дневная зарплата',
       en: 'Automatic daily salary',
+    },
+    'Calculated employee meals': {
+      uz: 'Xodimlar ovqatining hisoblangan qiymati',
+      ru: 'Расчётная стоимость питания сотрудников',
+      en: 'Calculated employees meal cost',
     },
   }
   if (systemLabels[description]) return systemLabels[description][selectedLang]
@@ -319,29 +330,63 @@ export function getEmployeeMealExpenseEstimate(
   dateTo,
   averageDailyEmployeeMealUzs = 0,
 ) {
+  const rows = buildEmployeeMealExpenseRows(
+    salaryProfiles,
+    dateFrom,
+    dateTo,
+    averageDailyEmployeeMealUzs,
+  )
   const dailyMealUzs = normalizeExpenseAmount(averageDailyEmployeeMealUzs)
-  let presentEmployeeDays = 0
-
-  if (dailyMealUzs > 0) {
-    for (const salaryProfile of salaryProfiles || []) {
-      if (!salaryProfile) continue
-      if (salaryProfile.is_active === false && !salaryProfile.ended_at) continue
-      const joinedAt = String(salaryProfile.joined_at || dateFrom).slice(0, 10)
-      const activeUntil = getSalaryActiveUntil(salaryProfile, dateTo)
-      const start = joinedAt > dateFrom ? joinedAt : dateFrom
-      if (!start || !activeUntil || start > activeUntil) continue
-      const absenceDates = getSalaryAbsenceDates(salaryProfile)
-      presentEmployeeDays += listLocalDateRange(start, activeUntil)
-        .filter(date => !absenceDates.has(date))
-        .length
-    }
-  }
+  const presentEmployeeDays = rows.reduce(
+    (total, row) => total + normalizeExpenseAmount(row.present_employee_count),
+    0,
+  )
 
   return {
     averageDailyEmployeeMealUzs: dailyMealUzs,
     presentEmployeeDays,
-    total: dailyMealUzs * presentEmployeeDays,
+    total: rows.reduce((total, row) => total + normalizeExpenseAmount(row.amount), 0),
   }
+}
+
+export function buildEmployeeMealExpenseRows(
+  salaryProfiles = [],
+  dateFrom,
+  dateTo,
+  averageDailyEmployeeMealUzs = 0,
+) {
+  const dailyMealUzs = normalizeExpenseAmount(averageDailyEmployeeMealUzs)
+  if (dailyMealUzs <= 0) return []
+
+  return listLocalDateRange(dateFrom, dateTo).flatMap(date => {
+    const presentEmployeeCount = (salaryProfiles || []).filter(salaryProfile => {
+      if (!salaryProfile) return false
+      if (salaryProfile.is_active === false && !salaryProfile.ended_at) return false
+      const joinedAt = String(salaryProfile.joined_at || dateFrom).slice(0, 10)
+      const endedAt = String(salaryProfile.ended_at || '').slice(0, 10)
+      const deletedAt = String(salaryProfile.deleted_at || '').slice(0, 10)
+      if (joinedAt && joinedAt > date) return false
+      if (endedAt && endedAt < date) return false
+      if (deletedAt && deletedAt <= date) return false
+      return !getSalaryAbsenceDates(salaryProfile).has(date)
+    }).length
+
+    if (presentEmployeeCount <= 0) return []
+    return [{
+      id: `employee-meals-${date}`,
+      entry_type: 'expense',
+      expense_date: date,
+      category: 'employee_meals',
+      payment_method: 'calculated',
+      amount: dailyMealUzs * presentEmployeeCount,
+      vendor: '',
+      description: 'Calculated employee meals',
+      created_by_name: '',
+      is_employee_meal_estimate: true,
+      present_employee_count: presentEmployeeCount,
+      average_daily_employee_meal_uzs: dailyMealUzs,
+    }]
+  })
 }
 
 export function buildSalaryReactivationAbsenceRows(salaryProfile, reactivatedAt = todayExpenseDate(), note = 'Inactive employment period') {
@@ -467,6 +512,7 @@ export function isGeneratedSalaryExpense(expense) {
     expense?.is_salary_auto ||
     expense?.is_salary_payment ||
     expense?.is_salary_bonus ||
+    expense?.is_employee_meal_estimate ||
     id.startsWith('salary-')
   )
 }

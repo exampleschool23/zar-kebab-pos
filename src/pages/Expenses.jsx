@@ -18,6 +18,7 @@ import {
   Users,
   Terminal,
   Trash2,
+  UtensilsCrossed,
   WalletCards,
   ShoppingBasket,
 } from 'lucide-react'
@@ -42,6 +43,7 @@ import {
   EXPENSE_PAYMENT_METHODS,
   INCOME_CATEGORIES,
   MANUAL_EXPENSE_CATEGORIES,
+  buildEmployeeMealExpenseRows,
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
@@ -245,6 +247,8 @@ export default function Expenses() {
       otherIncomeSub: 'Boshqa daromad',
       investorSupport: 'Investor yordami',
       expenses: 'Xarajatlar',
+      employeeMeals: 'Xodimlar ovqatining o‘rtacha qiymati',
+      employeeMealsSub: 'Davomat bo‘yicha hisoblangan',
       left: 'Qolgan pul',
       add: 'Xarajat qo‘shish',
       addIncome: 'Investor yordamini qo‘shish',
@@ -301,7 +305,7 @@ export default function Expenses() {
       showLess: 'Kamroq ko‘rsatish',
       empty: 'Bu davrda xarajat yozilmagan',
       emptyInvestor: 'Bu davrda investor yordami yo‘q',
-      investorNotificationFailed: 'Investor yordami saqlandi, lekin Salary Events kanaliga xabar yuborilmadi.',
+      investorNotificationFailed: 'Investor yordami saqlandi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
       salaryBonus: 'Maosh bonusi',
       required: 'Sana, kategoriya, to‘lov turi va summa kerak.',
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
@@ -328,6 +332,8 @@ export default function Expenses() {
       otherIncomeSub: 'Другой доход',
       investorSupport: 'Поддержка инвестора',
       expenses: 'Расходы',
+      employeeMeals: 'Среднее питание сотрудников',
+      employeeMealsSub: 'Рассчитано по посещаемости',
       left: 'Остаток',
       add: 'Добавить расход',
       addIncome: 'Добавить поддержку инвестора',
@@ -384,7 +390,7 @@ export default function Expenses() {
       showLess: 'Свернуть',
       empty: 'За этот период расходов нет',
       emptyInvestor: 'За этот период поддержки инвестора нет',
-      investorNotificationFailed: 'Поддержка инвестора сохранена, но сообщение в канал Salary Events не отправлено.',
+      investorNotificationFailed: 'Поддержка инвестора сохранена, но сообщение в группу ZarKebab Investor не отправлено.',
       salaryBonus: 'Бонус к зарплате',
       required: 'Нужны дата, категория, способ оплаты и сумма.',
       saveFailed: 'Не удалось сохранить расход.',
@@ -411,6 +417,8 @@ export default function Expenses() {
       otherIncomeSub: 'Other income',
       investorSupport: 'Investor support',
       expenses: 'Expenses',
+      employeeMeals: 'Avg employees meal',
+      employeeMealsSub: 'Calculated from attendance',
       left: 'Left',
       add: 'Add expense',
       addIncome: 'Add investor support',
@@ -467,7 +475,7 @@ export default function Expenses() {
       showLess: 'Show less',
       empty: 'No expenses in this period',
       emptyInvestor: 'No investor support in this period',
-      investorNotificationFailed: 'Investor support was saved, but the Salary Events channel notification was not sent.',
+      investorNotificationFailed: 'Investor support was saved, but the ZarKebab Investor group notification was not sent.',
       salaryBonus: 'Salary bonus',
       required: 'Date, category, payment method, and amount are required.',
       saveFailed: 'Could not save expense.',
@@ -590,13 +598,22 @@ export default function Expenses() {
       .sort((a, b) => b.expense_date.localeCompare(a.expense_date) || String(a.vendor || '').localeCompare(String(b.vendor || '')))
   ), [salaryProfiles, dateFrom, dateTo])
 
+  const employeeMealExpenses = useMemo(() => (
+    buildEmployeeMealExpenseRows(
+      salaryProfiles,
+      dateFrom,
+      dateTo < todayExpenseDate() ? dateTo : todayExpenseDate(),
+      state.settings?.averageDailyEmployeeMealUzs,
+    )
+  ), [salaryProfiles, dateFrom, dateTo, state.settings?.averageDailyEmployeeMealUzs])
+
   const allExpenses = useMemo(() => (
-    [...salaryExpenses, ...salaryBonusExpenses, ...expenses]
+    [...salaryExpenses, ...salaryBonusExpenses, ...employeeMealExpenses, ...expenses]
       .sort((a, b) => (
         b.expense_date.localeCompare(a.expense_date) ||
         String(b.created_at || '').localeCompare(String(a.created_at || ''))
       ))
-  ), [salaryExpenses, salaryBonusExpenses, expenses])
+  ), [salaryExpenses, salaryBonusExpenses, employeeMealExpenses, expenses])
 
   const filteredExpenses = allExpenses
 
@@ -629,6 +646,7 @@ export default function Expenses() {
     netIncome,
     netProfit,
     profitMarginPct,
+    employeeMealExpensesTotal,
     investorSupportTotal,
     otherIncomeTotal,
   } = accountingSummary
@@ -863,6 +881,7 @@ export default function Expenses() {
               tone="purple"
             />
             <Kpi icon={ReceiptText} label={l.expenses} value={loading ? '—' : formatCurrency(summary.total)} sub={loading ? l.periodHelp : `${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" />
+            <Kpi icon={UtensilsCrossed} label={l.employeeMeals} value={loading ? '—' : formatCurrency(employeeMealExpensesTotal)} sub={l.employeeMealsSub} tone="orange" />
             <Kpi icon={Banknote} label={l.left} value={loading ? '—' : formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
             <Kpi
               icon={Users}

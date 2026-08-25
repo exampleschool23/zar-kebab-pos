@@ -362,6 +362,13 @@ These bugs were recently fixed and are now protected by tests:
    - Tech-card ingredient prices are staff-only; they must never appear in public, Telegram, waiter, cashier, order, or receipt catalog payloads.
    - A recipe edit must never rewrite `order_items.cost_price`, paid-order profit, or any historical report. The protected catalog `menu_item_costs` value remains separate unless an explicit future product decision links them.
 
+45. Average employee meals are attendance-based calculated operating costs.
+   - `business_settings.average_daily_employee_meal_uzs` is the average daily amount for each present employee, not a one-time restaurant total.
+   - Reports, Accounting, and All Accounting calculate one non-deletable `employee_meals` row per completed day as present employees multiplied by the configured average.
+   - Recorded absences and employment start/end boundaries control who is counted. Future days are excluded from actual reports.
+   - Calculated meal rows reduce the report remainder but do not claim a cash/card/terminal payment method or mutate the recorded expense ledger.
+   - The aggregate daily Telegram message shows the employee-count formula and goes to the configured ZarKebab Investor group. Its legacy database target key remains `salary_events` for delivery-history compatibility.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:

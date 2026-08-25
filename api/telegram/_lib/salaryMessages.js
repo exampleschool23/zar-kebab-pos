@@ -34,7 +34,7 @@ const COPY = {
     groupTotal: 'Umumiy summa',
     groupRent: 'Ijara',
     groupUtilities: 'Kommunal xarajatlar',
-    groupEmployeeMeals: 'Xodimlar ovqati',
+    groupEmployeeMeals: 'Xodimlar ovqatining o‘rtacha qiymati',
     groupNetProfit: 'Kunlik sof foyda',
     unavailable: 'Mavjud emas',
   },
@@ -63,7 +63,7 @@ const COPY = {
     groupTotal: 'Общая сумма',
     groupRent: 'Аренда',
     groupUtilities: 'Коммуналка',
-    groupEmployeeMeals: 'Питание сотрудников',
+    groupEmployeeMeals: 'Среднее питание сотрудников',
     groupNetProfit: 'Чистая прибыль за день',
     unavailable: 'Недоступно',
   },
@@ -92,7 +92,7 @@ const COPY = {
     groupTotal: 'Combined total',
     groupRent: 'Rent',
     groupUtilities: 'Utilities',
-    groupEmployeeMeals: 'Employee meals',
+    groupEmployeeMeals: 'Avg employees meal',
     groupNetProfit: 'Daily net profit',
     unavailable: 'Unavailable',
   },
@@ -315,6 +315,8 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
   const rentTotal = normalizeExpenseAmount(summary?.rentTotal)
   const utilitiesTotal = normalizeExpenseAmount(summary?.utilitiesTotal)
   const employeeMealTotal = normalizeExpenseAmount(summary?.employeeMealTotal)
+  const employeeMealPerEmployeeTotal = normalizeExpenseAmount(summary?.employeeMealPerEmployeeTotal)
+  const presentEmployeeCount = normalizeExpenseAmount(summary?.presentEmployeeCount)
   const cafeIncomeTotal = normalizeExpenseAmount(summary?.cafeIncomeTotal)
   const dineInPercentage = Number(summary?.dineInPercentage) || 0
   const offPremisePercentage = Number(summary?.offPremisePercentage) || 0
@@ -345,7 +347,7 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
     `<b>${copy.groupTotal}:</b> ${formatSalaryNotificationAmount(combinedTotal)} ${copy.currency}`,
     `<b>${copy.groupRent}:</b> ${formatSalaryNotificationAmount(rentTotal)} ${copy.currency}`,
     `<b>${copy.groupUtilities}:</b> ${formatSalaryNotificationAmount(utilitiesTotal)} ${copy.currency}`,
-    `<b>${copy.groupEmployeeMeals}:</b> ${formatSalaryNotificationAmount(employeeMealTotal)} ${copy.currency}`,
+    `<b>${copy.groupEmployeeMeals} (${presentEmployeeCount} × ${formatSalaryNotificationAmount(employeeMealPerEmployeeTotal)}):</b> ${formatSalaryNotificationAmount(employeeMealTotal)} ${copy.currency}`,
     '',
     `<b>${copy.groupNetProfit}:</b> ${netProfit == null
       ? copy.unavailable

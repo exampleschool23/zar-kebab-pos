@@ -132,7 +132,7 @@ test('daily payroll group message reports aggregate earned salary and automatic 
   assert.match(message, /Общая сумма:<\/b> 225 000 UZS/)
   assert.match(message, /Аренда:<\/b> 800 000 UZS/)
   assert.match(message, /Коммуналка:<\/b> 700 000 UZS/)
-  assert.match(message, /Питание сотрудников:<\/b> 50 000 UZS/)
+  assert.match(message, /Среднее питание сотрудников \(1 × 50 000\):<\/b> 50 000 UZS/)
   assert.match(message, /Чистая прибыль за день:<\/b> 225 000 UZS/)
   assert.doesNotMatch(message, /Иван Петров/)
 })

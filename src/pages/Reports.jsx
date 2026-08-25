@@ -38,6 +38,7 @@ import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderT
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import {
   buildSalaryBonusExpenseRows,
+  buildEmployeeMealExpenseRows,
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
   expenseDescriptionLabel,
@@ -365,6 +366,7 @@ function ExpenseBreakdownDialog({ rows, expenseSummary, expenseCashflow, cashflo
               <SummaryRow label={labels.cash} value={formatCurrency(expenseCashflow.byMethod.cash.left)} />
               <SummaryRow label={labels.card} value={formatCurrency(expenseCashflow.byMethod.card.left)} />
               <SummaryRow label={labels.terminal} value={formatCurrency(expenseCashflow.byMethod.terminal.left)} />
+              <SummaryRow label={labels.employeeMeals} value={formatCurrency(expenseSummary.byCategory.employee_meals || 0)} />
               <SummaryRow label={labels.totalLeft} value={formatCurrency(cashflowLeft)} bold valueClass={cashflowLeft < 0 ? 'text-red-600' : 'text-emerald-700'} />
             </div>
           </div>
@@ -1932,7 +1934,18 @@ export default function Reports() {
   const salaryBonusExpenses = useMemo(() => (
     buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
   ), [salaryProfiles, dateFrom, dateTo])
-  const allExpenses = useMemo(() => [...salaryExpenses, ...salaryBonusExpenses, ...expenses], [salaryExpenses, salaryBonusExpenses, expenses])
+  const employeeMealExpenses = useMemo(() => (
+    buildEmployeeMealExpenseRows(
+      salaryProfiles,
+      dateFrom,
+      dateTo < todayStr() ? dateTo : todayStr(),
+      state.settings?.averageDailyEmployeeMealUzs,
+    )
+  ), [salaryProfiles, dateFrom, dateTo, state.settings?.averageDailyEmployeeMealUzs])
+  const allExpenses = useMemo(
+    () => [...salaryExpenses, ...salaryBonusExpenses, ...employeeMealExpenses, ...expenses],
+    [salaryExpenses, salaryBonusExpenses, employeeMealExpenses, expenses],
+  )
   const expenseBreakdownRows = useMemo(() => (
     allExpenses
       .filter(expense => (
@@ -1952,6 +1965,7 @@ export default function Reports() {
   )
   const cashflowLeft = kpiRevenue - expenseSummary.total
   const netIncome = cashflowLeft
+  const employeeMealTotal = expenseSummary.byCategory.employee_meals || 0
 
   useEffect(() => {
     let cancelled = false
@@ -2125,9 +2139,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Jami qolgan', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq', tapForDetails: 'Xarajatlarni ko‘rish', expenseDetails: 'Xarajatlar tafsiloti', periodExpenses: 'Davr xarajatlari', entries: 'ta yozuv', noExpenses: 'Bu davrda xarajatlar yo‘q', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi', close: 'Yopish' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'Итого осталось', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение', tapForDetails: 'Показать расходы', expenseDetails: 'Детализация расходов', periodExpenses: 'Расходы за период', entries: 'записей', noExpenses: 'За этот период расходов нет', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате', close: 'Закрыть' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', leftAfterExpenses: 'Left after expenses', totalLeft: 'Total left', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance', tapForDetails: 'View expenses', expenseDetails: 'Expense breakdown', periodExpenses: 'Expenses for the period', entries: 'entries', noExpenses: 'No expenses were recorded for this period', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus', close: 'Close' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', employeeMeals: 'Xodimlar ovqati', employeeMealsSub: 'Davomat bo‘yicha hisoblangan', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Jami qolgan', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq', tapForDetails: 'Xarajatlarni ko‘rish', expenseDetails: 'Xarajatlar tafsiloti', periodExpenses: 'Davr xarajatlari', entries: 'ta yozuv', noExpenses: 'Bu davrda xarajatlar yo‘q', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi', close: 'Yopish' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', employeeMeals: 'Питание сотрудников', employeeMealsSub: 'Рассчитано по посещаемости', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', from: 'С', to: 'По', closeout: 'Закрытие дня', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'Итого осталось', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение', tapForDetails: 'Показать расходы', expenseDetails: 'Детализация расходов', periodExpenses: 'Расходы за период', entries: 'записей', noExpenses: 'За этот период расходов нет', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате', close: 'Закрыть' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', employeeMeals: 'Employees meal', employeeMealsSub: 'Calculated from attendance', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', from: 'From', to: 'To', closeout: 'Daily closeout', leftAfterExpenses: 'Left after expenses', totalLeft: 'Total left', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance', tapForDetails: 'View expenses', expenseDetails: 'Expense breakdown', periodExpenses: 'Expenses for the period', entries: 'entries', noExpenses: 'No expenses were recorded for this period', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus', close: 'Close' },
   }
   const l = L[lang] || L.en
 
@@ -2238,13 +2252,14 @@ export default function Reports() {
             )}
 
             {/* KPI cards */}
-            <div className={`grid grid-cols-2 lg:grid-cols-3 ${canViewExpenses ? 'xl:grid-cols-5' : 'xl:grid-cols-3'} gap-4 mb-6`}>
+            <div className={`grid grid-cols-2 lg:grid-cols-3 ${canViewExpenses ? 'xl:grid-cols-6' : 'xl:grid-cols-3'} gap-4 mb-6`}>
               <KpiCard icon={DollarSign}  iconCls="bg-green-50 text-green-600"   label={l.totalRev}  value={formatCurrency(kpiRevenue)} sub={`${l.loyaltyIncome}: ${formatCurrency(kpiLoyaltyIncome)}`} />
               <KpiCard icon={ShoppingBag} iconCls="bg-orange-50 text-[#ff5a00]"  label={l.numOrders} value={kpiOrders} />
               <KpiCard icon={BarChart2}   iconCls="bg-blue-50 text-blue-600"     label={l.avgOrder}  value={formatCurrency(kpiAvg)} />
               {canViewExpenses && (
                 <>
                   <KpiCard icon={CreditCard} iconCls="bg-red-50 text-red-600" label={l.expenses} value={formatCurrency(expenseSummary.total)} sub={expensesError || ''} />
+                  <KpiCard icon={UtensilsCrossed} iconCls="bg-amber-50 text-amber-700" label={l.employeeMeals} value={formatCurrency(employeeMealTotal)} sub={l.employeeMealsSub} />
                   <KpiCard icon={DollarSign} iconCls={netIncome >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} label={l.netIncome} value={formatCurrency(netIncome)} />
                 </>
               )}
@@ -2328,6 +2343,7 @@ export default function Reports() {
                   <SummaryRow label={l.cash} value={formatCurrency(expenseCashflow.byMethod.cash.left)} />
                   <SummaryRow label={l.card} value={formatCurrency(expenseCashflow.byMethod.card.left)} />
                   <SummaryRow label={l.terminal} value={formatCurrency(expenseCashflow.byMethod.terminal.left)} />
+                  <SummaryRow label={l.employeeMeals} value={formatCurrency(employeeMealTotal)} />
                   <SummaryRow label={l.expenses} value={formatCurrency(expenseSummary.total)} />
                   <SummaryRow label={l.totalLeft} value={formatCurrency(cashflowLeft)} />
                 </div>
