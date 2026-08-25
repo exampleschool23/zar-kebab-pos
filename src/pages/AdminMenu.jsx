@@ -40,7 +40,7 @@ import {
   canChangeMenuItemAvailability,
   canChangeMenuItemPublicVisibility,
   canEditMenu as canEditMenuForProfile,
-  normalizeRole,
+  canViewPage, normalizeRole,
 } from '../lib/permissions'
 import { getSaleProfitSummary } from '../lib/profit'
 import { getRequiredMenuItemCost, hasRequiredMenuItemCost } from '../lib/menuItemCosts'
@@ -1635,6 +1635,7 @@ export default function AdminMenu() {
   const isOwner = normalizeRole(profile?.role || state.user?.role) === 'owner'
   const canChangeAvailability = canChangeMenuItemAvailability(profile || { role: state.user?.role })
   const canChangePublicVisibility = canChangeMenuItemPublicVisibility(profile || { role: state.user?.role })
+  const canViewTechCards = canViewPage(profile || { role: state.user?.role }, 'tech_cards')
   const scheduleLabels = menuScheduleLabels(lang)
   const navigate = useNavigate()
   const { productId, categoryId } = useParams()
@@ -2651,7 +2652,7 @@ export default function AdminMenu() {
                    'Manage product details, variant prices, and stock counts'}
                 </p>
               </div>
-              {itemModal === 'edit' && form.id && (
+              {itemModal === 'edit' && form.id && canViewTechCards && (
                 <button
                   type="button"
                   onClick={() => navigate(`/admin/tech-cards/${encodeURIComponent(form.id)}`)}

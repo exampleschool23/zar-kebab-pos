@@ -6,15 +6,36 @@ function source(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 }
 
-test('Tech Cards is lazy-routed behind menu access and appears in the drawer', () => {
+test('Tech Cards is lazy-routed behind its own page access and appears in the drawer', () => {
   const app = source('src/App.jsx')
   const sidebar = source('src/components/UnifiedSidebar.jsx')
 
   assert.match(app, /const TechCards = lazy\(\(\) => import\('\.\/pages\/TechCards'\)\)/)
-  assert.match(app, /path="\/admin\/tech-cards"[\s\S]{0,120}page="menu"><TechCards/)
-  assert.match(app, /path="\/admin\/tech-cards\/:menuItemId"[\s\S]{0,120}page="menu"><TechCards/)
-  assert.match(sidebar, /key: 'tech_cards',[\s\S]{0,180}accessKey: 'menu',[\s\S]{0,180}path: '\/admin\/tech-cards'/)
+  assert.match(app, /path="\/admin\/tech-cards"[\s\S]{0,120}page="tech_cards"><TechCards/)
+  assert.match(app, /path="\/admin\/tech-cards\/:menuItemId"[\s\S]{0,120}page="tech_cards"><TechCards/)
+  assert.match(sidebar, /key: 'tech_cards',[\s\S]{0,180}path: '\/admin\/tech-cards'/)
+  assert.doesNotMatch(sidebar, /key: 'tech_cards',[\s\S]{0,120}accessKey: 'menu'/)
   assert.match(sidebar, /pathname\.startsWith\('\/admin\/tech-cards'\)\) return 'tech_cards'/)
+})
+
+test('Tech Cards appears as an independent Team page-access option', () => {
+  const permissions = source('src/lib/permissions.js')
+  const users = source('src/pages/AdminUsers.jsx')
+
+  assert.match(permissions, /key: 'tech_cards',\s*kind: 'page'/)
+  assert.match(permissions, /labels: \{ uz: 'Texnologik kartalar', ru: 'Техкарты', en: 'Tech Cards' \}/)
+  assert.match(users, /FEATURE_DEFINITIONS\.filter\(feature => feature\.kind === 'page'\)/)
+})
+
+test('separate Tech Cards access is enforced by the profile constraint and recipe RLS', () => {
+  const migration = source('supabase/140_tech_card_feature_access.sql')
+
+  assert.match(migration, /profiles_feature_access_valid/)
+  assert.match(migration, /'bazaar', 'tech_cards', 'team'/)
+  assert.match(migration, /menu_item_tech_cards for select[\s\S]{0,120}current_staff_can_access\('tech_cards'\)/)
+  assert.match(migration, /menu_item_tech_card_ingredients for select[\s\S]{0,120}current_staff_can_access\('tech_cards'\)/)
+  assert.match(migration, /current_staff_can_access\('tech_cards'\)[\s\S]{0,100}current_staff_can_write\('menu'\)/)
+  assert.match(migration, /array\['dashboard', 'menu', 'expenses', 'tech_cards'\]/)
 })
 
 test('Tech card migration protects recipe prices and saves a whole recipe atomically', () => {

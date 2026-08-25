@@ -56,6 +56,21 @@ test('daily bazaar access is independent from salaries and full accounting', () 
   assert.equal(FEATURE_DEFINITIONS.find(feature => feature.key === 'bazaar')?.kind, 'page')
 })
 
+test('Tech Cards page access is separate while Manage Menu controls recipe editing', () => {
+  const techCardViewer = { role: 'viewer', feature_access: ['tech_cards'] }
+  const techCardEditor = { role: 'admin', feature_access: ['tech_cards', 'menu'] }
+  const menuOnlyAdmin = { role: 'admin', feature_access: ['menu'] }
+
+  assert.equal(canViewPage(techCardViewer, 'tech_cards'), true)
+  assert.equal(canEditMenu(techCardViewer), false)
+  assert.equal(canViewPage(techCardEditor, 'tech_cards'), true)
+  assert.equal(canEditMenu(techCardEditor), true)
+  assert.equal(canViewPage(menuOnlyAdmin, 'tech_cards'), false)
+  assert.equal(defaultPath(techCardViewer), '/admin/tech-cards')
+  assert.equal(FEATURE_DEFINITIONS.find(feature => feature.key === 'tech_cards')?.kind, 'page')
+  assert.deepEqual(updateFeatureAccessSelection([], 'tech_cards', true), ['tech_cards'])
+})
+
 test('menu is always viewable by staff while Manage menu controls editing', () => {
   const viewerWithMenu = { role: 'viewer', feature_access: ['menu'] }
   const viewerWithoutMenu = { role: 'viewer', feature_access: [] }

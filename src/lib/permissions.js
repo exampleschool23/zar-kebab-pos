@@ -59,6 +59,12 @@ export const FEATURE_DEFINITIONS = [
     description: { uz: 'Kunlik bozor xaridlari va tahlil', ru: 'Ежедневные закупки и аналитика базара', en: 'Daily bazaar purchases and analytics' },
   },
   {
+    key: 'tech_cards',
+    kind: 'page',
+    labels: { uz: 'Texnologik kartalar', ru: 'Техкарты', en: 'Tech Cards' },
+    description: { uz: 'Retseptlar, masalliqlar va porsiya tannarxi', ru: 'Рецептуры, ингредиенты и себестоимость порций', en: 'Recipes, ingredients, and portion costs' },
+  },
+  {
     key: 'team',
     kind: 'page',
     labels: { uz: 'Jamoa', ru: 'Команда', en: 'Team' },
@@ -256,6 +262,7 @@ export function defaultPath(role) {
   if (canViewPage(profile, 'loyalty')) return '/admin/loyalty'
   if (canViewPage(profile, 'expenses')) return '/admin/accounting'
   if (canViewPage(profile, 'bazaar')) return '/admin/bazaar'
+  if (canViewPage(profile, 'tech_cards')) return '/admin/tech-cards'
   if (canViewPage(profile, 'team')) return '/admin/users'
   if (canViewPage(profile, 'reports')) return '/admin/reports'
   if (canViewPage(profile, 'audit')) return '/admin/audit'

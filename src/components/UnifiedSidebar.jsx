@@ -33,7 +33,6 @@ const NAV = [
   },
   {
     key: 'tech_cards',
-    accessKey: 'menu',
     icon: ClipboardList,
     labels: { uz: 'Texnologik kartalar', ru: 'Техкарты', en: 'Tech Cards' },
     path: '/admin/tech-cards',
@@ -129,7 +128,7 @@ export default function UnifiedSidebar({ onClose, navigationDisabled = false }) 
   const displayName = profile?.full_name || state.user?.name || profile?.email || ''
   const initial     = (displayName || '?')[0].toUpperCase()
 
-  const visibleNav = NAV.filter(item => canViewPage(profile || { role }, item.accessKey || item.key))
+  const visibleNav = NAV.filter(item => canViewPage(profile || { role }, item.key))
 
   function handleNav(item) {
     if (navigationDisabled) return

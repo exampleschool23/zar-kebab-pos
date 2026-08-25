@@ -51,7 +51,7 @@ Protected:
 - Waiter: `/waiter/tables`, `/waiter/order/:tableId`, `/waiter/take-away`
 - Kitchen checks: `/kitchen-check/:orderId` (print-only; the retired `/kitchen` screen redirects to `/admin`)
 - Cashier: `/cashier/tables`, `/cashier/bill/:tableId`, `/cashier/bill/order/:orderId`, receipt routes
-- Admin/reporting: `/admin`, `/admin/menu`, `/admin/tables`, `/admin/users`, `/admin/reports`, `/admin/audit`, `/admin/settings`
+- Admin/reporting: `/admin`, `/admin/menu`, `/admin/tech-cards`, `/admin/tables`, `/admin/users`, `/admin/reports`, `/admin/audit`, `/admin/settings`
 - Daily bazaar: `/admin/bazaar` (receipt-level purchases, product quantities, spend analytics)
 
 Role access rules are centralized in `src/lib/permissions.js`.
@@ -358,7 +358,8 @@ These bugs were recently fixed and are now protected by tests:
    - Each active menu item may have one protected `menu_item_tech_cards` row and ordered `menu_item_tech_card_ingredients` rows.
    - Ingredient quantity multiplied by its selected-unit price produces the batch cost; dividing by `portion_count` produces the current calculated portion cost.
    - Tech-card edits use `save_menu_item_tech_card(payload jsonb)` so the card and full ingredient list save atomically.
-   - Tech-card ingredient prices are staff-only and follow Manage Menu read/write boundaries; they must never appear in public, Telegram, waiter, cashier, order, or receipt catalog payloads.
+   - The `tech_cards` page feature controls drawer, route, and protected recipe reads. Manage Menu separately controls recipe writes, so Tech Cards access without Manage Menu is read-only.
+   - Tech-card ingredient prices are staff-only; they must never appear in public, Telegram, waiter, cashier, order, or receipt catalog payloads.
    - A recipe edit must never rewrite `order_items.cost_price`, paid-order profit, or any historical report. The protected catalog `menu_item_costs` value remains separate unless an explicit future product decision links them.
 
 ## Database Migrations
@@ -481,6 +482,12 @@ Run migrations in order. Important recent files:
 
 - `supabase/130_tourist_service_rate.sql`
   Adds the separate Tourist dine-in service setting with a 20% default/backfill, keeps the Regular setting independent, and preserves historical order-rate snapshots.
+
+- `supabase/139_menu_item_tech_cards.sql`
+  Adds protected per-product recipes, ordered ingredient quantities/prices, batch yield, portion calculations, and the atomic `save_menu_item_tech_card(payload jsonb)` RPC.
+
+- `supabase/140_tech_card_feature_access.sql`
+  Adds the independent `tech_cards` page permission, enforces it on protected recipe reads, and keeps recipe writes additionally gated by Manage Menu.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

@@ -391,10 +391,10 @@ function InternalAppRoutes({ adminHost = false }) {
           <LazyProtectedRoute page="menu"><AdminMenu /></LazyProtectedRoute>
         } />
         <Route path="/admin/tech-cards" element={
-          <LazyProtectedRoute page="menu"><TechCards /></LazyProtectedRoute>
+          <LazyProtectedRoute page="tech_cards"><TechCards /></LazyProtectedRoute>
         } />
         <Route path="/admin/tech-cards/:menuItemId" element={
-          <LazyProtectedRoute page="menu"><TechCards /></LazyProtectedRoute>
+          <LazyProtectedRoute page="tech_cards"><TechCards /></LazyProtectedRoute>
         } />
         <Route path="/admin/tables" element={
           <LazyProtectedRoute page="settings"><AdminTables /></LazyProtectedRoute>
