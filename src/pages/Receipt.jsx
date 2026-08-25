@@ -8,7 +8,7 @@ import {
   getOrderItemProductId,
   isCancelledOrderItem,
 } from '../lib/analytics'
-import { getOrderItemUnitPrice } from '../lib/priceModes'
+import { getOrderItemUnitPrice, PRICE_MODE_TOURIST } from '../lib/priceModes'
 import { isCashierQuickItem } from '../lib/menuItems'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatDateTime } from '../lib/dateFormat'
@@ -292,6 +292,13 @@ function firstNonEmpty(orders, keys, fallback = '—') {
   return fallback
 }
 
+function useTouristReceiptEnglish(priceMode, receiptKey, dispatch) {
+  useEffect(() => {
+    if (priceMode !== PRICE_MODE_TOURIST) return
+    dispatch({ type: 'SET_LANG', payload: 'en' })
+  }, [dispatch, priceMode, receiptKey])
+}
+
 function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
   const marketingMode = normalizeReceiptMarketing(receiptMarketing)
 
@@ -559,6 +566,8 @@ export function TableReceipt() {
     }
   }, [state.orders, state.tables, tableId, settings, menuItemMap, lang])
 
+  useTouristReceiptEnglish(data?.priceMode, tableId, dispatch)
+
   if (!data) return <NotFound onBack={() => navigate(-1)} />
 
   return (
@@ -684,6 +693,8 @@ export default function Receipt() {
       total: quote.total,
     }
   }, [receiptOrders, state.tables, orderId, settings, menuItemMap, lang])
+
+  useTouristReceiptEnglish(data?.priceMode, orderId, dispatch)
 
   if (!localOrder && lookupState.loading) {
     return <OperationalLoading title={t(lang, 'loading')} description="" />

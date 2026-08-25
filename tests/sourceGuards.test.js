@@ -2968,6 +2968,22 @@ test('Receipt hides payment methods and uses contributing order metadata with pa
   assert.doesNotMatch(receipt, /function formatDate\(/)
 })
 
+test('Tourist receipts select English once and keep the cashier language controls available', () => {
+  const receipt = readSource('src/pages/Receipt.jsx')
+  const languageDefault = functionBody(receipt, 'useTouristReceiptEnglish')
+  const tableReceiptRoute = functionBody(receipt, 'TableReceipt')
+  const receiptShell = functionBody(receipt, 'ReceiptShell')
+
+  assert.match(receipt, /import \{ getOrderItemUnitPrice, PRICE_MODE_TOURIST \} from '\.\.\/lib\/priceModes'/)
+  assert.match(languageDefault, /priceMode !== PRICE_MODE_TOURIST/)
+  assert.match(languageDefault, /dispatch\(\{ type: 'SET_LANG', payload: 'en' \}\)/)
+  assert.match(languageDefault, /\[dispatch, priceMode, receiptKey\]/)
+  assert.match(tableReceiptRoute, /useTouristReceiptEnglish\(data\?\.priceMode, tableId, dispatch\)/)
+  assert.match(receipt, /export default function Receipt\(\)[\s\S]*useTouristReceiptEnglish\(data\?\.priceMode, orderId, dispatch\)/)
+  assert.match(receiptShell, /\['uz', 'ru', 'en'\]\.map/)
+  assert.match(receiptShell, /onClick=\{\(\) => dispatch\(\{ type: 'SET_LANG', payload: l \}\)\}/)
+})
+
 test('cashier payment waits for one atomic database settlement before local success', () => {
   const cashier = readSource('src/pages/CashierBill.jsx')
   const appContext = readSource('src/store/AppContext.jsx')
