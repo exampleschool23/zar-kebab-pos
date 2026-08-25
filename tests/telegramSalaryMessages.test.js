@@ -97,6 +97,7 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     grossProfit: 2_000_000,
     rent: 800_000,
     utilities: 700_000,
+    employeeMealPerEmployee: 50_000,
   })
 
   assert.deepEqual(summary, {
@@ -111,7 +112,10 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     combinedTotal: 225_000,
     rentTotal: 800_000,
     utilitiesTotal: 700_000,
-    netProfit: 275_000,
+    presentEmployeeCount: 1,
+    employeeMealPerEmployeeTotal: 50_000,
+    employeeMealTotal: 50_000,
+    netProfit: 225_000,
   })
 
   const message = buildDailyPayrollGroupMessage(summary, '2026-07-29', 'ru')
@@ -128,7 +132,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
   assert.match(message, /Общая сумма:<\/b> 225 000 UZS/)
   assert.match(message, /Аренда:<\/b> 800 000 UZS/)
   assert.match(message, /Коммуналка:<\/b> 700 000 UZS/)
-  assert.match(message, /Чистая прибыль за день:<\/b> 275 000 UZS/)
+  assert.match(message, /Питание сотрудников:<\/b> 50 000 UZS/)
+  assert.match(message, /Чистая прибыль за день:<\/b> 225 000 UZS/)
   assert.doesNotMatch(message, /Иван Петров/)
 })
 

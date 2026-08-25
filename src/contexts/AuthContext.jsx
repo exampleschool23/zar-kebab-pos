@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase, getProfile } from '../lib/supabase'
+import { isRetryableProfileLoadError, loadProfileWithRetry } from '../lib/profileLoading'
+import { withReadTimeout } from '../lib/writeTimeout'
 
 const AuthContext = createContext(null)
 const OAUTH_RETURN_TO_KEY = 'zk_oauth_return_to'
+const PROFILE_LOAD_TIMEOUT_MS = 7000
 
 function fallbackProfileFromUser(user, status = 'pending') {
   return {
@@ -34,34 +37,93 @@ export function AuthProvider({ children }) {
   const [profileError, setProfileError] = useState(null)
   const [authError, setAuthError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const sessionRef = useRef(null)
+  const profileRef = useRef(null)
+  const profileLoadRef = useRef(null)
+  const profileRequestIdRef = useRef(0)
 
   async function loadProfile(user) {
-    try {
-      setProfileError(null)
-      const data = await getProfile(user.id)
-      const next = data || fallbackProfileFromUser(user)
-      setProfile(next)
-      return next
-    } catch (error) {
-      setProfile(null)
-      setProfileError(error)
-      return null
-    }
+    if (!user?.id) return null
+
+    const inFlight = profileLoadRef.current
+    if (inFlight?.userId === user.id) return inFlight.promise
+
+    const requestId = profileRequestIdRef.current + 1
+    profileRequestIdRef.current = requestId
+    setProfileError(null)
+
+    const promise = (async () => {
+      try {
+        const data = await loadProfileWithRetry(() => withReadTimeout(
+          signal => getProfile(user.id, { signal }),
+          'profile load',
+          PROFILE_LOAD_TIMEOUT_MS
+        ))
+        const next = data || fallbackProfileFromUser(user)
+        if (profileRequestIdRef.current !== requestId) return null
+        profileRef.current = next
+        setProfile(next)
+        setProfileError(null)
+        return next
+      } catch (error) {
+        if (profileRequestIdRef.current !== requestId) return null
+
+        const current = profileRef.current
+        if (current?.id === user.id && isRetryableProfileLoadError(error)) {
+          setProfileError(null)
+          return current
+        }
+
+        profileRef.current = null
+        setProfile(null)
+        setProfileError(error)
+        return null
+      } finally {
+        if (profileLoadRef.current?.requestId === requestId) {
+          profileLoadRef.current = null
+        }
+      }
+    })()
+
+    profileLoadRef.current = { userId: user.id, requestId, promise }
+    return promise
   }
 
-  function applyAuthSession(nextSession) {
+  async function applyAuthSession(nextSession) {
+    sessionRef.current = nextSession
     setSession(nextSession)
     setAuthError(null)
-    setLoading(false)
     if (nextSession?.user) {
-      return loadProfile(nextSession.user)
+      const current = profileRef.current
+      if (current?.id === nextSession.user.id) {
+        setLoading(false)
+        return current
+      }
+
+      if (current) {
+        profileRef.current = null
+        setProfile(null)
+      }
+
+      setLoading(true)
+      const next = await loadProfile(nextSession.user)
+      if (sessionRef.current?.user?.id === nextSession.user.id) setLoading(false)
+      return next
     }
+    profileRequestIdRef.current += 1
+    profileLoadRef.current = null
+    profileRef.current = null
     setProfile(null)
     setProfileError(null)
+    setLoading(false)
     return null
   }
 
   function failAuthSession(error) {
+    sessionRef.current = null
+    profileRequestIdRef.current += 1
+    profileLoadRef.current = null
+    profileRef.current = null
     setSession(null)
     setProfile(null)
     setProfileError(null)
@@ -91,6 +153,12 @@ export function AuthProvider({ children }) {
       applySession(nextSession)
     })
 
+    const retryProfileWhenOnline = () => {
+      const user = sessionRef.current?.user
+      if (user && !profileRef.current && !profileLoadRef.current) loadProfile(user)
+    }
+    window.addEventListener('online', retryProfileWhenOnline)
+
     // getSession as a backup (also triggers token refresh if needed)
     supabase.auth.getSession()
       .then(({ data, error }) => {
@@ -106,6 +174,8 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true
       clearTimeout(sessionTimeout)
+      window.removeEventListener('online', retryProfileWhenOnline)
+      profileRequestIdRef.current += 1
       subscription.unsubscribe()
     }
   }, [])
@@ -191,10 +261,15 @@ export function AuthProvider({ children }) {
     try {
       return await supabase.auth.signOut()
     } finally {
+      sessionRef.current = null
+      profileRequestIdRef.current += 1
+      profileLoadRef.current = null
+      profileRef.current = null
       setSession(null)
       setProfile(null)
       setProfileError(null)
       setAuthError(null)
+      setLoading(false)
     }
   }
 

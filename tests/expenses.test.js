@@ -19,6 +19,7 @@ import {
   expenseMatchesRange,
   expensePaymentMethodLabel,
   getDailySalaryAmount,
+  getEmployeeMealExpenseEstimate,
   getEstimatedMonthlyExpenseSummary,
   getExpenseHistoryDeleteTarget,
   getNetIncome,
@@ -1066,6 +1067,30 @@ test('monthly expense estimate tracks employee paid amount, fines, remaining sal
   assert.equal(summary.employeeProjectedMonth, 8_400_000)
   assert.equal(summary.employeeRemainingThisMonth, 6_900_000)
   assert.equal(summary.estimatedMonthlyExpenseUzs, 8_400_000)
+})
+
+test('employee meal estimate counts present employee-days inside employment windows', () => {
+  const summary = getEmployeeMealExpenseEstimate([
+    {
+      id: 'meal-active',
+      joined_at: '2026-08-02',
+      is_active: true,
+      absences: [{ absence_date: '2026-08-03' }],
+    },
+    {
+      id: 'meal-ended',
+      joined_at: '2026-08-01',
+      ended_at: '2026-08-02',
+      is_active: false,
+      absences: [],
+    },
+  ], '2026-08-01', '2026-08-04', 50_000)
+
+  assert.deepEqual(summary, {
+    averageDailyEmployeeMealUzs: 50_000,
+    presentEmployeeDays: 4,
+    total: 200_000,
+  })
 })
 
 test('salary month-end debt projects the full remaining liability', () => {

@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS = {
   touristServiceRate: DEFAULT_TOURIST_SERVICE_RATE_PCT,
   monthlyRentUzs: 0,
   monthlyUtilitiesUzs: 0,
+  averageDailyEmployeeMealUzs: 0,
   receiptFooter:  '',
   receiptMarketing: 'compactFooter',
   autoPrint:      false,

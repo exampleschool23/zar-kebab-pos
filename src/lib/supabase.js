@@ -39,12 +39,14 @@ export const supabase = createClient(
   }
 )
 
-export async function getProfile(userId) {
-  const { data, error } = await supabase
+export async function getProfile(userId, { signal } = {}) {
+  let query = supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .maybeSingle()
+  if (signal) query = query.abortSignal(signal)
+  const { data, error } = await query
   if (error) throw error
   return data
 }

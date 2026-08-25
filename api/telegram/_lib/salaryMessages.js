@@ -1,6 +1,7 @@
 import {
   expensePaymentMethodLabel,
   getSalaryAccruedAmount,
+  getSalaryAbsenceForDate,
   getSalaryBalance,
   normalizeExpenseAmount,
 } from '../../../src/lib/expenses.js'
@@ -33,6 +34,7 @@ const COPY = {
     groupTotal: 'Umumiy summa',
     groupRent: 'Ijara',
     groupUtilities: 'Kommunal xarajatlar',
+    groupEmployeeMeals: 'Xodimlar ovqati',
     groupNetProfit: 'Kunlik sof foyda',
     unavailable: 'Mavjud emas',
   },
@@ -61,6 +63,7 @@ const COPY = {
     groupTotal: 'Общая сумма',
     groupRent: 'Аренда',
     groupUtilities: 'Коммуналка',
+    groupEmployeeMeals: 'Питание сотрудников',
     groupNetProfit: 'Чистая прибыль за день',
     unavailable: 'Недоступно',
   },
@@ -89,6 +92,7 @@ const COPY = {
     groupTotal: 'Combined total',
     groupRent: 'Rent',
     groupUtilities: 'Utilities',
+    groupEmployeeMeals: 'Employee meals',
     groupNetProfit: 'Daily net profit',
     unavailable: 'Unavailable',
   },
@@ -247,6 +251,7 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   grossProfit = null,
   rent = 0,
   utilities = 0,
+  employeeMealPerEmployee = 0,
 } = {}) {
   const profiles = Array.isArray(salaryProfiles) ? salaryProfiles : []
   const results = Array.isArray(kpiResults) ? kpiResults : []
@@ -259,6 +264,9 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     .reduce((total, result) => total + normalizeExpenseAmount(result?.bonus_amount), 0)
   const rentTotal = normalizeExpenseAmount(rent)
   const utilitiesTotal = normalizeExpenseAmount(utilities)
+  const presentEmployeeCount = profiles.filter(profile => !getSalaryAbsenceForDate(profile, date)).length
+  const employeeMealPerEmployeeTotal = normalizeExpenseAmount(employeeMealPerEmployee)
+  const employeeMealTotal = employeeMealPerEmployeeTotal * presentEmployeeCount
   const normalizedGrossProfit = Number.isFinite(Number(grossProfit))
     ? Math.round(Number(grossProfit))
     : null
@@ -289,9 +297,12 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     combinedTotal: salaryTotal + kpiBonusTotal,
     rentTotal,
     utilitiesTotal,
+    presentEmployeeCount,
+    employeeMealPerEmployeeTotal,
+    employeeMealTotal,
     netProfit: normalizedGrossProfit == null
       ? null
-      : normalizedGrossProfit - salaryTotal - kpiBonusTotal - rentTotal - utilitiesTotal,
+      : normalizedGrossProfit - salaryTotal - kpiBonusTotal - rentTotal - utilitiesTotal - employeeMealTotal,
   }
 }
 
@@ -303,6 +314,7 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
   const combinedTotal = salaryTotal + kpiBonusTotal
   const rentTotal = normalizeExpenseAmount(summary?.rentTotal)
   const utilitiesTotal = normalizeExpenseAmount(summary?.utilitiesTotal)
+  const employeeMealTotal = normalizeExpenseAmount(summary?.employeeMealTotal)
   const cafeIncomeTotal = normalizeExpenseAmount(summary?.cafeIncomeTotal)
   const dineInPercentage = Number(summary?.dineInPercentage) || 0
   const offPremisePercentage = Number(summary?.offPremisePercentage) || 0
@@ -333,6 +345,7 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
     `<b>${copy.groupTotal}:</b> ${formatSalaryNotificationAmount(combinedTotal)} ${copy.currency}`,
     `<b>${copy.groupRent}:</b> ${formatSalaryNotificationAmount(rentTotal)} ${copy.currency}`,
     `<b>${copy.groupUtilities}:</b> ${formatSalaryNotificationAmount(utilitiesTotal)} ${copy.currency}`,
+    `<b>${copy.groupEmployeeMeals}:</b> ${formatSalaryNotificationAmount(employeeMealTotal)} ${copy.currency}`,
     '',
     `<b>${copy.groupNetProfit}:</b> ${netProfit == null
       ? copy.unavailable

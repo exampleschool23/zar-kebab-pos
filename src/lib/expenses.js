@@ -313,6 +313,37 @@ export function listLocalDateRange(dateFrom, dateTo) {
   return dates
 }
 
+export function getEmployeeMealExpenseEstimate(
+  salaryProfiles = [],
+  dateFrom,
+  dateTo,
+  averageDailyEmployeeMealUzs = 0,
+) {
+  const dailyMealUzs = normalizeExpenseAmount(averageDailyEmployeeMealUzs)
+  let presentEmployeeDays = 0
+
+  if (dailyMealUzs > 0) {
+    for (const salaryProfile of salaryProfiles || []) {
+      if (!salaryProfile) continue
+      if (salaryProfile.is_active === false && !salaryProfile.ended_at) continue
+      const joinedAt = String(salaryProfile.joined_at || dateFrom).slice(0, 10)
+      const activeUntil = getSalaryActiveUntil(salaryProfile, dateTo)
+      const start = joinedAt > dateFrom ? joinedAt : dateFrom
+      if (!start || !activeUntil || start > activeUntil) continue
+      const absenceDates = getSalaryAbsenceDates(salaryProfile)
+      presentEmployeeDays += listLocalDateRange(start, activeUntil)
+        .filter(date => !absenceDates.has(date))
+        .length
+    }
+  }
+
+  return {
+    averageDailyEmployeeMealUzs: dailyMealUzs,
+    presentEmployeeDays,
+    total: dailyMealUzs * presentEmployeeDays,
+  }
+}
+
 export function buildSalaryReactivationAbsenceRows(salaryProfile, reactivatedAt = todayExpenseDate(), note = 'Inactive employment period') {
   const salaryProfileId = salaryProfile?.id
   const inactiveFrom = String(salaryProfile?.ended_at || '').slice(0, 10)
@@ -622,7 +653,7 @@ export function getSelectedMonthSalaryOperatingSummary(salaryProfiles = [], asOf
   })
 }
 
-function addLocalDateDays(isoDate, days) {
+export function addLocalDateDays(isoDate, days) {
   const date = new Date(`${isoDate}T00:00:00`)
   date.setDate(date.getDate() + days)
   return toLocalDateStr(date.toISOString())

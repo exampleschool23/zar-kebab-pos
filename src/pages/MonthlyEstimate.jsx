@@ -19,7 +19,9 @@ import { formatLongDate } from '../lib/dateFormat'
 import {
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
+  addLocalDateDays,
   expensePaymentMethodLabel,
+  getEmployeeMealExpenseEstimate,
   getEstimatedMonthlyExpenseSummary,
   getSelectedMonthSalaryOperatingSummary,
   normalizeExpenseEntryType,
@@ -153,6 +155,8 @@ export default function MonthlyEstimate() {
       utilitiesPaid: 'Kommunal to‘langan',
       utilitiesRemaining: 'Kommunal to‘lanishi kerak',
       otherSpent: 'Boshqa xarajatlar',
+      employeeMealsRemaining: 'Xodimlar ovqati oy oxirigacha',
+      employeeDays: 'xodim-kun',
       payroll: 'Maosh va xodimlar',
       fixedBills: 'Doimiy to‘lovlar',
       operations: 'Operatsion xarajatlar',
@@ -211,6 +215,8 @@ export default function MonthlyEstimate() {
       utilitiesPaid: 'Коммуналка оплачена',
       utilitiesRemaining: 'Осталось оплатить коммуналку',
       otherSpent: 'Другие расходы',
+      employeeMealsRemaining: 'Питание сотрудников до конца месяца',
+      employeeDays: 'чел.-дн.',
       payroll: 'Зарплата и сотрудники',
       fixedBills: 'Постоянные платежи',
       operations: 'Операционные расходы',
@@ -269,6 +275,8 @@ export default function MonthlyEstimate() {
       utilitiesPaid: 'Utilities paid',
       utilitiesRemaining: 'Utilities still due',
       otherSpent: 'Other expenses',
+      employeeMealsRemaining: 'Employee meals through month end',
+      employeeDays: 'employee-days',
       payroll: 'Payroll and staff',
       fixedBills: 'Fixed bills',
       operations: 'Operating expenses',
@@ -389,6 +397,15 @@ export default function MonthlyEstimate() {
   const salaryOperatingSummary = useMemo(() => (
     getSelectedMonthSalaryOperatingSummary(salaryProfiles, cutoffEnd)
   ), [salaryProfiles, cutoffEnd])
+  const mealForecastStart = today < monthStart ? monthStart : addLocalDateDays(cutoffEnd, 1)
+  const employeeMealEstimate = useMemo(() => (
+    getEmployeeMealExpenseEstimate(
+      salaryProfiles,
+      mealForecastStart,
+      monthEnd,
+      state.settings?.averageDailyEmployeeMealUzs || 0,
+    )
+  ), [salaryProfiles, mealForecastStart, monthEnd, state.settings?.averageDailyEmployeeMealUzs])
   const salesRevenue = paidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
   const incomeSummary = summarizeIncomeEntries(incomeEntries)
   const allActualExpenseRows = [...salaryPaymentRows, ...salaryBonusRows, ...manualExpenseRows]
@@ -428,6 +445,7 @@ export default function MonthlyEstimate() {
     + salaryOperatingSummary.expectedSalaryCost
     + rentExpectedRemaining
     + utilitiesExpectedRemaining
+    + employeeMealEstimate.total
 
   const cameRows = [
     { key: 'sales', label: l.salesRevenue, amount: salesRevenue, color: '#16A34A' },
@@ -477,11 +495,16 @@ export default function MonthlyEstimate() {
       key: 'operations',
       icon: ReceiptText,
       title: l.operations,
-      total: productsSpentTotal + otherRecordedExpenseTotal,
+      total: productsSpentTotal + otherRecordedExpenseTotal + employeeMealEstimate.total,
       tone: 'orange',
       rows: [
         { label: l.productsSpent, value: formatCurrency(productsSpentTotal) },
         { label: l.otherSpent, value: formatCurrency(otherRecordedExpenseTotal) },
+        {
+          label: `${l.employeeMealsRemaining} · ${employeeMealEstimate.presentEmployeeDays} ${l.employeeDays}`,
+          value: formatCurrency(employeeMealEstimate.total),
+          accent: employeeMealEstimate.total > 0 ? 'text-orange-600' : 'text-green-600',
+        },
       ],
     },
   ]

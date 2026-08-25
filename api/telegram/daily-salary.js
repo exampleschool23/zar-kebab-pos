@@ -253,7 +253,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
       .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
     supabase
       .from('business_settings')
-      .select('monthly_rent_uzs, monthly_utilities_uzs')
+      .select('monthly_rent_uzs, monthly_utilities_uzs, average_daily_employee_meal_uzs')
       .eq('id', 'default')
       .maybeSingle(),
   ])
@@ -304,6 +304,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     grossProfit,
     rent: dailyRent,
     utilities: dailyUtilities,
+    employeeMealPerEmployee: settingsResult.data?.average_daily_employee_meal_uzs,
   })
 }
 

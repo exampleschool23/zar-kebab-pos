@@ -467,6 +467,26 @@ test('only a missing auth profile falls back to pending approval', () => {
   assert.doesNotMatch(fallback, /status: 'active'/)
 })
 
+test('auth profile loading deduplicates startup reads and tolerates transient failures', () => {
+  const auth = readSource('src/contexts/AuthContext.jsx')
+  const supabase = readSource('src/lib/supabase.js')
+  const loader = readSource('src/lib/profileLoading.js')
+  const loadProfile = functionBody(auth, 'loadProfile')
+  const applyAuthSession = functionBody(auth, 'applyAuthSession')
+
+  assert.match(auth, /const profileLoadRef = useRef\(null\)/)
+  assert.match(loadProfile, /if \(inFlight\?\.userId === user\.id\) return inFlight\.promise/)
+  assert.match(loadProfile, /loadProfileWithRetry\(\(\) => withReadTimeout\(/)
+  assert.match(loadProfile, /signal => getProfile\(user\.id, \{ signal \}\)/)
+  assert.match(loadProfile, /current\?\.id === user\.id && isRetryableProfileLoadError\(error\)/)
+  assert.match(loadProfile, /profileRequestIdRef\.current !== requestId/)
+  assert.match(applyAuthSession, /if \(current\?\.id === nextSession\.user\.id\)[\s\S]*return current/)
+  assert.match(auth, /window\.addEventListener\('online', retryProfileWhenOnline\)/)
+  assert.match(supabase, /if \(signal\) query = query\.abortSignal\(signal\)/)
+  assert.match(loader, /status === 401/)
+  assert.match(loader, /message\.includes\('failed to fetch'\)/)
+})
+
 test('PendingApproval redirects approved users to their workspace route', () => {
   const pending = readSource('src/pages/PendingApproval.jsx')
   const approvedTarget = functionBody(pending, 'approvedTarget')
@@ -2901,6 +2921,32 @@ test('AdminSettings exposes monthly utilities as a UZS billing setting', () => {
   assert.match(dbHealth, /monthly_utilities_uzs/)
 })
 
+test('AdminSettings persists the average daily employee meal and forecasts present employee-days', () => {
+  const settings = readSource('src/pages/AdminSettings.jsx')
+  const defaults = readSource('src/store/reducerHelpers.js')
+  const db = readSource('src/lib/db.js')
+  const migration = readSource('supabase/141_average_daily_employee_meal.sql')
+  const health = readSource('scripts/check-db-health.js')
+  const dbHealth = readSource('src/lib/dbHealth.js')
+  const monthlyEstimate = readSource('src/pages/MonthlyEstimate.jsx')
+  const salaryMessages = readSource('api/telegram/_lib/salaryMessages.js')
+
+  assert.match(settings, /const \[averageDailyEmployeeMealUzs, setAverageDailyEmployeeMealUzs\] = useState\(String\(settings\.averageDailyEmployeeMealUzs \|\| ''\)\)/)
+  assert.match(settings, /averageDailyEmployeeMealUzs: Number\(normalizeMoneyInput\(averageDailyEmployeeMealUzs\) \|\| 0\)/)
+  assert.match(settings, /formatMoneyInput\(averageDailyEmployeeMealUzs\)/)
+  assert.match(settings, /setAverageDailyEmployeeMealUzs\(normalizeMoneyInput\(event\.target\.value\)\)/)
+  assert.match(defaults, /averageDailyEmployeeMealUzs:\s*0/)
+  assert.match(db, /averageDailyEmployeeMealUzs: Math\.max\(0, Math\.round\(Number\(row\.average_daily_employee_meal_uzs\) \|\| 0\)\)/)
+  assert.match(db, /average_daily_employee_meal_uzs: Math\.max\(0, Math\.round\(Number\(settings\.averageDailyEmployeeMealUzs\) \|\| 0\)\)/)
+  assert.match(migration, /average_daily_employee_meal_uzs bigint not null default 0/)
+  assert.match(health, /average_daily_employee_meal_uzs/)
+  assert.match(dbHealth, /average_daily_employee_meal_uzs/)
+  assert.match(monthlyEstimate, /getEmployeeMealExpenseEstimate\(/)
+  assert.match(monthlyEstimate, /\+ employeeMealEstimate\.total/)
+  assert.match(salaryMessages, /employeeMealTotal = employeeMealPerEmployeeTotal \* presentEmployeeCount/)
+  assert.match(salaryMessages, /normalizedGrossProfit - salaryTotal - kpiBonusTotal - rentTotal - utilitiesTotal - employeeMealTotal/)
+})
+
 test('AdminSettings does not expose receipt footer editing', () => {
   const settings = readSource('src/pages/AdminSettings.jsx')
 
@@ -3316,6 +3362,8 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(monthlyEstimate, /const salaryExpectedRemaining = salaryOperatingSummary\.remainingSalary/)
   assert.match(monthlyEstimate, /const rentExpectedRemaining = Math\.max\(0, monthlyEstimate\.monthlyRentUzs - recordedRentTotal\)/)
   assert.match(monthlyEstimate, /const utilitiesExpectedRemaining = Math\.max\(0, monthlyEstimate\.monthlyUtilitiesUzs - recordedUtilitiesTotal\)/)
+  assert.match(monthlyEstimate, /const employeeMealEstimate = useMemo/)
+  assert.match(monthlyEstimate, /employeeMealsRemaining/)
   assert.match(monthlyEstimate, /const expectedMonthOutflow = totalOutflow[\s\S]*- salaryPaymentTotal[\s\S]*\+ salaryOperatingSummary\.expectedSalaryCost[\s\S]*\+ rentExpectedRemaining[\s\S]*\+ utilitiesExpectedRemaining/)
   assert.match(monthlyEstimate, /expectedMonthSpent[\s\S]*formatCurrency\(expectedMonthOutflow\)/)
   assert.doesNotMatch(monthlyEstimate, /employeeArrearsRemaining|employeeRemainingTotal|employeeOpeningArrears|remainingCommitmentsUzs|plannedMonthOutflowUzs/)
