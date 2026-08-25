@@ -579,6 +579,7 @@ function MediaGalleryField({ label, values, onChange, onUploadComplete, lang, en
                   controls={isMenuVideoUrl(url)}
                   autoPlay={false}
                   className="h-full w-full object-cover object-center"
+                  containerClassName="h-full w-full"
                   fallback={
                     <div className="flex h-full w-full items-center justify-center bg-orange-50">
                       <UtensilsCrossed size={22} className="text-orange-200" />

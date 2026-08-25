@@ -8,7 +8,7 @@ import {
   getOrderItemProductId,
   isCancelledOrderItem,
 } from '../lib/analytics'
-import { getOrderItemUnitPrice, getPriceModeLabel } from '../lib/priceModes'
+import { getOrderItemUnitPrice } from '../lib/priceModes'
 import { isCashierQuickItem } from '../lib/menuItems'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatDateTime } from '../lib/dateFormat'
@@ -25,7 +25,6 @@ const L = {
     slogan:      "Olov. Ta'm. An'ana.",
     receiptTitle:'CHEK',
     table:       'Stol',
-    menuType:    'Menyu turi',
     waiter:      'Ofitsiant',
     completedBy: 'Yopgan',
     date:        'Sana',
@@ -34,7 +33,6 @@ const L = {
     amountCol:   'Summa',
     orderAmount: 'Buyurtma summasi',
     servicePct:  n => n == null ? 'Xizmat haqi' : `Xizmat haqi ${n}%`,
-    mixed:       'Aralash',
     loyaltyUsed: 'Sodiqlik ishlatildi',
     cashbackEarned: 'Cashback hisoblandi',
     total:       "To'lovga jami",
@@ -51,7 +49,6 @@ const L = {
     slogan:      'Огонь. Вкус. Традиции.',
     receiptTitle:'ЧЕК',
     table:       'Стол',
-    menuType:    'Тип меню',
     waiter:      'Официант',
     completedBy: 'Закрыл',
     date:        'Дата',
@@ -60,7 +57,6 @@ const L = {
     amountCol:   'Сумма',
     orderAmount: 'Сумма заказа',
     servicePct:  n => n == null ? 'Обслуживание' : `Обслуживание ${n}%`,
-    mixed:       'Смешанный',
     loyaltyUsed: 'Использовано с карты',
     cashbackEarned: 'Начислен кешбэк',
     total:       'Итого к оплате',
@@ -77,7 +73,6 @@ const L = {
     slogan:      'Fire. Flavor. Tradition.',
     receiptTitle:'RECEIPT',
     table:       'Table',
-    menuType:    'Menu type',
     waiter:      'Waiter',
     completedBy: 'Completed by',
     date:        'Date',
@@ -86,7 +81,6 @@ const L = {
     amountCol:   'Amount',
     orderAmount: 'Order amount',
     servicePct:  n => n == null ? 'Service' : `Service ${n}%`,
-    mixed:       'Mixed',
     loyaltyUsed: 'Loyalty used',
     cashbackEarned: 'Cashback earned',
     total:       'Total to pay',
@@ -298,7 +292,7 @@ function firstNonEmpty(orders, keys, fallback = '—') {
   return fallback
 }
 
-function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, lang, receiptFooter, receiptMarketing }) {
+function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
   const marketingMode = normalizeReceiptMarketing(receiptMarketing)
 
   return (
@@ -345,7 +339,6 @@ function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateS
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3px' }}>
         <tbody>
           <MetaRow label={labels.table} value={tableName} />
-          <MetaRow label={labels.menuType} value={priceMode ? getPriceModeLabel(priceMode, lang) : labels.mixed} />
           <MetaRow label={labels.waiter} value={waiterName} />
           {completedByName && completedByName !== '—' && <MetaRow label={labels.completedBy} value={completedByName} />}
           <MetaRow label={labels.date} value={dateStr} />
@@ -579,7 +572,6 @@ export function TableReceipt() {
         {...data}
         dateStr={formatDateTime(data.receiptAt)}
         labels={labels}
-        lang={lang}
         restaurantName={settings.restaurantName}
         receiptFooter={settings.receiptFooter}
         receiptMarketing={settings.receiptMarketing}
@@ -721,7 +713,6 @@ export default function Receipt() {
         {...data}
         dateStr={formatDateTime(data.receiptAt)}
         labels={labels}
-        lang={lang}
         restaurantName={settings.restaurantName}
         receiptFooter={settings.receiptFooter}
         receiptMarketing={settings.receiptMarketing}
