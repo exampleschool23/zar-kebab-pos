@@ -383,9 +383,22 @@ function getDashboardHistoryRange(period, today = todayStr()) {
   return { dateFrom: `${Number(today.slice(0, 4)) - 1}-01-01`, dateTo: today }
 }
 
+function dashboardHistoryRangeKey(range) {
+  return `${range.dateFrom}:${range.dateTo}`
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight, tone = 'default' }) {
+function ShimmerBlock({ className = '' }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`animate-pulse rounded-lg bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 ${className}`}
+    />
+  )
+}
+
+function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight, tone = 'default', loading = false }) {
   const isProfit = tone === 'profit' && !highlight
   const cardClass = highlight
     ? 'border-red-200 bg-white'
@@ -400,23 +413,67 @@ function KpiCard({ icon: Icon, label, value, sub, subColor, badge, highlight, to
   const valueClass = highlight ? 'text-[#DC2626]' : isProfit ? 'text-emerald-700' : 'text-[#1F2937]'
 
   return (
-    <div className={`rounded-2xl border shadow-sm p-4 flex flex-col gap-2 min-w-0 h-full ${cardClass}`}>
+    <div aria-busy={loading} className={`rounded-2xl border shadow-sm p-4 flex flex-col gap-2 min-w-0 h-full ${cardClass}`}>
       <div className="flex items-start justify-between gap-2">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${iconClass}`}>
           <Icon size={17} />
         </div>
-        {badge && (
+        {!loading && badge && (
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 ${badge.cls}`}>
             {badge.up !== null && (badge.up ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />)}
             {badge.text}
           </span>
         )}
       </div>
-      <div>
-        <p className={`font-black text-xl leading-tight break-words tabular-nums mb-1 ${valueClass}`}>{value}</p>
-        <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider leading-snug">{label}</p>
-        {sub && <p className={`text-xs mt-0.5 leading-snug ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
+      {loading ? (
+        <div className="space-y-2 py-0.5">
+          <ShimmerBlock className="h-6 w-2/3" />
+          <ShimmerBlock className="h-3 w-1/2" />
+          <ShimmerBlock className="h-3 w-5/6" />
+        </div>
+      ) : (
+        <div>
+          <p className={`font-black text-xl leading-tight break-words tabular-nums mb-1 ${valueClass}`}>{value}</p>
+          <p className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-wider leading-snug">{label}</p>
+          {sub && <p className={`text-xs mt-0.5 leading-snug ${subColor || 'text-[#9CA3AF]'}`}>{sub}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ChartShimmer() {
+  return (
+    <div className="animate-pulse" aria-hidden="true">
+      <div className="flex h-36 items-end gap-2 mb-4">
+        {[28, 44, 35, 62, 48, 78, 56, 88, 68, 96, 74, 84].map((height, index) => (
+          <div key={index} className="flex-1 rounded-t-md bg-gray-100" style={{ height: `${height}%` }} />
+        ))}
       </div>
+      <div className="grid grid-cols-3 gap-3 border-t border-[#F3F4F6] pt-3">
+        <ShimmerBlock className="h-9 w-4/5" />
+        <ShimmerBlock className="h-9 w-4/5" />
+        <ShimmerBlock className="h-9 w-3/5" />
+      </div>
+    </div>
+  )
+}
+
+function ListShimmer({ rows = 5, withAvatar = false }) {
+  return (
+    <div className="animate-pulse space-y-3 py-1" aria-hidden="true">
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className="flex items-center gap-3">
+          {withAvatar && <div className="h-9 w-9 flex-shrink-0 rounded-xl bg-gray-100" />}
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <ShimmerBlock className="h-3 w-2/5" />
+              <ShimmerBlock className="h-3 w-1/4" />
+            </div>
+            <ShimmerBlock className="h-1.5 w-full" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -652,23 +709,35 @@ function DonutChart({ slices }) {
   )
 }
 
-function OrderTypePerformanceCard({ rows, lang }) {
+function OrderTypePerformanceCard({ rows, lang, loading = false }) {
   const l = L[lang] || L.en
   const maxRevenue = Math.max(...rows.map(row => row.revenue), 1)
   const topKey = rows.find(row => row.revenue > 0)?.key || ''
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 mb-4 min-w-0">
+    <div aria-busy={loading} className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 mb-4 min-w-0">
       <div className="flex items-center justify-between gap-3 mb-4">
         <h3 className="font-black text-[#1F2937] text-base">{l.orderTypePerformance}</h3>
-        {topKey && (
+        {!loading && topKey && (
           <span className="rounded-full bg-[#0F3B2E] px-3 py-1 text-[11px] font-black text-white">
             {l.topOrderType}: {rows.find(row => row.key === topKey)?.label}
           </span>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {rows.map(row => {
+        {loading ? Array.from({ length: 3 }, (_, index) => (
+          <div key={index} className="animate-pulse rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3" aria-hidden="true">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-gray-200" />
+              <div className="flex-1 space-y-2">
+                <ShimmerBlock className="h-3 w-2/5" />
+                <ShimmerBlock className="h-3 w-1/4" />
+              </div>
+            </div>
+            <ShimmerBlock className="mt-4 h-5 w-3/5" />
+            <ShimmerBlock className="mt-3 h-1.5 w-full" />
+          </div>
+        )) : rows.map(row => {
           const visual = ORDER_TYPE_PERFORMANCE_STYLE[row.key] || ORDER_TYPE_PERFORMANCE_STYLE.dine_in
           const Icon = visual.Icon
           const width = row.revenue > 0 ? Math.max(6, Math.round((row.revenue / maxRevenue) * 100)) : 0
@@ -730,23 +799,29 @@ export default function AdminDashboard() {
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
   const [historyError, setHistoryError] = useState('')
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [loadedHistoryRangeKey, setLoadedHistoryRangeKey] = useState('')
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
 
   const dashboardHistoryRange = useMemo(() => getDashboardHistoryRange(period), [period])
+  const requestedHistoryRangeKey = dashboardHistoryRangeKey(dashboardHistoryRange)
+  const analyticsLoading = historyLoading || loadedHistoryRangeKey !== requestedHistoryRangeKey
 
   useEffect(() => {
     let cancelled = false
+    const requestRangeKey = dashboardHistoryRangeKey(dashboardHistoryRange)
     setHistoryError('')
     setHistoryLoading(true)
     loadPaidOrdersForRange(dashboardHistoryRange.dateFrom, dashboardHistoryRange.dateTo)
       .then(orders => {
         if (cancelled) return
         setPaidHistoryOrders(orders)
+        setLoadedHistoryRangeKey(requestRangeKey)
         setHistoryLoading(false)
       })
       .catch(error => {
         if (cancelled) return
         setPaidHistoryOrders([])
+        setLoadedHistoryRangeKey(requestRangeKey)
         setHistoryError(error?.message || 'Could not load complete dashboard history')
         setHistoryLoading(false)
       })
@@ -1111,6 +1186,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
+            loading={analyticsLoading}
             label={`${l.revenue} · ${currentKpiPeriodLabel}`}
             value={formatCurrency(periodRevenue)}
             sub={`${l.loyaltyIncome}: ${formatCurrency(periodLoyaltyIncome)} · ${previousKpiPeriodLabel}: ${formatCurrency(previousKpiRevenue)}`}
@@ -1118,6 +1194,7 @@ export default function AdminDashboard() {
           />
           <KpiCard
             icon={BadgeDollarSign}
+            loading={analyticsLoading}
             label={`${l.netProfit} · ${currentKpiPeriodLabel}`}
             value={formatCurrencyWithPercentage(periodNetProfit, periodProfitMargin, lang)}
             sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousKpiNetProfit)}`}
@@ -1126,12 +1203,14 @@ export default function AdminDashboard() {
           />
           <KpiCard
             icon={CalendarDays}
+            loading={analyticsLoading}
             label={`${l.avgDailyCafeIncome} · ${currentKpiPeriodLabel}`}
             value={formatCurrency(selectedPeriodCafeIncome.averageDaily)}
             sub={`${l.total}: ${formatCurrency(selectedPeriodCafeIncome.total)} · ${l.loyaltyIncome}: ${formatCurrency(selectedPeriodCafeIncome.loyaltyTotal)}`}
           />
           <KpiCard
             icon={ShoppingBag}
+            loading={analyticsLoading}
             label={`${l.orders} · ${currentKpiPeriodLabel}`}
             value={periodOrderCount}
             sub={`${previousKpiPeriodLabel}: ${previousOrderCount}`}
@@ -1151,7 +1230,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-12 gap-4 mb-4 min-w-0">
 
           {/* Revenue Statistics — left 2 cols */}
-          <div className="col-span-12 xl:col-span-8 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
+          <div aria-busy={analyticsLoading} className="col-span-12 xl:col-span-8 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div>
                 <h3 className="font-bold text-[#1F2937] text-base">{l.revenueStats}</h3>
@@ -1184,6 +1263,10 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {analyticsLoading ? (
+              <ChartShimmer />
+            ) : (
+              <>
             {/* Bar chart — bars use h-full so they fill it properly */}
             <div className="relative h-36 mb-1">
               <div className="flex items-end gap-[3px] h-full">
@@ -1244,12 +1327,23 @@ export default function AdminDashboard() {
                 )}
               </div>
             </div>
+              </>
+            )}
           </div>
 
           {/* Payment Methods */}
-          <div className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
+          <div aria-busy={analyticsLoading} className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
             <h3 className="font-black text-[#1F2937] text-base mb-4">{l.paymentMethods}</h3>
-            {paymentMethods.length === 0 ? (
+            {analyticsLoading ? (
+              <div className="flex animate-pulse items-center gap-4 py-1" aria-hidden="true">
+                <div className="h-28 w-28 flex-shrink-0 rounded-full border-[14px] border-gray-100" />
+                <div className="flex-1 space-y-3">
+                  <ShimmerBlock className="h-3 w-full" />
+                  <ShimmerBlock className="h-3 w-5/6" />
+                  <ShimmerBlock className="h-3 w-2/3" />
+                </div>
+              </div>
+            ) : paymentMethods.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noData}</p>
             ) : (
               <div className="flex items-center gap-4 min-w-0">
@@ -1273,19 +1367,16 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <OrderTypePerformanceCard rows={orderTypePerformance} lang={lang} />
+        <OrderTypePerformanceCard rows={orderTypePerformance} lang={lang} loading={analyticsLoading} />
 
         {/* ── Row 3: Sales by Category + Best-Selling + Recent Orders ── */}
         <div className="grid grid-cols-12 gap-4 mb-4 min-w-0">
 
           {/* Sales by Category */}
-          <div aria-busy={historyLoading} className="col-span-12 xl:col-span-4 flex min-h-0 min-w-0 flex-col bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-4">
+          <div aria-busy={analyticsLoading} className="col-span-12 xl:col-span-4 flex min-h-0 min-w-0 flex-col bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-4">
             <h3 className="font-black text-[#1F2937] text-base mb-3">{l.salesByCategory} · {currentKpiPeriodLabel}</h3>
-            {historyLoading ? (
-              <div className="flex flex-1 items-center justify-center gap-2 py-8 text-sm font-semibold text-[#9CA3AF]">
-                <Loader2 size={16} className="animate-spin text-[#ff5a00]" />
-                {l.loading}
-              </div>
+            {analyticsLoading ? (
+              <ListShimmer rows={6} />
             ) : salesByCategory.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
             ) : (
@@ -1309,13 +1400,10 @@ export default function AdminDashboard() {
           </div>
 
           {/* Best-selling */}
-          <div aria-busy={historyLoading} className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
+          <div aria-busy={analyticsLoading} className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
             <h3 className="font-black text-[#1F2937] text-base mb-4">{l.bestSelling} · {currentKpiPeriodLabel}</h3>
-            {historyLoading ? (
-              <div className="flex min-h-32 items-center justify-center gap-2 py-8 text-sm font-semibold text-[#9CA3AF]">
-                <Loader2 size={16} className="animate-spin text-[#ff5a00]" />
-                {l.loading}
-              </div>
+            {analyticsLoading ? (
+              <ListShimmer rows={6} withAvatar />
             ) : bestSelling.length === 0 ? (
               <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
             ) : (

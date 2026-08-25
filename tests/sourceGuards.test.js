@@ -2038,7 +2038,7 @@ test('AdminDashboard shows period-based order type performance', () => {
   assert.match(dashboard, /getDashboardOrderTypePerformance/)
   assert.match(dashboard, /const orderTypePerformance = useMemo\(\(\) =>/)
   assert.match(dashboard, /getDashboardOrderTypePerformance\(periodPaidOrders, lang\)/)
-  assert.match(dashboard, /<OrderTypePerformanceCard rows=\{orderTypePerformance\} lang=\{lang\} \/>/)
+  assert.match(dashboard, /<OrderTypePerformanceCard rows=\{orderTypePerformance\} lang=\{lang\} loading=\{analyticsLoading\} \/>/)
   assert.match(card, /ORDER_TYPE_PERFORMANCE_STYLE/)
   assert.match(card, /topKey/)
   assert.match(card, /row\.orders/)
@@ -2055,16 +2055,24 @@ test('AdminDashboard category sales use the available card height before scrolli
   assert.doesNotMatch(dashboard, /max-h-\[230px\] space-y-2 overflow-y-auto/)
 })
 
-test('AdminDashboard period filter owns category and best-selling analytics loading state', () => {
+test('AdminDashboard period filter shimmers every range-dependent statistic until its exact history range is loaded', () => {
   const dashboard = readSource('src/pages/AdminDashboard.jsx')
 
   assert.match(dashboard, /const \[historyLoading, setHistoryLoading\] = useState\(true\)/)
+  assert.match(dashboard, /const \[loadedHistoryRangeKey, setLoadedHistoryRangeKey\] = useState\(''\)/)
+  assert.match(dashboard, /const analyticsLoading = historyLoading \|\| loadedHistoryRangeKey !== requestedHistoryRangeKey/)
   assert.match(dashboard, /setHistoryLoading\(true\)[\s\S]*loadPaidOrdersForRange/)
+  assert.match(dashboard, /setPaidHistoryOrders\(orders\)[\s\S]*setLoadedHistoryRangeKey\(requestRangeKey\)[\s\S]*setHistoryLoading\(false\)/)
   assert.match(dashboard, /\{l\.salesByCategory\} · \{currentKpiPeriodLabel\}/)
   assert.match(dashboard, /\{l\.bestSelling\} · \{currentKpiPeriodLabel\}/)
-  assert.equal((dashboard.match(/aria-busy=\{historyLoading\}/g) || []).length, 2)
-  assert.match(dashboard, /historyLoading \? \([\s\S]*salesByCategory\.length === 0/)
-  assert.match(dashboard, /historyLoading \? \([\s\S]*bestSelling\.length === 0/)
+  assert.ok((dashboard.match(/aria-busy=\{analyticsLoading\}/g) || []).length >= 4)
+  assert.ok((dashboard.match(/loading=\{analyticsLoading\}/g) || []).length >= 5)
+  assert.match(dashboard, /analyticsLoading \? \([\s\S]*<ChartShimmer \/>/)
+  assert.match(dashboard, /analyticsLoading \? \([\s\S]*salesByCategory\.length === 0/)
+  assert.match(dashboard, /analyticsLoading \? \([\s\S]*bestSelling\.length === 0/)
+  assert.match(dashboard, /function ShimmerBlock/)
+  assert.match(dashboard, /function ChartShimmer/)
+  assert.match(dashboard, /function ListShimmer/)
 })
 
 test('AdminDashboard omits staff performance and its profile-loading work', () => {
