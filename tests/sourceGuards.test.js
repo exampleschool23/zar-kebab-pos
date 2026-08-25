@@ -3925,7 +3925,7 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(rpc, /selected_options/)
 })
 
-test('Daily Bazaar filter toolbar stays grouped across responsive widths', () => {
+test('Daily Bazaar filter toolbar uses one responsive range calendar with internal presets', () => {
   const source = readSource('src/pages/DailyBazaar.jsx')
   const toolbar = source.slice(
     source.indexOf('function RangeAndFilters'),
@@ -3934,14 +3934,21 @@ test('Daily Bazaar filter toolbar stays grouped across responsive widths', () =>
   const dateInput = source.slice(source.indexOf('function FormattedDateInput'))
 
   assert.match(toolbar, /aria-labelledby="bazaar-range-heading"/)
-  assert.match(toolbar, /aria-pressed=\{rangeKey === option\.key\}/)
   assert.match(toolbar, /rangeSummary = dateFrom === dateTo/)
-  assert.match(toolbar, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(380px,520px\)\]/)
+  assert.match(toolbar, /function DateRangePicker/)
+  assert.match(toolbar, /role="dialog" aria-label=\{l\.selectDateRange\}/)
+  assert.match(toolbar, /function MonthCalendar/)
+  assert.match(toolbar, /buildRangeCalendar\(monthKey\)/)
+  assert.match(toolbar, /previousCurrentWeek/)
+  assert.match(toolbar, /currentNextWeek/)
+  assert.match(toolbar, /onClick=\{applyDraft\}/)
   assert.match(toolbar, /border-t border-\[#EEF0F3\] pt-3/)
   assert.match(toolbar, /lg:grid-cols-\[minmax\(200px,260px\)_minmax\(220px,280px\)_minmax\(260px,1fr\)\]/)
   assert.match(toolbar, /id="bazaar-history-search"/)
   assert.match(toolbar, /sm:col-span-2 lg:col-span-1/)
   assert.doesNotMatch(toolbar, /AnimatedSearch/)
+  assert.doesNotMatch(toolbar, /\{ key: 'week', label: l\.week \}/)
+  assert.doesNotMatch(toolbar, /<FormattedDateInput value=\{dateFrom\}/)
   assert.doesNotMatch(toolbar, /min-w-\[130px\]/)
   assert.match(dateInput, /right-10[^\n]+text-ellipsis/)
 })

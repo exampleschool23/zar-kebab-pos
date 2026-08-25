@@ -52,9 +52,15 @@ test('daily bazaar normalizes product names, decimal quantities, money, and comp
 test('daily bazaar quick ranges are inclusive and handle month/year boundaries', () => {
   assert.deepEqual(getBazaarRange('today', '2026-07-17'), { dateFrom: '2026-07-17', dateTo: '2026-07-17' })
   assert.deepEqual(getBazaarRange('week', '2026-07-17'), { dateFrom: '2026-07-11', dateTo: '2026-07-17' })
+  assert.deepEqual(getBazaarRange('previousWeek', '2026-07-17'), { dateFrom: '2026-07-06', dateTo: '2026-07-12' })
+  assert.deepEqual(getBazaarRange('previousCurrentWeek', '2026-07-17'), { dateFrom: '2026-07-06', dateTo: '2026-07-19' })
+  assert.deepEqual(getBazaarRange('currentWeek', '2026-07-17'), { dateFrom: '2026-07-13', dateTo: '2026-07-19' })
+  assert.deepEqual(getBazaarRange('currentNextWeek', '2026-07-17'), { dateFrom: '2026-07-13', dateTo: '2026-07-26' })
+  assert.deepEqual(getBazaarRange('nextWeek', '2026-07-17'), { dateFrom: '2026-07-20', dateTo: '2026-07-26' })
   assert.deepEqual(getBazaarRange('month', '2026-07-17'), { dateFrom: '2026-07-01', dateTo: '2026-07-17' })
   assert.deepEqual(getBazaarRange('previousMonth', '2026-01-08'), { dateFrom: '2025-12-01', dateTo: '2025-12-31' })
   assert.deepEqual(getBazaarRange('previousMonth', '2024-03-01'), { dateFrom: '2024-02-01', dateTo: '2024-02-29' })
+  assert.deepEqual(getBazaarRange('nextMonth', '2026-12-08'), { dateFrom: '2027-01-01', dateTo: '2027-01-31' })
 })
 
 test('calendar-day averages stay inclusive across daylight-saving boundaries', () => {

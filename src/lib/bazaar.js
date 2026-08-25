@@ -313,16 +313,33 @@ function addDays(value, amount) {
   return normalizeBazaarDate(parsed)
 }
 
+function startOfWeek(value) {
+  const parsed = parseLocalDate(value)
+  if (!parsed) return ''
+  const mondayOffset = (parsed.getDay() + 6) % 7
+  return addDays(value, -mondayOffset)
+}
+
+function monthRange(value, monthOffset = 0) {
+  const parsed = parseLocalDate(value)
+  if (!parsed) return { dateFrom: '', dateTo: '' }
+  const first = new Date(parsed.getFullYear(), parsed.getMonth() + monthOffset, 1, 12, 0, 0, 0)
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0, 12, 0, 0, 0)
+  return { dateFrom: normalizeBazaarDate(first), dateTo: normalizeBazaarDate(last) }
+}
+
 export function getBazaarRange(key = 'month', today = todayBazaarDate()) {
   const normalizedToday = normalizeBazaarDate(today) || todayBazaarDate()
   if (key === 'today') return { dateFrom: normalizedToday, dateTo: normalizedToday }
   if (key === 'week' || key === '7days') return { dateFrom: addDays(normalizedToday, -6), dateTo: normalizedToday }
-  if (key === 'previousMonth') {
-    const parsed = parseLocalDate(normalizedToday)
-    const previousEnd = new Date(parsed.getFullYear(), parsed.getMonth(), 0, 12, 0, 0, 0)
-    const previousStart = new Date(previousEnd.getFullYear(), previousEnd.getMonth(), 1, 12, 0, 0, 0)
-    return { dateFrom: normalizeBazaarDate(previousStart), dateTo: normalizeBazaarDate(previousEnd) }
-  }
+  const currentWeekStart = startOfWeek(normalizedToday)
+  if (key === 'previousWeek') return { dateFrom: addDays(currentWeekStart, -7), dateTo: addDays(currentWeekStart, -1) }
+  if (key === 'previousCurrentWeek') return { dateFrom: addDays(currentWeekStart, -7), dateTo: addDays(currentWeekStart, 6) }
+  if (key === 'currentWeek') return { dateFrom: currentWeekStart, dateTo: addDays(currentWeekStart, 6) }
+  if (key === 'currentNextWeek') return { dateFrom: currentWeekStart, dateTo: addDays(currentWeekStart, 13) }
+  if (key === 'nextWeek') return { dateFrom: addDays(currentWeekStart, 7), dateTo: addDays(currentWeekStart, 13) }
+  if (key === 'previousMonth') return monthRange(normalizedToday, -1)
+  if (key === 'nextMonth') return monthRange(normalizedToday, 1)
   return { dateFrom: `${normalizedToday.slice(0, 8)}01`, dateTo: normalizedToday }
 }
 

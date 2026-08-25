@@ -67,14 +67,15 @@ test('Daily Bazaar entry uses active employees, cash/card entry methods, and dur
   assert.doesNotMatch(page, /receipt_reference|l\.reference|l\.receipt/)
 })
 
-test('Daily Bazaar native date controls display through the shared date formatter', () => {
+test('Daily Bazaar dates display through shared formatters and the entry keeps a native date control', () => {
   const page = readSource('src/pages/DailyBazaar.jsx')
 
   assert.match(page, /function FormattedDateInput/)
   assert.match(page, /formatLongDate\(value, lang, value\)/)
   assert.match(page, /<FormattedDateInput value=\{form\.purchase_date\}/)
-  assert.match(page, /<FormattedDateInput value=\{dateFrom\}/)
-  assert.match(page, /<FormattedDateInput value=\{dateTo\}/)
+  assert.match(page, /function DateRangePicker/)
+  assert.match(page, /formatLongDate\(dateFrom, lang, dateFrom\)/)
+  assert.match(page, /formatLongDate\(dateTo, lang, dateTo\)/)
 })
 
 test('Daily Bazaar history defaults to today and shows only structured entries in a compact paginated ledger', () => {
