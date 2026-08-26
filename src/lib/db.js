@@ -12,7 +12,7 @@ import {
   normalizePriceMode,
   withPriceModeFields,
 } from './priceModes.js'
-import { notifyTelegramOrderStatus } from './telegramNotifications.js'
+import { notifyTelegramMenuUnavailable, notifyTelegramOrderStatus } from './telegramNotifications.js'
 import {
   isOffPremiseOrderType,
   normalizeOrderType,
@@ -967,7 +967,12 @@ export async function writeToSupabase(action, state, options = {}) {
           throw cancellationError
         }
         if (markMenuUnavailable && menuItemId) {
-          await supabase.from('menu_items').update({ available: false }).eq('id', menuItemId)
+          const { error: availabilityError } = await supabase
+            .from('menu_items')
+            .update({ available: false })
+            .eq('id', menuItemId)
+          if (availabilityError) throw availabilityError
+          void notifyTelegramMenuUnavailable(menuItemId)
         }
       }
       let query = status === 'cancelled'
@@ -1517,6 +1522,9 @@ export async function writeToSupabase(action, state, options = {}) {
       const normalizedFields = trimMenuItemTextFields(fields)
       const { error } = await supabase.from('menu_items').update(normalizedFields).eq('id', id)
       if (error) throw error
+      if (normalizedFields.available === false) {
+        void notifyTelegramMenuUnavailable(id)
+      }
       const { error: costError } = await supabase.from('menu_item_costs').upsert({
         menu_item_id: id,
         cost_price: Math.max(0, Math.round(Number(costPrice ?? _costPriceAlias) || 0)),

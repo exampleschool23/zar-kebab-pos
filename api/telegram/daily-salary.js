@@ -12,6 +12,10 @@ import {
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
 import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
+import {
+  buildDailyUnavailableMenuTeamMessage,
+  getRussianMenuItemName,
+} from './_lib/menuAvailabilityMessages.js'
 import { notifyAutomaticKpiBonus } from './employee-notification.js'
 import { getOrderRevenueTotal } from '../../src/lib/analytics.js'
 import { getOrdersCostTotal, hasOrdersCostCoverage } from '../../src/lib/profit.js'
@@ -27,6 +31,11 @@ function requireCronSecret(req) {
   if (!expected || getBearerToken(req) !== expected) {
     throw Object.assign(new Error('Unauthorized'), { status: 401 })
   }
+}
+
+function getCronTask(req) {
+  const requestUrl = new URL(req.url || '/', 'http://localhost')
+  return String(requestUrl.searchParams.get('task') || '').trim()
 }
 
 function isMissingDailyKpiMigration(error) {
@@ -86,6 +95,160 @@ async function loadInvestorGroupTarget(supabase) {
   return {
     chatId: String(data.chat_id || fallback.chatId).trim(),
     language: String(data.language || fallback.language || 'ru').trim(),
+  }
+}
+
+async function loadTeamGroupTarget(supabase) {
+  const fallbackChatId = String(process.env.TELEGRAM_TEAM_CHAT_ID || '').trim()
+  const { data, error } = await supabase
+    .from('telegram_notification_targets')
+    .select('chat_id, is_enabled')
+    .eq('target_key', 'team_events')
+    .maybeSingle()
+  if (error) throw error
+  if (data && !data.is_enabled) return { chatId: '' }
+  return { chatId: String(data?.chat_id || fallbackChatId).trim() }
+}
+
+async function loadUnavailableMenuItems(supabase) {
+  const { data: categories, error: categoryError } = await supabase
+    .from('menu_categories')
+    .select('id')
+    .is('deleted_at', null)
+  if (categoryError) throw categoryError
+  const activeCategoryIds = (categories || []).map(category => category.id).filter(Boolean)
+  if (activeCategoryIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('menu_items')
+    .select('id, category_id, name_ru, name_uz, name_en, sort_order')
+    .eq('available', false)
+    .is('deleted_at', null)
+    .in('category_id', activeCategoryIds)
+    .order('sort_order', { ascending: true })
+    .order('name_ru', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+function unavailableMenuSnapshot(items) {
+  return {
+    item_count: items.length,
+    item_ids: items.map(item => String(item.id || '')).filter(Boolean),
+    item_names: items.map(getRussianMenuItemName),
+  }
+}
+
+async function claimDailyUnavailableMenuDelivery(supabase, businessDate, items) {
+  const { data: existing, error: existingError } = await supabase
+    .from('daily_unavailable_menu_notification_deliveries')
+    .select('*')
+    .eq('business_date', businessDate)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (existing?.status === 'sent' || existing?.status === 'skipped') return null
+  if (existing?.status === 'pending' && !canRetryPending(existing.attempted_at)) return null
+
+  const now = new Date().toISOString()
+  const pendingFields = {
+    target_key: 'team_events',
+    ...unavailableMenuSnapshot(items),
+    status: 'pending',
+    telegram_chat_id: null,
+    telegram_message_id: null,
+    error_message: '',
+    attempted_at: now,
+    sent_at: null,
+    updated_at: now,
+  }
+  if (!existing) {
+    const created = await supabase
+      .from('daily_unavailable_menu_notification_deliveries')
+      .insert({ business_date: businessDate, ...pendingFields })
+      .select('*')
+      .single()
+    if (created.error?.code === '23505') return null
+    if (created.error) throw created.error
+    return created.data
+  }
+
+  let claim = supabase
+    .from('daily_unavailable_menu_notification_deliveries')
+    .update(pendingFields)
+    .eq('business_date', businessDate)
+    .eq('status', existing.status)
+  if (existing.attempted_at) claim = claim.eq('attempted_at', existing.attempted_at)
+  else claim = claim.is('attempted_at', null)
+  const claimed = await claim.select('*').maybeSingle()
+  if (claimed.error) throw claimed.error
+  return claimed.data || null
+}
+
+async function markDailyUnavailableMenuDeliverySent(
+  supabase,
+  businessDate,
+  target,
+  telegramMessageId
+) {
+  let lastError = null
+  const sentAt = new Date().toISOString()
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const updated = await supabase
+      .from('daily_unavailable_menu_notification_deliveries')
+      .update({
+        status: 'sent',
+        telegram_chat_id: target.chatId,
+        telegram_message_id: telegramMessageId,
+        error_message: '',
+        sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('business_date', businessDate)
+      .select('business_date')
+      .maybeSingle()
+    if (!updated.error && updated.data) return
+    lastError = updated.error || new Error('Unavailable-menu delivery row disappeared')
+  }
+  throw lastError
+}
+
+async function sendDailyUnavailableMenuNotification(supabase, businessDate) {
+  const items = await loadUnavailableMenuItems(supabase)
+  const delivery = await claimDailyUnavailableMenuDelivery(supabase, businessDate, items)
+  if (!delivery) return { businessDate, itemCount: items.length, status: 'duplicate' }
+
+  let target = { chatId: '' }
+  let telegramMessageId = ''
+  try {
+    target = await loadTeamGroupTarget(supabase)
+    if (!target.chatId) throw new Error('ZarKebab Team Telegram group is not configured')
+    const response = await sendTelegramMessage(
+      target.chatId,
+      buildDailyUnavailableMenuTeamMessage(items, businessDate)
+    )
+    telegramMessageId = getTelegramMessageId(response)
+    await markDailyUnavailableMenuDeliverySent(
+      supabase,
+      businessDate,
+      target,
+      telegramMessageId
+    )
+    return { businessDate, itemCount: items.length, status: 'sent' }
+  } catch (error) {
+    if (!telegramMessageId) {
+      await supabase
+        .from('daily_unavailable_menu_notification_deliveries')
+        .update({
+          status: 'failed',
+          telegram_chat_id: target.chatId || null,
+          error_message: String(error?.message || error).slice(0, 1000),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('business_date', businessDate)
+    } else {
+      console.error('[telegram/daily-salary] unavailable-menu message sent but delivery status was not persisted:', error)
+    }
+    throw error
   }
 }
 
@@ -619,6 +782,11 @@ export default async function handler(req, res) {
     requireCronSecret(req)
     const supabase = getSupabaseAdmin()
     const now = new Date()
+    if (getCronTask(req) === 'unavailable-products') {
+      const businessDate = getTashkentDate(now)
+      const result = await sendDailyUnavailableMenuNotification(supabase, businessDate)
+      return json(res, 200, { ok: true, ...result })
+    }
     const notificationDate = getCompletedTashkentDate(now)
     const catchUpDates = getCompletedTashkentDates(now, KPI_CATCH_UP_DAYS)
     const kpiRuns = []

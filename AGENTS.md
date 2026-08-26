@@ -369,6 +369,15 @@ These bugs were recently fixed and are now protected by tests:
    - Calculated meal rows reduce the report remainder but do not claim a cash/card/terminal payment method or mutate the recorded expense ledger.
    - The aggregate daily Telegram message shows the employee-count formula and goes to the configured ZarKebab Investor group. Its legacy database target key remains `salary_events` for delivery-history compatibility.
 
+46. Making a menu product unavailable notifies ZarKebab Team in Russian.
+   - Every authenticated `available: true -> false` transition queues an immutable delivery row with the Russian product-name snapshot and the staff profile that made the change.
+   - Admin Menu saves, quick availability toggles, and kitchen cancellation paths all use the same database-backed event and shared authenticated Telegram endpoint.
+   - The Team message is always Russian, regardless of the Telegram target language, and includes both the product and the employee name.
+   - Delivery is duplicate-safe; editing a product that is already unavailable must never announce it again.
+   - Product archival does not change `available` and must not create an unavailable-product announcement.
+   - At 08:00 Tashkent each day, the shared Telegram cron sends ZarKebab Team one Russian snapshot of every unavailable active product, or confirms that all products are available.
+   - The daily snapshot excludes archived products and products in archived categories, records the exact ids/names sent, and is duplicate-safe per Tashkent business date.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -495,6 +504,12 @@ Run migrations in order. Important recent files:
 
 - `supabase/140_tech_card_feature_access.sql`
   Adds the independent `tech_cards` page permission, enforces it on protected recipe reads, and keeps recipe writes additionally gated by Manage Menu.
+
+- `supabase/142_menu_unavailable_team_notifications.sql`
+  Queues duplicate-safe ZarKebab Team delivery tracking for each menu-product transition to unavailable, including immutable Russian product and staff-name snapshots.
+
+- `supabase/143_daily_unavailable_menu_team_notifications.sql`
+  Stores one duplicate-safe unavailable-menu snapshot delivery per Tashkent date for the 08:00 ZarKebab Team cron.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

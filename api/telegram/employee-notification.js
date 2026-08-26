@@ -15,6 +15,7 @@ import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salar
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
 import { buildInvestorIncomeGroupMessage } from './_lib/investorIncomeMessages.js'
+import { buildMenuUnavailableTeamMessage } from './_lib/menuAvailabilityMessages.js'
 import {
   getSalaryEventRetryTargets,
   getSalaryPaymentRetryTargets,
@@ -91,6 +92,34 @@ async function requireExpensesWriteAccess(req) {
     user,
     actorName: profile?.full_name || profile?.email || user.email || '',
   }
+}
+
+async function requireMenuWriteAccess(req) {
+  const token = getBearerToken(req)
+  if (!token) throw Object.assign(new Error('Authentication required'), { status: 401 })
+
+  const supabase = getSupabaseAdmin()
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !user) throw Object.assign(new Error('Invalid or expired session'), { status: 401 })
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, status, full_name, email, feature_access')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (profileError) throw profileError
+
+  const role = String(profile?.role || '').toLowerCase()
+  const access = Array.isArray(profile?.feature_access) ? profile.feature_access : null
+  const isPrimaryOwner = role === 'owner'
+    && FEATURE_ACCESS_MANAGER_EMAILS.has(String(profile?.email || '').trim().toLowerCase())
+  const hasImplicitOwnerAccess = role === 'owner' && access === null
+  const hasExplicitMenuWrite = EDITOR_ROLES.has(role) && access?.includes('menu')
+  if (profile?.status !== 'active' || (!isPrimaryOwner && !hasImplicitOwnerAccess && !hasExplicitMenuWrite)) {
+    throw Object.assign(new Error('Forbidden'), { status: 403 })
+  }
+
+  return { supabase, user }
 }
 
 async function loadSalaryGroupTarget(supabase) {
@@ -225,6 +254,121 @@ function savedTeamDeliveryResult(delivery, duplicate = true) {
     telegramMessageId: delivery?.team_telegram_message_id || null,
     sentAt: delivery?.team_sent_at || null,
     errorMessage: delivery?.team_error_message || '',
+  }
+}
+
+function savedMenuUnavailableDeliveryResult(delivery, duplicate = true) {
+  return {
+    ok: delivery?.status === 'sent',
+    status: delivery?.status || 'pending',
+    duplicate,
+    deliveryId: delivery?.id || null,
+    telegramMessageId: delivery?.telegram_message_id || null,
+    sentAt: delivery?.sent_at || null,
+    errorMessage: delivery?.error_message || '',
+  }
+}
+
+function canRetryMenuUnavailableDelivery(delivery) {
+  if (!delivery) return false
+  if (['not_attempted', 'failed'].includes(delivery.status)) return true
+  if (delivery.status !== 'pending') return false
+  const attemptedAt = Date.parse(delivery.attempted_at || '')
+  return !Number.isFinite(attemptedAt) || Date.now() - attemptedAt >= PENDING_DELIVERY_RETRY_MS
+}
+
+async function notifyMenuUnavailable(supabase, user, menuItemId) {
+  const normalizedMenuItemId = String(menuItemId || '').trim()
+  if (!normalizedMenuItemId) {
+    throw Object.assign(new Error('menuItemId is required'), { status: 400 })
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('menu_item_unavailable_notification_deliveries')
+    .select('*')
+    .eq('menu_item_id', normalizedMenuItemId)
+    .eq('actor_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (!existing) {
+    throw Object.assign(new Error('Unavailable menu item event not found'), { status: 404 })
+  }
+  if (!canRetryMenuUnavailableDelivery(existing)) {
+    return savedMenuUnavailableDeliveryResult(existing)
+  }
+
+  const target = await loadSalaryTeamTarget(supabase)
+  const now = new Date().toISOString()
+  const pendingFields = {
+    status: target.chatId ? 'pending' : 'skipped',
+    telegram_chat_id: target.chatId || null,
+    telegram_message_id: null,
+    error_message: target.chatId ? '' : 'ZarKebab Team Telegram group is not configured',
+    attempted_at: now,
+    sent_at: null,
+    updated_at: now,
+  }
+  const claimed = await supabase
+    .from('menu_item_unavailable_notification_deliveries')
+    .update(pendingFields)
+    .eq('id', existing.id)
+    .eq('status', existing.status)
+    .eq('updated_at', existing.updated_at)
+    .select('*')
+    .maybeSingle()
+  if (claimed.error) throw claimed.error
+  if (!claimed.data) {
+    const { data: concurrent, error: concurrentError } = await supabase
+      .from('menu_item_unavailable_notification_deliveries')
+      .select('*')
+      .eq('id', existing.id)
+      .single()
+    if (concurrentError) throw concurrentError
+    return savedMenuUnavailableDeliveryResult(concurrent)
+  }
+  if (!target.chatId) {
+    return savedMenuUnavailableDeliveryResult(claimed.data, false)
+  }
+
+  try {
+    const text = buildMenuUnavailableTeamMessage(claimed.data)
+    const response = await sendTelegramMessage(target.chatId, text)
+    const sentAt = new Date().toISOString()
+    const telegramMessageId = getTelegramMessageId(response)
+    const { data: sentDelivery, error: updateError } = await supabase
+      .from('menu_item_unavailable_notification_deliveries')
+      .update({
+        status: 'sent',
+        telegram_message_id: telegramMessageId,
+        error_message: '',
+        sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('id', existing.id)
+      .select('*')
+      .single()
+    if (updateError) throw updateError
+    return savedMenuUnavailableDeliveryResult(sentDelivery, false)
+  } catch (error) {
+    const errorMessage = String(error?.message || error).slice(0, 1000)
+    await supabase
+      .from('menu_item_unavailable_notification_deliveries')
+      .update({
+        status: 'failed',
+        error_message: errorMessage,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+    return {
+      ...savedMenuUnavailableDeliveryResult(existing, false),
+      ok: false,
+      status: 'failed',
+      telegramMessageId: null,
+      sentAt: null,
+      errorMessage,
+    }
   }
 }
 
@@ -1058,7 +1202,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
   try {
-    const { type, fineId, paymentId, bonusId, absenceId, rateId, expenseId } = await readJson(req)
+    const { type, fineId, paymentId, bonusId, absenceId, rateId, expenseId, menuItemId } = await readJson(req)
     const notificationType = type
       || (paymentId
         ? 'payment'
@@ -1072,7 +1216,9 @@ export default async function handler(req, res) {
                 ? 'rate'
                 : expenseId
                   ? 'investor_income'
-                : '')
+                  : menuItemId
+                    ? 'menu_unavailable'
+                    : '')
     const eventIds = {
       payment: paymentId,
       fine: fineId,
@@ -1081,16 +1227,25 @@ export default async function handler(req, res) {
       rate: rateId,
       investor_income: expenseId,
     }
-    if (!['fine', 'payment', 'bonus', 'absence', 'rate', 'investor_income'].includes(notificationType)) {
+    const isMenuUnavailable = notificationType === 'menu_unavailable'
+    if (!isMenuUnavailable && !['fine', 'payment', 'bonus', 'absence', 'rate', 'investor_income'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
-    if (!eventIds[notificationType]) {
+    if (isMenuUnavailable && !menuItemId) {
+      return json(res, 400, { error: 'menuItemId is required' })
+    }
+    if (!isMenuUnavailable && !eventIds[notificationType]) {
       return json(res, 400, { error: `${notificationType}Id is required` })
     }
 
-    const { supabase, user, actorName } = await requireExpensesWriteAccess(req)
+    const access = isMenuUnavailable
+      ? await requireMenuWriteAccess(req)
+      : await requireExpensesWriteAccess(req)
+    const { supabase, user, actorName } = access
     let result
-    if (notificationType === 'investor_income') {
+    if (isMenuUnavailable) {
+      result = await notifyMenuUnavailable(supabase, user, menuItemId)
+    } else if (notificationType === 'investor_income') {
       result = await notifyInvestorIncome(supabase, user, expenseId)
     } else if (notificationType === 'payment') {
       result = await notifyPayment(supabase, user, paymentId)
