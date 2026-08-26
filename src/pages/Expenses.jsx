@@ -44,7 +44,7 @@ import {
   EXPENSE_PAYMENT_METHODS,
   INCOME_CATEGORIES,
   MANUAL_EXPENSE_CATEGORIES,
-  buildEmployeeMealExpenseRows,
+  buildFinalizedEmployeeMealExpenseRows,
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
@@ -215,6 +215,7 @@ export default function Expenses() {
   const [activeRangeKey, setActiveRangeKey] = useState('month')
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
+  const [employeeMealSnapshots, setEmployeeMealSnapshots] = useState([])
   const [paidOrderSummary, setPaidOrderSummary] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -560,6 +561,13 @@ export default function Expenses() {
       loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
     ])
+    const employeeMealPromise = loadPagedResult((from, to) => supabase
+      .from('employee_daily_meal_expenses')
+      .select('business_date, average_daily_amount, present_employee_count, total_amount, source_type, finalized_at, created_at')
+      .gte('business_date', dateFrom)
+      .lte('business_date', dateTo)
+      .order('business_date', { ascending: false })
+      .range(from, to))
     const fallbackMenuItemMap = Object.fromEntries(state.menuItems.map(item => [item.id, item]))
     const orderPromise = loadAccountingPaidOrderSummary(dateFrom, dateTo, { fallbackMenuItemMap })
       .then(data => ({ data, error: null }))
@@ -568,8 +576,9 @@ export default function Expenses() {
     const [
       expenseResult,
       orderHistoryResult,
+      employeeMealResult,
       [salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult],
-    ] = await Promise.all([expensePromise, orderPromise, salaryPromise])
+    ] = await Promise.all([expensePromise, orderPromise, employeeMealPromise, salaryPromise])
     if (requestId !== loadRequestRef.current) return
 
     let loadError = ''
@@ -587,6 +596,13 @@ export default function Expenses() {
       loadError ||= orderHistoryResult.error.message || l.loadFailed
     } else {
       setPaidOrderSummary(orderHistoryResult.data || {})
+    }
+
+    if (employeeMealResult.error) {
+      setEmployeeMealSnapshots([])
+      loadError ||= employeeMealResult.error.message || l.loadFailed
+    } else {
+      setEmployeeMealSnapshots(employeeMealResult.data || [])
     }
 
     const salaryError = salaryProfileResult.error
@@ -636,13 +652,8 @@ export default function Expenses() {
   ), [salaryProfiles, dateFrom, dateTo])
 
   const employeeMealExpenses = useMemo(() => (
-    buildEmployeeMealExpenseRows(
-      salaryProfiles,
-      dateFrom,
-      dateTo < todayExpenseDate() ? dateTo : todayExpenseDate(),
-      state.settings?.averageDailyEmployeeMealUzs,
-    )
-  ), [salaryProfiles, dateFrom, dateTo, state.settings?.averageDailyEmployeeMealUzs])
+    buildFinalizedEmployeeMealExpenseRows(employeeMealSnapshots)
+  ), [employeeMealSnapshots])
 
   const allExpenses = useMemo(() => (
     [...salaryExpenses, ...salaryBonusExpenses, ...employeeMealExpenses, ...expenses]

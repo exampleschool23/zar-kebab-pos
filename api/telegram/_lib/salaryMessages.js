@@ -252,6 +252,7 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   rent = 0,
   utilities = 0,
   employeeMealPerEmployee = 0,
+  employeeMealPresentEmployeeCount = null,
 } = {}) {
   const profiles = Array.isArray(salaryProfiles) ? salaryProfiles : []
   const results = Array.isArray(kpiResults) ? kpiResults : []
@@ -264,7 +265,10 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     .reduce((total, result) => total + normalizeExpenseAmount(result?.bonus_amount), 0)
   const rentTotal = normalizeExpenseAmount(rent)
   const utilitiesTotal = normalizeExpenseAmount(utilities)
-  const presentEmployeeCount = profiles.filter(profile => !getSalaryAbsenceForDate(profile, date)).length
+  const calculatedPresentEmployeeCount = profiles.filter(profile => !getSalaryAbsenceForDate(profile, date)).length
+  const presentEmployeeCount = employeeMealPresentEmployeeCount == null
+    ? calculatedPresentEmployeeCount
+    : normalizeExpenseAmount(employeeMealPresentEmployeeCount)
   const employeeMealPerEmployeeTotal = normalizeExpenseAmount(employeeMealPerEmployee)
   const employeeMealTotal = employeeMealPerEmployeeTotal * presentEmployeeCount
   const normalizedGrossProfit = Number.isFinite(Number(grossProfit))

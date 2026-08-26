@@ -20,11 +20,12 @@ import {
 import { notifyAutomaticKpiBonus } from './employee-notification.js'
 import { getOrderRevenueTotal } from '../../src/lib/analytics.js'
 import { getOrdersCostTotal, hasOrdersCostCoverage } from '../../src/lib/profit.js'
-import { convertSalaryAmountToDaily } from '../../src/lib/expenses.js'
+import { allocateMonthlySalaryToDate } from '../../src/lib/expenses.js'
 import { isDineInOrderType } from '../../src/lib/orderTypes.js'
 import { PRICE_MODE_TOURIST } from '../../src/lib/priceModes.js'
 
-const KPI_CATCH_UP_DAYS = 7
+const KPI_RETRY_LOOKBACK_DAYS = 7
+const KPI_MISSING_DATE_BATCH_SIZE = 31
 const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
 
 function requireCronSecret(req) {
@@ -42,9 +43,38 @@ function getCronTask(req) {
 function isMissingDailyKpiMigration(error) {
   return ['42883', 'PGRST202', 'PGRST205'].includes(error?.code)
     || (
-      /generate_daily_kpi_bonuses|employee_daily_kpi/i.test(error?.message || '')
+      /generate_daily_kpi_bonuses|get_pending_daily_kpi_dates|employee_daily_kpi|generate_employee_daily_meal_expense|employee_daily_meal/i.test(error?.message || '')
       && /does not exist|schema cache|could not find/i.test(error?.message || '')
     )
+}
+
+async function loadKpiCatchUpDates(supabase, now) {
+  const retryDates = getCompletedTashkentDates(now, KPI_RETRY_LOOKBACK_DAYS)
+  const [kpiPendingResult, mealPendingResult] = await Promise.all([
+    supabase.rpc('get_pending_daily_kpi_dates', {
+      p_limit: KPI_MISSING_DATE_BATCH_SIZE,
+    }),
+    supabase.rpc('get_pending_employee_meal_dates', {
+      p_limit: KPI_MISSING_DATE_BATCH_SIZE,
+    }),
+  ])
+  const pendingError = kpiPendingResult.error || mealPendingResult.error
+  if (pendingError) {
+    // Rolling-deployment fallback. Migration 147 removes the permanent
+    // seven-day recovery ceiling by returning outstanding KPI and meal dates.
+    if (isMissingDailyKpiMigration(pendingError)) return retryDates
+    throw pendingError
+  }
+  const missingDates = [
+    ...(kpiPendingResult.data || []),
+    ...(mealPendingResult.data || []),
+  ]
+    .map(row => String(row?.business_date || row || '').slice(0, 10))
+    .filter(Boolean)
+  const notificationDate = getCompletedTashkentDate(now)
+  return [...new Set([...retryDates, ...missingDates])].sort((a, b) => (
+    a === notificationDate ? -1 : b === notificationDate ? 1 : a.localeCompare(b)
+  ))
 }
 
 function isEligibleForSalaryDate(salaryProfile, notificationDate) {
@@ -419,7 +449,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
   ))
   const profileIds = eligibleProfiles.map(profile => profile.id)
   const emptyRelatedResult = { data: [], error: null }
-  const [ratesResult, absencesResult, salesResult, settingsResult] = await Promise.all([
+  const [ratesResult, absencesResult, salesResult, settingsResult, employeeMealResult] = await Promise.all([
     profileIds.length > 0
       ? supabase
           .from('employee_salary_rates')
@@ -442,14 +472,21 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
       .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
     supabase
       .from('business_settings')
-      .select('monthly_rent_uzs, monthly_utilities_uzs, average_daily_employee_meal_uzs')
+      .select('monthly_rent_uzs, monthly_utilities_uzs')
       .eq('id', 'default')
+      .maybeSingle(),
+    supabase
+      .from('employee_daily_meal_expenses')
+      .select('business_date, average_daily_amount, present_employee_count, total_amount')
+      .eq('business_date', businessDate)
       .maybeSingle(),
   ])
   if (ratesResult.error) throw ratesResult.error
   if (absencesResult.error) throw absencesResult.error
   if (salesResult.error) throw salesResult.error
   if (settingsResult.error) throw settingsResult.error
+  if (employeeMealResult.error) throw employeeMealResult.error
+  if (!employeeMealResult.data) throw new Error(`Employee meal expense was not finalized for ${businessDate}`)
 
   const salaryProfiles = eligibleProfiles.map(profile => ({
     ...profile,
@@ -477,14 +514,8 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
   const grossProfit = hasOrdersCostCoverage(paidOrders)
     ? cafeIncome - getOrdersCostTotal(paidOrders)
     : null
-  const dailyRent = convertSalaryAmountToDaily(
-    settingsResult.data?.monthly_rent_uzs,
-    'monthly'
-  )
-  const dailyUtilities = convertSalaryAmountToDaily(
-    settingsResult.data?.monthly_utilities_uzs,
-    'monthly'
-  )
+  const dailyRent = allocateMonthlySalaryToDate(settingsResult.data?.monthly_rent_uzs, businessDate)
+  const dailyUtilities = allocateMonthlySalaryToDate(settingsResult.data?.monthly_utilities_uzs, businessDate)
   return getDailyPayrollGroupSummary(salaryProfiles, kpiResults, businessDate, {
     cafeIncome,
     regularDineInIncome,
@@ -493,7 +524,8 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     grossProfit,
     rent: dailyRent,
     utilities: dailyUtilities,
-    employeeMealPerEmployee: settingsResult.data?.average_daily_employee_meal_uzs,
+    employeeMealPerEmployee: employeeMealResult.data.average_daily_amount,
+    employeeMealPresentEmployeeCount: employeeMealResult.data.present_employee_count,
   })
 }
 
@@ -693,6 +725,14 @@ async function finalizeDailyKpiDate(supabase, businessDate) {
   return data || []
 }
 
+async function finalizeEmployeeMealDate(supabase, businessDate) {
+  const { data, error } = await supabase.rpc('generate_employee_daily_meal_expense', {
+    p_business_date: businessDate,
+  })
+  if (error) throw error
+  return data?.[0] || null
+}
+
 async function deliverAutomaticKpiBonuses(supabase, results) {
   const generatedResults = (results || []).filter(
     result => result.status === 'generated' && result.bonus_id
@@ -812,7 +852,7 @@ export default async function handler(req, res) {
       return json(res, 200, { ok: true, ...result })
     }
     const notificationDate = getCompletedTashkentDate(now)
-    const catchUpDates = getCompletedTashkentDates(now, KPI_CATCH_UP_DAYS)
+    const catchUpDates = await loadKpiCatchUpDates(supabase, now)
     const kpiRuns = []
     const kpiDeliveries = []
     const kpiResultsByDate = new Map()
@@ -820,6 +860,7 @@ export default async function handler(req, res) {
 
     for (const businessDate of catchUpDates) {
       try {
+        await finalizeEmployeeMealDate(supabase, businessDate)
         const results = await finalizeDailyKpiDate(supabase, businessDate)
         kpiResultsByDate.set(businessDate, results)
         const deliveries = await deliverAutomaticKpiBonuses(supabase, results)
@@ -836,7 +877,7 @@ export default async function handler(req, res) {
           kpiRuns.push({
             businessDate,
             status: 'unavailable',
-            error: 'Run supabase/129_daily_kpi_bonuses.sql',
+            error: 'Run supabase/129_daily_kpi_bonuses.sql and supabase/147_financial_report_history_snapshots.sql',
           })
           break
         }
@@ -850,12 +891,22 @@ export default async function handler(req, res) {
 
     const notificationKpiRun = kpiRuns.find(run => run.businessDate === notificationDate)
     const kpiFinalizationFailed = notificationKpiRun?.status !== 'completed'
+    const summaryRetryDates = new Set(getCompletedTashkentDates(now, KPI_RETRY_LOOKBACK_DAYS))
     const dailySummaryRuns = []
     const dailyBazaarRuns = []
     const dailyPayrollGroupRuns = []
 
     for (const kpiRun of kpiRuns) {
       if (kpiRun.status !== 'completed') continue
+      if (!summaryRetryDates.has(kpiRun.businessDate)) {
+        dailySummaryRuns.push({
+          businessDate: kpiRun.businessDate,
+          status: 'skipped_outside_delivery_window',
+          sentCount: 0,
+          failedCount: 0,
+        })
+        continue
+      }
       try {
         const summaryResults = await sendDailySalaryNotifications(
           supabase,

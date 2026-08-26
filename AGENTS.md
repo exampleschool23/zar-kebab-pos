@@ -364,12 +364,20 @@ These bugs were recently fixed and are now protected by tests:
 
 45. Average employee meals are attendance-based calculated operating costs.
    - `business_settings.average_daily_employee_meal_uzs` is the average daily amount for each present employee, not a one-time restaurant total.
-   - Reports, Accounting, and All Accounting calculate one non-deletable `employee_meals` row per completed day as present employees multiplied by the configured average.
+   - `employee_daily_meal_expenses` freezes one immutable completed-day row containing the configured-rate snapshot, present-employee count, and total. Reports, Accounting, All Accounting, Monthly Estimate, and Telegram must read that snapshot instead of recalculating historical dates from today's setting.
+   - Migration `147` freezes legacy dates once with the only recoverable pre-ledger input: the rate configured when the migration is applied. Later rate edits affect only subsequently finalized dates.
+   - The daily cron asks the database for missing meal dates independently of KPI runs and repairs them in bounded batches, including for restaurants with no KPI rule.
    - Recorded absences and employment start/end boundaries control who is counted. Future days are excluded from actual reports.
    - Calculated meal rows reduce the report remainder but do not claim a cash/card/terminal payment method or mutate the recorded expense ledger.
    - The aggregate daily Telegram message shows the employee-count formula and goes to the configured ZarKebab Investor group. Its legacy database target key remains `salary_events` for delivery-history compatibility.
 
-46. Making a menu product available or unavailable notifies ZarKebab Team in Russian.
+46. Financial report history uses immutable category and daily snapshots.
+   - `order_items.category_id_snapshot` captures the product category when a sold item is created. `category_snapshot_captured` distinguishes an intentional null/uncategorized snapshot from a legacy row that still needs its one-time backfill. Category reports must prefer the snapshot over the product's current `category_id`.
+   - KPI rule effective dates cannot enter an already finalized period. The UI starts at the current Tashkent date and migration `147` enforces the latest finalized boundary for direct writes.
+   - The daily cron retries the recent delivery window and also asks the database for older missing KPI dates in bounded batches, so an outage longer than seven days eventually heals.
+   - Employee deactivation `ended_at` and reactivation dates are inclusive working dates. Only the intervening dates become absences, and archived `deleted_at` is stored as the exclusive boundary after the final working date.
+
+47. Making a menu product available or unavailable notifies ZarKebab Team in Russian.
    - Every authenticated `available: true -> false` and `false -> true` transition queues an immutable delivery row with the Russian product-name snapshot, transition type, and staff profile that made the change.
    - Admin Menu saves and quick availability toggles use the same database-backed event and shared authenticated Telegram endpoint; kitchen cancellation also uses the unavailable path.
    - Both Team messages are always Russian, regardless of the Telegram target language, and include the product and employee name.
@@ -378,7 +386,7 @@ These bugs were recently fixed and are now protected by tests:
    - At 08:00 Tashkent each day, the shared Telegram cron sends ZarKebab Team one Russian snapshot of every unavailable active product, or confirms that all products are available.
    - The daily snapshot excludes archived products and products in archived categories, groups products under their Russian category names in saved category order, records the exact ids/names/categories sent, and is duplicate-safe per Tashkent business date.
 
-47. Every newly recorded cash expense notifies ZarKebab Investor.
+48. Every newly recorded cash expense notifies ZarKebab Investor.
    - Inserts into `expenses` with `entry_type = 'expense'` queue an immutable delivery snapshot before the authenticated app requests Telegram delivery.
    - Manual Accounting expenses and new Daily Bazaar purchases both call the same shared notification endpoint; Bazaar edits and expense edits/deletes do not create another announcement.
    - The legacy `salary_events` target key remains the independently configured ZarKebab Investor group for delivery-history compatibility.
@@ -526,6 +534,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/146_menu_available_team_notifications.sql`
   Extends the immediate menu-availability ledger and trigger to queue duplicate-safe Team messages for both available and unavailable transitions without replaying historical events.
+
+- `supabase/147_financial_report_history_snapshots.sql`
+  Freezes daily employee-meal expenses and sold-item categories, prevents KPI rules from entering finalized periods, and exposes bounded recovery of missing KPI and employee-meal dates.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

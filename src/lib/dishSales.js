@@ -1,5 +1,6 @@
 import {
   getOrderDate,
+  getOrderItemCategoryId,
   getOrderItemProductId,
   getOrderItems,
   getRestaurantHour,
@@ -84,7 +85,7 @@ function createDishRowFromOrderItem(item, key) {
     name_uz: '',
     name_ru: '',
     name_en: name,
-    category_id: null,
+    category_id: getOrderItemCategoryId(item),
     image_url: item?.image_url || '',
     available: false,
     currentMenuItem: false,
@@ -163,6 +164,7 @@ export function getDishSalesAnalysis({ orders = [], menuItems = [], selectedDish
 
       if (!dishMap.has(key)) dishMap.set(key, createDishRowFromOrderItem(item, key))
       const dish = dishMap.get(key)
+      if (!dish.category_id) dish.category_id = getOrderItemCategoryId(item)
       const quantity = positiveQuantity(item.quantity)
       const unitPrice = getOrderItemUnitPrice(item)
       const revenue = unitPrice * quantity

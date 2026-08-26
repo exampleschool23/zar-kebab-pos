@@ -256,6 +256,32 @@ test('database health requires daily KPI calculation and source tracking', async
   assert.match(cliHealthSource, /p_business_date: null/)
 })
 
+test('database health requires immutable meal and sold-category snapshots', async () => {
+  const missingMeals = await runDbHealthChecks(makeClient({ missingTable: 'employee_daily_meal_expenses' }))
+  assert.equal(missingMeals.ok, false)
+  assert.match(
+    missingMeals.failed.find(check => check.name === 'employee_daily_meal_expenses').hint,
+    /147_financial_report_history_snapshots/
+  )
+
+  const missingCategory = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'order_items',
+    missingColumn: 'category_id_snapshot',
+  }))
+  assert.equal(missingCategory.ok, false)
+  assert.equal(
+    missingCategory.failed.find(check => check.name === 'order_items').detail,
+    'category_id_snapshot'
+  )
+  const missingCategoryCapture = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'order_items',
+    missingColumn: 'category_snapshot_captured',
+  }))
+  assert.equal(missingCategoryCapture.ok, false)
+  assert.match(cliHealthSource, /employee_daily_meal_expenses/)
+  assert.match(cliHealthSource, /category_id_snapshot/)
+})
+
 test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)
@@ -269,7 +295,10 @@ test('database health reports missing tables and missing RPC', async () => {
     'current_staff_can_write',
     'delete_bazaar_purchase',
     'generate_daily_kpi_bonuses',
+    'generate_employee_daily_meal_expense',
     'get_accounting_paid_order_summary',
+    'get_pending_daily_kpi_dates',
+    'get_pending_employee_meal_dates',
     'kitchen_round_receipts_version',
     'order_payments',
     'recall_table_from_cashier',

@@ -8,11 +8,13 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import {
   getOrderDate,
+  getOrderItemCategoryId,
   getOrderItems,
   getOrderLoyaltyIncomeTotal,
   getOrderPaymentBreakdown,
   getOrderPaymentSummary,
   getOrderRevenueTotal,
+  getRestaurantHour,
   getSoldOrderItems,
   getOrderTotal,
   groupOrdersBySession,
@@ -39,7 +41,7 @@ import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderT
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import {
   buildSalaryBonusExpenseRows,
-  buildEmployeeMealExpenseRows,
+  buildFinalizedEmployeeMealExpenseRows,
   buildSalaryPaymentExpenseRows,
   expenseCategoryLabel,
   expenseDescriptionLabel,
@@ -425,7 +427,8 @@ function BestSellingTab({ orders, menuItemMap, categories, lang }) {
       getSoldOrderItems(o).forEach(item => {
         const key = item.menu_item_id || item.name || 'unknown'
         const mi  = menuItemMap[item.menu_item_id]
-        const cat = mi ? categories.find(c => c.id === mi.category_id) : null
+        const categoryId = getOrderItemCategoryId(item, mi)
+        const cat = categoryId ? categories.find(c => c.id === categoryId) : null
         if (!map[key]) {
           map[key] = {
             name:     item.name || mi?.name_en || mi?.name_uz || 'Unknown',
@@ -948,7 +951,8 @@ function ByCategoryTab({ orders, categories, menuItemMap, lang }) {
     orders.forEach(o => {
       getSoldOrderItems(o).forEach(item => {
         const mi  = menuItemMap[item.menu_item_id]
-        const cat = mi ? categories.find(c => c.id === mi.category_id) : null
+        const categoryId = getOrderItemCategoryId(item, mi)
+        const cat = categoryId ? categories.find(c => c.id === categoryId) : null
         const key = cat?.id || '__uncategorized__'
         const lbl = cat ? getCategoryName(cat, lang) : 'Uncategorized'
         if (!map[key]) map[key] = { label: lbl, image: cat?.image_url || null, revenue: 0, qty: 0 }
@@ -1010,7 +1014,7 @@ function ByHourTab({ orders, lang }) {
     orders.forEach(o => {
       const d = getOrderDate(o)
       if (!d) return
-      const h = new Date(d).getHours()   // local hour
+      const h = getRestaurantHour(d)
       hrs[h].revenue += getOrderRevenueTotal(o)
       hrs[h].count   += 1
     })
@@ -1815,6 +1819,7 @@ export default function Reports() {
   const [savingPaymentOrderId, setSavingPaymentOrderId] = useState('')
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
+  const [employeeMealSnapshots, setEmployeeMealSnapshots] = useState([])
   const [expensesError, setExpensesError] = useState('')
   const [expenseBreakdownOpen, setExpenseBreakdownOpen] = useState(false)
   const [historyOrders, setHistoryOrders] = useState([])
@@ -1892,13 +1897,8 @@ export default function Reports() {
     buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
   ), [salaryProfiles, dateFrom, dateTo])
   const employeeMealExpenses = useMemo(() => (
-    buildEmployeeMealExpenseRows(
-      salaryProfiles,
-      dateFrom,
-      dateTo < todayStr() ? dateTo : todayStr(),
-      state.settings?.averageDailyEmployeeMealUzs,
-    )
-  ), [salaryProfiles, dateFrom, dateTo, state.settings?.averageDailyEmployeeMealUzs])
+    buildFinalizedEmployeeMealExpenseRows(employeeMealSnapshots)
+  ), [employeeMealSnapshots])
   const allExpenses = useMemo(
     () => [...salaryExpenses, ...salaryBonusExpenses, ...employeeMealExpenses, ...expenses],
     [salaryExpenses, salaryBonusExpenses, employeeMealExpenses, expenses],
@@ -1944,10 +1944,11 @@ export default function Reports() {
     async function loadExpenses() {
       if (!canViewExpenses) {
         setExpenses([])
+        setEmployeeMealSnapshots([])
         setExpensesError('')
         return
       }
-      const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult] = await Promise.all([
+      const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryAbsenceResult, teamResult, employeeMealResult] = await Promise.all([
         loadPagedResult((from, to) => supabase
           .from('expenses')
           .select('id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_at')
@@ -1962,6 +1963,7 @@ export default function Reports() {
         loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select('*').order('id').range(from, to)),
         loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
         loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_daily_meal_expenses').select('business_date, average_daily_amount, present_employee_count, total_amount, source_type, finalized_at, created_at').gte('business_date', dateFrom).lte('business_date', dateTo).order('business_date').range(from, to)),
       ])
       if (cancelled) return
       const { data, error } = expenseResult
@@ -1978,6 +1980,8 @@ export default function Reports() {
       }
       if (salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error) {
         setSalaryProfiles([])
+        const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
+        setExpensesError(current => current || salaryError?.message || 'Could not load salary accounting data')
       } else {
         setSalaryProfiles(composeSalaryProfiles(
           salaryProfileResult.data || [],
@@ -1987,6 +1991,12 @@ export default function Reports() {
           salaryAbsenceResult.data || [],
           teamResult.data || [],
         ))
+      }
+      if (employeeMealResult.error) {
+        setEmployeeMealSnapshots([])
+        setExpensesError(current => current || employeeMealResult.error.message || 'Could not load finalized employee meals')
+      } else {
+        setEmployeeMealSnapshots(employeeMealResult.data || [])
       }
     }
     loadExpenses()
@@ -2186,6 +2196,11 @@ export default function Reports() {
                 {ordersError}
               </div>
             )}
+            {canViewExpenses && expensesError && (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700" role="alert">
+                {expensesError}
+              </div>
+            )}
 
             {/* KPI cards */}
             <div className={`grid grid-cols-2 lg:grid-cols-3 ${canViewExpenses ? 'xl:grid-cols-6' : 'xl:grid-cols-3'} gap-4 mb-6`}>
@@ -2194,9 +2209,9 @@ export default function Reports() {
               <KpiCard icon={BarChart2}   iconCls="bg-blue-50 text-blue-600"     label={l.avgOrder}  value={formatCurrency(kpiAvg)} />
               {canViewExpenses && (
                 <>
-                  <KpiCard icon={CreditCard} iconCls="bg-red-50 text-red-600" label={l.expenses} value={formatCurrency(expenseSummary.total)} sub={expensesError || ''} />
-                  <KpiCard icon={UtensilsCrossed} iconCls="bg-amber-50 text-amber-700" label={l.employeeMeals} value={formatCurrency(employeeMealTotal)} sub={l.employeeMealsSub} />
-                  <KpiCard icon={DollarSign} iconCls={netIncome >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} label={l.netIncome} value={formatCurrency(netIncome)} />
+                  <KpiCard icon={CreditCard} iconCls="bg-red-50 text-red-600" label={l.expenses} value={expensesError ? '—' : formatCurrency(expenseSummary.total)} sub={expensesError || ''} />
+                  <KpiCard icon={UtensilsCrossed} iconCls="bg-amber-50 text-amber-700" label={l.employeeMeals} value={expensesError ? '—' : formatCurrency(employeeMealTotal)} sub={l.employeeMealsSub} />
+                  <KpiCard icon={DollarSign} iconCls={netIncome >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} label={l.netIncome} value={expensesError ? '—' : formatCurrency(netIncome)} />
                 </>
               )}
             </div>
@@ -2248,7 +2263,7 @@ export default function Reports() {
               </div>
             </div>
 
-            {canViewExpenses && (
+            {canViewExpenses && !expensesError && (
               <div
                 role="button"
                 tabIndex={0}
@@ -2374,7 +2389,7 @@ export default function Reports() {
           </>
         )}
 
-        {expenseBreakdownOpen && (
+        {expenseBreakdownOpen && !expensesError && (
           <ExpenseBreakdownDialog
             rows={expenseBreakdownRows}
             expenseSummary={expenseSummary}

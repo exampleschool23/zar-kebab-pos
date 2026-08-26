@@ -729,6 +729,8 @@ test('daily salary cron runs in the 01:00 Tashkent hour and reports the complete
     ['2026-07-27', '2026-07-28', '2026-07-29']
   )
   assert.match(dailySalaryEndpoint, /const notificationDate = getCompletedTashkentDate\(now\)/)
-  assert.match(dailySalaryEndpoint, /getCompletedTashkentDates\(now, KPI_CATCH_UP_DAYS\)/)
+  assert.match(dailySalaryEndpoint, /getCompletedTashkentDates\(now, KPI_RETRY_LOOKBACK_DAYS\)/)
+  assert.match(dailySalaryEndpoint, /get_pending_daily_kpi_dates/)
+  assert.match(dailySalaryEndpoint, /get_pending_employee_meal_dates/)
   assert.match(dailySalaryEndpoint, /finalizeDailyKpiDate[\s\S]*?sendDailySalaryNotifications/)
 })

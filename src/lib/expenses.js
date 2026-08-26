@@ -349,6 +349,31 @@ export function getEmployeeMealExpenseEstimate(
   }
 }
 
+export function buildFinalizedEmployeeMealExpenseRows(snapshotRows = []) {
+  return (snapshotRows || []).flatMap(snapshot => {
+    const businessDate = String(snapshot?.business_date || '').slice(0, 10)
+    const amount = normalizeExpenseAmount(snapshot?.total_amount)
+    if (!businessDate || amount <= 0) return []
+    return [{
+      id: `employee-meals-${businessDate}`,
+      entry_type: 'expense',
+      expense_date: businessDate,
+      category: 'employee_meals',
+      payment_method: 'calculated',
+      amount,
+      vendor: '',
+      description: 'Calculated employee meals',
+      created_by_name: '',
+      created_at: snapshot?.finalized_at || snapshot?.created_at || '',
+      is_employee_meal_estimate: true,
+      is_employee_meal_finalized: true,
+      present_employee_count: normalizeExpenseAmount(snapshot?.present_employee_count),
+      average_daily_employee_meal_uzs: normalizeExpenseAmount(snapshot?.average_daily_amount),
+      source_type: snapshot?.source_type || 'daily_finalizer',
+    }]
+  })
+}
+
 export function buildEmployeeMealExpenseRows(
   salaryProfiles = [],
   dateFrom,
@@ -367,7 +392,7 @@ export function buildEmployeeMealExpenseRows(
       const deletedAt = String(salaryProfile.deleted_at || '').slice(0, 10)
       if (joinedAt && joinedAt > date) return false
       if (endedAt && endedAt < date) return false
-      if (deletedAt && deletedAt <= date) return false
+      if (deletedAt && deletedAt < date) return false
       return !getSalaryAbsenceDates(salaryProfile).has(date)
     }).length
 
@@ -391,9 +416,12 @@ export function buildEmployeeMealExpenseRows(
 
 export function buildSalaryReactivationAbsenceRows(salaryProfile, reactivatedAt = todayExpenseDate(), note = 'Inactive employment period') {
   const salaryProfileId = salaryProfile?.id
-  const inactiveFrom = String(salaryProfile?.ended_at || '').slice(0, 10)
-  const inactiveUntil = String(reactivatedAt || todayExpenseDate()).slice(0, 10)
+  const endedAt = String(salaryProfile?.ended_at || '').slice(0, 10)
+  const reactivationDate = String(reactivatedAt || todayExpenseDate()).slice(0, 10)
+  const inactiveFrom = endedAt ? addLocalDateDays(endedAt, 1) : ''
+  const inactiveUntil = reactivationDate ? addLocalDateDays(reactivationDate, -1) : ''
   if (!salaryProfileId || !inactiveFrom || !inactiveUntil) return []
+  if (inactiveFrom > inactiveUntil) return []
   const existingAbsences = getSalaryAbsenceDates(salaryProfile)
   return listLocalDateRange(inactiveFrom, inactiveUntil)
     .filter(absenceDate => !existingAbsences.has(absenceDate))
@@ -596,6 +624,7 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
   let employeeOpeningArrears = 0
   let employeePaidTowardArrears = 0
   let employeeAppliedToCurrentMonth = 0
+  let employeePaymentAppliedToCurrentMonth = 0
 
   if (!isBeforeActiveMonth) {
     const dayBeforeMonth = addLocalDateDays(monthStart, -1)
@@ -639,6 +668,14 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
         projectedThisMonth,
         Math.max(0, settledThisMonth - paidTowardArrears),
       )
+      // Current-month fines reduce this month's operating payroll cost. Cash
+      // payments still settle an employee's opening arrears before they are
+      // allowed to reduce the selected month's remaining salary.
+      const fineAppliedToCurrentMonth = Math.min(projectedThisMonth, finedThisMonth)
+      const paymentAppliedToCurrentMonth = Math.min(
+        Math.max(0, projectedThisMonth - fineAppliedToCurrentMonth),
+        Math.max(0, appliedToCurrentMonth - fineAppliedToCurrentMonth),
+      )
 
       employeePaidToDate += paidThisMonth
       employeeFineToDate += finedThisMonth
@@ -646,6 +683,7 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
       employeeOpeningArrears += openingArrears
       employeePaidTowardArrears += paidTowardArrears
       employeeAppliedToCurrentMonth += appliedToCurrentMonth
+      employeePaymentAppliedToCurrentMonth += paymentAppliedToCurrentMonth
     }
   }
   const employeeRemainingThisMonth = Math.max(0, employeeProjectedMonth - employeeAppliedToCurrentMonth)
@@ -666,6 +704,7 @@ export function getEstimatedMonthlyExpenseSummary(salaryProfiles = [], asOfDate 
     employeeOpeningArrears,
     employeePaidTowardArrears,
     employeeAppliedToCurrentMonth,
+    employeePaymentAppliedToCurrentMonth,
     employeeRemainingThisMonth,
     employeeArrearsRemaining,
     employeeRemainingTotal,
@@ -680,7 +719,7 @@ export function getSelectedMonthSalaryOperatingSummary(salaryProfiles = [], asOf
       monthlyUtilitiesUzs: 0,
     })
     const expectedSalaryCost = Math.max(0, estimate.employeeProjectedMonth - estimate.employeeFineToDate)
-    const appliedPayment = Math.min(expectedSalaryCost, estimate.employeePaidToDate)
+    const appliedPayment = Math.min(expectedSalaryCost, estimate.employeePaymentAppliedToCurrentMonth)
 
     totals.projectedSalary += estimate.employeeProjectedMonth
     totals.fines += estimate.employeeFineToDate

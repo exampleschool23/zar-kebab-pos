@@ -219,6 +219,42 @@ test('dashboard analytics keep historical category context after category archiv
   assert.equal(rows.find(row => row.name === 'Kebab').revenue, 50000)
 })
 
+test('dashboard category sales prefer sold-item snapshots after a product moves category', () => {
+  const movedMenuMap = {
+    ...menuItemMap,
+    kebab: { ...menuItemMap.kebab, category_id: 'drinks' },
+  }
+  const snapshotOrder = order({
+    id: 'historical-category',
+    paidAt: '2026-05-19T10:00:00',
+    total: 50_000,
+    items: [{
+      ...item('kebab', 'Kebab', 2, 25_000),
+      category_id_snapshot: 'kebab',
+    }],
+  })
+  const uncategorizedOrder = order({
+    id: 'historical-uncategorized',
+    paidAt: '2026-05-19T11:00:00',
+    total: 25_000,
+    items: [{
+      ...item('kebab', 'Kebab', 1, 25_000),
+      category_id_snapshot: null,
+    }],
+  })
+
+  assert.deepEqual(
+    getDashboardSalesByCategory([snapshotOrder], movedMenuMap, categoryMap, 'en')
+      .map(row => row.name),
+    ['Kebab']
+  )
+  assert.deepEqual(
+    getDashboardSalesByCategory([uncategorizedOrder], movedMenuMap, categoryMap, 'en')
+      .map(row => row.name),
+    ['Other']
+  )
+})
+
 test('dashboard period change from 7 days to month updates all widgets to month data', () => {
   const month = analyticsFor('month')
 

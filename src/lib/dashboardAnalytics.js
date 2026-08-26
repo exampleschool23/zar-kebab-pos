@@ -2,6 +2,7 @@ import {
   addRestaurantDays,
   getCafeIncomeForRange,
   getOrderDate,
+  getOrderItemCategoryId,
   getOrderPaymentBreakdown,
   getOrderRevenueTotal,
   getSoldOrderItems,
@@ -80,7 +81,8 @@ export function getDashboardSalesByCategory(orders, menuItemMap, categoryMap, la
   ;(orders || []).forEach(order => {
     getSoldOrderItems(order).forEach(item => {
       const mi = menuItemMap[item.menu_item_id]
-      const cat = mi ? categoryMap[mi.category_id] : null
+      const categoryId = getOrderItemCategoryId(item, mi)
+      const cat = categoryId ? categoryMap[categoryId] : null
       const name = cat
         ? (cat[`name_${lang}`] || cat.name_en || cat.name_uz || 'Other')
         : 'Other'

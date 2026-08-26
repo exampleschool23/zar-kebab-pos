@@ -30,6 +30,10 @@ const skipAutomaticKpiGroupMigration = fs.readFileSync(
   new URL('../supabase/136_skip_automatic_kpi_salary_group.sql', import.meta.url),
   'utf8'
 )
+const financialHistoryMigration = fs.readFileSync(
+  new URL('../supabase/147_financial_report_history_snapshots.sql', import.meta.url),
+  'utf8'
+)
 
 test('daily KPI migration stores effective-dated rules and immutable result snapshots', () => {
   assert.match(migration, /create table if not exists public\.employee_kpi_rules/i)
@@ -169,11 +173,17 @@ test('only the server finalizer can create or mutate an automatic KPI bonus', ()
   assert.doesNotMatch(protectionFunction, /before delete/i)
 })
 
-test('daily cron catches up seven completed dates and sends Team KPI before the aggregate summary', () => {
-  assert.match(dailyCron, /const KPI_CATCH_UP_DAYS = 7/)
+test('daily cron retries recent deliveries and heals older missing KPI dates in batches', () => {
+  assert.match(dailyCron, /const KPI_RETRY_LOOKBACK_DAYS = 7/)
+  assert.match(dailyCron, /const KPI_MISSING_DATE_BATCH_SIZE = 31/)
   assert.match(dailyCron, /getCompletedTashkentDate\(now\)/)
-  assert.match(dailyCron, /getCompletedTashkentDates\(now, KPI_CATCH_UP_DAYS\)/)
+  assert.match(dailyCron, /getCompletedTashkentDates\(now, KPI_RETRY_LOOKBACK_DAYS\)/)
+  assert.match(dailyCron, /supabase\.rpc\('get_pending_daily_kpi_dates'/)
+  assert.match(dailyCron, /supabase\.rpc\('get_pending_employee_meal_dates'/)
+  assert.match(financialHistoryMigration, /create or replace function public\.get_pending_daily_kpi_dates/i)
+  assert.match(financialHistoryMigration, /employee_daily_kpi_runs[\s\S]*?run\.business_date is null/i)
   assert.match(dailyCron, /supabase\.rpc\('generate_daily_kpi_bonuses'/)
+  assert.match(dailyCron, /supabase\.rpc\('generate_employee_daily_meal_expense'/)
   assert.match(dailyCron, /notifyAutomaticKpiBonus\(supabase, result\.bonus_id\)/)
   assert.match(dailyCron, /existing\.status === 'sent'/)
   assert.match(dailyCron, /existing\.status === 'pending'[\s\S]*?canRetryPending/i)
@@ -382,10 +392,12 @@ test('daily cron sends one duplicate-safe aggregate salary, KPI, and meal messag
   assert.match(dailyCron, /daily_payroll_group_notification_deliveries/)
   assert.match(dailyCron, /\.eq\('target_key', 'salary_events'\)/)
   assert.match(dailyCron, /kpiResultsByDate\.get\(kpiRun\.businessDate\)/)
-  assert.match(dailyCron, /\.from\('business_settings'\)[\s\S]*?monthly_rent_uzs, monthly_utilities_uzs, average_daily_employee_meal_uzs/)
-  assert.match(dailyCron, /convertSalaryAmountToDaily\([\s\S]*?monthly_rent_uzs[\s\S]*?'monthly'/)
-  assert.match(dailyCron, /convertSalaryAmountToDaily\([\s\S]*?monthly_utilities_uzs[\s\S]*?'monthly'/)
-  assert.match(dailyCron, /employeeMealPerEmployee: settingsResult\.data\?\.average_daily_employee_meal_uzs/)
+  assert.match(dailyCron, /\.from\('business_settings'\)[\s\S]*?monthly_rent_uzs, monthly_utilities_uzs/)
+  assert.match(dailyCron, /allocateMonthlySalaryToDate\(settingsResult\.data\?\.monthly_rent_uzs, businessDate\)/)
+  assert.match(dailyCron, /allocateMonthlySalaryToDate\(settingsResult\.data\?\.monthly_utilities_uzs, businessDate\)/)
+  assert.match(dailyCron, /\.from\('employee_daily_meal_expenses'\)/)
+  assert.match(dailyCron, /employeeMealPerEmployee: employeeMealResult\.data\.average_daily_amount/)
+  assert.match(dailyCron, /employeeMealPresentEmployeeCount: employeeMealResult\.data\.present_employee_count/)
   assert.match(dailyCron, /getOrderRevenueTotal/)
   assert.match(dailyCron, /getOrdersCostTotal/)
   assert.match(dailyCron, /const cafeIncome = paidOrders\.reduce/)

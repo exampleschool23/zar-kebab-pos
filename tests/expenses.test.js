@@ -9,6 +9,7 @@ import {
   DEFAULT_MONTHLY_UTILITIES_UZS,
   getAccountingHistoryRange,
   buildEmployeeMealExpenseRows,
+  buildFinalizedEmployeeMealExpenseRows,
   buildSalaryBonusExpenseRows,
   buildSalaryExpenseRows,
   buildSalaryPaymentExpenseRows,
@@ -416,14 +417,12 @@ test('reactivated salary profiles skip the inactive dates before accruing again'
     '2026-06-05',
   ])
   assert.deepEqual(reactivationAbsences.map(row => row.absence_date), [
-    '2026-06-01',
     '2026-06-02',
     '2026-06-03',
     '2026-06-04',
-    '2026-06-05',
   ])
-  assert.deepEqual(rows.map(row => row.expense_date), ['2026-06-06', '2026-06-07'])
-  assert.equal(getSalaryDue(reactivatedEmployee, '2026-06-07'), 600_000)
+  assert.deepEqual(rows.map(row => row.expense_date), ['2026-06-01', '2026-06-05', '2026-06-06', '2026-06-07'])
+  assert.equal(getSalaryDue(reactivatedEmployee, '2026-06-07'), 800_000)
 })
 
 test('safe-deleted salary profiles keep recorded accounting payment and bonus history', () => {
@@ -917,9 +916,9 @@ test('selected-month salary operating cost excludes prior arrears and employee o
   assert.equal(summary.projectedSalary, 6_000_000)
   assert.equal(summary.fines, 500_000)
   assert.equal(summary.expectedSalaryCost, 5_500_000)
-  assert.equal(summary.appliedPayments, 5_000_000)
-  assert.equal(summary.remainingSalary, 500_000)
-  assert.equal(summary.excludedPayments, 1_000_000)
+  assert.equal(summary.appliedPayments, 3_000_000)
+  assert.equal(summary.remainingSalary, 2_500_000)
+  assert.equal(summary.excludedPayments, 3_000_000)
 })
 
 test('salary expenses participate in expense cashflow by recorded payment method', () => {
@@ -1103,6 +1102,40 @@ test('employee meal estimate counts present employee-days inside employment wind
       ['2026-08-04', 1, 50_000, 'calculated'],
     ],
   )
+})
+
+test('finalized employee meal rows preserve their saved rate attendance and total', () => {
+  const rows = buildFinalizedEmployeeMealExpenseRows([
+    {
+      business_date: '2026-08-01',
+      average_daily_amount: 50_000,
+      present_employee_count: 3,
+      total_amount: 150_000,
+      source_type: 'daily_finalizer',
+      finalized_at: '2026-08-02T01:00:00+05:00',
+    },
+    {
+      business_date: '2026-08-02',
+      average_daily_amount: 80_000,
+      present_employee_count: 0,
+      total_amount: 0,
+      source_type: 'daily_finalizer',
+    },
+  ])
+
+  assert.deepEqual(rows.map(row => ({
+    date: row.expense_date,
+    amount: row.amount,
+    rate: row.average_daily_employee_meal_uzs,
+    employees: row.present_employee_count,
+    method: row.payment_method,
+  })), [{
+    date: '2026-08-01',
+    amount: 150_000,
+    rate: 50_000,
+    employees: 3,
+    method: 'calculated',
+  }])
 })
 
 test('salary month-end debt projects the full remaining liability', () => {

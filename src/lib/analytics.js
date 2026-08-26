@@ -77,6 +77,15 @@ export function getSoldOrderItems(order) {
   return getOrderItems(order).filter(item => !isCancelledOrderItem(item))
 }
 
+export function getOrderItemCategoryId(item, currentMenuItem = null) {
+  if (item && Object.prototype.hasOwnProperty.call(item, 'category_id_snapshot')) {
+    return String(item.category_id_snapshot || '').trim() || null
+  }
+  const legacyItemCategory = String(item?.category_id || '').trim()
+  if (legacyItemCategory) return legacyItemCategory
+  return String(currentMenuItem?.category_id || '').trim() || null
+}
+
 export function mergeOrderItemsByIdentity(primaryItems = [], fallbackItems = []) {
   const merged = []
   const seen = new Set()

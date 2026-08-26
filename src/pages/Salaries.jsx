@@ -71,6 +71,7 @@ function isMissingKpiMigration(error) {
 function isFinalizedKpiRuleError(error) {
   const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
   return text.includes('kpi rule used by a finalized day')
+    || text.includes('kpi rule effective date must be after the latest finalized kpi date')
     || text.includes('employee_daily_kpi_results_rule_id_fkey')
 }
 
@@ -971,7 +972,7 @@ export default function Salaries() {
   async function saveKpiRule() {
     const salaryProfile = activeSalaryProfiles.find(item => item.id === kpiForm.salary_profile_id)
     const rateBps = parseKpiPercentToBps(kpiForm.rate_percentage)
-    if (!canManage || !salaryProfile || !kpiForm.effective_from || rateBps <= 0) return
+    if (!canManage || !salaryProfile || !kpiForm.effective_from || kpiForm.effective_from < today || rateBps <= 0) return
 
     setSaving('kpi-rule')
     setKpiRulesError('')
@@ -1646,6 +1647,7 @@ export default function Salaries() {
               <DailyKpiSection
                 labels={l}
                 lang={lang}
+                minimumEffectiveDate={today}
                 canManage={canManage}
                 canRemoveRules={canRemoveKpiRules}
                 loading={loading}
@@ -1935,6 +1937,7 @@ export default function Salaries() {
 function DailyKpiSection({
   labels,
   lang,
+  minimumEffectiveDate,
   canManage,
   canRemoveRules,
   loading,
@@ -1995,6 +1998,7 @@ function DailyKpiSection({
               <DateInput
                 value={form.effective_from}
                 lang={lang}
+                min={minimumEffectiveDate}
                 onChange={value => onFormChange(current => ({ ...current, effective_from: value }))}
                 disabled={!canManage || loading || rulesLoading}
               />
@@ -2190,7 +2194,7 @@ function Field({ label, hint = '', hintClassName = '', children }) {
   )
 }
 
-function DateInput({ value, lang, onChange, disabled = false }) {
+function DateInput({ value, lang, onChange, min, max, disabled = false }) {
   return (
     <div className="relative">
       <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm font-semibold text-[#1F2937]">
@@ -2199,6 +2203,8 @@ function DateInput({ value, lang, onChange, disabled = false }) {
       <input
         type="date"
         value={value}
+        min={min}
+        max={max}
         onChange={event => onChange(event.target.value)}
         className={`${FIELD} text-transparent caret-transparent`}
         disabled={disabled}

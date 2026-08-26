@@ -18,7 +18,7 @@ import {
   groupAccountingHistoryRows,
 } from '../lib/accounting'
 import {
-  buildEmployeeMealExpenseRows,
+  buildFinalizedEmployeeMealExpenseRows,
   buildSalaryBonusExpenseRows,
   buildSalaryPaymentExpenseRows,
   EXPENSE_CATEGORIES,
@@ -27,7 +27,6 @@ import {
   expensePaymentMethodLabel,
   getAccountingHistoryRange,
   normalizeExpenseEntryType,
-  todayExpenseDate,
 } from '../lib/expenses'
 
 const EXPENSE_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by_name, created_at'
@@ -127,6 +126,7 @@ export default function AccountingHistory() {
         loadPagedResult((from, to) => supabase.from('employee_salary_bonuses').select(SALARY_BONUS_COLUMNS).gte('bonus_date', dateFrom).lte('bonus_date', dateTo).order('id').range(from, to)),
         loadPagedResult((from, to) => supabase.from('employee_salary_absences').select(SALARY_ABSENCE_COLUMNS).gte('absence_date', dateFrom).lte('absence_date', dateTo).order('id').range(from, to)),
         loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
+        loadPagedResult((from, to) => supabase.from('employee_daily_meal_expenses').select('business_date, average_daily_amount, present_employee_count, total_amount, source_type, finalized_at, created_at').gte('business_date', dateFrom).lte('business_date', dateTo).order('business_date', { ascending: false }).range(from, to)),
       ])
       const orderPromise = loadPaidOrdersForRange(dateFrom, dateTo)
         .then(data => ({ data, error: null }))
@@ -139,9 +139,9 @@ export default function AccountingHistory() {
           if (expenseResult.error) setError(expenseResult.error.message || 'Could not load accounting history')
           setLoading(false)
         }),
-        salaryPromise.then(([profileResult, paymentResult, bonusResult, absenceResult, teamResult]) => {
+        salaryPromise.then(([profileResult, paymentResult, bonusResult, absenceResult, teamResult, employeeMealResult]) => {
           if (!active) return
-          const salaryError = [profileResult, paymentResult, bonusResult, absenceResult, teamResult].find(result => result.error)?.error
+          const salaryError = [profileResult, paymentResult, bonusResult, absenceResult, teamResult, employeeMealResult].find(result => result.error)?.error
           if (salaryError) {
             setSalaryRows([])
             setError(salaryError.message || 'Could not load accounting history')
@@ -157,12 +157,7 @@ export default function AccountingHistory() {
           )
           const salaryPayments = buildSalaryPaymentExpenseRows(salaryProfiles, dateFrom, dateTo)
           const salaryBonuses = buildSalaryBonusExpenseRows(salaryProfiles, dateFrom, dateTo)
-          const employeeMeals = buildEmployeeMealExpenseRows(
-            salaryProfiles,
-            dateFrom,
-            dateTo < todayExpenseDate() ? dateTo : todayExpenseDate(),
-            state.settings?.averageDailyEmployeeMealUzs,
-          )
+          const employeeMeals = buildFinalizedEmployeeMealExpenseRows(employeeMealResult.data || [])
           setSalaryRows([...salaryPayments, ...salaryBonuses, ...employeeMeals])
           setSalaryLoading(false)
         }),
@@ -176,7 +171,7 @@ export default function AccountingHistory() {
     }
     load()
     return () => { active = false }
-  }, [dateFrom, dateTo, state.settings?.averageDailyEmployeeMealUzs])
+  }, [dateFrom, dateTo])
 
   const rows = useMemo(() => (
     [...expenseRows, ...salaryRows]

@@ -129,6 +129,7 @@ const checks = await Promise.all([
   checkTable('employee_kpi_rules', 'id, salary_profile_id, effective_from, rate_bps, is_enabled', false),
   checkTable('employee_daily_kpi_runs', 'business_date, sales_base_amount, completed_at', false),
   checkTable('employee_daily_kpi_results', 'id, business_date, salary_profile_id, rule_id, sales_base_amount, rate_bps, bonus_amount, payment_method, status, bonus_id', false),
+  checkTable('employee_daily_meal_expenses', 'business_date, average_daily_amount, present_employee_count, total_amount, source_type, finalized_at'),
   checkTable('employee_salary_fines', 'id, salary_profile_id, fine_date, amount, reason, created_by_name', false),
   checkTable('employee_salary_absences', 'id, salary_profile_id, absence_date', false),
   checkTable('employee_salary_telegram_links', 'salary_profile_id, telegram_user_id, chat_id, preferred_language, notifications_enabled, linked_at', false),
@@ -148,7 +149,7 @@ const checks = await Promise.all([
   checkTable('menu_item_tech_cards', 'menu_item_id, portion_count, batch_output_quantity, batch_output_unit, preparation_steps, notes, updated_by, created_at, updated_at'),
   checkTable('menu_item_tech_card_ingredients', 'id, menu_item_id, name, quantity, unit, unit_price_uzs, sort_order, created_at, updated_at'),
   checkTable('orders', 'id, table_id, table_name, status, payment_status, service_rate_pct, order_type, order_number, loyalty_card_number, loyalty_used_amount, cashback_earned, stock_deducted_at'),
-  checkTable('order_items', 'id, order_id, menu_item_id, status, quantity, sale_unit, order_type, kitchen_round_id, submitted_at, item_type, is_counter_item, selected_options, cost_price'),
+  checkTable('order_items', 'id, order_id, menu_item_id, status, quantity, sale_unit, order_type, kitchen_round_id, submitted_at, item_type, is_counter_item, selected_options, cost_price, category_id_snapshot, category_snapshot_captured'),
   checkTable('order_kitchen_rounds', 'order_id, kitchen_round_id, item_ids, table_id, submitted_by, submitted_at, created_at'),
   checkTable('business_settings', 'id, restaurant_name, service_rate_pct, tourist_service_rate_pct, monthly_rent_uzs, monthly_utilities_uzs, average_daily_employee_meal_uzs, receipt_footer, auto_print, auto_print_kitchen_check'),
   checkTable('order_payments', 'id, order_id, method, amount'),
@@ -246,6 +247,19 @@ const checks = await Promise.all([
     () => supabase.rpc('generate_daily_kpi_bonuses', { p_business_date: null }),
     'business date is required',
     false
+  ),
+  checkRpc(
+    'generate_employee_daily_meal_expense(p_business_date)',
+    () => supabase.rpc('generate_employee_daily_meal_expense', { p_business_date: null }),
+    'business date is required'
+  ),
+  checkRpc(
+    'get_pending_daily_kpi_dates(p_limit)',
+    () => supabase.rpc('get_pending_daily_kpi_dates', { p_limit: 1 })
+  ),
+  checkRpc(
+    'get_pending_employee_meal_dates(p_limit)',
+    () => supabase.rpc('get_pending_employee_meal_dates', { p_limit: 1 })
   ),
   checkRpc(
     'remove_loyalty_card(p_card_id)',

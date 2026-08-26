@@ -18,6 +18,7 @@ import { getOrderRevenueTotal, isPaidOrder, matchesRange, toLocalDateStr } from 
 import { formatLongDate } from '../lib/dateFormat'
 import {
   buildSalaryBonusExpenseRows,
+  buildFinalizedEmployeeMealExpenseRows,
   buildSalaryPaymentExpenseRows,
   addLocalDateDays,
   expensePaymentMethodLabel,
@@ -111,6 +112,7 @@ export default function MonthlyEstimate() {
 
   const [expenses, setExpenses] = useState([])
   const [salaryProfiles, setSalaryProfiles] = useState([])
+  const [employeeMealSnapshots, setEmployeeMealSnapshots] = useState([])
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -155,6 +157,7 @@ export default function MonthlyEstimate() {
       utilitiesPaid: 'Kommunal to‘langan',
       utilitiesRemaining: 'Kommunal to‘lanishi kerak',
       otherSpent: 'Boshqa xarajatlar',
+      employeeMealsActual: 'Hisoblangan xodimlar ovqati',
       employeeMealsRemaining: 'Xodimlar ovqati oy oxirigacha',
       employeeDays: 'xodim-kun',
       payroll: 'Maosh va xodimlar',
@@ -215,6 +218,7 @@ export default function MonthlyEstimate() {
       utilitiesPaid: 'Коммуналка оплачена',
       utilitiesRemaining: 'Осталось оплатить коммуналку',
       otherSpent: 'Другие расходы',
+      employeeMealsActual: 'Начисленное питание сотрудников',
       employeeMealsRemaining: 'Питание сотрудников до конца месяца',
       employeeDays: 'чел.-дн.',
       payroll: 'Зарплата и сотрудники',
@@ -275,6 +279,7 @@ export default function MonthlyEstimate() {
       utilitiesPaid: 'Utilities paid',
       utilitiesRemaining: 'Utilities still due',
       otherSpent: 'Other expenses',
+      employeeMealsActual: 'Finalized employee meals',
       employeeMealsRemaining: 'Employee meals through month end',
       employeeDays: 'employee-days',
       payroll: 'Payroll and staff',
@@ -305,7 +310,7 @@ export default function MonthlyEstimate() {
     loadRequestRef.current = requestId
     setLoading(true)
     setError('')
-    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult, orderHistoryResult] = await Promise.all([
+    const [expenseResult, salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult, employeeMealResult, orderHistoryResult] = await Promise.all([
       loadPagedResult((from, to) => supabase
         .from('expenses')
         .select(SELECT_COLUMNS)
@@ -321,6 +326,7 @@ export default function MonthlyEstimate() {
       loadPagedResult((from, to) => supabase.from('employee_salary_fines').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('employee_salary_absences').select('*').order('id').range(from, to)),
       loadPagedResult((from, to) => supabase.from('profiles').select('id, full_name, email, role, status').order('id').range(from, to)),
+      loadPagedResult((from, to) => supabase.from('employee_daily_meal_expenses').select('business_date, average_daily_amount, present_employee_count, total_amount, source_type, finalized_at, created_at').gte('business_date', monthStart).lte('business_date', monthEnd).order('business_date').range(from, to)),
       loadPaidOrdersForRange(monthStart, monthEnd)
         .then(data => ({ data, error: null }))
         .catch(error => ({ data: [], error })),
@@ -338,6 +344,14 @@ export default function MonthlyEstimate() {
       if (!expenseResult.error) setError(orderHistoryResult.error.message || l.loadFailed)
     } else {
       setPaidHistoryOrders(orderHistoryResult.data || [])
+    }
+    if (employeeMealResult.error) {
+      setEmployeeMealSnapshots([])
+      if (!expenseResult.error && !orderHistoryResult.error) {
+        setError(employeeMealResult.error.message || l.loadFailed)
+      }
+    } else {
+      setEmployeeMealSnapshots(employeeMealResult.data || [])
     }
     const salaryError = salaryProfileResult.error || salaryRateResult.error || salaryPaymentResult.error || salaryBonusResult.error || salaryAbsenceResult.error
     if (salaryError) {
@@ -397,7 +411,15 @@ export default function MonthlyEstimate() {
   const salaryOperatingSummary = useMemo(() => (
     getSelectedMonthSalaryOperatingSummary(salaryProfiles, cutoffEnd)
   ), [salaryProfiles, cutoffEnd])
-  const mealForecastStart = today < monthStart ? monthStart : addLocalDateDays(cutoffEnd, 1)
+  const finalizedEmployeeMealRows = useMemo(() => (
+    buildFinalizedEmployeeMealExpenseRows(employeeMealSnapshots)
+      .filter(row => row.expense_date <= cutoffEnd)
+  ), [employeeMealSnapshots, cutoffEnd])
+  const mealForecastStart = today < monthStart
+    ? monthStart
+    : today > monthEnd
+      ? addLocalDateDays(monthEnd, 1)
+      : today
   const employeeMealEstimate = useMemo(() => (
     getEmployeeMealExpenseEstimate(
       salaryProfiles,
@@ -408,10 +430,11 @@ export default function MonthlyEstimate() {
   ), [salaryProfiles, mealForecastStart, monthEnd, state.settings?.averageDailyEmployeeMealUzs])
   const salesRevenue = paidOrders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
   const incomeSummary = summarizeIncomeEntries(incomeEntries)
-  const allActualExpenseRows = [...salaryPaymentRows, ...salaryBonusRows, ...manualExpenseRows]
+  const allActualExpenseRows = [...salaryPaymentRows, ...salaryBonusRows, ...finalizedEmployeeMealRows, ...manualExpenseRows]
   const actualExpenseSummary = summarizeExpenses(allActualExpenseRows)
   const salaryPaymentTotal = summarizeExpenses(salaryPaymentRows).total
   const salaryBonusTotal = summarizeExpenses(salaryBonusRows).total
+  const employeeMealActualTotal = summarizeExpenses(finalizedEmployeeMealRows).total
   const recordedExpenseTotal = summarizeExpenses(manualExpenseRows).total
   const investorInvestedTotal = incomeSummary.byCategory.investor_support || 0
   const productsSpentTotal = actualExpenseSummary.byCategory.products_bazaar || 0
@@ -457,6 +480,7 @@ export default function MonthlyEstimate() {
     { key: 'salary-paid', label: l.salaryPaid, amount: salaryPaymentTotal, color: '#2563EB' },
     { key: 'salary-bonus', label: l.salaryBonus, amount: salaryBonusTotal, color: '#9333EA' },
     { key: 'products', label: l.productsSpent, amount: productsSpentTotal, color: '#F97316' },
+    { key: 'employee-meals', label: l.employeeMealsActual, amount: employeeMealActualTotal, color: '#EA580C' },
     { key: 'other-recorded', label: l.otherSpent, amount: otherRecordedExpenseTotal, color: '#64748B' },
     { key: 'rent-paid', label: l.rentPaidAmount, amount: recordedRentTotal, color: '#0F766E' },
     { key: 'utilities-paid', label: l.utilitiesPaid, amount: recordedUtilitiesTotal, color: '#CA8A04' },
@@ -495,11 +519,12 @@ export default function MonthlyEstimate() {
       key: 'operations',
       icon: ReceiptText,
       title: l.operations,
-      total: productsSpentTotal + otherRecordedExpenseTotal + employeeMealEstimate.total,
+      total: productsSpentTotal + otherRecordedExpenseTotal + employeeMealActualTotal + employeeMealEstimate.total,
       tone: 'orange',
       rows: [
         { label: l.productsSpent, value: formatCurrency(productsSpentTotal) },
         { label: l.otherSpent, value: formatCurrency(otherRecordedExpenseTotal) },
+        { label: l.employeeMealsActual, value: formatCurrency(employeeMealActualTotal), accent: 'text-orange-700' },
         {
           label: `${l.employeeMealsRemaining} · ${employeeMealEstimate.presentEmployeeDays} ${l.employeeDays}`,
           value: formatCurrency(employeeMealEstimate.total),
