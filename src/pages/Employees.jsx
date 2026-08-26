@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
 import { compareSalaryAbsencesNewestFirst } from '../lib/salaryTransactions'
 import { formatKpiRatePercent, getEffectiveKpiRule } from '../lib/dailyKpi'
+import { notifyTelegramAbsenceUndo } from '../lib/telegramNotifications'
 import {
   getDailySalaryAmount,
   getSalaryAbsenceForDate,
@@ -86,6 +87,7 @@ export default function Employees() {
       undoAbsence: 'Yo‘qlikni bekor qilish',
       undoAbsenceWarning: 'Bugungi maosh qayta hisoblanadi. Telegramdagi yuborilgan xabarlar o‘chirilmaydi.',
       undoAbsenceFailed: 'Bugungi yo‘qlikni bekor qilib bo‘lmadi.',
+      undoAbsenceNotificationFailed: 'Yo‘qlik bekor qilindi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
       balance: 'Balans',
       due: 'Qarz',
       endDate: 'Tugash sanasi',
@@ -131,6 +133,7 @@ export default function Employees() {
       undoAbsence: 'Отменить отсутствие',
       undoAbsenceWarning: 'Зарплата за сегодня будет восстановлена. Отправленные сообщения Telegram не удаляются.',
       undoAbsenceFailed: 'Не удалось отменить сегодняшнее отсутствие.',
+      undoAbsenceNotificationFailed: 'Отсутствие отменено, но сообщение в группу ZarKebab Investor не отправлено.',
       balance: 'Баланс',
       due: 'Долг',
       endDate: 'Дата окончания',
@@ -176,6 +179,7 @@ export default function Employees() {
       undoAbsence: 'Undo absence',
       undoAbsenceWarning: "Today's salary will be restored. Sent Telegram messages are not recalled.",
       undoAbsenceFailed: "Could not undo today's absence.",
+      undoAbsenceNotificationFailed: 'Absence was undone, but the ZarKebab Investor group notification was not sent.',
       balance: 'Balance',
       due: 'Due',
       endDate: 'End date',
@@ -366,6 +370,8 @@ export default function Employees() {
       setError(deleteError?.message || l.undoAbsenceFailed)
       return
     }
+    const notification = await notifyTelegramAbsenceUndo(absence.id)
+    if (!notification?.ok) setError(l.undoAbsenceNotificationFailed)
     await loadEmployees()
   }
   function startNameEdit(employee) {

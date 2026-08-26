@@ -15,6 +15,7 @@ import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salar
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
 import {
+  buildAbsenceUndoInvestorMessage,
   buildInvestorExpenseGroupMessage,
   buildInvestorIncomeGroupMessage,
 } from './_lib/investorIncomeMessages.js'
@@ -1417,6 +1418,73 @@ async function notifyInvestorIncome(supabase, user, expenseId) {
   }
 }
 
+async function notifyAbsenceUndo(supabase, user, absenceId) {
+  const { data: delivery, error } = await supabase
+    .from('salary_absence_undo_notification_deliveries')
+    .select('*')
+    .eq('absence_id', absenceId)
+    .eq('actor_id', user.id)
+    .maybeSingle()
+  if (error) throw error
+  if (!delivery) throw Object.assign(new Error('Absence undo delivery was not queued'), { status: 404 })
+  if (delivery.status === 'sent' && delivery.telegram_message_id) {
+    return { ok: true, duplicate: true, status: 'sent', telegramMessageId: delivery.telegram_message_id }
+  }
+
+  const target = await loadSalaryGroupTarget(supabase)
+  const now = new Date().toISOString()
+  if (!target.chatId) {
+    await supabase.from('salary_absence_undo_notification_deliveries').update({
+      status: 'skipped',
+      telegram_chat_id: null,
+      error_message: 'ZarKebab Investor Telegram group is not configured',
+      attempted_at: now,
+      updated_at: now,
+    }).eq('id', delivery.id)
+    return { ok: false, status: 'skipped', telegramMessageId: null }
+  }
+
+  const { data: claimed, error: claimError } = await supabase
+    .from('salary_absence_undo_notification_deliveries')
+    .update({
+      status: 'pending',
+      telegram_chat_id: target.chatId,
+      telegram_message_id: null,
+      error_message: '',
+      attempted_at: now,
+      sent_at: null,
+      updated_at: now,
+    })
+    .eq('id', delivery.id)
+    .eq('status', delivery.status)
+    .select('*')
+    .maybeSingle()
+  if (claimError) throw claimError
+  if (!claimed) return { ok: true, duplicate: true, status: 'pending', telegramMessageId: null }
+
+  try {
+    const response = await sendTelegramMessage(
+      target.chatId,
+      buildAbsenceUndoInvestorMessage(claimed, target.language)
+    )
+    const telegramMessageId = getTelegramMessageId(response)
+    const sentAt = new Date().toISOString()
+    const { error: updateError } = await supabase
+      .from('salary_absence_undo_notification_deliveries')
+      .update({ status: 'sent', telegram_message_id: telegramMessageId, sent_at: sentAt, updated_at: sentAt })
+      .eq('id', delivery.id)
+    if (updateError) throw updateError
+    return { ok: true, status: 'sent', telegramMessageId }
+  } catch (sendError) {
+    await supabase.from('salary_absence_undo_notification_deliveries').update({
+      status: 'failed',
+      error_message: String(sendError?.message || sendError).slice(0, 1000),
+      updated_at: new Date().toISOString(),
+    }).eq('id', delivery.id)
+    throw sendError
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
@@ -1446,11 +1514,12 @@ export default async function handler(req, res) {
       rate: rateId,
       expense: expenseId,
       investor_income: expenseId,
+      absence_undo: absenceId,
     }
     const isMenuUnavailable = notificationType === 'menu_unavailable'
     const isMenuAvailable = notificationType === 'menu_available'
     const isMenuAvailability = isMenuUnavailable || isMenuAvailable
-    if (!isMenuAvailability && !['fine', 'payment', 'bonus', 'absence', 'rate', 'expense', 'investor_income'].includes(notificationType)) {
+    if (!isMenuAvailability && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'expense', 'investor_income'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (isMenuAvailability && !menuItemId) {
@@ -1475,6 +1544,8 @@ export default async function handler(req, res) {
       result = await notifyInvestorExpense(supabase, user, expenseId)
     } else if (notificationType === 'investor_income') {
       result = await notifyInvestorIncome(supabase, user, expenseId)
+    } else if (notificationType === 'absence_undo') {
+      result = await notifyAbsenceUndo(supabase, user, absenceId)
     } else if (notificationType === 'payment') {
       result = await notifyPayment(supabase, user, paymentId)
     } else {

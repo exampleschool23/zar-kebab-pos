@@ -81,6 +81,16 @@ export function notifyTelegramEmployeeAbsence(absenceId) {
   return notifyTelegramSalaryEvent('absence', absenceId)
 }
 
+export async function notifyTelegramAbsenceUndo(absenceId) {
+  if (!absenceId) return { ok: false, status: 'failed' }
+  try {
+    return await postAuthenticatedTelegramNotification({ type: 'absence_undo', absenceId })
+  } catch (error) {
+    console.warn('[telegram] absence undo Investor notification failed:', error)
+    return { ok: false, status: 'failed', errorMessage: String(error?.message || error) }
+  }
+}
+
 export function notifyTelegramEmployeeRate(rateId) {
   return notifyTelegramSalaryEvent('rate', rateId)
 }

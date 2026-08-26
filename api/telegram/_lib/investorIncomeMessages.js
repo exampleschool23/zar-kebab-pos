@@ -122,3 +122,19 @@ export function buildInvestorExpenseGroupMessage(expense, language = 'ru', month
   }
   return lines.join('\n')
 }
+
+export function buildAbsenceUndoInvestorMessage(delivery, language = 'ru') {
+  const lang = normalizeLanguage(language)
+  const copy = {
+    uz: { title: 'Yo‘qlik bekor qilindi', employee: 'Xodim', date: 'Sana', actor: 'Bekor qilgan' },
+    ru: { title: 'Отсутствие отменено', employee: 'Сотрудник', date: 'Дата', actor: 'Отменил(а)' },
+    en: { title: 'Absence undone', employee: 'Employee', date: 'Date', actor: 'Undone by' },
+  }[lang]
+  const lines = [
+    `✅ <b>${copy.title}</b>`,
+    `${copy.employee}: <b>${escapeTelegramHtml(delivery?.employee_name || '—')}</b>`,
+    `${copy.date}: ${escapeTelegramHtml(formatLongDate(delivery?.absence_date, lang, delivery?.absence_date || '—'))}`,
+  ]
+  if (delivery?.actor_name) lines.push(`${copy.actor}: ${escapeTelegramHtml(delivery.actor_name)}`)
+  return lines.join('\n')
+}
