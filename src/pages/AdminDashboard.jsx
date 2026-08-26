@@ -1246,7 +1246,6 @@ export default function AdminDashboard() {
                   { key: '7days',  label: l.days7    },
                   { key: 'rollingMonth', label: l.rollingMonth },
                   { key: 'month',  label: l.thisMonth },
-                  { key: 'year',   label: l.thisYear  },
                 ].map(tab => (
                   <button
                     key={tab.key}

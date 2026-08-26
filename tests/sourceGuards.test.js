@@ -2026,6 +2026,12 @@ test('AdminDashboard offers a rolling Month from 4 July to the 5 August boundary
   assert.match(analytics, /dateToExclusive: addRestaurantDays\(today, 1\)/)
 })
 
+test('AdminDashboard does not offer a This Year period filter', () => {
+  const dashboard = readSource('src/pages/AdminDashboard.jsx')
+
+  assert.doesNotMatch(dashboard, /\{ key: 'year',\s+label: l\.thisYear\s+\}/)
+})
+
 test('AdminDashboard shows period-based order type performance', () => {
   const dashboard = readSource('src/pages/AdminDashboard.jsx')
   const analytics = readSource('src/lib/dashboardAnalytics.js')
