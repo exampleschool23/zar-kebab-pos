@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   buildDailyUnavailableMenuTeamMessage,
+  buildMenuAvailableTeamMessage,
   buildMenuUnavailableTeamMessage,
 } from '../api/telegram/_lib/menuAvailabilityMessages.js'
 import { runDbHealthChecks } from '../src/lib/dbHealth.js'
@@ -17,6 +18,10 @@ const dailyMigration = readFileSync(
 )
 const dailyCategoryMigration = readFileSync(
   new URL('../supabase/145_daily_unavailable_menu_categories.sql', import.meta.url),
+  'utf8'
+)
+const availableMigration = readFileSync(
+  new URL('../supabase/146_menu_available_team_notifications.sql', import.meta.url),
   'utf8'
 )
 const endpoint = readFileSync(
@@ -74,6 +79,18 @@ test('unavailable product Team message is Russian and identifies product and act
   assert.doesNotMatch(message, /Unavailable|Made by|Product:/)
 })
 
+test('available product Team message is Russian and identifies product and actor', () => {
+  const message = buildMenuAvailableTeamMessage({
+    menu_item_name: 'Шашлык <Особый>',
+    actor_name: 'Анна & Али',
+  })
+
+  assert.match(message, /Блюдо снова доступно/)
+  assert.match(message, /Блюдо:<\/b> Шашлык &lt;Особый&gt;/)
+  assert.match(message, /Изменил\(а\):<\/b> Анна &amp; Али/)
+  assert.doesNotMatch(message, /Available|Made by|Product:/)
+})
+
 test('daily unavailable-product snapshot is Russian and lists the current state', () => {
   const message = buildDailyUnavailableMenuTeamMessage([
     {
@@ -122,15 +139,31 @@ test('unavailable product event snapshots Russian name and authenticated staff o
   assert.doesNotMatch(migration, /after insert on public\.menu_items/i)
 })
 
+test('availability event migration queues both transition directions without replaying history', () => {
+  assert.match(availableMigration, /add column if not exists availability_event text not null default 'unavailable'/i)
+  assert.match(availableMigration, /availability_event in \('unavailable', 'available'\)/i)
+  assert.match(availableMigration, /after update of available on public\.menu_items/i)
+  assert.match(availableMigration, /old\.available is distinct from new\.available/i)
+  assert.match(availableMigration, /case when new\.available is false then 'unavailable' else 'available' end/i)
+  assert.doesNotMatch(availableMigration, /insert into public\.menu_item_unavailable_notification_deliveries[\s\S]+select[\s\S]+from public\.menu_items/i)
+})
+
 test('Admin Menu and kitchen unavailability writes trigger the shared authenticated endpoint', () => {
-  assert.match(db, /notifyTelegramMenuUnavailable, notifyTelegramOrderStatus/)
+  assert.match(db, /notifyTelegramMenuAvailable/)
+  assert.match(db, /notifyTelegramMenuUnavailable/)
+  assert.match(db, /notifyTelegramOrderStatus/)
   assert.match(db, /markMenuUnavailable[\s\S]*update\(\{ available: false \}\)[\s\S]*notifyTelegramMenuUnavailable\(menuItemId\)/)
   assert.match(db, /case 'UPDATE_MENU_ITEM':[\s\S]*normalizedFields\.available === false[\s\S]*notifyTelegramMenuUnavailable\(id\)/)
-  assert.match(notifications, /type: 'menu_unavailable'/)
+  assert.match(db, /case 'UPDATE_MENU_ITEM':[\s\S]*normalizedFields\.available === true[\s\S]*notifyTelegramMenuAvailable\(id\)/)
+  assert.match(notifications, /'menu_unavailable'/)
+  assert.match(notifications, /'menu_available'/)
   assert.match(notifications, /menuItemId/)
   assert.equal((notifications.match(/\/api\/telegram\/employee-notification/g) || []).length, 1)
   assert.match(endpoint, /requireMenuWriteAccess/)
   assert.match(endpoint, /notifyMenuUnavailable\(supabase, user, menuItemId\)/)
+  assert.match(endpoint, /notifyMenuAvailable\(supabase, user, menuItemId\)/)
+  assert.match(endpoint, /\.eq\('availability_event', availabilityEvent\)/)
+  assert.match(endpoint, /buildMenuAvailableTeamMessage/)
   assert.match(endpoint, /buildMenuUnavailableTeamMessage/)
   assert.match(endpoint, /loadSalaryTeamTarget\(supabase\)/)
   assert.match(endpoint, /\.eq\('actor_id', user\.id\)/)
@@ -147,6 +180,7 @@ test('database health requires unavailable-product delivery tracking', async () 
 
   assert.equal(result.ok, false)
   assert.match(failed.hint, /142_menu_unavailable_team_notifications/)
+  assert.match(failed.hint, /146_menu_available_team_notifications/)
   assert.match(cliHealth, /checkTable\('menu_item_unavailable_notification_deliveries'/)
 })
 

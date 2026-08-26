@@ -12,7 +12,11 @@ import {
   normalizePriceMode,
   withPriceModeFields,
 } from './priceModes.js'
-import { notifyTelegramMenuUnavailable, notifyTelegramOrderStatus } from './telegramNotifications.js'
+import {
+  notifyTelegramMenuAvailable,
+  notifyTelegramMenuUnavailable,
+  notifyTelegramOrderStatus,
+} from './telegramNotifications.js'
 import {
   isOffPremiseOrderType,
   normalizeOrderType,
@@ -1524,6 +1528,8 @@ export async function writeToSupabase(action, state, options = {}) {
       if (error) throw error
       if (normalizedFields.available === false) {
         void notifyTelegramMenuUnavailable(id)
+      } else if (normalizedFields.available === true) {
+        void notifyTelegramMenuAvailable(id)
       }
       const { error: costError } = await supabase.from('menu_item_costs').upsert({
         menu_item_id: id,

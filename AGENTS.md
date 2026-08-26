@@ -369,11 +369,11 @@ These bugs were recently fixed and are now protected by tests:
    - Calculated meal rows reduce the report remainder but do not claim a cash/card/terminal payment method or mutate the recorded expense ledger.
    - The aggregate daily Telegram message shows the employee-count formula and goes to the configured ZarKebab Investor group. Its legacy database target key remains `salary_events` for delivery-history compatibility.
 
-46. Making a menu product unavailable notifies ZarKebab Team in Russian.
-   - Every authenticated `available: true -> false` transition queues an immutable delivery row with the Russian product-name snapshot and the staff profile that made the change.
-   - Admin Menu saves, quick availability toggles, and kitchen cancellation paths all use the same database-backed event and shared authenticated Telegram endpoint.
-   - The Team message is always Russian, regardless of the Telegram target language, and includes both the product and the employee name.
-   - Delivery is duplicate-safe; editing a product that is already unavailable must never announce it again.
+46. Making a menu product available or unavailable notifies ZarKebab Team in Russian.
+   - Every authenticated `available: true -> false` and `false -> true` transition queues an immutable delivery row with the Russian product-name snapshot, transition type, and staff profile that made the change.
+   - Admin Menu saves and quick availability toggles use the same database-backed event and shared authenticated Telegram endpoint; kitchen cancellation also uses the unavailable path.
+   - Both Team messages are always Russian, regardless of the Telegram target language, and include the product and employee name.
+   - Delivery is duplicate-safe; editing a product without changing its availability must never announce it again.
    - Product archival does not change `available` and must not create an unavailable-product announcement.
    - At 08:00 Tashkent each day, the shared Telegram cron sends ZarKebab Team one Russian snapshot of every unavailable active product, or confirms that all products are available.
    - The daily snapshot excludes archived products and products in archived categories, groups products under their Russian category names in saved category order, records the exact ids/names/categories sent, and is duplicate-safe per Tashkent business date.
@@ -523,6 +523,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/145_daily_unavailable_menu_categories.sql`
   Adds Russian category snapshots to future 08:00 unavailable-menu deliveries so the Team report can group products by category without rewriting sent history.
+
+- `supabase/146_menu_available_team_notifications.sql`
+  Extends the immediate menu-availability ledger and trigger to queue duplicate-safe Team messages for both available and unavailable transitions without replaying historical events.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

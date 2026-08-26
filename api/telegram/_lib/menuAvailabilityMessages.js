@@ -64,6 +64,17 @@ export function buildMenuUnavailableTeamMessage(event) {
   ].join('\n')
 }
 
+export function buildMenuAvailableTeamMessage(event) {
+  const itemName = getRussianMenuItemName(event)
+  const actorName = firstText(event?.actor_name, 'Неизвестный сотрудник')
+
+  return [
+    '✅ <b>Блюдо снова доступно</b>',
+    `🍽 <b>Блюдо:</b> ${escapeTelegramHtml(itemName)}`,
+    `👤 <b>Изменил(а):</b> ${escapeTelegramHtml(actorName)}`,
+  ].join('\n')
+}
+
 export function buildDailyUnavailableMenuTeamMessage(items, businessDate) {
   const unavailableItems = Array.isArray(items) ? items : []
   const dateLabel = formatRussianBusinessDate(businessDate)

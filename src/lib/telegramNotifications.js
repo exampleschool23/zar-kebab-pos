@@ -109,7 +109,7 @@ export async function notifyTelegramInvestorExpense(expenseId) {
   }
 }
 
-export async function notifyTelegramMenuUnavailable(menuItemId) {
+async function notifyTelegramMenuAvailability(menuItemId, type) {
   const failedResult = {
     ok: false,
     status: 'failed',
@@ -120,15 +120,23 @@ export async function notifyTelegramMenuUnavailable(menuItemId) {
 
   try {
     const result = await postAuthenticatedTelegramNotification({
-      type: 'menu_unavailable',
+      type,
       menuItemId,
     })
     return { ...failedResult, ...result }
   } catch (error) {
-    console.warn('[telegram] unavailable menu item notification failed:', error)
+    console.warn(`[telegram] ${type} menu item notification failed:`, error)
     return {
       ...failedResult,
       errorMessage: String(error?.message || error),
     }
   }
+}
+
+export function notifyTelegramMenuUnavailable(menuItemId) {
+  return notifyTelegramMenuAvailability(menuItemId, 'menu_unavailable')
+}
+
+export function notifyTelegramMenuAvailable(menuItemId) {
+  return notifyTelegramMenuAvailability(menuItemId, 'menu_available')
 }
