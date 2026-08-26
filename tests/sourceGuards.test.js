@@ -2337,6 +2337,17 @@ test('table cart hides order-type controls and Regular or Tourist badges', () =>
   assert.match(cartPanel, /\{showOrderBadges && \([\s\S]*orderTypeLabel\(orderType, lang\)[\s\S]*getPriceModeLabel\(normalizedPriceMode, lang\)/)
 })
 
+test('WaiterOrder ignores empty order shells when resolving table price mode', () => {
+  const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
+  const tableGuestEntry = readSource('src/lib/tableGuestEntry.js')
+
+  assert.match(tableGuestEntry, /export function getActiveTableOrders\(tableId, orders = \[\]\)/)
+  assert.match(waiterOrder, /import \{ getActiveTableOrders \} from '\.\.\/lib\/tableGuestEntry'/)
+  assert.match(waiterOrder, /const activeOrders = useMemo\([\s\S]*getActiveTableOrders\(tableId, state\.orders\)/)
+  assert.match(waiterOrder, /const activeOrder = useMemo\(\(\) => \{[\s\S]*activeOrders\.length === 0[\s\S]*resolveOrderingPriceMode\(activeOrder, state\.cart\)/)
+  assert.doesNotMatch(waiterOrder, /state\.orders\.filter\(o => o\.table_id === tableId && o\.payment_status !== 'paid'\)/)
+})
+
 test('AnimatedSearch provides reusable smooth expandable search controls', () => {
   const source = readSource('src/components/AnimatedSearch.jsx')
   const publicMenu = readSource('src/pages/PublicMenu.jsx')

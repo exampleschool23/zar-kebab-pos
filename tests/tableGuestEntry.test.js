@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getTableGuestEntryContext } from '../src/lib/tableGuestEntry.js'
+import { getActiveTableOrders, getTableGuestEntryContext } from '../src/lib/tableGuestEntry.js'
 
 test('a new table asks staff to choose its pricing mode', () => {
   assert.deepEqual(getTableGuestEntryContext('t1', []), {
@@ -41,7 +41,7 @@ test('mixed active pricing modes require staff review instead of guessing', () =
 })
 
 test('empty unpaid order shells do not lock the Guest pricing option', () => {
-  const context = getTableGuestEntryContext('t1', [{
+  const orders = [{
     id: 'empty-shell',
     table_id: 't1',
     payment_status: 'unpaid',
@@ -50,8 +50,10 @@ test('empty unpaid order shells do not lock the Guest pricing option', () => {
     subtotal: 65_000,
     total: 78_000,
     items: [],
-  }])
+  }]
+  const context = getTableGuestEntryContext('t1', orders)
 
+  assert.deepEqual(getActiveTableOrders('t1', orders), [])
   assert.deepEqual(context, {
     activeOrderIds: [],
     hasActiveOrders: false,
@@ -59,6 +61,31 @@ test('empty unpaid order shells do not lock the Guest pricing option', () => {
     priceMode: 'regular',
     priceModeLocked: false,
   })
+})
+
+test('waiter ordering ignores an empty Regular shell while retaining a real Tourist order', () => {
+  const orders = [
+    {
+      id: 'empty-regular-shell',
+      table_id: 't1',
+      payment_status: 'unpaid',
+      status: 'sent_to_kitchen',
+      price_mode: 'regular',
+      subtotal: 0,
+      total: 0,
+      items: [],
+    },
+    {
+      id: 'real-tourist-order',
+      table_id: 't1',
+      payment_status: 'unpaid',
+      status: 'sent_to_kitchen',
+      price_mode: 'tourist',
+      items: [{ id: 'tourist-item', quantity: 1, price: 36_000, price_mode: 'tourist' }],
+    },
+  ]
+
+  assert.deepEqual(getActiveTableOrders('t1', orders).map(order => order.id), ['real-tourist-order'])
 })
 
 test('orders containing only cancelled items do not lock the Guest pricing option', () => {

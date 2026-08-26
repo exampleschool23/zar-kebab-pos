@@ -25,6 +25,7 @@ import { DEFAULT_PRICE_MODE, PRICE_MODE_TOURIST, calculateUnitPrice, getMenuItem
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canEditFeature } from '../lib/permissions'
 import { rebuildGuestCartFromCatalog } from '../lib/guestCart'
+import { getActiveTableOrders } from '../lib/tableGuestEntry'
 import {
   clearGuestModeSession,
   getGuestModePinLength,
@@ -688,13 +689,17 @@ export default function WaiterOrder() {
     ? (lang === 'uz' ? 'Buyurtma turi' : lang === 'ru' ? 'Тип заказа' : 'Order type')
     : t(lang, 'table')
 
-  // Merge all active orders for this table
+  const activeOrders = useMemo(
+    () => isTakeAwayFlow ? [] : getActiveTableOrders(tableId, state.orders),
+    [state.orders, tableId, isTakeAwayFlow]
+  )
+
+  // Merge all billable active orders for this table. Empty shells must not
+  // override the R/T price mode selected while entering the table.
   const activeOrder = useMemo(() => {
-    if (isTakeAwayFlow) return null
-    const orders = state.orders.filter(o => o.table_id === tableId && o.payment_status !== 'paid')
-    if (orders.length === 0) return null
-    const merged = { ...orders[0] }
-    merged.items = orders.flatMap(o => (o.items || []).map(item => ({
+    if (activeOrders.length === 0) return null
+    const merged = { ...activeOrders[0] }
+    merged.items = activeOrders.flatMap(o => (o.items || []).map(item => ({
       ...item,
       order_id: item.order_id || o.id,
       _orderId: o.id,
@@ -705,20 +710,17 @@ export default function WaiterOrder() {
     })))
     const priority = ['preparing', 'sent_to_kitchen', 'needs_bill', 'delivered']
     for (const p of priority) {
-      if (orders.some(o => o.status === p)) { merged.status = p; break }
+      if (activeOrders.some(o => o.status === p)) { merged.status = p; break }
     }
     return merged
-  }, [state.orders, tableId, isTakeAwayFlow])
+  }, [activeOrders])
 
   const activeTableOrderIds = useMemo(() => (
-    isTakeAwayFlow
-      ? []
-      : state.orders
-        .filter(order => order.table_id === tableId && order.payment_status !== 'paid')
-        .map(order => String(order.id || '').trim())
-        .filter(Boolean)
-        .sort()
-  ), [state.orders, tableId, isTakeAwayFlow])
+    activeOrders
+      .map(order => String(order.id || '').trim())
+      .filter(Boolean)
+      .sort()
+  ), [activeOrders])
 
   const guestOrderChangedWarning = staffLang === 'uz'
     ? 'Bu stolning buyurtmasi mehmon rejimi vaqtida o‘zgargan. Oshxonaga yuborishdan oldin stol holati va tanlovni tekshiring.'

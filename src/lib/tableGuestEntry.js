@@ -7,7 +7,7 @@ function hasBillableOrderItems(order) {
   return getOrderPaymentSummary(order, billableItems, order?.service_rate_pct).total > 0
 }
 
-function activeOrderRows(tableId, orders = []) {
+export function getActiveTableOrders(tableId, orders = []) {
   return (Array.isArray(orders) ? orders : []).filter(order =>
     order?.table_id === tableId &&
     !isPaidOrder(order) &&
@@ -18,7 +18,7 @@ function activeOrderRows(tableId, orders = []) {
 }
 
 export function getTableGuestEntryContext(tableId, orders = []) {
-  const activeOrders = activeOrderRows(tableId, orders)
+  const activeOrders = getActiveTableOrders(tableId, orders)
   const activeOrderIds = Array.from(new Set(activeOrders
     .map(order => String(order?.id || '').trim())
     .filter(Boolean)))
