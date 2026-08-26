@@ -33,6 +33,7 @@ const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
 const TEAM_EVENT_TYPES = new Set(['bonus', 'fine', 'absence'])
 const COMBINED_DAILY_KPI_EMPLOYEE_REASON = 'Automatic KPI is included in the combined daily salary summary'
 const DAILY_KPI_GROUP_REASON = 'Automatic KPI details are sent only to ZarKebab Team'
+const INACTIVE_EMPLOYEE_REASON = 'Employee is deactivated; private Telegram notifications are disabled'
 const GROUP_EVENT_CONFIG = {
   bonus: {
     table: 'employee_salary_bonuses',
@@ -684,7 +685,7 @@ async function deliverSalaryTeamEvent(supabase, type, event) {
   }
 }
 
-async function deliverEmployeeSalaryEvent(supabase, type, event, remainingDue) {
+async function deliverEmployeeSalaryEvent(supabase, type, event, remainingDue, salaryProfile) {
   const { data: existing, error: existingError } = await supabase
     .from('employee_salary_group_notification_deliveries')
     .select('*')
@@ -698,11 +699,14 @@ async function deliverEmployeeSalaryEvent(supabase, type, event, remainingDue) {
     return savedEmployeeEventDeliveryResult(existing)
   }
 
-  const { data: employeeLink, error: linkError } = await supabase
-    .from('employee_salary_telegram_links')
-    .select('chat_id, notifications_enabled, preferred_language')
-    .eq('salary_profile_id', event.salary_profile_id)
-    .maybeSingle()
+  const employeeIsActive = salaryProfile?.is_active !== false && !salaryProfile?.deleted_at
+  const { data: employeeLink, error: linkError } = employeeIsActive
+    ? await supabase
+        .from('employee_salary_telegram_links')
+        .select('chat_id, notifications_enabled, preferred_language')
+        .eq('salary_profile_id', event.salary_profile_id)
+        .maybeSingle()
+    : { data: null, error: null }
   if (linkError) throw linkError
 
   const employeeChatId = employeeLink?.notifications_enabled === false
@@ -715,7 +719,9 @@ async function deliverEmployeeSalaryEvent(supabase, type, event, remainingDue) {
     employee_telegram_message_id: null,
     employee_error_message: employeeChatId
       ? ''
-      : 'Employee Telegram is not linked or notifications are disabled',
+      : employeeIsActive
+        ? 'Employee Telegram is not linked or notifications are disabled'
+        : INACTIVE_EMPLOYEE_REASON,
     employee_attempted_at: now,
     employee_sent_at: null,
     updated_at: now,
@@ -870,7 +876,7 @@ async function notifyLoadedSalaryEvent(supabase, type, event, {
         })
   const [groupSettled] = await Promise.allSettled([groupDelivery])
   const employeeDelivery = includeEmployee
-    ? deliverEmployeeSalaryEvent(supabase, type, event, remainingDue)
+    ? deliverEmployeeSalaryEvent(supabase, type, event, remainingDue, salaryProfile)
     : Promise.resolve({
         status: 'skipped',
         telegramMessageId: null,
@@ -1112,6 +1118,14 @@ async function notifyPayment(supabase, user, paymentId) {
           errorMessage: delivery.error_message || '',
         })
       : (async () => {
+          if (salaryProfile?.is_active === false || salaryProfile?.deleted_at) {
+            return {
+              status: 'skipped',
+              telegramMessageId: null,
+              sentAt: null,
+              errorMessage: INACTIVE_EMPLOYEE_REASON,
+            }
+          }
           const { data: employeeLink, error: linkError } = await supabase
             .from('employee_salary_telegram_links')
             .select('chat_id, notifications_enabled, preferred_language')

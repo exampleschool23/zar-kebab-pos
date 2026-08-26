@@ -648,6 +648,25 @@ test('employee salary notifications share one endpoint within the Hobby function
   assert.ok(countApiFunctions(apiRoot) <= 12)
 })
 
+test('deactivated employees never receive private salary notifications', () => {
+  const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
+  const dailySalary = fs.readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
+  const employeeEventDelivery = endpoint.slice(
+    endpoint.indexOf('async function deliverEmployeeSalaryEvent'),
+    endpoint.indexOf('function normalizeDeliverySettlement')
+  )
+  const paymentDelivery = endpoint.slice(
+    endpoint.indexOf('async function notifyPayment'),
+    endpoint.indexOf('export default async function handler')
+  )
+
+  assert.match(employeeEventDelivery, /salaryProfile\?\.is_active !== false/)
+  assert.match(employeeEventDelivery, /INACTIVE_EMPLOYEE_REASON/)
+  assert.match(paymentDelivery, /salaryProfile\?\.is_active === false \|\| salaryProfile\?\.deleted_at/)
+  assert.match(paymentDelivery, /status: 'skipped'[\s\S]*INACTIVE_EMPLOYEE_REASON/)
+  assert.match(dailySalary, /salaryProfile\?\.is_active === false \|\| !isEligibleForSalaryDate/)
+})
+
 test('daily salary message shows absence while retaining the daily salary and bonus fields', () => {
   const message = buildDailySalaryMessage({
     ...salaryProfile,

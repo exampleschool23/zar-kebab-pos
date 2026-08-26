@@ -782,7 +782,7 @@ async function sendDailySalaryNotifications(supabase, notificationDate) {
       continue
     }
     const salaryProfile = salaryProfiles.get(link.salary_profile_id)
-    if (!isEligibleForSalaryDate(salaryProfile, notificationDate)) {
+    if (salaryProfile?.is_active === false || !isEligibleForSalaryDate(salaryProfile, notificationDate)) {
       results.push({ salaryProfileId: link.salary_profile_id, status: 'skipped' })
       continue
     }

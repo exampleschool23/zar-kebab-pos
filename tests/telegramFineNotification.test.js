@@ -35,7 +35,7 @@ test('fine notification endpoint authenticates accounting access and reads the s
   assert.match(api, /sendTelegramMessage\(employeeChatId, text\)/)
   assert.match(api, /notifySalaryEvent/)
   assert.match(api, /deliverSalaryGroupEvent\(supabase, type, event, remainingDue\)/)
-  assert.match(api, /deliverEmployeeSalaryEvent\(supabase, type, event, remainingDue\)/)
+  assert.match(api, /deliverEmployeeSalaryEvent\(supabase, type, event, remainingDue, salaryProfile\)/)
   assert.match(api, /deliverSalaryTeamEvent\(supabase, type, event\)/)
   assert.match(api, /fine: fineId/)
   assert.match(api, /TELEGRAM_TEAM_CHAT_ID/)
