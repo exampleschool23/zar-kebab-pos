@@ -14,6 +14,7 @@ import { sendTelegramMessage } from './_lib/telegram.js'
 import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import {
   buildDailyUnavailableMenuTeamMessage,
+  getRussianMenuCategoryName,
   getRussianMenuItemName,
 } from './_lib/menuAvailabilityMessages.js'
 import { notifyAutomaticKpiBonus } from './employee-notification.js'
@@ -113,11 +114,16 @@ async function loadTeamGroupTarget(supabase) {
 async function loadUnavailableMenuItems(supabase) {
   const { data: categories, error: categoryError } = await supabase
     .from('menu_categories')
-    .select('id')
+    .select('id, name_ru, name_uz, name_en, sort_order')
     .is('deleted_at', null)
+    .order('sort_order', { ascending: true })
   if (categoryError) throw categoryError
   const activeCategoryIds = (categories || []).map(category => category.id).filter(Boolean)
   if (activeCategoryIds.length === 0) return []
+  const categoriesById = new Map((categories || []).map((category, index) => [
+    category.id,
+    { ...category, category_order: index },
+  ]))
 
   const { data, error } = await supabase
     .from('menu_items')
@@ -128,7 +134,24 @@ async function loadUnavailableMenuItems(supabase) {
     .order('sort_order', { ascending: true })
     .order('name_ru', { ascending: true })
   if (error) throw error
-  return data || []
+  return (data || [])
+    .map(item => {
+      const category = categoriesById.get(item.category_id) || {}
+      return {
+        ...item,
+        category_name_ru: category.name_ru || '',
+        category_name_uz: category.name_uz || '',
+        category_name_en: category.name_en || '',
+        category_order: Number.isFinite(category.category_order)
+          ? category.category_order
+          : Number.MAX_SAFE_INTEGER,
+      }
+    })
+    .sort((left, right) => (
+      left.category_order - right.category_order
+      || (Number(left.sort_order) || 0) - (Number(right.sort_order) || 0)
+      || getRussianMenuItemName(left).localeCompare(getRussianMenuItemName(right), 'ru')
+    ))
 }
 
 function unavailableMenuSnapshot(items) {
@@ -136,6 +159,7 @@ function unavailableMenuSnapshot(items) {
     item_count: items.length,
     item_ids: items.map(item => String(item.id || '')).filter(Boolean),
     item_names: items.map(getRussianMenuItemName),
+    item_categories: items.map(getRussianMenuCategoryName),
   }
 }
 

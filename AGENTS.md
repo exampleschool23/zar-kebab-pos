@@ -376,7 +376,7 @@ These bugs were recently fixed and are now protected by tests:
    - Delivery is duplicate-safe; editing a product that is already unavailable must never announce it again.
    - Product archival does not change `available` and must not create an unavailable-product announcement.
    - At 08:00 Tashkent each day, the shared Telegram cron sends ZarKebab Team one Russian snapshot of every unavailable active product, or confirms that all products are available.
-   - The daily snapshot excludes archived products and products in archived categories, records the exact ids/names sent, and is duplicate-safe per Tashkent business date.
+   - The daily snapshot excludes archived products and products in archived categories, groups products under their Russian category names in saved category order, records the exact ids/names/categories sent, and is duplicate-safe per Tashkent business date.
 
 47. Every newly recorded cash expense notifies ZarKebab Investor.
    - Inserts into `expenses` with `entry_type = 'expense'` queue an immutable delivery snapshot before the authenticated app requests Telegram delivery.
@@ -520,6 +520,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/144_expense_investor_group_notifications.sql`
   Queues immutable, duplicate-safe ZarKebab Investor delivery tracking for each newly inserted cash expense without replaying historical expenses.
+
+- `supabase/145_daily_unavailable_menu_categories.sql`
+  Adds Russian category snapshots to future 08:00 unavailable-menu deliveries so the Team report can group products by category without rewriting sent history.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 

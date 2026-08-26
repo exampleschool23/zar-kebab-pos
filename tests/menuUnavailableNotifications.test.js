@@ -15,6 +15,10 @@ const dailyMigration = readFileSync(
   new URL('../supabase/143_daily_unavailable_menu_team_notifications.sql', import.meta.url),
   'utf8'
 )
+const dailyCategoryMigration = readFileSync(
+  new URL('../supabase/145_daily_unavailable_menu_categories.sql', import.meta.url),
+  'utf8'
+)
 const endpoint = readFileSync(
   new URL('../api/telegram/employee-notification.js', import.meta.url),
   'utf8'
@@ -72,15 +76,32 @@ test('unavailable product Team message is Russian and identifies product and act
 
 test('daily unavailable-product snapshot is Russian and lists the current state', () => {
   const message = buildDailyUnavailableMenuTeamMessage([
-    { name_ru: 'Шашлык <Особый>' },
-    { name_ru: '', name_uz: 'Лагмон & манти' },
+    {
+      category_id: 'grill',
+      category_name_ru: 'Мангал & гриль',
+      name_ru: 'Шашлык <Особый>',
+    },
+    {
+      category_id: 'grill',
+      category_name_ru: 'Мангал & гриль',
+      name_ru: '',
+      name_uz: 'Лагмон & манти',
+    },
+    {
+      category_id: 'desserts',
+      category_name_ru: 'Десерты',
+      name_ru: 'Медовик',
+    },
   ], '2026-08-26')
 
   assert.match(message, /Недоступные блюда/)
   assert.match(message, /На 26 августа 2026, 08:00/)
+  assert.match(message, /📂 <b>Мангал &amp; гриль<\/b>/)
   assert.match(message, /1\. Шашлык &lt;Особый&gt;/)
   assert.match(message, /2\. Лагмон &amp; манти/)
-  assert.match(message, /Всего:<\/b> 2/)
+  assert.match(message, /📂 <b>Десерты<\/b>/)
+  assert.match(message, /3\. Медовик/)
+  assert.match(message, /Всего:<\/b> 3/)
 })
 
 test('daily unavailable-product snapshot confirms an empty current state', () => {
@@ -140,13 +161,17 @@ test('08:00 Tashkent cron sends one duplicate-safe active unavailable-product sn
   assert.match(dailyCron, /sendDailyUnavailableMenuNotification\(supabase, businessDate\)/)
   assert.match(dailyCron, /\.from\('menu_items'\)[\s\S]*?\.eq\('available', false\)[\s\S]*?\.is\('deleted_at', null\)/)
   assert.match(dailyCron, /\.from\('menu_categories'\)[\s\S]*?\.is\('deleted_at', null\)/)
+  assert.match(dailyCron, /\.select\('id, name_ru, name_uz, name_en, sort_order'\)/)
   assert.match(dailyCron, /\.eq\('target_key', 'team_events'\)/)
   assert.match(dailyCron, /daily_unavailable_menu_notification_deliveries/)
+  assert.match(dailyCron, /item_categories: items\.map\(getRussianMenuCategoryName\)/)
   assert.match(dailyCron, /buildDailyUnavailableMenuTeamMessage\(items, businessDate\)/)
   assert.match(dailyMigration, /business_date\s+date primary key/)
   assert.match(dailyMigration, /item_ids\s+jsonb/)
   assert.match(dailyMigration, /item_names\s+jsonb/)
   assert.match(dailyMigration, /target_key\s+text not null default 'team_events'/)
+  assert.match(dailyCategoryMigration, /add column if not exists item_categories jsonb/i)
+  assert.match(dailyCategoryMigration, /jsonb_typeof\(item_categories\) = 'array'/i)
 })
 
 test('database health requires daily unavailable-menu snapshots', async () => {
@@ -159,5 +184,6 @@ test('database health requires daily unavailable-menu snapshots', async () => {
 
   assert.equal(result.ok, false)
   assert.match(failed.hint, /143_daily_unavailable_menu_team_notifications/)
+  assert.match(failed.hint, /145_daily_unavailable_menu_categories/)
   assert.match(cliHealth, /checkTable\('daily_unavailable_menu_notification_deliveries'/)
 })

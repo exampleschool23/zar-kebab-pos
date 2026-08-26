@@ -40,6 +40,19 @@ export function getRussianMenuItemName(item) {
   )
 }
 
+export function getRussianMenuCategoryName(item) {
+  return firstText(
+    item?.category_name,
+    item?.category_name_ru,
+    item?.category?.name_ru,
+    item?.category_name_uz,
+    item?.category?.name_uz,
+    item?.category_name_en,
+    item?.category?.name_en,
+    'Без категории'
+  )
+}
+
 export function buildMenuUnavailableTeamMessage(event) {
   const itemName = getRussianMenuItemName(event)
   const actorName = firstText(event?.actor_name, 'Неизвестный сотрудник')
@@ -63,13 +76,34 @@ export function buildDailyUnavailableMenuTeamMessage(items, businessDate) {
     return [...header, '✅ Все блюда доступны.'].join('\n')
   }
 
-  const itemLines = unavailableItems.map((item, index) => (
-    `${index + 1}. ${escapeTelegramHtml(getRussianMenuItemName(item))}`
-  ))
+  const categoryGroups = []
+  const groupsByKey = new Map()
+  for (const item of unavailableItems) {
+    const categoryName = getRussianMenuCategoryName(item)
+    const categoryKey = firstText(item?.category_id, categoryName)
+    let group = groupsByKey.get(categoryKey)
+    if (!group) {
+      group = { categoryName, items: [] }
+      groupsByKey.set(categoryKey, group)
+      categoryGroups.push(group)
+    }
+    group.items.push(item)
+  }
+
+  const groupedLines = []
+  let itemNumber = 0
+  for (const group of categoryGroups) {
+    if (groupedLines.length > 0) groupedLines.push('')
+    groupedLines.push(`📂 <b>${escapeTelegramHtml(group.categoryName)}</b>`)
+    for (const item of group.items) {
+      itemNumber += 1
+      groupedLines.push(`${itemNumber}. ${escapeTelegramHtml(getRussianMenuItemName(item))}`)
+    }
+  }
   return [
     ...header,
     '',
-    ...itemLines,
+    ...groupedLines,
     '',
     `📦 <b>Всего:</b> ${unavailableItems.length}`,
   ].join('\n')
