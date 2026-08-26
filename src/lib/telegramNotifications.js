@@ -85,6 +85,30 @@ export function notifyTelegramEmployeeRate(rateId) {
   return notifyTelegramSalaryEvent('rate', rateId)
 }
 
+export async function notifyTelegramInvestorExpense(expenseId) {
+  const failedResult = {
+    ok: false,
+    status: 'failed',
+    telegramMessageId: null,
+    errorMessage: '',
+  }
+  if (!expenseId) return failedResult
+
+  try {
+    const result = await postAuthenticatedTelegramNotification({
+      type: 'expense',
+      expenseId,
+    })
+    return { ...failedResult, ...result }
+  } catch (error) {
+    console.warn('[telegram] Investor expense notification failed:', error)
+    return {
+      ...failedResult,
+      errorMessage: String(error?.message || error),
+    }
+  }
+}
+
 export async function notifyTelegramMenuUnavailable(menuItemId) {
   const failedResult = {
     ok: false,

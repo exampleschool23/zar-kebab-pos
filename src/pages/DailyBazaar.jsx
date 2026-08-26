@@ -34,6 +34,7 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import { withWriteTimeout } from '../lib/writeTimeout'
+import { notifyTelegramInvestorExpense } from '../lib/telegramNotifications'
 import {
   BAZAAR_CATEGORIES,
   BAZAAR_ENTRY_CATEGORIES,
@@ -130,6 +131,7 @@ const EN = {
   cancelEdit: 'Cancel edit',
   readOnly: 'Your access is read-only. You can review history and analytics.',
   saved: 'Bazaar entry saved and added to Accounting.',
+  investorNotificationFailed: 'The Bazaar expense was saved, but the ZarKebab Investor group notification was not sent.',
   updated: 'Bazaar entry and its Accounting expense were updated.',
   deleted: 'Bazaar entry removed.',
   saveFailed: 'Could not save the bazaar entry.',
@@ -231,6 +233,7 @@ const LABELS = {
     lineNotesPlaceholder: 'Navi, sotuvchi, maqsad…', removeLine: 'Qatorni o‘chirish', totalBazaar: 'Bozor jami', itemCount: 'Mahsulot qatorlari',
     exactHint: 'Bu jami Buxgalteriyaga bitta Bozor mahsulotlari xarajati sifatida tushadi.', save: 'Bozorni saqlash', saving: 'Saqlanmoqda…', cancelEdit: 'Tahrirni bekor qilish',
     readOnly: 'Siz faqat ko‘rishingiz mumkin. Tarix va tahlil mavjud.', saved: 'Bozor yozuvi saqlandi va Buxgalteriyaga qo‘shildi.',
+    investorNotificationFailed: 'Bozor xarajati saqlandi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
     updated: 'Bozor yozuvi va Buxgalteriyadagi xarajat yangilandi.', deleted: 'Bozor yozuvi o‘chirildi.', saveFailed: 'Bozor yozuvini saqlab bo‘lmadi.',
     deleteFailed: 'Bozor yozuvini o‘chirib bo‘lmadi.', loadFailed: 'Bozor ma’lumotlarini yuklab bo‘lmadi',
     migrationMissing: 'Kunlik bozor bazada hali tayyor emas. Oxirgi bozor migratsiyasini ishga tushiring va yangilang.', refresh: 'Yangilash',
@@ -270,6 +273,7 @@ const LABELS = {
     lineNotesPlaceholder: 'Сорт, продавец, назначение…', removeLine: 'Удалить строку', totalBazaar: 'Итого базар', itemCount: 'Строк продуктов',
     exactHint: 'Эта сумма попадёт в Бухгалтерию одним расходом «Продукты / базар».', save: 'Сохранить базар', saving: 'Сохраняется…', cancelEdit: 'Отменить изменение',
     readOnly: 'У вас доступ только для просмотра. История и аналитика доступны.', saved: 'Запись базара сохранена и добавлена в Бухгалтерию.',
+    investorNotificationFailed: 'Расход базара сохранён, но сообщение в группу ZarKebab Investor не отправлено.',
     updated: 'Запись базара и расход в Бухгалтерии обновлены.', deleted: 'Запись базара удалена.', saveFailed: 'Не удалось сохранить запись базара.',
     deleteFailed: 'Не удалось удалить запись базара.', loadFailed: 'Не удалось загрузить данные базара',
     migrationMissing: 'Ежедневный базар ещё не готов в базе. Примените последнюю миграцию базара и обновите.', refresh: 'Обновить',
@@ -698,15 +702,15 @@ export default function DailyBazaar() {
       payload.request_key = attempt.requestKey
     }
 
+    const wasEditing = Boolean(normalized.id)
     setSaving(true)
     try {
-      const { error: saveError } = await withWriteTimeout(
+      const { data: savedPurchase, error: saveError } = await withWriteTimeout(
         signal => supabase.rpc('save_bazaar_purchase', { payload }).abortSignal(signal),
         'SAVE_BAZAAR_PURCHASE',
       )
       if (saveError) throw saveError
 
-      const wasEditing = Boolean(form.id)
       setCatalogProducts(current => {
         const next = new Map(current.map(product => [
           product.product_key || normalizeBazaarProductKey(product.product_name),
@@ -725,6 +729,10 @@ export default function DailyBazaar() {
       })
       resetEntry()
       setNotice(wasEditing ? l.updated : l.saved)
+      if (!wasEditing && savedPurchase?.expense_id) {
+        const notification = await notifyTelegramInvestorExpense(savedPurchase.expense_id)
+        if (!notification.ok) setError(l.investorNotificationFailed)
+      }
       await loadPurchases()
       if (wasEditing) setTab('history')
     } catch (saveError) {

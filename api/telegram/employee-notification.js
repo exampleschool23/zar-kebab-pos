@@ -14,7 +14,10 @@ import {
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage } from './_lib/telegram.js'
-import { buildInvestorIncomeGroupMessage } from './_lib/investorIncomeMessages.js'
+import {
+  buildInvestorExpenseGroupMessage,
+  buildInvestorIncomeGroupMessage,
+} from './_lib/investorIncomeMessages.js'
 import { buildMenuUnavailableTeamMessage } from './_lib/menuAvailabilityMessages.js'
 import {
   getSalaryEventRetryTargets,
@@ -92,6 +95,35 @@ async function requireExpensesWriteAccess(req) {
     user,
     actorName: profile?.full_name || profile?.email || user.email || '',
   }
+}
+
+async function requireExpenseNotificationAccess(req) {
+  const token = getBearerToken(req)
+  if (!token) throw Object.assign(new Error('Authentication required'), { status: 401 })
+
+  const supabase = getSupabaseAdmin()
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !user) throw Object.assign(new Error('Invalid or expired session'), { status: 401 })
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, status, full_name, email, feature_access')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (profileError) throw profileError
+
+  const role = normalizeRole(profile?.role)
+  const access = Array.isArray(profile?.feature_access) ? profile.feature_access : null
+  const isPrimaryOwner = role === 'owner'
+    && FEATURE_ACCESS_MANAGER_EMAILS.has(String(profile?.email || '').trim().toLowerCase())
+  const hasImplicitOwnerAccess = role === 'owner' && access === null
+  const hasExpenseOrBazaarWrite = EDITOR_ROLES.has(role)
+    && (access?.includes('expenses') || access?.includes('bazaar'))
+  if (profile?.status !== 'active' || (!isPrimaryOwner && !hasImplicitOwnerAccess && !hasExpenseOrBazaarWrite)) {
+    throw Object.assign(new Error('Forbidden'), { status: 403 })
+  }
+
+  return { supabase, user }
 }
 
 async function requireMenuWriteAccess(req) {
@@ -269,7 +301,28 @@ function savedMenuUnavailableDeliveryResult(delivery, duplicate = true) {
   }
 }
 
+function savedInvestorExpenseDeliveryResult(delivery, duplicate = true) {
+  return {
+    ok: delivery?.status === 'sent',
+    status: delivery?.status || 'pending',
+    duplicate,
+    deliveryId: delivery?.expense_id || null,
+    target: delivery?.target_key || 'salary_events',
+    telegramMessageId: delivery?.telegram_message_id || null,
+    sentAt: delivery?.sent_at || null,
+    errorMessage: delivery?.error_message || '',
+  }
+}
+
 function canRetryMenuUnavailableDelivery(delivery) {
+  if (!delivery) return false
+  if (['not_attempted', 'failed'].includes(delivery.status)) return true
+  if (delivery.status !== 'pending') return false
+  const attemptedAt = Date.parse(delivery.attempted_at || '')
+  return !Number.isFinite(attemptedAt) || Date.now() - attemptedAt >= PENDING_DELIVERY_RETRY_MS
+}
+
+function canRetryInvestorExpenseDelivery(delivery) {
   if (!delivery) return false
   if (['not_attempted', 'failed'].includes(delivery.status)) return true
   if (delivery.status !== 'pending') return false
@@ -1153,6 +1206,115 @@ async function notifyPayment(supabase, user, paymentId) {
   }
 }
 
+async function notifyInvestorExpense(supabase, user, expenseId) {
+  const normalizedExpenseId = String(expenseId || '').trim()
+  if (!normalizedExpenseId) {
+    throw Object.assign(new Error('expenseId is required'), { status: 400 })
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('expense_investor_notification_deliveries')
+    .select('*')
+    .eq('expense_id', normalizedExpenseId)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (!existing || existing.actor_id !== user.id) {
+    throw Object.assign(new Error('Expense notification event not found'), { status: 404 })
+  }
+  if (!canRetryInvestorExpenseDelivery(existing)) {
+    return savedInvestorExpenseDeliveryResult(existing)
+  }
+
+  const target = await loadSalaryGroupTarget(supabase)
+  const now = new Date().toISOString()
+  const pendingFields = {
+    status: target.chatId ? 'pending' : 'skipped',
+    telegram_chat_id: target.chatId || null,
+    telegram_message_id: null,
+    error_message: target.chatId ? '' : 'ZarKebab Investor Telegram group is not configured',
+    attempted_at: now,
+    sent_at: null,
+    updated_at: now,
+  }
+  const claimed = await supabase
+    .from('expense_investor_notification_deliveries')
+    .update(pendingFields)
+    .eq('expense_id', existing.expense_id)
+    .eq('status', existing.status)
+    .eq('updated_at', existing.updated_at)
+    .select('*')
+    .maybeSingle()
+  if (claimed.error) throw claimed.error
+  if (!claimed.data) {
+    const { data: concurrent, error: concurrentError } = await supabase
+      .from('expense_investor_notification_deliveries')
+      .select('*')
+      .eq('expense_id', existing.expense_id)
+      .single()
+    if (concurrentError) throw concurrentError
+    return savedInvestorExpenseDeliveryResult(concurrent)
+  }
+  if (!target.chatId) {
+    return savedInvestorExpenseDeliveryResult(claimed.data, false)
+  }
+
+  try {
+    const normalizedDate = /^\d{4}-\d{2}-\d{2}$/.test(String(claimed.data.expense_date || ''))
+      ? claimed.data.expense_date
+      : getTashkentDate()
+    const monthStart = `${normalizedDate.slice(0, 7)}-01`
+    const [year, month] = monthStart.split('-').map(Number)
+    const nextMonthStart = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10)
+    const { data: monthEntries, error: monthError } = await supabase
+      .from('expenses')
+      .select('amount')
+      .eq('entry_type', 'expense')
+      .gte('expense_date', monthStart)
+      .lt('expense_date', nextMonthStart)
+    if (monthError) throw monthError
+    const monthTotal = (monthEntries || []).reduce(
+      (total, entry) => total + (Number(entry?.amount) || 0),
+      0
+    )
+    const text = buildInvestorExpenseGroupMessage(claimed.data, target.language, monthTotal)
+    const response = await sendTelegramMessage(target.chatId, text)
+    const sentAt = new Date().toISOString()
+    const telegramMessageId = getTelegramMessageId(response)
+    const { data: sentDelivery, error: updateError } = await supabase
+      .from('expense_investor_notification_deliveries')
+      .update({
+        status: 'sent',
+        telegram_message_id: telegramMessageId,
+        error_message: '',
+        sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('expense_id', existing.expense_id)
+      .select('*')
+      .single()
+    if (updateError) throw updateError
+    return savedInvestorExpenseDeliveryResult(sentDelivery, false)
+  } catch (error) {
+    const errorMessage = String(error?.message || error).slice(0, 1000)
+    await supabase
+      .from('expense_investor_notification_deliveries')
+      .update({
+        status: 'failed',
+        error_message: errorMessage,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('expense_id', existing.expense_id)
+    return {
+      ...savedInvestorExpenseDeliveryResult(existing, false),
+      ok: false,
+      status: 'failed',
+      telegramMessageId: null,
+      sentAt: null,
+      errorMessage,
+    }
+  }
+}
+
 async function notifyInvestorIncome(supabase, user, expenseId) {
   const { data: expense, error } = await supabase
     .from('expenses')
@@ -1225,10 +1387,11 @@ export default async function handler(req, res) {
       bonus: bonusId,
       absence: absenceId,
       rate: rateId,
+      expense: expenseId,
       investor_income: expenseId,
     }
     const isMenuUnavailable = notificationType === 'menu_unavailable'
-    if (!isMenuUnavailable && !['fine', 'payment', 'bonus', 'absence', 'rate', 'investor_income'].includes(notificationType)) {
+    if (!isMenuUnavailable && !['fine', 'payment', 'bonus', 'absence', 'rate', 'expense', 'investor_income'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (isMenuUnavailable && !menuItemId) {
@@ -1240,11 +1403,15 @@ export default async function handler(req, res) {
 
     const access = isMenuUnavailable
       ? await requireMenuWriteAccess(req)
-      : await requireExpensesWriteAccess(req)
+      : notificationType === 'expense'
+        ? await requireExpenseNotificationAccess(req)
+        : await requireExpensesWriteAccess(req)
     const { supabase, user, actorName } = access
     let result
     if (isMenuUnavailable) {
       result = await notifyMenuUnavailable(supabase, user, menuItemId)
+    } else if (notificationType === 'expense') {
+      result = await notifyInvestorExpense(supabase, user, expenseId)
     } else if (notificationType === 'investor_income') {
       result = await notifyInvestorIncome(supabase, user, expenseId)
     } else if (notificationType === 'payment') {

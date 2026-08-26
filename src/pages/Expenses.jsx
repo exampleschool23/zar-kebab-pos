@@ -58,6 +58,7 @@ import {
   todayExpenseDate,
 } from '../lib/expenses'
 import { collectPagedRows } from '../lib/orderHistory'
+import { notifyTelegramInvestorExpense } from '../lib/telegramNotifications'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 const FIELD_INPUT_CLASS = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
@@ -317,6 +318,7 @@ export default function Expenses() {
       empty: 'Bu davrda xarajat yozilmagan',
       emptyInvestor: 'Bu davrda investor yordami yo‘q',
       investorNotificationFailed: 'Investor yordami saqlandi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
+      expenseNotificationFailed: 'Xarajat saqlandi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
       salaryBonus: 'Maosh bonusi',
       required: 'Sana, kategoriya, to‘lov turi va summa kerak.',
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
@@ -413,6 +415,7 @@ export default function Expenses() {
       empty: 'За этот период расходов нет',
       emptyInvestor: 'За этот период поддержки инвестора нет',
       investorNotificationFailed: 'Поддержка инвестора сохранена, но сообщение в группу ZarKebab Investor не отправлено.',
+      expenseNotificationFailed: 'Расход сохранён, но сообщение в группу ZarKebab Investor не отправлено.',
       salaryBonus: 'Бонус к зарплате',
       required: 'Нужны дата, категория, способ оплаты и сумма.',
       saveFailed: 'Не удалось сохранить расход.',
@@ -509,6 +512,7 @@ export default function Expenses() {
       empty: 'No expenses in this period',
       emptyInvestor: 'No investor support in this period',
       investorNotificationFailed: 'Investor support was saved, but the ZarKebab Investor group notification was not sent.',
+      expenseNotificationFailed: 'The expense was saved, but the ZarKebab Investor group notification was not sent.',
       salaryBonus: 'Salary bonus',
       required: 'Date, category, payment method, and amount are required.',
       saveFailed: 'Could not save expense.',
@@ -772,6 +776,9 @@ export default function Expenses() {
         console.error('[accounting] investor Telegram notification failed:', notificationError)
         setError(l.investorNotificationFailed)
       }
+    } else {
+      const notification = await notifyTelegramInvestorExpense(savedExpense.id)
+      if (!notification.ok) setError(l.expenseNotificationFailed)
     }
     setSaving(false)
     await loadExpenses()

@@ -378,6 +378,13 @@ These bugs were recently fixed and are now protected by tests:
    - At 08:00 Tashkent each day, the shared Telegram cron sends ZarKebab Team one Russian snapshot of every unavailable active product, or confirms that all products are available.
    - The daily snapshot excludes archived products and products in archived categories, records the exact ids/names sent, and is duplicate-safe per Tashkent business date.
 
+47. Every newly recorded cash expense notifies ZarKebab Investor.
+   - Inserts into `expenses` with `entry_type = 'expense'` queue an immutable delivery snapshot before the authenticated app requests Telegram delivery.
+   - Manual Accounting expenses and new Daily Bazaar purchases both call the same shared notification endpoint; Bazaar edits and expense edits/deletes do not create another announcement.
+   - The legacy `salary_events` target key remains the independently configured ZarKebab Investor group for delivery-history compatibility.
+   - Messages use the target language and include amount, date, category, payment method, optional supplier/description, the employee who added the expense, and the recorded total for that expense month.
+   - Delivery is duplicate-safe and becomes `sent` only after Telegram returns a message id. Do not project salary, bonus, employee-meal, or other calculated Accounting rows into this flow because they are not inserted `expenses` records and already have separate messaging rules.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -510,6 +517,9 @@ Run migrations in order. Important recent files:
 
 - `supabase/143_daily_unavailable_menu_team_notifications.sql`
   Stores one duplicate-safe unavailable-menu snapshot delivery per Tashkent date for the 08:00 ZarKebab Team cron.
+
+- `supabase/144_expense_investor_group_notifications.sql`
+  Queues immutable, duplicate-safe ZarKebab Investor delivery tracking for each newly inserted cash expense without replaying historical expenses.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
 
