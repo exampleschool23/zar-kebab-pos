@@ -2327,6 +2327,16 @@ test('WaiterOrder shows the current table or order type in the header', () => {
   assert.doesNotMatch(source, /ml-auto flex-shrink-0 rounded-xl border font-black/)
 })
 
+test('table cart hides order-type controls and Regular or Tourist badges', () => {
+  const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
+  const cartPanel = readSource('src/components/CartPanel.jsx')
+
+  assert.match(waiterOrder, /allowOrderTypeChange=\{isTakeAwayFlow && !isGuestTabletMode\}/)
+  assert.match(waiterOrder, /showOrderBadges=\{isTakeAwayFlow\}/)
+  assert.match(cartPanel, /showOrderBadges = true/)
+  assert.match(cartPanel, /\{showOrderBadges && \([\s\S]*orderTypeLabel\(orderType, lang\)[\s\S]*getPriceModeLabel\(normalizedPriceMode, lang\)/)
+})
+
 test('AnimatedSearch provides reusable smooth expandable search controls', () => {
   const source = readSource('src/components/AnimatedSearch.jsx')
   const publicMenu = readSource('src/pages/PublicMenu.jsx')

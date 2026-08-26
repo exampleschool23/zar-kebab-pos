@@ -191,6 +191,7 @@ export default function CartPanel({
   onClose,
   priceMode = DEFAULT_PRICE_MODE,
   allowOrderTypeChange = true,
+  showOrderBadges = true,
   isSending = false,
   onSendingChange,
   onSubmitSuccess,
@@ -306,14 +307,18 @@ export default function CartPanel({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="font-black text-[#1F2937] text-[18px] leading-tight">{tableName}</p>
-                {orderType && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E8FFF0] text-green-700 border border-green-100 flex-shrink-0">
-                    {orderTypeLabel(orderType, lang)}
-                  </span>
+                {showOrderBadges && (
+                  <>
+                    {orderType && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E8FFF0] text-green-700 border border-green-100 flex-shrink-0">
+                        {orderTypeLabel(orderType, lang)}
+                      </span>
+                    )}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#ff5a00] border border-orange-100 flex-shrink-0">
+                      {getPriceModeLabel(normalizedPriceMode, lang)}
+                    </span>
+                  </>
                 )}
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-[#ff5a00] border border-orange-100 flex-shrink-0">
-                  {getPriceModeLabel(normalizedPriceMode, lang)}
-                </span>
               </div>
               <p className="text-[12px] text-[#9CA3AF] mt-0.5">
                 {itemCount > 0

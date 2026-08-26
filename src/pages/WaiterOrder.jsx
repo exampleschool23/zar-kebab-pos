@@ -1657,7 +1657,8 @@ export default function WaiterOrder() {
                 orderType={orderType}
                 onOrderTypeChange={canEditTables ? setOrderType : undefined}
                 priceMode={priceMode}
-                allowOrderTypeChange={!isGuestTabletMode}
+                allowOrderTypeChange={isTakeAwayFlow && !isGuestTabletMode}
+                showOrderBadges={isTakeAwayFlow}
                 isSending={isSendingOrder}
                 onSendingChange={setSendingOrder}
                 onSubmitSuccess={handleSubmittedOrderPrint}
