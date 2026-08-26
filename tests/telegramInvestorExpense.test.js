@@ -73,6 +73,20 @@ test('Investor expense message contains the saved expense, actor, and monthly to
   assert.match(message, /Расходы за месяц: <b>4\D300\D000 UZS<\/b>/)
 })
 
+test('Investor expense message localizes the Daily Bazaar fallback description', () => {
+  const message = buildInvestorExpenseGroupMessage({
+    amount: 120_000,
+    expense_date: '2026-08-26',
+    category: 'products_bazaar',
+    payment_method: 'cash',
+    description: 'Daily Bazaar purchase (4 items)',
+    actor_name: 'Анна',
+  }, 'ru')
+
+  assert.match(message, /Описание: Покупка на ежедневном базаре \(4 поз\.\)/)
+  assert.doesNotMatch(message, /Daily Bazaar purchase/)
+})
+
 test('new expenses queue immutable Investor delivery snapshots without replaying history', () => {
   assert.match(migration, /expense_investor_notification_deliveries/)
   assert.match(migration, /expense_id\s+uuid primary key references public\.expenses\(id\) on delete cascade/i)
