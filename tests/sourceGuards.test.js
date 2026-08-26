@@ -3527,6 +3527,7 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(salaryHistoryLib, /entryType: 'absence'/)
   assert.match(salaries, /\['payment', 'bonus', 'fine'\]/)
   assert.match(salaries, /fineReason/)
+  assert.match(salaries, /entry_type === 'bonus'[\s\S]*?bonusComment[\s\S]*?transactionForm\.note/)
   assert.match(salaries, /autoCorrect="off"/)
   assert.match(salaries, /autoCapitalize="none"/)
   assert.match(salaries, /spellCheck=\{false\}/)

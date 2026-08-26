@@ -170,6 +170,8 @@ export default function Salaries() {
       paidDate: 'To‘lov sanasi',
       bonusDate: 'Bonus sanasi',
       fineDate: 'Jarima sanasi',
+      bonusComment: 'Bonus izohi',
+      bonusCommentPlaceholder: 'Bonus sababini yoki izohni kiriting (ixtiyoriy)',
       fineReason: 'Jarima sababi',
       absence: 'Kelmagan kun',
       markAbsence: 'Kelmagan kunni belgilash',
@@ -303,6 +305,8 @@ export default function Salaries() {
       paidDate: 'Дата выплаты',
       bonusDate: 'Дата бонуса',
       fineDate: 'Дата штрафа',
+      bonusComment: 'Комментарий к бонусу',
+      bonusCommentPlaceholder: 'Укажите причину или комментарий (необязательно)',
       fineReason: 'Причина штрафа',
       absence: 'Отсутствие',
       markAbsence: 'Отметить отсутствие',
@@ -436,6 +440,8 @@ export default function Salaries() {
       paidDate: 'Paid date',
       bonusDate: 'Bonus date',
       fineDate: 'Fine date',
+      bonusComment: 'Bonus comment',
+      bonusCommentPlaceholder: 'Add a reason or comment (optional)',
       fineReason: 'Reason for fine',
       absence: 'Absence',
       markAbsence: 'Mark absence',
@@ -1548,11 +1554,25 @@ export default function Salaries() {
                       </Field>
                     </div>
                   )}
+                  {transactionForm.entry_type === 'bonus' && (
+                    <div className="sm:col-span-2">
+                      <Field label={l.bonusComment}>
+                        <input
+                          type="text"
+                          value={transactionForm.note}
+                          onChange={event => setTransactionForm(current => ({ ...current, note: event.target.value }))}
+                          placeholder={l.bonusCommentPlaceholder}
+                          className={FIELD}
+                          disabled={!canManage || loading}
+                        />
+                      </Field>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={addTransaction}
                     disabled={!canManage || loading || !transactionForm.salary_profile_id || normalizeExpenseAmount(transactionForm.amount) <= 0 || (transactionForm.entry_type === 'fine' && !transactionForm.note.trim()) || (saving !== '' && ['payment-create', 'bonus-create', 'fine-create'].includes(saving))}
-                    className={`inline-flex h-11 self-end items-center justify-center gap-2 rounded-xl px-4 text-sm font-black text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none ${transactionForm.entry_type === 'fine' ? 'bg-red-600 hover:bg-red-700 sm:col-span-2' : transactionForm.entry_type === 'bonus' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[#ff5a00] hover:bg-[#e85100]'}`}
+                    className={`inline-flex h-11 self-end items-center justify-center gap-2 rounded-xl px-4 text-sm font-black text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none ${transactionForm.entry_type === 'fine' ? 'bg-red-600 hover:bg-red-700 sm:col-span-2' : transactionForm.entry_type === 'bonus' ? 'bg-blue-600 hover:bg-blue-700 sm:col-span-2' : 'bg-[#ff5a00] hover:bg-[#e85100]'}`}
                   >
                     {['payment-create', 'bonus-create', 'fine-create'].includes(saving)
                       ? <Loader2 size={16} className="animate-spin" />
