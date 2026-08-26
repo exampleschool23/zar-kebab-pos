@@ -34,14 +34,15 @@ test('Salaries keeps only KPI configuration while result history stays on employ
   assert.doesNotMatch(salaries, /generate_daily_kpi_bonuses/)
 })
 
-test('Add employee salary and Employee KPI share the salary settings grid', () => {
+test('salary setup forms share one tabbed card', () => {
   const settingsSection = salaries.slice(
     salaries.indexOf('aria-labelledby="salary-settings-heading"'),
     salaries.indexOf('function DailyKpiSection')
   )
 
-  assert.match(settingsSection, /<CardHeading icon=\{Plus\} title=\{l\.add\}[\s\S]*?<DailyKpiSection/)
-  assert.match(settingsSection, /<DailyKpiSection[\s\S]*?<CardHeading icon=\{Save\} title=\{l\.changeSalary\}/)
+  assert.match(settingsSection, /salarySetupMode === 'kpi' \? Percent : salarySetupMode === 'change' \? Save : Plus/)
+  assert.match(settingsSection, /\{ key: 'add',[\s\S]*\{ key: 'change',[\s\S]*\{ key: 'kpi'/)
+  assert.match(settingsSection, /salarySetupMode === 'add'[\s\S]*salarySetupMode === 'kpi'[\s\S]*<DailyKpiSection[\s\S]*salarySetupMode === 'change'/)
   assert.doesNotMatch(salaries, /<section className="mb-7" aria-labelledby="daily-kpi-heading">/)
 })
 

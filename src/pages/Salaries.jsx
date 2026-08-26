@@ -41,7 +41,6 @@ import {
 } from '../lib/telegramNotifications'
 
 const FIELD = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
-const SECTION_GRID = 'grid items-stretch gap-4 lg:grid-cols-2'
 const PAGE_SIZE = 12
 const TELEGRAM_DELIVERY_PAGE_SIZE = 5
 const KPI_PREVIEW_BASE_AMOUNT = 10_000_000
@@ -160,7 +159,7 @@ export default function Salaries() {
       changeSalary: 'Maoshni o‘zgartirish',
       selectEmployee: 'Xodimni tanlang',
       recordPayment: 'To‘lovni yozish',
-      paymentBonus: 'To‘lov / bonus / jarima yozish',
+      paymentBonus: 'To‘lov / bonus / jarima / yo‘qlama',
       paymentEntry: 'To‘lov',
       bonusEntry: 'Bonus',
       fineEntry: 'Jarima',
@@ -295,7 +294,7 @@ export default function Salaries() {
       changeSalary: 'Изменить зарплату',
       selectEmployee: 'Выберите сотрудника',
       recordPayment: 'Записать выплату',
-      paymentBonus: 'Записать выплату / бонус / штраф',
+      paymentBonus: 'Выплата / бонус / штраф / отсутствие',
       paymentEntry: 'Выплата',
       bonusEntry: 'Бонус',
       fineEntry: 'Штраф',
@@ -430,7 +429,7 @@ export default function Salaries() {
       changeSalary: 'Change salary',
       selectEmployee: 'Select employee',
       recordPayment: 'Record payment',
-      paymentBonus: 'Record payment / bonus / fine',
+      paymentBonus: 'Record payment / bonus / fine / absence',
       paymentEntry: 'Payment',
       bonusEntry: 'Bonus',
       fineEntry: 'Fine',
@@ -589,6 +588,7 @@ export default function Salaries() {
     absence_date: today,
     note: '',
   })
+  const [salarySetupMode, setSalarySetupMode] = useState('add')
   const [kpiRules, setKpiRules] = useState([])
   const [kpiRulesLoading, setKpiRulesLoading] = useState(true)
   const [kpiRulesError, setKpiRulesError] = useState('')
@@ -956,7 +956,9 @@ export default function Salaries() {
     ? l.fineHelp
     : transactionForm.entry_type === 'bonus'
       ? l.bonusHelp
-      : l.paymentHelp
+      : transactionForm.entry_type === 'absence'
+        ? l.absenceHelp
+        : l.paymentHelp
   useEffect(() => {
     setPage(current => Math.min(current, pageCount))
   }, [pageCount])
@@ -1406,15 +1408,16 @@ export default function Salaries() {
               title={l.quickActions}
               description={l.quickActionsHelp}
             />
-            <div className={SECTION_GRID}>
+            <div className="grid items-stretch gap-4">
               <div className="flex h-full flex-col rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
                 <CardHeading icon={WalletCards} title={l.paymentBonus} description={l.transactionHelp} tone="orange" />
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid grid-cols-3 gap-2 sm:col-span-2" role="group" aria-label={l.paymentBonus}>
-                    {['payment', 'bonus', 'fine'].map(entryType => {
+                  <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-4" role="group" aria-label={l.paymentBonus}>
+                    {['payment', 'bonus', 'fine', 'absence'].map(entryType => {
                       const active = transactionForm.entry_type === entryType
                       const isFine = entryType === 'fine'
                       const isBonus = entryType === 'bonus'
+                      const isAbsence = entryType === 'absence'
                       return (
                         <button
                           key={entryType}
@@ -1422,7 +1425,7 @@ export default function Salaries() {
                           onClick={() => setTransactionForm(current => {
                             const selectedProfile = salaryProfiles.find(item => item.id === current.salary_profile_id)
                             const paidDate = current.paid_date || today
-                            const keepSelected = canRecordSalaryTransaction(selectedProfile, entryType, paidDate)
+                            const keepSelected = entryType !== 'absence' && canRecordSalaryTransaction(selectedProfile, entryType, paidDate)
                             return {
                               ...current,
                               entry_type: entryType,
@@ -1436,7 +1439,7 @@ export default function Salaries() {
                           disabled={!canManage || loading}
                           aria-pressed={active}
                           className={`flex h-11 items-center justify-center rounded-xl border text-xs font-black transition-colors sm:text-sm ${
-                            active && isFine
+                            active && (isFine || isAbsence)
                               ? 'border-red-400 bg-red-50 text-red-700 ring-2 ring-red-100'
                               : active && isBonus
                                 ? 'border-blue-400 bg-blue-50 text-blue-700 ring-2 ring-blue-100'
@@ -1445,14 +1448,54 @@ export default function Salaries() {
                                 : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100'
                           }`}
                         >
-                          {isFine ? l.fineEntry : entryType === 'bonus' ? l.bonusEntry : l.paymentEntry}
+                          {isAbsence ? l.absence : isFine ? l.fineEntry : isBonus ? l.bonusEntry : l.paymentEntry}
                         </button>
                       )
                     })}
                   </div>
-                  <p className={`rounded-xl px-3 py-2 text-xs font-semibold sm:col-span-2 ${transactionForm.entry_type === 'fine' ? 'bg-red-50 text-red-700' : transactionForm.entry_type === 'bonus' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-[#9a4300]'}`}>
+                  <p className={`rounded-xl px-3 py-2 text-xs font-semibold sm:col-span-2 ${['fine', 'absence'].includes(transactionForm.entry_type) ? 'bg-red-50 text-red-700' : transactionForm.entry_type === 'bonus' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-[#9a4300]'}`}>
                     {transactionGuidance}
                   </p>
+                  {transactionForm.entry_type === 'absence' && (
+                    <>
+                      <div className="sm:col-span-2">
+                        <Field label={l.employee}>
+                          <select
+                            value={absenceForm.salary_profile_id}
+                            onChange={event => setAbsenceForm(current => ({ ...current, salary_profile_id: event.target.value }))}
+                            className={FIELD}
+                            disabled={!canManage || loading}
+                          >
+                            <option value="">{l.selectEmployee}</option>
+                            {activeSalaryProfiles.map(item => (
+                              <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
+                            ))}
+                          </select>
+                        </Field>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Field label={l.absenceDate}>
+                          <DateInput value={absenceForm.absence_date} lang={lang} onChange={value => setAbsenceForm(current => ({ ...current, absence_date: value }))} disabled={!canManage || loading} />
+                        </Field>
+                      </div>
+                      {absenceAlreadyRecorded && (
+                        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 sm:col-span-2">
+                          {l.absenceDuplicate}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={addAbsence}
+                        disabled={!canManage || loading || !absenceForm.salary_profile_id || !absenceForm.absence_date || absenceAlreadyRecorded || saving === 'absence-create'}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none sm:col-span-2"
+                      >
+                        {saving === 'absence-create' ? <Loader2 size={16} className="animate-spin" /> : <CalendarX2 size={15} />}
+                        {l.absence}
+                      </button>
+                    </>
+                  )}
+                  {transactionForm.entry_type !== 'absence' && (
+                    <>
                   <div className="sm:col-span-2">
                     <Field
                       label={l.employee}
@@ -1583,42 +1626,9 @@ export default function Salaries() {
                           : <WalletCards size={15} />}
                     {transactionForm.entry_type === 'fine' ? l.addFine : transactionForm.entry_type === 'bonus' ? l.addBonus : l.recordPayment}
                   </button>
+                    </>
+                  )}
                 </div>
-              </div>
-              <div className="flex h-full flex-col rounded-2xl border border-red-100 bg-white p-4 shadow-sm sm:p-5">
-                  <CardHeading icon={CalendarX2} title={l.markAbsence} description={l.absenceHelp} tone="red" />
-                  <div className="flex flex-1 flex-col gap-4">
-                    <Field label={l.employee}>
-                      <select
-                        value={absenceForm.salary_profile_id}
-                        onChange={event => setAbsenceForm(current => ({ ...current, salary_profile_id: event.target.value }))}
-                        className={FIELD}
-                        disabled={!canManage || loading}
-                      >
-                        <option value="">{l.selectEmployee}</option>
-                        {activeSalaryProfiles.map(item => (
-                          <option key={item.id} value={item.id}>{item.employee_name || item.profile?.full_name || item.profile?.email}</option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label={l.absenceDate}>
-                      <DateInput value={absenceForm.absence_date} lang={lang} onChange={value => setAbsenceForm(current => ({ ...current, absence_date: value }))} disabled={!canManage || loading} />
-                    </Field>
-                    {absenceAlreadyRecorded && (
-                      <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
-                        {l.absenceDuplicate}
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      onClick={addAbsence}
-                      disabled={!canManage || loading || !absenceForm.salary_profile_id || !absenceForm.absence_date || absenceAlreadyRecorded || saving === 'absence-create'}
-                      className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
-                    >
-                      {saving === 'absence-create' ? <Loader2 size={16} className="animate-spin" /> : <CalendarX2 size={15} />}
-                      {l.absence}
-                    </button>
-                  </div>
               </div>
             </div>
           </section>
@@ -1629,9 +1639,44 @@ export default function Salaries() {
               title={l.salarySettings}
               description={l.salarySettingsHelp}
             />
-            <div className={SECTION_GRID}>
-              <div className="h-full rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
-                <CardHeading icon={Plus} title={l.add} description={l.addHelp} tone="orange" />
+            <div className="grid w-full min-w-0 items-stretch gap-4">
+              <div className="h-full w-full min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
+                <CardHeading
+                  icon={salarySetupMode === 'kpi' ? Percent : salarySetupMode === 'change' ? Save : Plus}
+                  title={salarySetupMode === 'kpi' ? l.kpiRuleTitle : salarySetupMode === 'change' ? l.changeSalary : l.add}
+                  description={salarySetupMode === 'kpi' ? l.kpiRuleHelp : salarySetupMode === 'change' ? l.changeHelp : l.addHelp}
+                  tone={salarySetupMode === 'kpi' ? 'violet' : salarySetupMode === 'change' ? 'dark' : 'orange'}
+                />
+                <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3" role="group" aria-label={l.salarySettings}>
+                  {[
+                    { key: 'add', label: l.add },
+                    { key: 'change', label: l.changeSalary },
+                    { key: 'kpi', label: l.kpiRuleTitle },
+                  ].map(item => {
+                    const active = salarySetupMode === item.key
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => setSalarySetupMode(item.key)}
+                        disabled={loading}
+                        aria-pressed={active}
+                        className={`flex min-h-11 items-center justify-center rounded-xl border px-3 py-2 text-xs font-black transition-colors sm:text-sm ${
+                          active && item.key === 'kpi'
+                            ? 'border-violet-400 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
+                            : active && item.key === 'change'
+                              ? 'border-gray-500 bg-gray-100 text-[#1F2937] ring-2 ring-gray-200'
+                              : active
+                                ? 'border-[#ff5a00] bg-orange-50 text-[#ff5a00] ring-2 ring-orange-100'
+                                : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {salarySetupMode === 'add' && (
                 <form onSubmit={createSalaryProfile} className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <Field label={l.employeeName}>
@@ -1662,9 +1707,11 @@ export default function Salaries() {
                     {saving === 'create' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}{l.save}
                   </button>
                 </form>
-              </div>
+                )}
 
+              {salarySetupMode === 'kpi' && (
               <DailyKpiSection
+                embedded
                 labels={l}
                 lang={lang}
                 minimumEffectiveDate={today}
@@ -1690,9 +1737,9 @@ export default function Salaries() {
                 previewRateBps={kpiPreviewRateBps}
                 previewBonus={kpiPreviewBonus}
               />
+              )}
 
-              <div className="h-full rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
-                <CardHeading icon={Save} title={l.changeSalary} description={l.changeHelp} tone="dark" />
+              {salarySetupMode === 'change' && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <Field label={l.selectEmployee}>
@@ -1745,6 +1792,7 @@ export default function Salaries() {
                     {saving === 'rate-create' ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}{l.save}
                   </button>
                 </div>
+              )}
               </div>
 
               <div className="h-full rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
@@ -1955,6 +2003,7 @@ export default function Salaries() {
 }
 
 function DailyKpiSection({
+  embedded = false,
   labels,
   lang,
   minimumEffectiveDate,
@@ -1987,8 +2036,8 @@ function DailyKpiSection({
 
   return (
     <>
-      <div className="h-full rounded-2xl border border-violet-100 bg-white p-4 shadow-sm sm:p-5">
-          <CardHeading icon={Percent} title={labels.kpiRuleTitle} description={labels.kpiRuleHelp} tone="violet" />
+      <div className={embedded ? '' : 'h-full rounded-2xl border border-violet-100 bg-white p-4 shadow-sm sm:p-5'}>
+          {!embedded && <CardHeading icon={Percent} title={labels.kpiRuleTitle} description={labels.kpiRuleHelp} tone="violet" />}
           <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50/70 px-3 py-2.5 text-xs font-semibold leading-relaxed text-violet-900">
             <p>{labels.kpiBaseStatement}</p>
             <p className="mt-1.5 font-black">{labels.kpiPaidImmediately}</p>
