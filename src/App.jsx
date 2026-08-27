@@ -18,6 +18,7 @@ import PublicMenu     from './pages/PublicMenu'
 import TelegramMiniApp from './pages/TelegramMiniApp'
 import PendingApproval from './pages/PendingApproval'
 import CateringPage from './pages/CateringPage'
+import PublicVacancies from './pages/PublicVacancies'
 
 const ADMIN_HOSTNAME = 'admin.zarkebab.uz'
 const PUBLIC_HOSTNAMES = new Set(['zarkebab.uz', 'www.zarkebab.uz'])
@@ -309,6 +310,8 @@ function PublicCustomerRoutes() {
       <Route path="/premium-menu" element={<PublicMenu premium />} />
       <Route path="/premium-menu/item/:itemId" element={<PublicMenu premium />} />
       <Route path="/catering" element={<CateringPage />} />
+      <Route path="/vacancies" element={<PublicVacancies />} />
+      <Route path="/vacancies/:vacancyId" element={<PublicVacancies />} />
       <Route path="/telegram" element={<TelegramMiniApp />} />
       <Route path="/login" element={<PublicHostAdminRedirect />} />
       <Route path="/auth/callback" element={<PublicHostAdminRedirect />} />
@@ -338,6 +341,8 @@ function InternalAppRoutes({ adminHost = false }) {
         <Route path="/premium-menu"          element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu premium />} />
         <Route path="/premium-menu/item/:itemId" element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu premium />} />
         <Route path="/catering"      element={adminHost ? <Navigate to="/admin" replace /> : <CateringPage />} />
+        <Route path="/vacancies"     element={adminHost ? <Navigate to="/admin" replace /> : <PublicVacancies />} />
+        <Route path="/vacancies/:vacancyId" element={adminHost ? <Navigate to="/admin" replace /> : <PublicVacancies />} />
         <Route path="/telegram"      element={adminHost ? <Navigate to="/admin" replace /> : <TelegramMiniApp />} />
         <Route path="/login"         element={<SignedOutRoute><Login /></SignedOutRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />

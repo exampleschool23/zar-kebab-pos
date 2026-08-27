@@ -54,7 +54,7 @@ test('public site metadata uses the Zar Kebab logo and canonical domain', () => 
   assert.match(html, /"logo": "https:\/\/www\.zarkebab\.uz\/brand\/zarkebab-logo\.png"/)
 })
 
-test('public menu reinforces homepage search signals and hides controls from snippets', () => {
+test('public menu keeps homepage search metadata without rendering an SEO copy banner', () => {
   const app = fs.readFileSync(path.join(root, 'src/App.jsx'), 'utf8')
   const menu = fs.readFileSync(path.join(root, 'src/pages/PublicMenu.jsx'), 'utf8')
 
@@ -64,7 +64,9 @@ test('public menu reinforces homepage search signals and hides controls from sni
   assert.match(menu, /Breakfast · Lunch · Dinner\./)
   assert.match(menu, /\+998 90 509-55-45/)
   assert.match(menu, /document\.documentElement\.lang = lang/)
-  assert.match(menu, /<h1[^>]*>{seo\.heading}<\/h1>/)
+  assert.doesNotMatch(menu, /<h1[^>]*>{seo\.heading}<\/h1>/)
+  assert.doesNotMatch(menu, /id="public-menu-vacancies"/)
+  assert.match(menu, /id="public-menu-contacts"/)
   assert.match(menu, /<div data-nosnippet="">\s*<header ref=\{headerRef\}/)
   assert.match(menu, /<div data-nosnippet="">\s*<MenuCategoryScroller/)
   assert.match(menu, /PUBLIC_CONTACTS\.location\.href/)
@@ -78,4 +80,5 @@ test('search crawlers receive real robots and sitemap files', () => {
   assert.match(sitemap, /<loc>https:\/\/www\.zarkebab\.uz\/<\/loc>/)
   assert.match(sitemap, /<loc>https:\/\/www\.zarkebab\.uz\/menu<\/loc>/)
   assert.match(sitemap, /<loc>https:\/\/www\.zarkebab\.uz\/catering<\/loc>/)
+  assert.match(sitemap, /<loc>https:\/\/www\.zarkebab\.uz\/vacancies<\/loc>/)
 })

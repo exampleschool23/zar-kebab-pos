@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Coins, Instagram, MapPin, Phone, Search, Send, UtensilsCrossed, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Clock3, Coins, Instagram, MapPin, Phone, Search, Send, UtensilsCrossed, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
 import { getBrandLogo } from '../lib/brandLogo'
@@ -63,6 +64,51 @@ const PUBLIC_MENU_SEO = {
     description: 'Breakfast · Lunch · Dinner. Zar Kebab — Uzbek, Uyghur and Turkish restaurant in Tashkent. Menu · Reservations · Promotions · Contacts. +998 90 509-55-45. Open daily from 08:00 to 01:00.',
     locale: 'en_US',
   },
+}
+
+const PUBLIC_SITE_COPY = {
+  uz: {
+    menu: 'Menyu',
+    promotions: 'Aksiyalar',
+    vacancies: 'Ish o‘rinlari',
+    contacts: 'Aloqa',
+    company: 'Restoran',
+    information: 'Ma’lumot',
+    address: 'Manzil',
+    hours: 'Har kuni 08:00–01:00',
+    rights: 'Barcha huquqlar himoyalangan.',
+  },
+  ru: {
+    menu: 'Меню',
+    promotions: 'Акции',
+    vacancies: 'Вакансии',
+    contacts: 'Контакты',
+    company: 'Ресторан',
+    information: 'Информация',
+    address: 'Адрес',
+    hours: 'Ежедневно 08:00–01:00',
+    rights: 'Все права защищены.',
+  },
+  en: {
+    menu: 'Menu',
+    promotions: 'Promotions',
+    vacancies: 'Vacancies',
+    contacts: 'Contacts',
+    company: 'Restaurant',
+    information: 'Information',
+    address: 'Address',
+    hours: 'Open daily 08:00–01:00',
+    rights: 'All rights reserved.',
+  },
+}
+
+function navigateToPublicSection(event, sectionId) {
+  const target = document.getElementById(sectionId)
+  if (!target) return
+  event.preventDefault()
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+  window.history.replaceState(null, '', `#${sectionId}`)
 }
 
 function HeaderSelect({ value, onChange, options, ariaLabel, icon: Icon, className = '' }) {
@@ -135,6 +181,46 @@ function PublicContactButtons({ className = '' }) {
   )
 }
 
+function PublicMenuFooter({ copy, lang, onOpenVacancies }) {
+  const year = new Date().getFullYear()
+  return (
+    <footer id="public-menu-contacts" className="scroll-mt-28 border-t border-[#E5E7EB] bg-[#FAFAF9] px-4 py-9 sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-[1280px]">
+        <div className="grid gap-9 sm:grid-cols-2 lg:grid-cols-[1.2fr_0.8fr_0.9fr_1.1fr]">
+          <div>
+            <img src={getBrandLogo(lang)} alt="Zar Kebab" className="h-14 w-auto object-contain" />
+            <p className="mt-4 max-w-xs text-sm font-medium leading-relaxed text-[#64748B]">{PUBLIC_MENU_SEO[lang]?.description || PUBLIC_MENU_SEO.en.description}</p>
+          </div>
+          <div>
+            <h2 className="text-sm font-black text-[#1F2937]">{copy.company}</h2>
+            <nav className="mt-4 flex flex-col items-start gap-3 text-sm font-semibold text-[#64748B]">
+              <a href="#public-menu-content" onClick={event => navigateToPublicSection(event, 'public-menu-content')} className="hover:text-[#ff5a00]">{copy.menu}</a>
+              <a href="#public-menu-deals" onClick={event => navigateToPublicSection(event, 'public-menu-deals')} className="hover:text-[#ff5a00]">{copy.promotions}</a>
+              <a href="/vacancies" onClick={onOpenVacancies} className="hover:text-[#ff5a00]">{copy.vacancies}</a>
+            </nav>
+          </div>
+          <div>
+            <h2 className="text-sm font-black text-[#1F2937]">{copy.information}</h2>
+            <div className="mt-4 space-y-3 text-sm font-semibold text-[#64748B]">
+              <p className="flex items-center gap-2"><Clock3 size={16} className="text-[#ff5a00]" />{copy.hours}</p>
+              <a href={PUBLIC_CONTACTS.location.href} target="_blank" rel="noreferrer" className="flex items-start gap-2 hover:text-[#ff5a00]"><MapPin size={16} className="mt-0.5 flex-shrink-0 text-[#ff5a00]" />{PUBLIC_CONTACTS.location.label}</a>
+            </div>
+          </div>
+          <div>
+            <h2 className="text-sm font-black text-[#1F2937]">{copy.contacts}</h2>
+            <a href={PUBLIC_CONTACTS.phone.href} className="mt-4 block text-lg font-black text-[#1F2937] hover:text-[#ff5a00]">{PUBLIC_CONTACTS.phone.label}</a>
+            <PublicContactButtons className="mt-4 justify-start" />
+          </div>
+        </div>
+        <div className="mt-9 flex flex-col gap-2 border-t border-[#E5E7EB] pt-5 text-xs font-semibold text-[#94A3B8] sm:flex-row sm:items-center sm:justify-between">
+          <p>© {year} Zar Kebab. {copy.rights}</p>
+          <p>{copy.address}: {PUBLIC_CONTACTS.location.label}</p>
+        </div>
+      </div>
+    </footer>
+  )
+}
+
 function MenuSectionHeader({ title, tone = 'default' }) {
   const titleClass = tone === 'deal' ? 'text-red-600' : 'text-[#1F2937]'
 
@@ -155,8 +241,10 @@ function MobileSearchPage({
   onChange,
   onClose,
   items,
+  categories,
   lang,
   onOpenDetail,
+  onOpenCategory,
   formatPrice,
   linkBasePath,
 }) {
@@ -177,48 +265,52 @@ function MobileSearchPage({
     close: lang === 'uz' ? 'Yopish' : lang === 'ru' ? 'Закрыть' : 'Close',
     emptyTitle: lang === 'uz' ? 'Hech narsa topilmadi' : lang === 'ru' ? 'Ничего не найдено' : 'No results found',
     emptyText: lang === 'uz' ? 'Boshqa nom yoki taomni qidirib ko‘ring.' : lang === 'ru' ? 'Попробуйте другое название или блюдо.' : 'Try another dish name or keyword.',
+    categories: lang === 'uz' ? 'Kategoriyalar' : lang === 'ru' ? 'Категории' : 'Categories',
+    dishes: lang === 'uz' ? 'Taomlar' : lang === 'ru' ? 'Блюда' : 'Dishes',
   }
 
   return (
     <div className="fixed inset-0 z-[90] flex flex-col bg-white text-[#1F2937]">
       <div className="sticky top-0 z-10 border-b border-[#E5E7EB] bg-white/95 px-4 py-3 backdrop-blur">
-        <div className="mb-3 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={labels.close}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-[#64748B] transition-colors hover:border-orange-200 hover:text-[#ff5a00]"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <h1 className="text-lg font-black text-[#1F2937]">{labels.title}</h1>
-        </div>
-
-        <div className="relative flex h-12 items-center rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/20">
-          <Search size={18} className="pointer-events-none absolute left-4 text-[#9CA3AF]" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={value}
-            onChange={event => onChange(event.target.value)}
-            placeholder={labels.placeholder}
-            className="h-full w-full bg-transparent pl-12 pr-12 text-base text-[#1F2937] placeholder-[#9CA3AF] outline-none"
-          />
-          {value && (
+        <div className="mx-auto w-full max-w-[1280px]">
+          <div className="mb-3 flex items-center gap-3">
             <button
               type="button"
-              onClick={() => onChange('')}
-              aria-label={labels.clear}
-              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-[#9CA3AF] transition-colors hover:bg-white hover:text-[#ff5a00]"
+              onClick={onClose}
+              aria-label={labels.close}
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-[#64748B] transition-colors hover:border-orange-200 hover:text-[#ff5a00]"
             >
-              <X size={18} />
+              <ArrowLeft size={18} />
             </button>
-          )}
+            <h1 className="text-lg font-black text-[#1F2937]">{labels.title}</h1>
+          </div>
+
+          <div className="relative flex h-12 items-center rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/20">
+            <Search size={18} className="pointer-events-none absolute left-4 text-[#9CA3AF]" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={value}
+              onChange={event => onChange(event.target.value)}
+              placeholder={labels.placeholder}
+              className="h-full w-full bg-transparent pl-12 pr-12 text-base text-[#1F2937] placeholder-[#9CA3AF] outline-none"
+            />
+            {value && (
+              <button
+                type="button"
+                onClick={() => onChange('')}
+                aria-label={labels.clear}
+                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-[#9CA3AF] transition-colors hover:bg-white hover:text-[#ff5a00]"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-5">
-        {items.length === 0 ? (
+        {items.length === 0 && categories.length === 0 ? (
           <div className="flex min-h-[45vh] flex-col items-center justify-center text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
               <UtensilsCrossed size={28} className="text-orange-300" />
@@ -227,23 +319,47 @@ function MobileSearchPage({
             <p className="mt-1 max-w-[260px] text-sm text-[#8A94A6]">{labels.emptyText}</p>
           </div>
         ) : (
-          <div className="mx-auto grid max-w-[1280px] grid-cols-2 gap-4 pb-6 md:grid-cols-3 xl:grid-cols-4">
-            {items.map((item, index) => (
-              <MenuProductCard
-                key={item.id}
-                item={item}
-                qty={0}
-                lang={lang}
-                eager={index < 4}
-                onOpenDetail={itemToOpen => {
-                  onClose()
-                  onOpenDetail(itemToOpen)
-                }}
-                readOnly
-                formatPrice={formatPrice}
-                linkBasePath={linkBasePath}
-              />
-            ))}
+          <div className="mx-auto max-w-[1280px] pb-6">
+            {categories.length > 0 && (
+              <section className="mb-7">
+                <h2 className="mb-3 text-sm font-black text-[#1F2937]">{labels.categories}</h2>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map(category => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => onOpenCategory(category)}
+                      className="inline-flex min-h-11 items-center rounded-2xl border border-orange-100 bg-orange-50 px-4 text-sm font-black text-[#1F2937] transition-colors hover:border-[#ff5a00] hover:bg-white hover:text-[#ff5a00]"
+                    >
+                      {getCategoryName(category, lang)}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+            {items.length > 0 && (
+              <section>
+                <h2 className="mb-3 text-sm font-black text-[#1F2937]">{labels.dishes}</h2>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                  {items.map((item, index) => (
+                    <MenuProductCard
+                      key={item.id}
+                      item={item}
+                      qty={0}
+                      lang={lang}
+                      eager={index < 4}
+                      onOpenDetail={itemToOpen => {
+                        onClose()
+                        onOpenDetail(itemToOpen)
+                      }}
+                      readOnly
+                      formatPrice={formatPrice}
+                      linkBasePath={linkBasePath}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>
@@ -307,6 +423,7 @@ export default function PublicMenu({ premium = false }) {
   const menuBasePath = premium ? '/premium-menu' : '/menu'
   const lang = premium ? premiumLang : appLang
   const seo = PUBLIC_MENU_SEO[lang] || PUBLIC_MENU_SEO.ru
+  const siteCopy = PUBLIC_SITE_COPY[lang] || PUBLIC_SITE_COPY.en
   const showDetailOverlay = Boolean(detailItem)
   const headerRef = useRef(null)
   const savedScrollRef = useRef(0)
@@ -455,6 +572,11 @@ export default function PublicMenu({ premium = false }) {
       return matchesSearch
     })
   }, [displayItems, searchQuery])
+  const searchCategoryResults = useMemo(() => displayCategories.filter(category => {
+    if (!searchQuery) return true
+    return [category.name_uz, category.name_ru, category.name_en]
+      .some(value => value?.toLowerCase().includes(searchQuery))
+  }), [displayCategories, searchQuery])
 
   const groupedSections = useMemo(() => {
     const sections = displayCategories
@@ -516,12 +638,34 @@ export default function PublicMenu({ premium = false }) {
     setMenuCurrency(premium ? normalized : saveMenuCurrency(normalized))
   }
 
+  function openCategoryFromSearch(category) {
+    setMobileSearchOpen(false)
+    setSearch('')
+    setActiveCategory(category.id)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.getElementById(menuCategorySectionId('public-menu-category', category.id))
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }))
+  }
+
+  function openVacancies(event) {
+    event.preventDefault()
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduceMotion || typeof document.startViewTransition !== 'function') {
+      navigate('/vacancies')
+      return
+    }
+    document.startViewTransition(() => {
+      flushSync(() => navigate('/vacancies'))
+    })
+  }
+
   return (
     <div className="min-h-screen bg-white text-[#1F2937]" style={{ paddingTop: headerOffset }}>
       <div data-nosnippet="">
         <header ref={headerRef} className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
           <div className="relative mx-auto grid max-w-[1280px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-2 px-4 py-2 sm:flex sm:flex-nowrap sm:gap-4 sm:py-3">
-          <div className="flex min-w-0 items-center gap-2 sm:flex-1 sm:gap-3 sm:pr-0 lg:pr-36">
+          <div className="flex min-w-0 items-center gap-2 sm:flex-1 sm:gap-3">
             <div className="flex min-w-0 flex-shrink items-center gap-2 sm:gap-3">
               <img
                 src={getBrandLogo(lang)}
@@ -532,6 +676,14 @@ export default function PublicMenu({ premium = false }) {
                 ZarKebab
               </p>
             </div>
+            {!premium && (
+              <nav className="ml-4 hidden items-center gap-5 lg:flex" aria-label={siteCopy.company}>
+                <a href="#public-menu-content" onClick={event => navigateToPublicSection(event, 'public-menu-content')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.menu}</a>
+                <a href="#public-menu-deals" onClick={event => navigateToPublicSection(event, 'public-menu-deals')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.promotions}</a>
+                <a href="/vacancies" onClick={openVacancies} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.vacancies}</a>
+                <a href="#public-menu-contacts" onClick={event => navigateToPublicSection(event, 'public-menu-contacts')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.contacts}</a>
+              </nav>
+            )}
           </div>
           <div className="col-start-1 row-start-2 flex items-center sm:contents">
             <button
@@ -544,7 +696,9 @@ export default function PublicMenu({ premium = false }) {
             </button>
           </div>
 
-          <PublicContactButtons className="col-span-3 col-start-1 row-start-2 justify-self-center sm:absolute sm:left-1/2 sm:top-1/2 sm:w-auto sm:-translate-x-1/2 sm:-translate-y-1/2" />
+          <div className="col-span-3 col-start-1 row-start-2 justify-self-center sm:absolute sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 lg:hidden">
+            <PublicContactButtons />
+          </div>
 
           <div className="col-start-2 row-start-1 flex flex-shrink-0 items-center gap-1.5">
             <HeaderSelect
@@ -567,14 +721,7 @@ export default function PublicMenu({ premium = false }) {
         </header>
       </div>
 
-      <main className="mx-auto max-w-[1280px] px-4 pb-5 pt-2 sm:px-6">
-        {!premium && (
-          <section className="mb-4 rounded-2xl bg-orange-50/70 px-4 py-3 text-center sm:mb-5 sm:px-6 sm:py-4">
-            <h1 className="text-lg font-black tracking-tight text-[#1F2937] sm:text-xl">{seo.heading}</h1>
-            <p className="mx-auto mt-1 max-w-3xl text-xs leading-relaxed text-[#64748B] sm:text-sm">{seo.description}</p>
-          </section>
-        )}
-
+      <main id="public-menu-content" className="mx-auto max-w-[1280px] scroll-mt-28 px-4 pb-5 pt-3 sm:px-6 sm:pt-5">
         <div data-nosnippet="">
           <MenuCategoryScroller
             categories={categoryCards}
@@ -718,6 +865,7 @@ export default function PublicMenu({ premium = false }) {
           )
         )}
       </main>
+      {!premium && <PublicMenuFooter copy={siteCopy} lang={lang} onOpenVacancies={openVacancies} />}
       {showDetailOverlay && (
         <div className="fixed inset-0 z-[80] bg-white">
           <MenuProductDetailPage
@@ -744,8 +892,10 @@ export default function PublicMenu({ premium = false }) {
         onChange={setSearch}
         onClose={() => setMobileSearchOpen(false)}
         items={searchResults}
+        categories={searchCategoryResults}
         lang={lang}
         onOpenDetail={openDetail}
+        onOpenCategory={openCategoryFromSearch}
         formatPrice={priceFormatter}
         linkBasePath={menuBasePath}
       />

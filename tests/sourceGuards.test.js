@@ -1520,7 +1520,7 @@ test('PublicMenu enables tappable fixed collapsed categories', () => {
   assert.match(source, /collapsedPosition="fixed"/)
   assert.match(source, /collapsedClassName="z-50/)
   assert.match(source, /scrollOffset=\{64\}/)
-  assert.match(source, /px-4 pb-5 pt-2 sm:px-6/)
+  assert.match(source, /px-4 pb-5 pt-3 sm:px-6 sm:pt-5/)
   assert.match(source, /grid max-w-\[1280px\] grid-cols-\[minmax\(0,1fr\)_auto_auto\]/)
   assert.match(source, /gap-x-2 gap-y-2 px-4 py-2/)
   assert.match(source, /col-span-3 col-start-1 row-start-2 justify-self-center/)
@@ -1548,6 +1548,21 @@ test('PublicMenu enables tappable fixed collapsed categories', () => {
   assert.match(source, /displayCategories\.filter\(category => \(itemCounts\[category\.id\] \|\| 0\) > 0\)/)
   assert.doesNotMatch(source, /px-4 py-5 sm:px-6/)
   assert.doesNotMatch(source, /className="mb-7 mt-3 rounded-\[28px\]/)
+})
+
+test('public search includes matching categories and vacancies have detail routes', () => {
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const vacancies = readSource('src/pages/PublicVacancies.jsx')
+  const app = readSource('src/App.jsx')
+
+  assert.match(publicMenu, /const searchCategoryResults = useMemo/)
+  assert.match(publicMenu, /categories=\{searchCategoryResults\}/)
+  assert.match(publicMenu, /onOpenCategory=\{openCategoryFromSearch\}/)
+  assert.match(app, /path="\/vacancies\/:vacancyId"/)
+  assert.match(vacancies, /useParams\(\)/)
+  assert.match(vacancies, /selectedPosition\.responsibilities/)
+  assert.match(vacancies, /selectedPosition\.requirements/)
+  assert.match(vacancies, /to=\{`\/vacancies\/\$\{key\}`\}/)
 })
 
 test('menu item discounts use old_price for display and public deals', () => {
