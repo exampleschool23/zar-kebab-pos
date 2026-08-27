@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, CheckCircle2, ChefHat, Clock3, MapPin, Phone, Send, UserRound, WalletCards } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, ChefHat, Clock3, MapPin, Phone, Send, UserRound, UsersRound } from 'lucide-react'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import { getBrandLogo } from '../lib/brandLogo'
 import { useApp } from '../store/AppContext'
@@ -17,11 +17,11 @@ const COPY = {
     intro: 'Mehmondo‘stlikni yaxshi ko‘radigan mas’uliyatli insonlarni jamoamizga taklif qilamiz.',
     openings: 'Ochiq ish o‘rinlari',
     waiter: 'Ofitsiant',
-    waiterText: 'Mehmonlarga samimiy xizmat ko‘rsatish va zal jamoasi bilan ishlash.',
+    waiterText: 'Mehmonlarga yuqori darajada xizmat ko‘rsatish va buyurtmalarni to‘g‘ri qabul qilish.',
     cook: 'Oshpaz',
     cookText: 'Taomlarni standartlarimiz asosida sifatli va o‘z vaqtida tayyorlash.',
-    cashier: 'Kassir',
-    cashierText: 'Buyurtma va to‘lovlarni diqqat bilan boshqarish, mehmonlarga yordam berish.',
+    hostess: 'Hostess',
+    hostessText: 'Mehmonlarni samimiy kutib olish, joylashtirish va rezervatsiyalarni boshqarish.',
     fullTime: 'To‘liq ish kuni',
     tashkent: 'Toshkent',
     apply: 'Telegram orqali ariza',
@@ -41,11 +41,11 @@ const COPY = {
     intro: 'Приглашаем ответственных людей, которые любят гостеприимство и хотят стать частью нашей команды.',
     openings: 'Открытые вакансии',
     waiter: 'Официант',
-    waiterText: 'Заботиться о гостях и работать вместе с командой зала.',
+    waiterText: 'Обслуживать гостей на высоком уровне и точно принимать заказы.',
     cook: 'Повар',
     cookText: 'Качественно и вовремя готовить блюда по стандартам ресторана.',
-    cashier: 'Кассир',
-    cashierText: 'Внимательно работать с заказами и оплатой, помогать гостям.',
+    hostess: 'Хостес',
+    hostessText: 'Тепло встречать и размещать гостей, управлять бронированиями.',
     fullTime: 'Полный рабочий день',
     tashkent: 'Ташкент',
     apply: 'Откликнуться в Telegram',
@@ -65,11 +65,11 @@ const COPY = {
     intro: 'We welcome responsible people who care about hospitality and want to become part of our team.',
     openings: 'Open positions',
     waiter: 'Waiter',
-    waiterText: 'Create a welcoming guest experience and work closely with the service team.',
+    waiterText: 'Provide attentive guest service and take orders accurately.',
     cook: 'Cook',
     cookText: 'Prepare dishes with consistent quality and timing according to our standards.',
-    cashier: 'Cashier',
-    cashierText: 'Handle orders and payments carefully while helping guests.',
+    hostess: 'Hostess',
+    hostessText: 'Welcome and seat guests warmly while managing reservations.',
     fullTime: 'Full time',
     tashkent: 'Tashkent',
     apply: 'Apply on Telegram',
@@ -87,53 +87,53 @@ const COPY = {
 const VACANCY_DETAILS = {
   uz: {
     waiter: {
-      description: 'Ofitsiant mehmonni kutib oladi, menyuni tushuntiradi va xizmat davomida unga e’tibor beradi. Bu lavozim samimiy muloqot va jamoaviy ishni qadrlaydigan inson uchun.',
-      responsibilities: ['Mehmonlarni kutib olish va buyurtmalarni aniq qabul qilish', 'Taom va ichimliklar haqida tushunarli ma’lumot berish', 'Stollar va xizmat hududini tartibli saqlash', 'Oshxona va kassir bilan bir jamoa bo‘lib ishlash'],
-      requirements: ['O‘zbek yoki rus tilida ravon muloqot', 'Xushmuomalalik va mas’uliyat', 'Faol ish jadvaliga tayyorlik', 'Restorandagi tajriba afzallik beradi'],
+      description: 'Mehmonlar bilan ishlashni yoqtiradigan, xushmuomala va mas’uliyatli ofitsiant izlaymiz. Tajriba bo‘lsa yaxshi, tajribasiz nomzodlarga ish o‘rgatiladi.',
+      responsibilities: ['Mehmonlarni kutib olish va buyurtmalarni to‘g‘ri qabul qilish', 'Taom va ichimliklarni sifatli yetkazish', 'Mijozlarga yuqori darajada xizmat ko‘rsatish', 'Stol va ish joyi tozaligiga rioya qilish'],
+      requirements: ['Rus tilida erkin gaplasha olish — majburiy', 'Ingliz tilida mijozlar bilan bemalol muloqot qila olish', 'Xushmuomala, ozoda va mas’uliyatli bo‘lish', 'Mehmonlar bilan ishlashni yoqtirish'],
     },
     cook: {
       description: 'Oshpaz retsept va standartlarimiz asosida taomlarni barqaror sifatda tayyorlaydi. Biz tozalik, tezlik va mahsulotga ehtiyotkor munosabatni qadrlaymiz.',
       responsibilities: ['Taomlarni texnologik kartalar asosida tayyorlash', 'Mahsulot sifati va porsiya standartini nazorat qilish', 'Ish joyi va uskunalarni toza saqlash', 'Buyurtmalarni oshxona jamoasi bilan o‘z vaqtida chiqarish'],
       requirements: ['Oshxonada ishlash tajribasi', 'Sanitariya va xavfsizlik qoidalarini bilish', 'Tez va tartibli ishlash qobiliyati', 'Jamoada ishlashga tayyorlik'],
     },
-    cashier: {
-      description: 'Kassir buyurtma va to‘lovlarni to‘g‘ri rasmiylashtiradi, mehmon savollariga yordam beradi va smena hisobini aniq yuritadi.',
-      responsibilities: ['Buyurtmalar va to‘lovlarni diqqat bilan qabul qilish', 'Naqd va terminal operatsiyalarini to‘g‘ri yuritish', 'Mehmonlarga menyu va to‘lov bo‘yicha yordam berish', 'Smena yakunidagi hisoblarni topshirish'],
-      requirements: ['Diqqatlilik va halollik', 'Oddiy hisob-kitob va POS tizimlari bilan ishlash ko‘nikmasi', 'O‘zbek yoki rus tilida muloqot', 'Kassadagi tajriba afzallik beradi'],
+    hostess: {
+      description: 'Mehmonlarda Zar Kebab haqida iliq va yaxshi taassurot qoldiradigan hostess izlaymiz. Tajriba bo‘lsa yaxshi, tajribasiz nomzodlarga ish o‘rgatiladi.',
+      responsibilities: ['Mehmonlarni samimiy kutib olish va joylashtirish', 'Rezervatsiyalarni nazorat qilish', 'Mehmonlarga menyu hamda kafe haqida ma’lumot berish', 'Kirish qismida tartibni va mehmonlar oqimini boshqarish', 'Xorijiy mehmonlar bilan muloqot qilish', 'Mehmonlarda yaxshi taassurot qoldirish'],
+      requirements: ['Rus tilida erkin so‘zlasha olish — majburiy', 'Ingliz tilida bemalol muloqot qila olish', 'O‘zbek tilini bilish', 'Xushmuomala, ozoda va mas’uliyatli bo‘lish', 'Yaxshi kommunikatsiya qobiliyatiga ega bo‘lish', 'Mehmonlar bilan ishlashni yoqtirish'],
     },
   },
   ru: {
     waiter: {
-      description: 'Официант встречает гостей, помогает разобраться в меню и внимательно сопровождает их на протяжении всего визита. Роль подойдёт тем, кто ценит живое общение и командную работу.',
-      responsibilities: ['Встречать гостей и точно принимать заказы', 'Понятно рассказывать о блюдах и напитках', 'Поддерживать порядок на столах и в зоне обслуживания', 'Работать в связке с кухней и кассой'],
-      requirements: ['Свободное общение на русском или узбекском языке', 'Вежливость и ответственность', 'Готовность к активному рабочему графику', 'Опыт в ресторане будет преимуществом'],
+      description: 'Ищем вежливого и ответственного официанта, которому нравится работать с гостями. Опыт будет преимуществом, кандидатов без опыта обучим.',
+      responsibilities: ['Встречать гостей и правильно принимать заказы', 'Качественно подавать блюда и напитки', 'Обеспечивать высокий уровень обслуживания', 'Поддерживать чистоту столов и рабочего места'],
+      requirements: ['Свободное владение русским языком — обязательно', 'Уверенное общение с гостями на английском языке', 'Вежливость, опрятность и ответственность', 'Желание работать с гостями'],
     },
     cook: {
       description: 'Повар готовит блюда стабильно высокого качества по нашим рецептам и стандартам. Для нас важны чистота, скорость и бережное отношение к продуктам.',
       responsibilities: ['Готовить блюда по технологическим картам', 'Контролировать качество продуктов и размер порций', 'Поддерживать чистоту рабочего места и оборудования', 'Вовремя отдавать заказы вместе с командой кухни'],
       requirements: ['Опыт работы на кухне', 'Знание санитарных норм и правил безопасности', 'Умение работать быстро и организованно', 'Готовность работать в команде'],
     },
-    cashier: {
-      description: 'Кассир корректно оформляет заказы и оплату, помогает гостям с вопросами и обеспечивает точность кассовой смены.',
-      responsibilities: ['Внимательно принимать заказы и платежи', 'Правильно проводить наличные и терминальные операции', 'Помогать гостям с меню и вариантами оплаты', 'Сдавать точный отчёт по окончании смены'],
-      requirements: ['Внимательность и честность', 'Базовые навыки расчётов и работы с POS', 'Общение на русском или узбекском языке', 'Опыт работы с кассой будет преимуществом'],
+    hostess: {
+      description: 'Ищем хостес, которая создаст у гостей тёплое первое впечатление о Zar Kebab. Опыт будет преимуществом, кандидатов без опыта обучим.',
+      responsibilities: ['Тепло встречать и размещать гостей', 'Контролировать бронирования', 'Рассказывать гостям о меню и кафе', 'Поддерживать порядок во входной зоне и управлять потоком гостей', 'Общаться с иностранными гостями', 'Создавать хорошее впечатление у гостей'],
+      requirements: ['Свободное владение русским языком — обязательно', 'Уверенное общение на английском языке', 'Знание узбекского языка', 'Вежливость, опрятность и ответственность', 'Хорошие коммуникативные навыки', 'Желание работать с гостями'],
     },
   },
   en: {
     waiter: {
-      description: 'The waiter welcomes guests, helps them understand the menu, and looks after their experience throughout the visit. This role suits someone who enjoys genuine communication and teamwork.',
-      responsibilities: ['Welcome guests and take orders accurately', 'Explain dishes and drinks clearly', 'Keep tables and the service area organized', 'Coordinate closely with the kitchen and cashier'],
-      requirements: ['Confident Uzbek or Russian communication', 'Friendly and responsible attitude', 'Comfort with an active work schedule', 'Restaurant experience is an advantage'],
+      description: 'We are looking for a polite and responsible waiter who enjoys working with guests. Experience is welcome, and training is provided for candidates without experience.',
+      responsibilities: ['Welcome guests and take orders accurately', 'Deliver food and drinks with care', 'Provide a high standard of customer service', 'Keep tables and the work area clean'],
+      requirements: ['Fluent Russian — required', 'Confident communication with guests in English', 'A polite, neat, and responsible attitude', 'Enjoyment of working with guests'],
     },
     cook: {
       description: 'The cook prepares consistently high-quality dishes using our recipes and standards. We value cleanliness, good timing, and careful handling of ingredients.',
       responsibilities: ['Prepare dishes from approved recipe cards', 'Control ingredient quality and portion standards', 'Keep the station and equipment clean', 'Complete orders on time with the kitchen team'],
       requirements: ['Professional kitchen experience', 'Knowledge of food safety and hygiene', 'Ability to work quickly and stay organized', 'A reliable team-oriented attitude'],
     },
-    cashier: {
-      description: 'The cashier records orders and payments accurately, helps guests with questions, and keeps each shift’s cash reporting correct.',
-      responsibilities: ['Process orders and payments carefully', 'Handle cash and terminal transactions correctly', 'Help guests with menu and payment questions', 'Complete accurate end-of-shift reporting'],
-      requirements: ['Attention to detail and integrity', 'Basic calculation and POS skills', 'Uzbek or Russian communication', 'Cashier experience is an advantage'],
+    hostess: {
+      description: 'We are looking for a hostess who will give every guest a warm first impression of Zar Kebab. Experience is welcome, and training is provided for candidates without experience.',
+      responsibilities: ['Welcome and seat guests warmly', 'Manage reservations', 'Tell guests about the menu and cafe', 'Keep the entrance organized and manage guest flow', 'Communicate with international guests', 'Create a positive impression for every guest'],
+      requirements: ['Fluent Russian — required', 'Confident communication in English', 'Knowledge of Uzbek', 'A polite, neat, and responsible attitude', 'Strong communication skills', 'Enjoyment of working with guests'],
     },
   },
 }
@@ -149,7 +149,7 @@ export default function PublicVacancies() {
   const positions = [
     { key: 'waiter', Icon: UserRound, title: copy.waiter, text: copy.waiterText, ...details.waiter },
     { key: 'cook', Icon: ChefHat, title: copy.cook, text: copy.cookText, ...details.cook },
-    { key: 'cashier', Icon: WalletCards, title: copy.cashier, text: copy.cashierText, ...details.cashier },
+    { key: 'hostess', Icon: UsersRound, title: copy.hostess, text: copy.hostessText, ...details.hostess },
   ]
   const selectedPosition = vacancyId ? positions.find(position => position.key === vacancyId) : null
 
@@ -174,15 +174,23 @@ export default function PublicVacancies() {
     animatedNavigate(event, '/menu')
   }
 
+  function returnFromPage(event) {
+    animatedNavigate(event, selectedPosition ? '/vacancies' : '/menu')
+  }
+
   return (
     <div className="public-page-enter min-h-screen bg-[#FAFAF9] text-[#1F2937]">
       <header className="border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:h-20 sm:px-6">
-          <Link to="/menu" onClick={returnToMenu} className="flex min-w-0 items-center gap-3">
-            <img src={getBrandLogo(lang)} alt="Zar Kebab" className="h-11 w-auto object-contain sm:h-14" />
-            <span className="hidden text-xs font-black uppercase tracking-[0.15em] text-[#ff5a00] sm:block">Zar Kebab</span>
+        <div className="mx-auto grid h-16 max-w-[1280px] grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:h-20 sm:px-6">
+          <Link to={selectedPosition ? '/vacancies' : '/menu'} onClick={returnFromPage} className="inline-flex min-w-0 items-center gap-2 justify-self-start text-xs font-black uppercase tracking-wide text-[#64748B] transition-colors hover:text-[#ff5a00]">
+            <ArrowLeft size={16} />
+            <span className="hidden sm:inline">{selectedPosition ? copy.backToVacancies : copy.back}</span>
           </Link>
-          <LanguageSwitcher />
+          <Link to="/menu" onClick={returnToMenu} aria-label="Zar Kebab" className="flex items-center gap-2.5 justify-self-center sm:gap-3">
+            <img src={getBrandLogo(lang)} alt="" className="h-11 w-auto object-contain sm:h-14" />
+            <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-[0.15em] text-[#ff5a00] sm:text-xs">Zar Kebab</span>
+          </Link>
+          <LanguageSwitcher className="justify-self-end" />
         </div>
       </header>
 
@@ -191,10 +199,7 @@ export default function PublicVacancies() {
           <>
             <section className="border-b border-orange-100 bg-[#FFF8F1]">
               <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 sm:py-14">
-                <Link to="/vacancies" onClick={event => animatedNavigate(event, '/vacancies')} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-[#64748B] transition-colors hover:text-[#ff5a00]">
-                  <ArrowLeft size={15} />{copy.backToVacancies}
-                </Link>
-                <div className="mt-8 flex max-w-3xl items-start gap-4 sm:gap-5">
+                <div className="flex max-w-3xl items-start gap-4 sm:gap-5">
                   <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white text-[#ff5a00] shadow-sm sm:h-16 sm:w-16"><selectedPosition.Icon size={27} /></span>
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-[#ff5a00]">{copy.eyebrow}</p>
@@ -231,10 +236,7 @@ export default function PublicVacancies() {
           <>
         <section className="border-b border-orange-100 bg-[#FFF8F1]">
           <div className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 sm:py-16">
-            <Link to="/menu" onClick={returnToMenu} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-[#64748B] transition-colors hover:text-[#ff5a00]">
-              <ArrowLeft size={15} />{copy.back}
-            </Link>
-            <div className="mt-9 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
               <div className="max-w-3xl">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#ff5a00]">{copy.eyebrow}</p>
                 <h1 className="mt-3 text-4xl font-black leading-tight tracking-tight text-[#1F2937] sm:text-5xl">{copy.title}</h1>

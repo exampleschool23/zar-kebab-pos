@@ -34,6 +34,13 @@ export function loadSettings() {
 
 export function loadInitialLang() {
   try {
+    const hostname = String(globalThis.location?.hostname || '').toLowerCase()
+    const isPublicWebsite = hostname === 'zarkebab.uz' || hostname === 'www.zarkebab.uz'
+    if (isPublicWebsite && !localStorage.getItem('zk_public_default_lang_ru_v1')) {
+      localStorage.setItem('zk_lang', 'ru')
+      localStorage.setItem('zk_public_default_lang_ru_v1', '1')
+      return 'ru'
+    }
     if (!localStorage.getItem('zk_default_lang_ru_applied')) {
       localStorage.setItem('zk_lang', 'ru')
       localStorage.setItem('zk_default_lang_ru_applied', '1')

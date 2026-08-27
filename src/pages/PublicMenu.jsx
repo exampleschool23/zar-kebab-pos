@@ -664,59 +664,70 @@ export default function PublicMenu({ premium = false }) {
     <div className="min-h-screen bg-white text-[#1F2937]" style={{ paddingTop: headerOffset }}>
       <div data-nosnippet="">
         <header ref={headerRef} className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
-          <div className="relative mx-auto grid max-w-[1280px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-2 px-4 py-2 sm:flex sm:flex-nowrap sm:gap-4 sm:py-3">
-          <div className="flex min-w-0 items-center gap-2 sm:flex-1 sm:gap-3">
-            <div className="flex min-w-0 flex-shrink items-center gap-2 sm:gap-3">
-              <img
-                src={getBrandLogo(lang)}
-                alt="Zar Kebab"
-                className="h-10 w-auto max-w-[110px] flex-shrink-0 object-contain sm:h-12 sm:max-w-[150px]"
-              />
-              <p className="min-w-0 truncate text-[11px] font-bold uppercase tracking-wider text-[#ff5a00] sm:text-xs">
-                ZarKebab
-              </p>
+          <div className="mx-auto max-w-[1280px] px-4 py-2 sm:px-6 sm:py-3">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+              <div className="min-w-0 justify-self-start">
+                <button
+                  type="button"
+                  onClick={() => setMobileSearchOpen(true)}
+                  aria-label={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-colors hover:border-orange-200 hover:bg-white hover:text-[#ff5a00] lg:hidden"
+                >
+                  <Search size={17} />
+                </button>
+                {!premium && (
+                  <nav className="hidden items-center gap-5 lg:flex" aria-label={siteCopy.company}>
+                    <a href="#public-menu-content" onClick={event => navigateToPublicSection(event, 'public-menu-content')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.menu}</a>
+                    <a href="#public-menu-deals" onClick={event => navigateToPublicSection(event, 'public-menu-deals')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.promotions}</a>
+                    <a href="/vacancies" onClick={openVacancies} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.vacancies}</a>
+                    <a href="#public-menu-contacts" onClick={event => navigateToPublicSection(event, 'public-menu-contacts')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.contacts}</a>
+                  </nav>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 justify-self-center sm:gap-3">
+                <img src={getBrandLogo(lang)} alt="Zar Kebab" className="h-10 w-auto object-contain sm:h-12" />
+                <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-[0.15em] text-[#ff5a00] sm:text-xs">Zar Kebab</span>
+              </div>
+
+              <div className="flex items-center gap-2 justify-self-end">
+                <button
+                  type="button"
+                  onClick={() => setMobileSearchOpen(true)}
+                  aria-label={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
+                  className="hidden h-10 w-10 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-colors hover:border-orange-200 hover:bg-white hover:text-[#ff5a00] lg:flex"
+                >
+                  <Search size={17} />
+                </button>
+                <div className="hidden lg:block">
+                  <HeaderSelect
+                    value={menuCurrency}
+                    onChange={changeMenuCurrency}
+                    icon={Coins}
+                    options={MENU_CURRENCIES.map(currency => ({
+                      value: currency,
+                      label: currency === 'UZS' ? "so'm UZS" : currency === 'USD' ? '$ USD' : '€ EUR',
+                    }))}
+                    ariaLabel={lang === 'uz' ? 'Valyuta' : lang === 'ru' ? 'Валюта' : 'Currency'}
+                  />
+                </div>
+                {premium ? <LanguageSwitcher value={lang} onChange={setPremiumLang} /> : <LanguageSwitcher />}
+              </div>
             </div>
-            {!premium && (
-              <nav className="ml-4 hidden items-center gap-5 lg:flex" aria-label={siteCopy.company}>
-                <a href="#public-menu-content" onClick={event => navigateToPublicSection(event, 'public-menu-content')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.menu}</a>
-                <a href="#public-menu-deals" onClick={event => navigateToPublicSection(event, 'public-menu-deals')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.promotions}</a>
-                <a href="/vacancies" onClick={openVacancies} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.vacancies}</a>
-                <a href="#public-menu-contacts" onClick={event => navigateToPublicSection(event, 'public-menu-contacts')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.contacts}</a>
-              </nav>
-            )}
-          </div>
-          <div className="col-start-1 row-start-2 flex items-center sm:contents">
-            <button
-              type="button"
-              onClick={() => setMobileSearchOpen(true)}
-              aria-label={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-colors hover:border-orange-200 hover:bg-white hover:text-[#ff5a00] sm:h-10 sm:w-10"
-            >
-              <Search size={17} />
-            </button>
-          </div>
 
-          <div className="col-span-3 col-start-1 row-start-2 justify-self-center sm:absolute sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 lg:hidden">
-            <PublicContactButtons />
-          </div>
-
-          <div className="col-start-2 row-start-1 flex flex-shrink-0 items-center gap-1.5">
-            <HeaderSelect
-              value={menuCurrency}
-              onChange={changeMenuCurrency}
-              icon={Coins}
-              options={MENU_CURRENCIES.map(currency => ({
-                value: currency,
-                label: currency === 'UZS' ? "so'm UZS" : currency === 'USD' ? '$ USD' : '€ EUR',
-              }))}
-              ariaLabel={lang === 'uz' ? 'Valyuta' : lang === 'ru' ? 'Валюта' : 'Currency'}
-            />
-          </div>
-          {premium ? (
-            <LanguageSwitcher value={lang} onChange={setPremiumLang} className="col-start-3 row-start-1" />
-          ) : (
-            <LanguageSwitcher className="col-start-3 row-start-1" />
-          )}
+            <div className="mt-2 flex items-center justify-between gap-3 lg:hidden">
+              <PublicContactButtons className="justify-start" />
+              <HeaderSelect
+                value={menuCurrency}
+                onChange={changeMenuCurrency}
+                icon={Coins}
+                options={MENU_CURRENCIES.map(currency => ({
+                  value: currency,
+                  label: currency === 'UZS' ? "so'm UZS" : currency === 'USD' ? '$ USD' : '€ EUR',
+                }))}
+                ariaLabel={lang === 'uz' ? 'Valyuta' : lang === 'ru' ? 'Валюта' : 'Currency'}
+              />
+            </div>
           </div>
         </header>
       </div>
