@@ -24,7 +24,13 @@ import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate, formatMonthYear, formatTime } from '../lib/dateFormat'
 import { formatKpiRatePercent } from '../lib/dailyKpi'
-import { expensePaymentMethodLabel, todayExpenseDate } from '../lib/expenses'
+import {
+  expensePaymentMethodLabel,
+  getSalaryAccruedAmount,
+  getSalaryActiveUntil,
+  getSalaryDue,
+  todayExpenseDate,
+} from '../lib/expenses'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
 import {
   buildSalaryHistoryCalendar,
@@ -137,6 +143,8 @@ export default function EmployeeSalaryHistory() {
       kpiBonusTotal: 'KPI bonuslari',
       fineTotal: 'Jarimalar',
       absenceTotal: 'Kelmagan kunlar',
+      earnedTotal: 'Maosh + bonuslar',
+      leftToPay: 'To‘lash qoldi',
       empty: 'Bu davrda yozuvlar yo‘q.',
       delete: 'O‘chirish',
       confirm: 'Tasdiqlash',
@@ -187,6 +195,8 @@ export default function EmployeeSalaryHistory() {
       kpiBonusTotal: 'KPI-бонусы',
       fineTotal: 'Штрафы',
       absenceTotal: 'Дни отсутствия',
+      earnedTotal: 'Зарплата + бонусы',
+      leftToPay: 'Осталось выплатить',
       empty: 'За этот период записей нет.',
       delete: 'Удалить',
       confirm: 'Подтвердить',
@@ -237,6 +247,8 @@ export default function EmployeeSalaryHistory() {
       kpiBonusTotal: 'KPI bonuses',
       fineTotal: 'Fines',
       absenceTotal: 'Absent days',
+      earnedTotal: 'Salary + bonuses',
+      leftToPay: 'Left to pay',
       empty: 'There are no records for this period.',
       delete: 'Delete',
       confirm: 'Confirm',
@@ -266,8 +278,9 @@ export default function EmployeeSalaryHistory() {
     if (showLoader) setLoading(true)
     setError('')
     try {
-      const [employeeRes, paymentRes, bonusRes, fineRes, absenceRes, kpiResultRes] = await Promise.all([
+      const [employeeRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, kpiResultRes] = await Promise.all([
         supabase.from('employee_salary_profiles').select('*').eq('id', employeeId).maybeSingle(),
+        supabase.from('employee_salary_rates').select('*').eq('salary_profile_id', employeeId),
         supabase.from('employee_salary_payments').select('*').eq('salary_profile_id', employeeId),
         supabase.from('employee_salary_bonuses').select('*').eq('salary_profile_id', employeeId),
         supabase.from('employee_salary_fines').select('*').eq('salary_profile_id', employeeId),
@@ -276,7 +289,7 @@ export default function EmployeeSalaryHistory() {
           .select('id, business_date, salary_profile_id, sales_base_amount, rate_bps, bonus_amount, bonus_id, status')
           .eq('salary_profile_id', employeeId),
       ])
-      const loadError = employeeRes.error || paymentRes.error || bonusRes.error || absenceRes.error
+      const loadError = employeeRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
       if (loadError) throw loadError
       if (!employeeRes.data || employeeRes.data.deleted_at) {
         setEmployee(null)
@@ -285,7 +298,13 @@ export default function EmployeeSalaryHistory() {
         return
       }
 
-      setEmployee(employeeRes.data)
+      setEmployee({
+        ...employeeRes.data,
+        rates: rateRes.data || [],
+        payments: paymentRes.data || [],
+        fines: fineRes.error ? [] : fineRes.data || [],
+        absences: absenceRes.data || [],
+      })
       setEntries(buildSalaryHistoryEntries({
         payments: paymentRes.data || [],
         bonuses: bonusRes.data || [],
@@ -325,6 +344,22 @@ export default function EmployeeSalaryHistory() {
     () => summarizeSalaryHistoryMonth(entries, visibleMonth),
     [entries, visibleMonth]
   )
+  const headerTotals = useMemo(() => {
+    if (!employee || !visibleMonth) return { earned: 0, due: 0 }
+    const monthStart = `${visibleMonth}-01`
+    const [year, month] = visibleMonth.split('-').map(Number)
+    const monthEnd = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10)
+    const accrualEnd = [monthEnd, today, getSalaryActiveUntil(employee, monthEnd)]
+      .filter(Boolean)
+      .sort()[0]
+    const salaryEarned = accrualEnd >= monthStart
+      ? getSalaryAccruedAmount(employee, monthStart, accrualEnd)
+      : 0
+    return {
+      earned: salaryEarned + monthSummary.bonusAmount,
+      due: getSalaryDue(employee, today),
+    }
+  }, [employee, monthSummary.bonusAmount, today, visibleMonth])
   const pageCount = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE))
   const pagedEntries = useMemo(
     () => visibleEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
@@ -385,6 +420,17 @@ export default function EmployeeSalaryHistory() {
     setEntries(current => current.filter(item => !(
       item.id === entry.id && item.entryType === entry.entryType
     )))
+    if (entry.entryType === 'payment' || entry.entryType === 'fine' || entry.entryType === 'absence') {
+      const collection = entry.entryType === 'payment'
+        ? 'payments'
+        : entry.entryType === 'fine'
+          ? 'fines'
+          : 'absences'
+      setEmployee(current => current ? {
+        ...current,
+        [collection]: (current[collection] || []).filter(item => item.id !== entry.id),
+      } : current)
+    }
   }
 
   if (loading) {
@@ -458,6 +504,8 @@ export default function EmployeeSalaryHistory() {
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${inactive ? 'bg-gray-200 text-gray-600' : 'bg-emerald-100 text-emerald-700'}`}>
                       {inactive ? l.inactive : l.active}
                     </span>
+                    <HeaderAmount label={l.leftToPay} value={headerTotals.due} tone="orange" />
+                    <HeaderAmount label={l.earnedTotal} value={headerTotals.earned} tone="blue" />
                   </div>
                   <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-[#6B7280]">
                     <span>{l.title}</span>
@@ -715,6 +763,18 @@ function SummaryCard({ icon: Icon, label, value, tone }) {
       <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide sm:text-[11px]"><Icon size={14} />{label}</p>
       <p className="mt-1 truncate text-sm font-black text-[#1F2937] sm:text-base" title={value}>{value}</p>
     </div>
+  )
+}
+
+function HeaderAmount({ label, value, tone }) {
+  const colors = tone === 'blue'
+    ? 'border-blue-200 bg-blue-50 text-blue-700'
+    : 'border-orange-200 bg-orange-50 text-[#d94d00]'
+  return (
+    <span className={`inline-flex items-baseline gap-1.5 rounded-xl border px-2.5 py-1.5 shadow-sm ${colors}`}>
+      <span className="text-[9px] font-black uppercase tracking-wide sm:text-[10px]">{label}</span>
+      <span className="whitespace-nowrap text-xs font-black text-[#1F2937] sm:text-sm">{formatCurrency(value)}</span>
+    </span>
   )
 }
 
