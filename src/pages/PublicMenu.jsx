@@ -140,6 +140,25 @@ function HeaderSelect({ value, onChange, options, ariaLabel, icon: Icon, classNa
   )
 }
 
+function CompactCurrencySelect({ value, onChange, ariaLabel }) {
+  return (
+    <label
+      title={`${ariaLabel}: ${value}`}
+      className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-[#ff5a00] shadow-sm"
+    >
+      <Coins size={16} strokeWidth={2.5} aria-hidden="true" />
+      <select
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        aria-label={ariaLabel}
+        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+      >
+        {MENU_CURRENCIES.map(currency => <option key={currency} value={currency}>{currency}</option>)}
+      </select>
+    </label>
+  )
+}
+
 function PublicContactButtons({ className = '' }) {
   return (
     <div className={`flex items-center justify-center gap-1.5 ${className}`}>
@@ -225,9 +244,9 @@ function MenuSectionHeader({ title, tone = 'default' }) {
   const titleClass = tone === 'deal' ? 'text-red-600' : 'text-[#1F2937]'
 
   return (
-    <div className="mb-4 flex items-center gap-4 sm:mb-5 sm:gap-5">
+    <div className="mb-3.5 flex items-center gap-3 sm:mb-5 sm:gap-5">
       <div className="h-px min-w-0 flex-1 bg-[#C9C9C9]" />
-      <h2 className={`max-w-[70%] flex-shrink-0 text-center text-[24px] font-black leading-none tracking-tight sm:text-[30px] ${titleClass}`}>
+      <h2 className={`max-w-[76%] flex-shrink-0 text-center text-[22px] font-black leading-none tracking-tight sm:max-w-[70%] sm:text-[30px] ${titleClass}`}>
         {title}
       </h2>
       <div className="h-px min-w-0 flex-1 bg-[#C9C9C9]" />
@@ -242,9 +261,10 @@ function MobileSearchPage({
   onClose,
   items,
   categories,
+  selectedCategoryId,
   lang,
   onOpenDetail,
-  onOpenCategory,
+  onSelectCategory,
   formatPrice,
   linkBasePath,
 }) {
@@ -310,58 +330,61 @@ function MobileSearchPage({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-5">
-        {items.length === 0 && categories.length === 0 ? (
-          <div className="flex min-h-[45vh] flex-col items-center justify-center text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
-              <UtensilsCrossed size={28} className="text-orange-300" />
+        <div className="mx-auto max-w-[1280px] pb-6">
+          <section className="mb-7">
+            <h2 className="mb-3 text-sm font-black text-[#1F2937]">{labels.categories}</h2>
+            <div className="flex flex-wrap gap-2" role="list" aria-label={labels.categories}>
+              {categories.map(category => {
+                const active = selectedCategoryId === category.id
+                const name = category.id === 'all'
+                  ? (lang === 'uz' ? 'Barchasi' : lang === 'ru' ? 'Все' : 'All')
+                  : getCategoryName(category, lang)
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => onSelectCategory(category.id)}
+                    className={`inline-flex min-h-11 items-center rounded-2xl border px-4 text-sm font-black transition-colors ${active
+                      ? 'border-[#ff5a00] bg-[#fff4ed] text-[#ff5a00]'
+                      : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#1F2937] hover:border-orange-200 hover:bg-white hover:text-[#ff5a00]'}`}
+                  >
+                    {name}
+                  </button>
+                )
+              })}
             </div>
-            <p className="font-black text-[#1F2937]">{labels.emptyTitle}</p>
-            <p className="mt-1 max-w-[260px] text-sm text-[#8A94A6]">{labels.emptyText}</p>
-          </div>
-        ) : (
-          <div className="mx-auto max-w-[1280px] pb-6">
-            {categories.length > 0 && (
-              <section className="mb-7">
-                <h2 className="mb-3 text-sm font-black text-[#1F2937]">{labels.categories}</h2>
-                <div className="flex flex-wrap gap-2">
-                  {categories.map(category => (
-                    <button
-                      key={category.id}
-                      type="button"
-                      onClick={() => onOpenCategory(category)}
-                      className="inline-flex min-h-11 items-center rounded-2xl border border-orange-100 bg-orange-50 px-4 text-sm font-black text-[#1F2937] transition-colors hover:border-[#ff5a00] hover:bg-white hover:text-[#ff5a00]"
-                    >
-                      {getCategoryName(category, lang)}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
-            {items.length > 0 && (
-              <section>
-                <h2 className="mb-3 text-sm font-black text-[#1F2937]">{labels.dishes}</h2>
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-                  {items.map((item, index) => (
-                    <MenuProductCard
-                      key={item.id}
-                      item={item}
-                      qty={0}
-                      lang={lang}
-                      eager={index < 4}
-                      onOpenDetail={itemToOpen => {
-                        onClose()
-                        onOpenDetail(itemToOpen)
-                      }}
-                      readOnly
-                      formatPrice={formatPrice}
-                      linkBasePath={linkBasePath}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-        )}
+          </section>
+
+          {items.length === 0 ? (
+            <div className="flex min-h-[35vh] flex-col items-center justify-center text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
+                <UtensilsCrossed size={28} className="text-orange-300" />
+              </div>
+              <p className="font-black text-[#1F2937]">{labels.emptyTitle}</p>
+              <p className="mt-1 max-w-[260px] text-sm text-[#8A94A6]">{labels.emptyText}</p>
+            </div>
+          ) : (
+            <section>
+              <h2 className="mb-3 text-sm font-black text-[#1F2937]">{labels.dishes}</h2>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                {items.map((item, index) => (
+                  <MenuProductCard
+                    key={item.id}
+                    item={item}
+                    qty={0}
+                    lang={lang}
+                    eager={index < 4}
+                    onOpenDetail={onOpenDetail}
+                    readOnly
+                    formatPrice={formatPrice}
+                    linkBasePath={linkBasePath}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -400,7 +423,7 @@ async function loadPublicMenuData(now = new Date()) {
   }
 }
 
-export default function PublicMenu({ premium = false }) {
+export default function PublicMenu({ premium = false, searchMode = false }) {
   const { itemId } = useParams()
   const navigate = useNavigate()
   const { state } = useApp()
@@ -415,6 +438,7 @@ export default function PublicMenu({ premium = false }) {
   const [detailItem, setDetailItem] = useState(null)
   const [missingItemLink, setMissingItemLink] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const [searchCategoryId, setSearchCategoryId] = useState('all')
   const [headerOffset, setHeaderOffset] = useState(() => globalThis.window?.innerWidth < 640 ? 122 : 73)
   const [premiumLang, setPremiumLang] = useState('en')
   const [menuCurrency, setMenuCurrency] = useState(() => premium ? 'USD' : getDefaultMenuCurrency())
@@ -569,14 +593,10 @@ export default function PublicMenu({ premium = false }) {
     return displayItems.filter(item => {
       const names = [item.name_uz, item.name_ru, item.name_en, item.description_uz, item.description_ru, item.description_en]
       const matchesSearch = !searchQuery || names.some(value => value?.toLowerCase().includes(searchQuery))
-      return matchesSearch
+      const matchesCategory = searchCategoryId === 'all' || item.category_id === searchCategoryId
+      return matchesCategory && matchesSearch
     })
-  }, [displayItems, searchQuery])
-  const searchCategoryResults = useMemo(() => displayCategories.filter(category => {
-    if (!searchQuery) return true
-    return [category.name_uz, category.name_ru, category.name_en]
-      .some(value => value?.toLowerCase().includes(searchQuery))
-  }), [displayCategories, searchQuery])
+  }, [displayItems, searchCategoryId, searchQuery])
 
   const groupedSections = useMemo(() => {
     const sections = displayCategories
@@ -638,40 +658,105 @@ export default function PublicMenu({ premium = false }) {
     setMenuCurrency(premium ? normalized : saveMenuCurrency(normalized))
   }
 
-  function openCategoryFromSearch(category) {
+  function navigateWithTransition(path) {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduceMotion || typeof document.startViewTransition !== 'function') {
+      navigate(path)
+      return
+    }
+    document.startViewTransition(() => {
+      flushSync(() => navigate(path))
+    })
+  }
+
+  function openSearch() {
+    setSearchCategoryId('all')
+    if (premium) {
+      setMobileSearchOpen(true)
+      return
+    }
+    navigateWithTransition('/search')
+  }
+
+  function closeSearch() {
+    if (searchMode) {
+      navigateWithTransition('/menu')
+      return
+    }
     setMobileSearchOpen(false)
-    setSearch('')
-    setActiveCategory(category.id)
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      document.getElementById(menuCategorySectionId('public-menu-category', category.id))
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }))
   }
 
   function openVacancies(event) {
     event.preventDefault()
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    if (reduceMotion || typeof document.startViewTransition !== 'function') {
-      navigate('/vacancies')
-      return
-    }
-    document.startViewTransition(() => {
-      flushSync(() => navigate('/vacancies'))
-    })
+    navigateWithTransition('/vacancies')
+  }
+
+  if (searchMode) {
+    return (
+      <MobileSearchPage
+        open
+        value={search}
+        onChange={setSearch}
+        onClose={closeSearch}
+        items={searchResults}
+        categories={categoryCards}
+        selectedCategoryId={searchCategoryId}
+        lang={lang}
+        onOpenDetail={openDetail}
+        onSelectCategory={setSearchCategoryId}
+        formatPrice={priceFormatter}
+        linkBasePath={menuBasePath}
+      />
+    )
   }
 
   return (
     <div className="min-h-screen bg-white text-[#1F2937]" style={{ paddingTop: headerOffset }}>
       <div data-nosnippet="">
         <header ref={headerRef} className="fixed left-0 right-0 top-0 z-40 border-b border-[#E5E7EB] bg-white/95 backdrop-blur">
-          <div className="mx-auto max-w-[1280px] px-4 py-2 sm:px-6 sm:py-3">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div className="mx-auto max-w-[1280px] px-3 py-2 sm:px-6 sm:py-3">
+            <div className="relative flex h-11 items-center justify-between lg:hidden">
+              <button
+                type="button"
+                onClick={openSearch}
+                aria-label={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-[#64748B] shadow-sm transition-colors active:scale-95"
+              >
+                <Search size={17} />
+              </button>
+
+              <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-0.5 min-[360px]:gap-1 min-[400px]:gap-2">
+                <img src={getBrandLogo(lang)} alt="Zar Kebab" className="h-7 w-auto object-contain min-[360px]:h-8 min-[400px]:h-9" />
+                <span className="whitespace-nowrap text-[7px] font-black uppercase tracking-[0.03em] text-[#ff5a00] min-[360px]:text-[8px] min-[360px]:tracking-[0.08em] min-[400px]:text-[10px] min-[400px]:tracking-[0.14em]">Zar Kebab</span>
+              </div>
+
+              <div className="flex items-center gap-1 min-[400px]:gap-1.5">
+                <div className="min-[400px]:hidden">
+                  <CompactCurrencySelect
+                    value={menuCurrency}
+                    onChange={changeMenuCurrency}
+                    ariaLabel={lang === 'uz' ? 'Valyuta' : lang === 'ru' ? 'Валюта' : 'Currency'}
+                  />
+                </div>
+                <div className="hidden min-[400px]:block">
+                  <HeaderSelect
+                    value={menuCurrency}
+                    onChange={changeMenuCurrency}
+                    options={MENU_CURRENCIES.map(currency => ({ value: currency, label: currency }))}
+                    ariaLabel={lang === 'uz' ? 'Valyuta' : lang === 'ru' ? 'Валюта' : 'Currency'}
+                  />
+                </div>
+                {premium ? <LanguageSwitcher value={lang} onChange={setPremiumLang} compact /> : <LanguageSwitcher compact />}
+              </div>
+            </div>
+
+            <div className="hidden grid-cols-[1fr_auto_1fr] items-center gap-3 lg:grid">
               <div className="min-w-0 justify-self-start">
                 <button
                   type="button"
-                  onClick={() => setMobileSearchOpen(true)}
+                  onClick={openSearch}
                   aria-label={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-colors hover:border-orange-200 hover:bg-white hover:text-[#ff5a00] lg:hidden"
+                  className="hidden h-10 w-10 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-colors hover:border-orange-200 hover:bg-white hover:text-[#ff5a00]"
                 >
                   <Search size={17} />
                 </button>
@@ -693,9 +778,9 @@ export default function PublicMenu({ premium = false }) {
               <div className="flex items-center gap-2 justify-self-end">
                 <button
                   type="button"
-                  onClick={() => setMobileSearchOpen(true)}
+                  onClick={openSearch}
                   aria-label={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
-                  className="hidden h-10 w-10 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-colors hover:border-orange-200 hover:bg-white hover:text-[#ff5a00] lg:flex"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] text-[#64748B] transition-colors hover:border-orange-200 hover:bg-white hover:text-[#ff5a00]"
                 >
                   <Search size={17} />
                 </button>
@@ -714,25 +799,11 @@ export default function PublicMenu({ premium = false }) {
                 {premium ? <LanguageSwitcher value={lang} onChange={setPremiumLang} /> : <LanguageSwitcher />}
               </div>
             </div>
-
-            <div className="mt-2 flex items-center justify-between gap-3 lg:hidden">
-              <PublicContactButtons className="justify-start" />
-              <HeaderSelect
-                value={menuCurrency}
-                onChange={changeMenuCurrency}
-                icon={Coins}
-                options={MENU_CURRENCIES.map(currency => ({
-                  value: currency,
-                  label: currency === 'UZS' ? "so'm UZS" : currency === 'USD' ? '$ USD' : '€ EUR',
-                }))}
-                ariaLabel={lang === 'uz' ? 'Valyuta' : lang === 'ru' ? 'Валюта' : 'Currency'}
-              />
-            </div>
           </div>
         </header>
       </div>
 
-      <main id="public-menu-content" className="mx-auto max-w-[1280px] scroll-mt-28 px-4 pb-5 pt-3 sm:px-6 sm:pt-5">
+      <main id="public-menu-content" className="mx-auto max-w-[1280px] scroll-mt-28 px-3 pb-5 pt-3 sm:px-6 sm:pt-5">
         <div data-nosnippet="">
           <MenuCategoryScroller
             categories={categoryCards}
@@ -744,15 +815,15 @@ export default function PublicMenu({ premium = false }) {
             sectionPrefix="public-menu-category"
             topOffset={headerOffset}
             scrollOffset={64}
-            className="mb-6 mt-0 rounded-[24px] border border-[#E5E7EB] bg-white p-3 shadow-sm sm:mb-7 sm:rounded-[28px] sm:p-4"
+            className="mb-5 mt-0 rounded-[22px] border border-[#E5E7EB] bg-white p-2.5 shadow-sm sm:mb-7 sm:rounded-[28px] sm:p-4"
             collapsedPosition="fixed"
             collapsedSurfaceClass="bg-white/95"
-            collapsedClassName="z-50 px-4 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1280px] sm:-translate-x-1/2"
+            collapsedClassName="z-50 px-3 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1280px] sm:-translate-x-1/2 sm:px-4"
           />
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div key={idx} className="overflow-hidden rounded-[18px] border border-[#E5E7EB] bg-white shadow-sm">
                 <div className="aspect-square animate-pulse bg-orange-50" />
@@ -815,7 +886,7 @@ export default function PublicMenu({ premium = false }) {
               {dealItems.length > 0 && (
                 <section id="public-menu-deals" className="scroll-mt-32">
                   <MenuSectionHeader title={dealsTitle} tone="deal" />
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
                     {dealItems.map((item, index) => (
                       <MenuProductCard
                         key={`deal-${item.id}`}
@@ -839,7 +910,7 @@ export default function PublicMenu({ premium = false }) {
                   className="scroll-mt-32"
                 >
                   <MenuSectionHeader title={getCategoryName(section.cat, lang)} />
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
                     {section.items.map((item, index) => (
                       <MenuProductCard
                         key={item.id}
@@ -858,7 +929,7 @@ export default function PublicMenu({ premium = false }) {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
               {displayItems.map((item, index) => (
                 <MenuProductCard
                   key={item.id}
@@ -901,12 +972,13 @@ export default function PublicMenu({ premium = false }) {
         open={mobileSearchOpen}
         value={search}
         onChange={setSearch}
-        onClose={() => setMobileSearchOpen(false)}
+        onClose={closeSearch}
         items={searchResults}
-        categories={searchCategoryResults}
+        categories={categoryCards}
+        selectedCategoryId={searchCategoryId}
         lang={lang}
         onOpenDetail={openDetail}
-        onOpenCategory={openCategoryFromSearch}
+        onSelectCategory={setSearchCategoryId}
         formatPrice={priceFormatter}
         linkBasePath={menuBasePath}
       />

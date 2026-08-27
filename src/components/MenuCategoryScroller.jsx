@@ -74,7 +74,7 @@ function CategoryChip({ category, active, title, count, onClick }) {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex h-11 w-auto min-w-[96px] max-w-none flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border px-3 py-1 text-sm font-black transition-all ${
+      className={`flex h-10 w-auto min-w-fit max-w-none flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border px-2.5 py-1 text-sm font-black transition-all sm:h-11 sm:min-w-[96px] sm:gap-2 sm:rounded-2xl sm:px-3 ${
         active
           ? 'border-[#ff5a1f] bg-[#fff4ed] text-[#ff4d00] shadow-sm'
           : 'border-[#E5E7EB] bg-white text-[#1F2937] hover:border-orange-200 hover:bg-orange-50/40'
@@ -89,9 +89,9 @@ function CategoryChip({ category, active, title, count, onClick }) {
           <UtensilsCrossed size={15} className={active ? 'text-[#ff4d00]' : 'text-orange-300'} />
         )}
       </span>
-      <span className="max-w-none flex-shrink-0 whitespace-nowrap text-[12px] leading-tight">{title}</span>
+      <span className="max-w-none flex-shrink-0 whitespace-nowrap text-[11px] leading-tight sm:text-[12px]">{title}</span>
       {Number.isFinite(count) && (
-        <span className={`flex h-6 min-w-6 flex-shrink-0 items-center justify-center rounded-lg px-1.5 text-[12px] font-black tabular-nums leading-none ${active ? 'bg-white/90 text-[#ff4d00]' : 'bg-[#E8F1FF] text-[#2563EB]'}`}>
+        <span className={`flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-md px-1 text-[11px] font-black tabular-nums leading-none sm:h-6 sm:min-w-6 sm:rounded-lg sm:px-1.5 sm:text-[12px] ${active ? 'bg-white/90 text-[#ff4d00]' : 'bg-[#E8F1FF] text-[#2563EB]'}`}>
           {count}
         </span>
       )}

@@ -314,7 +314,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
           : inCart
           ? 'rounded-[18px] border-2 border-[#ff5a00]/40 bg-white shadow-md shadow-orange-100/60'
           : showCompactPublicCard
-            ? 'rounded-[18px] border border-[#E6EAF0] bg-white shadow-sm hover:-translate-y-0.5 hover:border-[#D8DEE8] hover:shadow-md'
+            ? 'rounded-[16px] border border-[#E6EAF0] bg-white shadow-sm hover:-translate-y-0.5 hover:border-[#D8DEE8] hover:shadow-md sm:rounded-[18px]'
             : 'rounded-[18px] border-2 border-[#E5E7EB] bg-white shadow-sm hover:shadow-md hover:border-gray-200'
       }`}
     >
@@ -349,14 +349,14 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             onClick={copyProductLink}
             title={copied ? labels.copied : labels.copy}
             aria-label={copied ? labels.copied : labels.copy}
-            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/95 text-[#5B6472] shadow-sm backdrop-blur transition-colors hover:bg-[#fff4ed] hover:text-[#ff5a00]"
+            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full border border-white/80 bg-white/95 text-[#5B6472] shadow-sm backdrop-blur transition-colors hover:bg-[#fff4ed] hover:text-[#ff5a00] sm:right-2 sm:top-2 sm:h-8 sm:w-8"
           >
             {copied ? <Check size={16} /> : <Copy size={15} />}
           </button>
         )}
       </div>
 
-      <div className={`${showCompactPublicCard ? 'p-3 pt-2.5' : dense ? 'p-2.5' : 'p-3'} flex flex-col flex-1`}>
+      <div className={`${showCompactPublicCard ? 'p-2.5 pt-2 sm:p-3 sm:pt-2.5' : dense ? 'p-2.5' : 'p-3'} flex flex-col flex-1`}>
         <h3 className={`${showCompactPublicCard ? 'text-[13px] sm:text-[15px]' : dense ? 'text-[14px] mb-0.5 flex-1' : 'text-[15px] mb-1 flex-1'} font-bold ${unavailable ? 'text-[#6B7280]' : 'text-[#1F2937]'} line-clamp-2 leading-snug`}>
           {getItemName(item, lang)}
         </h3>
@@ -374,7 +374,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             {pricing.discounted && (
               <p className={`${showCompactPublicCard ? 'text-[13px]' : 'text-[12px]'} font-bold text-[#9CA3AF] line-through`}>{formatPrice(pricing.oldPrice)}</p>
             )}
-            <p className={`${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[16px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
+            <p className={`${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[15px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
               {formatPrice(pricing.price)}{priceUnit}
             </p>
           </div>

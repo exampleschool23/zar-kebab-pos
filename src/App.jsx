@@ -307,6 +307,7 @@ function PublicCustomerRoutes() {
       <Route path="/" element={<PublicMenu />} />
       <Route path="/menu" element={<PublicMenu />} />
       <Route path="/menu/item/:itemId" element={<PublicMenu />} />
+      <Route path="/search" element={<PublicMenu searchMode />} />
       <Route path="/premium-menu" element={<PublicMenu premium />} />
       <Route path="/premium-menu/item/:itemId" element={<PublicMenu premium />} />
       <Route path="/catering" element={<CateringPage />} />
@@ -338,6 +339,7 @@ function InternalAppRoutes({ adminHost = false }) {
         <Route path="/"              element={adminHost ? <Navigate to="/admin" replace /> : <RoleRedirect signedOutPath={signedOutPath} />} />
         <Route path="/menu"          element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu />} />
         <Route path="/menu/item/:itemId" element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu />} />
+        <Route path="/search"        element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu searchMode />} />
         <Route path="/premium-menu"          element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu premium />} />
         <Route path="/premium-menu/item/:itemId" element={adminHost ? <Navigate to="/admin" replace /> : <PublicMenu premium />} />
         <Route path="/catering"      element={adminHost ? <Navigate to="/admin" replace /> : <CateringPage />} />
