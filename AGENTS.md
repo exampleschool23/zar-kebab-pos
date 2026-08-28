@@ -393,6 +393,12 @@ These bugs were recently fixed and are now protected by tests:
    - Messages use the target language and include amount, date, category, payment method, optional supplier/description, the employee who added the expense, and the recorded total for that expense month.
    - Delivery is duplicate-safe and becomes `sent` only after Telegram returns a message id. Do not project salary, bonus, employee-meal, or other calculated Accounting rows into this flow because they are not inserted `expenses` records and already have separate messaging rules.
 
+49. The waiter order button and drawer distinguish submitted orders from the unsent cart.
+   - The header button reports non-cancelled submitted quantities when a table already has an active order; it must never say the cart is empty merely because the next unsent batch is empty.
+   - When submitted items exist, the empty cart area says there are no new items and invites the waiter to add the next batch.
+   - Submitted kitchen rounds remain visible while the waiter builds another cart batch. Each round has a stable `Order 1`, `Order 2`, and so on heading plus its own kitchen-check action.
+   - Derive round numbering from the complete chronologically sorted `getKitchenCheckGroups()` result before filtering item controls. A served or otherwise non-editable earlier round must not cause later rounds to be renumbered.
+
 ## Database Migrations
 
 Run migrations in order. Important recent files:
@@ -695,6 +701,7 @@ npm run build
 - Option variants increment only their own configured cart row.
 - Requested kitchen rounds never fall back to an older print group.
 - Kitchen retries preserve their attempt ids and the RPC is idempotent by order/round.
+- Waiter order controls distinguish submitted quantities from new cart items and keep stable, visible kitchen-round headings.
 - Returning to `WaiterTables` refreshes orders/tables and renews realtime without clearing the visible grid.
 - Initial/realtime operational loading never downloads current-year paid history and still includes all active orders.
 - Waiter table entry requires only R/T, carries that mode into ordering, and clears legacy Guest locks.

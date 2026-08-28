@@ -200,6 +200,7 @@ export default function CartPanel({
   onGuestFinish,
   reviewWarning = '',
   reviewKey = '',
+  hasSubmittedItems = false,
 }) {
   const { state, dispatch, pendingKitchenSubmission } = useApp()
   const lang    = langProp || state.lang
@@ -323,6 +324,8 @@ export default function CartPanel({
               <p className="text-[12px] text-[#9CA3AF] mt-0.5">
                 {itemCount > 0
                   ? `${itemCount} ${lang === 'uz' ? 'ta mahsulot' : lang === 'ru' ? 'позиций' : 'items'}`
+                  : hasSubmittedItems
+                    ? (lang === 'uz' ? "Yangi mahsulotlar yo'q" : lang === 'ru' ? 'Нет новых позиций' : 'No new items yet')
                   : lang === 'uz' ? "Buyurtma yo'q" : lang === 'ru' ? 'Нет позиций' : 'No items yet'}
               </p>
             </div>
@@ -358,10 +361,14 @@ export default function CartPanel({
               <ShoppingCart size={26} strokeWidth={1.5} className="text-[#D1D5DB]" />
             </div>
             <p className="text-sm font-semibold text-[#9CA3AF]">
-              {lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty'}
+              {hasSubmittedItems
+                ? (lang === 'uz' ? "Yangi mahsulotlar yo'q" : lang === 'ru' ? 'Нет новых позиций' : 'No new items')
+                : (lang === 'uz' ? "Savat bo'sh" : lang === 'ru' ? 'Корзина пуста' : 'Cart is empty')}
             </p>
             <p className="text-[12px] text-[#D1D5DB] mt-1">
-              {lang === 'uz' ? "Menyudan taom qo'shing" : lang === 'ru' ? 'Добавьте блюда из меню' : 'Add items from the menu'}
+              {hasSubmittedItems
+                ? (lang === 'uz' ? "Keyingi buyurtmaga taom qo'shing" : lang === 'ru' ? 'Добавьте блюда в следующий заказ' : 'Add items for the next order batch')
+                : (lang === 'uz' ? "Menyudan taom qo'shing" : lang === 'ru' ? 'Добавьте блюда из меню' : 'Add items from the menu')}
             </p>
           </div>
         ) : (
