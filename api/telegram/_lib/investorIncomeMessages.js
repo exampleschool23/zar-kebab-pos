@@ -44,7 +44,6 @@ const EXPENSE_COPY = {
     monthTotal: 'Oylik xarajatlar jami',
     date: 'Sana',
     category: 'Kategoriya',
-    method: 'To‘lov turi',
     vendor: 'Yetkazuvchi yoki oluvchi',
     description: 'Izoh',
     addedBy: 'Kiritgan',
@@ -55,7 +54,6 @@ const EXPENSE_COPY = {
     monthTotal: 'Расходы за месяц',
     date: 'Дата',
     category: 'Категория',
-    method: 'Способ оплаты',
     vendor: 'Поставщик или получатель',
     description: 'Описание',
     addedBy: 'Добавил(а)',
@@ -66,7 +64,6 @@ const EXPENSE_COPY = {
     monthTotal: 'Expenses for the month',
     date: 'Date',
     category: 'Category',
-    method: 'Payment method',
     vendor: 'Supplier or recipient',
     description: 'Description',
     addedBy: 'Added by',
@@ -108,7 +105,6 @@ export function buildInvestorExpenseGroupMessage(expense, language = 'ru', month
     '',
     `${copy.date}: ${escapeTelegramHtml(formatLongDate(expense?.expense_date, lang, expense?.expense_date || '—'))}`,
     `${copy.category}: ${escapeTelegramHtml(expenseCategoryLabel(expense?.category, lang))}`,
-    `${copy.method}: ${escapeTelegramHtml(expensePaymentMethodLabel(expense?.payment_method, lang))}`,
   ]
   if (expense?.vendor) lines.push(`${copy.vendor}: ${escapeTelegramHtml(expense.vendor)}`)
   if (expense?.description) {

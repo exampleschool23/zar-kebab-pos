@@ -66,7 +66,7 @@ test('Investor expense message contains the saved expense, actor, and monthly to
   assert.match(message, /Сумма: <b>750\D000 UZS<\/b>/)
   assert.match(message, /Дата: 26 августа 2026/)
   assert.match(message, /Категория: Ремонт/)
-  assert.match(message, /Способ оплаты: Карта/)
+  assert.doesNotMatch(message, /Способ оплаты:/)
   assert.match(message, /Master &lt;Ali&gt;/)
   assert.match(message, /Kitchen &amp; ventilation/)
   assert.match(message, /Добавил\(а\): Anna &lt;Admin&gt;/)
