@@ -43,13 +43,6 @@ import { withReadTimeout } from '../lib/writeTimeout'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const CASH_PRESETS    = [
-  { label: 'Exact',   exact: true  },
-  { label: '150,000', value: 150000 },
-  { label: '200,000', value: 200000 },
-  { label: '500,000', value: 500000 },
-]
-
 const PAY_METHODS = [
   { key: 'cash',     icon: Banknote,  labelUz: 'Naqd',    labelRu: 'Наличные',  labelEn: 'Cash'     },
   { key: 'terminal', icon: Monitor,   labelUz: 'Terminal', labelRu: 'Терминал',  labelEn: 'Terminal' },
@@ -307,9 +300,9 @@ export default function CashierBill() {
     })
   }, [total])
 
-  function applyPreset(p) {
+  function applyExactAmount() {
     const remainingForActive = getMaxForPaymentRow(activePaymentId)
-    updateActivePaymentAmount(p.exact ? remainingForActive : Math.min(p.value, remainingForActive))
+    updateActivePaymentAmount(remainingForActive)
   }
 
   function getMaxForPaymentRow(id) {
@@ -1379,17 +1372,13 @@ export default function CashierBill() {
                   <p className="text-[10px] font-semibold text-[#9CA3AF] mb-2 uppercase tracking-wide">
                     {lbl.quickAmt}
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {CASH_PRESETS.map((p, i) => (
-                      <button
-                        key={i}
-                        onClick={() => applyPreset(p)}
-                        className="px-3 py-1.5 rounded-xl border border-[#E5E7EB] text-xs font-semibold text-[#6B7280] hover:border-[#ff5a00] hover:text-[#ff5a00] bg-white transition-all"
-                      >
-                        {p.exact ? lbl.exact : p.label}
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={applyExactAmount}
+                    className="flex min-h-12 w-full items-center justify-center rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-sm font-bold text-[#6B7280] transition-all hover:border-[#ff5a00] hover:text-[#ff5a00] active:scale-[0.99]"
+                  >
+                    {lbl.exact}
+                  </button>
                 </div>
 
                 <div className="mt-4 space-y-2">
