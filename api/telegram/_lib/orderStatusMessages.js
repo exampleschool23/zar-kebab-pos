@@ -283,6 +283,8 @@ export function buildCompletedOrderGroupMessage(order) {
     : 0
   const loyaltyUsed = getLoyaltyUsedAmount(order)
   const loyaltyOwnerNames = getLoyaltyOwnerNames(order)
+  const turboIconCount = Math.min(TURBO_ORDER_MAX_ICONS, Math.floor(grossOrderTotal / TURBO_ORDER_STEP_UZS))
+  const turboBadge = turboIconCount > 0 ? ` ${'⚡'.repeat(turboIconCount)}` : ''
   const closedAt = formatTelegramDateTime(order?.paid_at || order?.updated_at || order?.created_at)
   const typeIcon = orderTypeIcon(order)
   const lines = [
@@ -295,7 +297,7 @@ export function buildCompletedOrderGroupMessage(order) {
 
   if (items.length > 0) lines.push('', `<pre>${escapeTelegramHtml(buildItemRows(items))}</pre>`)
   lines.push('')
-  lines.push(`Сумма заказа: ${escapeTelegramHtml(formatMoney(subtotal))}`)
+  lines.push(`Сумма заказа: ${escapeTelegramHtml(formatMoney(subtotal))}${turboBadge}`)
   if (serviceFee > 0) lines.push(`Сервис ${escapeTelegramHtml(serviceRate)}%: ${escapeTelegramHtml(formatMoney(serviceFee))}`)
   if (loyaltyUsed > 0) {
     lines.push(`Лояльность: - ${escapeTelegramHtml(formatMoney(loyaltyUsed))}`)
@@ -304,8 +306,6 @@ export function buildCompletedOrderGroupMessage(order) {
     }
   }
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
-  const turboIconCount = Math.min(TURBO_ORDER_MAX_ICONS, Math.floor(grossOrderTotal / TURBO_ORDER_STEP_UZS))
-  if (turboIconCount > 0) lines.push('⚡'.repeat(turboIconCount))
   if (order?.orderNetProfit != null && Number.isFinite(Number(order.orderNetProfit))) {
     const margin = order?.orderProfitMarginPct != null && Number.isFinite(Number(order.orderProfitMarginPct))
       ? ` · ${formatPercent(order.orderProfitMarginPct)}`
