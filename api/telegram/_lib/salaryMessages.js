@@ -25,13 +25,13 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Kunlik umumiy maosh va KPI hisoboti',
     groupCafeIncome: 'Kunlik kafe daromadi',
+    groupMonthlyAverageCafeIncome: 'Bu oydagi o‘rtacha kunlik kafe daromadi',
     groupDineInShare: 'Oddiy zaldagi savdo ulushi',
     groupOffPremiseShare: 'Oddiy olib ketish + yetkazib berish ulushi',
     groupTouristShare: 'Turist savdolari ulushi',
     groupCafeNetProfit: 'Kafening sof foydasi',
     groupSalary: 'Hisoblangan umumiy maosh',
     groupKpi: 'Avtomatik KPI bonuslari',
-    groupTotal: 'Umumiy summa',
     groupRent: 'Ijara',
     groupUtilities: 'Kommunal xarajatlar',
     groupEmployeeMeals: 'Xodimlar ovqatining o‘rtacha qiymati',
@@ -54,13 +54,13 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Общий отчёт по зарплате и KPI',
     groupCafeIncome: 'Выручка кафе за день',
+    groupMonthlyAverageCafeIncome: 'Средняя дневная выручка кафе за месяц',
     groupDineInShare: 'Доля обычной выручки в зале',
     groupOffPremiseShare: 'Доля обычной выручки с собой + доставка',
     groupTouristShare: 'Доля туристической выручки',
     groupCafeNetProfit: 'Чистая прибыль кафе',
     groupSalary: 'Начисленная зарплата',
     groupKpi: 'Автоматические KPI-бонусы',
-    groupTotal: 'Общая сумма',
     groupRent: 'Аренда',
     groupUtilities: 'Коммуналка',
     groupEmployeeMeals: 'Среднее питание сотрудников',
@@ -83,13 +83,13 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Daily salary and KPI totals',
     groupCafeIncome: 'Daily cafe income',
+    groupMonthlyAverageCafeIncome: 'Average daily cafe income this month',
     groupDineInShare: 'Regular dine-in revenue share',
     groupOffPremiseShare: 'Regular take-away + delivery revenue share',
     groupTouristShare: 'Tourist revenue share',
     groupCafeNetProfit: 'Cafe net profit',
     groupSalary: 'Salary earned',
     groupKpi: 'Automatic KPI bonuses',
-    groupTotal: 'Combined total',
     groupRent: 'Rent',
     groupUtilities: 'Utilities',
     groupEmployeeMeals: 'Avg employees meal',
@@ -245,6 +245,8 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
 
 export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   cafeIncome = 0,
+  monthToDateCafeIncome = 0,
+  monthToDateCalendarDayCount = 0,
   regularDineInIncome = 0,
   regularOffPremiseIncome = 0,
   touristIncome = 0,
@@ -275,6 +277,11 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     ? Math.round(Number(grossProfit))
     : null
   const cafeIncomeTotal = normalizeExpenseAmount(cafeIncome)
+  const monthlyCafeIncomeTotal = normalizeExpenseAmount(monthToDateCafeIncome)
+  const monthlyCalendarDayCount = normalizeExpenseAmount(monthToDateCalendarDayCount)
+  const monthlyAverageCafeIncome = monthlyCalendarDayCount > 0
+    ? Math.round(monthlyCafeIncomeTotal / monthlyCalendarDayCount)
+    : 0
   const dineInIncomeTotal = normalizeExpenseAmount(regularDineInIncome)
   const offPremiseIncomeTotal = normalizeExpenseAmount(regularOffPremiseIncome)
   const touristIncomeTotal = normalizeExpenseAmount(touristIncome)
@@ -292,6 +299,7 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   return {
     date,
     cafeIncomeTotal,
+    monthlyAverageCafeIncome,
     dineInPercentage,
     offPremisePercentage,
     touristPercentage,
@@ -315,13 +323,13 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
   const copy = COPY[lang]
   const salaryTotal = normalizeExpenseAmount(summary?.salaryTotal)
   const kpiBonusTotal = normalizeExpenseAmount(summary?.kpiBonusTotal)
-  const combinedTotal = salaryTotal + kpiBonusTotal
   const rentTotal = normalizeExpenseAmount(summary?.rentTotal)
   const utilitiesTotal = normalizeExpenseAmount(summary?.utilitiesTotal)
   const employeeMealTotal = normalizeExpenseAmount(summary?.employeeMealTotal)
   const employeeMealPerEmployeeTotal = normalizeExpenseAmount(summary?.employeeMealPerEmployeeTotal)
   const presentEmployeeCount = normalizeExpenseAmount(summary?.presentEmployeeCount)
   const cafeIncomeTotal = normalizeExpenseAmount(summary?.cafeIncomeTotal)
+  const monthlyAverageCafeIncome = normalizeExpenseAmount(summary?.monthlyAverageCafeIncome)
   const dineInPercentage = Number(summary?.dineInPercentage) || 0
   const offPremisePercentage = Number(summary?.offPremisePercentage) || 0
   const touristPercentage = Number(summary?.touristPercentage) || 0
@@ -339,6 +347,7 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
     `📅 ${escapeTelegramHtml(compactRussianDate)}`,
     '',
     `<b>${copy.groupCafeIncome}:</b> ${formatSalaryNotificationAmount(cafeIncomeTotal)} ${copy.currency}`,
+    '',
     `<b>${copy.groupDineInShare}:</b> ${formatSalaryNotificationPercent(dineInPercentage, lang)}`,
     `<b>${copy.groupOffPremiseShare}:</b> ${formatSalaryNotificationPercent(offPremisePercentage, lang)}`,
     `<b>${copy.groupTouristShare}:</b> ${formatSalaryNotificationPercent(touristPercentage, lang)}`,
@@ -346,16 +355,21 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
       ? copy.unavailable
       : `${formatSalaryNotificationAmount(cafeNetProfit)} ${copy.currency}`}`,
     '',
+    '────────────',
+    '',
     `<b>${copy.groupSalary}:</b> ${formatSalaryNotificationAmount(salaryTotal)} ${copy.currency}`,
     `<b>${copy.groupKpi}:</b> ${formatSalaryNotificationAmount(kpiBonusTotal)} ${copy.currency}`,
-    `<b>${copy.groupTotal}:</b> ${formatSalaryNotificationAmount(combinedTotal)} ${copy.currency}`,
     `<b>${copy.groupRent}:</b> ${formatSalaryNotificationAmount(rentTotal)} ${copy.currency}`,
     `<b>${copy.groupUtilities}:</b> ${formatSalaryNotificationAmount(utilitiesTotal)} ${copy.currency}`,
     `<b>${copy.groupEmployeeMeals} (${presentEmployeeCount} × ${formatSalaryNotificationAmount(employeeMealPerEmployeeTotal)}):</b> ${formatSalaryNotificationAmount(employeeMealTotal)} ${copy.currency}`,
     '',
+    '────────────',
+    '',
     `<b>${copy.groupNetProfit}:</b> ${netProfit == null
       ? copy.unavailable
       : `${formatSalaryNotificationAmount(netProfit)} ${copy.currency}`}`,
+    '',
+    `<b>${copy.groupMonthlyAverageCafeIncome}:</b> ${formatSalaryNotificationAmount(monthlyAverageCafeIncome)} ${copy.currency}`,
   ].join('\n').trim()
 }
 

@@ -18,7 +18,7 @@ import {
   getRussianMenuItemName,
 } from './_lib/menuAvailabilityMessages.js'
 import { notifyAutomaticKpiBonus } from './employee-notification.js'
-import { getOrderRevenueTotal } from '../../src/lib/analytics.js'
+import { getInclusiveCalendarDayCount, getOrderRevenueTotal } from '../../src/lib/analytics.js'
 import { getOrdersCostTotal, hasOrdersCostCoverage } from '../../src/lib/profit.js'
 import { allocateMonthlySalaryToDate } from '../../src/lib/expenses.js'
 import { isDineInOrderType } from '../../src/lib/orderTypes.js'
@@ -439,6 +439,7 @@ async function sendDailyBazaarNotification(supabase, purchaseDate) {
 }
 
 async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) {
+  const monthStart = `${businessDate.slice(0, 8)}01`
   const { data: profileRows, error: profilesError } = await supabase
     .from('employee_salary_profiles')
     .select('id, employee_name, joined_at, ended_at, deleted_at, is_active')
@@ -449,7 +450,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
   ))
   const profileIds = eligibleProfiles.map(profile => profile.id)
   const emptyRelatedResult = { data: [], error: null }
-  const [ratesResult, absencesResult, salesResult, settingsResult, employeeMealResult] = await Promise.all([
+  const [ratesResult, absencesResult, salesResult, monthlySalesResult, settingsResult, employeeMealResult] = await Promise.all([
     profileIds.length > 0
       ? supabase
           .from('employee_salary_rates')
@@ -471,6 +472,12 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
       .gte('paid_at', `${businessDate}T00:00:00+05:00`)
       .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
     supabase
+      .from('orders')
+      .select('status, subtotal, service_fee, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount')
+      .eq('payment_status', 'paid')
+      .gte('paid_at', `${monthStart}T00:00:00+05:00`)
+      .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
+    supabase
       .from('business_settings')
       .select('monthly_rent_uzs, monthly_utilities_uzs')
       .eq('id', 'default')
@@ -484,6 +491,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
   if (ratesResult.error) throw ratesResult.error
   if (absencesResult.error) throw absencesResult.error
   if (salesResult.error) throw salesResult.error
+  if (monthlySalesResult.error) throw monthlySalesResult.error
   if (settingsResult.error) throw settingsResult.error
   if (employeeMealResult.error) throw employeeMealResult.error
   if (!employeeMealResult.data) throw new Error(`Employee meal expense was not finalized for ${businessDate}`)
@@ -494,6 +502,9 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     absences: (absencesResult.data || []).filter(absence => absence.salary_profile_id === profile.id),
   }))
   const paidOrders = (salesResult.data || []).filter(order => order?.status !== 'cancelled')
+  const monthToDateCafeIncome = (monthlySalesResult.data || [])
+    .filter(order => order?.status !== 'cancelled')
+    .reduce((total, order) => total + getOrderRevenueTotal(order), 0)
   const cafeIncome = paidOrders.reduce(
     (total, order) => total + getOrderRevenueTotal(order),
     0
@@ -518,6 +529,8 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
   const dailyUtilities = allocateMonthlySalaryToDate(settingsResult.data?.monthly_utilities_uzs, businessDate)
   return getDailyPayrollGroupSummary(salaryProfiles, kpiResults, businessDate, {
     cafeIncome,
+    monthToDateCafeIncome,
+    monthToDateCalendarDayCount: getInclusiveCalendarDayCount(monthStart, businessDate),
     regularDineInIncome,
     regularOffPremiseIncome,
     touristIncome,

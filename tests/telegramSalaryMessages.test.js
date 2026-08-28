@@ -91,6 +91,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     { status: 'skipped_absent', bonus_amount: 0 },
   ], '2026-07-29', {
     cafeIncome: 3_500_000,
+    monthToDateCafeIncome: 87_000_000,
+    monthToDateCalendarDayCount: 29,
     regularDineInIncome: 1_925_000,
     regularOffPremiseIncome: 875_000,
     touristIncome: 700_000,
@@ -103,6 +105,7 @@ test('daily payroll group message reports aggregate earned salary and automatic 
   assert.deepEqual(summary, {
     date: '2026-07-29',
     cafeIncomeTotal: 3_500_000,
+    monthlyAverageCafeIncome: 3_000_000,
     dineInPercentage: 55,
     offPremisePercentage: 25,
     touristPercentage: 20,
@@ -123,17 +126,22 @@ test('daily payroll group message reports aggregate earned salary and automatic 
   assert.match(message, /📅 29-июля/)
   assert.doesNotMatch(message, /29\.07\.2026/)
   assert.match(message, /Выручка кафе за день:<\/b> 3 500 000 UZS/)
+  assert.match(message, /Средняя дневная выручка кафе за месяц:<\/b> 3 000 000 UZS/)
   assert.match(message, /Доля обычной выручки в зале:<\/b> 55%/)
   assert.match(message, /Доля обычной выручки с собой \+ доставка:<\/b> 25%/)
   assert.match(message, /Доля туристической выручки:<\/b> 20%/)
   assert.match(message, /Чистая прибыль кафе:<\/b> 2 000 000 UZS/)
   assert.match(message, /Начисленная зарплата:<\/b> 150 000 UZS/)
   assert.match(message, /Автоматические KPI-бонусы:<\/b> 75 000 UZS/)
-  assert.match(message, /Общая сумма:<\/b> 225 000 UZS/)
+  assert.doesNotMatch(message, /Общая сумма/)
   assert.match(message, /Аренда:<\/b> 800 000 UZS/)
   assert.match(message, /Коммуналка:<\/b> 700 000 UZS/)
   assert.match(message, /Среднее питание сотрудников \(1 × 50 000\):<\/b> 50 000 UZS/)
   assert.match(message, /Чистая прибыль за день:<\/b> 225 000 UZS/)
+  assert.match(message, /────────────/)
+  assert.ok(
+    message.indexOf('Чистая прибыль за день') < message.indexOf('Средняя дневная выручка кафе за месяц')
+  )
   assert.doesNotMatch(message, /Иван Петров/)
 })
 
