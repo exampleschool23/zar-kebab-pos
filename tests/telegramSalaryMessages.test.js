@@ -21,6 +21,11 @@ import {
   buildSalaryTeamEventMessage,
   buildSalaryPaymentGroupMessage,
 } from '../api/telegram/_lib/paymentMessages.js'
+import {
+  buildDailyPayrollGroupReportPng,
+  buildDailyPayrollGroupReportSvg,
+} from '../api/telegram/_lib/payrollReportImage.js'
+import { sendTelegramPhoto } from '../api/telegram/_lib/telegram.js'
 
 const salaryProfile = {
   id: 'salary-1',
@@ -143,6 +148,76 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     message.indexOf('Чистая прибыль за день') < message.indexOf('Средняя дневная выручка кафе за месяц')
   )
   assert.doesNotMatch(message, /Иван Петров/)
+})
+
+test('daily payroll group image contains the full Russian report and renders as PNG', async () => {
+  const summary = getDailyPayrollGroupSummary([salaryProfile], [
+    { status: 'generated', bonus_amount: 485_015 },
+  ], '2026-08-27', {
+    cafeIncome: 7_594_000,
+    monthToDateCafeIncome: 175_500_000,
+    monthToDateCalendarDayCount: 27,
+    regularDineInIncome: 3_257_826,
+    regularOffPremiseIncome: 364_512,
+    touristIncome: 3_971_662,
+    grossProfit: 5_112_967,
+    rent: 774_193,
+    utilities: 645_161,
+    employeeMealPerEmployee: 25_000,
+    employeeMealPresentEmployeeCount: 12,
+  })
+  const svg = buildDailyPayrollGroupReportSvg(summary, '2026-08-27')
+  const png = await buildDailyPayrollGroupReportPng(summary, '2026-08-27')
+
+  assert.match(svg, /Зарплата, KPI и прибыль/)
+  assert.match(svg, /7 594 000 UZS/)
+  assert.match(svg, /● ЗАЛ/)
+  assert.match(svg, /Обычная выручка/)
+  assert.match(svg, /С собой \+ доставка/)
+  assert.match(svg, /Туристическая выручка/)
+  assert.match(svg, /Чистая прибыль кафе/i)
+  assert.match(svg, /Начисленная зарплата/)
+  assert.match(svg, /Автоматические KPI-бонусы/)
+  assert.match(svg, /Среднее питание сотрудников/)
+  assert.match(svg, /Чистая прибыль за день/i)
+  assert.match(svg, /Средняя дневная выручка кафе за месяц/i)
+  assert.match(svg, />42,9%<\/text>/)
+  assert.match(svg, />4,8%<\/text>/)
+  assert.match(svg, />52,3%<\/text>/)
+  assert.match(svg, /#0D9488/)
+  assert.match(svg, /#F97316/)
+  assert.match(svg, /#C026D3/)
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
+})
+
+test('Telegram photo delivery uploads the generated PNG as multipart form data', async () => {
+  const originalFetch = globalThis.fetch
+  const originalToken = process.env.TELEGRAM_BOT_TOKEN
+  process.env.TELEGRAM_BOT_TOKEN = 'test-token'
+  let request
+  globalThis.fetch = async (url, options) => {
+    request = { url, options }
+    return {
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 321 } }),
+    }
+  }
+
+  try {
+    const response = await sendTelegramPhoto('-100123', Buffer.from([137, 80, 78, 71]), {
+      filename: 'daily-report.png',
+    })
+    assert.equal(response.result.message_id, 321)
+    assert.match(request.url, /\/bottest-token\/sendPhoto$/)
+    assert.equal(request.options.method, 'POST')
+    assert.equal(request.options.body.get('chat_id'), '-100123')
+    assert.equal(request.options.body.get('photo').name, 'daily-report.png')
+    assert.equal(request.options.body.get('photo').type, 'image/png')
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalToken == null) delete process.env.TELEGRAM_BOT_TOKEN
+    else process.env.TELEGRAM_BOT_TOKEN = originalToken
+  }
 })
 
 test('salary payment notification includes the saved payment and remaining due', () => {

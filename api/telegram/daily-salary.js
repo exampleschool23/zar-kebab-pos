@@ -1,7 +1,6 @@
 import { json, methodNotAllowed, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import {
-  buildDailyPayrollGroupMessage,
   buildDailySalaryMessage,
   addSalaryDateDays,
   getDailyPayrollGroupSummary,
@@ -10,7 +9,8 @@ import {
   getTashkentDate,
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
-import { sendTelegramMessage } from './_lib/telegram.js'
+import { sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
+import { buildDailyPayrollGroupReportPng } from './_lib/payrollReportImage.js'
 import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import {
   buildDailyUnavailableMenuTeamMessage,
@@ -610,9 +610,11 @@ async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResu
   let telegramMessageId = ''
   try {
     const summary = await loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults)
-    const response = await sendTelegramMessage(
+    const reportImage = await buildDailyPayrollGroupReportPng(summary, businessDate)
+    const response = await sendTelegramPhoto(
       target.chatId,
-      buildDailyPayrollGroupMessage(summary, businessDate, 'ru')
+      reportImage,
+      { filename: `zar-kebab-payroll-${businessDate}.png` }
     )
     telegramMessageId = getTelegramMessageId(response)
     const sentAt = new Date().toISOString()

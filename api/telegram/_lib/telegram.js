@@ -137,6 +137,31 @@ export async function sendTelegramMessage(chatId, text, options = {}) {
   })
 }
 
+export async function sendTelegramPhoto(chatId, photo, {
+  caption = '',
+  filename = 'report.png',
+  parseMode = 'HTML',
+} = {}) {
+  if (!chatId || !photo) return { skipped: true }
+  const form = new FormData()
+  form.append('chat_id', String(chatId))
+  form.append('photo', new Blob([photo], { type: 'image/png' }), filename)
+  if (caption) {
+    form.append('caption', caption)
+    form.append('parse_mode', parseMode)
+  }
+
+  const res = await fetch(`https://api.telegram.org/bot${getBotToken()}/sendPhoto`, {
+    method: 'POST',
+    body: form,
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok || body.ok === false) {
+    throw new Error(body.description || `Telegram sendPhoto failed with ${res.status}`)
+  }
+  return body
+}
+
 export function escapeTelegramHtml(value) {
   return String(value ?? '').replace(/[&<>]/g, char => ({
     '&': '&amp;',
