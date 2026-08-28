@@ -13,6 +13,10 @@ import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { escapeTelegramHtml, sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
 import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import {
+  buildDailyPayrollGroupReportCaption,
+  buildDailyPayrollGroupReportPng,
+} from './_lib/payrollReportImage.js'
+import {
   buildDailyUnavailableMenuTeamMessage,
   getRussianMenuCategoryName,
   getRussianMenuItemName,
@@ -168,6 +172,7 @@ async function notifyDailySalaryCronFailure(supabase, notificationDate, error) {
     return { status: 'skipped' }
   }
   let telegramMessageId = ''
+  let deliveryFormat = 'text'
   try {
     const response = await sendTelegramMessage(
       target.chatId,
@@ -792,15 +797,12 @@ async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResu
     let reportImage = null
     let reportCaption = ''
     try {
-      const {
-        buildDailyPayrollGroupReportCaption,
-        buildDailyPayrollGroupReportPng,
-      } = await import('./_lib/payrollReportImage.js')
       reportImage = await buildDailyPayrollGroupReportPng(summary, businessDate)
       reportCaption = buildDailyPayrollGroupReportCaption(businessDate)
     } catch (error) {
       console.error('[telegram/daily-salary] payroll image unavailable; sending text fallback:', error)
     }
+    deliveryFormat = reportImage ? 'photo' : 'text'
     const response = reportImage
       ? await sendTelegramPhoto(
           target.chatId,
@@ -832,7 +834,7 @@ async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResu
         .select('business_date')
         .maybeSingle()
       if (!updated.error && updated.data) {
-        return { businessDate, status: 'sent' }
+        return { businessDate, status: 'sent', format: deliveryFormat }
       }
       lastError = updated.error || new Error('Daily payroll group delivery row disappeared')
     }

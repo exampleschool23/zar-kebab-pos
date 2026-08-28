@@ -48,4 +48,11 @@ test('manual Investor report task sends only the aggregate report from finalized
   assert.match(dailySalary, /cronTask === 'investor-report'/)
   assert.match(dailySalary, /\.from\('employee_daily_kpi_results'\)[\s\S]*?\.eq\('business_date', notificationDate\)/)
   assert.match(dailySalary, /sendDailyPayrollGroupNotification\([\s\S]*?notificationDate,[\s\S]*?kpiResults \|\| \[\]/)
+  assert.match(dailySalary, /import \{[\s\S]*buildDailyPayrollGroupReportPng[\s\S]*\} from '\.\/_lib\/payrollReportImage\.js'/)
+  assert.doesNotMatch(dailySalary, /await import\('\.\/_lib\/payrollReportImage\.js'\)/)
+  assert.match(dailySalary, /status: 'sent', format: deliveryFormat/)
+  assert.equal(
+    vercelConfig.functions?.['api/telegram/daily-salary.js']?.includeFiles,
+    'node_modules/@img/sharp-libvips-linux-x64/**'
+  )
 })
