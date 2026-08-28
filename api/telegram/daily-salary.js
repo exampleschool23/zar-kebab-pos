@@ -1,6 +1,7 @@
 import { json, methodNotAllowed, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import {
+  buildDailyPayrollGroupMessage,
   buildDailySalaryMessage,
   addSalaryDateDays,
   getDailyPayrollGroupSummary,
@@ -10,10 +11,6 @@ import {
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
-import {
-  buildDailyPayrollGroupReportCaption,
-  buildDailyPayrollGroupReportPng,
-} from './_lib/payrollReportImage.js'
 import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import {
   buildDailyUnavailableMenuTeamMessage,
@@ -613,15 +610,31 @@ async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResu
   let telegramMessageId = ''
   try {
     const summary = await loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults)
-    const reportImage = await buildDailyPayrollGroupReportPng(summary, businessDate)
-    const response = await sendTelegramPhoto(
-      target.chatId,
-      reportImage,
-      {
-        caption: buildDailyPayrollGroupReportCaption(businessDate),
-        filename: `zar-kebab-payroll-${businessDate}.png`,
-      }
-    )
+    let reportImage = null
+    let reportCaption = ''
+    try {
+      const {
+        buildDailyPayrollGroupReportCaption,
+        buildDailyPayrollGroupReportPng,
+      } = await import('./_lib/payrollReportImage.js')
+      reportImage = await buildDailyPayrollGroupReportPng(summary, businessDate)
+      reportCaption = buildDailyPayrollGroupReportCaption(businessDate)
+    } catch (error) {
+      console.error('[telegram/daily-salary] payroll image unavailable; sending text fallback:', error)
+    }
+    const response = reportImage
+      ? await sendTelegramPhoto(
+          target.chatId,
+          reportImage,
+          {
+            caption: reportCaption,
+            filename: `zar-kebab-payroll-${businessDate}.png`,
+          }
+        )
+      : await sendTelegramMessage(
+          target.chatId,
+          buildDailyPayrollGroupMessage(summary, businessDate, 'ru')
+        )
     telegramMessageId = getTelegramMessageId(response)
     const sentAt = new Date().toISOString()
     let lastError = null

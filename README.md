@@ -128,8 +128,8 @@ is applied and `VITE_TELEGRAM_BOT_USERNAME` is configured. The employee opens
 that link and presses Start. The token expires after 30 minutes and can be used
 only once.
 
-`vercel.json` invokes `/api/telegram/daily-salary` in the `20:00 UTC` hour,
-which is the `01:00` hour in `Asia/Tashkent`. Vercel automatically sends
+`vercel.json` invokes `/api/telegram/daily-salary` at `21:30 UTC`,
+which is `02:30` in `Asia/Tashkent`. Vercel automatically sends
 `CRON_SECRET` as a Bearer token. The job first idempotently finalizes KPI
 bonuses for the previous completed Tashkent date (and retries the last seven
 completed dates as bounded catch-up), then sends or retries the combined salary

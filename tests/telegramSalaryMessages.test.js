@@ -827,15 +827,15 @@ test('current employee status uses the Tashkent calendar date', () => {
   assert.equal(getTashkentDate(new Date('2026-07-28T19:00:00Z')), '2026-07-29')
 })
 
-test('daily salary cron runs in the 01:00 Tashkent hour and reports the completed day', () => {
+test('daily salary cron runs at 02:30 Tashkent and reports the completed day', () => {
   const vercelConfig = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
   const dailySalaryCron = vercelConfig.crons.find(cron => cron.path === '/api/telegram/daily-salary')
   const dailySalaryEndpoint = fs.readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
 
-  assert.equal(dailySalaryCron?.schedule, '0 20 * * *')
-  assert.equal(getCompletedTashkentDate(new Date('2026-07-29T20:00:00Z')), '2026-07-29')
+  assert.equal(dailySalaryCron?.schedule, '30 21 * * *')
+  assert.equal(getCompletedTashkentDate(new Date('2026-07-29T21:30:00Z')), '2026-07-29')
   assert.deepEqual(
-    getCompletedTashkentDates(new Date('2026-07-29T20:00:00Z'), 3),
+    getCompletedTashkentDates(new Date('2026-07-29T21:30:00Z'), 3),
     ['2026-07-27', '2026-07-28', '2026-07-29']
   )
   assert.match(dailySalaryEndpoint, /const notificationDate = getCompletedTashkentDate\(now\)/)
