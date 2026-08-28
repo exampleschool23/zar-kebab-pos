@@ -3,7 +3,7 @@ import { formatLongDate } from '../../../src/lib/dateFormat.js'
 import { formatSalaryNotificationAmount } from './salaryMessages.js'
 
 const WIDTH = 1200
-const HEIGHT = 1800
+const HEIGHT = 1460
 const CIRCLE_RADIUS = 205
 const CIRCLE_LENGTH = 2 * Math.PI * CIRCLE_RADIUS
 
@@ -72,7 +72,6 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     ? formatMoney(summary.netProfit)
     : 'Недоступно'
   const employeeMealLabel = `Среднее питание сотрудников (${normalizeAmount(summary?.presentEmployeeCount)} × ${formatSalaryNotificationAmount(summary?.employeeMealPerEmployeeTotal)})`
-  const compactDate = formatLongDate(date, 'ru', date, { includeYear: false }).replace(/\s+/, '-')
   const chartCenterX = 365
   const chartCenterY = 613
   const regularColor = '#0D9488'
@@ -82,30 +81,15 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
   <defs>
-    <linearGradient id="header" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#173B3F"/>
-      <stop offset="1" stop-color="#0F5B59"/>
-    </linearGradient>
-    <linearGradient id="profit" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#DDF7EC"/>
-      <stop offset="1" stop-color="#ECFAF4"/>
-    </linearGradient>
     <linearGradient id="average" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#173B3F"/>
       <stop offset="1" stop-color="#0D766F"/>
     </linearGradient>
   </defs>
   <rect width="${WIDTH}" height="${HEIGHT}" rx="52" fill="#EAF0EE"/>
-  <rect x="34" y="34" width="1132" height="1732" rx="44" fill="#F8FAF9"/>
+  <rect x="34" y="34" width="1132" height="1392" rx="44" fill="#F8FAF9"/>
   <g font-family="Arial, DejaVu Sans, sans-serif">
-    <rect x="34" y="34" width="1132" height="204" rx="44" fill="url(#header)"/>
-    <rect x="78" y="78" width="64" height="56" rx="14" fill="#FFFFFF" fill-opacity="0.14"/>
-    <path d="M94 94h32v27H94z M102 87h16v8h-16z" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round"/>
-    <text x="174" y="105" font-size="20" font-weight="700" letter-spacing="3" fill="#9FE3D8">ZAR KEBAB · DAILY FINANCE</text>
-    <text x="174" y="157" font-size="42" font-weight="700" fill="#FFFFFF">Зарплата, KPI и прибыль</text>
-    <rect x="905" y="92" width="195" height="58" rx="29" fill="#FFFFFF" fill-opacity="0.14"/>
-    <text x="1002" y="130" text-anchor="middle" font-size="27" font-weight="700" fill="#FFFFFF">${escapeSvg(compactDate)}</text>
-
+    <g transform="translate(0 -210)">
     <rect x="68" y="270" width="1064" height="642" rx="34" fill="#FFFFFF" stroke="#DDE8E5" stroke-width="2"/>
     <text x="664" y="324" font-size="20" font-weight="700" letter-spacing="2.5" fill="#70817E">ВЫРУЧКА КАФЕ ЗА ДЕНЬ</text>
     <text x="664" y="382" font-size="49" font-weight="800" fill="#173B3F">${escapeSvg(formatMoney(cafeIncome))}</text>
@@ -145,19 +129,27 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     ${expenseRow('Коммуналка', formatMoney(summary?.utilitiesTotal), 1280, { accent: '#EAB308' })}
     ${expenseRow(employeeMealLabel, formatMoney(summary?.employeeMealTotal), 1344, { labelSize: 26, accent: offPremiseColor })}
 
-    <rect x="68" y="1418" width="1064" height="142" rx="32" fill="url(#profit)" stroke="#BDEBD8" stroke-width="2"/>
-    <circle cx="128" cy="1489" r="32" fill="#137A58"/>
-    <path d="M113 1497l11-11 9 8 15-18" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="182" y="1477" font-size="22" font-weight="800" letter-spacing="1.8" fill="#447164">ЧИСТАЯ ПРИБЫЛЬ ЗА ДЕНЬ</text>
-    <text x="182" y="1525" font-size="42" font-weight="800" fill="#137A58">${escapeSvg(netProfit)}</text>
+    <rect x="68" y="1418" width="1064" height="190" rx="32" fill="url(#average)"/>
+    <line x1="600" y1="1448" x2="600" y2="1578" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="2"/>
 
-    <rect x="68" y="1590" width="1064" height="142" rx="32" fill="url(#average)"/>
-    <circle cx="128" cy="1661" r="32" fill="#FFFFFF" fill-opacity="0.14"/>
-    <path d="M111 1669v-22 M123 1669v-34 M135 1669v-15 M147 1669v-43" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
-    <text x="182" y="1649" font-size="22" font-weight="800" letter-spacing="1.4" fill="#A8E6DC">СРЕДНЯЯ ДНЕВНАЯ ВЫРУЧКА КАФЕ ЗА МЕСЯЦ</text>
-    <text x="182" y="1697" font-size="42" font-weight="800" fill="#FFFFFF">${escapeSvg(formatMoney(summary?.monthlyAverageCafeIncome))}</text>
+    <circle cx="128" cy="1513" r="32" fill="#FFFFFF" fill-opacity="0.14"/>
+    <path d="M113 1521l11-11 9 8 15-18" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="182" y="1497" font-size="19" font-weight="800" letter-spacing="1.4" fill="#A8E6DC">ЧИСТАЯ ПРИБЫЛЬ ЗА ДЕНЬ</text>
+    <text x="182" y="1550" font-size="38" font-weight="800" fill="#FFFFFF">${escapeSvg(netProfit)}</text>
+
+    <circle cx="660" cy="1513" r="32" fill="#FFFFFF" fill-opacity="0.14"/>
+    <path d="M643 1521v-22 M655 1521v-34 M667 1521v-15 M679 1521v-43" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+    <text x="714" y="1485" font-size="17" font-weight="800" letter-spacing="1.1" fill="#A8E6DC">СРЕДНЯЯ ДНЕВНАЯ</text>
+    <text x="714" y="1513" font-size="17" font-weight="800" letter-spacing="1.1" fill="#A8E6DC">ВЫРУЧКА КАФЕ ЗА МЕСЯЦ</text>
+    <text x="714" y="1560" font-size="36" font-weight="800" fill="#FFFFFF">${escapeSvg(formatMoney(summary?.monthlyAverageCafeIncome))}</text>
+    </g>
   </g>
 </svg>`
+}
+
+export function buildDailyPayrollGroupReportCaption(date) {
+  const compactDate = formatLongDate(date, 'ru', date, { includeYear: false }).replace(/\s+/, '-')
+  return `💼 <b>Зарплата, KPI и прибыль</b>\n📅 ${compactDate}`
 }
 
 export async function buildDailyPayrollGroupReportPng(summary, date) {

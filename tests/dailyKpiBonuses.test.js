@@ -389,6 +389,7 @@ test('daily cron sends one duplicate-safe aggregate salary, KPI, and meal image 
   assert.match(dailyCron, /sendDailyPayrollGroupNotification/)
   assert.match(dailyCron, /loadInvestorGroupTarget/)
   assert.match(dailyCron, /buildDailyPayrollGroupReportPng\(summary, businessDate\)/)
+  assert.match(dailyCron, /caption: buildDailyPayrollGroupReportCaption\(businessDate\)/)
   assert.match(dailyCron, /sendTelegramPhoto\(/)
   assert.match(dailyCron, /daily_payroll_group_notification_deliveries/)
   assert.match(dailyCron, /\.eq\('target_key', 'salary_events'\)/)

@@ -10,7 +10,10 @@ import {
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
-import { buildDailyPayrollGroupReportPng } from './_lib/payrollReportImage.js'
+import {
+  buildDailyPayrollGroupReportCaption,
+  buildDailyPayrollGroupReportPng,
+} from './_lib/payrollReportImage.js'
 import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import {
   buildDailyUnavailableMenuTeamMessage,
@@ -614,7 +617,10 @@ async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResu
     const response = await sendTelegramPhoto(
       target.chatId,
       reportImage,
-      { filename: `zar-kebab-payroll-${businessDate}.png` }
+      {
+        caption: buildDailyPayrollGroupReportCaption(businessDate),
+        filename: `zar-kebab-payroll-${businessDate}.png`,
+      }
     )
     telegramMessageId = getTelegramMessageId(response)
     const sentAt = new Date().toISOString()

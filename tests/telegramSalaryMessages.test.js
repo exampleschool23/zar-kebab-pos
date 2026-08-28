@@ -22,6 +22,7 @@ import {
   buildSalaryPaymentGroupMessage,
 } from '../api/telegram/_lib/paymentMessages.js'
 import {
+  buildDailyPayrollGroupReportCaption,
   buildDailyPayrollGroupReportPng,
   buildDailyPayrollGroupReportSvg,
 } from '../api/telegram/_lib/payrollReportImage.js'
@@ -169,7 +170,8 @@ test('daily payroll group image contains the full Russian report and renders as 
   const svg = buildDailyPayrollGroupReportSvg(summary, '2026-08-27')
   const png = await buildDailyPayrollGroupReportPng(summary, '2026-08-27')
 
-  assert.match(svg, /Зарплата, KPI и прибыль/)
+  assert.doesNotMatch(svg, /Зарплата, KPI и прибыль/)
+  assert.doesNotMatch(svg, /27-августа/)
   assert.match(svg, /7 594 000 UZS/)
   assert.match(svg, /● ЗАЛ/)
   assert.match(svg, /Обычная выручка/)
@@ -180,7 +182,8 @@ test('daily payroll group image contains the full Russian report and renders as 
   assert.match(svg, /Автоматические KPI-бонусы/)
   assert.match(svg, /Среднее питание сотрудников/)
   assert.match(svg, /Чистая прибыль за день/i)
-  assert.match(svg, /Средняя дневная выручка кафе за месяц/i)
+  assert.match(svg, /Средняя дневная/i)
+  assert.match(svg, /Выручка кафе за месяц/i)
   assert.match(svg, />42,9%<\/text>/)
   assert.match(svg, />4,8%<\/text>/)
   assert.match(svg, />52,3%<\/text>/)
@@ -188,6 +191,11 @@ test('daily payroll group image contains the full Russian report and renders as 
   assert.match(svg, /#F97316/)
   assert.match(svg, /#C026D3/)
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
+})
+
+test('daily payroll group image title and date live in the Telegram caption', () => {
+  const caption = buildDailyPayrollGroupReportCaption('2026-08-27')
+  assert.equal(caption, '💼 <b>Зарплата, KPI и прибыль</b>\n📅 27-августа')
 })
 
 test('Telegram photo delivery uploads the generated PNG as multipart form data', async () => {
