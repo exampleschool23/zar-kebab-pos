@@ -8,7 +8,7 @@
 --     'Bearer token used by the Zar Kebab daily report cron'
 --   );
 --
--- The schedule is UTC. 21:30 UTC is 02:30 the next day in Asia/Tashkent.
+-- The schedule is UTC. 20:00 UTC is 01:00 the next day in Asia/Tashkent.
 
 create extension if not exists pg_cron with schema pg_catalog;
 create extension if not exists pg_net with schema extensions;
@@ -67,7 +67,7 @@ begin
 
   perform cron.schedule(
     'zar-kebab-daily-reports',
-    '30 21 * * *',
+    '0 20 * * *',
     'select public.invoke_zar_kebab_daily_reports();'
   );
 end;

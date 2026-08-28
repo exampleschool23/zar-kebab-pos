@@ -128,8 +128,8 @@ is applied and `VITE_TELEGRAM_BOT_USERNAME` is configured. The employee opens
 that link and presses Start. The token expires after 30 minutes and can be used
 only once.
 
-Supabase Cron invokes `/api/telegram/daily-salary` at `21:30 UTC`, which is
-`02:30` in `Asia/Tashkent`, using the matching `CRON_SECRET` stored in Supabase
+Supabase Cron invokes `/api/telegram/daily-salary` at `20:00 UTC`, which is
+`01:00` in `Asia/Tashkent`, using the matching `CRON_SECRET` stored in Supabase
 Vault as a Bearer token. The job first idempotently finalizes KPI
 bonuses for the previous completed Tashkent date (and retries the last seven
 completed dates as bounded catch-up), then sends or retries the combined salary
@@ -141,7 +141,7 @@ If the completed date cannot be finalized, its salary summary is left unclaimed
 and the endpoint returns an error so a retry cannot permanently omit the KPI.
 
 Migration `152_supabase_daily_report_cron.sql` installs the exact daily trigger
-in Supabase Cron at `21:30 UTC` (`02:30 Asia/Tashkent`). Before applying it, save
+in Supabase Cron at `20:00 UTC` (`01:00 Asia/Tashkent`). Before applying it, save
 the same value used by Vercel's `CRON_SECRET` in Supabase Vault:
 
 ```sql

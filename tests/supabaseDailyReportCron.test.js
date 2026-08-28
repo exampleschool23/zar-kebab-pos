@@ -7,9 +7,9 @@ const migration = readFileSync(
   'utf8'
 )
 
-test('Supabase owns the exact 02:30 Tashkent daily report schedule', () => {
+test('Supabase owns the exact 01:00 Tashkent daily report schedule', () => {
   assert.match(migration, /'zar-kebab-daily-reports'/)
-  assert.match(migration, /'30 21 \* \* \*'/)
+  assert.match(migration, /'0 20 \* \* \*'/)
   assert.match(migration, /'select public\.invoke_zar_kebab_daily_reports\(\);'/)
 })
 

@@ -827,17 +827,17 @@ test('current employee status uses the Tashkent calendar date', () => {
   assert.equal(getTashkentDate(new Date('2026-07-28T19:00:00Z')), '2026-07-29')
 })
 
-test('daily salary cron runs at 02:30 Tashkent and reports the completed day', () => {
+test('daily salary cron runs at 01:00 Tashkent and reports the completed day', () => {
   const supabaseCron = fs.readFileSync(
     new URL('../supabase/152_supabase_daily_report_cron.sql', import.meta.url),
     'utf8'
   )
   const dailySalaryEndpoint = fs.readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
 
-  assert.match(supabaseCron, /'30 21 \* \* \*'/)
-  assert.equal(getCompletedTashkentDate(new Date('2026-07-29T21:30:00Z')), '2026-07-29')
+  assert.match(supabaseCron, /'0 20 \* \* \*'/)
+  assert.equal(getCompletedTashkentDate(new Date('2026-07-29T20:00:00Z')), '2026-07-29')
   assert.deepEqual(
-    getCompletedTashkentDates(new Date('2026-07-29T21:30:00Z'), 3),
+    getCompletedTashkentDates(new Date('2026-07-29T20:00:00Z'), 3),
     ['2026-07-27', '2026-07-28', '2026-07-29']
   )
   assert.match(dailySalaryEndpoint, /const notificationDate = getCompletedTashkentDate\(now\)/)
