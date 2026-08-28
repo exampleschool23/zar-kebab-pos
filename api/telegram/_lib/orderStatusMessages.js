@@ -292,12 +292,12 @@ export function buildCompletedOrderGroupMessage(order) {
       ? `${typeIcon} Тип: ${escapeTelegramHtml(orderTypeLabel(inferOrderType(order), 'ru'))}`
       : `${typeIcon} Стол: ${escapeTelegramHtml(order?.table_name || '-')}`,
     `Дата: ${escapeTelegramHtml(closedAt)}`,
-    escapeTelegramHtml(formatPriceModeLine(order)),
+    `${escapeTelegramHtml(formatPriceModeLine(order))}${turboBadge}`,
   ]
 
   if (items.length > 0) lines.push('', `<pre>${escapeTelegramHtml(buildItemRows(items))}</pre>`)
   lines.push('')
-  lines.push(`Сумма заказа: ${escapeTelegramHtml(formatMoney(subtotal))}${turboBadge}`)
+  lines.push(`Сумма заказа: ${escapeTelegramHtml(formatMoney(subtotal))}`)
   if (serviceFee > 0) lines.push(`Сервис ${escapeTelegramHtml(serviceRate)}%: ${escapeTelegramHtml(formatMoney(serviceFee))}`)
   if (loyaltyUsed > 0) {
     lines.push(`Лояльность: - ${escapeTelegramHtml(formatMoney(loyaltyUsed))}`)

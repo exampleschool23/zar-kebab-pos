@@ -252,7 +252,7 @@ test('completed group message shows split payment methods with amounts', () => {
   assert.match(message, /Оплата: Наличные 60 000 UZS, Карта 40 000 UZS/)
 })
 
-test('completed group message adds turbo icons to the order amount line including service and caps at six', () => {
+test('completed group message adds turbo icons to the menu type line including service and caps at six', () => {
   const expectedIconCounts = [
     [99_999, 0],
     [100_000, 1],
@@ -278,10 +278,11 @@ test('completed group message adds turbo icons to the order amount line includin
       payment_status: 'paid',
       payments: [{ method: 'terminal', amount: grossTotal }],
     })
-    const orderAmountLine = message.split('\n').find(line => line.startsWith('Сумма заказа:')) || ''
-    const turboBadge = orderAmountLine.match(/(⚡+)$/)?.[1] || ''
+    const priceModeLine = message.split('\n').find(line => line.startsWith('Тип меню:')) || ''
+    const turboBadge = priceModeLine.match(/(⚡+)$/)?.[1] || ''
 
     assert.equal(turboBadge, '⚡'.repeat(expectedIconCount), `unexpected turbo badge for ${grossTotal} UZS`)
+    assert.equal(message.split('\n').find(line => line.startsWith('Сумма заказа:'))?.includes('⚡'), false)
     assert.equal(message.split('\n').some(line => /^⚡+$/.test(line)), false)
   }
 })
