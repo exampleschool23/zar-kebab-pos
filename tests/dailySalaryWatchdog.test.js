@@ -20,7 +20,11 @@ test('daily salary cron reports authorized execution failures to the Investor gr
 })
 
 test('existing later cron independently checks the daily salary delivery', () => {
-  assert.equal(vercelConfig.crons.length, 2)
+  assert.equal(vercelConfig.crons.length, 1)
+  assert.equal(
+    vercelConfig.crons.some(entry => entry.path === '/api/telegram/daily-salary'),
+    false
+  )
   const cron = vercelConfig.crons.find(entry => (
     entry.path === '/api/telegram/daily-salary?task=unavailable-products'
   ))

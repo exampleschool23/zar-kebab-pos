@@ -128,9 +128,9 @@ is applied and `VITE_TELEGRAM_BOT_USERNAME` is configured. The employee opens
 that link and presses Start. The token expires after 30 minutes and can be used
 only once.
 
-`vercel.json` invokes `/api/telegram/daily-salary` at `21:30 UTC`,
-which is `02:30` in `Asia/Tashkent`. Vercel automatically sends
-`CRON_SECRET` as a Bearer token. The job first idempotently finalizes KPI
+Supabase Cron invokes `/api/telegram/daily-salary` at `21:30 UTC`, which is
+`02:30` in `Asia/Tashkent`, using the matching `CRON_SECRET` stored in Supabase
+Vault as a Bearer token. The job first idempotently finalizes KPI
 bonuses for the previous completed Tashkent date (and retries the last seven
 completed dates as bounded catch-up), then sends or retries the combined salary
 summary for each finalized date. Each private message always includes Salary
@@ -140,9 +140,23 @@ messages when the cron is retried.
 If the completed date cannot be finalized, its salary summary is left unclaimed
 and the endpoint returns an error so a retry cannot permanently omit the KPI.
 
-The Vercel Hobby scheduler may start at any point during the configured hour.
-For exact timing, remove the Vercel cron entry and call the same endpoint from
-Supabase Cron with `Authorization: Bearer <CRON_SECRET>`.
+Migration `152_supabase_daily_report_cron.sql` installs the exact daily trigger
+in Supabase Cron at `21:30 UTC` (`02:30 Asia/Tashkent`). Before applying it, save
+the same value used by Vercel's `CRON_SECRET` in Supabase Vault:
+
+```sql
+select vault.create_secret(
+  '<the Vercel CRON_SECRET value>',
+  'zar_kebab_daily_report_cron_secret',
+  'Bearer token used by the Zar Kebab daily report cron'
+);
+```
+
+The migration reads that secret only inside the database and calls
+`https://www.zarkebab.uz/api/telegram/daily-salary`. Verify requests in
+`net._http_response` and scheduled runs in `cron.job_run_details`. Vercel keeps
+only the later watchdog cron; delivery rows remain the final duplicate-safety
+boundary for manual retries and overlapping deployments.
 
 The existing `08:00 Tashkent` unavailable-products cron also acts as the
 independent daily-salary watchdog. It runs after the primary Hobby cron window,
@@ -150,8 +164,8 @@ verifies that the completed Tashkent date has a sent aggregate report, and
 sends one failure alert to the ZarKebab Investor group for a missing, failed,
 or stale run. The report remains retryable. Authorized primary runs also send
 an immediate failure alert when KPI finalization or report delivery returns an
-error. Reusing the second cron keeps the project within Vercel Hobby's two-cron
-limit.
+error. This remains within the Vercel Hobby cron limit while Supabase owns the
+primary report schedule.
 
 ### Security notes
 

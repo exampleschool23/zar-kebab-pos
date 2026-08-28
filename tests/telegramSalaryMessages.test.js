@@ -828,11 +828,13 @@ test('current employee status uses the Tashkent calendar date', () => {
 })
 
 test('daily salary cron runs at 02:30 Tashkent and reports the completed day', () => {
-  const vercelConfig = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
-  const dailySalaryCron = vercelConfig.crons.find(cron => cron.path === '/api/telegram/daily-salary')
+  const supabaseCron = fs.readFileSync(
+    new URL('../supabase/152_supabase_daily_report_cron.sql', import.meta.url),
+    'utf8'
+  )
   const dailySalaryEndpoint = fs.readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
 
-  assert.equal(dailySalaryCron?.schedule, '30 21 * * *')
+  assert.match(supabaseCron, /'30 21 \* \* \*'/)
   assert.equal(getCompletedTashkentDate(new Date('2026-07-29T21:30:00Z')), '2026-07-29')
   assert.deepEqual(
     getCompletedTashkentDates(new Date('2026-07-29T21:30:00Z'), 3),
