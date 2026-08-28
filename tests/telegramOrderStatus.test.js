@@ -252,6 +252,38 @@ test('completed group message shows split payment methods with amounts', () => {
   assert.match(message, /Оплата: Наличные 60 000 UZS, Карта 40 000 UZS/)
 })
 
+test('completed group message adds one turbo icon per 100,000 UZS including service and caps at six', () => {
+  const expectedIconCounts = [
+    [99_999, 0],
+    [100_000, 1],
+    [199_999, 1],
+    [200_000, 2],
+    [399_999, 3],
+    [400_000, 4],
+    [599_999, 5],
+    [600_000, 6],
+    [773_950, 6],
+  ]
+
+  for (const [grossTotal, expectedIconCount] of expectedIconCounts) {
+    const subtotal = Math.floor(grossTotal / 1.15)
+    const serviceFee = grossTotal - subtotal
+    const message = buildCompletedOrderGroupMessage({
+      table_name: 'Stol 8',
+      order_type: 'dine_in',
+      subtotal,
+      service_fee: serviceFee,
+      service_rate_pct: 15,
+      total: grossTotal,
+      payment_status: 'paid',
+      payments: [{ method: 'terminal', amount: grossTotal }],
+    })
+    const turboLine = message.split('\n').find(line => /^⚡+$/.test(line)) || ''
+
+    assert.equal(turboLine, '⚡'.repeat(expectedIconCount), `unexpected turbo badge for ${grossTotal} UZS`)
+  }
+})
+
 test('completed group message shows loyalty usage and the card owner snapshot', () => {
   const message = buildCompletedOrderGroupMessage({
     table_name: 'Take Away',

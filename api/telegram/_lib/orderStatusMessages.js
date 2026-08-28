@@ -21,6 +21,8 @@ const PAYMENT_METHOD_LABELS_RU = {
 }
 
 const PRICE_MODE_TOURIST = 'tourist'
+const TURBO_ORDER_STEP_UZS = 100_000
+const TURBO_ORDER_MAX_ICONS = 6
 
 function formatMoney(amount) {
   const rounded = Math.round(Number(amount) || 0)
@@ -275,7 +277,7 @@ export function buildCompletedOrderGroupMessage(order) {
   const itemSubtotal = items.reduce((sum, item) => sum + getItemAmount(item), 0)
   const subtotal = Number.isFinite(Number(order?.subtotal)) ? Number(order.subtotal) : itemSubtotal
   const serviceFee = Number.isFinite(Number(order?.service_fee)) ? Number(order.service_fee) : 0
-  const total = Number.isFinite(Number(order?.total)) ? Number(order.total) : subtotal + serviceFee
+  const grossOrderTotal = subtotal + serviceFee
   const serviceRate = Number.isFinite(Number(order?.service_rate_pct))
     ? Number(order.service_rate_pct)
     : 0
@@ -302,6 +304,8 @@ export function buildCompletedOrderGroupMessage(order) {
     }
   }
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
+  const turboIconCount = Math.min(TURBO_ORDER_MAX_ICONS, Math.floor(grossOrderTotal / TURBO_ORDER_STEP_UZS))
+  if (turboIconCount > 0) lines.push('⚡'.repeat(turboIconCount))
   if (order?.orderNetProfit != null && Number.isFinite(Number(order.orderNetProfit))) {
     const margin = order?.orderProfitMarginPct != null && Number.isFinite(Number(order.orderProfitMarginPct))
       ? ` · ${formatPercent(order.orderProfitMarginPct)}`
