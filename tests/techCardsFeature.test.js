@@ -50,6 +50,45 @@ test('Tech card migration protects recipe prices and saves a whole recipe atomic
   assert.doesNotMatch(migration, /update public\.menu_item_costs|insert into public\.menu_item_costs/)
 })
 
+test('set composition is structured, cycle-safe, and snapshotted onto new order items', () => {
+  const migration = source('supabase/149_tech_card_menu_item_components.sql')
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.match(migration, /create table if not exists public\.menu_item_tech_card_components/)
+  assert.match(migration, /component_menu_item_id text not null references public\.menu_items\(id\)/)
+  assert.match(migration, /current_staff_can_access\('tech_cards'\)[\s\S]{0,120}current_staff_can_write\('menu'\)/)
+  assert.match(migration, /reject_recursive_tech_card_component/)
+  assert.match(migration, /add column if not exists tech_card_component_snapshot jsonb not null default '\[\]'::jsonb/)
+  assert.match(migration, /create trigger order_items_snapshot_tech_card_components/)
+  assert.match(migration, /'quantity', component\.quantity/)
+  assert.match(migration, /delete from public\.menu_item_tech_card_components[\s\S]*insert into public\.menu_item_tech_card_components/)
+  assert.doesNotMatch(migration, /update public\.menu_item_costs|insert into public\.menu_item_costs/)
+  assert.match(page, /supabase\.from\('menu_item_tech_card_components'\)/)
+  assert.match(page, /createBlankTechCardComponent/)
+  assert.match(page, /l\.includedItems/)
+  assert.match(page, /<MenuItemPicker/)
+  assert.match(page, /calculateTechCardSummary\(form, activeItems\)/)
+  assert.doesNotMatch(page, /<select[\s\S]{0,300}component\.component_menu_item_id/)
+})
+
+test('Tech Card included-item picker is searchable and grouped by menu category', () => {
+  const picker = source('src/components/MenuItemPicker.jsx')
+
+  assert.match(picker, /Meal or category/)
+  assert.match(picker, /getCategoryName/)
+  assert.match(picker, /visibleSections/)
+  assert.match(picker, /MenuMedia/)
+  assert.match(picker, /document\.addEventListener\('pointerdown'/)
+})
+
+test('included-item controls stay top-aligned when the real-cost line is visible', () => {
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.match(page, /sm:grid-cols-\[minmax\(220px,1fr\)_130px_40px\] sm:items-start/)
+  assert.match(page, /aria-label="Remove included menu item"[\s\S]{0,240}sm:mt-\[22px\]/)
+  assert.match(page, /l\.savedCost[\s\S]{0,260}componentSummary\.lineCost/)
+})
+
 test('menu product editor links directly to its tech card', () => {
   const adminMenu = source('src/pages/AdminMenu.jsx')
   assert.match(adminMenu, /navigate\(`\/admin\/tech-cards\/\$\{encodeURIComponent\(form\.id\)\}`\)/)
@@ -61,7 +100,11 @@ test('database health requires the tech-card schema and atomic save RPC', () => 
 
   assert.match(health, /name: 'menu_item_tech_cards'/)
   assert.match(health, /name: 'menu_item_tech_card_ingredients'/)
+  assert.match(health, /name: 'menu_item_tech_card_components'/)
+  assert.match(health, /tech_card_component_snapshot/)
   assert.match(health, /checkRpc\(dbClient, 'save_menu_item_tech_card'\)/)
   assert.match(cli, /checkTable\('menu_item_tech_cards'/)
+  assert.match(cli, /checkTable\('menu_item_tech_card_components'/)
+  assert.match(cli, /tech_card_component_snapshot/)
   assert.match(cli, /save_menu_item_tech_card\(payload\)/)
 })

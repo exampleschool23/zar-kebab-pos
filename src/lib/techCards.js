@@ -20,6 +20,7 @@ export function createBlankTechCard(menuItemId = '') {
     preparation_steps: '',
     notes: '',
     ingredients: [],
+    components: [],
   }
 }
 
@@ -29,6 +30,13 @@ export function createBlankTechCardIngredient() {
     quantity: '1',
     unit: 'kg',
     unit_price_uzs: '',
+  }
+}
+
+export function createBlankTechCardComponent() {
+  return {
+    component_menu_item_id: '',
+    quantity: '1',
   }
 }
 
@@ -48,10 +56,16 @@ export function normalizeTechCard(card = {}) {
       unit: normalizeTechCardUnit(ingredient.unit, 'kg'),
       unit_price_uzs: String(ingredient.unit_price_uzs ?? ''),
     })),
+    components: (card.components || []).map(component => ({
+      id: component.id || null,
+      component_menu_item_id: String(component.component_menu_item_id || ''),
+      quantity: String(component.quantity ?? '1'),
+    })),
   }
 }
 
-export function calculateTechCardSummary(card = {}) {
+export function calculateTechCardSummary(card = {}, menuItems = []) {
+  const menuItemById = new Map(menuItems.map(item => [item.id, item]))
   const ingredients = (card.ingredients || []).map(ingredient => {
     const quantity = normalizeTechCardNumber(ingredient.quantity)
     const unitPrice = normalizeTechCardNumber(ingredient.unit_price_uzs)
@@ -62,15 +76,45 @@ export function calculateTechCardSummary(card = {}) {
       lineCost: quantity * unitPrice,
     }
   })
-  const batchCost = ingredients.reduce((sum, ingredient) => sum + ingredient.lineCost, 0)
+  const ingredientBatchCost = ingredients.reduce((sum, ingredient) => sum + ingredient.lineCost, 0)
+  const components = (card.components || []).map(component => {
+    const quantity = normalizeTechCardNumber(component.quantity)
+    const menuItem = menuItemById.get(component.component_menu_item_id)
+    const rawCost = menuItem?.cost_price
+    const costAvailable = rawCost !== null && rawCost !== undefined && rawCost !== '' && Number.isFinite(Number(rawCost))
+    const unitCost = costAvailable ? Math.max(0, Number(rawCost)) : null
+    return {
+      ...component,
+      quantity,
+      menuItem,
+      costAvailable,
+      unitCost,
+      lineCost: costAvailable ? quantity * unitCost : null,
+    }
+  })
   const portionCount = normalizeTechCardNumber(card.portion_count)
   const batchOutputQuantity = normalizeTechCardNumber(card.batch_output_quantity)
+  const selectedComponents = components.filter(component => component.component_menu_item_id)
+  const componentCostAvailable = selectedComponents.every(component => component.costAvailable)
+  const componentCostPerPortion = componentCostAvailable
+    ? selectedComponents.reduce((sum, component) => sum + component.lineCost, 0)
+    : null
+  const ingredientCostPerPortion = portionCount > 0 ? ingredientBatchCost / portionCount : 0
+  const portionCost = componentCostPerPortion === null
+    ? null
+    : ingredientCostPerPortion + componentCostPerPortion
+  const batchCost = portionCost === null || portionCount <= 0 ? null : portionCost * portionCount
 
   return {
     ingredients,
+    components,
+    ingredientBatchCost,
+    ingredientCostPerPortion,
+    componentCostAvailable,
+    componentCostPerPortion,
     batchCost,
     portionCount,
-    portionCost: portionCount > 0 ? batchCost / portionCount : 0,
+    portionCost,
     batchOutputQuantity,
     outputPerPortion: portionCount > 0 && batchOutputQuantity > 0
       ? batchOutputQuantity / portionCount
@@ -96,21 +140,44 @@ export function buildTechCardPayload(card = {}) {
       unit_price_uzs: Math.round(normalizeTechCardNumber(ingredient.unit_price_uzs)),
       sort_order: index + 1,
     })),
+    components: normalized.components.map((component, index) => ({
+      component_menu_item_id: component.component_menu_item_id.trim(),
+      quantity: normalizeTechCardNumber(component.quantity),
+      sort_order: index + 1,
+    })),
   }
 }
 
-export function validateTechCard(card = {}) {
+export function validateTechCard(card = {}, menuItems = []) {
   const payload = buildTechCardPayload(card)
+  const menuItemById = new Map(menuItems.map(item => [item.id, item]))
   if (!payload.menu_item_id) return 'Menu item is required.'
   if (!(payload.portion_count > 0)) return 'Portions per batch must be greater than zero.'
   if (payload.batch_output_quantity !== null && !(payload.batch_output_quantity > 0)) {
     return 'Batch output must be greater than zero when provided.'
   }
-  if (payload.ingredients.length === 0) return 'Add at least one ingredient.'
+  if (payload.ingredients.length === 0 && payload.components.length === 0) {
+    return 'Add at least one ingredient or included menu item.'
+  }
   for (const ingredient of payload.ingredients) {
     if (!ingredient.name) return 'Every ingredient needs a name.'
     if (!(ingredient.quantity > 0)) return `${ingredient.name}: quantity must be greater than zero.`
     if (ingredient.unit_price_uzs < 0) return `${ingredient.name}: price cannot be negative.`
+  }
+  const componentIds = new Set()
+  for (const component of payload.components) {
+    if (!component.component_menu_item_id) return 'Every included menu item must be selected.'
+    if (component.component_menu_item_id === payload.menu_item_id) return 'A meal cannot include itself.'
+    if (!(component.quantity > 0)) return 'Included menu item quantity must be greater than zero.'
+    const includedItem = menuItemById.get(component.component_menu_item_id)
+    if (includedItem && (includedItem.cost_price === null || includedItem.cost_price === undefined || includedItem.cost_price === '' || !Number.isFinite(Number(includedItem.cost_price)))) {
+      return 'Every included menu item must have a real cost.'
+    }
+    if (includedItem && (includedItem.sale_unit || 'piece') === 'piece' && !Number.isInteger(component.quantity)) {
+      return 'Piece-based included menu items require a whole quantity.'
+    }
+    if (componentIds.has(component.component_menu_item_id)) return 'The same included menu item cannot be added twice.'
+    componentIds.add(component.component_menu_item_id)
   }
   if (!payload.preparation_steps) return 'Add the preparation method.'
   return ''

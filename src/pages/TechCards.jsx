@@ -14,6 +14,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
+import MenuItemPicker from '../components/MenuItemPicker'
 import MenuMedia from '../components/MenuMedia'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
@@ -30,6 +31,7 @@ import {
   buildTechCardPayload,
   calculateTechCardSummary,
   createBlankTechCard,
+  createBlankTechCardComponent,
   createBlankTechCardIngredient,
   normalizeTechCard,
   techCardFingerprint,
@@ -42,10 +44,12 @@ function labels(lang) {
     search: 'Taomni qidirish…', all: 'Barchasi', ready: 'Tayyor', missing: 'To‘ldirilmagan',
     total: 'Jami taomlar', configured: 'Tayyor kartalar', needSetup: 'To‘ldirish kerak', average: 'O‘rtacha porsiya tannarxi',
     open: 'Kartani ochish', noResults: 'Mos taom topilmadi', noResultsHint: 'Qidiruv yoki filtrni o‘zgartiring.',
-    listError: 'Texnologik kartalarni yuklab bo‘lmadi', migration: 'Ma’lumotlar bazasiga 139-migratsiyani qo‘llang.',
+    listError: 'Texnologik kartalarni yuklab bo‘lmadi', migration: 'Ma’lumotlar bazasiga 139 va 149-migratsiyalarni qo‘llang.',
     editorSubtitle: 'Retsept, ishlab chiqarish chiqishi va haqiqiy masalliq tannarxi', ingredients: 'Masalliqlar',
     ingredientHint: 'Har bir masalliq miqdori va tanlangan birlik uchun narxini kiriting.', addIngredient: 'Masalliq qo‘shish',
     ingredient: 'Masalliq', quantity: 'Miqdor', unit: 'Birlik', unitPrice: 'Birlik narxi', lineCost: 'Jami',
+    includedItems: 'Kiritilgan menyu taomlari', includedItemsHint: 'Set sotilganda auditda hisoblanadigan tayyor taomlarni va ularning miqdorini tanlang.',
+    addIncludedItem: 'Taom qo‘shish', selectIncludedItem: 'Taomni tanlang', noIncludedItems: 'Bu taomda kiritilgan menyu mahsulotlari yo‘q.',
     batch: 'Partiya va porsiya', batchOutput: 'Tayyor mahsulot chiqishi', portions: 'Partiyadagi porsiyalar',
     method: 'Tayyorlash usuli', methodPlaceholder: 'Tayyorlash bosqichlarini ketma-ket yozing…',
     notes: 'Ichki izohlar', notesPlaceholder: 'Saqlash, harorat yoki oshpaz uchun boshqa eslatmalar…',
@@ -60,10 +64,12 @@ function labels(lang) {
     search: 'Поиск блюда…', all: 'Все', ready: 'Готовые', missing: 'Не заполнены',
     total: 'Всего блюд', configured: 'Готовые техкарты', needSetup: 'Нужно заполнить', average: 'Средняя себестоимость порции',
     open: 'Открыть техкарту', noResults: 'Подходящие блюда не найдены', noResultsHint: 'Измените поиск или фильтр.',
-    listError: 'Не удалось загрузить техкарты', migration: 'Примените миграцию базы данных 139.',
+    listError: 'Не удалось загрузить техкарты', migration: 'Примените миграции базы данных 139 и 149.',
     editorSubtitle: 'Рецептура, производственный выход и фактическая стоимость ингредиентов', ingredients: 'Ингредиенты',
     ingredientHint: 'Укажите количество и цену каждого ингредиента за выбранную единицу.', addIngredient: 'Добавить ингредиент',
     ingredient: 'Ингредиент', quantity: 'Количество', unit: 'Единица', unitPrice: 'Цена за единицу', lineCost: 'Сумма',
+    includedItems: 'Включённые блюда меню', includedItemsHint: 'Выберите готовые блюда и их количество, которые нужно учитывать при продаже этого сета.',
+    addIncludedItem: 'Добавить блюдо', selectIncludedItem: 'Выберите блюдо', noIncludedItems: 'В это блюдо не включены другие позиции меню.',
     batch: 'Партия и порции', batchOutput: 'Выход готового продукта', portions: 'Порций из партии',
     method: 'Технология приготовления', methodPlaceholder: 'Опишите этапы приготовления по порядку…',
     notes: 'Внутренние примечания', notesPlaceholder: 'Хранение, температура или другие заметки для кухни…',
@@ -78,10 +84,12 @@ function labels(lang) {
     search: 'Search meals…', all: 'All', ready: 'Ready', missing: 'Not completed',
     total: 'Total meals', configured: 'Completed cards', needSetup: 'Need setup', average: 'Average portion cost',
     open: 'Open tech card', noResults: 'No matching meals', noResultsHint: 'Change the search or filter.',
-    listError: 'Could not load tech cards', migration: 'Apply database migration 139.',
+    listError: 'Could not load tech cards', migration: 'Apply database migrations 139 and 149.',
     editorSubtitle: 'Recipe, production yield, and actual ingredient cost', ingredients: 'Ingredients',
     ingredientHint: 'Enter each ingredient quantity and its price for the selected unit.', addIngredient: 'Add ingredient',
     ingredient: 'Ingredient', quantity: 'Quantity', unit: 'Unit', unitPrice: 'Unit price', lineCost: 'Total',
+    includedItems: 'Included menu items', includedItemsHint: 'Choose the prepared meals and quantities counted when this set is sold.',
+    addIncludedItem: 'Add menu item', selectIncludedItem: 'Select a meal', noIncludedItems: 'No other menu items are included in this meal.',
     batch: 'Batch and portions', batchOutput: 'Finished batch output', portions: 'Portions per batch',
     method: 'Preparation method', methodPlaceholder: 'Write the preparation steps in order…',
     notes: 'Internal notes', notesPlaceholder: 'Storage, temperature, or other kitchen notes…',
@@ -141,12 +149,14 @@ function TechCardImage({ item, className = '' }) {
 }
 
 async function loadTechCards() {
-  const [cardsResult, ingredientsResult] = await Promise.all([
+  const [cardsResult, ingredientsResult, componentsResult] = await Promise.all([
     supabase.from('menu_item_tech_cards').select('*').order('updated_at', { ascending: false }),
     supabase.from('menu_item_tech_card_ingredients').select('*').order('sort_order', { ascending: true }),
+    supabase.from('menu_item_tech_card_components').select('*').order('sort_order', { ascending: true }),
   ])
   if (cardsResult.error) throw cardsResult.error
   if (ingredientsResult.error) throw ingredientsResult.error
+  if (componentsResult.error) throw componentsResult.error
 
   const ingredientsByItemId = new Map()
   for (const ingredient of ingredientsResult.data || []) {
@@ -154,10 +164,20 @@ async function loadTechCards() {
     rows.push(ingredient)
     ingredientsByItemId.set(ingredient.menu_item_id, rows)
   }
+  const componentsByItemId = new Map()
+  for (const component of componentsResult.data || []) {
+    const rows = componentsByItemId.get(component.menu_item_id) || []
+    rows.push(component)
+    componentsByItemId.set(component.menu_item_id, rows)
+  }
 
   return Object.fromEntries((cardsResult.data || []).map(card => [
     card.menu_item_id,
-    normalizeTechCard({ ...card, ingredients: ingredientsByItemId.get(card.menu_item_id) || [] }),
+    normalizeTechCard({
+      ...card,
+      ingredients: ingredientsByItemId.get(card.menu_item_id) || [],
+      components: componentsByItemId.get(card.menu_item_id) || [],
+    }),
   ]))
 }
 
@@ -248,7 +268,7 @@ export default function TechCards() {
 
   const configuredCards = activeItems.filter(item => cardsByItemId[item.id])
   const averagePortionCost = configuredCards.length
-    ? configuredCards.reduce((sum, item) => sum + calculateTechCardSummary(cardsByItemId[item.id]).portionCost, 0) / configuredCards.length
+    ? configuredCards.reduce((sum, item) => sum + (calculateTechCardSummary(cardsByItemId[item.id], activeItems).portionCost || 0), 0) / configuredCards.length
     : 0
 
   function updateIngredient(index, patch) {
@@ -274,9 +294,35 @@ export default function TechCards() {
     setSaveNotice('')
   }
 
+  function updateComponent(index, patch) {
+    setForm(current => ({
+      ...current,
+      components: current.components.map((component, componentIndex) => (
+        componentIndex === index ? { ...component, ...patch } : component
+      )),
+    }))
+    setSaveNotice('')
+  }
+
+  function addComponent() {
+    setForm(current => ({
+      ...current,
+      components: [...current.components, createBlankTechCardComponent()],
+    }))
+    setSaveNotice('')
+  }
+
+  function removeComponent(index) {
+    setForm(current => ({
+      ...current,
+      components: current.components.filter((_, componentIndex) => componentIndex !== index),
+    }))
+    setSaveNotice('')
+  }
+
   async function saveCard() {
     if (!mayEdit || !form || saving) return
-    const validationError = validateTechCard(form)
+    const validationError = validateTechCard(form, activeItems)
     if (validationError) {
       setSaveError(validationError)
       return
@@ -343,12 +389,12 @@ export default function TechCards() {
       )
     }
 
-    const summary = calculateTechCardSummary(form)
+    const summary = calculateTechCardSummary(form, activeItems)
     const category = categoriesById.get(editorItem.category_id)
     const dirty = techCardFingerprint(form) !== originalFingerprint
-    const validationError = validateTechCard(form)
+    const validationError = validateTechCard(form, activeItems)
     const price = Number(editorItem.price || 0)
-    const estimatedDifference = price - summary.portionCost
+    const estimatedDifference = summary.portionCost == null ? null : price - summary.portionCost
 
     return (
       <AppShell title={`${l.title} · ${getItemName(editorItem, lang)}`}>
@@ -454,6 +500,75 @@ export default function TechCards() {
                 </section>
 
                 <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-black text-gray-900">{l.includedItems}</h2>
+                      <p className="mt-0.5 max-w-2xl text-xs font-semibold text-gray-400">{l.includedItemsHint}</p>
+                    </div>
+                    {mayEdit && (
+                      <button type="button" onClick={addComponent} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-xl bg-orange-50 px-3 text-xs font-black text-[#ff5a00] hover:bg-orange-100 disabled:opacity-50">
+                        <Plus size={15} /> {l.addIncludedItem}
+                      </button>
+                    )}
+                  </div>
+
+                  {form.components.length === 0 ? (
+                    <button type="button" onClick={mayEdit ? addComponent : undefined} className="flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 px-4 py-8 text-center disabled:cursor-default" disabled={!mayEdit}>
+                      <UtensilsCrossed size={27} className="mb-2 text-orange-300" />
+                      <span className="text-sm font-black text-gray-500">{mayEdit ? l.addIncludedItem : l.noIncludedItems}</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      {form.components.map((component, index) => {
+                        const componentSummary = summary.components[index]
+                        return (
+                        <div key={component.id || index} className="grid min-w-0 gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 sm:grid-cols-[minmax(220px,1fr)_130px_40px] sm:items-start">
+                          <label className="min-w-0">
+                            <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.includedItems}</span>
+                            <MenuItemPicker
+                              items={activeItems.filter(item => item.id !== editorItem.id)}
+                              categories={state.categories}
+                              value={component.component_menu_item_id}
+                              onChange={itemId => updateComponent(index, { component_menu_item_id: itemId })}
+                              lang={lang}
+                              disabled={!mayEdit || saving}
+                            />
+                            {component.component_menu_item_id && (
+                              <span className="mt-1.5 block text-[11px] font-bold text-gray-400">
+                                {l.savedCost}: {componentSummary?.costAvailable
+                                  ? `${formatCurrency(Math.round(componentSummary.unitCost))} × ${formatDecimal(componentSummary.quantity, lang)} = ${formatCurrency(Math.round(componentSummary.lineCost))}`
+                                  : '—'}
+                              </span>
+                            )}
+                          </label>
+                          <label>
+                            <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.quantity}</span>
+                            <div className="relative">
+                              <input
+                                inputMode="decimal"
+                                value={component.quantity}
+                                onChange={event => updateComponent(index, { quantity: event.target.value })}
+                                disabled={!mayEdit || saving}
+                                className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 pr-14 text-sm font-bold tabular-nums outline-none focus:border-[#ff5a00] disabled:bg-gray-100"
+                              />
+                              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-black text-gray-400">
+                                {unitLabel(activeItems.find(item => item.id === component.component_menu_item_id)?.sale_unit || 'piece', lang)}
+                              </span>
+                            </div>
+                          </label>
+                          {mayEdit && (
+                            <button type="button" onClick={() => removeComponent(index)} disabled={saving} aria-label="Remove included menu item" className="flex h-11 w-10 items-center justify-center rounded-xl border border-red-100 bg-white text-red-400 hover:bg-red-50 disabled:opacity-50 sm:mt-[22px]">
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+
+                <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
                   <h2 className="mb-4 text-lg font-black text-gray-900">{l.batch}</h2>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <label>
@@ -492,8 +607,8 @@ export default function TechCards() {
                     {[
                       [l.salePrice, formatCurrency(price)],
                       [l.savedCost, editorItem.cost_price == null ? '—' : formatCurrency(editorItem.cost_price)],
-                      [l.batchCost, formatCurrency(Math.round(summary.batchCost))],
-                      [l.portionCost, formatCurrency(Math.round(summary.portionCost))],
+                      [l.batchCost, summary.batchCost == null ? '—' : formatCurrency(Math.round(summary.batchCost))],
+                      [l.portionCost, summary.portionCost == null ? '—' : formatCurrency(Math.round(summary.portionCost))],
                       [l.outputPerPortion, formatOutputPerPortion(summary, form.batch_output_unit, lang)],
                     ].map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
@@ -501,9 +616,9 @@ export default function TechCards() {
                         <span className="text-right text-sm font-black tabular-nums text-gray-900">{value}</span>
                       </div>
                     ))}
-                    <div className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${estimatedDifference >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                    <div className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${estimatedDifference == null || estimatedDifference >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                       <span className="text-xs font-bold">{l.estimatedProfit}</span>
-                      <span className="text-sm font-black tabular-nums">{formatCurrency(Math.round(estimatedDifference))}</span>
+                      <span className="text-sm font-black tabular-nums">{estimatedDifference == null ? '—' : formatCurrency(Math.round(estimatedDifference))}</span>
                     </div>
                   </div>
                 </section>
@@ -572,7 +687,7 @@ export default function TechCards() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredItems.map(item => {
                 const card = cardsByItemId[item.id]
-                const summary = card ? calculateTechCardSummary(card) : null
+                const summary = card ? calculateTechCardSummary(card, activeItems) : null
                 const category = categoriesById.get(item.category_id)
                 return (
                   <button
@@ -598,7 +713,7 @@ export default function TechCards() {
                             <span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-orange-700">{formatDecimal(card.portion_count, lang)} {l.portions.toLowerCase()}</span>
                           </div>
                           <p className="mt-3 text-xs font-bold text-gray-400">{l.portionCost}</p>
-                          <p className="text-sm font-black tabular-nums text-gray-900">{formatCurrency(Math.round(summary.portionCost))}</p>
+                          <p className="text-sm font-black tabular-nums text-gray-900">{summary.portionCost == null ? '—' : formatCurrency(Math.round(summary.portionCost))}</p>
                         </>
                       ) : (
                         <div className="mt-4 rounded-xl border border-dashed border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700">{l.unsaved}</div>
