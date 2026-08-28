@@ -172,7 +172,6 @@ async function notifyDailySalaryCronFailure(supabase, notificationDate, error) {
     return { status: 'skipped' }
   }
   let telegramMessageId = ''
-  let deliveryFormat = 'text'
   try {
     const response = await sendTelegramMessage(
       target.chatId,
@@ -792,6 +791,7 @@ async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResu
   }
 
   let telegramMessageId = ''
+  let deliveryFormat = 'text'
   try {
     const summary = await loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults)
     let reportImage = null
