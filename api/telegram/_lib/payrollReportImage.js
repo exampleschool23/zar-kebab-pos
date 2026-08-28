@@ -1,4 +1,8 @@
 import sharp from 'sharp'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { formatLongDate } from '../../../src/lib/dateFormat.js'
 import { formatSalaryNotificationAmount } from './salaryMessages.js'
 
@@ -6,6 +10,36 @@ const WIDTH = 1200
 const HEIGHT = 1460
 const CIRCLE_RADIUS = 205
 const CIRCLE_LENGTH = 2 * Math.PI * CIRCLE_RADIUS
+let payrollFontsConfigured = false
+
+function escapeFontConfigPath(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&apos;',
+  })[character])
+}
+
+function configurePayrollFonts() {
+  if (payrollFontsConfigured) return
+  const fontDirectory = fileURLToPath(
+    new URL('../../../node_modules/notosans-fontface/fonts/', import.meta.url)
+  )
+  const configDirectory = join(tmpdir(), 'zar-kebab-fontconfig')
+  const configPath = join(configDirectory, 'fonts.conf')
+  mkdirSync(configDirectory, { recursive: true })
+  writeFileSync(configPath, `<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <dir>${escapeFontConfigPath(fontDirectory)}</dir>
+  <cachedir>${escapeFontConfigPath(join(tmpdir(), 'zar-kebab-font-cache'))}</cachedir>
+  <config></config>
+</fontconfig>`)
+  process.env.FONTCONFIG_FILE = configPath
+  payrollFontsConfigured = true
+}
 
 function escapeSvg(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -88,7 +122,7 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
   </defs>
   <rect width="${WIDTH}" height="${HEIGHT}" rx="52" fill="#EAF0EE"/>
   <rect x="34" y="34" width="1132" height="1392" rx="44" fill="#F8FAF9"/>
-  <g font-family="Arial, DejaVu Sans, sans-serif">
+  <g font-family="Noto Sans">
     <g transform="translate(0 -210)">
     <rect x="68" y="270" width="1064" height="642" rx="34" fill="#FFFFFF" stroke="#DDE8E5" stroke-width="2"/>
     <text x="664" y="324" font-size="20" font-weight="700" letter-spacing="2.5" fill="#70817E">ВЫРУЧКА КАФЕ ЗА ДЕНЬ</text>
@@ -153,6 +187,7 @@ export function buildDailyPayrollGroupReportCaption(date) {
 }
 
 export async function buildDailyPayrollGroupReportPng(summary, date) {
+  configurePayrollFonts()
   const svg = buildDailyPayrollGroupReportSvg(summary, date)
   return sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer()
 }

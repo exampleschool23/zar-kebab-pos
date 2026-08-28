@@ -190,7 +190,18 @@ test('daily payroll group image contains the full Russian report and renders as 
   assert.match(svg, /#0D9488/)
   assert.match(svg, /#F97316/)
   assert.match(svg, /#C026D3/)
+  assert.match(svg, /font-family="Noto Sans"/)
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
+})
+
+test('daily payroll image configures the bundled Cyrillic font for serverless rendering', () => {
+  const imageSource = fs.readFileSync(
+    new URL('../api/telegram/_lib/payrollReportImage.js', import.meta.url),
+    'utf8'
+  )
+  assert.match(imageSource, /notosans-fontface\/fonts/)
+  assert.match(imageSource, /process\.env\.FONTCONFIG_FILE = configPath/)
+  assert.match(imageSource, /configurePayrollFonts\(\)[\s\S]*sharp\(Buffer\.from\(svg\)\)/)
 })
 
 test('daily payroll group image title and date live in the Telegram caption', () => {

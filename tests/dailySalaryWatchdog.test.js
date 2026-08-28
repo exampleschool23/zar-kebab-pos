@@ -53,6 +53,6 @@ test('manual Investor report task sends only the aggregate report from finalized
   assert.match(dailySalary, /status: 'sent', format: deliveryFormat/)
   assert.equal(
     vercelConfig.functions?.['api/telegram/daily-salary.js']?.includeFiles,
-    'node_modules/@img/sharp-libvips-linux-x64/**'
+    '{node_modules/@img/sharp-libvips-linux-x64/**,node_modules/notosans-fontface/fonts/*.ttf}'
   )
 })
