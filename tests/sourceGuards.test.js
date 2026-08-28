@@ -2047,9 +2047,7 @@ test('AdminDashboard defaults to today period', () => {
   const analytics = readSource('src/lib/dashboardAnalytics.js')
   assert.match(source, /const \[period, setPeriod\]\s*=\s*useState\('today'\)/)
   assert.doesNotMatch(source, /const \[period, setPeriod\]\s*=\s*useState\('7days'\)/)
-  assert.match(source, /getDashboardPeriodCafeIncome\(paidOrders, period\)/)
-  assert.match(source, /selectedPeriodCafeIncome\.averageDaily/)
-  assert.match(source, /label=\{`\$\{l\.avgDailyCafeIncome\} · \$\{currentKpiPeriodLabel\}`\}/)
+  assert.doesNotMatch(source, /getDashboardPeriodCafeIncome|selectedPeriodCafeIncome|avgDailyCafeIncome/)
   assert.doesNotMatch(source, /icon=\{DollarSign\}/)
   assert.doesNotMatch(source, /avgOrderValue|previousAvgOrder|avgChange/)
   assert.match(analytics, /export function getDashboardPeriodCafeIncome\(orders, period, now = new Date\(\)\)/)
@@ -2059,7 +2057,7 @@ test('AdminDashboard omits the Items Today KPI card', () => {
   const source = readSource('src/pages/AdminDashboard.jsx')
 
   assert.doesNotMatch(source, /periodItemsSold/)
-  assert.match(source, /2xl:grid-cols-5/)
+  assert.match(source, /xl:grid-cols-4/)
 })
 
 test('AdminDashboard offers a rolling Month from 4 July to the 5 August boundary', () => {

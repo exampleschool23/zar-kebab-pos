@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingBag, Package, Receipt,
-  Clock, CalendarDays, ArrowUpRight, ArrowDownRight, Users, Loader2,
+  Clock, ArrowUpRight, ArrowDownRight, Users, Loader2,
   Printer, CreditCard, Trash2, Wallet, Monitor, BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -30,7 +30,6 @@ import {
   getDashboardBestSelling,
   getDashboardOrderTypePerformance,
   getDashboardPaymentMethods,
-  getDashboardPeriodCafeIncome,
   getDashboardPeriodOrders,
   getRollingDashboardMonthRange,
   getDashboardSalesByCategory,
@@ -59,7 +58,6 @@ const L = {
     yesterday:      'Kecha',
     vsYesterday:    'kechaga nisbatan',
     revenueStats:   'Daromad statistikasi',
-    avgDailyCafeIncome: "Kafe o'rtacha kunlik daromadi",
     today:          'Bugun',
     days7:          '7 kun',
     rollingMonth:   'Oy',
@@ -123,7 +121,6 @@ const L = {
     yesterday:      'Вчера',
     vsYesterday:    'vs вчера',
     revenueStats:   'Статистика дохода',
-    avgDailyCafeIncome: 'Среднедневной доход кафе',
     today:          'Сегодня',
     days7:          '7 дней',
     rollingMonth:   'Месяц',
@@ -187,7 +184,6 @@ const L = {
     yesterday:      'Yesterday',
     vsYesterday:    'vs yesterday',
     revenueStats:   'Income Statistics',
-    avgDailyCafeIncome: 'Avg daily cafe income',
     today:          'Today',
     days7:          '7 Days',
     rollingMonth:   'Month',
@@ -905,11 +901,6 @@ export default function AdminDashboard() {
     [state.tables]
   )
 
-  const selectedPeriodCafeIncome = useMemo(
-    () => getDashboardPeriodCafeIncome(paidOrders, period),
-    [paidOrders, period]
-  )
-
   // ── Revenue chart & period comparison ─────────────────────────────────────
   const { chartBars, currentPeriodTotal, previousPeriodTotal } = useMemo(() => {
     const now = new Date()
@@ -1183,7 +1174,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-3 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
           <KpiCard
             icon={TrendingUp}
             loading={analyticsLoading}
@@ -1200,13 +1191,6 @@ export default function AdminDashboard() {
             sub={`${previousKpiPeriodLabel}: ${formatCurrency(previousKpiNetProfit)}`}
             badge={pctBadge(netProfitChange)}
             tone="profit"
-          />
-          <KpiCard
-            icon={CalendarDays}
-            loading={analyticsLoading}
-            label={`${l.avgDailyCafeIncome} · ${currentKpiPeriodLabel}`}
-            value={formatCurrency(selectedPeriodCafeIncome.averageDaily)}
-            sub={`${l.total}: ${formatCurrency(selectedPeriodCafeIncome.total)} · ${l.loyaltyIncome}: ${formatCurrency(selectedPeriodCafeIncome.loyaltyTotal)}`}
           />
           <KpiCard
             icon={ShoppingBag}
