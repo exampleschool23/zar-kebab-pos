@@ -144,6 +144,15 @@ The Vercel Hobby scheduler may start at any point during the configured hour.
 For exact timing, remove the Vercel cron entry and call the same endpoint from
 Supabase Cron with `Authorization: Bearer <CRON_SECRET>`.
 
+The existing `08:00 Tashkent` unavailable-products cron also acts as the
+independent daily-salary watchdog. It runs after the primary Hobby cron window,
+verifies that the completed Tashkent date has a sent aggregate report, and
+sends one failure alert to the ZarKebab Investor group for a missing, failed,
+or stale run. The report remains retryable. Authorized primary runs also send
+an immediate failure alert when KPI finalization or report delivery returns an
+error. Reusing the second cron keeps the project within Vercel Hobby's two-cron
+limit.
+
 ### Security notes
 
 The Mini App reads `window.Telegram.WebApp.initData` and sends the raw string to `POST /api/telegram/auth`. The backend validates the signature with `TELEGRAM_BOT_TOKEN` before creating a signed app session. The frontend never trusts `initDataUnsafe` for authentication and never receives the bot token.

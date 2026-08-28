@@ -10,7 +10,7 @@ import {
   getTashkentDate,
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
-import { sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
+import { escapeTelegramHtml, sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
 import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import {
   buildDailyUnavailableMenuTeamMessage,
@@ -27,6 +27,8 @@ import { PRICE_MODE_TOURIST } from '../../src/lib/priceModes.js'
 const KPI_RETRY_LOOKBACK_DAYS = 7
 const KPI_MISSING_DATE_BATCH_SIZE = 31
 const PENDING_DELIVERY_RETRY_MS = 2 * 60 * 1000
+const CRON_FAILURE_ALERT_MARKER = '[cron-failure-alerted]'
+const WATCHDOG_ACTIVE_RUN_GRACE_MS = 3 * 60 * 1000
 
 function requireCronSecret(req) {
   const expected = process.env.CRON_SECRET
@@ -139,6 +141,183 @@ async function loadTeamGroupTarget(supabase) {
   if (error) throw error
   if (data && !data.is_enabled) return { chatId: '' }
   return { chatId: String(data?.chat_id || fallbackChatId).trim() }
+}
+
+function buildDailySalaryCronFailureMessage(notificationDate, error) {
+  const detail = String(error?.message || error || 'Unknown cron failure').slice(0, 800)
+  return [
+    '🚨 <b>Ошибка ежедневного финансового отчёта</b>',
+    `Дата отчёта: ${escapeTelegramHtml(notificationDate || '—')}`,
+    `Ошибка: ${escapeTelegramHtml(detail)}`,
+    '',
+    'Отчёт остаётся в очереди и будет доступен для повторной отправки.',
+  ].join('\n')
+}
+
+async function notifyDailySalaryCronFailure(supabase, notificationDate, error) {
+  let target = {
+    chatId: String(process.env.TELEGRAM_SALARY_PAYMENTS_CHAT_ID || '').trim(),
+  }
+  try {
+    if (supabase) target = await loadInvestorGroupTarget(supabase)
+  } catch (targetError) {
+    console.error('[telegram/daily-salary] could not load failure-alert target:', targetError)
+  }
+  if (!target.chatId) {
+    console.error('[telegram/daily-salary] failure alert skipped: Investor group is not configured')
+    return { status: 'skipped' }
+  }
+  let telegramMessageId = ''
+  try {
+    const response = await sendTelegramMessage(
+      target.chatId,
+      buildDailySalaryCronFailureMessage(notificationDate, error)
+    )
+    telegramMessageId = getTelegramMessageId(response)
+  } catch (notificationError) {
+    console.error('[telegram/daily-salary] could not send failure alert:', notificationError)
+    return { status: 'failed' }
+  }
+  try {
+    if (supabase && notificationDate) {
+      const now = new Date().toISOString()
+      const detail = String(error?.message || error || 'Unknown cron failure').slice(0, 700)
+      const errorMessage = `${CRON_FAILURE_ALERT_MARKER} ${detail}`
+      const existing = await supabase
+        .from('daily_payroll_group_notification_deliveries')
+        .select('business_date, status')
+        .eq('business_date', notificationDate)
+        .maybeSingle()
+      if (existing.error) throw existing.error
+      if (!existing.data) {
+        const created = await supabase
+          .from('daily_payroll_group_notification_deliveries')
+          .insert({
+            business_date: notificationDate,
+            target_key: 'salary_events',
+            status: 'failed',
+            error_message: errorMessage,
+            attempted_at: now,
+            updated_at: now,
+          })
+        if (created.error) throw created.error
+      } else if (existing.data.status !== 'sent') {
+        const updated = await supabase
+          .from('daily_payroll_group_notification_deliveries')
+          .update({ status: 'failed', error_message: errorMessage, updated_at: now })
+          .eq('business_date', notificationDate)
+          .neq('status', 'sent')
+        if (updated.error) throw updated.error
+      }
+    }
+  } catch (persistenceError) {
+    console.error('[telegram/daily-salary] failure alert sent but marker was not persisted:', persistenceError)
+  }
+  return { status: 'sent', telegramMessageId }
+}
+
+async function notifySecondaryCronFailure(supabase, businessDate, error) {
+  let target = {
+    chatId: String(process.env.TELEGRAM_SALARY_PAYMENTS_CHAT_ID || '').trim(),
+  }
+  try {
+    if (supabase) target = await loadInvestorGroupTarget(supabase)
+  } catch (targetError) {
+    console.error('[telegram/daily-salary] could not load secondary-cron alert target:', targetError)
+  }
+  if (!target.chatId) {
+    console.error('[telegram/daily-salary] secondary cron alert skipped: Investor group is not configured')
+    return { status: 'skipped' }
+  }
+  const detail = String(error?.message || error || 'Unknown cron failure').slice(0, 800)
+  try {
+    const response = await sendTelegramMessage(target.chatId, [
+      '🚨 <b>Ошибка резервной проверки cron</b>',
+      `Дата: ${escapeTelegramHtml(businessDate || '—')}`,
+      `Ошибка: ${escapeTelegramHtml(detail)}`,
+      '',
+      'Проверьте ежедневный финансовый отчёт и список недоступных блюд.',
+    ].join('\n'))
+    return { status: 'sent', telegramMessageId: getTelegramMessageId(response) }
+  } catch (notificationError) {
+    console.error('[telegram/daily-salary] could not send secondary-cron alert:', notificationError)
+    return { status: 'failed' }
+  }
+}
+
+function dailySalaryRunCanStillBeActive(delivery) {
+  if (delivery?.status !== 'pending') return false
+  const attemptedAt = new Date(delivery.attempted_at || 0).getTime()
+  return Number.isFinite(attemptedAt) && Date.now() - attemptedAt < WATCHDOG_ACTIVE_RUN_GRACE_MS
+}
+
+function buildDailySalaryWatchdogMessage(businessDate, delivery) {
+  const status = delivery?.status || 'not_started'
+  const detail = String(delivery?.error_message || 'Vercel did not complete the scheduled report run')
+    .replace(CRON_FAILURE_ALERT_MARKER, '')
+    .trim()
+    .slice(0, 800)
+  return [
+    '🚨 <b>Ежедневный финансовый отчёт не отправлен</b>',
+    `Дата отчёта: ${escapeTelegramHtml(businessDate)}`,
+    `Статус: ${escapeTelegramHtml(status)}`,
+    `Причина: ${escapeTelegramHtml(detail || 'Неизвестная ошибка')}`,
+    '',
+    'Отчёт оставлен в очереди для повторной отправки.',
+  ].join('\n')
+}
+
+async function markDailySalaryWatchdogAlerted(supabase, businessDate, delivery, telegramMessageId) {
+  const now = new Date().toISOString()
+  const errorMessage = `${CRON_FAILURE_ALERT_MARKER} Telegram message ${telegramMessageId}`
+  if (!delivery) {
+    const created = await supabase
+      .from('daily_payroll_group_notification_deliveries')
+      .insert({
+        business_date: businessDate,
+        target_key: 'salary_events',
+        status: 'failed',
+        error_message: errorMessage,
+        attempted_at: now,
+        updated_at: now,
+      })
+    if (created.error) throw created.error
+    return
+  }
+  const updated = await supabase
+    .from('daily_payroll_group_notification_deliveries')
+    .update({ status: 'failed', error_message: errorMessage, updated_at: now })
+    .eq('business_date', businessDate)
+    .neq('status', 'sent')
+  if (updated.error) throw updated.error
+}
+
+async function verifyDailySalaryCronDelivery(supabase, businessDate) {
+  const { data: delivery, error } = await supabase
+    .from('daily_payroll_group_notification_deliveries')
+    .select('business_date, status, attempted_at, sent_at, telegram_message_id, error_message')
+    .eq('business_date', businessDate)
+    .maybeSingle()
+  if (error) throw error
+  if (delivery?.status === 'sent' && delivery?.telegram_message_id) {
+    return { status: 'healthy' }
+  }
+  if (dailySalaryRunCanStillBeActive(delivery)) return { status: 'in_progress' }
+  if (delivery?.error_message?.includes(CRON_FAILURE_ALERT_MARKER)) {
+    return { status: 'alert_already_sent' }
+  }
+
+  const target = await loadInvestorGroupTarget(supabase)
+  const response = await sendTelegramMessage(
+    target.chatId,
+    buildDailySalaryWatchdogMessage(businessDate, delivery)
+  )
+  const telegramMessageId = getTelegramMessageId(response)
+  if (!telegramMessageId) {
+    throw new Error('Telegram did not return a message id for the cron failure alert')
+  }
+  await markDailySalaryWatchdogAlerted(supabase, businessDate, delivery, telegramMessageId)
+  return { status: 'alert_sent', telegramMessageId }
 }
 
 async function loadUnavailableMenuItems(supabase) {
@@ -876,16 +1055,30 @@ async function sendDailySalaryNotifications(supabase, notificationDate) {
 export default async function handler(req, res) {
   if (!['GET', 'POST'].includes(req.method)) return methodNotAllowed(res, ['GET', 'POST'])
 
+  const now = new Date()
+  const notificationDate = getCompletedTashkentDate(now)
+  let cronAuthorized = false
+  let cronTask = ''
+  let supabase = null
   try {
     requireCronSecret(req)
-    const supabase = getSupabaseAdmin()
-    const now = new Date()
-    if (getCronTask(req) === 'unavailable-products') {
+    cronAuthorized = true
+    cronTask = getCronTask(req)
+    supabase = getSupabaseAdmin()
+    if (cronTask === 'unavailable-products') {
       const businessDate = getTashkentDate(now)
-      const result = await sendDailyUnavailableMenuNotification(supabase, businessDate)
-      return json(res, 200, { ok: true, ...result })
+      const [watchdogRun, unavailableRun] = await Promise.allSettled([
+        verifyDailySalaryCronDelivery(supabase, notificationDate),
+        sendDailyUnavailableMenuNotification(supabase, businessDate),
+      ])
+      if (watchdogRun.status === 'rejected') throw watchdogRun.reason
+      if (unavailableRun.status === 'rejected') throw unavailableRun.reason
+      return json(res, 200, {
+        ok: true,
+        ...unavailableRun.value,
+        dailySalaryWatchdog: watchdogRun.value,
+      })
     }
-    const notificationDate = getCompletedTashkentDate(now)
     const catchUpDates = await loadKpiCatchUpDates(supabase, now)
     const kpiRuns = []
     const kpiDeliveries = []
@@ -1018,6 +1211,16 @@ export default async function handler(req, res) {
     // return 500 and leave delivery unclaimed for a complete retry.
     const results = notificationSummaryRun?.results || []
     const responseStatus = requestFailed ? 500 : 200
+    const responseError = kpiFinalizationFailed
+      ? 'Daily salary summary deferred because KPI finalization failed'
+      : 'Daily salary summary delivery could not be prepared'
+
+    if (requestFailed) {
+      const failureDetail = notificationKpiRun?.error
+        || notificationSummaryRun?.error
+        || responseError
+      await notifyDailySalaryCronFailure(supabase, notificationDate, failureDetail)
+    }
 
     return json(res, responseStatus, {
       ok: !requestFailed,
@@ -1043,13 +1246,18 @@ export default async function handler(req, res) {
       failedCount: results.filter(result => result.status === 'failed').length,
       results,
       ...(requestFailed
-        ? { error: kpiFinalizationFailed
-            ? 'Daily salary summary deferred because KPI finalization failed'
-            : 'Daily salary summary delivery could not be prepared' }
+        ? { error: responseError }
         : {}),
     })
   } catch (error) {
     console.error('[telegram/daily-salary]', error)
+    if (cronAuthorized) {
+      if (cronTask === 'unavailable-products') {
+        await notifySecondaryCronFailure(supabase, getTashkentDate(now), error)
+      } else {
+        await notifyDailySalaryCronFailure(supabase, notificationDate, error)
+      }
+    }
     return json(res, error?.status || 500, {
       error: error.message || 'Could not finalize KPI bonuses and send salary notifications',
     })

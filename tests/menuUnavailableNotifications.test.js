@@ -190,7 +190,8 @@ test('08:00 Tashkent cron sends one duplicate-safe active unavailable-product sn
   ))
 
   assert.equal(unavailableCron?.schedule, '0 3 * * *')
-  assert.match(dailyCron, /getCronTask\(req\) === 'unavailable-products'/)
+  assert.match(dailyCron, /cronTask = getCronTask\(req\)/)
+  assert.match(dailyCron, /cronTask === 'unavailable-products'/)
   assert.match(dailyCron, /const businessDate = getTashkentDate\(now\)/)
   assert.match(dailyCron, /sendDailyUnavailableMenuNotification\(supabase, businessDate\)/)
   assert.match(dailyCron, /\.from\('menu_items'\)[\s\S]*?\.eq\('available', false\)[\s\S]*?\.is\('deleted_at', null\)/)
