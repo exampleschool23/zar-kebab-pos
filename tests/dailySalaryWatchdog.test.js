@@ -39,3 +39,9 @@ test('watchdog suppresses duplicate alerts and does not alert for an active run'
   assert.match(dailySalary, /status: 'alert_already_sent'/)
   assert.match(dailySalary, /CRON_FAILURE_ALERT_MARKER/)
 })
+
+test('manual Investor report task sends only the aggregate report from finalized KPI data', () => {
+  assert.match(dailySalary, /cronTask === 'investor-report'/)
+  assert.match(dailySalary, /\.from\('employee_daily_kpi_results'\)[\s\S]*?\.eq\('business_date', notificationDate\)/)
+  assert.match(dailySalary, /sendDailyPayrollGroupNotification\([\s\S]*?notificationDate,[\s\S]*?kpiResults \|\| \[\]/)
+})

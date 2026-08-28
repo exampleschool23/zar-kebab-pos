@@ -1065,6 +1065,19 @@ export default async function handler(req, res) {
     cronAuthorized = true
     cronTask = getCronTask(req)
     supabase = getSupabaseAdmin()
+    if (cronTask === 'investor-report') {
+      const { data: kpiResults, error: kpiResultsError } = await supabase
+        .from('employee_daily_kpi_results')
+        .select('*')
+        .eq('business_date', notificationDate)
+      if (kpiResultsError) throw kpiResultsError
+      const result = await sendDailyPayrollGroupNotification(
+        supabase,
+        notificationDate,
+        kpiResults || []
+      )
+      return json(res, 200, { ok: true, notificationDate, result })
+    }
     if (cronTask === 'unavailable-products') {
       const businessDate = getTashkentDate(now)
       const [watchdogRun, unavailableRun] = await Promise.allSettled([
