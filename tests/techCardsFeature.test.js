@@ -159,6 +159,7 @@ test('saved tech-card cost replaces and locks the current menu real cost only', 
   assert.doesNotMatch(migration, /update public\.order_items|delete from public\.order_items/)
 
   assert.match(db, /cost_source: protectedCosts\?\.cost_source === 'tech_card' \? 'tech_card' : 'manual'/)
+  assert.match(db, /case 'UPDATE_MENU_ITEM':[\s\S]{0,420}cost_source: _costSource,[\s\S]{0,180}\.\.\.fields/)
   assert.match(adminMenu, /const techCardCost = isTechCardMenuItemCost\(form\)/)
   assert.match(adminMenu, /disabled=\{techCardCost\}/)
   assert.match(adminMenu, /techCardCost \? labels\.techCardHint : labels\.hint/)

@@ -1531,6 +1531,8 @@ export async function writeToSupabase(action, state, options = {}) {
         id,
         cost_price: costPrice,
         costPrice: _costPriceAlias,
+        cost_source: _costSource,
+        costSource: _costSourceAlias,
         variant_costs: variantCosts,
         variantCosts: _variantCostsAlias,
         ...fields
