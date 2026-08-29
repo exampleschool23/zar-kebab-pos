@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Search, SlidersHorizontal, UtensilsCrossed } from 'lucide-react'
 import MenuMedia from './MenuMedia'
+import { getMenuItemOptionGroups } from './MenuProductCards'
 import { getCategoryName, getItemName } from '../lib/i18n'
 
 function pickerLabels(lang) {
@@ -152,12 +153,13 @@ export default function MenuItemPicker({
               </div>
               {visibleItems.map(item => {
                 const isSelected = item.id === value
+                const optionGroups = getMenuItemOptionGroups(item, lang, { includeUnavailable: true })
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => selectItem(item.id)}
-                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? 'bg-orange-50 text-[#ff5a00]' : 'text-gray-800 hover:bg-gray-50'}`}
+                    className={`group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? 'bg-orange-50 text-[#ff5a00]' : 'text-gray-800 hover:bg-gray-50'}`}
                   >
                     <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-orange-50">
                       <MenuMedia
@@ -176,8 +178,20 @@ export default function MenuItemPicker({
                           return category ? getCategoryName(category, lang) : l.uncategorized
                         })()}
                       </p>
+                      {optionGroups.length > 0 && (
+                        <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-200 group-hover:mt-1.5 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-visible:mt-1.5 group-focus-visible:grid-rows-[1fr] group-focus-visible:opacity-100">
+                          <div className="min-h-0 overflow-hidden">
+                            {optionGroups.map(group => (
+                              <p key={group.id} className="text-[11px] font-semibold leading-4 text-gray-500">
+                                <span className="font-black text-gray-600">{group.title}:</span>{' '}
+                                {group.options.map(option => option.label).join(', ')}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    {isSelected && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#ff5a00]" />}
+                    {isSelected && <span className="mt-3.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#ff5a00]" />}
                   </button>
                 )
               })}

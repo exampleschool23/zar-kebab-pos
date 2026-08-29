@@ -94,6 +94,10 @@ test('tech card validation requires a positive yield and a complete ingredient',
 
   card.ingredients[0].quantity = '5'
   assert.match(validateTechCard(card), /preparation method/i)
+  assert.equal(
+    validateTechCard(card, [], { preparationMethodRequired: 'Tayyorlash usulini kiriting.' }),
+    'Tayyorlash usulini kiriting.'
+  )
 
   card.preparation_steps = 'Cook slowly.'
   assert.equal(validateTechCard(card), '')

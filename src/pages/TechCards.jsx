@@ -21,10 +21,11 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppDataStatus } from '../store/appHooks'
 import { canEditMenu } from '../lib/permissions'
-import { formatCurrency } from '../lib/formatCurrency'
+import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import { getCategoryName, getItemName } from '../lib/i18n'
 import { isActiveMenuItem } from '../lib/menuItems'
+import { getSaleProfitSummary } from '../lib/profit'
 import { supabase } from '../lib/supabase'
 import {
   TECH_CARD_UNITS,
@@ -51,10 +52,10 @@ function labels(lang) {
     includedItems: 'Kiritilgan menyu taomlari', includedItemsHint: 'Set sotilganda auditda hisoblanadigan tayyor taomlarni va ularning miqdorini tanlang.',
     addIncludedItem: 'Taom qo‘shish', selectIncludedItem: 'Taomni tanlang', noIncludedItems: 'Bu taomda kiritilgan menyu mahsulotlari yo‘q.',
     batch: 'Partiya va porsiya', batchOutput: 'Tayyor mahsulot chiqishi', portions: 'Partiyadagi porsiyalar',
-    method: 'Tayyorlash usuli', methodPlaceholder: 'Tayyorlash bosqichlarini ketma-ket yozing…',
+    method: 'Tayyorlash usuli', methodPlaceholder: 'Tayyorlash bosqichlarini ketma-ket yozing…', preparationMethodRequired: 'Tayyorlash usulini kiriting.',
     notes: 'Ichki izohlar', notesPlaceholder: 'Saqlash, harorat yoki oshpaz uchun boshqa eslatmalar…',
     salePrice: 'Sotuv narxi', savedCost: 'Saqlangan real tannarx', batchCost: 'Partiya tannarxi',
-    portionCost: 'Bir porsiya tannarxi', outputPerPortion: 'Bir porsiya chiqishi', estimatedProfit: 'Taxminiy farq',
+    portionCost: 'Bir porsiya tannarxi', outputPerPortion: 'Bir porsiya chiqishi', estimatedProfit: 'Taxminiy sof foyda',
     save: 'Kartani saqlash', saving: 'Saqlanmoqda…', saved: 'Texnologik karta saqlandi.', back: 'Kartalar ro‘yxatiga',
     readOnly: 'Faqat ko‘rish', editProduct: 'Mahsulotni tahrirlash', productMissing: 'Taom topilmadi',
     productMissingHint: 'Bu mahsulot o‘chirilgan yoki mavjud emas.', unsaved: 'Saqlanmagan karta',
@@ -71,10 +72,10 @@ function labels(lang) {
     includedItems: 'Включённые блюда меню', includedItemsHint: 'Выберите готовые блюда и их количество, которые нужно учитывать при продаже этого сета.',
     addIncludedItem: 'Добавить блюдо', selectIncludedItem: 'Выберите блюдо', noIncludedItems: 'В это блюдо не включены другие позиции меню.',
     batch: 'Партия и порции', batchOutput: 'Выход готового продукта', portions: 'Порций из партии',
-    method: 'Технология приготовления', methodPlaceholder: 'Опишите этапы приготовления по порядку…',
+    method: 'Технология приготовления', methodPlaceholder: 'Опишите этапы приготовления по порядку…', preparationMethodRequired: 'Добавьте технологию приготовления.',
     notes: 'Внутренние примечания', notesPlaceholder: 'Хранение, температура или другие заметки для кухни…',
     salePrice: 'Цена продажи', savedCost: 'Сохранённая себестоимость', batchCost: 'Стоимость партии',
-    portionCost: 'Себестоимость порции', outputPerPortion: 'Выход на порцию', estimatedProfit: 'Расчётная разница',
+    portionCost: 'Себестоимость порции', outputPerPortion: 'Выход на порцию', estimatedProfit: 'Расчётная чистая прибыль',
     save: 'Сохранить техкарту', saving: 'Сохранение…', saved: 'Техкарта сохранена.', back: 'К списку техкарт',
     readOnly: 'Только просмотр', editProduct: 'Редактировать товар', productMissing: 'Блюдо не найдено',
     productMissingHint: 'Товар удалён или больше не существует.', unsaved: 'Техкарта не заполнена',
@@ -91,10 +92,10 @@ function labels(lang) {
     includedItems: 'Included menu items', includedItemsHint: 'Choose the prepared meals and quantities counted when this set is sold.',
     addIncludedItem: 'Add menu item', selectIncludedItem: 'Select a meal', noIncludedItems: 'No other menu items are included in this meal.',
     batch: 'Batch and portions', batchOutput: 'Finished batch output', portions: 'Portions per batch',
-    method: 'Preparation method', methodPlaceholder: 'Write the preparation steps in order…',
+    method: 'Preparation method', methodPlaceholder: 'Write the preparation steps in order…', preparationMethodRequired: 'Add the preparation method.',
     notes: 'Internal notes', notesPlaceholder: 'Storage, temperature, or other kitchen notes…',
     salePrice: 'Selling price', savedCost: 'Saved real cost', batchCost: 'Batch cost',
-    portionCost: 'Cost per portion', outputPerPortion: 'Output per portion', estimatedProfit: 'Estimated difference',
+    portionCost: 'Cost per portion', outputPerPortion: 'Output per portion', estimatedProfit: 'Estimated net profit',
     save: 'Save tech card', saving: 'Saving…', saved: 'Tech card saved.', back: 'Back to tech cards',
     readOnly: 'Read only', editProduct: 'Edit product', productMissing: 'Meal not found',
     productMissingHint: 'This product was archived or no longer exists.', unsaved: 'Tech card not completed',
@@ -322,7 +323,9 @@ export default function TechCards() {
 
   async function saveCard() {
     if (!mayEdit || !form || saving) return
-    const validationError = validateTechCard(form, activeItems)
+    const validationError = validateTechCard(form, activeItems, {
+      preparationMethodRequired: l.preparationMethodRequired,
+    })
     if (validationError) {
       setSaveError(validationError)
       return
@@ -392,9 +395,13 @@ export default function TechCards() {
     const summary = calculateTechCardSummary(form, activeItems)
     const category = categoriesById.get(editorItem.category_id)
     const dirty = techCardFingerprint(form) !== originalFingerprint
-    const validationError = validateTechCard(form, activeItems)
+    const validationError = validateTechCard(form, activeItems, {
+      preparationMethodRequired: l.preparationMethodRequired,
+    })
     const price = Number(editorItem.price || 0)
-    const estimatedDifference = summary.portionCost == null ? null : price - summary.portionCost
+    const estimatedProfit = summary.portionCost == null
+      ? null
+      : getSaleProfitSummary(price, summary.portionCost)
 
     return (
       <AppShell title={`${l.title} · ${getItemName(editorItem, lang)}`}>
@@ -616,9 +623,11 @@ export default function TechCards() {
                         <span className="text-right text-sm font-black tabular-nums text-gray-900">{value}</span>
                       </div>
                     ))}
-                    <div className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${estimatedDifference == null || estimatedDifference >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                    <div className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ${estimatedProfit == null || estimatedProfit.profit >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                       <span className="text-xs font-bold">{l.estimatedProfit}</span>
-                      <span className="text-sm font-black tabular-nums">{estimatedDifference == null ? '—' : formatCurrency(Math.round(estimatedDifference))}</span>
+                      <span className="text-sm font-black tabular-nums">{estimatedProfit == null
+                        ? '—'
+                        : formatCurrencyWithPercentage(estimatedProfit.profit, estimatedProfit.marginPct, lang)}</span>
                     </div>
                   </div>
                 </section>

@@ -148,7 +148,7 @@ export function buildTechCardPayload(card = {}) {
   }
 }
 
-export function validateTechCard(card = {}, menuItems = []) {
+export function validateTechCard(card = {}, menuItems = [], messages = {}) {
   const payload = buildTechCardPayload(card)
   const menuItemById = new Map(menuItems.map(item => [item.id, item]))
   if (!payload.menu_item_id) return 'Menu item is required.'
@@ -179,7 +179,7 @@ export function validateTechCard(card = {}, menuItems = []) {
     if (componentIds.has(component.component_menu_item_id)) return 'The same included menu item cannot be added twice.'
     componentIds.add(component.component_menu_item_id)
   }
-  if (!payload.preparation_steps) return 'Add the preparation method.'
+  if (!payload.preparation_steps) return messages.preparationMethodRequired || 'Add the preparation method.'
   return ''
 }
 

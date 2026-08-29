@@ -78,6 +78,9 @@ test('Tech Card included-item picker is searchable and grouped by menu category'
   assert.match(picker, /getCategoryName/)
   assert.match(picker, /visibleSections/)
   assert.match(picker, /MenuMedia/)
+  assert.match(picker, /getMenuItemOptionGroups\(item, lang, \{ includeUnavailable: true \}\)/)
+  assert.match(picker, /group-hover:grid-rows-\[1fr\]/)
+  assert.match(picker, /group-focus-visible:grid-rows-\[1fr\]/)
   assert.match(picker, /document\.addEventListener\('pointerdown'/)
 })
 
