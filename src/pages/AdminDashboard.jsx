@@ -262,6 +262,15 @@ function localDateStr(d) {
 function todayStr()     { return restaurantTodayStr() }
 function yesterdayStr() { return addRestaurantDays(todayStr(), -1) }
 
+function formatCompactIncome(amount, lang = 'uz') {
+  const locale = lang === 'en' ? 'en-US' : lang === 'ru' ? 'ru-RU' : 'uz-UZ'
+  return new Intl.NumberFormat(locale, {
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 1,
+  }).format(Math.max(0, Math.round(Number(amount) || 0)))
+}
+
 function isOrderInPeriod(order, period) {
   return isOrderInDashboardPeriod(order, period)
 }
@@ -1617,14 +1626,25 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex gap-3 px-2 pt-2">
                   {monthlyIncomeChartRows.map(row => (
-                    <p
+                    <div
                       key={row.monthStart}
-                      className={`min-w-[44px] flex-1 text-center text-[10px] font-bold leading-tight ${
-                        row.isCurrent ? 'text-[#ff5a00]' : 'text-[#718096]'
-                      }`}
+                      className="min-w-[44px] flex-1 text-center leading-tight"
                     >
-                      {row.label}
-                    </p>
+                      <p className={`text-[10px] font-bold ${
+                        row.isCurrent ? 'text-[#ff5a00]' : 'text-[#718096]'
+                      }`}>
+                        {row.label}
+                      </p>
+                      <p className={`mt-1 text-[10px] font-black tabular-nums ${
+                        row.averageDailyIncome <= 0
+                          ? 'text-[#CBD5E1]'
+                          : row.isCurrent
+                          ? 'text-[#ff5a00]'
+                          : 'text-[#0F766E]'
+                      }`}>
+                        {formatCompactIncome(row.averageDailyIncome, lang)}
+                      </p>
+                    </div>
                   ))}
                 </div>
               </div>

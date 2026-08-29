@@ -111,5 +111,6 @@ test('Dashboard monthly chart reads snapshots plus only the live current month a
   assert.match(migration, /grant execute on function public\.get_dashboard_monthly_average_income\(integer\)[\s\S]*to authenticated/i)
   assert.match(dashboard, /loadDashboardMonthlyAverageIncome/)
   assert.match(dashboard, /monthlyIncomeChartRows\.map/)
+  assert.match(dashboard, /formatCompactIncome\(row\.averageDailyIncome, lang\)/)
   assert.match(dashboard, /Average Daily Income by Month/)
 })
