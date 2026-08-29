@@ -37,7 +37,7 @@ Read this guide for dashboard analytics, reports, historical drilldowns, immutab
 - Sales by Category shows every category represented by sold items in the selected period.
 - Best-Selling Dishes shows up to ten ranked sold products and may scroll internally.
 - Never fabricate unsold products or empty categories to fill visual space.
-- Average Daily Income by Month shows the latest 12 calendar months. Completed months come only from immutable `dashboard_monthly_income_snapshots`; the current partial month is the only month aggregated live from orders.
+- Average Daily Income by Month always shows the latest 12 calendar-month positions, suppresses numeric zero labels, and overlays the `business_settings.average_daily_break_even_income_uzs` target as a red dotted horizontal line. Completed actual months come only from immutable `dashboard_monthly_income_snapshots`; the current partial month is the only month aggregated live from orders.
 - Migration `157` performs the one-time completed-history backfill. Its duplicate-safe daily cron finalizes the previous Tashkent month, so normal Dashboard reads never rescan completed order history for this chart.
 - Monthly averages use total paid cafe income divided by all calendar days in a completed month. The current month uses elapsed calendar days through today.
 

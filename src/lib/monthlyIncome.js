@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js'
 
 export const DASHBOARD_MONTHLY_INCOME_MONTH_COUNT = 12
+export const DASHBOARD_DAILY_BREAK_EVEN_INCOME = 10_000_000
 
 function toNonNegativeInteger(value) {
   return Math.max(0, Math.round(Number(value) || 0))
@@ -17,6 +18,12 @@ export function normalizeDashboardMonthlyIncomeRows(rows = []) {
       isFinalized: row?.is_finalized === true,
     }))
     .filter(row => /^\d{4}-\d{2}-01$/.test(row.monthStart))
+    .sort((a, b) => a.monthStart.localeCompare(b.monthStart))
+}
+
+export function buildDashboardMonthlyIncomeChartRows(rows = []) {
+  return [...(rows || [])]
+    .filter(row => /^\d{4}-\d{2}-01$/.test(String(row?.monthStart || '')))
     .sort((a, b) => a.monthStart.localeCompare(b.monthStart))
 }
 

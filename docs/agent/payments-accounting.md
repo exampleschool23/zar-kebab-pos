@@ -41,6 +41,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 - Monthly Estimate is selected-month actuals plus expected salary, rent, and utilities for that month only. Do not add older arrears/liabilities.
 - Calculate salary operating cost per employee so one employee's advance or older-debt payment cannot distort another employee.
 - `business_settings.monthly_utilities_uzs` is the plan; only recorded `utilities` rows are monthly actuals.
+- `business_settings.average_daily_break_even_income_uzs` is the operator-entered Dashboard benchmark; it does not alter Accounting totals.
 
 ## Cash-expense Telegram delivery
 

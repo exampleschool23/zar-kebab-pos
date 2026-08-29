@@ -39,7 +39,11 @@ import AppShell from '../components/AppShell'
 import { inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
 import { loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
-import { loadDashboardMonthlyAverageIncome } from '../lib/monthlyIncome'
+import {
+  buildDashboardMonthlyIncomeChartRows,
+  DASHBOARD_DAILY_BREAK_EVEN_INCOME,
+  loadDashboardMonthlyAverageIncome,
+} from '../lib/monthlyIncome'
 import { getOrdersNetProfit, getSaleProfitSummary } from '../lib/profit'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
@@ -60,9 +64,10 @@ const L = {
     vsYesterday:    'kechaga nisbatan',
     revenueStats:   'Daromad statistikasi',
     monthlyAvgDailyIncome: "Oylar bo'yicha o'rtacha kunlik daromad",
-    monthlyAvgDailyIncomeSub: "Yakunlangan oylar bazadagi saqlangan hisobotdan olinadi; joriy oy jonli hisoblanadi.",
+    monthlyAvgDailyIncomeSub: "Oxirgi 12 oy ko'rsatiladi; nol daromad qiymatlari yashiriladi.",
     savedMonth:     'Saqlangan oy',
     currentMonth:   'Joriy oy',
+    breakEvenIncome: 'Kunlik zararsizlik',
     monthlyIncomeFailed: "Oylik daromad ma'lumotlarini yuklab bo'lmadi",
     retry:          'Qayta urinish',
     today:          'Bugun',
@@ -129,9 +134,10 @@ const L = {
     vsYesterday:    'vs вчера',
     revenueStats:   'Статистика дохода',
     monthlyAvgDailyIncome: 'Средний дневной доход по месяцам',
-    monthlyAvgDailyIncomeSub: 'Завершённые месяцы загружаются из сохранённых итогов; текущий месяц рассчитывается в реальном времени.',
+    monthlyAvgDailyIncomeSub: 'Показаны последние 12 месяцев; нулевые значения дохода скрыты.',
     savedMonth:     'Сохранённый месяц',
     currentMonth:   'Текущий месяц',
+    breakEvenIncome: 'Безубыточность в день',
     monthlyIncomeFailed: 'Не удалось загрузить среднемесячный доход',
     retry:          'Повторить',
     today:          'Сегодня',
@@ -198,9 +204,10 @@ const L = {
     vsYesterday:    'vs yesterday',
     revenueStats:   'Income Statistics',
     monthlyAvgDailyIncome: 'Average Daily Income by Month',
-    monthlyAvgDailyIncomeSub: 'Completed months use saved database summaries; the current month is calculated live.',
+    monthlyAvgDailyIncomeSub: 'The latest 12 months are shown; zero income values are hidden.',
     savedMonth:     'Saved month',
     currentMonth:   'Current month',
+    breakEvenIncome: 'Daily break-even',
     monthlyIncomeFailed: 'Could not load monthly income averages',
     retry:          'Retry',
     today:          'Today',
@@ -1191,13 +1198,23 @@ export default function AdminDashboard() {
   }
 
   const chartMax = Math.max(...chartBars.map(b => b.revenue), 1)
+  const dailyBreakEvenIncome = Math.max(0, Math.round(Number(
+    state.settings?.averageDailyBreakEvenIncomeUzs ?? DASHBOARD_DAILY_BREAK_EVEN_INCOME
+  ) || 0))
   const currentMonthStart = `${todayStr().slice(0, 8)}01`
-  const monthlyIncomeChartRows = monthlyIncomeRows.map(row => ({
+  const monthlyIncomeChartRows = buildDashboardMonthlyIncomeChartRows(monthlyIncomeRows).map(row => ({
     ...row,
     label: formatMonthYear(row.monthStart, lang, row.monthStart),
     isCurrent: row.monthStart === currentMonthStart,
   }))
-  const monthlyIncomeMax = Math.max(...monthlyIncomeChartRows.map(row => row.averageDailyIncome), 1)
+  const monthlyIncomeScaleMax = Math.max(
+    ...monthlyIncomeChartRows.map(row => row.averageDailyIncome),
+    dailyBreakEvenIncome > 0 ? Math.ceil(dailyBreakEvenIncome * 1.2) : 0,
+    1,
+  )
+  const breakEvenLineHeight = dailyBreakEvenIncome > 0
+    ? Math.round((dailyBreakEvenIncome / monthlyIncomeScaleMax) * 100)
+    : 0
   const now      = new Date()
   const lastUpdated = formatReadableDateTime(now)
   const currentKpiPeriodLabel = dashboardPeriodLabel(period, lang)
@@ -1570,6 +1587,12 @@ export default function AdminDashboard() {
                 <span className="h-2.5 w-2.5 rounded-sm bg-[#ff5a00]" />
                 {l.currentMonth}
               </span>
+              {dailyBreakEvenIncome > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-4 border-t-2 border-dotted border-red-500" />
+                  {l.breakEvenIncome}
+                </span>
+              )}
             </div>
           </div>
 
@@ -1592,12 +1615,23 @@ export default function AdminDashboard() {
             <div className="overflow-x-auto pb-1">
               <div className="min-w-[720px]">
                 <div
-                  className="flex h-48 items-end gap-3 border-b border-[#E5E7EB] px-2 pt-7"
+                  className="relative flex h-48 items-end gap-3 border-b border-[#E5E7EB] px-2 pt-7"
                   role="list"
                   aria-label={l.monthlyAvgDailyIncome}
                 >
+                  {dailyBreakEvenIncome > 0 && (
+                    <div
+                      className="pointer-events-none absolute inset-x-2 z-20 border-t-2 border-dotted border-red-500"
+                      style={{ bottom: `${breakEvenLineHeight}%` }}
+                      aria-hidden="true"
+                    >
+                      <span className="absolute bottom-1 right-0 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-black text-red-600 shadow-sm">
+                        {formatCompactIncome(dailyBreakEvenIncome, lang)}
+                      </span>
+                    </div>
+                  )}
                   {monthlyIncomeChartRows.map(row => {
-                    const height = Math.max(3, Math.round((row.averageDailyIncome / monthlyIncomeMax) * 100))
+                    const height = Math.max(3, Math.round((row.averageDailyIncome / monthlyIncomeScaleMax) * 100))
                     return (
                       <div
                         key={row.monthStart}
@@ -1642,7 +1676,7 @@ export default function AdminDashboard() {
                           ? 'text-[#ff5a00]'
                           : 'text-[#0F766E]'
                       }`}>
-                        {formatCompactIncome(row.averageDailyIncome, lang)}
+                        {row.averageDailyIncome > 0 ? formatCompactIncome(row.averageDailyIncome, lang) : ''}
                       </p>
                     </div>
                   ))}

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Store, Percent, Globe, Printer, Bell, Shield, Table2, ChefHat,
-  Check, ChevronRight, Activity, AlertTriangle, RefreshCw, Home, Zap, UtensilsCrossed,
+  Check, ChevronRight, Activity, AlertTriangle, RefreshCw, Home, Zap, UtensilsCrossed, BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -81,6 +81,7 @@ export default function AdminSettings() {
   const [monthlyRentUzs, setMonthlyRentUzs] = useState(String(settings.monthlyRentUzs || ''))
   const [monthlyUtilitiesUzs, setMonthlyUtilitiesUzs] = useState(String(settings.monthlyUtilitiesUzs || ''))
   const [averageDailyEmployeeMealUzs, setAverageDailyEmployeeMealUzs] = useState(String(settings.averageDailyEmployeeMealUzs || ''))
+  const [averageDailyBreakEvenIncomeUzs, setAverageDailyBreakEvenIncomeUzs] = useState(String(settings.averageDailyBreakEvenIncomeUzs || ''))
   const [autoPrint,      setAutoPrint]      = useState(settings.autoPrint)
   const [autoPrintKitchenCheck, setAutoPrintKitchenCheck] = useState(!!settings.autoPrintKitchenCheck)
   const [receiptMarketing, setReceiptMarketing] = useState(settings.receiptMarketing || 'compactFooter')
@@ -99,10 +100,11 @@ export default function AdminSettings() {
     setMonthlyRentUzs(String(settings.monthlyRentUzs || ''))
     setMonthlyUtilitiesUzs(String(settings.monthlyUtilitiesUzs || ''))
     setAverageDailyEmployeeMealUzs(String(settings.averageDailyEmployeeMealUzs || ''))
+    setAverageDailyBreakEvenIncomeUzs(String(settings.averageDailyBreakEvenIncomeUzs || ''))
     setAutoPrint(settings.autoPrint)
     setAutoPrintKitchenCheck(!!settings.autoPrintKitchenCheck)
     setReceiptMarketing(settings.receiptMarketing || 'compactFooter')
-  }, [settings.restaurantName, settings.serviceRate, settings.touristServiceRate, settings.monthlyRentUzs, settings.monthlyUtilitiesUzs, settings.averageDailyEmployeeMealUzs, settings.autoPrint, settings.autoPrintKitchenCheck, settings.receiptMarketing])
+  }, [settings.restaurantName, settings.serviceRate, settings.touristServiceRate, settings.monthlyRentUzs, settings.monthlyUtilitiesUzs, settings.averageDailyEmployeeMealUzs, settings.averageDailyBreakEvenIncomeUzs, settings.autoPrint, settings.autoPrintKitchenCheck, settings.receiptMarketing])
 
   async function saveSettings(overrides = {}) {
     if (!canManageSettings) return { error: new Error('Settings write access is required') }
@@ -115,6 +117,7 @@ export default function AdminSettings() {
       monthlyRentUzs: Number(normalizeMoneyInput(monthlyRentUzs) || 0),
       monthlyUtilitiesUzs: Number(normalizeMoneyInput(monthlyUtilitiesUzs) || 0),
       averageDailyEmployeeMealUzs: Number(normalizeMoneyInput(averageDailyEmployeeMealUzs) || 0),
+      averageDailyBreakEvenIncomeUzs: Number(normalizeMoneyInput(averageDailyBreakEvenIncomeUzs) || 0),
       autoPrint,
       autoPrintKitchenCheck,
       receiptMarketing,
@@ -187,6 +190,8 @@ export default function AdminSettings() {
       monthlyUtilitiesSub: 'Kommunal to‘lovlar oylik taxminiga qo‘shiladi',
       averageDailyEmployeeMeal: 'Xodimlar ovqatining o‘rtacha qiymati',
       averageDailyEmployeeMealSub: 'Har bir ishga kelgan xodim uchun kunlik o‘rtacha qiymat',
+      averageDailyBreakEvenIncome: 'O‘rtacha kunlik zararsizlik daromadi',
+      averageDailyBreakEvenIncomeSub: 'Dashboard grafigidagi qizil nuqtali chiziq uchun kunlik maqsad',
       system:          'Tizim',
       tableManagement: 'Stollar',
       tableManagementSub: 'Restoran stollari, zonalari va sig‘imini boshqarish',
@@ -256,6 +261,8 @@ export default function AdminSettings() {
       monthlyUtilitiesSub: 'Добавляется в месячный прогноз расходов',
       averageDailyEmployeeMeal: 'Среднее питание сотрудников',
       averageDailyEmployeeMealSub: 'Средняя дневная стоимость на каждого присутствующего сотрудника',
+      averageDailyBreakEvenIncome: 'Средний дневной доход безубыточности',
+      averageDailyBreakEvenIncomeSub: 'Дневная цель для красной пунктирной линии на графике Dashboard',
       system:          'Система',
       tableManagement: 'Столы',
       tableManagementSub: 'Управление столами, зонами и вместимостью',
@@ -325,6 +332,8 @@ export default function AdminSettings() {
       monthlyUtilitiesSub: 'Included in the monthly accounting estimate',
       averageDailyEmployeeMeal: 'Avg employees meal',
       averageDailyEmployeeMealSub: 'Average daily cost for each employee who is present',
+      averageDailyBreakEvenIncome: 'Average daily break-even income',
+      averageDailyBreakEvenIncomeSub: 'Daily target used by the red dotted line on the Dashboard chart',
       system:          'System',
       tableManagement: 'Tables',
       tableManagementSub: 'Manage restaurant tables, zones, and capacity',
@@ -480,6 +489,20 @@ export default function AdminSettings() {
                 inputMode="numeric"
                 value={formatMoneyInput(averageDailyEmployeeMealUzs)}
                 onChange={event => setAverageDailyEmployeeMealUzs(normalizeMoneyInput(event.target.value))}
+                disabled={!canManageSettings}
+                className="w-[180px] rounded-xl border border-[#E5E7EB] px-3 py-2 pr-12 text-right text-[13px] font-bold tabular-nums text-[#1F2937] transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]"
+                placeholder="0"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-black text-[#9CA3AF]">UZS</span>
+            </div>
+          </SettingRow>
+          <SettingRow icon={BadgeDollarSign} label={l.averageDailyBreakEvenIncome} sub={l.averageDailyBreakEvenIncomeSub}>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatMoneyInput(averageDailyBreakEvenIncomeUzs)}
+                onChange={event => setAverageDailyBreakEvenIncomeUzs(normalizeMoneyInput(event.target.value))}
                 disabled={!canManageSettings}
                 className="w-[180px] rounded-xl border border-[#E5E7EB] px-3 py-2 pr-12 text-right text-[13px] font-bold tabular-nums text-[#1F2937] transition-all focus:border-[#ff5a00] focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]"
                 placeholder="0"

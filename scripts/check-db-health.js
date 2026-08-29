@@ -153,7 +153,7 @@ const checks = await Promise.all([
   checkTable('orders', 'id, table_id, table_name, status, payment_status, service_rate_pct, order_type, order_number, loyalty_card_number, loyalty_used_amount, cashback_earned, stock_deducted_at'),
   checkTable('order_items', 'id, order_id, menu_item_id, status, quantity, sale_unit, order_type, kitchen_round_id, submitted_at, item_type, is_counter_item, selected_options, cost_price, category_id_snapshot, category_snapshot_captured, tech_card_component_snapshot'),
   checkTable('order_kitchen_rounds', 'order_id, kitchen_round_id, item_ids, table_id, submitted_by, submitted_at, created_at'),
-  checkTable('business_settings', 'id, restaurant_name, service_rate_pct, tourist_service_rate_pct, monthly_rent_uzs, monthly_utilities_uzs, average_daily_employee_meal_uzs, receipt_footer, auto_print, auto_print_kitchen_check'),
+  checkTable('business_settings', 'id, restaurant_name, service_rate_pct, tourist_service_rate_pct, monthly_rent_uzs, monthly_utilities_uzs, average_daily_employee_meal_uzs, average_daily_break_even_income_uzs, receipt_footer, auto_print, auto_print_kitchen_check'),
   checkTable('order_payments', 'id, order_id, method, amount'),
   checkTable('loyalty_cards', 'id, card_number, public_token, customer_name, phone_number, cashback_type, balance, total_earned, total_redeemed, is_active, created_at, updated_at'),
   checkTable('loyalty_transactions', 'id, loyalty_card_id, order_id, type, amount, balance_before, balance_after, reason, created_by, cashback_percent_used, card_type_at_transaction, card_number_at_transaction, customer_name_at_transaction, phone_number_at_transaction, created_at'),

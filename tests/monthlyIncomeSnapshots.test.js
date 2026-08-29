@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 
 import {
+  buildDashboardMonthlyIncomeChartRows,
+  DASHBOARD_DAILY_BREAK_EVEN_INCOME,
   loadDashboardMonthlyAverageIncome,
   normalizeDashboardMonthlyIncomeRows,
 } from '../src/lib/monthlyIncome.js'
@@ -13,6 +15,13 @@ const migration = fs.readFileSync(
 )
 const loader = fs.readFileSync(new URL('../src/lib/monthlyIncome.js', import.meta.url), 'utf8')
 const dashboard = fs.readFileSync(new URL('../src/pages/AdminDashboard.jsx', import.meta.url), 'utf8')
+const settings = fs.readFileSync(new URL('../src/pages/AdminSettings.jsx', import.meta.url), 'utf8')
+const db = fs.readFileSync(new URL('../src/lib/db.js', import.meta.url), 'utf8')
+const defaults = fs.readFileSync(new URL('../src/store/reducerHelpers.js', import.meta.url), 'utf8')
+const breakEvenMigration = fs.readFileSync(
+  new URL('../supabase/158_business_settings_daily_break_even_income.sql', import.meta.url),
+  'utf8'
+)
 
 test('monthly income rows normalize exact-money fields and sort chronologically', () => {
   assert.deepEqual(normalizeDashboardMonthlyIncomeRows([
@@ -80,6 +89,36 @@ test('monthly income loader uses the bounded aggregate RPC rather than order his
   assert.doesNotMatch(loader, /loadPaidOrdersForRange|from\(['"]orders['"]\)/)
 })
 
+test('monthly income chart keeps all 12 calendar positions in chronological order', () => {
+  const rows = [
+    ['2026-05-01', 0],
+    ['2026-06-01', 1_600_000],
+    ['2026-07-01', 3_800_000],
+    ['2026-08-01', 5_600_000],
+  ].map(([monthStart, averageDailyIncome]) => ({ monthStart, averageDailyIncome }))
+
+  const chartRows = buildDashboardMonthlyIncomeChartRows(rows)
+
+  assert.deepEqual(chartRows.map(row => row.monthStart), [
+    '2026-05-01',
+    '2026-06-01',
+    '2026-07-01',
+    '2026-08-01',
+  ])
+  assert.equal(chartRows[0].averageDailyIncome, 0)
+})
+
+test('daily break-even defaults to 10 million UZS and persists through business settings', () => {
+  assert.equal(DASHBOARD_DAILY_BREAK_EVEN_INCOME, 10_000_000)
+  assert.match(settings, /averageDailyBreakEvenIncomeUzs/)
+  assert.match(settings, /formatMoneyInput\(averageDailyBreakEvenIncomeUzs\)/)
+  assert.match(db, /averageDailyBreakEvenIncomeUzs: Math\.max\(0, Math\.round\(Number\(row\.average_daily_break_even_income_uzs \?\? 10_000_000\) \|\| 0\)\)/)
+  assert.match(db, /average_daily_break_even_income_uzs: Math\.max\(0, Math\.round\(Number\(settings\.averageDailyBreakEvenIncomeUzs\) \|\| 0\)\)/)
+  assert.match(defaults, /averageDailyBreakEvenIncomeUzs:\s*10_000_000/)
+  assert.match(breakEvenMigration, /average_daily_break_even_income_uzs bigint not null default 10000000/)
+  assert.doesNotMatch(loader, /loadPaidOrdersForRange|from\(['"]orders['"]\)/)
+})
+
 test('completed Dashboard months are immutable database snapshots with one-time backfill', () => {
   assert.match(migration, /create table if not exists public\.dashboard_monthly_income_snapshots/i)
   assert.match(migration, /month_start\s+date primary key/i)
@@ -110,6 +149,11 @@ test('Dashboard monthly chart reads snapshots plus only the live current month a
   assert.match(migration, /"order"\.paid_at < v_to_instant_exclusive/i)
   assert.match(migration, /grant execute on function public\.get_dashboard_monthly_average_income\(integer\)[\s\S]*to authenticated/i)
   assert.match(dashboard, /loadDashboardMonthlyAverageIncome/)
+  assert.match(dashboard, /buildDashboardMonthlyIncomeChartRows\(monthlyIncomeRows\)/)
+  assert.match(dashboard, /DASHBOARD_DAILY_BREAK_EVEN_INCOME/)
+  assert.match(dashboard, /breakEvenLineHeight/)
+  assert.match(dashboard, /state\.settings\?\.averageDailyBreakEvenIncomeUzs/)
+  assert.match(dashboard, /border-dotted border-red-500/)
   assert.match(dashboard, /monthlyIncomeChartRows\.map/)
   assert.match(dashboard, /formatCompactIncome\(row\.averageDailyIncome, lang\)/)
   assert.match(dashboard, /Average Daily Income by Month/)

@@ -7,7 +7,7 @@ const TABLE_CHECKS = [
   { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity', 'sale_unit', 'base_price', 'unit_price', 'price_mode', 'selected_options', 'cost_price', 'category_id_snapshot', 'category_snapshot_captured', 'tech_card_component_snapshot'] },
   { name: 'order_kitchen_rounds', columns: ['order_id', 'kitchen_round_id', 'item_ids', 'table_id', 'submitted_by', 'submitted_at', 'created_at'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
-  { name: 'business_settings', columns: ['id', 'service_rate_pct', 'tourist_service_rate_pct', 'restaurant_name', 'monthly_rent_uzs', 'monthly_utilities_uzs', 'average_daily_employee_meal_uzs', 'receipt_marketing', 'auto_print', 'auto_print_kitchen_check'] },
+  { name: 'business_settings', columns: ['id', 'service_rate_pct', 'tourist_service_rate_pct', 'restaurant_name', 'monthly_rent_uzs', 'monthly_utilities_uzs', 'average_daily_employee_meal_uzs', 'average_daily_break_even_income_uzs', 'receipt_marketing', 'auto_print', 'auto_print_kitchen_check'] },
   { name: 'loyalty_cards', columns: ['id', 'card_number', 'cashback_type', 'balance', 'total_earned', 'total_redeemed', 'is_active'] },
   { name: 'loyalty_transactions', columns: ['id', 'loyalty_card_id', 'type', 'amount', 'balance_before', 'balance_after', 'cashback_percent_used', 'card_type_at_transaction', 'card_number_at_transaction', 'customer_name_at_transaction', 'phone_number_at_transaction'] },
   { name: 'expenses', columns: ['id', 'entry_type', 'expense_date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'created_by_name'] },
@@ -52,7 +52,7 @@ const TABLE_CHECKS = [
 
 const MIGRATION_HINTS = {
   order_payments: 'Run supabase/012_split_order_payments.sql',
-  business_settings: 'Run supabase/011_business_settings.sql, supabase/073_business_settings_monthly_rent.sql, supabase/074_receipt_marketing_setting.sql, supabase/081_auto_print_kitchen_check_setting.sql, supabase/126_business_settings_monthly_utilities.sql, supabase/130_tourist_service_rate.sql, and supabase/141_average_daily_employee_meal.sql',
+  business_settings: 'Run business settings migrations through supabase/158_business_settings_daily_break_even_income.sql',
   table_zones: 'Run supabase/019_table_management.sql',
   loyalty_cards: 'Run supabase/022_loyalty_cashback_wallet.sql and supabase/061_loyalty_special_card.sql',
   loyalty_transactions: 'Run supabase/022_loyalty_cashback_wallet.sql, supabase/051_remove_loyalty_cards_preserve_history.sql, and supabase/061_loyalty_special_card.sql',

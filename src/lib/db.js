@@ -141,6 +141,16 @@ function isMissingTouristServiceRateColumn(error) {
   )
 }
 
+function isMissingDailyBreakEvenIncomeColumn(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('average_daily_break_even_income_uzs') && (
+    message.includes('schema cache') ||
+    message.includes('column') ||
+    message.includes('42703') ||
+    message.includes('pgrst204')
+  )
+}
+
 function normalizeVariantCosts(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return Object.fromEntries(Object.entries(value).flatMap(([variantId, rawCost]) => {
@@ -213,6 +223,7 @@ function normalizeBusinessSettings(row) {
     monthlyRentUzs: Math.max(0, Math.round(Number(row.monthly_rent_uzs) || 0)),
     monthlyUtilitiesUzs: Math.max(0, Math.round(Number(row.monthly_utilities_uzs) || 0)),
     averageDailyEmployeeMealUzs: Math.max(0, Math.round(Number(row.average_daily_employee_meal_uzs) || 0)),
+    averageDailyBreakEvenIncomeUzs: Math.max(0, Math.round(Number(row.average_daily_break_even_income_uzs ?? 10_000_000) || 0)),
     receiptFooter: row.receipt_footer || '',
     receiptMarketing: normalizeReceiptMarketing(row.receipt_marketing),
     autoPrint: !!row.auto_print,
@@ -1422,6 +1433,7 @@ export async function writeToSupabase(action, state, options = {}) {
         monthly_rent_uzs: Math.max(0, Math.round(Number(settings.monthlyRentUzs) || 0)),
         monthly_utilities_uzs: Math.max(0, Math.round(Number(settings.monthlyUtilitiesUzs) || 0)),
         average_daily_employee_meal_uzs: Math.max(0, Math.round(Number(settings.averageDailyEmployeeMealUzs) || 0)),
+        average_daily_break_even_income_uzs: Math.max(0, Math.round(Number(settings.averageDailyBreakEvenIncomeUzs) || 0)),
         receipt_footer: settings.receiptFooter || '',
         receipt_marketing: normalizeReceiptMarketing(settings.receiptMarketing),
         auto_print: !!settings.autoPrint,
@@ -1431,8 +1443,16 @@ export async function writeToSupabase(action, state, options = {}) {
       let { error } = await supabase
         .from('business_settings')
         .upsert(settingsRow)
+      let compatibleSettingsRow = settingsRow
+      if (error && isMissingDailyBreakEvenIncomeColumn(error)) {
+        const { average_daily_break_even_income_uzs, ...legacySettingsRow } = compatibleSettingsRow
+        compatibleSettingsRow = legacySettingsRow
+        ;({ error } = await supabase
+          .from('business_settings')
+          .upsert(compatibleSettingsRow))
+      }
       if (error && isMissingTouristServiceRateColumn(error)) {
-        const { tourist_service_rate_pct, ...legacySettingsRow } = settingsRow
+        const { tourist_service_rate_pct, ...legacySettingsRow } = compatibleSettingsRow
         ;({ error } = await supabase
           .from('business_settings')
           .upsert(legacySettingsRow))

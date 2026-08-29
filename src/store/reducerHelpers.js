@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = {
   monthlyRentUzs: 0,
   monthlyUtilitiesUzs: 0,
   averageDailyEmployeeMealUzs: 0,
+  averageDailyBreakEvenIncomeUzs: 10_000_000,
   receiptFooter:  '',
   receiptMarketing: 'compactFooter',
   autoPrint:      false,
