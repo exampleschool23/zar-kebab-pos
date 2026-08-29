@@ -2,6 +2,14 @@
 
 Read this guide for the Telegram Mini App, bot/API endpoints, notification targets, message formats, retries, and scheduled delivery.
 
+## Entry points
+
+- Customer surface and browser integration: `src/pages/TelegramMiniApp.jsx`, `src/lib/telegramWebApp.js`
+- Notification client and server endpoints: `src/lib/telegramNotifications.js`, `api/telegram/`
+- Shared server delivery logic: `api/telegram/_lib/`
+- Bot polling fallback: `bots/telegram-bot.js`
+- Focused tests: `tests/telegramOrderStatus.test.js`, `tests/telegramSalaryMessages.test.js`, `tests/telegramDeliveryRetry.test.js`, `tests/telegramDailyBazaar.test.js`, `tests/telegramInvestorExpense.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
+
 ## Customer Mini App
 
 - The Telegram Mini App is a read-only customer menu.

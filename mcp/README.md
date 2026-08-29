@@ -15,6 +15,11 @@ outside this repository; credentials still should never be committed to source.
 5. `{"op":"read","id":"<returned-id>"}` — bounded source with line numbers.
 6. `{"op":"refs","id":"<returned-id>"}` — bounded references.
 
+For an exact symbol or filename already known to the agent, direct `rg` plus a
+narrow source read is cheaper. Use `repo_nav` for unfamiliar tasks and feature
+discovery; do not use it as an extra step before a known lookup. Archived
+`docs/agent/legacy-context.md` is deliberately excluded from the live index.
+
 All list operations return columnar JSON (`cols` plus `rows`) and an opaque
 `next` cursor when truncated. Guide rows use `landmark`, `command`, and `rule`
 kinds. Continue with only `op` and `cursor`. Default responses are 2.5–6 KB;
@@ -29,11 +34,13 @@ Codex restarts in this trusted repository. It can also be started manually:
 ```bash
 npm run mcp:nav
 npm run mcp:benchmark
+npm run docs:check
 ```
 
 Use `/mcp` in Codex to confirm that `zarkebab_nav` and `repo_nav` are enabled.
 
-The benchmark starts from natural task phrases and verifies that each query
+The benchmark starts from representative natural task phrases across the main
+project domains and verifies that each query
 reaches and reads required implementation markers. It reports a character-based
 token proxy against both a broad whole-file workflow and an ideal targeted-search
 workflow. The latter is included so the result does not imply that MCP JSON is

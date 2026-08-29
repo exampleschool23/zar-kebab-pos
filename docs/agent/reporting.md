@@ -2,6 +2,13 @@
 
 Read this guide for dashboard analytics, reports, historical drilldowns, immutable snapshots, date ranges, profit, and monthly/all-accounting views.
 
+## Entry points
+
+- UI: `src/pages/AdminDashboard.jsx`, `src/pages/Reports.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`
+- Shared logic: `src/lib/dashboardAnalytics.js`, `src/lib/dishSales.js`, `src/lib/profit.js`, `src/lib/orderHistory.js`, `src/lib/accountingSummary.js`, `src/lib/closeout.js`
+- Historical snapshot schema: migrations `114`, `147`, and related aggregate RPC migrations
+- Focused tests: `tests/dashboardAnalytics.test.js`, `tests/dishSales.test.js`, `tests/profit.test.js`, `tests/orderHistory.test.js`, `tests/financialHistorySnapshots.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
+
 ## Loader boundaries
 
 - Initial POS hydration contains active orders plus today's paid operational subset only. It is never a source for historical reports or Accounting ranges.

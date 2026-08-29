@@ -2,6 +2,14 @@
 
 Read this guide for SQL migrations, schema compatibility, database health, regression tests, source guards, and deployment verification.
 
+## Entry points
+
+- Database client and health inventory: `src/lib/db.js`, `src/lib/dbHealth.js`
+- Migration runner and health commands: `supabase/migrate.js`, `scripts/check-db-health.js`
+- SQL migrations: `supabase/`
+- Navigator implementation and checks: `mcp/`, `tests/repoNavigatorMcp.test.js`, `scripts/benchmark-repo-nav.js`
+- Source guards: `tests/sourceGuards.*.test.js`
+
 ## Database workflow
 
 - Run migrations in numeric order. Production should have all migrations applied even when `src/lib/db.js` has rolling-deployment fallbacks.
@@ -14,8 +22,9 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - salary/Telegram tracking and historical financial freezing: `107`–`119`
   - menu permissions, estimates, archival, stale-item rejection: `121`–`127`
   - KPI and Tourist service: `129`–`130`
-  - Tech Cards and access: `139`–`140`
+  - Tech Cards, access, components, stock, and variant recipes: `139`–`140`, `149`–`151`, `154`–`156`
   - menu/expense notifications and financial snapshots: `142`–`147`
+  - absence notification cleanup and daily-report cron: `148`, `152`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants
@@ -36,7 +45,7 @@ Tests use Node's built-in runner. Main coverage areas:
 - `tests/profit.test.js`: cost snapshots, missing legacy coverage, cancellation, net profit.
 - `tests/bazaar.test.js`: exact money, quantities, filters, analytics.
 - `tests/salaryTransactions.test.js`: salary ledger and deterministic history ordering.
-- `tests/sourceGuards.test.js`: source-level protection for regressions that reached users.
+- `tests/sourceGuards.*.test.js`: domain-split source-level protection for regressions that reached users.
 
 Run the smallest relevant test while iterating, then normally run:
 
@@ -44,6 +53,8 @@ Run the smallest relevant test while iterating, then normally run:
 npm test
 npm run build
 ```
+
+For changes to `AGENTS.md`, focused guides, the repository navigator/map, or source-guard organization, also run `npm run docs:check` and `npm run mcp:benchmark`.
 
 ## Source-guard policy
 

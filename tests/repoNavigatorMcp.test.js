@@ -309,6 +309,20 @@ test('excludes local dot directories and common credential files', async (t) => 
   }
 })
 
+test('excludes archived legacy agent context from repository search', async (t) => {
+  const root = await fixture(t)
+  await fs.mkdir(path.join(root, 'docs', 'agent'), { recursive: true })
+  await fs.writeFile(path.join(root, 'docs', 'agent', 'legacy-context.md'), 'obsolete-agent-marker')
+  const navigator = new RepoNavigator(root)
+
+  const output = await navigator.run({ op: 'find', q: 'obsolete-agent-marker' })
+  assert.equal(output.rows.length, 0)
+  await assert.rejects(
+    () => navigator.run({ op: 'read', path: 'docs/agent/legacy-context.md' }),
+    /Indexed text file not found/,
+  )
+})
+
 test('bounds tiny queries, total index bytes, and cursor-only list continuation', async (t) => {
   const root = await fixture(t)
   const navigator = new RepoNavigator(root)
@@ -343,7 +357,7 @@ test('keeps every curated project-map path valid', async () => {
   }
 
   const navigator = new RepoNavigator(projectRoot)
-  const guide = await navigator.run({ op: 'guide' })
+  const guide = await navigator.run({ op: 'guide', max_chars: 16_000 })
   const landmarks = guide.rows.filter((row) => row[1] === 'landmark')
   assert.equal(landmarks.length, map.landmarks.length)
   assert.equal(guide.rows.filter((row) => row[1] === 'command').length, map.commands.length)
@@ -363,6 +377,13 @@ test('resolves curated task phrases directly to implementation declarations', as
     ['large menu editor', 'src/pages/AdminMenu.jsx', 'AdminMenu'],
     ['sent cart snapshot removal', 'src/lib/analytics.js', 'removeSentCartItems'],
     ['stable profile synchronization', 'src/App.jsx', 'ProfileSync'],
+    ['salary liability without advance netting', 'src/lib/expenses.js', 'getTotalSalaryDue'],
+    ['variant tech card payload', 'src/lib/techCards.js', 'buildTechCardPayload'],
+    ['daily bazaar idempotent retry', 'src/lib/bazaar.js', 'getBazaarSubmissionAttempt'],
+    ['historical order profit', 'src/lib/profit.js', 'getOrderNetProfit'],
+    ['guest mode pin verification', 'src/lib/guestMode.js', 'verifyGuestModePin'],
+    ['telegram order status notification', 'src/lib/telegramNotifications.js', 'notifyTelegramOrderStatus'],
+    ['daily salary cron', 'api/telegram/daily-salary.js', 'handler'],
   ]
   for (const [query, expectedPath, expectedLabel] of expectations) {
     const output = await navigator.run({ op: 'find', q: query, limit: 8 })
@@ -385,9 +406,9 @@ test('paginates the compact guide without dropping landmarks, commands, or guard
     cursors.add(output.next)
     request = { op: 'guide', cursor: output.next, max_chars: 500, limit: 50 }
   }
-  assert.equal(kinds.filter((kind) => kind === 'landmark').length, 8)
+  assert.equal(kinds.filter((kind) => kind === 'landmark').length, 9)
   assert.equal(kinds.filter((kind) => kind === 'command').length, 4)
-  assert.equal(kinds.filter((kind) => kind === 'rule').length, 6)
+  assert.equal(kinds.filter((kind) => kind === 'rule').length, 8)
 })
 
 test('tool manifest and every operation retain hard token-proxy limits', async () => {

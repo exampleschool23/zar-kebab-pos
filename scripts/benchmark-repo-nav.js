@@ -36,7 +36,49 @@ const cases = [
     task: 'stable profile synchronization', markerQuery: 'ProfileSync',
     expected: { path: 'src/App.jsx', kind: 'function', label: 'ProfileSync' },
     needles: ["type: 'LOGIN'", 'profile?.id'],
-    baseline: ['tests/sourceGuards.test.js', 'src/App.jsx', 'src/store/AppContext.jsx'],
+    baseline: ['tests/sourceGuards.architecture.test.js', 'src/App.jsx', 'src/store/AppContext.jsx'],
+  },
+  {
+    task: 'salary liability without advance netting', markerQuery: 'getTotalSalaryDue',
+    expected: { path: 'src/lib/expenses.js', kind: 'function', label: 'getTotalSalaryDue' },
+    needles: ['getSalaryDue', 'reduce'],
+    baseline: ['src/lib/expenses.js', 'src/pages/Salaries.jsx', 'tests/expenses.test.js', 'tests/salaryAccrual.test.js'],
+  },
+  {
+    task: 'variant tech card payload', markerQuery: 'buildTechCardPayload',
+    expected: { path: 'src/lib/techCards.js', kind: 'function', label: 'buildTechCardPayload' },
+    needles: ['variant_option_id', 'selected_options'],
+    baseline: ['src/lib/techCards.js', 'src/pages/TechCards.jsx', 'supabase/156_variant_tech_cards.sql', 'tests/techCards.test.js'],
+  },
+  {
+    task: 'daily bazaar idempotent retry', markerQuery: 'getBazaarSubmissionAttempt',
+    expected: { path: 'src/lib/bazaar.js', kind: 'function', label: 'getBazaarSubmissionAttempt' },
+    needles: ['fingerprint', 'requestKey'],
+    baseline: ['src/lib/bazaar.js', 'src/pages/DailyBazaar.jsx', 'tests/bazaar.test.js', 'tests/bazaarMigration.test.js'],
+  },
+  {
+    task: 'historical order profit', markerQuery: 'getOrderNetProfit',
+    expected: { path: 'src/lib/profit.js', kind: 'function', label: 'getOrderNetProfit' },
+    needles: ['getOrderRevenueTotal', 'getOrderCostTotal'],
+    baseline: ['src/lib/profit.js', 'src/pages/Reports.jsx', 'tests/profit.test.js', 'tests/financialHistorySnapshots.test.js'],
+  },
+  {
+    task: 'guest mode pin verification', markerQuery: 'verifyGuestModePin',
+    expected: { path: 'src/lib/guestMode.js', kind: 'function', label: 'verifyGuestModePin' },
+    needles: ['derivePinDigest', 'mismatch'],
+    baseline: ['src/lib/guestMode.js', 'src/components/GuestModeUI.jsx', 'tests/guestMode.test.js', 'tests/guestAutoSubmit.test.js'],
+  },
+  {
+    task: 'telegram order status notification', markerQuery: 'notifyTelegramOrderStatus',
+    expected: { path: 'src/lib/telegramNotifications.js', kind: 'function', label: 'notifyTelegramOrderStatus' },
+    needles: ['/api/telegram/order-status', 'NOTIFIABLE_STATUSES'],
+    baseline: ['src/lib/telegramNotifications.js', 'api/telegram/order-status.js', 'tests/telegramOrderStatus.test.js'],
+  },
+  {
+    task: 'daily salary cron', markerQuery: 'handler',
+    expected: { path: 'api/telegram/daily-salary.js', kind: 'function', label: 'handler' },
+    needles: ['requireCronSecret', 'loadKpiCatchUpDates'],
+    baseline: ['api/telegram/daily-salary.js', 'api/telegram/_lib/salaryMessages.js', 'tests/dailyKpiBonuses.test.js', 'tests/dailySalaryWatchdog.test.js'],
   },
 ]
 

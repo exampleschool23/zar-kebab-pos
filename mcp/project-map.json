@@ -1,6 +1,6 @@
 {
   "name": "Zar Kebab POS",
-  "summary": "Vite React 18 POS backed by Supabase. Covers public menus, waiter ordering, cashier payment, admin, accounting, reporting, loyalty, and Telegram flows.",
+  "summary": "Vite React 18 POS backed by Supabase. Covers public menus, waiter ordering, cashier payment, admin, accounting, reporting, payroll, loyalty, Tech Cards, and Telegram flows.",
   "commands": [
     "npm run dev",
     "npm test",
@@ -8,6 +8,7 @@
     "npm run db:health"
   ],
   "landmarks": [
+    ["agent guide", "AGENTS.md", "task routing, global invariants, and validation contract"],
     ["routes", "src/App.jsx", "host-aware routes and access guards"],
     ["auth", "src/contexts/AuthContext.jsx", "Supabase sessions, OAuth, and profiles"],
     ["state", "src/store/AppContext.jsx", "hydration, realtime, and DB dispatch policy"],
@@ -15,7 +16,7 @@
     ["money", "src/lib/analytics.js", "authoritative payment and service math"],
     ["dates", "src/lib/dateFormat.js", "Asia/Tashkent date boundaries"],
     ["schema", "src/lib/dbHealth.js", "schema inventory plus ordered SQL migration hints"],
-    ["tests", "tests/sourceGuards.test.js", "Node test runner regression guard index"]
+    ["source guards", "tests/sourceGuards.architecture.test.js", "domain-split source regression guards"]
   ],
   "tasks": [
     {
@@ -47,64 +48,132 @@
       "aliases": ["profile sync login loop", "stable auth profile dispatch"],
       "path": "src/App.jsx",
       "symbol": "ProfileSync"
+    },
+    {
+      "name": "salary liability without advance netting",
+      "aliases": ["total salary due", "employee advances and salary liability"],
+      "path": "src/lib/expenses.js",
+      "symbol": "getTotalSalaryDue"
+    },
+    {
+      "name": "variant tech card payload",
+      "aliases": ["variant recipe save", "tech card variant identity"],
+      "path": "src/lib/techCards.js",
+      "symbol": "buildTechCardPayload"
+    },
+    {
+      "name": "daily bazaar idempotent retry",
+      "aliases": ["bazaar submission request key", "daily bazaar unknown outcome"],
+      "path": "src/lib/bazaar.js",
+      "symbol": "getBazaarSubmissionAttempt"
+    },
+    {
+      "name": "historical order profit",
+      "aliases": ["paid order cost snapshot profit", "order net profit"],
+      "path": "src/lib/profit.js",
+      "symbol": "getOrderNetProfit"
+    },
+    {
+      "name": "guest mode pin verification",
+      "aliases": ["staff access guest cart", "guest session pin"],
+      "path": "src/lib/guestMode.js",
+      "symbol": "verifyGuestModePin"
+    },
+    {
+      "name": "telegram order status notification",
+      "aliases": ["notify telegram order status", "completed order telegram"],
+      "path": "src/lib/telegramNotifications.js",
+      "symbol": "notifyTelegramOrderStatus"
+    },
+    {
+      "name": "daily salary cron",
+      "aliases": ["payroll cron", "daily KPI salary delivery", "salary watchdog"],
+      "path": "api/telegram/daily-salary.js",
+      "symbol": "handler"
     }
   ],
   "features": [
     {
-      "name": "accounting",
-      "keywords": ["expense", "income", "salary", "estimate", "report", "dashboard"],
-      "files": ["src/pages/Expenses.jsx", "src/pages/AccountingHistory.jsx", "src/pages/MonthlyEstimate.jsx", "src/pages/Reports.jsx", "src/lib/accounting.js", "src/lib/expenses.js", "src/lib/orderHistory.js", "src/lib/monthlyEstimate.js"],
-      "tests": ["tests/accountingPages.test.js", "tests/orderHistory.test.js", "tests/salaryAccrual.test.js", "tests/monthlyEstimate.test.js", "tests/dashboardAnalytics.test.js"]
-    },
-    {
-      "name": "payments",
-      "keywords": ["cashier", "bill", "payment", "service", "split", "loyalty"],
-      "files": ["src/pages/CashierBill.jsx", "src/pages/Receipt.jsx", "src/lib/analytics.js", "src/lib/cashierBills.js", "src/lib/loyalty.js", "src/lib/db.js"],
-      "tests": ["tests/orderPayment.test.js", "tests/cashierPaymentFixes.test.js", "tests/atomicPaymentSettlement.test.js"]
+      "name": "architecture-auth-realtime",
+      "keywords": ["startup", "login", "oauth", "profile", "route", "role", "permission", "realtime", "hydration"],
+      "files": ["src/App.jsx", "src/contexts/AuthContext.jsx", "src/store/AppContext.jsx", "src/store/appHooks.js", "src/lib/permissions.js", "src/lib/profileLoading.js", "src/lib/db.js"],
+      "tests": ["tests/permissions.test.js", "tests/profileLoading.test.js", "tests/dbRealtime.test.js", "tests/sourceGuards.architecture.test.js"]
     },
     {
       "name": "waiter-kitchen",
-      "keywords": ["cart", "waiter", "kitchen", "submit", "order", "table"],
-      "files": ["src/pages/WaiterTables.jsx", "src/pages/WaiterOrder.jsx", "src/components/CartPanel.jsx", "src/store/AppContext.jsx", "src/store/ordersReducer.js", "src/store/cartReducer.js", "src/lib/db.js"],
-      "tests": ["tests/operationalFlows.test.js", "tests/kitchenCheck.test.js", "tests/writeTimeout.test.js", "tests/dbRealtime.test.js"]
+      "keywords": ["cart", "waiter", "kitchen", "submit", "order", "round", "table", "reservation"],
+      "files": ["src/pages/WaiterTables.jsx", "src/pages/WaiterOrder.jsx", "src/pages/KitchenCheckReceipt.jsx", "src/components/CartPanel.jsx", "src/store/ordersReducer.js", "src/store/cartReducer.js", "src/lib/kitchenCheck.js", "src/lib/db.js"],
+      "tests": ["tests/operationalFlows.test.js", "tests/kitchenCheck.test.js", "tests/kitchenSubmissionRecovery.test.js", "tests/kitchenSubmissionReducer.test.js", "tests/priceModes.test.js", "tests/writeTimeout.test.js", "tests/sourceGuards.ordering.test.js"]
     },
     {
-      "name": "menu",
-      "keywords": ["dish", "category", "variant", "price", "currency", "image", "nutrition"],
-      "files": ["src/pages/AdminMenu.jsx", "src/pages/PublicMenu.jsx", "src/components/MenuProductCards.jsx", "src/lib/menuItems.js", "src/lib/menuPricing.js", "src/lib/menuCurrency.js", "src/store/menuReducer.js"],
-      "tests": ["tests/menuItems.test.js", "tests/menuPricing.test.js", "tests/menuCurrency.test.js", "tests/menuReorder.test.js", "tests/nutrition.test.js"]
+      "name": "menu-media-inventory",
+      "keywords": ["dish", "category", "variant", "price", "currency", "image", "video", "nutrition", "stock", "availability", "archive"],
+      "files": ["src/pages/AdminMenu.jsx", "src/pages/PublicMenu.jsx", "src/pages/TelegramMiniApp.jsx", "src/components/MenuProductCards.jsx", "src/lib/menuItems.js", "src/lib/menuPricing.js", "src/lib/menuMedia.js", "src/store/menuReducer.js", "api/menu-image/upload.js"],
+      "tests": ["tests/menuItems.test.js", "tests/menuArchiveSafety.test.js", "tests/menuMedia.test.js", "tests/menuPricing.test.js", "tests/menuStock.test.js", "tests/nutrition.test.js", "tests/sourceGuards.menu.test.js", "tests/sourceGuards.public-menu.test.js"]
     },
     {
-      "name": "auth-access",
-      "keywords": ["login", "oauth", "google", "role", "permission", "profile", "redirect"],
-      "files": ["src/App.jsx", "src/contexts/AuthContext.jsx", "src/pages/AuthCallback.jsx", "src/pages/Login.jsx", "src/lib/permissions.js", "src/components/UnifiedSidebar.jsx"],
-      "tests": ["tests/permissions.test.js", "tests/rlsPolicyGuards.test.js", "tests/dbHealth.test.js"]
+      "name": "tech-cards",
+      "keywords": ["recipe", "ingredient", "component", "portion", "real cost", "variant recipe"],
+      "files": ["src/pages/TechCards.jsx", "src/lib/techCards.js", "src/lib/menuItemCosts.js", "src/lib/db.js", "supabase/156_variant_tech_cards.sql"],
+      "tests": ["tests/techCards.test.js", "tests/techCardsFeature.test.js", "tests/menuItemCosts.test.js", "tests/sourceGuards.menu.test.js"]
+    },
+    {
+      "name": "payments-cashier",
+      "keywords": ["cashier", "bill", "payment", "service", "split", "settlement", "receipt", "loyalty"],
+      "files": ["src/pages/CashierBill.jsx", "src/pages/CashierTables.jsx", "src/pages/Receipt.jsx", "src/lib/analytics.js", "src/lib/cashierCheckout.js", "src/lib/cashierBills.js", "src/lib/loyalty.js", "src/lib/db.js"],
+      "tests": ["tests/orderPayment.test.js", "tests/cashierCheckout.test.js", "tests/cashierPaymentFixes.test.js", "tests/atomicPaymentSettlement.test.js", "tests/loyaltyCards.test.js", "tests/sourceGuards.payments-reporting.test.js"]
+    },
+    {
+      "name": "accounting-bazaar",
+      "keywords": ["expense", "income", "estimate", "accounting", "bazaar", "supplier", "cashflow"],
+      "files": ["src/pages/Expenses.jsx", "src/pages/AccountingHistory.jsx", "src/pages/MonthlyEstimate.jsx", "src/pages/DailyBazaar.jsx", "src/lib/accounting.js", "src/lib/expenses.js", "src/lib/monthlyEstimate.js", "src/lib/bazaar.js"],
+      "tests": ["tests/accountingPages.test.js", "tests/accountingSummary.test.js", "tests/expenses.test.js", "tests/monthlyEstimate.test.js", "tests/bazaar.test.js", "tests/bazaarMigration.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
+    },
+    {
+      "name": "payroll-kpi-meals",
+      "keywords": ["employee", "salary", "bonus", "fine", "absence", "advance", "KPI", "meal", "payroll"],
+      "files": ["src/pages/Salaries.jsx", "src/pages/Employees.jsx", "src/pages/EmployeeSalaryHistory.jsx", "src/lib/salaryTransactions.js", "src/lib/salaryHistory.js", "src/lib/dailyKpi.js", "src/lib/expenses.js", "api/telegram/daily-salary.js"],
+      "tests": ["tests/salaryTransactions.test.js", "tests/salaryHistory.test.js", "tests/salaryAccrual.test.js", "tests/dailyKpiBonuses.test.js", "tests/dailySalaryWatchdog.test.js", "tests/telegramSalaryMessages.test.js"]
+    },
+    {
+      "name": "reporting-history",
+      "keywords": ["dashboard", "report", "profit", "history", "snapshot", "date range", "closeout", "dish sales"],
+      "files": ["src/pages/AdminDashboard.jsx", "src/pages/Reports.jsx", "src/lib/dashboardAnalytics.js", "src/lib/dishSales.js", "src/lib/profit.js", "src/lib/orderHistory.js", "src/lib/accountingSummary.js", "src/lib/closeout.js"],
+      "tests": ["tests/dashboardAnalytics.test.js", "tests/dishSales.test.js", "tests/profit.test.js", "tests/orderHistory.test.js", "tests/financialHistorySnapshots.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
+    },
+    {
+      "name": "telegram-delivery",
+      "keywords": ["bot", "mini app", "telegram", "notification", "delivery", "retry", "cron", "investor", "salary group", "team"],
+      "files": ["src/pages/TelegramMiniApp.jsx", "src/lib/telegramWebApp.js", "src/lib/telegramNotifications.js", "api/telegram/employee-notification.js", "api/telegram/daily-salary.js", "api/telegram/webhook.js", "bots/telegram-bot.js"],
+      "tests": ["tests/telegramOrderStatus.test.js", "tests/telegramSalaryMessages.test.js", "tests/telegramDeliveryRetry.test.js", "tests/telegramDailyBazaar.test.js", "tests/telegramInvestorExpense.test.js", "tests/dailySalaryWatchdog.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
+    },
+    {
+      "name": "guest-mode",
+      "keywords": ["guest", "staff access", "PIN", "session", "reviewed cart", "auto submit"],
+      "files": ["src/components/GuestModeUI.jsx", "src/hooks/useGuestModeSession.js", "src/lib/guestMode.js", "src/lib/guestCart.js", "src/pages/WaiterOrder.jsx"],
+      "tests": ["tests/guestMode.test.js", "tests/guestCart.test.js", "tests/guestAutoSubmit.test.js", "tests/sourceGuards.architecture.test.js"]
     },
     {
       "name": "tables",
-      "keywords": ["reservation", "zone", "occupied", "available", "table"],
-      "files": ["src/pages/WaiterTables.jsx", "src/pages/AdminTables.jsx", "src/lib/tableManagement.js", "src/lib/tableActivity.js"],
-      "tests": ["tests/tableManagement.test.js", "tests/tableActivity.test.js", "tests/operationalFlows.test.js"]
+      "keywords": ["reservation", "zone", "occupied", "available", "disabled", "table"],
+      "files": ["src/pages/WaiterTables.jsx", "src/pages/AdminTables.jsx", "src/lib/tableManagement.js", "src/lib/tableActivity.js", "src/lib/tableZoneColors.js"],
+      "tests": ["tests/tableManagement.test.js", "tests/tableActivity.test.js", "tests/tableZoneColors.test.js", "tests/operationalFlows.test.js", "tests/sourceGuards.ordering.test.js"]
     },
     {
-      "name": "loyalty",
-      "keywords": ["card", "cashback", "discount", "wallet", "redeem"],
-      "files": ["src/pages/AdminLoyalty.jsx", "src/pages/CashierBill.jsx", "src/pages/Receipt.jsx", "src/lib/loyalty.js"],
-      "tests": ["tests/loyaltyCards.test.js", "tests/orderPayment.test.js", "tests/monthlyEstimate.test.js"]
-    },
-    {
-      "name": "telegram",
-      "keywords": ["bot", "mini app", "telegram", "customer order"],
-      "files": ["src/pages/TelegramMiniApp.jsx", "src/lib/telegramWebApp.js", "src/lib/telegramNotifications.js", "bots/telegram-bot.js"],
-      "tests": ["tests/telegramOrderStatus.test.js"]
+      "name": "database-migrations-verification",
+      "keywords": ["migration", "schema", "RPC", "RLS", "health", "source guard", "deployment"],
+      "files": ["src/lib/db.js", "src/lib/dbHealth.js", "supabase/migrate.js", "scripts/check-db-health.js", "mcp/repo-navigator.js"],
+      "tests": ["tests/dbHealth.test.js", "tests/rlsPolicyGuards.test.js", "tests/repoNavigatorMcp.test.js", "tests/sourceGuards.architecture.test.js"]
     }
   ],
   "rules": [
+    "Read AGENTS.md, then only the focused domain guide required by the task.",
+    "Use exact rg for known symbols; use repo_nav for unfamiliar task discovery.",
     "Use analytics.js helpers for all order, service, loyalty, and revenue totals.",
     "Use paid_at and Asia/Tashkent boundaries for paid-order reporting ranges.",
     "Keep AppContext dbDispatch stable; ProfileSync dependencies stay field-based.",
     "Kitchen submission removes only the sent cart snapshot and rejects paid orders.",
     "Apply Supabase migrations in filename order; duplicate numeric prefixes exist.",
-    "Run npm test and npm run build after changes."
+    "Update the focused guide and project map when a documented contract changes."
   ]
 }

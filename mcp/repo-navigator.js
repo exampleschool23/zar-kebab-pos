@@ -11,6 +11,7 @@ const EXCLUDED_DIRS = new Set([
   '.git', '.next', '.turbo', '.vercel', 'coverage', 'dist', 'migration-reports',
   'node_modules', 'playwright-report', 'test-results',
 ])
+const EXCLUDED_FILES = new Set(['docs/agent/legacy-context.md'])
 
 const ALLOWED_DOT_DIRS = new Set(['.github'])
 const SECRET_NAME = /(^|\/)(?:\.env(?:\.|$)|(?:(?:auth|token|credentials?|service[-_]?account|api[-_]?key|secrets?)(?:[-_.][^/]*)?|client[-_]?secret(?:[-_.][^/]*)?|firebase[-_]?adminsdk(?:[-_.][^/]*)?|serviceaccountkey)\.(?:json|toml|ya?ml|txt)$|.*(?:private[-_]?key).*)/i
@@ -434,7 +435,7 @@ export class RepoNavigator {
         }
         continue
       }
-      if (!entry.isFile() || SECRET_NAME.test(relativePath) || KEY_EXTENSION.test(entry.name)) continue
+      if (!entry.isFile() || EXCLUDED_FILES.has(relativePath) || SECRET_NAME.test(relativePath) || KEY_EXTENSION.test(entry.name)) continue
       const extension = path.extname(entry.name).toLowerCase()
       if (!TEXT_EXTENSIONS.has(extension)) continue
       const absolutePath = path.join(directory, entry.name)

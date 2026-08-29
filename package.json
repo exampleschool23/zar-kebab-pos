@@ -12,6 +12,7 @@
     "cleanup:test-operations": "node scripts/cleanup-test-operations.js",
     "mcp:nav": "node mcp/server.js",
     "mcp:benchmark": "node scripts/benchmark-repo-nav.js",
+    "docs:check": "node --test tests/agentDocs.test.js tests/repoNavigatorMcp.test.js",
     "test": "node --test",
     "build": "vite build",
     "preview": "vite preview"

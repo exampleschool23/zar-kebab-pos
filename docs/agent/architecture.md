@@ -2,6 +2,14 @@
 
 Read this guide for app startup, authentication, routes, permissions, shared state, hydration, and realtime work.
 
+## Entry points
+
+- Routes and host boundaries: `src/App.jsx`
+- Authentication and profile loading: `src/contexts/AuthContext.jsx`, `src/lib/profileLoading.js`
+- Shared state and selectors: `src/store/AppContext.jsx`, `src/store/appHooks.js`, `src/store/`
+- Permissions and database orchestration: `src/lib/permissions.js`, `src/lib/db.js`
+- Focused tests: `tests/permissions.test.js`, `tests/profileLoading.test.js`, `tests/dbRealtime.test.js`, `tests/sourceGuards.architecture.test.js`
+
 ## Routes and access
 
 - Public routes: `/menu`, `/telegram`, authentication and password-reset routes.

@@ -2,6 +2,14 @@
 
 Read this guide for salary profiles, payments, bonuses, fines, absences, advances, effective-dated KPI rules, daily payroll, and average employee meals.
 
+## Entry points
+
+- UI: `src/pages/Salaries.jsx`, `src/pages/Employees.jsx`, `src/pages/EmployeeSalaryHistory.jsx`
+- Shared logic: `src/lib/salaryTransactions.js`, `src/lib/salaryHistory.js`, `src/lib/dailyKpi.js`, `src/lib/teamProfiles.js`, `src/lib/expenses.js`
+- Notifications and scheduled finalization: `api/telegram/employee-notification.js`, `api/telegram/daily-salary.js`
+- Schema: migrations `099`, `107`–`119`, `124`–`129`, `136`, `141`, and `148`
+- Focused tests: `tests/salaryTransactions.test.js`, `tests/salaryHistory.test.js`, `tests/dailyKpiBonuses.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/telegramSalaryMessages.test.js`
+
 ## Salary ledger
 
 - Keep payment, bonus, fine, absence, and salary-rate changes as distinct operation types.

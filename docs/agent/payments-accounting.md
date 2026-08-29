@@ -2,6 +2,13 @@
 
 Read this guide for cashier settlement, split payments, service fees, Accounting overview/history, cash expenses, monthly estimates, and Daily Bazaar.
 
+## Entry points
+
+- UI: `src/pages/CashierBill.jsx`, `src/pages/Receipt.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`, `src/pages/MonthlyEstimate.jsx`, `src/pages/DailyBazaar.jsx`
+- Shared logic: `src/lib/analytics.js`, `src/lib/cashierCheckout.js`, `src/lib/accounting.js`, `src/lib/accountingSummary.js`, `src/lib/expenses.js`, `src/lib/monthlyEstimate.js`, `src/lib/bazaar.js`
+- Database boundaries: `src/lib/db.js`, migrations `083`, `090`, `097`, `109`, and `135`
+- Focused tests: `tests/orderPayment.test.js`, `tests/atomicPaymentSettlement.test.js`, `tests/cashierCheckout.test.js`, `tests/accountingPages.test.js`, `tests/monthlyEstimate.test.js`, `tests/bazaar.test.js`, `tests/sourceGuards.payments-reporting.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
+
 ## Payment and service math
 
 - Use `normalizeServiceRatePct()`, `getOrderPaymentSummary()`, and `getOrderPaymentFields()` from `src/lib/analytics.js`; do not hand-roll totals in pages.

@@ -27,6 +27,13 @@ npm run db:health
 
 Use `npm run db:health` first for endless loading or missing migration/RPC warnings.
 
+For repository navigation:
+
+- If the symbol or filename is known, use `rg` and read only the matching range.
+- For an unfamiliar feature, use `repo_nav` to find the feature map, declarations, and focused tests before opening source.
+- Do not begin by reading an entire large page, `src/lib/db.js`, or a complete source-guard suite.
+- `README.md` is an operator/deployment runbook. Read it only for Telegram setup or deployment work.
+
 ## Read only the relevant guide
 
 Before editing a feature, read its guide completely. Read more than one only when the task genuinely crosses those boundaries.
@@ -66,3 +73,5 @@ npm run build
 ```
 
 The known Vite large-chunk warning is not a build failure. Protected pages require an authenticated profile for browser verification.
+
+When a change alters a documented invariant, route, RPC contract, historical-data rule, or focused test path, update the corresponding `docs/agent/` guide and `mcp/project-map.json` in the same change.

@@ -2,6 +2,13 @@
 
 Read this guide for menu products/categories, availability and visibility, media, prices/costs, inventory, archival, preparation estimates, and Tech Cards.
 
+## Entry points
+
+- Editors and customer surfaces: `src/pages/AdminMenu.jsx`, `src/pages/TechCards.jsx`, `src/pages/PublicMenu.jsx`, `src/pages/TelegramMiniApp.jsx`
+- Shared menu and recipe logic: `src/lib/menuItems.js`, `src/lib/menuPricing.js`, `src/lib/menuMedia.js`, `src/lib/menuItemCosts.js`, `src/lib/techCards.js`
+- Database writes and schema: `src/lib/db.js`, migrations `139`, `149`–`151`, and `154`–`156`
+- Focused tests: `tests/menuItems.test.js`, `tests/menuArchiveSafety.test.js`, `tests/menuStock.test.js`, `tests/menuMedia.test.js`, `tests/techCards.test.js`, `tests/techCardsFeature.test.js`, `tests/sourceGuards.menu.test.js`, `tests/sourceGuards.public-menu.test.js`
+
 ## Visibility and availability
 
 - `menu_items.available` affects waiter orderability only. Public and Telegram menus still show active unavailable meals.
@@ -47,11 +54,13 @@ Read this guide for menu products/categories, availability and visibility, media
 
 ## Tech Cards
 
-- One active product may have one protected recipe with ordered ingredient rows. Batch ingredient cost divided by `portion_count` is the current portion cost.
+- One active product may have one protected base recipe and one recipe per eligible variant. The empty `variant_option_id` identifies the backward-compatible base recipe.
+- Ingredient rows and included-product component rows belong to the exact product-and-variant recipe. Batch ingredient cost divided by `portion_count`, plus per-portion component cost, is the current portion cost.
 - Save the card and complete ingredient list atomically with `save_menu_item_tech_card(payload jsonb)`.
 - `tech_cards` permission controls route/read access; Manage Menu separately controls writes.
 - Ingredient prices and protected recipes never enter public, Telegram-menu, waiter, cashier, order, or receipt payloads.
-- Saving a recipe synchronizes its calculated portion cost into protected catalog cost for future sales. Existing order-item cost snapshots remain untouched.
+- Saving a base recipe synchronizes the protected parent cost; saving a variant recipe synchronizes that option in protected `variant_costs`. Existing order-item cost snapshots remain untouched.
+- Variant recipes may be copied and quantity-scaled, but the destination variant identity and its sellable portion count remain explicit.
 - Structured components may choose a product variant through `selected_options`; empty means the base product.
 - Variant calculation uses protected variant cost with protected parent-cost fallback. Changing parent selection clears stale options.
 - Copy chosen options into immutable `order_items.tech_card_component_snapshot`; payment deducts included parent/variant stock once.

@@ -2,7 +2,12 @@
 
 Read this guide for waiter tables, table entry, carts, price modes, reservations, kitchen submission, kitchen rounds, and kitchen checks.
 
-Main files include `src/pages/WaiterTables.jsx`, `src/pages/WaiterOrder.jsx`, `src/components/CartPanel.jsx`, `src/store/cartReducer.js`, `src/store/ordersReducer.js`, `src/lib/db.js`, and the kitchen submission migrations.
+## Entry points
+
+- Waiter and kitchen UI: `src/pages/WaiterTables.jsx`, `src/pages/WaiterOrder.jsx`, `src/pages/KitchenCheckReceipt.jsx`, `src/components/CartPanel.jsx`
+- State and shared logic: `src/store/cartReducer.js`, `src/store/ordersReducer.js`, `src/lib/kitchenCheck.js`, `src/lib/tableActivity.js`, `src/lib/priceModes.js`
+- Database orchestration: `src/lib/db.js`, kitchen migrations `096`, `127`, and `128`
+- Focused tests: `tests/operationalFlows.test.js`, `tests/kitchenCheck.test.js`, `tests/kitchenSubmissionRecovery.test.js`, `tests/kitchenSubmissionReducer.test.js`, `tests/priceModes.test.js`, `tests/writeTimeout.test.js`, `tests/sourceGuards.ordering.test.js`
 
 ## Table entry and price mode
 
