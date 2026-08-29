@@ -201,7 +201,7 @@ function SummaryTile({ label, value, icon: Icon, tone = 'orange' }) {
 }
 
 export default function TechCards() {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const { menuItemId } = useParams()
@@ -337,8 +337,13 @@ export default function TechCards() {
     try {
       const { error } = await supabase.rpc('save_menu_item_tech_card', { payload })
       if (error) throw error
+      const savedCost = Math.max(0, Math.round(calculateTechCardSummary(form, activeItems).portionCost || 0))
       const savedCard = normalizeTechCard({ ...payload, updated_at: new Date().toISOString() })
       setCardsByItemId(current => ({ ...current, [payload.menu_item_id]: savedCard }))
+      dispatch({
+        type: 'SET_MENU_ITEM_COST',
+        payload: { id: payload.menu_item_id, cost_price: savedCost, cost_source: 'tech_card' },
+      })
       setForm(savedCard)
       setOriginalFingerprint(techCardFingerprint(savedCard))
       setSaveNotice(l.saved)
@@ -536,7 +541,11 @@ export default function TechCards() {
                               items={activeItems.filter(item => item.id !== editorItem.id)}
                               categories={state.categories}
                               value={component.component_menu_item_id}
-                              onChange={itemId => updateComponent(index, { component_menu_item_id: itemId })}
+                              selectedOptions={component.selected_options}
+                              onChange={(itemId, selectedOptions) => updateComponent(index, {
+                                component_menu_item_id: itemId,
+                                selected_options: selectedOptions,
+                              })}
                               lang={lang}
                               disabled={!mayEdit || saving}
                             />

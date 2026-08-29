@@ -18,11 +18,26 @@ export function menuReducer(state, action) {
     case 'SET_MENU_ITEMS':
       return { ...state, menuItems: action.payload }
 
+    case 'SET_MENU_ITEM_COST':
+      return {
+        ...state,
+        menuItems: state.menuItems.map(item => item.id === action.payload.id
+          ? {
+              ...item,
+              cost_price: action.payload.cost_price,
+              cost_source: action.payload.cost_source,
+            }
+          : item),
+      }
+
     case 'ADD_MENU_ITEM': {
       const maxItemOrder = state.menuItems.length > 0
         ? Math.max(...state.menuItems.map(i => i.sort_order ?? 0))
         : 0
-      return { ...state, menuItems: [...state.menuItems, { sort_order: maxItemOrder + 1, ...action.payload }] }
+      return {
+        ...state,
+        menuItems: [...state.menuItems, { sort_order: maxItemOrder + 1, cost_source: 'manual', ...action.payload }],
+      }
     }
 
     case 'UPDATE_MENU_ITEM':
@@ -30,7 +45,11 @@ export function menuReducer(state, action) {
         ...state,
         menuItems: state.menuItems.map(i =>
           i.id === action.payload.id
-            ? { ...action.payload, external_id: i.external_id || action.payload.external_id || '' }
+            ? {
+                ...action.payload,
+                external_id: i.external_id || action.payload.external_id || '',
+                cost_source: i.cost_source || action.payload.cost_source || 'manual',
+              }
             : i
         ),
       }

@@ -43,7 +43,7 @@ import {
   canViewPage, normalizeRole,
 } from '../lib/permissions'
 import { getSaleProfitSummary } from '../lib/profit'
-import { getRequiredMenuItemCost, hasRequiredMenuItemCost } from '../lib/menuItemCosts'
+import { getRequiredMenuItemCost, hasRequiredMenuItemCost, isTechCardMenuItemCost } from '../lib/menuItemCosts'
 import {
   getMenuItemMediaUrls,
   isMenuVideoUrl,
@@ -247,6 +247,7 @@ function ProfitMarginPreview({ price, cost, lang, inheritedCost = false }) {
 
 function PricingFields({ form, setF, lang, compact = false, costRequired = false }) {
   const priceUnit = menuPriceUnitSuffix(form.sale_unit, lang)
+  const techCardCost = isTechCardMenuItemCost(form)
   const labels = lang === 'uz'
     ? {
         title: 'Narx va foyda',
@@ -255,6 +256,7 @@ function PricingFields({ form, setF, lang, compact = false, costRequired = false
         old: 'Eski narx',
         cost: 'Haqiqiy tannarx',
         hint: 'Tannarx faqat sof foydani hisoblash uchun ishlatiladi. Menyu, buyurtma va cheklarda ko‘rsatilmaydi.',
+        techCardHint: 'Bu tannarx texnologik kartadan hisoblangan. Uni o‘zgartirish uchun texnologik kartani tahrirlang.',
         required: 'Yangi mahsulot uchun haqiqiy tannarx majburiy.',
       }
     : lang === 'ru'
@@ -265,6 +267,7 @@ function PricingFields({ form, setF, lang, compact = false, costRequired = false
           old: 'Старая цена',
           cost: 'Реальная себестоимость',
           hint: 'Себестоимость используется только для расчёта чистой прибыли. Она не показывается в меню, заказах и чеках.',
+          techCardHint: 'Эта себестоимость рассчитана по техкарте. Чтобы изменить её, отредактируйте техкарту.',
           required: 'Для нового товара реальная себестоимость обязательна.',
         }
       : {
@@ -274,6 +277,7 @@ function PricingFields({ form, setF, lang, compact = false, costRequired = false
           old: 'Old price',
           cost: 'Real cost',
           hint: 'Cost is used only to calculate net profit. It is never shown in menus, orders, or receipts.',
+          techCardHint: 'This cost is calculated from the tech card. Edit the tech card to change it.',
           required: 'Real cost is required for every new product.',
         }
   const missingRequiredCost = costRequired && !hasRequiredMenuItemCost(form.cost_price)
@@ -300,12 +304,13 @@ function PricingFields({ form, setF, lang, compact = false, costRequired = false
           onChange={setF('cost_price')}
           placeholder="18000"
           required={costRequired}
+          disabled={techCardCost}
           aria-required={costRequired}
           aria-invalid={missingRequiredCost}
-          className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm font-semibold tabular-nums outline-none transition-all ${
+          className={`w-full rounded-xl border px-3 py-2.5 text-sm font-semibold tabular-nums outline-none transition-all disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-500 ${
             missingRequiredCost
               ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-              : 'border-emerald-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+              : 'border-emerald-300 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
           }`}
           labelClassName={`mb-1.5 block text-xs font-bold ${missingRequiredCost ? 'text-red-700' : 'text-emerald-800'}`}
         />
@@ -318,7 +323,9 @@ function PricingFields({ form, setF, lang, compact = false, costRequired = false
       <div className="mt-3">
         <ProfitMarginPreview price={form.price} cost={form.cost_price} lang={lang} />
       </div>
-      <p className="mt-3 text-[11px] font-semibold leading-5 text-emerald-800/75">{labels.hint}</p>
+      <p className="mt-3 text-[11px] font-semibold leading-5 text-emerald-800/75">
+        {techCardCost ? labels.techCardHint : labels.hint}
+      </p>
     </div>
   )
 }
@@ -1197,7 +1204,7 @@ const blankItem = {
   id: '', category_id: '',
   name_uz: '', name_ru: '', name_en: '',
   description_uz: '', description_ru: '', description_en: '',
-  external_id: '', price: '', old_price: '', cost_price: '', variant_costs: {}, sale_unit: MENU_SALE_UNIT_PIECE, grams: '', millilitres: '', kcal: '', stock_count: '', estimated_prep_minutes: DEFAULT_MENU_PREP_MINUTES, image_url: '', media_urls: [], available: true, sort_order: '',
+  external_id: '', price: '', old_price: '', cost_price: '', cost_source: 'manual', variant_costs: {}, sale_unit: MENU_SALE_UNIT_PIECE, grams: '', millilitres: '', kcal: '', stock_count: '', estimated_prep_minutes: DEFAULT_MENU_PREP_MINUTES, image_url: '', media_urls: [], available: true, sort_order: '',
   option_groups: [],
   option_groups_editor: [],
   show_in_cashier_quick_items: false,
@@ -2022,6 +2029,7 @@ export default function AdminMenu() {
       const {
         option_groups_editor: _optionGroupsEditor,
         option_groups: _optionGroups,
+        cost_source: _costSource,
         waiter_hidden: _legacyWaiterHidden,
         ...formFields
       } = form

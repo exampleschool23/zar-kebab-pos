@@ -1735,7 +1735,7 @@ test('AdminMenu product editor formats price inputs while storing digits', () =>
   assert.match(pricingFields, /<MoneyField label=\{`\$\{labels\.old\} \(UZS\)`\} value=\{form\.old_price\} onChange=\{setF\('old_price'\)\}/)
   assert.match(pricingFields, /label=\{`\$\{labels\.cost\} \(UZS\$\{priceUnit\}\)\$\{costRequired \? ' \*' : ''\}`\}[\s\S]*value=\{form\.cost_price\}[\s\S]*onChange=\{setF\('cost_price'\)\}/)
   assert.match(pricingFields, /\{labels\.private\}/)
-  assert.match(pricingFields, /\{labels\.hint\}/)
+  assert.match(pricingFields, /techCardCost \? labels\.techCardHint : labels\.hint/)
   assert.match(adminMenu, /<PricingFields form=\{form\} setF=\{setF\} lang=\{lang\}/)
   assert.match(optionEditor, /<MoneyField[\s\S]*label=\{labels\.price\}[\s\S]*updateOption\(optionIndex, \{ price: event\.target\.value \}\)/)
   assert.match(optionEditor, /xl:grid-cols-\[minmax\(0,1fr\)_auto\]/)

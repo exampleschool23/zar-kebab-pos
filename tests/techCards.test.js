@@ -46,6 +46,25 @@ test('included menu items add their protected real cost to every set portion', (
   assert.deepEqual(summary.components.map(component => component.lineCost), [4_000, 40_000, null])
 })
 
+test('included menu item variants use their protected variant cost and otherwise fall back to the parent cost', () => {
+  const menuItem = {
+    id: 'bread-1',
+    cost_price: 8_000,
+    variant_costs: { half: 4_000 },
+    option_groups: [{ id: 'variants', options: [{ id: 'whole' }, { id: 'half' }] }],
+  }
+  const summary = calculateTechCardSummary({
+    portion_count: 1,
+    components: [
+      { component_menu_item_id: 'bread-1', selected_options: { variants: 'half' }, quantity: 1 },
+      { component_menu_item_id: 'bread-1', selected_options: { variants: 'whole' }, quantity: 1 },
+    ],
+  }, [menuItem])
+
+  assert.deepEqual(summary.components.map(component => component.unitCost), [4_000, 8_000])
+  assert.equal(summary.portionCost, 12_000)
+})
+
 test('included menu item cost is unavailable instead of silently treated as zero', () => {
   const card = {
     menu_item_id: 'set-1',
@@ -113,13 +132,33 @@ test('tech card normalizes and validates included menu items for sets', () => {
 
   const payload = buildTechCardPayload(card)
   assert.deepEqual(payload.components, [
-    { component_menu_item_id: 'kebab-1', quantity: 10, sort_order: 1 },
-    { component_menu_item_id: 'bread-1', quantity: 2.5, sort_order: 2 },
+    { component_menu_item_id: 'kebab-1', selected_options: {}, quantity: 10, sort_order: 1 },
+    { component_menu_item_id: 'bread-1', selected_options: {}, quantity: 2.5, sort_order: 2 },
   ])
   assert.equal(validateTechCard(card), '')
 
   card.components.push({ component_menu_item_id: 'kebab-1', quantity: 1 })
   assert.match(validateTechCard(card), /same included menu item/i)
+})
+
+test('tech card payload preserves a selected included-item variant', () => {
+  const payload = buildTechCardPayload({
+    menu_item_id: 'set-1',
+    portion_count: 1,
+    preparation_steps: 'Assemble.',
+    components: [{
+      component_menu_item_id: 'bread-1',
+      selected_options: { variants: 'half' },
+      quantity: 2,
+    }],
+  })
+
+  assert.deepEqual(payload.components[0], {
+    component_menu_item_id: 'bread-1',
+    selected_options: { variants: 'half' },
+    quantity: 2,
+    sort_order: 1,
+  })
 })
 
 test('piece-based included items require whole stock quantities', () => {

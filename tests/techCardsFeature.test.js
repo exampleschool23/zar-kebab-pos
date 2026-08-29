@@ -71,6 +71,21 @@ test('set composition is structured, cycle-safe, and snapshotted onto new order 
   assert.doesNotMatch(page, /<select[\s\S]{0,300}component\.component_menu_item_id/)
 })
 
+test('Tech Card components persist selected variants for cost, snapshots, and stock', () => {
+  const migration = source('supabase/154_tech_card_component_variants.sql')
+  const helpers = source('src/lib/techCards.js')
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.match(migration, /add column if not exists selected_options jsonb not null/)
+  assert.match(migration, /unique \(menu_item_id, component_menu_item_id, selected_options\)/)
+  assert.match(migration, /'selected_options', component\.selected_options/)
+  assert.match(migration, /component_selected_options := coalesce\(component -> 'selected_options'/)
+  assert.match(migration, /decrement_selected_variant_stock\([\s\S]*component -> 'selected_options'/)
+  assert.match(helpers, /getTechCardComponentUnitCost/)
+  assert.match(helpers, /variant_costs/)
+  assert.match(page, /selectedOptions=\{component\.selected_options\}/)
+})
+
 test('Tech Card included-item picker is searchable and grouped by menu category', () => {
   const picker = source('src/components/MenuItemPicker.jsx')
 
@@ -80,7 +95,8 @@ test('Tech Card included-item picker is searchable and grouped by menu category'
   assert.match(picker, /MenuMedia/)
   assert.match(picker, /getMenuItemOptionGroups\(item, lang, \{ includeUnavailable: true \}\)/)
   assert.match(picker, /group-hover:grid-rows-\[1fr\]/)
-  assert.match(picker, /group-focus-visible:grid-rows-\[1fr\]/)
+  assert.match(picker, /group-focus-within:grid-rows-\[1fr\]/)
+  assert.match(picker, /selectItem\(item\.id, \{ \[group\.id\]: option\.id \}\)/)
   assert.match(picker, /document\.addEventListener\('pointerdown'/)
 })
 
@@ -97,17 +113,44 @@ test('menu product editor links directly to its tech card', () => {
   assert.match(adminMenu, /navigate\(`\/admin\/tech-cards\/\$\{encodeURIComponent\(form\.id\)\}`\)/)
 })
 
+test('saved tech-card cost replaces and locks the current menu real cost only', () => {
+  const migration = source('supabase/155_tech_card_real_costs.sql')
+  const adminMenu = source('src/pages/AdminMenu.jsx')
+  const techCards = source('src/pages/TechCards.jsx')
+  const db = source('src/lib/db.js')
+
+  assert.match(migration, /add column if not exists cost_source text not null default 'manual'/)
+  assert.match(migration, /calculate_menu_item_tech_card_real_cost/)
+  assert.match(migration, /ingredient\.quantity \* ingredient\.unit_price_uzs/)
+  assert.match(migration, /ingredient_batch_cost \/ target_portion_count/)
+  assert.match(migration, /jsonb_each_text\(component\.selected_options\)/)
+  assert.match(migration, /item_cost\.variant_costs \? selected\.value/)
+  assert.match(migration, /order by selected\.key/)
+  assert.match(migration, /item_cost\.cost_price::numeric/)
+  assert.match(migration, /new\.cost_source := 'tech_card'/)
+  assert.match(migration, /new\.cost_source := 'manual'/)
+  assert.match(migration, /set cost_source = 'manual'[\s\S]{0,220}not exists/)
+  assert.match(migration, /sync_menu_item_tech_card_real_costs/)
+  assert.doesNotMatch(migration, /update public\.order_items|delete from public\.order_items/)
+
+  assert.match(db, /cost_source: protectedCosts\?\.cost_source === 'tech_card' \? 'tech_card' : 'manual'/)
+  assert.match(adminMenu, /const techCardCost = isTechCardMenuItemCost\(form\)/)
+  assert.match(adminMenu, /disabled=\{techCardCost\}/)
+  assert.match(adminMenu, /techCardCost \? labels\.techCardHint : labels\.hint/)
+  assert.match(techCards, /cost_source: 'tech_card'/)
+})
+
 test('database health requires the tech-card schema and atomic save RPC', () => {
   const health = source('src/lib/dbHealth.js')
   const cli = source('scripts/check-db-health.js')
 
   assert.match(health, /name: 'menu_item_tech_cards'/)
   assert.match(health, /name: 'menu_item_tech_card_ingredients'/)
-  assert.match(health, /name: 'menu_item_tech_card_components'/)
+  assert.match(health, /name: 'menu_item_tech_card_components'[\s\S]{0,220}'selected_options'/)
   assert.match(health, /tech_card_component_snapshot/)
   assert.match(health, /checkRpc\(dbClient, 'save_menu_item_tech_card'\)/)
   assert.match(cli, /checkTable\('menu_item_tech_cards'/)
-  assert.match(cli, /checkTable\('menu_item_tech_card_components'/)
+  assert.match(cli, /checkTable\('menu_item_tech_card_components'[\s\S]{0,160}selected_options/)
   assert.match(cli, /tech_card_component_snapshot/)
   assert.match(cli, /save_menu_item_tech_card\(payload\)/)
 })

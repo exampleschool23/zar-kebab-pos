@@ -360,7 +360,8 @@ These bugs were recently fixed and are now protected by tests:
    - Tech-card edits use `save_menu_item_tech_card(payload jsonb)` so the card and full ingredient list save atomically.
    - The `tech_cards` page feature controls drawer, route, and protected recipe reads. Manage Menu separately controls recipe writes, so Tech Cards access without Manage Menu is read-only.
    - Tech-card ingredient prices are staff-only; they must never appear in public, Telegram, waiter, cashier, order, or receipt catalog payloads.
-   - A recipe edit must never rewrite `order_items.cost_price`, paid-order profit, or any historical report. The protected catalog `menu_item_costs` value remains separate unless an explicit future product decision links them.
+   - Saving a tech card makes its calculated per-portion cost the protected catalog `menu_item_costs` value for future sales. The Admin Menu shows that cost as read-only until the tech card is removed; products without a tech card keep their manually editable real cost.
+   - A recipe edit must never rewrite `order_items.cost_price`, paid-order profit, or any historical report. Only future order-item cost snapshots use the newly synchronized tech-card cost.
 
 45. Average employee meals are attendance-based calculated operating costs.
    - `business_settings.average_daily_employee_meal_uzs` is the average daily amount for each present employee, not a one-time restaurant total.
@@ -398,6 +399,13 @@ These bugs were recently fixed and are now protected by tests:
    - When submitted items exist, the empty cart area says there are no new items and invites the waiter to add the next batch.
    - Submitted kitchen rounds remain visible while the waiter builds another cart batch. Each round has a stable `Order 1`, `Order 2`, and so on heading plus its own kitchen-check action.
    - Derive round numbering from the complete chronologically sorted `getKitchenCheckGroups()` result before filtering item controls. A served or otherwise non-editable earlier round must not cause later rounds to be renumbered.
+
+50. Structured Tech Card components may target a specific product variant.
+   - `menu_item_tech_card_components.selected_options` stores the chosen option ids; an empty object means the parent/base product.
+   - The current Tech Card calculation uses the protected selected-variant cost from `menu_item_costs.variant_costs`, falling back to the protected parent cost when that variant has no dedicated cost.
+   - The picker must make variants selectable, show the selected variant in the collapsed field, and clear an old variant choice when a different parent product is selected.
+   - The selected options are copied into the immutable `order_items.tech_card_component_snapshot`. Paying the order deducts the included parent product and its selected variant stock exactly once.
+   - The same parent product may appear more than once only when each row targets a different variant; exact duplicate parent-and-variant rows remain invalid.
 
 ## Database Migrations
 

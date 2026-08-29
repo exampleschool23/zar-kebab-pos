@@ -36,8 +36,51 @@ export function createBlankTechCardIngredient() {
 export function createBlankTechCardComponent() {
   return {
     component_menu_item_id: '',
+    selected_options: {},
     quantity: '1',
   }
+}
+
+function normalizeSelectedOptions(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(Object.entries(value).flatMap(([groupId, optionId]) => {
+    const normalizedGroupId = String(groupId || '').trim()
+    const normalizedOptionId = String(optionId || '').trim()
+    return normalizedGroupId && normalizedOptionId ? [[normalizedGroupId, normalizedOptionId]] : []
+  }))
+}
+
+function parseOptionGroups(value) {
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string') return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function getVariantCosts(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return value
+}
+
+export function getTechCardComponentUnitCost(menuItem, selectedOptions = {}) {
+  const normalizedSelections = normalizeSelectedOptions(selectedOptions)
+  const variantCosts = getVariantCosts(menuItem?.variant_costs)
+  for (const optionId of Object.values(normalizedSelections)) {
+    if (Object.prototype.hasOwnProperty.call(variantCosts, optionId)) {
+      const variantCost = variantCosts[optionId]
+      if (variantCost !== null && variantCost !== '' && Number.isFinite(Number(variantCost))) {
+        return Math.max(0, Number(variantCost))
+      }
+    }
+  }
+  const parentCost = menuItem?.cost_price
+  return parentCost !== null && parentCost !== undefined && parentCost !== '' && Number.isFinite(Number(parentCost))
+    ? Math.max(0, Number(parentCost))
+    : null
 }
 
 export function normalizeTechCard(card = {}) {
@@ -59,6 +102,7 @@ export function normalizeTechCard(card = {}) {
     components: (card.components || []).map(component => ({
       id: component.id || null,
       component_menu_item_id: String(component.component_menu_item_id || ''),
+      selected_options: normalizeSelectedOptions(component.selected_options),
       quantity: String(component.quantity ?? '1'),
     })),
   }
@@ -80,9 +124,8 @@ export function calculateTechCardSummary(card = {}, menuItems = []) {
   const components = (card.components || []).map(component => {
     const quantity = normalizeTechCardNumber(component.quantity)
     const menuItem = menuItemById.get(component.component_menu_item_id)
-    const rawCost = menuItem?.cost_price
-    const costAvailable = rawCost !== null && rawCost !== undefined && rawCost !== '' && Number.isFinite(Number(rawCost))
-    const unitCost = costAvailable ? Math.max(0, Number(rawCost)) : null
+    const unitCost = getTechCardComponentUnitCost(menuItem, component.selected_options)
+    const costAvailable = unitCost !== null
     return {
       ...component,
       quantity,
@@ -142,6 +185,7 @@ export function buildTechCardPayload(card = {}) {
     })),
     components: normalized.components.map((component, index) => ({
       component_menu_item_id: component.component_menu_item_id.trim(),
+      selected_options: normalizeSelectedOptions(component.selected_options),
       quantity: normalizeTechCardNumber(component.quantity),
       sort_order: index + 1,
     })),
@@ -164,20 +208,30 @@ export function validateTechCard(card = {}, menuItems = [], messages = {}) {
     if (!(ingredient.quantity > 0)) return `${ingredient.name}: quantity must be greater than zero.`
     if (ingredient.unit_price_uzs < 0) return `${ingredient.name}: price cannot be negative.`
   }
-  const componentIds = new Set()
+  const componentKeys = new Set()
   for (const component of payload.components) {
     if (!component.component_menu_item_id) return 'Every included menu item must be selected.'
     if (component.component_menu_item_id === payload.menu_item_id) return 'A meal cannot include itself.'
     if (!(component.quantity > 0)) return 'Included menu item quantity must be greater than zero.'
     const includedItem = menuItemById.get(component.component_menu_item_id)
-    if (includedItem && (includedItem.cost_price === null || includedItem.cost_price === undefined || includedItem.cost_price === '' || !Number.isFinite(Number(includedItem.cost_price)))) {
+    if (includedItem && getTechCardComponentUnitCost(includedItem, component.selected_options) === null) {
       return 'Every included menu item must have a real cost.'
+    }
+    if (includedItem) {
+      const optionGroups = parseOptionGroups(includedItem.option_groups)
+      for (const [groupId, optionId] of Object.entries(component.selected_options)) {
+        const group = optionGroups.find(row => String(row?.id || '') === groupId)
+        const optionExists = Array.isArray(group?.options)
+          && group.options.some(option => String(option?.id || '') === optionId)
+        if (!optionExists) return 'The selected included-item variant is no longer available.'
+      }
     }
     if (includedItem && (includedItem.sale_unit || 'piece') === 'piece' && !Number.isInteger(component.quantity)) {
       return 'Piece-based included menu items require a whole quantity.'
     }
-    if (componentIds.has(component.component_menu_item_id)) return 'The same included menu item cannot be added twice.'
-    componentIds.add(component.component_menu_item_id)
+    const componentKey = `${component.component_menu_item_id}:${JSON.stringify(component.selected_options)}`
+    if (componentKeys.has(componentKey)) return 'The same included menu item variant cannot be added twice.'
+    componentKeys.add(componentKey)
   }
   if (!payload.preparation_steps) return messages.preparationMethodRequired || 'Add the preparation method.'
   return ''

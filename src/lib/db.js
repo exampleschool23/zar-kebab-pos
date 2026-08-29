@@ -105,6 +105,16 @@ function isMissingVariantCostsColumn(error) {
   )
 }
 
+function isMissingMenuItemCostSourceColumn(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('cost_source') && (
+    message.includes('schema cache') ||
+    message.includes('column') ||
+    message.includes('42703') ||
+    message.includes('pgrst204')
+  )
+}
+
 function isMissingCategoryScheduleOverridesTable(error) {
   const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
   return message.includes('menu_category_user_schedule_overrides') && (
@@ -493,7 +503,7 @@ export async function loadMenuCatalog(dbClient = supabase) {
   const [categoriesRes, menuItemsRes, initialMenuItemCostsRes, categoryScheduleOverridesRes] = await Promise.all([
     dbClient.from('menu_categories').select('*').order('sort_order'),
     dbClient.from('menu_items').select('*').order('sort_order'),
-    dbClient.from('menu_item_costs').select('menu_item_id, cost_price, variant_costs'),
+    dbClient.from('menu_item_costs').select('menu_item_id, cost_price, variant_costs, cost_source'),
     dbClient.from('menu_category_user_schedule_overrides').select('category_id, profile_id'),
   ])
   if (categoriesRes.error) throw categoriesRes.error
@@ -507,6 +517,9 @@ export async function loadMenuCatalog(dbClient = supabase) {
   }
 
   let menuItemCostsRes = initialMenuItemCostsRes
+  if (isMissingMenuItemCostSourceColumn(menuItemCostsRes.error)) {
+    menuItemCostsRes = await dbClient.from('menu_item_costs').select('menu_item_id, cost_price, variant_costs')
+  }
   if (isMissingVariantCostsColumn(menuItemCostsRes.error)) {
     menuItemCostsRes = await dbClient.from('menu_item_costs').select('menu_item_id, cost_price')
   }
@@ -534,6 +547,7 @@ export async function loadMenuCatalog(dbClient = supabase) {
       return {
         ...item,
         cost_price: protectedCosts ? protectedCosts.cost_price : null,
+        cost_source: protectedCosts?.cost_source === 'tech_card' ? 'tech_card' : 'manual',
         variant_costs: normalizeVariantCosts(protectedCosts?.variant_costs),
       }
     }),

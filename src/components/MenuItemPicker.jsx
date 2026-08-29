@@ -6,13 +6,13 @@ import { getCategoryName, getItemName } from '../lib/i18n'
 
 function pickerLabels(lang) {
   if (lang === 'uz') return {
-    field: 'Taom', all: 'Barcha taomlar', search: 'Taom yoki kategoriya', select: 'Taomni tanlang', uncategorized: 'Boshqa',
+    field: 'Taom', all: 'Barcha taomlar', search: 'Taom yoki kategoriya', select: 'Taomni tanlang', uncategorized: 'Boshqa', base: 'Asosiy',
   }
   if (lang === 'ru') return {
-    field: 'Блюдо', all: 'Все блюда', search: 'Блюдо или категория', select: 'Выберите блюдо', uncategorized: 'Другое',
+    field: 'Блюдо', all: 'Все блюда', search: 'Блюдо или категория', select: 'Выберите блюдо', uncategorized: 'Другое', base: 'Основной',
   }
   return {
-    field: 'Meal', all: 'All meals', search: 'Meal or category', select: 'Select a meal', uncategorized: 'Other',
+    field: 'Meal', all: 'All meals', search: 'Meal or category', select: 'Select a meal', uncategorized: 'Other', base: 'Base',
   }
 }
 
@@ -20,6 +20,7 @@ export default function MenuItemPicker({
   items = [],
   categories = [],
   value = '',
+  selectedOptions = {},
   onChange,
   lang = 'en',
   disabled = false,
@@ -29,8 +30,17 @@ export default function MenuItemPicker({
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState('all')
+  const [expandedItemId, setExpandedItemId] = useState('')
 
   const selectedItem = items.find(item => item.id === value) || null
+  const selectedItemOptionGroups = selectedItem
+    ? getMenuItemOptionGroups(selectedItem, lang, { includeUnavailable: true })
+    : []
+  const selectedOptionLabels = selectedItemOptionGroups.flatMap(group => {
+    const selectedOptionId = selectedOptions?.[group.id]
+    const option = group.options.find(row => row.id === selectedOptionId)
+    return option ? [option.label] : []
+  })
   const sections = useMemo(() => {
     const categoryMap = new Map(categories.map(category => [category.id, category]))
     const grouped = new Map()
@@ -82,10 +92,11 @@ export default function MenuItemPicker({
     }
   }, [activeCategoryId, visibleSections])
 
-  function selectItem(itemId) {
-    onChange?.(itemId)
+  function selectItem(itemId, nextSelectedOptions = {}) {
+    onChange?.(itemId, nextSelectedOptions)
     setOpen(false)
     setSearch('')
+    setExpandedItemId('')
   }
 
   return (
@@ -100,7 +111,9 @@ export default function MenuItemPicker({
         <SlidersHorizontal size={14} className="shrink-0 text-gray-400" />
         <span className="shrink-0 text-[10px] font-black uppercase tracking-wide text-gray-400">{l.field}</span>
         <span className={`min-w-0 flex-1 truncate text-sm font-bold ${selectedItem ? 'text-gray-800' : 'text-gray-400'}`}>
-          {selectedItem ? getItemName(selectedItem, lang) : l.select}
+          {selectedItem
+            ? `${getItemName(selectedItem, lang)}${selectedOptionLabels.length ? ` · ${selectedOptionLabels.join(', ')}` : ''}`
+            : l.select}
         </span>
         <ChevronDown size={15} className={`shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -154,45 +167,77 @@ export default function MenuItemPicker({
               {visibleItems.map(item => {
                 const isSelected = item.id === value
                 const optionGroups = getMenuItemOptionGroups(item, lang, { includeUnavailable: true })
+                const hasSelectedOption = isSelected && optionGroups.some(group => selectedOptions?.[group.id])
                 return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => selectItem(item.id)}
-                    className={`group flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? 'bg-orange-50 text-[#ff5a00]' : 'text-gray-800 hover:bg-gray-50'}`}
-                  >
-                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-orange-50">
-                      <MenuMedia
-                        src={item.image_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        containerClassName="h-full w-full"
-                        fallback={<div className="flex h-full w-full items-center justify-center"><UtensilsCrossed size={14} className="text-orange-200" /></div>}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black">{getItemName(item, lang)}</p>
-                      <p className="truncate text-[11px] font-semibold text-gray-400">
-                        {(() => {
-                          const category = categories.find(row => row.id === item.category_id)
-                          return category ? getCategoryName(category, lang) : l.uncategorized
-                        })()}
-                      </p>
-                      {optionGroups.length > 0 && (
-                        <div className="grid grid-rows-[0fr] opacity-0 transition-all duration-200 group-hover:mt-1.5 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-visible:mt-1.5 group-focus-visible:grid-rows-[1fr] group-focus-visible:opacity-100">
-                          <div className="min-h-0 overflow-hidden">
-                            {optionGroups.map(group => (
-                              <p key={group.id} className="text-[11px] font-semibold leading-4 text-gray-500">
-                                <span className="font-black text-gray-600">{group.title}:</span>{' '}
-                                {group.options.map(option => option.label).join(', ')}
-                              </p>
+                  <div key={item.id} className={`group rounded-xl transition-colors ${isSelected ? 'bg-orange-50 text-[#ff5a00]' : 'text-gray-800 hover:bg-gray-50'}`}>
+                    <button
+                      type="button"
+                      onClick={() => optionGroups.length > 0
+                        ? setExpandedItemId(current => current === item.id ? '' : item.id)
+                        : selectItem(item.id)}
+                      aria-expanded={optionGroups.length > 0 ? expandedItemId === item.id : undefined}
+                      className="flex w-full items-start gap-3 px-3 py-2 text-left"
+                    >
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-orange-50">
+                        <MenuMedia
+                          src={item.image_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          containerClassName="h-full w-full"
+                          fallback={<div className="flex h-full w-full items-center justify-center"><UtensilsCrossed size={14} className="text-orange-200" /></div>}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black">{getItemName(item, lang)}</p>
+                        <p className="truncate text-[11px] font-semibold text-gray-400">
+                          {(() => {
+                            const category = categories.find(row => row.id === item.category_id)
+                            return category ? getCategoryName(category, lang) : l.uncategorized
+                          })()}
+                        </p>
+                      </div>
+                      {isSelected && !hasSelectedOption && <span className="mt-3.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#ff5a00]" />}
+                    </button>
+                    {optionGroups.length > 0 && (
+                      <div className={`grid transition-all duration-200 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100 ${expandedItemId === item.id ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                        <div className="min-h-0 overflow-hidden">
+                          <div className="space-y-2 border-t border-orange-100/70 px-3 pb-2.5 pt-2">
+                            {optionGroups.map((group, groupIndex) => (
+                              <div key={group.id}>
+                                <p className="mb-1.5 text-[10px] font-black uppercase tracking-wide text-gray-400">{group.title}</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {groupIndex === 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => selectItem(item.id)}
+                                      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-black transition-colors ${isSelected && !hasSelectedOption ? 'border-[#ff5a00] bg-[#ff5a00] text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-orange-300 hover:text-[#ff5a00]'}`}
+                                    >
+                                      <span>{l.base}</span>
+                                      <span className={isSelected && !hasSelectedOption ? 'text-white/80' : 'text-gray-400'}>{new Intl.NumberFormat('uz-UZ').format(Number(item.price) || 0)}</span>
+                                    </button>
+                                  )}
+                                  {group.options.map(option => {
+                                    const optionSelected = isSelected && selectedOptions?.[group.id] === option.id
+                                    return (
+                                      <button
+                                        key={option.id}
+                                        type="button"
+                                        onClick={() => selectItem(item.id, { [group.id]: option.id })}
+                                        className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-black transition-colors ${optionSelected ? 'border-[#ff5a00] bg-[#ff5a00] text-white' : 'border-gray-200 bg-white text-gray-700 hover:border-orange-300 hover:text-[#ff5a00]'}`}
+                                      >
+                                        <span>{option.label}</span>
+                                        <span className={optionSelected ? 'text-white/80' : 'text-gray-400'}>{new Intl.NumberFormat('uz-UZ').format(option.price)}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
-                      )}
-                    </div>
-                    {isSelected && <span className="mt-3.5 h-2.5 w-2.5 shrink-0 rounded-full bg-[#ff5a00]" />}
-                  </button>
+                      </div>
+                    )}
+                  </div>
                 )
               })}
               {visibleItems.length === 0 && (

@@ -112,6 +112,7 @@ test('database health requires private menu costs and order cost snapshots', asy
   assert.equal(missingCosts.ok, false)
   assert.match(missingCosts.failed.find(check => check.name === 'menu_item_costs').hint, /098_menu_item_costs_and_profit/)
   assert.match(missingCosts.failed.find(check => check.name === 'menu_item_costs').hint, /100_menu_variant_costs_and_accounting_profit/)
+  assert.match(missingCosts.failed.find(check => check.name === 'menu_item_costs').hint, /155_tech_card_real_costs/)
 
   const missingSnapshot = await runDbHealthChecks(makeClient({
     missingColumnTable: 'order_items',
@@ -119,6 +120,17 @@ test('database health requires private menu costs and order cost snapshots', asy
   }))
   assert.equal(missingSnapshot.ok, false)
   assert.equal(missingSnapshot.failed.find(check => check.name === 'order_items').detail, 'cost_price')
+})
+
+test('database health requires the tech-card cost source marker', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'menu_item_costs',
+    missingColumn: 'cost_source',
+  }))
+
+  assert.equal(result.ok, false)
+  assert.equal(result.failed.find(check => check.name === 'menu_item_costs').detail, 'cost_source')
+  assert.match(cliHealthSource, /menu_item_costs', 'menu_item_id, cost_price, variant_costs, cost_source, updated_at'/)
 })
 
 test('database health requires durable kitchen-round retry receipts', async () => {
