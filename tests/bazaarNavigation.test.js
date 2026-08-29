@@ -91,15 +91,21 @@ test('Daily Bazaar history defaults to today and shows only structured entries i
   assert.match(page, /<th[^>]*>\{l\.quantity\}<\/th>/)
   assert.match(page, /<th[^>]*>\{l\.itemPrice\}<\/th>/)
   assert.match(page, /<th[^>]*>\{l\.category\}<\/th>/)
-  assert.match(page, /<th[^>]*>\{l\.addedBy\}<\/th>/)
+  assert.doesNotMatch(page, /<th[^>]*>\{l\.purchaseDate\}<\/th>/)
+  assert.doesNotMatch(page, /<th[^>]*>\{l\.addedBy\}<\/th>/)
+  assert.doesNotMatch(page, /<th[^>]*>\{l\.totalPaid\}<\/th>/)
+  assert.doesNotMatch(page, /<th[^>]*>\{l\.actions\}<\/th>/)
   assert.match(page, /purchase\.created_by_name \|\| '—'/)
   assert.match(page, /formatCurrency\(item\.line_total\)/)
   assert.match(page, /data-bazaar-purchase-summary="true"/)
-  assert.doesNotMatch(page, /<td colSpan=\{5\}/)
+  assert.match(page, /const columnCount = 5/)
   assert.match(page, /colSpan=\{columnCount\} className="h-3 border-y/)
   assert.doesNotMatch(page, /rowSpan=\{rowSpan\}/)
   assert.match(page, /pageCount > 1/)
   assert.doesNotMatch(page, /function PurchaseCard/)
+
+  const history = page.slice(page.indexOf('function BazaarHistory'), page.indexOf('function BazaarAnalytics'))
+  assert.ok(history.indexOf('data-bazaar-purchase-summary="true"') < history.indexOf('{items.map((item, index) => {'))
 })
 
 test('Accounting shows one daily Bazaar total and manages its details in Daily Bazaar', () => {

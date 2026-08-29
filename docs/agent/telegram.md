@@ -1,0 +1,53 @@
+# Telegram Menus, Targets, Notifications, and Delivery
+
+Read this guide for the Telegram Mini App, bot/API endpoints, notification targets, message formats, retries, and scheduled delivery.
+
+## Customer Mini App
+
+- The Telegram Mini App is a read-only customer menu.
+- Customer checkout and My Orders are retired. Do not restore `/api/telegram/order` or `/api/telegram/orders` without an explicit product decision.
+- Keep authentication, loyalty lookup, contact data, employee notifications, and POS status notifications separate from retired customer ordering.
+
+## Delivery records and retries
+
+- Every saved salary payment, bonus, fine, absence, and genuine salary-rate change immediately receives database-first `not_attempted` tracking. Initial salary setup is not a rate-change event.
+- Delivery advances independently through pending, sent, failed, skipped, or confirmed states for each destination.
+- Mark sent only after Telegram returns a message id.
+- Employee, Salary group, Team, and Investor delivery attempts are independent and duplicate-safe. A failure/retry for one destination must not duplicate another.
+- The Salaries page combines salary-operation status with five records per page and retry controls for unsent destinations.
+- Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
+
+## Salary destinations
+
+- Salary payment goes to the linked employee privately (with receipt confirmation) and the dedicated Salary group (without confirmation).
+- The Salary group target is `salary_events`; `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` is deployment-order fallback only. Never fall back to Team or completed-orders groups.
+- Payment, bonus, fine, absence, and salary-rate change notify employee and Salary group, except automatic KPI uses the combined daily summaries.
+- Rate-change messages include applicable previous rate, new amount/unit, and effective date.
+
+## Team salary events
+
+- Manual bonus, fine, and absence notify Team; salary payments and rate changes have terminal skipped Team status.
+- Team messages include saved amount and full fine reason/absence note, but omit remaining salary balance and manager identity.
+- Bonus messages omit payment method for employee, Salary group, and Team.
+- Use shared localized long-date formatting. Optional empty notes are omitted; Team copy stays compact.
+- Historical rows are skipped during migration and never broadcast retroactively.
+
+## Automatic daily payroll privacy and language
+
+- Combined employee Salary + Bonus summaries are always Russian and contain attendance, earned salary, bonuses, and current due—never repeated fines or payments.
+- Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
+- Team automatic KPI messages are always Russian and contain only employee name, paid KPI amount, and date. Never disclose restaurant sales base, KPI percentage, salary due, or manager identity.
+
+## Menu availability
+
+- Every authenticated available/unavailable transition queues one immutable Russian Team event with product and employee snapshots.
+- Editing without a transition and product archival send nothing.
+- At 08:00 Tashkent, send one duplicate-safe Russian snapshot of unavailable active products grouped by saved Russian category order, or confirm all available.
+- Exclude archived products and archived categories; preserve exact sent snapshots.
+
+## Investor notifications
+
+- New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
+- Message language follows the target and includes amount, date, category, method, optional supplier/description, creator, and recorded monthly total.
+- Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
+- Edits/deletes and calculated salary/bonus rows do not create new cash-expense announcements.
