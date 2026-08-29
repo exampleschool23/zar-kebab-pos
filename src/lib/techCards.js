@@ -11,9 +11,10 @@ export function normalizeTechCardUnit(value, fallback = 'kg') {
   return TECH_CARD_UNITS.includes(normalized) ? normalized : fallback
 }
 
-export function createBlankTechCard(menuItemId = '') {
+export function createBlankTechCard(menuItemId = '', variantOptionId = '') {
   return {
     menu_item_id: menuItemId,
+    variant_option_id: String(variantOptionId || '').trim(),
     portion_count: '1',
     batch_output_quantity: '',
     batch_output_unit: 'kg',
@@ -86,6 +87,7 @@ export function getTechCardComponentUnitCost(menuItem, selectedOptions = {}) {
 export function normalizeTechCard(card = {}) {
   return {
     menu_item_id: String(card.menu_item_id || '').trim(),
+    variant_option_id: String(card.variant_option_id || '').trim(),
     portion_count: String(card.portion_count ?? '1'),
     batch_output_quantity: card.batch_output_quantity == null ? '' : String(card.batch_output_quantity),
     batch_output_unit: normalizeTechCardUnit(card.batch_output_unit, 'kg'),
@@ -169,6 +171,7 @@ export function buildTechCardPayload(card = {}) {
   const normalized = normalizeTechCard(card)
   return {
     menu_item_id: normalized.menu_item_id,
+    variant_option_id: normalized.variant_option_id,
     portion_count: normalizeTechCardNumber(normalized.portion_count),
     batch_output_quantity: normalized.batch_output_quantity === ''
       ? null
@@ -190,6 +193,34 @@ export function buildTechCardPayload(card = {}) {
       sort_order: index + 1,
     })),
   }
+}
+
+export function techCardStorageKey(menuItemId, variantOptionId = '') {
+  return `${String(menuItemId || '').trim()}::${String(variantOptionId || '').trim()}`
+}
+
+export function copyAndScaleTechCard(card = {}, variantOptionId = '', scale = 1) {
+  const normalized = normalizeTechCard(card)
+  const multiplier = normalizeTechCardNumber(scale, 1) || 1
+  return normalizeTechCard({
+    ...normalized,
+    variant_option_id: String(variantOptionId || '').trim(),
+    updated_at: null,
+    ingredients: normalized.ingredients.map(({ id: _id, ...ingredient }) => ({
+      ...ingredient,
+      quantity: String(normalizeTechCardNumber(ingredient.quantity) * multiplier),
+    })),
+    components: normalized.components.map(({ id: _id, ...component }) => ({
+      ...component,
+      quantity: String(normalizeTechCardNumber(component.quantity) * multiplier),
+    })),
+    // The copied card still yields the same number of sellable variant units;
+    // only its recipe/output quantities scale (for example, a larger Qurutob).
+    portion_count: normalized.portion_count,
+    batch_output_quantity: normalized.batch_output_quantity === ''
+      ? ''
+      : String(normalizeTechCardNumber(normalized.batch_output_quantity) * multiplier),
+  })
 }
 
 export function validateTechCard(card = {}, menuItems = [], messages = {}) {

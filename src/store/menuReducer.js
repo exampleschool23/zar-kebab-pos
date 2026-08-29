@@ -24,7 +24,8 @@ export function menuReducer(state, action) {
         menuItems: state.menuItems.map(item => item.id === action.payload.id
           ? {
               ...item,
-              cost_price: action.payload.cost_price,
+              ...(action.payload.cost_price !== undefined ? { cost_price: action.payload.cost_price } : {}),
+              ...(action.payload.variant_costs !== undefined ? { variant_costs: action.payload.variant_costs } : {}),
               cost_source: action.payload.cost_source,
             }
           : item),

@@ -3,9 +3,36 @@ import assert from 'node:assert/strict'
 import {
   buildTechCardPayload,
   calculateTechCardSummary,
+  copyAndScaleTechCard,
   createBlankTechCard,
+  techCardStorageKey,
   validateTechCard,
 } from '../src/lib/techCards.js'
+
+test('variant tech cards keep a stable storage key and payload identity', () => {
+  const card = createBlankTechCard('qurutob', 'two_three_people')
+  assert.equal(card.variant_option_id, 'two_three_people')
+  assert.equal(techCardStorageKey(card.menu_item_id, card.variant_option_id), 'qurutob::two_three_people')
+  assert.equal(buildTechCardPayload(card).variant_option_id, 'two_three_people')
+})
+
+test('copying a variant recipe scales quantities and removes row identities', () => {
+  const copied = copyAndScaleTechCard({
+    menu_item_id: 'qurutob',
+    variant_option_id: 'one_person',
+    portion_count: 1,
+    batch_output_quantity: 0.5,
+    ingredients: [{ id: 'ingredient-row', name: 'Bread', quantity: 2, unit: 'piece', unit_price_uzs: 5_000 }],
+    components: [{ id: 'component-row', component_menu_item_id: 'salad', quantity: 1 }],
+  }, 'two_three_people', 2)
+
+  assert.equal(copied.variant_option_id, 'two_three_people')
+  assert.equal(copied.portion_count, '1')
+  assert.equal(copied.batch_output_quantity, '1')
+  assert.equal(copied.ingredients[0].quantity, '4')
+  assert.equal(copied.ingredients[0].id, null)
+  assert.equal(copied.components[0].quantity, '2')
+})
 
 test('tech card calculates batch cost and per-portion cost from ingredient prices', () => {
   const summary = calculateTechCardSummary({
@@ -94,6 +121,7 @@ test('tech card payload trims recipe text and normalizes ingredient values', () 
 
   assert.deepEqual(payload, {
     menu_item_id: 'meal-1',
+    variant_option_id: '',
     portion_count: 50,
     batch_output_quantity: 5.5,
     batch_output_unit: 'kg',

@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardList,
+  Copy,
   Loader2,
   Plus,
   Search,
@@ -16,6 +17,7 @@ import {
 import AppShell from '../components/AppShell'
 import MenuItemPicker from '../components/MenuItemPicker'
 import MenuMedia from '../components/MenuMedia'
+import { getMenuItemOptionGroups } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -31,11 +33,13 @@ import {
   TECH_CARD_UNITS,
   buildTechCardPayload,
   calculateTechCardSummary,
+  copyAndScaleTechCard,
   createBlankTechCard,
   createBlankTechCardComponent,
   createBlankTechCardIngredient,
   normalizeTechCard,
   techCardFingerprint,
+  techCardStorageKey,
   validateTechCard,
 } from '../lib/techCards'
 
@@ -45,7 +49,7 @@ function labels(lang) {
     search: 'Taomni qidirish…', all: 'Barchasi', ready: 'Tayyor', missing: 'To‘ldirilmagan',
     total: 'Jami taomlar', configured: 'Tayyor kartalar', needSetup: 'To‘ldirish kerak', average: 'O‘rtacha porsiya tannarxi',
     open: 'Kartani ochish', noResults: 'Mos taom topilmadi', noResultsHint: 'Qidiruv yoki filtrni o‘zgartiring.',
-    listError: 'Texnologik kartalarni yuklab bo‘lmadi', migration: 'Ma’lumotlar bazasiga 139 va 149-migratsiyalarni qo‘llang.',
+    listError: 'Texnologik kartalarni yuklab bo‘lmadi', migration: 'Ma’lumotlar bazasiga 156-migratsiyani qo‘llang.',
     editorSubtitle: 'Retsept, ishlab chiqarish chiqishi va haqiqiy masalliq tannarxi', ingredients: 'Masalliqlar',
     ingredientHint: 'Har bir masalliq miqdori va tanlangan birlik uchun narxini kiriting.', addIngredient: 'Masalliq qo‘shish',
     ingredient: 'Masalliq', quantity: 'Miqdor', unit: 'Birlik', unitPrice: 'Birlik narxi', lineCost: 'Jami',
@@ -59,13 +63,14 @@ function labels(lang) {
     save: 'Kartani saqlash', saving: 'Saqlanmoqda…', saved: 'Texnologik karta saqlandi.', back: 'Kartalar ro‘yxatiga',
     readOnly: 'Faqat ko‘rish', editProduct: 'Mahsulotni tahrirlash', productMissing: 'Taom topilmadi',
     productMissingHint: 'Bu mahsulot o‘chirilgan yoki mavjud emas.', unsaved: 'Saqlanmagan karta',
+    baseRecipe: 'Asosiy retsept', copyRecipe: 'Retseptni nusxalash', copyFrom: 'Manba', scale: 'Miqyos', copy: 'Nusxalash', variantRecipe: 'Variant retsepti',
   }
   if (lang === 'ru') return {
     title: 'Техкарты', subtitle: 'Рецептуры блюд, стоимость ингредиентов и выход порций',
     search: 'Поиск блюда…', all: 'Все', ready: 'Готовые', missing: 'Не заполнены',
     total: 'Всего блюд', configured: 'Готовые техкарты', needSetup: 'Нужно заполнить', average: 'Средняя себестоимость порции',
     open: 'Открыть техкарту', noResults: 'Подходящие блюда не найдены', noResultsHint: 'Измените поиск или фильтр.',
-    listError: 'Не удалось загрузить техкарты', migration: 'Примените миграции базы данных 139 и 149.',
+    listError: 'Не удалось загрузить техкарты', migration: 'Примените миграцию базы данных 156.',
     editorSubtitle: 'Рецептура, производственный выход и фактическая стоимость ингредиентов', ingredients: 'Ингредиенты',
     ingredientHint: 'Укажите количество и цену каждого ингредиента за выбранную единицу.', addIngredient: 'Добавить ингредиент',
     ingredient: 'Ингредиент', quantity: 'Количество', unit: 'Единица', unitPrice: 'Цена за единицу', lineCost: 'Сумма',
@@ -79,13 +84,14 @@ function labels(lang) {
     save: 'Сохранить техкарту', saving: 'Сохранение…', saved: 'Техкарта сохранена.', back: 'К списку техкарт',
     readOnly: 'Только просмотр', editProduct: 'Редактировать товар', productMissing: 'Блюдо не найдено',
     productMissingHint: 'Товар удалён или больше не существует.', unsaved: 'Техкарта не заполнена',
+    baseRecipe: 'Основной рецепт', copyRecipe: 'Копировать рецепт', copyFrom: 'Источник', scale: 'Масштаб', copy: 'Копировать', variantRecipe: 'Техкарта варианта',
   }
   return {
     title: 'Tech Cards', subtitle: 'Meal recipes, ingredient costs, and portion yield',
     search: 'Search meals…', all: 'All', ready: 'Ready', missing: 'Not completed',
     total: 'Total meals', configured: 'Completed cards', needSetup: 'Need setup', average: 'Average portion cost',
     open: 'Open tech card', noResults: 'No matching meals', noResultsHint: 'Change the search or filter.',
-    listError: 'Could not load tech cards', migration: 'Apply database migrations 139 and 149.',
+    listError: 'Could not load tech cards', migration: 'Apply database migration 156.',
     editorSubtitle: 'Recipe, production yield, and actual ingredient cost', ingredients: 'Ingredients',
     ingredientHint: 'Enter each ingredient quantity and its price for the selected unit.', addIngredient: 'Add ingredient',
     ingredient: 'Ingredient', quantity: 'Quantity', unit: 'Unit', unitPrice: 'Unit price', lineCost: 'Total',
@@ -99,6 +105,7 @@ function labels(lang) {
     save: 'Save tech card', saving: 'Saving…', saved: 'Tech card saved.', back: 'Back to tech cards',
     readOnly: 'Read only', editProduct: 'Edit product', productMissing: 'Meal not found',
     productMissingHint: 'This product was archived or no longer exists.', unsaved: 'Tech card not completed',
+    baseRecipe: 'Base recipe', copyRecipe: 'Copy recipe', copyFrom: 'Source', scale: 'Scale', copy: 'Copy', variantRecipe: 'Variant recipe',
   }
 }
 
@@ -161,23 +168,25 @@ async function loadTechCards() {
 
   const ingredientsByItemId = new Map()
   for (const ingredient of ingredientsResult.data || []) {
-    const rows = ingredientsByItemId.get(ingredient.menu_item_id) || []
+    const key = techCardStorageKey(ingredient.menu_item_id, ingredient.variant_option_id)
+    const rows = ingredientsByItemId.get(key) || []
     rows.push(ingredient)
-    ingredientsByItemId.set(ingredient.menu_item_id, rows)
+    ingredientsByItemId.set(key, rows)
   }
   const componentsByItemId = new Map()
   for (const component of componentsResult.data || []) {
-    const rows = componentsByItemId.get(component.menu_item_id) || []
+    const key = techCardStorageKey(component.menu_item_id, component.variant_option_id)
+    const rows = componentsByItemId.get(key) || []
     rows.push(component)
-    componentsByItemId.set(component.menu_item_id, rows)
+    componentsByItemId.set(key, rows)
   }
 
   return Object.fromEntries((cardsResult.data || []).map(card => [
-    card.menu_item_id,
+    techCardStorageKey(card.menu_item_id, card.variant_option_id),
     normalizeTechCard({
       ...card,
-      ingredients: ingredientsByItemId.get(card.menu_item_id) || [],
-      components: componentsByItemId.get(card.menu_item_id) || [],
+      ingredients: ingredientsByItemId.get(techCardStorageKey(card.menu_item_id, card.variant_option_id)) || [],
+      components: componentsByItemId.get(techCardStorageKey(card.menu_item_id, card.variant_option_id)) || [],
     }),
   ]))
 }
@@ -219,12 +228,18 @@ export default function TechCards() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saveNotice, setSaveNotice] = useState('')
+  const [activeVariantOptionId, setActiveVariantOptionId] = useState('')
+  const [copySourceOptionId, setCopySourceOptionId] = useState('')
+  const [copyScale, setCopyScale] = useState('1')
 
   const activeItems = useMemo(() => state.menuItems
     .filter(isActiveMenuItem)
     .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)), [state.menuItems])
   const categoriesById = useMemo(() => new Map(state.categories.map(category => [category.id, category])), [state.categories])
   const editorItem = menuItemId ? activeItems.find(item => item.id === menuItemId) : null
+  const editorVariants = useMemo(() => editorItem
+    ? getMenuItemOptionGroups(editorItem, lang, { includeUnavailable: true }).flatMap(group => group.options)
+    : [], [editorItem, lang])
 
   useEffect(() => {
     if (!loaded || loadError) return undefined
@@ -246,19 +261,20 @@ export default function TechCards() {
 
   useEffect(() => {
     if (!menuItemId || cardsLoading) return
-    const nextForm = cardsByItemId[menuItemId]
-      ? normalizeTechCard(cardsByItemId[menuItemId])
-      : createBlankTechCard(menuItemId)
+    const key = techCardStorageKey(menuItemId, activeVariantOptionId)
+    const nextForm = cardsByItemId[key]
+      ? normalizeTechCard(cardsByItemId[key])
+      : createBlankTechCard(menuItemId, activeVariantOptionId)
     setForm(nextForm)
     setOriginalFingerprint(techCardFingerprint(nextForm))
     setSaveError('')
     setSaveNotice('')
-  }, [menuItemId, cardsLoading, cardsByItemId])
+  }, [menuItemId, activeVariantOptionId, cardsLoading, cardsByItemId])
 
   const filteredItems = useMemo(() => {
     const needle = search.trim().toLowerCase()
     return activeItems.filter(item => {
-      const hasCard = !!cardsByItemId[item.id]
+      const hasCard = Object.keys(cardsByItemId).some(key => key.startsWith(`${item.id}::`))
       if (filter === 'ready' && !hasCard) return false
       if (filter === 'missing' && hasCard) return false
       if (!needle) return true
@@ -267,9 +283,12 @@ export default function TechCards() {
     })
   }, [activeItems, cardsByItemId, filter, search])
 
-  const configuredCards = activeItems.filter(item => cardsByItemId[item.id])
+  const configuredCards = activeItems.filter(item => Object.keys(cardsByItemId).some(key => key.startsWith(`${item.id}::`)))
   const averagePortionCost = configuredCards.length
-    ? configuredCards.reduce((sum, item) => sum + (calculateTechCardSummary(cardsByItemId[item.id], activeItems).portionCost || 0), 0) / configuredCards.length
+    ? configuredCards.reduce((sum, item) => {
+      const card = cardsByItemId[techCardStorageKey(item.id)] || Object.entries(cardsByItemId).find(([key]) => key.startsWith(`${item.id}::`))?.[1]
+      return sum + (calculateTechCardSummary(card, activeItems).portionCost || 0)
+    }, 0) / configuredCards.length
     : 0
 
   function updateIngredient(index, patch) {
@@ -321,6 +340,16 @@ export default function TechCards() {
     setSaveNotice('')
   }
 
+  function copyRecipe() {
+    const source = cardsByItemId[techCardStorageKey(menuItemId, copySourceOptionId)]
+      || Object.entries(cardsByItemId).find(([key]) => key.startsWith(`${menuItemId}::`))?.[1]
+    if (!source) return
+    const copied = copyAndScaleTechCard(source, activeVariantOptionId, copyScale)
+    setForm(copied)
+    setSaveError('')
+    setSaveNotice('')
+  }
+
   async function saveCard() {
     if (!mayEdit || !form || saving) return
     const validationError = validateTechCard(form, activeItems, {
@@ -339,10 +368,12 @@ export default function TechCards() {
       if (error) throw error
       const savedCost = Math.max(0, Math.round(calculateTechCardSummary(form, activeItems).portionCost || 0))
       const savedCard = normalizeTechCard({ ...payload, updated_at: new Date().toISOString() })
-      setCardsByItemId(current => ({ ...current, [payload.menu_item_id]: savedCard }))
+      setCardsByItemId(current => ({ ...current, [techCardStorageKey(payload.menu_item_id, payload.variant_option_id)]: savedCard }))
       dispatch({
         type: 'SET_MENU_ITEM_COST',
-        payload: { id: payload.menu_item_id, cost_price: savedCost, cost_source: 'tech_card' },
+        payload: payload.variant_option_id
+          ? { id: payload.menu_item_id, variant_costs: { ...(editorItem.variant_costs || {}), [payload.variant_option_id]: savedCost }, cost_source: editorItem.cost_source || 'manual' }
+          : { id: payload.menu_item_id, cost_price: savedCost, cost_source: 'tech_card' },
       })
       setForm(savedCard)
       setOriginalFingerprint(techCardFingerprint(savedCard))
@@ -403,7 +434,11 @@ export default function TechCards() {
     const validationError = validateTechCard(form, activeItems, {
       preparationMethodRequired: l.preparationMethodRequired,
     })
-    const price = Number(editorItem.price || 0)
+    const activeVariant = editorVariants.find(option => option.id === activeVariantOptionId)
+    const price = Number(activeVariant?.price ?? editorItem.price ?? 0)
+    const savedCost = activeVariantOptionId
+      ? editorItem.variant_costs?.[activeVariantOptionId]
+      : editorItem.cost_price
     const estimatedProfit = summary.portionCost == null
       ? null
       : getSaleProfitSummary(price, summary.portionCost)
@@ -449,6 +484,46 @@ export default function TechCards() {
               <div className={`mb-4 rounded-xl border px-4 py-3 text-sm font-bold ${saveError ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
                 {saveError || saveNotice}
               </div>
+            )}
+
+            {editorVariants.length > 0 && (
+              <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <p className="mb-3 text-xs font-black uppercase tracking-wide text-gray-400">{l.variantRecipe}</p>
+                <div className="flex flex-wrap gap-2">
+                  {[{ id: '', label: l.baseRecipe }, ...editorVariants].map(option => {
+                    const selected = activeVariantOptionId === option.id
+                    const ready = !!cardsByItemId[techCardStorageKey(editorItem.id, option.id)]
+                    return (
+                      <button
+                        key={option.id || 'base'}
+                        type="button"
+                        onClick={() => setActiveVariantOptionId(option.id)}
+                        disabled={saving || (dirty && !selected)}
+                        title={dirty && !selected ? l.save : ''}
+                        className={`rounded-xl border px-3 py-2 text-xs font-black ${selected ? 'border-[#ff5a00] bg-[#ff5a00] text-white' : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-orange-300 disabled:opacity-50'}`}
+                      >
+                        {option.label} {ready ? '✓' : ''}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {mayEdit && !cardsByItemId[techCardStorageKey(editorItem.id, activeVariantOptionId)] && Object.keys(cardsByItemId).some(key => key.startsWith(`${editorItem.id}::`)) && (
+                  <div className="mt-4 grid gap-3 rounded-xl bg-orange-50 p-3 sm:grid-cols-[minmax(180px,1fr)_110px_auto] sm:items-end">
+                    <label>
+                      <span className="mb-1 block text-[10px] font-black uppercase text-gray-500">{l.copyFrom}</span>
+                      <select value={copySourceOptionId} onChange={event => setCopySourceOptionId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-200 bg-white px-3 text-sm font-bold">
+                        {[{ id: '', label: l.baseRecipe }, ...editorVariants].filter(option => !!cardsByItemId[techCardStorageKey(editorItem.id, option.id)]).map(option => <option key={option.id || 'base'} value={option.id}>{option.label}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      <span className="mb-1 block text-[10px] font-black uppercase text-gray-500">{l.scale}</span>
+                      <input inputMode="decimal" value={copyScale} onChange={event => setCopyScale(event.target.value)} className="h-10 w-full rounded-xl border border-orange-200 bg-white px-3 text-sm font-bold" />
+                    </label>
+                    <button type="button" onClick={copyRecipe} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-[#ff5a00] ring-1 ring-orange-200"><Copy size={14} />{l.copy}</button>
+                  </div>
+                )}
+              </section>
             )}
 
             <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_330px]">
@@ -622,7 +697,7 @@ export default function TechCards() {
                   <div className="space-y-2.5">
                     {[
                       [l.salePrice, formatCurrency(price)],
-                      [l.savedCost, editorItem.cost_price == null ? '—' : formatCurrency(editorItem.cost_price)],
+                      [l.savedCost, savedCost == null ? '—' : formatCurrency(savedCost)],
                       [l.batchCost, summary.batchCost == null ? '—' : formatCurrency(Math.round(summary.batchCost))],
                       [l.portionCost, summary.portionCost == null ? '—' : formatCurrency(Math.round(summary.portionCost))],
                       [l.outputPerPortion, formatOutputPerPortion(summary, form.batch_output_unit, lang)],
@@ -704,7 +779,8 @@ export default function TechCards() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {filteredItems.map(item => {
-                const card = cardsByItemId[item.id]
+                const card = cardsByItemId[techCardStorageKey(item.id)]
+                  || Object.entries(cardsByItemId).find(([key]) => key.startsWith(`${item.id}::`))?.[1]
                 const summary = card ? calculateTechCardSummary(card, activeItems) : null
                 const category = categoriesById.get(item.category_id)
                 return (
