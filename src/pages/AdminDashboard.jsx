@@ -8,7 +8,7 @@ import {
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
-import { formatDateOnly, formatLongDate, formatTime, normalizeDateLang, parseInstantDate } from '../lib/dateFormat'
+import { formatDateOnly, formatLongDate, formatMonthYear, formatTime, normalizeDateLang, parseInstantDate } from '../lib/dateFormat'
 import {
   addRestaurantDays,
   getRestaurantHour,
@@ -39,6 +39,7 @@ import AppShell from '../components/AppShell'
 import { inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
 import { loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
+import { loadDashboardMonthlyAverageIncome } from '../lib/monthlyIncome'
 import { getOrdersNetProfit, getSaleProfitSummary } from '../lib/profit'
 
 // ── Localisation ──────────────────────────────────────────────────────────────
@@ -58,6 +59,12 @@ const L = {
     yesterday:      'Kecha',
     vsYesterday:    'kechaga nisbatan',
     revenueStats:   'Daromad statistikasi',
+    monthlyAvgDailyIncome: "Oylar bo'yicha o'rtacha kunlik daromad",
+    monthlyAvgDailyIncomeSub: "Yakunlangan oylar bazadagi saqlangan hisobotdan olinadi; joriy oy jonli hisoblanadi.",
+    savedMonth:     'Saqlangan oy',
+    currentMonth:   'Joriy oy',
+    monthlyIncomeFailed: "Oylik daromad ma'lumotlarini yuklab bo'lmadi",
+    retry:          'Qayta urinish',
     today:          'Bugun',
     days7:          '7 kun',
     rollingMonth:   'Oy',
@@ -121,6 +128,12 @@ const L = {
     yesterday:      'Вчера',
     vsYesterday:    'vs вчера',
     revenueStats:   'Статистика дохода',
+    monthlyAvgDailyIncome: 'Средний дневной доход по месяцам',
+    monthlyAvgDailyIncomeSub: 'Завершённые месяцы загружаются из сохранённых итогов; текущий месяц рассчитывается в реальном времени.',
+    savedMonth:     'Сохранённый месяц',
+    currentMonth:   'Текущий месяц',
+    monthlyIncomeFailed: 'Не удалось загрузить среднемесячный доход',
+    retry:          'Повторить',
     today:          'Сегодня',
     days7:          '7 дней',
     rollingMonth:   'Месяц',
@@ -184,6 +197,12 @@ const L = {
     yesterday:      'Yesterday',
     vsYesterday:    'vs yesterday',
     revenueStats:   'Income Statistics',
+    monthlyAvgDailyIncome: 'Average Daily Income by Month',
+    monthlyAvgDailyIncomeSub: 'Completed months use saved database summaries; the current month is calculated live.',
+    savedMonth:     'Saved month',
+    currentMonth:   'Current month',
+    monthlyIncomeFailed: 'Could not load monthly income averages',
+    retry:          'Retry',
     today:          'Today',
     days7:          '7 Days',
     rollingMonth:   'Month',
@@ -796,6 +815,10 @@ export default function AdminDashboard() {
   const [historyError, setHistoryError] = useState('')
   const [historyLoading, setHistoryLoading] = useState(true)
   const [loadedHistoryRangeKey, setLoadedHistoryRangeKey] = useState('')
+  const [monthlyIncomeRows, setMonthlyIncomeRows] = useState([])
+  const [monthlyIncomeLoading, setMonthlyIncomeLoading] = useState(true)
+  const [monthlyIncomeError, setMonthlyIncomeError] = useState('')
+  const [monthlyIncomeRequestKey, setMonthlyIncomeRequestKey] = useState(0)
   const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
 
   const dashboardHistoryRange = useMemo(() => getDashboardHistoryRange(period), [period])
@@ -823,6 +846,31 @@ export default function AdminDashboard() {
       })
     return () => { cancelled = true }
   }, [dashboardHistoryRange])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let cancelled = false
+    setMonthlyIncomeLoading(true)
+    setMonthlyIncomeError('')
+
+    loadDashboardMonthlyAverageIncome({ signal: controller.signal })
+      .then(rows => {
+        if (cancelled) return
+        setMonthlyIncomeRows(rows)
+        setMonthlyIncomeLoading(false)
+      })
+      .catch(error => {
+        if (cancelled) return
+        setMonthlyIncomeRows([])
+        setMonthlyIncomeError(error?.message || l.monthlyIncomeFailed)
+        setMonthlyIncomeLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [l.monthlyIncomeFailed, monthlyIncomeRequestKey])
 
   // ── Core derived sets ─────────────────────────────────────────────────────
   const dashboardOrders = useMemo(
@@ -1134,6 +1182,13 @@ export default function AdminDashboard() {
   }
 
   const chartMax = Math.max(...chartBars.map(b => b.revenue), 1)
+  const currentMonthStart = `${todayStr().slice(0, 8)}01`
+  const monthlyIncomeChartRows = monthlyIncomeRows.map(row => ({
+    ...row,
+    label: formatMonthYear(row.monthStart, lang, row.monthStart),
+    isCurrent: row.monthStart === currentMonthStart,
+  }))
+  const monthlyIncomeMax = Math.max(...monthlyIncomeChartRows.map(row => row.averageDailyIncome), 1)
   const now      = new Date()
   const lastUpdated = formatReadableDateTime(now)
   const currentKpiPeriodLabel = dashboardPeriodLabel(period, lang)
@@ -1485,6 +1540,97 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+
+        <section
+          aria-busy={monthlyIncomeLoading}
+          className="mb-4 min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-base font-black text-[#1F2937]">{l.monthlyAvgDailyIncome}</h3>
+              <p className="mt-1 text-xs font-semibold leading-relaxed text-[#9CA3AF]">
+                {l.monthlyAvgDailyIncomeSub}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] font-bold text-[#718096]">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#0F766E]" />
+                {l.savedMonth}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[#ff5a00]" />
+                {l.currentMonth}
+              </span>
+            </div>
+          </div>
+
+          {monthlyIncomeLoading ? (
+            <ChartShimmer />
+          ) : monthlyIncomeError ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              <span>{l.monthlyIncomeFailed}: {monthlyIncomeError}</span>
+              <button
+                type="button"
+                onClick={() => setMonthlyIncomeRequestKey(key => key + 1)}
+                className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-black text-red-700 transition-colors hover:bg-red-100"
+              >
+                {l.retry}
+              </button>
+            </div>
+          ) : monthlyIncomeChartRows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-[#9CA3AF]">{l.noData}</p>
+          ) : (
+            <div className="overflow-x-auto pb-1">
+              <div className="min-w-[720px]">
+                <div
+                  className="flex h-48 items-end gap-3 border-b border-[#E5E7EB] px-2 pt-7"
+                  role="list"
+                  aria-label={l.monthlyAvgDailyIncome}
+                >
+                  {monthlyIncomeChartRows.map(row => {
+                    const height = Math.max(3, Math.round((row.averageDailyIncome / monthlyIncomeMax) * 100))
+                    return (
+                      <div
+                        key={row.monthStart}
+                        className="group relative flex h-full min-w-[44px] flex-1 items-end"
+                        role="listitem"
+                        tabIndex={0}
+                        aria-label={`${row.label}: ${formatCurrency(row.averageDailyIncome)}`}
+                      >
+                        <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded bg-[#1F2937] px-2 py-1 text-[10px] font-bold text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                          {formatCurrency(row.averageDailyIncome)}
+                        </div>
+                        <div
+                          className={`w-full rounded-t-lg transition-colors ${
+                            row.averageDailyIncome <= 0
+                              ? 'bg-[#F3F4F6]'
+                              : row.isCurrent
+                              ? 'bg-[#ff5a00]'
+                              : 'bg-[#0F766E] group-hover:bg-[#0D9488]'
+                          }`}
+                          style={{ height: `${height}%` }}
+                          title={`${row.label}: ${formatCurrency(row.averageDailyIncome)}`}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex gap-3 px-2 pt-2">
+                  {monthlyIncomeChartRows.map(row => (
+                    <p
+                      key={row.monthStart}
+                      className={`min-w-[44px] flex-1 text-center text-[10px] font-bold leading-tight ${
+                        row.isCurrent ? 'text-[#ff5a00]' : 'text-[#718096]'
+                      }`}
+                    >
+                      {row.label}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Footer */}
         <p className="text-center text-xs text-[#9CA3AF] mt-6">

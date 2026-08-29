@@ -130,6 +130,7 @@ const checks = await Promise.all([
   checkTable('employee_daily_kpi_runs', 'business_date, sales_base_amount, completed_at', false),
   checkTable('employee_daily_kpi_results', 'id, business_date, salary_profile_id, rule_id, sales_base_amount, rate_bps, bonus_amount, payment_method, status, bonus_id', false),
   checkTable('employee_daily_meal_expenses', 'business_date, average_daily_amount, present_employee_count, total_amount, source_type, finalized_at'),
+  checkTable('dashboard_monthly_income_snapshots', 'month_start, total_income, day_count, average_daily_income, order_count, source_type, finalized_at'),
   checkTable('employee_salary_fines', 'id, salary_profile_id, fine_date, amount, reason, created_by_name', false),
   checkTable('employee_salary_absences', 'id, salary_profile_id, absence_date', false),
   checkTable('employee_salary_telegram_links', 'salary_profile_id, telegram_user_id, chat_id, preferred_language, notifications_enabled, linked_at', false),
@@ -262,6 +263,11 @@ const checks = await Promise.all([
   checkRpc(
     'get_pending_employee_meal_dates(p_limit)',
     () => supabase.rpc('get_pending_employee_meal_dates', { p_limit: 1 })
+  ),
+  checkRpc(
+    'get_dashboard_monthly_average_income(p_month_count)',
+    () => supabase.rpc('get_dashboard_monthly_average_income', { p_month_count: 1 }),
+    'dashboard access is required'
   ),
   checkRpc(
     'remove_loyalty_card(p_card_id)',

@@ -37,6 +37,7 @@ const TABLE_CHECKS = [
   { name: 'employee_daily_kpi_runs', columns: ['business_date', 'sales_base_amount', 'completed_at'] },
   { name: 'employee_daily_kpi_results', columns: ['id', 'business_date', 'salary_profile_id', 'rule_id', 'sales_base_amount', 'rate_bps', 'bonus_amount', 'payment_method', 'status', 'bonus_id'] },
   { name: 'employee_daily_meal_expenses', columns: ['business_date', 'average_daily_amount', 'present_employee_count', 'total_amount', 'source_type', 'finalized_at'] },
+  { name: 'dashboard_monthly_income_snapshots', columns: ['month_start', 'total_income', 'day_count', 'average_daily_income', 'order_count', 'source_type', 'finalized_at'] },
   { name: 'employee_salary_fines', columns: ['id', 'salary_profile_id', 'fine_date', 'amount', 'reason', 'created_by_name'] },
   { name: 'employee_salary_absences', columns: ['id', 'salary_profile_id', 'absence_date'] },
   { name: 'employee_salary_telegram_links', columns: ['salary_profile_id', 'telegram_user_id', 'chat_id', 'preferred_language', 'notifications_enabled', 'linked_at'] },
@@ -87,6 +88,7 @@ const MIGRATION_HINTS = {
   employee_daily_kpi_runs: 'Run supabase/129_daily_kpi_bonuses.sql',
   employee_daily_kpi_results: 'Run supabase/129_daily_kpi_bonuses.sql',
   employee_daily_meal_expenses: 'Run supabase/147_financial_report_history_snapshots.sql',
+  dashboard_monthly_income_snapshots: 'Run supabase/157_dashboard_monthly_income_snapshots.sql',
   employee_salary_fines: 'Run supabase/099_employee_salary_fines.sql',
   employee_salary_absences: 'Run supabase/063_employee_salary_absences.sql',
   employee_salary_telegram_links: 'Run supabase/107_employee_salary_telegram_notifications.sql',
@@ -112,6 +114,7 @@ const MIGRATION_HINTS = {
   generate_employee_daily_meal_expense: 'Run supabase/147_financial_report_history_snapshots.sql',
   get_pending_daily_kpi_dates: 'Run supabase/147_financial_report_history_snapshots.sql',
   get_pending_employee_meal_dates: 'Run supabase/147_financial_report_history_snapshots.sql',
+  get_dashboard_monthly_average_income: 'Run supabase/157_dashboard_monthly_income_snapshots.sql',
   create_menu_item_with_cost: 'Run supabase/102_atomic_menu_item_cost_creation.sql',
   create_menu_item_with_media_and_cost: 'Run supabase/103_menu_item_media_gallery.sql',
   save_menu_item_tech_card: 'Run supabase/139_menu_item_tech_cards.sql, supabase/149_tech_card_menu_item_components.sql, and supabase/154_tech_card_component_variants.sql',
@@ -195,6 +198,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'generate_employee_daily_meal_expense', { p_business_date: null }))
   checks.push(await checkRpc(dbClient, 'get_pending_daily_kpi_dates', { p_limit: 1 }))
   checks.push(await checkRpc(dbClient, 'get_pending_employee_meal_dates', { p_limit: 1 }))
+  checks.push(await checkRpc(dbClient, 'get_dashboard_monthly_average_income', { p_month_count: 1 }))
   const failed = checks.filter(check => !check.ok)
   return {
     ok: failed.length === 0,

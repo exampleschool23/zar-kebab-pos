@@ -5,9 +5,9 @@ Read this guide for dashboard analytics, reports, historical drilldowns, immutab
 ## Entry points
 
 - UI: `src/pages/AdminDashboard.jsx`, `src/pages/Reports.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`
-- Shared logic: `src/lib/dashboardAnalytics.js`, `src/lib/dishSales.js`, `src/lib/profit.js`, `src/lib/orderHistory.js`, `src/lib/accountingSummary.js`, `src/lib/closeout.js`
-- Historical snapshot schema: migrations `114`, `147`, and related aggregate RPC migrations
-- Focused tests: `tests/dashboardAnalytics.test.js`, `tests/dishSales.test.js`, `tests/profit.test.js`, `tests/orderHistory.test.js`, `tests/financialHistorySnapshots.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
+- Shared logic: `src/lib/dashboardAnalytics.js`, `src/lib/monthlyIncome.js`, `src/lib/dishSales.js`, `src/lib/profit.js`, `src/lib/orderHistory.js`, `src/lib/accountingSummary.js`, `src/lib/closeout.js`
+- Historical snapshot schema: migrations `114`, `147`, `157`, and related aggregate RPC migrations
+- Focused tests: `tests/dashboardAnalytics.test.js`, `tests/monthlyIncomeSnapshots.test.js`, `tests/dishSales.test.js`, `tests/profit.test.js`, `tests/orderHistory.test.js`, `tests/financialHistorySnapshots.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
 
 ## Loader boundaries
 
@@ -37,6 +37,9 @@ Read this guide for dashboard analytics, reports, historical drilldowns, immutab
 - Sales by Category shows every category represented by sold items in the selected period.
 - Best-Selling Dishes shows up to ten ranked sold products and may scroll internally.
 - Never fabricate unsold products or empty categories to fill visual space.
+- Average Daily Income by Month shows the latest 12 calendar months. Completed months come only from immutable `dashboard_monthly_income_snapshots`; the current partial month is the only month aggregated live from orders.
+- Migration `157` performs the one-time completed-history backfill. Its duplicate-safe daily cron finalizes the previous Tashkent month, so normal Dashboard reads never rescan completed order history for this chart.
+- Monthly averages use total paid cafe income divided by all calendar days in a completed month. The current month uses elapsed calendar days through today.
 
 ## Accounting/report separation
 

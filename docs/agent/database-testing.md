@@ -25,6 +25,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - Tech Cards, access, components, stock, and variant recipes: `139`–`140`, `149`–`151`, `154`–`156`
   - menu/expense notifications and financial snapshots: `142`–`147`
   - absence notification cleanup and daily-report cron: `148`, `152`
+  - Dashboard monthly income snapshots and finalizer cron: `157`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants

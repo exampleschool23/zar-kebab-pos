@@ -138,8 +138,8 @@
     {
       "name": "reporting-history",
       "keywords": ["dashboard", "report", "profit", "history", "snapshot", "date range", "closeout", "dish sales"],
-      "files": ["src/pages/AdminDashboard.jsx", "src/pages/Reports.jsx", "src/lib/dashboardAnalytics.js", "src/lib/dishSales.js", "src/lib/profit.js", "src/lib/orderHistory.js", "src/lib/accountingSummary.js", "src/lib/closeout.js"],
-      "tests": ["tests/dashboardAnalytics.test.js", "tests/dishSales.test.js", "tests/profit.test.js", "tests/orderHistory.test.js", "tests/financialHistorySnapshots.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
+      "files": ["src/pages/AdminDashboard.jsx", "src/pages/Reports.jsx", "src/lib/dashboardAnalytics.js", "src/lib/monthlyIncome.js", "src/lib/dishSales.js", "src/lib/profit.js", "src/lib/orderHistory.js", "src/lib/accountingSummary.js", "src/lib/closeout.js", "supabase/157_dashboard_monthly_income_snapshots.sql"],
+      "tests": ["tests/dashboardAnalytics.test.js", "tests/monthlyIncomeSnapshots.test.js", "tests/dishSales.test.js", "tests/profit.test.js", "tests/orderHistory.test.js", "tests/financialHistorySnapshots.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
     },
     {
       "name": "telegram-delivery",

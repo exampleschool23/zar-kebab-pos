@@ -294,6 +294,19 @@ test('database health requires immutable meal and sold-category snapshots', asyn
   assert.match(cliHealthSource, /category_id_snapshot/)
 })
 
+test('database health requires Dashboard monthly income snapshots and aggregate RPC', async () => {
+  const missingSnapshots = await runDbHealthChecks(makeClient({
+    missingTable: 'dashboard_monthly_income_snapshots',
+  }))
+  assert.equal(missingSnapshots.ok, false)
+  assert.match(
+    missingSnapshots.failed.find(check => check.name === 'dashboard_monthly_income_snapshots').hint,
+    /157_dashboard_monthly_income_snapshots/
+  )
+  assert.match(cliHealthSource, /dashboard_monthly_income_snapshots/)
+  assert.match(cliHealthSource, /get_dashboard_monthly_average_income\(p_month_count\)/)
+})
+
 test('database health reports missing tables and missing RPC', async () => {
   const result = await runDbHealthChecks(makeClient({ missingTable: 'order_payments', missingRpc: true }))
   assert.equal(result.ok, false)
@@ -309,6 +322,7 @@ test('database health reports missing tables and missing RPC', async () => {
     'generate_daily_kpi_bonuses',
     'generate_employee_daily_meal_expense',
     'get_accounting_paid_order_summary',
+    'get_dashboard_monthly_average_income',
     'get_pending_daily_kpi_dates',
     'get_pending_employee_meal_dates',
     'kitchen_round_receipts_version',
