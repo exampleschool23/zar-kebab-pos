@@ -8,6 +8,7 @@ import {
   CircleDollarSign,
   ClipboardList,
   Copy,
+  LayoutGrid,
   Loader2,
   Plus,
   Search,
@@ -47,6 +48,7 @@ function labels(lang) {
   if (lang === 'uz') return {
     title: 'Texnologik kartalar', subtitle: 'Taom retseptlari, masalliqlar tannarxi va porsiya chiqishi',
     search: 'Taomni qidirish…', all: 'Barchasi', ready: 'Tayyor', missing: 'To‘ldirilmagan',
+    categories: 'Taom kategoriyalari', otherCategory: 'Boshqa taomlar',
     total: 'Jami taomlar', configured: 'Tayyor kartalar', needSetup: 'To‘ldirish kerak', average: 'O‘rtacha porsiya tannarxi',
     open: 'Kartani ochish', noResults: 'Mos taom topilmadi', noResultsHint: 'Qidiruv yoki filtrni o‘zgartiring.',
     listError: 'Texnologik kartalarni yuklab bo‘lmadi', migration: 'Ma’lumotlar bazasiga 156-migratsiyani qo‘llang.',
@@ -68,6 +70,7 @@ function labels(lang) {
   if (lang === 'ru') return {
     title: 'Техкарты', subtitle: 'Рецептуры блюд, стоимость ингредиентов и выход порций',
     search: 'Поиск блюда…', all: 'Все', ready: 'Готовые', missing: 'Не заполнены',
+    categories: 'Категории блюд', otherCategory: 'Другие блюда',
     total: 'Всего блюд', configured: 'Готовые техкарты', needSetup: 'Нужно заполнить', average: 'Средняя себестоимость порции',
     open: 'Открыть техкарту', noResults: 'Подходящие блюда не найдены', noResultsHint: 'Измените поиск или фильтр.',
     listError: 'Не удалось загрузить техкарты', migration: 'Примените миграцию базы данных 156.',
@@ -89,6 +92,7 @@ function labels(lang) {
   return {
     title: 'Tech Cards', subtitle: 'Meal recipes, ingredient costs, and portion yield',
     search: 'Search meals…', all: 'All', ready: 'Ready', missing: 'Not completed',
+    categories: 'Meal categories', otherCategory: 'Other meals',
     total: 'Total meals', configured: 'Completed cards', needSetup: 'Need setup', average: 'Average portion cost',
     open: 'Open tech card', noResults: 'No matching meals', noResultsHint: 'Change the search or filter.',
     listError: 'Could not load tech cards', migration: 'Apply database migration 156.',
@@ -209,6 +213,40 @@ function SummaryTile({ label, value, icon: Icon, tone = 'orange' }) {
   )
 }
 
+function CategoryFilterTile({ category, label, count, selected, onClick }) {
+  const isAll = category.id === 'all'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`group relative w-[104px] shrink-0 overflow-hidden rounded-2xl border-2 text-left transition-all sm:w-[116px] ${selected
+        ? 'border-[#ff5a00] bg-orange-50 shadow-sm'
+        : 'border-gray-200 bg-white hover:border-orange-200 hover:shadow-md'}`}
+    >
+      <div className={`flex aspect-[4/3] w-full items-center justify-center overflow-hidden ${selected ? 'bg-orange-100' : 'bg-gray-50'}`}>
+        {isAll ? (
+          <LayoutGrid size={28} className={selected ? 'text-[#ff5a00]' : 'text-orange-300'} />
+        ) : (
+          <MenuMedia
+            src={category.image_url}
+            alt=""
+            className="h-full w-full object-cover object-center transition-transform group-hover:scale-105"
+            containerClassName="h-full w-full"
+            fallback={<UtensilsCrossed size={26} className={selected ? 'text-[#ff5a00]' : 'text-orange-300'} />}
+          />
+        )}
+      </div>
+      <div className="min-h-[48px] px-2.5 py-2">
+        <p className={`line-clamp-2 text-xs font-black leading-tight ${selected ? 'text-[#ff5a00]' : 'text-gray-800'}`}>{label}</p>
+      </div>
+      <span className={`absolute right-1.5 top-1.5 flex h-6 min-w-6 items-center justify-center rounded-lg px-1.5 text-[11px] font-black tabular-nums shadow-sm ${selected ? 'bg-[#ff5a00] text-white' : 'bg-white text-gray-600'}`}>
+        {count}
+      </span>
+    </button>
+  )
+}
+
 export default function TechCards() {
   const { state, dispatch } = useApp()
   const { profile } = useAuth()
@@ -223,6 +261,7 @@ export default function TechCards() {
   const [cardsError, setCardsError] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
   const [form, setForm] = useState(null)
   const [originalFingerprint, setOriginalFingerprint] = useState('')
   const [saving, setSaving] = useState(false)
@@ -236,6 +275,13 @@ export default function TechCards() {
     .filter(isActiveMenuItem)
     .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)), [state.menuItems])
   const categoriesById = useMemo(() => new Map(state.categories.map(category => [category.id, category])), [state.categories])
+  const categoryCounts = useMemo(() => activeItems.reduce((counts, item) => {
+    if (item.category_id) counts[item.category_id] = (counts[item.category_id] || 0) + 1
+    return counts
+  }, {}), [activeItems])
+  const mealCategories = useMemo(() => state.categories
+    .filter(category => category.id !== 'all' && categoryCounts[category.id])
+    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)), [categoryCounts, state.categories])
   const editorItem = menuItemId ? activeItems.find(item => item.id === menuItemId) : null
   const editorVariants = useMemo(() => editorItem
     ? getMenuItemOptionGroups(editorItem, lang, { includeUnavailable: true }).flatMap(group => group.options)
@@ -277,11 +323,25 @@ export default function TechCards() {
       const hasCard = Object.keys(cardsByItemId).some(key => key.startsWith(`${item.id}::`))
       if (filter === 'ready' && !hasCard) return false
       if (filter === 'missing' && hasCard) return false
+      if (categoryFilter !== 'all' && item.category_id !== categoryFilter) return false
       if (!needle) return true
       return [item.name_uz, item.name_ru, item.name_en, item.external_id]
         .some(value => String(value || '').toLowerCase().includes(needle))
     })
-  }, [activeItems, cardsByItemId, filter, search])
+  }, [activeItems, cardsByItemId, categoryFilter, filter, search])
+  const filteredSections = useMemo(() => {
+    const sections = mealCategories
+      .map(category => ({
+        id: category.id,
+        label: getCategoryName(category, lang),
+        items: filteredItems.filter(item => item.category_id === category.id),
+      }))
+      .filter(section => section.items.length > 0)
+    const knownCategoryIds = new Set(mealCategories.map(category => category.id))
+    const otherItems = filteredItems.filter(item => !knownCategoryIds.has(item.category_id))
+    if (otherItems.length > 0) sections.push({ id: 'other', label: l.otherCategory, items: otherItems })
+    return sections
+  }, [filteredItems, l.otherCategory, lang, mealCategories])
 
   const configuredCards = activeItems.filter(item => Object.keys(cardsByItemId).some(key => key.startsWith(`${item.id}::`)))
   const averagePortionCost = configuredCards.length
@@ -754,6 +814,25 @@ export default function TechCards() {
             <SummaryTile label={l.average} value={formatCurrency(Math.round(averagePortionCost))} icon={CircleDollarSign} tone="blue" />
           </div>
 
+          <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" aria-labelledby="tech-card-categories-heading">
+            <h2 id="tech-card-categories-heading" className="mb-3 text-base font-black text-gray-900">{l.categories}</h2>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {[
+                { id: 'all', image_url: null },
+                ...mealCategories,
+              ].map(category => (
+                <CategoryFilterTile
+                  key={category.id}
+                  category={category}
+                  label={category.id === 'all' ? l.all : getCategoryName(category, lang)}
+                  count={category.id === 'all' ? activeItems.length : categoryCounts[category.id]}
+                  selected={categoryFilter === category.id}
+                  onClick={() => setCategoryFilter(category.id)}
+                />
+              ))}
+            </div>
+          </section>
+
           <div className="mb-5 flex flex-wrap gap-3 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
             <label className="relative min-w-[220px] flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -777,45 +856,57 @@ export default function TechCards() {
               <p className="mt-1 text-xs font-semibold text-gray-400">{l.noResultsHint}</p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredItems.map(item => {
-                const card = cardsByItemId[techCardStorageKey(item.id)]
-                  || Object.entries(cardsByItemId).find(([key]) => key.startsWith(`${item.id}::`))?.[1]
-                const summary = card ? calculateTechCardSummary(card, activeItems) : null
-                const category = categoriesById.get(item.category_id)
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => navigate(`/admin/tech-cards/${encodeURIComponent(item.id)}`)}
-                    className="group flex min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
-                  >
-                    <div className="h-auto w-28 shrink-0"><TechCardImage item={item} /></div>
-                    <div className="min-w-0 flex-1 p-4">
-                      <div className="flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-base font-black text-gray-900">{getItemName(item, lang)}</p>
-                          <p className="truncate text-[11px] font-bold text-gray-400">{category ? getCategoryName(category, lang) : '—'}</p>
-                        </div>
-                        <ChevronRight size={18} className="shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-[#ff5a00]" />
-                      </div>
-                      {card ? (
-                        <>
-                          <div className="mt-3 flex flex-wrap gap-1.5">
-                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">{l.ready}</span>
-                            <span className="rounded-full bg-gray-100 px-2 py-1 text-[10px] font-black text-gray-600">{card.ingredients.length} {l.ingredients.toLowerCase()}</span>
-                            <span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-orange-700">{formatDecimal(card.portion_count, lang)} {l.portions.toLowerCase()}</span>
+            <div className="space-y-7">
+              {filteredSections.map(section => (
+                <section key={section.id} aria-labelledby={`tech-card-section-${section.id}`}>
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="h-6 w-1 rounded-full bg-[#ff5a00]" aria-hidden="true" />
+                    <h2 id={`tech-card-section-${section.id}`} className="text-lg font-black text-gray-900">{section.label}</h2>
+                    <span className="flex h-6 min-w-6 items-center justify-center rounded-lg bg-orange-100 px-1.5 text-xs font-black tabular-nums text-[#ff5a00]">{section.items.length}</span>
+                    <span className="h-px flex-1 bg-gray-200" aria-hidden="true" />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {section.items.map(item => {
+                      const card = cardsByItemId[techCardStorageKey(item.id)]
+                        || Object.entries(cardsByItemId).find(([key]) => key.startsWith(`${item.id}::`))?.[1]
+                      const summary = card ? calculateTechCardSummary(card, activeItems) : null
+                      const category = categoriesById.get(item.category_id)
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => navigate(`/admin/tech-cards/${encodeURIComponent(item.id)}`)}
+                          className="group flex min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
+                        >
+                          <div className="h-auto w-28 shrink-0"><TechCardImage item={item} /></div>
+                          <div className="min-w-0 flex-1 p-4">
+                            <div className="flex items-start gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-base font-black text-gray-900">{getItemName(item, lang)}</p>
+                                <p className="truncate text-[11px] font-bold text-gray-400">{category ? getCategoryName(category, lang) : '—'}</p>
+                              </div>
+                              <ChevronRight size={18} className="shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-[#ff5a00]" />
+                            </div>
+                            {card ? (
+                              <>
+                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">{l.ready}</span>
+                                  <span className="rounded-full bg-gray-100 px-2 py-1 text-[10px] font-black text-gray-600">{card.ingredients.length} {l.ingredients.toLowerCase()}</span>
+                                  <span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-orange-700">{formatDecimal(card.portion_count, lang)} {l.portions.toLowerCase()}</span>
+                                </div>
+                                <p className="mt-3 text-xs font-bold text-gray-400">{l.portionCost}</p>
+                                <p className="text-sm font-black tabular-nums text-gray-900">{summary.portionCost == null ? '—' : formatCurrency(Math.round(summary.portionCost))}</p>
+                              </>
+                            ) : (
+                              <div className="mt-4 rounded-xl border border-dashed border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700">{l.unsaved}</div>
+                            )}
                           </div>
-                          <p className="mt-3 text-xs font-bold text-gray-400">{l.portionCost}</p>
-                          <p className="text-sm font-black tabular-nums text-gray-900">{summary.portionCost == null ? '—' : formatCurrency(Math.round(summary.portionCost))}</p>
-                        </>
-                      ) : (
-                        <div className="mt-4 rounded-xl border border-dashed border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700">{l.unsaved}</div>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </div>

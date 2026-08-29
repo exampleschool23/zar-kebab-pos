@@ -27,6 +27,31 @@ test('Tech Cards appears as an independent Team page-access option', () => {
   assert.match(users, /FEATURE_DEFINITIONS\.filter\(feature => feature\.kind === 'page'\)/)
 })
 
+test('Tech Cards exposes a prominent meal-category filter with counts and localized names', () => {
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.match(page, /categories: 'Meal categories'/)
+  assert.match(page, /const \[categoryFilter, setCategoryFilter\] = useState\('all'\)/)
+  assert.match(page, /counts\[item\.category_id\] = \(counts\[item\.category_id\] \|\| 0\) \+ 1/)
+  assert.match(page, /item\.category_id !== categoryFilter/)
+  assert.match(page, /aria-labelledby="tech-card-categories-heading"/)
+  assert.match(page, /<CategoryFilterTile/)
+  assert.match(page, /getCategoryName\(category, lang\)/)
+  assert.match(page, /count=\{category\.id === 'all' \? activeItems\.length : categoryCounts\[category\.id\]\}/)
+})
+
+test('Tech Card meals are grouped under visible category section titles', () => {
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.match(page, /const filteredSections = useMemo/)
+  assert.match(page, /label: getCategoryName\(category, lang\)/)
+  assert.match(page, /sections\.push\(\{ id: 'other', label: l\.otherCategory, items: otherItems \}\)/)
+  assert.match(page, /filteredSections\.map\(section =>/)
+  assert.match(page, /aria-labelledby=\{`tech-card-section-\$\{section\.id\}`\}/)
+  assert.match(page, /section\.items\.length/)
+  assert.match(page, /section\.items\.map\(item =>/)
+})
+
 test('separate Tech Cards access is enforced by the profile constraint and recipe RLS', () => {
   const migration = source('supabase/140_tech_card_feature_access.sql')
 
