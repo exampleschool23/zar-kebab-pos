@@ -116,6 +116,9 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     cashIncomeTotal: 1_200_000,
     terminalIncomeTotal: 2_300_000,
     monthlyAverageCafeIncome: 3_000_000,
+    dineInIncomeTotal: 1_925_000,
+    offPremiseIncomeTotal: 875_000,
+    touristIncomeTotal: 700_000,
     dineInPercentage: 55,
     offPremisePercentage: 25,
     touristPercentage: 20,
@@ -188,9 +191,12 @@ test('daily payroll group image contains the full Russian report and renders as 
   assert.match(svg, />34,2%<\/text>/)
   assert.match(svg, />65,8%<\/text>/)
   assert.match(svg, /● ЗАЛ/)
+  assert.match(svg, /3 257 826 UZS/)
   assert.match(svg, /Обычная выручка/)
   assert.match(svg, /С собой \+ доставка/)
+  assert.match(svg, /364 512 UZS/)
   assert.match(svg, /Туристическая выручка/)
+  assert.match(svg, /3 971 662 UZS/)
   assert.match(svg, /Чистая прибыль кафе/i)
   assert.match(svg, /Начисленная зарплата/)
   assert.match(svg, /Автоматические KPI-бонусы/)

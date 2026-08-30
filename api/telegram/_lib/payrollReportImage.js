@@ -108,6 +108,9 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
   const dineInPercentage = normalizePercent(summary?.dineInPercentage)
   const offPremisePercentage = normalizePercent(summary?.offPremisePercentage)
   const touristPercentage = normalizePercent(summary?.touristPercentage)
+  const dineInIncome = normalizeAmount(summary?.dineInIncomeTotal)
+  const offPremiseIncome = normalizeAmount(summary?.offPremiseIncomeTotal)
+  const touristIncome = normalizeAmount(summary?.touristIncomeTotal)
   const firstSegmentLength = CIRCLE_LENGTH * dineInPercentage / 100
   const secondSegmentLength = CIRCLE_LENGTH * offPremisePercentage / 100
   const cafeNetProfit = Number.isFinite(Number(summary?.cafeNetProfit))
@@ -169,10 +172,13 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     ${donutPercentageLabel(touristPercentage, firstSegmentLength + secondSegmentLength, chartCenterX, chartCenterY)}
 
     <text x="664" y="560" font-size="18" font-weight="700" letter-spacing="1.6" fill="${regularColor}">● ЗАЛ</text>
+    <text x="1048" y="560" text-anchor="end" font-size="18" font-weight="700" fill="${regularColor}">${escapeSvg(formatMoney(dineInIncome))}</text>
     <text x="664" y="592" font-size="27" font-weight="700" fill="#173B3F">Обычная выручка</text>
     <text x="664" y="635" font-size="18" font-weight="700" letter-spacing="1.6" fill="${offPremiseColor}">● ВНЕ ЗАЛА</text>
+    <text x="1048" y="635" text-anchor="end" font-size="18" font-weight="700" fill="${offPremiseColor}">${escapeSvg(formatMoney(offPremiseIncome))}</text>
     <text x="664" y="667" font-size="27" font-weight="700" fill="#173B3F">С собой + доставка</text>
     <text x="664" y="710" font-size="18" font-weight="700" letter-spacing="1.6" fill="${touristColor}">● ТУРИСТЫ</text>
+    <text x="1048" y="710" text-anchor="end" font-size="18" font-weight="700" fill="${touristColor}">${escapeSvg(formatMoney(touristIncome))}</text>
     <text x="664" y="742" font-size="27" font-weight="700" fill="#173B3F">Туристическая выручка</text>
 
     <rect x="646" y="774" width="424" height="90" rx="22" fill="#EAF8F3"/>
