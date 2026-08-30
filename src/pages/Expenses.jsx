@@ -50,11 +50,13 @@ import {
   expenseCategoryLabel,
   expenseDescriptionLabel,
   expensePaymentMethodLabel,
+  getExpenseEntryMinDate,
   getExpenseHistoryDeleteTarget,
   getSalaryMonthEndDate,
   getTotalSalaryDue,
   normalizeExpenseAmount,
   normalizeExpenseEntryType,
+  isExpenseEntryDateAllowed,
   todayExpenseDate,
 } from '../lib/expenses'
 import { collectPagedRows } from '../lib/orderHistory'
@@ -123,7 +125,7 @@ function expenseTone(expense) {
   }
 }
 
-function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS, disabled = false }) {
+function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS, disabled = false, min }) {
   const inputRef = useRef(null)
 
   function openPicker(event) {
@@ -152,6 +154,7 @@ function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS, disabl
         ref={inputRef}
         type="date"
         value={value}
+        min={min}
         aria-label={formatLongDate(value, lang, value)}
         onChange={event => onChange(event.target.value)}
         className={`native-date-input cursor-pointer ${className}`}
@@ -322,6 +325,7 @@ export default function Expenses() {
       expenseNotificationFailed: 'Xarajat saqlandi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
       salaryBonus: 'Maosh bonusi',
       required: 'Sana, kategoriya, to‘lov turi va summa kerak.',
+      expenseDateLimit: 'Xarajat faqat bugun yoki oldingi 3 kalendar kun uchun kiritilishi mumkin.',
       saveFailed: 'Xarajatni saqlab bo‘lmadi.',
       loadFailed: 'Xarajatlarni yuklab bo‘lmadi.',
       migrationMissing: 'Xarajatlar jadvali hali bazada tayyor emas. Supabase SQL editorida supabase/048_expenses.sql va supabase/059_expense_income_entries.sql migratsiyalarini ishga tushiring.',
@@ -419,6 +423,7 @@ export default function Expenses() {
       expenseNotificationFailed: 'Расход сохранён, но сообщение в группу ZarKebab Investor не отправлено.',
       salaryBonus: 'Бонус к зарплате',
       required: 'Нужны дата, категория, способ оплаты и сумма.',
+      expenseDateLimit: 'Расход можно добавить только за сегодня или за предыдущие 3 календарных дня.',
       saveFailed: 'Не удалось сохранить расход.',
       loadFailed: 'Не удалось загрузить расходы.',
       migrationMissing: 'Таблица расходов ещё не готова в базе. Запустите supabase/048_expenses.sql и supabase/059_expense_income_entries.sql в Supabase SQL Editor.',
@@ -516,6 +521,7 @@ export default function Expenses() {
       expenseNotificationFailed: 'The expense was saved, but the ZarKebab Investor group notification was not sent.',
       salaryBonus: 'Salary bonus',
       required: 'Date, category, payment method, and amount are required.',
+      expenseDateLimit: 'An expense can be added only for today or the previous 3 calendar days.',
       saveFailed: 'Could not save expense.',
       loadFailed: 'Could not load expenses.',
       migrationMissing: 'Expenses table is not ready yet. Run supabase/048_expenses.sql and supabase/059_expense_income_entries.sql in Supabase SQL Editor.',
@@ -530,11 +536,14 @@ export default function Expenses() {
   const l = L[lang] || L.en
   const categoryOptions = form.entry_type === 'income' ? INCOME_CATEGORIES : MANUAL_EXPENSE_CATEGORIES
   const formGuidance = form.entry_type === 'income' ? l.recordIncomeHelp : l.recordExpenseHelp
+  const expenseEntryMinDate = getExpenseEntryMinDate()
+  const expenseDateAllowed = form.entry_type === 'income' || isExpenseEntryDateAllowed(form.expense_date)
   const canSubmitExpense = canAdd && !saving && Boolean(
     form.expense_date &&
     form.category &&
     form.payment_method &&
-    normalizeExpenseAmount(form.amount) > 0
+    normalizeExpenseAmount(form.amount) > 0 &&
+    expenseDateAllowed
   )
 
   async function loadExpenses() {
@@ -750,6 +759,10 @@ export default function Expenses() {
       return
     }
     const entryType = normalizeExpenseEntryType(form.entry_type)
+    if (entryType === 'expense' && !isExpenseEntryDateAllowed(form.expense_date)) {
+      setError(l.expenseDateLimit)
+      return
+    }
     setSaving(true)
     const payload = {
       entry_type: entryType,
@@ -975,7 +988,9 @@ export default function Expenses() {
                         lang={lang}
                         onChange={value => setForm(current => ({ ...current, expense_date: value }))}
                         disabled={saving}
+                        min={form.entry_type === 'expense' ? expenseEntryMinDate : undefined}
                       />
+                      {form.entry_type === 'expense' && <p className="mt-1 text-[11px] font-semibold text-[#9CA3AF]">{l.expenseDateLimit}</p>}
                     </Field>
                     <Field label={l.amount}>
                       <input

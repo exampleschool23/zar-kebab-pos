@@ -35,6 +35,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 
 ## Expense history and monthly estimate
 
+- Expenses allow today or three prior Tashkent dates; UI/database reject older dates. Income and unchanged history are allowed.
 - Bonus display rows are projections: deletion targets `employee_salary_bonuses.source_id`, never a synthetic display id.
 - Salary payments/accruals and Daily Bazaar totals remain protected from overview deletion.
 - Fines reduce payroll liability but are not cash expenses.

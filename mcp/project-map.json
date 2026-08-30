@@ -125,8 +125,8 @@
     },
     {
       "name": "accounting-bazaar",
-      "keywords": ["expense", "income", "estimate", "accounting", "bazaar", "supplier", "cashflow"],
-      "files": ["src/pages/Expenses.jsx", "src/pages/AccountingHistory.jsx", "src/pages/MonthlyEstimate.jsx", "src/pages/DailyBazaar.jsx", "src/pages/BazaarIngredients.jsx", "src/lib/accounting.js", "src/lib/expenses.js", "src/lib/monthlyEstimate.js", "src/lib/bazaar.js", "supabase/160_daily_bazaar_ingredient_catalog.sql", "supabase/161_reset_daily_bazaar_ingredient_catalog.sql", "supabase/162_owner_only_bazaar_ingredient_management.sql", "supabase/163_daily_bazaar_price_variance_snapshots.sql"],
+      "keywords": ["expense", "income", "estimate", "accounting", "bazaar", "supplier", "cashflow", "expense backdate limit", "previous three days"],
+      "files": ["src/pages/Expenses.jsx", "src/pages/AccountingHistory.jsx", "src/pages/MonthlyEstimate.jsx", "src/pages/DailyBazaar.jsx", "src/pages/BazaarIngredients.jsx", "src/lib/accounting.js", "src/lib/expenses.js", "src/lib/monthlyEstimate.js", "src/lib/bazaar.js", "supabase/160_daily_bazaar_ingredient_catalog.sql", "supabase/161_reset_daily_bazaar_ingredient_catalog.sql", "supabase/162_owner_only_bazaar_ingredient_management.sql", "supabase/163_daily_bazaar_price_variance_snapshots.sql", "supabase/166_expense_backdate_limit.sql"],
       "tests": ["tests/accountingPages.test.js", "tests/accountingSummary.test.js", "tests/expenses.test.js", "tests/monthlyEstimate.test.js", "tests/bazaar.test.js", "tests/bazaarMigration.test.js", "tests/bazaarIngredientCatalogMigration.test.js", "tests/bazaarIngredientCatalogResetMigration.test.js", "tests/bazaarIngredientOwnerAccessMigration.test.js", "tests/bazaarPriceVarianceMigration.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
     },
     {

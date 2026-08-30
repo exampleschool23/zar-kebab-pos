@@ -28,6 +28,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - Dashboard monthly income snapshots, finalizer cron, and configurable break-even target: `157`–`158`
   - authoritative Daily Bazaar ingredient catalog, clean reset, owner-only catalog writes, and immutable price-variance snapshots: `160`–`163`
   - immutable sold-item Tech Card ingredient snapshots and duplicate-safe daily ingredient image delivery: `164`–`165`
+  - Tashkent-calendar expense backdate enforcement: `166`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants

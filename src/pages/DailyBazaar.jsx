@@ -38,6 +38,7 @@ import { formatLongDate } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import { withWriteTimeout } from '../lib/writeTimeout'
 import { notifyTelegramInvestorExpense } from '../lib/telegramNotifications'
+import { getExpenseEntryMinDate, isExpenseEntryDateAllowed } from '../lib/expenses'
 import {
   BAZAAR_CATEGORIES,
   BAZAAR_ENTRY_CATEGORIES,
@@ -152,6 +153,7 @@ const EN = {
   updated: 'Bazaar entry and its Accounting expense were updated.',
   deleted: 'Bazaar entry removed.',
   saveFailed: 'Could not save the bazaar entry.',
+  expenseDateLimit: 'A Bazaar expense can be added only for today or the previous 3 calendar days.',
   deleteFailed: 'Could not delete the bazaar entry.',
   loadFailed: 'Could not load bazaar data',
   migrationMissing: 'Daily Bazaar is not ready in the database yet. Apply the latest bazaar migration, then refresh.',
@@ -252,6 +254,7 @@ const LABELS = {
     readOnly: 'Siz faqat ko‘rishingiz mumkin. Tarix va tahlil mavjud.', saved: 'Bozor yozuvi saqlandi va Buxgalteriyaga qo‘shildi.',
     investorNotificationFailed: 'Bozor xarajati saqlandi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
     updated: 'Bozor yozuvi va Buxgalteriyadagi xarajat yangilandi.', deleted: 'Bozor yozuvi o‘chirildi.', saveFailed: 'Bozor yozuvini saqlab bo‘lmadi.',
+    expenseDateLimit: 'Bozor xarajati faqat bugun yoki oldingi 3 kalendar kun uchun kiritilishi mumkin.',
     deleteFailed: 'Bozor yozuvini o‘chirib bo‘lmadi.', loadFailed: 'Bozor ma’lumotlarini yuklab bo‘lmadi',
     migrationMissing: 'Kunlik bozor bazada hali tayyor emas. Oxirgi bozor migratsiyasini ishga tushiring va yangilang.', refresh: 'Yangilash',
     dateRange: 'Sana oralig‘i', today: 'Bugun', week: '7 kun', month: 'Joriy oy', previousMonth: 'O‘tgan oy', from: 'Dan', to: 'Gacha',
@@ -292,6 +295,7 @@ const LABELS = {
     readOnly: 'У вас доступ только для просмотра. История и аналитика доступны.', saved: 'Запись базара сохранена и добавлена в Бухгалтерию.',
     investorNotificationFailed: 'Расход базара сохранён, но сообщение в группу ZarKebab Investor не отправлено.',
     updated: 'Запись базара и расход в Бухгалтерии обновлены.', deleted: 'Запись базара удалена.', saveFailed: 'Не удалось сохранить запись базара.',
+    expenseDateLimit: 'Расход базара можно добавить только за сегодня или за предыдущие 3 календарных дня.',
     deleteFailed: 'Не удалось удалить запись базара.', loadFailed: 'Не удалось загрузить данные базара',
     migrationMissing: 'Ежедневный базар ещё не готов в базе. Примените последнюю миграцию базара и обновите.', refresh: 'Обновить',
     dateRange: 'Период', today: 'Сегодня', week: '7 дней', month: 'Текущий месяц', previousMonth: 'Прошлый месяц', from: 'С', to: 'По',
@@ -441,6 +445,7 @@ export default function DailyBazaar() {
   const canManage = canEditFeature(profile || { role }, 'bazaar')
   const defaultBuyer = profile?.full_name || profile?.email || state.user?.name || ''
   const defaultBuyerProfileId = profile?.id || state.user?.id || ''
+  const expenseEntryMinDate = getExpenseEntryMinDate()
 
   const initialRange = useMemo(() => getBazaarRange('today'), [])
   const [tab, setTab] = useState(canManage ? 'entry' : 'history')
@@ -714,6 +719,10 @@ export default function DailyBazaar() {
     if (!canManage || saving) return
     setError('')
     setNotice('')
+    if (!form.id && !isExpenseEntryDateAllowed(form.purchase_date)) {
+      setError(l.expenseDateLimit)
+      return
+    }
     const validation = validateBazaarPurchase(form)
     setValidationErrors(validation.errors)
     if (!validation.valid) {
@@ -924,6 +933,7 @@ export default function DailyBazaar() {
                 onSubmit={savePurchase}
                 onCancelEdit={resetEntry}
                 lineHasError={lineHasError}
+                expenseEntryMinDate={expenseEntryMinDate}
               />
             </div>
           )}
@@ -1096,6 +1106,7 @@ function BazaarEntryForm({
   onSubmit,
   onCancelEdit,
   lineHasError,
+  expenseEntryMinDate,
 }) {
   return (
     <form onSubmit={onSubmit} className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_clamp(320px,22vw,380px)]">
@@ -1116,7 +1127,8 @@ function BazaarEntryForm({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label={l.purchaseDate} icon={CalendarDays}>
-              <FormattedDateInput value={form.purchase_date} lang={lang} onChange={value => onUpdateForm('purchase_date', value)} className={`${INPUT} native-date-input cursor-pointer text-transparent caret-transparent`} />
+              <FormattedDateInput value={form.purchase_date} lang={lang} onChange={value => onUpdateForm('purchase_date', value)} min={form.id ? undefined : expenseEntryMinDate} className={`${INPUT} native-date-input cursor-pointer text-transparent caret-transparent`} />
+              {!form.id && <p className="mt-1 text-[11px] font-semibold text-[#9CA3AF]">{l.expenseDateLimit}</p>}
             </Field>
             <Field label={l.buyer} icon={UserRound} error={validationErrors.some(item => item.field === 'buyer_profile_id')}>
               <select aria-invalid={validationErrors.some(item => item.field === 'buyer_profile_id')} value={form.buyer_profile_id || ''} onChange={event => onUpdateBuyer(event.target.value)} className={SELECT}>
@@ -1602,7 +1614,7 @@ function Field({ label, icon: Icon, error = false, children }) {
   )
 }
 
-function FormattedDateInput({ value, lang, onChange, className = INPUT }) {
+function FormattedDateInput({ value, lang, onChange, className = INPUT, min }) {
   const inputRef = useRef(null)
 
   function openPicker(event) {
@@ -1629,6 +1641,7 @@ function FormattedDateInput({ value, lang, onChange, className = INPUT }) {
         ref={inputRef}
         type="date"
         value={value}
+        min={min}
         aria-label={formatted}
         onChange={event => onChange(event.target.value)}
         className={`native-date-input cursor-pointer text-transparent caret-transparent ${className}`}

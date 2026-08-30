@@ -99,6 +99,19 @@ export function todayExpenseDate() {
   return toLocalDateStr(new Date().toISOString())
 }
 
+export function getExpenseEntryMinDate(today = todayExpenseDate()) {
+  const normalizedToday = /^\d{4}-\d{2}-\d{2}$/.test(String(today || ''))
+    ? String(today)
+    : todayExpenseDate()
+  return addLocalDateDays(normalizedToday, -3)
+}
+
+export function isExpenseEntryDateAllowed(expenseDate, today = todayExpenseDate()) {
+  const normalizedDate = String(expenseDate || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) return false
+  return normalizedDate >= getExpenseEntryMinDate(today)
+}
+
 export function getAccountingHistoryRange(period = 'thisMonth', today = todayExpenseDate()) {
   const normalizedToday = /^\d{4}-\d{2}-\d{2}$/.test(String(today || ''))
     ? String(today)
