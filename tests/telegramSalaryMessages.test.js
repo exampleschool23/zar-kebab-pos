@@ -131,7 +131,9 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     presentEmployeeCount: 1,
     employeeMealPerEmployeeTotal: 50_000,
     employeeMealTotal: 50_000,
-    netProfit: 225_000,
+    estimatedTaxRatePercent: 4,
+    estimatedTaxTotal: 140_000,
+    netProfit: 85_000,
   })
 
   const message = buildDailyPayrollGroupMessage(summary, '2026-07-29', 'ru')
@@ -152,7 +154,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
   assert.match(message, /Аренда:<\/b> 800 000 UZS/)
   assert.match(message, /Коммуналка:<\/b> 700 000 UZS/)
   assert.match(message, /Среднее питание сотрудников \(1 × 50 000\):<\/b> 50 000 UZS/)
-  assert.match(message, /Чистая прибыль за день:<\/b> 225 000 UZS/)
+  assert.match(message, /Оценочный soliq \(4%\):<\/b> 140 000 UZS/)
+  assert.match(message, /Чистая прибыль за день:<\/b> 85 000 UZS/)
   assert.match(message, /────────────/)
   assert.ok(
     message.indexOf('Чистая прибыль за день') < message.indexOf('Средняя дневная выручка кафе за месяц')
@@ -201,7 +204,8 @@ test('daily payroll group image contains the full Russian report and renders as 
   assert.match(svg, /Начисленная зарплата/)
   assert.match(svg, /Автоматические KPI-бонусы/)
   assert.match(svg, /Среднее питание сотрудников/)
-  assert.match(svg, /ОБЩИЙ РАСХОД · 2 354 369 UZS/)
+  assert.match(svg, /ОБЩИЙ РАСХОД · 2 658 129 UZS/)
+  assert.match(svg, /Оценочный soliq \(4%\)/)
   assert.match(svg, /Чистая прибыль за день/i)
   assert.match(svg, /Средняя дневная/i)
   assert.match(svg, /Выручка кафе за месяц/i)

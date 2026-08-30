@@ -37,6 +37,7 @@ const COPY = {
     groupRent: 'Ijara',
     groupUtilities: 'Kommunal xarajatlar',
     groupEmployeeMeals: 'Xodimlar ovqatining o‘rtacha qiymati',
+    groupEstimatedTax: 'Taxminiy soliq (4%)',
     groupNetProfit: 'Kunlik sof foyda',
     unavailable: 'Mavjud emas',
   },
@@ -68,6 +69,7 @@ const COPY = {
     groupRent: 'Аренда',
     groupUtilities: 'Коммуналка',
     groupEmployeeMeals: 'Среднее питание сотрудников',
+    groupEstimatedTax: 'Оценочный soliq (4%)',
     groupNetProfit: 'Чистая прибыль за день',
     unavailable: 'Недоступно',
   },
@@ -99,6 +101,7 @@ const COPY = {
     groupRent: 'Rent',
     groupUtilities: 'Utilities',
     groupEmployeeMeals: 'Avg employees meal',
+    groupEstimatedTax: 'Estimated soliq (4%)',
     groupNetProfit: 'Daily net profit',
     unavailable: 'Unavailable',
   },
@@ -285,6 +288,8 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     ? Math.round(Number(grossProfit))
     : null
   const cafeIncomeTotal = normalizeExpenseAmount(cafeIncome)
+  const estimatedTaxRatePercent = 4
+  const estimatedTaxTotal = Math.round(cafeIncomeTotal * estimatedTaxRatePercent / 100)
   const cashIncomeTotal = normalizeExpenseAmount(cashIncome)
   const terminalIncomeTotal = normalizeExpenseAmount(terminalIncome)
   const monthlyCafeIncomeTotal = normalizeExpenseAmount(monthToDateCafeIncome)
@@ -327,9 +332,11 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     presentEmployeeCount,
     employeeMealPerEmployeeTotal,
     employeeMealTotal,
+    estimatedTaxRatePercent,
+    estimatedTaxTotal,
     netProfit: normalizedGrossProfit == null
       ? null
-      : normalizedGrossProfit - salaryTotal - kpiBonusTotal - rentTotal - utilitiesTotal - employeeMealTotal,
+      : normalizedGrossProfit - salaryTotal - kpiBonusTotal - rentTotal - utilitiesTotal - employeeMealTotal - estimatedTaxTotal,
   }
 }
 
@@ -341,6 +348,7 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
   const rentTotal = normalizeExpenseAmount(summary?.rentTotal)
   const utilitiesTotal = normalizeExpenseAmount(summary?.utilitiesTotal)
   const employeeMealTotal = normalizeExpenseAmount(summary?.employeeMealTotal)
+  const estimatedTaxTotal = normalizeExpenseAmount(summary?.estimatedTaxTotal)
   const employeeMealPerEmployeeTotal = normalizeExpenseAmount(summary?.employeeMealPerEmployeeTotal)
   const presentEmployeeCount = normalizeExpenseAmount(summary?.presentEmployeeCount)
   const cafeIncomeTotal = normalizeExpenseAmount(summary?.cafeIncomeTotal)
@@ -381,6 +389,7 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
     `<b>${copy.groupRent}:</b> ${formatSalaryNotificationAmount(rentTotal)} ${copy.currency}`,
     `<b>${copy.groupUtilities}:</b> ${formatSalaryNotificationAmount(utilitiesTotal)} ${copy.currency}`,
     `<b>${copy.groupEmployeeMeals} (${presentEmployeeCount} × ${formatSalaryNotificationAmount(employeeMealPerEmployeeTotal)}):</b> ${formatSalaryNotificationAmount(employeeMealTotal)} ${copy.currency}`,
+    `<b>${copy.groupEstimatedTax}:</b> ${formatSalaryNotificationAmount(estimatedTaxTotal)} ${copy.currency}`,
     '',
     '────────────',
     '',

@@ -125,6 +125,7 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     + normalizeAmount(summary?.rentTotal)
     + normalizeAmount(summary?.utilitiesTotal)
     + normalizeAmount(summary?.employeeMealTotal)
+    + normalizeAmount(summary?.estimatedTaxTotal)
   const chartCenterX = 365
   const chartCenterY = 613
   const regularColor = '#0D9488'
@@ -191,11 +192,12 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     <text x="150" y="1003" font-size="24" font-weight="800" letter-spacing="2" fill="#173B3F">РАСХОДЫ И НАЧИСЛЕНИЯ</text>
     <text x="1094" y="1003" text-anchor="end" font-size="20" font-weight="800" fill="#173B3F">ОБЩИЙ РАСХОД · ${escapeSvg(formatMoney(overallExpense))}</text>
     <line x1="106" y1="1032" x2="1094" y2="1032" stroke="#E7EEEC" stroke-width="2"/>
-    ${expenseRow('Начисленная зарплата', formatMoney(summary?.salaryTotal), 1088, { accent: regularColor })}
-    ${expenseRow('Автоматические KPI-бонусы', formatMoney(summary?.kpiBonusTotal), 1152, { accent: touristColor })}
-    ${expenseRow('Аренда', formatMoney(summary?.rentTotal), 1216, { accent: '#3B82F6' })}
-    ${expenseRow('Коммуналка', formatMoney(summary?.utilitiesTotal), 1280, { accent: '#EAB308' })}
-    ${expenseRow(employeeMealLabel, formatMoney(summary?.employeeMealTotal), 1344, { labelSize: 26, accent: offPremiseColor })}
+    ${expenseRow('Начисленная зарплата', formatMoney(summary?.salaryTotal), 1076, { accent: regularColor })}
+    ${expenseRow('Автоматические KPI-бонусы', formatMoney(summary?.kpiBonusTotal), 1134, { accent: touristColor })}
+    ${expenseRow('Аренда', formatMoney(summary?.rentTotal), 1192, { accent: '#3B82F6' })}
+    ${expenseRow('Коммуналка', formatMoney(summary?.utilitiesTotal), 1250, { accent: '#EAB308' })}
+    ${expenseRow(employeeMealLabel, formatMoney(summary?.employeeMealTotal), 1308, { labelSize: 26, accent: offPremiseColor })}
+    ${expenseRow('Оценочный soliq (4%)', formatMoney(summary?.estimatedTaxTotal), 1366, { labelSize: 26, accent: '#EF4444' })}
 
     <rect x="68" y="1418" width="1064" height="190" rx="32" fill="url(#average)"/>
     <line x1="600" y1="1448" x2="600" y2="1578" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="2"/>
