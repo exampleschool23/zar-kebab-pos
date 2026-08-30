@@ -1463,7 +1463,34 @@ async function notifyInvestorExpense(supabase, user, expenseId) {
       (total, entry) => total + (Number(entry?.amount) || 0),
       0
     )
-    const text = buildInvestorExpenseGroupMessage(claimed.data, target.language, monthTotal)
+    let bazaarPurchase = null
+    if (claimed.data.category === 'products_bazaar') {
+      const { data: purchase, error: purchaseError } = await supabase
+        .from('bazaar_purchases')
+        .select(`
+          id,
+          purchase_date,
+          total_amount,
+          bazaar_purchase_items (
+            id,
+            product_name,
+            product_key,
+            category,
+            quantity,
+            unit,
+            line_total,
+            normal_unit_price,
+            normal_line_total,
+            price_difference,
+            sort_order
+          )
+        `)
+        .eq('expense_id', normalizedExpenseId)
+        .maybeSingle()
+      if (purchaseError) throw purchaseError
+      bazaarPurchase = purchase
+    }
+    const text = buildInvestorExpenseGroupMessage(claimed.data, target.language, monthTotal, bazaarPurchase)
     const response = await sendTelegramMessage(target.chatId, text)
     const sentAt = new Date().toISOString()
     const telegramMessageId = getTelegramMessageId(response)

@@ -5,6 +5,7 @@ const TABLE_CHECKS = [
   { name: 'table_zones', columns: ['id', 'name', 'sort_order', 'is_active'] },
   { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned', 'price_mode', 'opened_by_name', 'completed_by_name', 'stock_deducted_at'] },
   { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity', 'sale_unit', 'base_price', 'unit_price', 'price_mode', 'selected_options', 'cost_price', 'category_id_snapshot', 'category_snapshot_captured', 'tech_card_component_snapshot'] },
+  { name: 'order_item_tech_card_ingredient_snapshots', columns: ['order_item_id', 'ingredients', 'is_complete', 'captured_at'], access: 'service_only' },
   { name: 'order_kitchen_rounds', columns: ['order_id', 'kitchen_round_id', 'item_ids', 'table_id', 'submitted_by', 'submitted_at', 'created_at'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
   { name: 'business_settings', columns: ['id', 'service_rate_pct', 'tourist_service_rate_pct', 'restaurant_name', 'monthly_rent_uzs', 'monthly_utilities_uzs', 'average_daily_employee_meal_uzs', 'average_daily_break_even_income_uzs', 'receipt_marketing', 'auto_print', 'auto_print_kitchen_check'] },
@@ -14,11 +15,12 @@ const TABLE_CHECKS = [
   { name: 'expense_investor_notification_deliveries', columns: ['expense_id', 'target_key', 'expense_date', 'category', 'payment_method', 'amount', 'vendor', 'description', 'actor_id', 'actor_name', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'created_at', 'updated_at'], access: 'service_only' },
   { name: 'salary_absence_undo_notification_deliveries', columns: ['audit_id', 'absence_id', 'salary_profile_id', 'absence_date', 'employee_name', 'actor_id', 'actor_name', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'created_at', 'updated_at'], access: 'service_only' },
   { name: 'bazaar_purchases', columns: ['id', 'request_key', 'expense_id', 'purchase_date', 'payment_method', 'buyer_profile_id', 'buyer_name', 'notes', 'total_amount', 'entry_source', 'created_by_name', 'created_at', 'updated_at'] },
-  { name: 'bazaar_purchase_items', columns: ['id', 'purchase_id', 'product_name', 'product_key', 'category', 'quantity', 'unit', 'line_total', 'sort_order', 'notes'] },
-  { name: 'bazaar_product_catalog', columns: ['product_key', 'product_name', 'category', 'unit', 'last_purchase_date', 'created_at', 'updated_at'] },
+  { name: 'bazaar_purchase_items', columns: ['id', 'purchase_id', 'product_name', 'product_key', 'category', 'quantity', 'unit', 'line_total', 'normal_unit_price', 'normal_line_total', 'price_difference', 'sort_order', 'notes'] },
+  { name: 'bazaar_product_catalog', columns: ['product_key', 'product_name', 'category', 'unit', 'normal_unit_price', 'is_active', 'is_catalog_managed', 'last_purchase_date', 'created_at', 'updated_at'] },
   { name: 'bazaar_purchase_audit', columns: ['id', 'purchase_id', 'action', 'old_snapshot', 'new_snapshot', 'changed_by', 'changed_by_name', 'changed_at'] },
   { name: 'daily_bazaar_telegram_deliveries', columns: ['purchase_date', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'updated_at'], access: 'service_only' },
   { name: 'daily_payroll_group_notification_deliveries', columns: ['business_date', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'updated_at'], access: 'service_only' },
+  { name: 'daily_ingredient_consumption_deliveries', columns: ['business_date', 'target_key', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'updated_at'], access: 'service_only' },
   { name: 'menu_items', columns: ['id', 'external_id', 'name_uz', 'name_ru', 'name_en', 'price', 'old_price', 'sale_unit', 'grams', 'millilitres', 'kcal', 'stock_count', 'image_url', 'media_urls', 'option_groups', 'cashier_only', 'public_hidden', 'waiter_hidden', 'visible_from_time', 'visible_until_time', 'sort_order', 'deleted_at'] },
   { name: 'menu_item_unavailable_notification_deliveries', columns: ['id', 'menu_item_id', 'menu_item_name', 'actor_id', 'actor_name', 'availability_event', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'created_at', 'updated_at'] },
   { name: 'daily_unavailable_menu_notification_deliveries', columns: ['business_date', 'target_key', 'item_count', 'item_ids', 'item_names', 'item_categories', 'status', 'telegram_chat_id', 'telegram_message_id', 'error_message', 'attempted_at', 'sent_at', 'created_at', 'updated_at'], access: 'service_only' },
@@ -61,11 +63,13 @@ const MIGRATION_HINTS = {
   salary_absence_undo_notification_deliveries: 'Run supabase/148_salary_absence_undo_investor_notifications.sql',
   profiles: 'Run supabase/064_profile_feature_access.sql or the latest supabase/097_daily_bazaar.sql',
   bazaar_purchases: 'Run supabase/097_daily_bazaar.sql',
-  bazaar_purchase_items: 'Run supabase/097_daily_bazaar.sql',
-  bazaar_product_catalog: 'Run supabase/097_daily_bazaar.sql',
+  bazaar_purchase_items: 'Run supabase/097_daily_bazaar.sql and supabase/163_daily_bazaar_price_variance_snapshots.sql',
+  bazaar_product_catalog: 'Run supabase/097_daily_bazaar.sql, supabase/160_daily_bazaar_ingredient_catalog.sql, and supabase/161_reset_daily_bazaar_ingredient_catalog.sql',
   bazaar_purchase_audit: 'Run supabase/097_daily_bazaar.sql',
   daily_bazaar_telegram_deliveries: 'Run supabase/131_daily_bazaar_telegram_deliveries.sql',
   daily_payroll_group_notification_deliveries: 'Run supabase/134_daily_payroll_group_notifications.sql',
+  daily_ingredient_consumption_deliveries: 'Run supabase/165_daily_ingredient_consumption_deliveries.sql',
+  order_item_tech_card_ingredient_snapshots: 'Run supabase/164_order_item_tech_card_ingredient_snapshots.sql',
   order_items: 'Run supabase/070_price_modes.sql, supabase/072_order_item_selected_options.sql, supabase/098_menu_item_costs_and_profit.sql, supabase/105_menu_items_sold_by_weight.sql, supabase/114_freeze_historical_order_prices_and_costs.sql, supabase/147_financial_report_history_snapshots.sql, and supabase/149_tech_card_menu_item_components.sql',
   order_kitchen_rounds: 'Run supabase/128_durable_kitchen_round_receipts.sql',
   order_payment_audit: 'Run supabase/010_order_payment_audit_and_guards.sql',
@@ -109,6 +113,9 @@ const MIGRATION_HINTS = {
   current_staff_can_write: 'Run the latest supabase/097_daily_bazaar.sql',
   save_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
   delete_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
+  save_bazaar_ingredient: 'Run supabase/160_daily_bazaar_ingredient_catalog.sql',
+  set_bazaar_ingredient_active: 'Run supabase/160_daily_bazaar_ingredient_catalog.sql',
+  current_staff_can_manage_bazaar_ingredients: 'Run supabase/162_owner_only_bazaar_ingredient_management.sql',
   create_employee_salary_telegram_link: 'Run supabase/107_employee_salary_telegram_notifications.sql',
   generate_daily_kpi_bonuses: 'Run supabase/129_daily_kpi_bonuses.sql',
   generate_employee_daily_meal_expense: 'Run supabase/147_financial_report_history_snapshots.sql',
@@ -188,8 +195,11 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'current_staff_can_view_menu_catalog', {}))
   checks.push(await checkRpc(dbClient, 'current_staff_can_access', { feature_key: 'bazaar' }))
   checks.push(await checkRpc(dbClient, 'current_staff_can_write', { feature_key: 'bazaar' }))
+  checks.push(await checkRpc(dbClient, 'current_staff_can_manage_bazaar_ingredients', {}))
   checks.push(await checkRpc(dbClient, 'save_bazaar_purchase'))
   checks.push(await checkRpc(dbClient, 'delete_bazaar_purchase', { p_purchase_id: '00000000-0000-0000-0000-000000000000' }))
+  checks.push(await checkRpc(dbClient, 'save_bazaar_ingredient'))
+  checks.push(await checkRpc(dbClient, 'set_bazaar_ingredient_active', { p_product_key: '__db_health_check__', p_is_active: false }))
   checks.push(await checkRpc(dbClient, 'get_accounting_paid_order_summary', {
     p_date_from: '2000-01-01',
     p_date_to: '2000-01-01',

@@ -31,6 +31,8 @@ Read this guide for dashboard analytics, reports, historical drilldowns, immutab
 - Category reports prefer the snapshot over the product's current category.
 - `employee_daily_meal_expenses` supplies frozen completed-day employee-meal values.
 - KPI rules cannot be inserted into finalized periods; bounded recovery eventually fills older missing KPI/meal dates.
+- Daily ingredient consumption is theoretical Tech Card usage from paid, non-cancelled order-item quantities and service-only immutable `order_item_tech_card_ingredient_snapshots`, including nested recipe components. Weight is normalized to kg, volume to litres, and pieces remain counts; incompatible units are never combined.
+- Ingredient value uses the saved per-unit Tech Card price. Missing legacy snapshots are reported as uncovered sales rather than filled from today's recipe.
 
 ## Dashboard presentation
 

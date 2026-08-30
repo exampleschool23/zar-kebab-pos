@@ -15,6 +15,7 @@ import {
   Scale,
   Search,
   ShoppingBasket,
+  Tags,
   Terminal,
   Trash2,
   TrendingDown,
@@ -23,7 +24,9 @@ import {
   WalletCards,
   X,
 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
+import BazaarIngredientPicker from '../components/BazaarIngredientPicker'
 import DateRangePicker from '../components/DateRangePicker'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
@@ -45,6 +48,9 @@ import {
   bazaarPaymentMethodLabel,
   bazaarUnitLabel,
   calculateBazaarTotal,
+  calculateBazaarNormalTotal,
+  calculateBazaarExpectedTotal,
+  calculateBazaarPriceDifference,
   filterBazaarPurchases,
   formatBazaarQuantity,
   getBazaarPurchaseScopedItems,
@@ -53,6 +59,8 @@ import {
   getBazaarRange,
   getBazaarSubmissionAttempt,
   getBazaarUnitCost,
+  getBazaarNormalLineTotal,
+  getBazaarPriceDifference,
   normalizeBazaarProductKey,
   normalizeBazaarPurchase,
   normalizeBazaarQuantity,
@@ -84,6 +92,9 @@ const PURCHASE_COLUMNS = `
     quantity,
     unit,
     line_total,
+    normal_unit_price,
+    normal_line_total,
+    price_difference,
     sort_order,
     notes
   )
@@ -100,6 +111,7 @@ const EN = {
   entry: 'New entry',
   history: 'History',
   analytics: 'Analytics',
+  ingredientCatalog: 'Ingredients & normal prices',
   newEntry: 'New bazaar entry',
   editEntry: 'Edit bazaar entry',
   entryHint: 'One entry should use one payment method. Add another entry when payment methods differ.',
@@ -115,6 +127,11 @@ const EN = {
   item: 'Item',
   product: 'Product',
   productPlaceholder: 'e.g. Tomatoes',
+  selectProduct: 'Select an ingredient',
+  noIngredients: 'No active ingredients. Add ingredients and normal prices first.',
+  normalPrice: 'Normal price',
+  normalTotal: 'Normal total',
+  difference: 'Difference',
   category: 'Category',
   quantity: 'Quantity',
   unit: 'Unit',
@@ -222,13 +239,13 @@ const LABELS = {
   uz: {
     title: 'Kunlik bozor',
     sub: 'Nima kelgani va bozor pulining har bir so‘mi qayerga ketganini aniq yozing',
-    entry: 'Yangi yozuv', history: 'Tarix', analytics: 'Tahlil',
+    entry: 'Yangi yozuv', history: 'Tarix', analytics: 'Tahlil', ingredientCatalog: 'Masalliqlar va odatiy narxlar',
     newEntry: 'Yangi bozor yozuvi', editEntry: 'Bozor yozuvini tahrirlash',
     entryHint: 'Bitta yozuvda bitta to‘lov turidan foydalaning. To‘lov turi boshqacha bo‘lsa, alohida yozuv qo‘shing.',
     purchaseDate: 'Xarid sanasi', buyer: 'Xarid qilgan', selectBuyer: 'Xodimni tanlang',
     payment: 'To‘lov turi', notes: 'Umumiy izoh', notesPlaceholder: 'Bozor xaridi haqida ixtiyoriy izoh',
     products: 'Kelgan mahsulotlar', productsHint: 'Miqdor va to‘langan summa asosiy ma’lumot. Birlik narxi avtomatik hisoblanadi.',
-    addProduct: 'Mahsulot qo‘shish', item: 'Qator', product: 'Mahsulot', productPlaceholder: 'Masalan: Pomidor', category: 'Kategoriya',
+    addProduct: 'Mahsulot qo‘shish', item: 'Qator', product: 'Mahsulot', productPlaceholder: 'Masalan: Pomidor', selectProduct: 'Masalliqni tanlang', noIngredients: 'Faol masalliq yo‘q. Avval masalliq va odatiy narxlarni qo‘shing.', normalPrice: 'Odatiy narx', normalTotal: 'Odatiy jami', difference: 'Farq', category: 'Kategoriya',
     quantity: 'Miqdor', unit: 'Birlik', totalPaid: 'To‘langan jami', unitCost: 'Birlik narxi', lineNotes: 'Qator izohi',
     lineNotesPlaceholder: 'Navi, sotuvchi, maqsad…', removeLine: 'Qatorni o‘chirish', totalBazaar: 'Bozor jami', itemCount: 'Mahsulot qatorlari',
     exactHint: 'Bu jami Buxgalteriyaga bitta Bozor mahsulotlari xarajati sifatida tushadi.', save: 'Bozorni saqlash', saving: 'Saqlanmoqda…', cancelEdit: 'Tahrirni bekor qilish',
@@ -262,13 +279,13 @@ const LABELS = {
   ru: {
     title: 'Ежедневный базар',
     sub: 'Фиксируйте, что именно пришло и куда ушёл каждый сум',
-    entry: 'Новая запись', history: 'История', analytics: 'Аналитика',
+    entry: 'Новая запись', history: 'История', analytics: 'Аналитика', ingredientCatalog: 'Ингредиенты и обычные цены',
     newEntry: 'Новая запись базара', editEntry: 'Изменить запись базара',
     entryHint: 'В одной записи используйте один способ оплаты. Для другого способа создайте новую запись.',
     purchaseDate: 'Дата покупки', buyer: 'Закупщик', selectBuyer: 'Выберите сотрудника',
     payment: 'Способ оплаты', notes: 'Общее примечание', notesPlaceholder: 'Необязательный контекст закупки',
     products: 'Поступившие продукты', productsHint: 'Количество и оплаченная сумма — источник истины. Цена за единицу считается автоматически.',
-    addProduct: 'Добавить продукт', item: 'Строка', product: 'Продукт', productPlaceholder: 'Например: Помидоры', category: 'Категория',
+    addProduct: 'Добавить продукт', item: 'Строка', product: 'Продукт', productPlaceholder: 'Например: Помидоры', selectProduct: 'Выберите ингредиент', noIngredients: 'Нет активных ингредиентов. Сначала добавьте ингредиенты и обычные цены.', normalPrice: 'Обычная цена', normalTotal: 'Итого по обычной цене', difference: 'Разница', category: 'Категория',
     quantity: 'Количество', unit: 'Единица', totalPaid: 'Оплачено всего', unitCost: 'Цена за единицу', lineNotes: 'Примечание',
     lineNotesPlaceholder: 'Сорт, продавец, назначение…', removeLine: 'Удалить строку', totalBazaar: 'Итого базар', itemCount: 'Строк продуктов',
     exactHint: 'Эта сумма попадёт в Бухгалтерию одним расходом «Продукты / базар».', save: 'Сохранить базар', saving: 'Сохраняется…', cancelEdit: 'Отменить изменение',
@@ -319,6 +336,7 @@ function blankItem(overrides = {}) {
   lineSequence += 1
   return {
     _key: `bazaar-line-${Date.now()}-${lineSequence}`,
+    product_key: '',
     product_name: '',
     category: 'vegetables',
     quantity: '',
@@ -351,11 +369,14 @@ function formFromPurchase(purchase) {
     buyer_name: normalized.buyer_name,
     notes: normalized.notes,
     items: normalized.items.map(item => blankItem({
+      id: item.id,
       product_name: item.product_name,
+      product_key: item.product_key,
       category: item.category,
       quantity: String(item.quantity || ''),
       unit: item.unit,
       line_total: String(item.line_total || ''),
+      normal_unit_price: item.normal_unit_price || '',
       notes: item.notes,
     })),
   }
@@ -398,7 +419,20 @@ function validationMessage(validationError, l) {
     : message
 }
 
+function formatBazaarSignedCurrency(value) {
+  const amount = Math.round(Number(value) || 0)
+  return amount > 0 ? `+${formatCurrency(amount)}` : formatCurrency(amount)
+}
+
+function bazaarDifferenceTone(value) {
+  const amount = Number(value) || 0
+  if (amount > 0) return 'border-red-200 bg-red-50 text-red-700'
+  if (amount < 0) return 'border-green-200 bg-green-50 text-green-700'
+  return 'border-[#E5E7EB] bg-white text-[#6B7280]'
+}
+
 export default function DailyBazaar() {
+  const navigate = useNavigate()
   const { state } = useApp()
   const { profile } = useAuth()
   const lang = state.lang || 'ru'
@@ -460,7 +494,9 @@ export default function DailyBazaar() {
             .order('full_name'),
           supabase
             .from('bazaar_product_catalog')
-            .select('product_key, product_name, category, unit, last_purchase_date, updated_at')
+            .select('product_key, product_name, category, unit, normal_unit_price, is_active, is_catalog_managed, last_purchase_date, updated_at')
+            .eq('is_catalog_managed', true)
+            .eq('is_active', true)
             .order('last_purchase_date', { ascending: false })
             .order('updated_at', { ascending: false }),
         ])
@@ -524,21 +560,16 @@ export default function DailyBazaar() {
     return () => { requestRef.current += 1 }
   }, [loadPurchases])
 
-  const productSuggestions = useMemo(() => {
-    const suggestions = new Map()
-    for (const product of catalogProducts) {
-      const key = normalizeBazaarProductKey(product.product_key || product.product_name)
-      if (key) suggestions.set(key, { name: product.product_name, category: product.category, unit: product.unit })
-    }
-    for (const purchase of purchases) {
-      for (const item of purchase.items || []) {
-        if (!item.product_name) continue
-        const key = item.product_key || normalizeBazaarProductKey(item.product_name)
-        if (!suggestions.has(key)) suggestions.set(key, { name: item.product_name, category: item.category, unit: item.unit })
-      }
-    }
-    return [...suggestions.values()].sort((a, b) => a.name.localeCompare(b.name))
-  }, [catalogProducts, purchases])
+  const productSuggestions = useMemo(() => catalogProducts
+    .map(product => ({
+      key: product.product_key || normalizeBazaarProductKey(product.product_name),
+      name: product.product_name,
+      category: product.category,
+      unit: product.unit,
+      normalUnitPrice: Number(product.normal_unit_price) || 0,
+    }))
+    .filter(product => product.key && product.name)
+    .sort((a, b) => a.name.localeCompare(b.name)), [catalogProducts])
 
   const buyerOptions = useMemo(() => {
     const options = new Map()
@@ -588,6 +619,8 @@ export default function DailyBazaar() {
   }), [purchases, dateFrom, dateTo, categoryFilter, paymentFilter])
 
   const formTotal = useMemo(() => calculateBazaarTotal(form.items), [form.items])
+  const formNormalTotal = useMemo(() => calculateBazaarExpectedTotal(form.items), [form.items])
+  const formDifference = useMemo(() => calculateBazaarPriceDifference(form.items), [form.items])
 
   function selectRange(key) {
     const range = getBazaarRange(key)
@@ -621,21 +654,35 @@ export default function DailyBazaar() {
   function updateItem(index, field, value) {
     setForm(current => ({
       ...current,
-      items: current.items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
+      items: current.items.map((item, itemIndex) => {
+        if (itemIndex !== index) return item
+        if (field === 'quantity' && item._uses_normal_price) {
+          return {
+            ...item,
+            quantity: value,
+            line_total: String(calculateBazaarNormalTotal(value, item.normal_unit_price) || ''),
+          }
+        }
+        return { ...item, [field]: value, ...(field === 'line_total' ? { _uses_normal_price: false } : {}) }
+      }),
     }))
     setValidationErrors(current => current.filter(item => item.index !== index || item.field !== field))
   }
 
   function updateProductName(index, value) {
-    const matched = productSuggestions.find(item => normalizeBazaarProductKey(item.name) === normalizeBazaarProductKey(value))
+    const matched = productSuggestions.find(item => item.key === value)
     setForm(current => ({
       ...current,
       items: current.items.map((item, itemIndex) => itemIndex === index ? {
         ...item,
-        product_name: value,
+        product_key: matched?.key || '',
+        product_name: matched?.name || '',
         ...(matched ? {
           ...(ENTRY_CATEGORY_KEYS.has(matched.category) ? { category: matched.category } : {}),
           unit: matched.unit,
+          normal_unit_price: matched.normalUnitPrice,
+          line_total: String(calculateBazaarNormalTotal(item.quantity, matched.normalUnitPrice) || ''),
+          _uses_normal_price: true,
         } : {}),
       } : item),
     }))
@@ -683,6 +730,8 @@ export default function DailyBazaar() {
       buyer_name: normalized.buyer_name,
       notes: normalized.notes,
       items: normalized.items.map(item => ({
+        id: item.id || undefined,
+        product_key: item.product_key,
         product_name: item.product_name,
         category: item.category,
         quantity: item.quantity,
@@ -711,22 +760,6 @@ export default function DailyBazaar() {
       )
       if (saveError) throw saveError
 
-      setCatalogProducts(current => {
-        const next = new Map(current.map(product => [
-          product.product_key || normalizeBazaarProductKey(product.product_name),
-          product,
-        ]))
-        for (const item of normalized.items) {
-          next.set(item.product_key, {
-            product_key: item.product_key,
-            product_name: item.product_name,
-            category: item.category,
-            unit: item.unit,
-            last_purchase_date: normalized.purchase_date,
-          })
-        }
-        return [...next.values()]
-      })
       resetEntry()
       setNotice(wasEditing ? l.updated : l.saved)
       if (!wasEditing && savedPurchase?.expense_id) {
@@ -799,15 +832,18 @@ export default function DailyBazaar() {
                 <p className="mt-1 max-w-3xl text-sm font-medium text-[#6B7280]">{l.sub}</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={loadPurchases}
-              disabled={loading}
-              className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280] shadow-sm transition-colors hover:border-orange-200 hover:text-[#ff5a00] disabled:opacity-60"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              {l.refresh}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {canManage && <button type="button" onClick={() => navigate('/admin/bazaar/ingredients')} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-3 text-xs font-black text-white"><Tags size={14} />{l.ingredientCatalog}</button>}
+              <button
+                type="button"
+                onClick={loadPurchases}
+                disabled={loading}
+                className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280] shadow-sm transition-colors hover:border-orange-200 hover:text-[#ff5a00] disabled:opacity-60"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                {l.refresh}
+              </button>
+            </div>
           </div>
 
           <div role="tablist" aria-label={l.title} className="mb-5 flex gap-1 overflow-x-auto rounded-2xl border border-[#E5E7EB] bg-white p-1.5 shadow-sm">
@@ -874,6 +910,8 @@ export default function DailyBazaar() {
                 form={form}
                 buyerOptions={buyerOptions}
                 total={formTotal}
+                normalTotal={formNormalTotal}
+                difference={formDifference}
                 saving={saving}
                 suggestions={productSuggestions}
                 validationErrors={validationErrors}
@@ -1044,6 +1082,8 @@ function BazaarEntryForm({
   form,
   buyerOptions,
   total,
+  normalTotal,
+  difference,
   saving,
   suggestions,
   validationErrors,
@@ -1126,15 +1166,20 @@ function BazaarEntryForm({
             </button>
           </div>
 
-          <datalist id="bazaar-product-suggestions">
-            {suggestions.map(suggestion => <option key={normalizeBazaarProductKey(suggestion.name)} value={suggestion.name} />)}
-          </datalist>
+          {suggestions.length === 0 && (
+            <div className="mx-3 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 sm:mx-4">
+              <span>{l.noIngredients}</span>
+              <Link to="/admin/bazaar/ingredients" className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-black text-amber-800 shadow-sm"><Tags size={14} />{l.ingredientCatalog}</Link>
+            </div>
+          )}
 
           <div className="space-y-3 p-3 sm:p-4">
             {form.items.map((item, index) => {
               const quantity = normalizeBazaarQuantity(item.quantity)
               const base = normalizeBazaarQuantityToBase(quantity, item.unit)
               const unitCost = getBazaarUnitCost(item)
+              const normalLineTotal = getBazaarNormalLineTotal(item)
+              const priceDifference = getBazaarPriceDifference(item)
               return (
                 <div key={item._key} className="rounded-2xl border border-[#E5E7EB] bg-[#FBFCFD] p-3 sm:p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
@@ -1146,10 +1191,10 @@ function BazaarEntryForm({
 
                   <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(220px,1.6fr)_minmax(145px,0.8fr)_120px_110px_minmax(170px,0.85fr)]">
                     <Field label={l.product} error={lineHasError(index, 'product_name')}>
-                      <input aria-invalid={lineHasError(index, 'product_name')} list="bazaar-product-suggestions" value={item.product_name} onChange={event => onUpdateProduct(index, event.target.value)} placeholder={l.productPlaceholder} className={`${INPUT} ${lineHasError(index, 'product_name') ? 'border-red-300 bg-red-50' : ''}`} />
+                      <BazaarIngredientPicker suggestions={suggestions} value={item.product_key || ''} onChange={value => onUpdateProduct(index, value)} lang={lang} disabled={saving} invalid={lineHasError(index, 'product_name')} />
                     </Field>
                     <Field label={l.category} error={lineHasError(index, 'category')}>
-                      <select aria-invalid={lineHasError(index, 'category')} value={item.category} onChange={event => onUpdateItem(index, 'category', event.target.value)} className={SELECT}>
+                      <select aria-invalid={lineHasError(index, 'category')} value={item.category} disabled className={SELECT}>
                         {BAZAAR_ENTRY_CATEGORIES.map(category => <option key={category.key} value={category.key}>{bazaarCategoryLabel(category.key, lang)}</option>)}
                       </select>
                     </Field>
@@ -1157,7 +1202,7 @@ function BazaarEntryForm({
                       <input aria-invalid={lineHasError(index, 'quantity')} type="text" inputMode="decimal" value={item.quantity} onChange={event => onUpdateItem(index, 'quantity', event.target.value.replace(/[^0-9.,]/g, ''))} placeholder="0" className={`${INPUT} tabular-nums ${lineHasError(index, 'quantity') ? 'border-red-300 bg-red-50' : ''}`} />
                     </Field>
                     <Field label={l.unit} error={lineHasError(index, 'unit')}>
-                      <select aria-invalid={lineHasError(index, 'unit')} value={item.unit} onChange={event => onUpdateItem(index, 'unit', event.target.value)} className={SELECT}>
+                      <select aria-invalid={lineHasError(index, 'unit')} value={item.unit} disabled className={SELECT}>
                         {BAZAAR_ENTRY_UNITS.map(unit => <option key={unit.key} value={unit.key}>{bazaarUnitLabel(unit.key, lang)}</option>)}
                       </select>
                     </Field>
@@ -1166,15 +1211,19 @@ function BazaarEntryForm({
                     </Field>
                   </div>
 
-                  <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px] md:items-end">
+                  <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px] md:items-end">
                     <Field label={l.lineNotes}>
                       <input value={item.notes} onChange={event => onUpdateItem(index, 'notes', event.target.value)} placeholder={l.lineNotesPlaceholder} className={INPUT} />
                     </Field>
                     <div className="rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-right">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.unitCost}</p>
+                      <p className="text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.unitCost} · {l.normalPrice} {item.normal_unit_price ? formatCurrency(item.normal_unit_price) : '—'}</p>
                       <p className="mt-0.5 text-sm font-black text-[#1F2937] tabular-nums">
                         {unitCost > 0 ? `${formatCurrency(Math.round(unitCost))} / ${bazaarUnitLabel(base.unit, lang)}` : '—'}
                       </p>
+                    </div>
+                    <div className={`rounded-xl border px-3 py-2.5 text-right ${bazaarDifferenceTone(priceDifference)}`}>
+                      <p className="text-[10px] font-black uppercase tracking-wide opacity-70">{l.difference}</p>
+                      <p className="mt-0.5 text-sm font-black tabular-nums">{normalLineTotal > 0 && item.line_total ? formatBazaarSignedCurrency(priceDifference) : '—'}</p>
                     </div>
                   </div>
                 </div>
@@ -1190,7 +1239,17 @@ function BazaarEntryForm({
         </div>
         <p className="text-xs font-black uppercase tracking-wide text-[#9CA3AF]">{l.totalBazaar}</p>
         <p className="mt-1 break-words text-3xl font-black text-[#1F2937] tabular-nums">{formatCurrency(total)}</p>
-        <div className="mt-4 flex items-center justify-between rounded-xl bg-[#F9FAFB] px-3 py-2.5 text-xs font-bold text-[#6B7280]">
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-[#F9FAFB] px-3 py-2.5">
+            <p className="text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.normalTotal}</p>
+            <p className="mt-1 text-sm font-black text-[#1F2937] tabular-nums">{formatCurrency(normalTotal)}</p>
+          </div>
+          <div className={`rounded-xl border px-3 py-2.5 ${bazaarDifferenceTone(difference)}`}>
+            <p className="text-[10px] font-black uppercase tracking-wide opacity-70">{l.difference}</p>
+            <p className="mt-1 text-sm font-black tabular-nums">{formatBazaarSignedCurrency(difference)}</p>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center justify-between rounded-xl bg-[#F9FAFB] px-3 py-2.5 text-xs font-bold text-[#6B7280]">
           <span>{l.itemCount}</span>
           <span className="font-black text-[#1F2937]">{form.items.length}</span>
         </div>

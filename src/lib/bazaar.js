@@ -245,6 +245,38 @@ export function getBazaarUnitCost(item = {}) {
   return base.quantity > 0 ? total / base.quantity : 0
 }
 
+export function calculateBazaarNormalTotal(quantity, normalUnitPrice) {
+  const normalizedQuantity = normalizeBazaarQuantity(quantity)
+  const normalizedPrice = normalizeBazaarMoney(normalUnitPrice)
+  return normalizedQuantity > 0 && normalizedPrice > 0
+    ? Math.round(normalizedQuantity * normalizedPrice)
+    : 0
+}
+
+export function getBazaarNormalLineTotal(item = {}) {
+  const savedTotal = Number(item.normal_line_total)
+  if (Number.isFinite(savedTotal) && savedTotal > 0) return Math.round(savedTotal)
+  return calculateBazaarNormalTotal(item.quantity, item.normal_unit_price)
+}
+
+export function getBazaarPriceDifference(item = {}) {
+  const savedDifference = Number(item.price_difference)
+  if (item.price_difference !== undefined && item.price_difference !== null && Number.isFinite(savedDifference)) {
+    return Math.round(savedDifference)
+  }
+  const paid = normalizeBazaarMoney(item.line_total ?? item.lineTotal)
+  const normal = getBazaarNormalLineTotal(item)
+  return paid > 0 && normal > 0 ? paid - normal : 0
+}
+
+export function calculateBazaarExpectedTotal(items = []) {
+  return (items || []).reduce((total, item) => total + getBazaarNormalLineTotal(item), 0)
+}
+
+export function calculateBazaarPriceDifference(items = []) {
+  return (items || []).reduce((total, item) => total + getBazaarPriceDifference(item), 0)
+}
+
 export function validateBazaarPurchase(purchase = {}) {
   const normalized = normalizeBazaarPurchase(purchase)
   const rawItems = purchase.bazaar_purchase_items || purchase.items || []

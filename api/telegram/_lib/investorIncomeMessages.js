@@ -5,6 +5,13 @@ import {
 } from '../../../src/lib/expenses.js'
 import { formatCurrency } from '../../../src/lib/formatCurrency.js'
 import { formatLongDate } from '../../../src/lib/dateFormat.js'
+import {
+  calculateBazaarExpectedTotal,
+  calculateBazaarPriceDifference,
+  getBazaarNormalLineTotal,
+  getBazaarPriceDifference,
+  normalizeBazaarPurchase,
+} from '../../../src/lib/bazaar.js'
 import { escapeTelegramHtml } from './telegram.js'
 
 const COPY = {
@@ -47,6 +54,9 @@ const EXPENSE_COPY = {
     vendor: 'Yetkazuvchi yoki oluvchi',
     description: 'Izoh',
     addedBy: 'Kiritgan',
+    normalTotal: 'Odatiy narx bo‘yicha jami',
+    difference: 'Farq',
+    paid: 'To‘langan',
   },
   ru: {
     title: 'Новый расход',
@@ -57,6 +67,9 @@ const EXPENSE_COPY = {
     vendor: 'Поставщик или получатель',
     description: 'Описание',
     addedBy: 'Добавил(а)',
+    normalTotal: 'Итого по обычной цене',
+    difference: 'Разница',
+    paid: 'Оплачено',
   },
   en: {
     title: 'New expense',
@@ -67,6 +80,9 @@ const EXPENSE_COPY = {
     vendor: 'Supplier or recipient',
     description: 'Description',
     addedBy: 'Added by',
+    normalTotal: 'Normal-price total',
+    difference: 'Difference',
+    paid: 'Paid',
   },
 }
 
@@ -96,7 +112,12 @@ export function buildInvestorIncomeGroupMessage(expense, language = 'ru', curren
   return lines.join('\n')
 }
 
-export function buildInvestorExpenseGroupMessage(expense, language = 'ru', monthTotal = null) {
+function formatSignedCurrency(value) {
+  const amount = Math.round(Number(value) || 0)
+  return amount > 0 ? `+${formatCurrency(amount)}` : formatCurrency(amount)
+}
+
+export function buildInvestorExpenseGroupMessage(expense, language = 'ru', monthTotal = null, bazaarPurchase = null) {
   const lang = normalizeLanguage(language)
   const copy = EXPENSE_COPY[lang]
   const lines = [
@@ -112,6 +133,24 @@ export function buildInvestorExpenseGroupMessage(expense, language = 'ru', month
   }
   if (expense?.actor_name || expense?.created_by_name) {
     lines.push(`${copy.addedBy}: ${escapeTelegramHtml(expense.actor_name || expense.created_by_name)}`)
+  }
+  if (bazaarPurchase) {
+    const normalized = normalizeBazaarPurchase(bazaarPurchase)
+    for (const [index, item] of normalized.items.entries()) {
+      const normalLineTotal = getBazaarNormalLineTotal(item)
+      const difference = getBazaarPriceDifference(item)
+      lines.push(
+        '',
+        `${index + 1}. <b>${escapeTelegramHtml(item.product_name)}</b>`,
+        `${copy.normalTotal}: ${escapeTelegramHtml(formatCurrency(normalLineTotal))} · ${copy.paid}: ${escapeTelegramHtml(formatCurrency(item.line_total))}`,
+        `${copy.difference}: <b>${escapeTelegramHtml(formatSignedCurrency(difference))}</b>`,
+      )
+    }
+    lines.push(
+      '',
+      `${copy.normalTotal}: <b>${escapeTelegramHtml(formatCurrency(calculateBazaarExpectedTotal(normalized.items)))}</b>`,
+      `${copy.difference}: <b>${escapeTelegramHtml(formatSignedCurrency(calculateBazaarPriceDifference(normalized.items)))}</b>`,
+    )
   }
   if (monthTotal !== null && Number.isFinite(Number(monthTotal))) {
     lines.push('', `${copy.monthTotal}: <b>${escapeTelegramHtml(formatCurrency(monthTotal))}</b>`)

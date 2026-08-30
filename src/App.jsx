@@ -38,6 +38,7 @@ const AdminUsers = lazy(() => import('./pages/AdminUsers'))
 const AdminLoyalty = lazy(() => import('./pages/AdminLoyalty'))
 const Expenses = lazy(() => import('./pages/Expenses'))
 const DailyBazaar = lazy(() => import('./pages/DailyBazaar'))
+const BazaarIngredients = lazy(() => import('./pages/BazaarIngredients'))
 const AccountingHistory = lazy(() => import('./pages/AccountingHistory'))
 const Salaries = lazy(() => import('./pages/Salaries'))
 const MonthlyEstimate = lazy(() => import('./pages/MonthlyEstimate'))
@@ -417,6 +418,9 @@ function InternalAppRoutes({ adminHost = false }) {
         } />
         <Route path="/admin/bazaar" element={
           <LazyProtectedRoute page="bazaar"><DailyBazaar /></LazyProtectedRoute>
+        } />
+        <Route path="/admin/bazaar/ingredients" element={
+          <LazyProtectedRoute page="bazaar"><BazaarIngredients /></LazyProtectedRoute>
         } />
         <Route path="/admin/accounting/history" element={
           <LazyProtectedRoute page="expenses"><AccountingHistory /></LazyProtectedRoute>

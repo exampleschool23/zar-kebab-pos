@@ -17,6 +17,12 @@ import {
   buildDailyPayrollGroupReportPng,
 } from './_lib/payrollReportImage.js'
 import {
+  buildDailyBazaarReportCaption,
+  buildDailyBazaarReportPng,
+  buildDailyIngredientConsumptionReportCaption,
+  buildDailyIngredientConsumptionReportPng,
+} from './_lib/dailyOperationsReportImages.js'
+import {
   buildDailyUnavailableMenuTeamMessage,
   getRussianMenuCategoryName,
   getRussianMenuItemName,
@@ -31,6 +37,7 @@ import { getOrdersCostTotal, hasOrdersCostCoverage } from '../../src/lib/profit.
 import { allocateMonthlySalaryToDate } from '../../src/lib/expenses.js'
 import { isDineInOrderType } from '../../src/lib/orderTypes.js'
 import { PRICE_MODE_TOURIST } from '../../src/lib/priceModes.js'
+import { aggregateIngredientConsumption } from '../../src/lib/ingredientConsumption.js'
 
 const KPI_RETRY_LOOKBACK_DAYS = 7
 const KPI_MISSING_DATE_BATCH_SIZE = 31
@@ -507,6 +514,9 @@ async function loadDailyBazaarPurchases(supabase, purchaseDate) {
         quantity,
         unit,
         line_total,
+        normal_unit_price,
+        normal_line_total,
+        price_difference,
         sort_order
       )
     `)
@@ -594,8 +604,6 @@ async function markDailyBazaarDeliverySent(supabase, purchaseDate, target, messa
 
 async function sendDailyBazaarNotification(supabase, purchaseDate) {
   const purchases = await loadDailyBazaarPurchases(supabase, purchaseDate)
-  if (purchases.length === 0) return { businessDate: purchaseDate, status: 'empty' }
-
   const target = await loadInvestorGroupTarget(supabase)
   if (!target.chatId) throw new Error('ZarKebab Investor Telegram group is not configured')
   const delivery = await claimDailyBazaarDelivery(supabase, purchaseDate)
@@ -603,10 +611,21 @@ async function sendDailyBazaarNotification(supabase, purchaseDate) {
 
   let telegramMessageId = ''
   try {
-    const response = await sendTelegramMessage(
+    let reportImage = null
+    try {
+      reportImage = await buildDailyBazaarReportPng(purchases, purchaseDate)
+    } catch (error) {
+      console.error('[telegram/daily-salary] Bazaar image unavailable; sending text fallback:', error)
+    }
+    const response = reportImage
+      ? await sendTelegramPhoto(target.chatId, reportImage, {
+          caption: buildDailyBazaarReportCaption(purchaseDate),
+          filename: `zar-kebab-bazaar-${purchaseDate}.png`,
+        })
+      : await sendTelegramMessage(
       target.chatId,
       buildDailyBazaarGroupMessage(purchases, purchaseDate, target.language)
-    )
+        )
     telegramMessageId = getTelegramMessageId(response)
     await markDailyBazaarDeliverySent(supabase, purchaseDate, target, telegramMessageId)
     return { businessDate: purchaseDate, status: 'sent' }
@@ -620,6 +639,108 @@ async function sendDailyBazaarNotification(supabase, purchaseDate) {
       }).eq('purchase_date', purchaseDate)
     } else {
       console.error('[telegram/daily-salary] Bazaar message sent but delivery status was not persisted:', error)
+    }
+    throw error
+  }
+}
+
+async function loadDailyIngredientConsumption(supabase, businessDate) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('status, payment_status, items:order_items(quantity, status, ingredient_snapshot:order_item_tech_card_ingredient_snapshots(ingredients, is_complete))')
+    .eq('payment_status', 'paid')
+    .gte('paid_at', `${businessDate}T00:00:00+05:00`)
+    .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`)
+  if (error) throw error
+  return aggregateIngredientConsumption(data || [])
+}
+
+async function claimDailyIngredientConsumptionDelivery(supabase, businessDate) {
+  const table = 'daily_ingredient_consumption_deliveries'
+  const { data: existing, error: existingError } = await supabase
+    .from(table)
+    .select('*')
+    .eq('business_date', businessDate)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (existing?.status === 'sent' || existing?.status === 'skipped') return null
+  if (existing?.status === 'pending' && !canRetryPending(existing.attempted_at)) return null
+
+  const now = new Date().toISOString()
+  if (!existing) {
+    const created = await supabase.from(table).insert({
+      business_date: businessDate,
+      target_key: 'salary_events',
+      status: 'pending',
+      error_message: '',
+      attempted_at: now,
+      sent_at: null,
+      updated_at: now,
+    }).select('*').single()
+    if (created.error?.code === '23505') return null
+    if (created.error) throw created.error
+    return created.data
+  }
+
+  let claim = supabase.from(table).update({
+    status: 'pending',
+    telegram_chat_id: null,
+    telegram_message_id: null,
+    error_message: '',
+    attempted_at: now,
+    sent_at: null,
+    updated_at: now,
+  }).eq('business_date', businessDate).eq('status', existing.status)
+  if (existing.attempted_at) claim = claim.eq('attempted_at', existing.attempted_at)
+  else claim = claim.is('attempted_at', null)
+  const claimed = await claim.select('*').maybeSingle()
+  if (claimed.error) throw claimed.error
+  return claimed.data || null
+}
+
+async function sendDailyIngredientConsumptionNotification(supabase, businessDate) {
+  const delivery = await claimDailyIngredientConsumptionDelivery(supabase, businessDate)
+  if (!delivery) return { businessDate, status: 'duplicate' }
+  const target = await loadInvestorGroupTarget(supabase)
+  if (!target.chatId) {
+    await supabase.from('daily_ingredient_consumption_deliveries').update({
+      status: 'skipped',
+      error_message: 'ZarKebab Investor Telegram group is not configured',
+      updated_at: new Date().toISOString(),
+    }).eq('business_date', businessDate)
+    return { businessDate, status: 'skipped' }
+  }
+
+  let telegramMessageId = ''
+  try {
+    const summary = await loadDailyIngredientConsumption(supabase, businessDate)
+    const reportImage = await buildDailyIngredientConsumptionReportPng(summary, businessDate)
+    const response = await sendTelegramPhoto(target.chatId, reportImage, {
+      caption: buildDailyIngredientConsumptionReportCaption(businessDate),
+      filename: `zar-kebab-ingredient-consumption-${businessDate}.png`,
+    })
+    telegramMessageId = getTelegramMessageId(response)
+    const sentAt = new Date().toISOString()
+    const updated = await supabase.from('daily_ingredient_consumption_deliveries').update({
+      status: 'sent',
+      telegram_chat_id: target.chatId,
+      telegram_message_id: telegramMessageId,
+      error_message: '',
+      sent_at: sentAt,
+      updated_at: sentAt,
+    }).eq('business_date', businessDate).select('business_date').maybeSingle()
+    if (updated.error || !updated.data) throw updated.error || new Error('Ingredient delivery row disappeared')
+    return { businessDate, status: 'sent', ingredientCount: summary.ingredients.length }
+  } catch (error) {
+    if (!telegramMessageId) {
+      await supabase.from('daily_ingredient_consumption_deliveries').update({
+        status: 'failed',
+        telegram_chat_id: target.chatId,
+        error_message: String(error?.message || error).slice(0, 1000),
+        updated_at: new Date().toISOString(),
+      }).eq('business_date', businessDate)
+    } else {
+      console.error('[telegram/daily-salary] ingredient image sent but delivery status was not persisted:', error)
     }
     throw error
   }
@@ -1149,6 +1270,7 @@ export default async function handler(req, res) {
     const summaryRetryDates = new Set(getCompletedTashkentDates(now, KPI_RETRY_LOOKBACK_DAYS))
     const dailySummaryRuns = []
     const dailyBazaarRuns = []
+    const dailyIngredientConsumptionRuns = []
     const dailyPayrollGroupRuns = []
 
     for (const kpiRun of kpiRuns) {
@@ -1194,17 +1316,34 @@ export default async function handler(req, res) {
           }
         }
         dailyBazaarRuns.push(bazaarResult)
+        let ingredientConsumptionResult
+        try {
+          ingredientConsumptionResult = await sendDailyIngredientConsumptionNotification(
+            supabase,
+            kpiRun.businessDate
+          )
+        } catch (error) {
+          ingredientConsumptionResult = {
+            businessDate: kpiRun.businessDate,
+            status: 'failed',
+            error: String(error?.message || error).slice(0, 1000),
+          }
+        }
+        dailyIngredientConsumptionRuns.push(ingredientConsumptionResult)
         dailySummaryRuns.push({
           businessDate: kpiRun.businessDate,
           status: failedCount > 0
             ? 'partial'
-            : payrollGroupResult.status === 'failed' || bazaarResult.status === 'failed'
+            : payrollGroupResult.status === 'failed'
+              || bazaarResult.status === 'failed'
+              || ingredientConsumptionResult.status === 'failed'
               ? 'partial'
               : 'completed',
           sentCount: summaryResults.filter(result => result.status === 'sent').length,
           failedCount,
           payrollGroupStatus: payrollGroupResult.status,
           bazaarStatus: bazaarResult.status,
+          ingredientConsumptionStatus: ingredientConsumptionResult.status,
           results: summaryResults,
         })
       } catch (error) {
@@ -1214,6 +1353,11 @@ export default async function handler(req, res) {
           error: 'Daily payroll group notification could not be prepared',
         })
         dailyBazaarRuns.push({
+          businessDate: kpiRun.businessDate,
+          status: 'deferred',
+          error: 'Daily salary notifications could not be prepared',
+        })
+        dailyIngredientConsumptionRuns.push({
           businessDate: kpiRun.businessDate,
           status: 'deferred',
           error: 'Daily salary notifications could not be prepared',
@@ -1266,6 +1410,9 @@ export default async function handler(req, res) {
       dailyBazaarRuns,
       dailyBazaarSentCount: dailyBazaarRuns.filter(result => result.status === 'sent').length,
       dailyBazaarFailedCount: dailyBazaarRuns.filter(result => result.status === 'failed').length,
+      dailyIngredientConsumptionRuns,
+      dailyIngredientConsumptionSentCount: dailyIngredientConsumptionRuns.filter(result => result.status === 'sent').length,
+      dailyIngredientConsumptionFailedCount: dailyIngredientConsumptionRuns.filter(result => result.status === 'failed').length,
       kpiDeliverySentCount: kpiDeliveries.filter(result => result.status === 'sent').length,
       kpiDeliveryPartialCount: kpiDeliveries.filter(result => result.status === 'partial').length,
       kpiDeliveryFailedCount: kpiDeliveries.filter(result => result.status === 'failed').length,

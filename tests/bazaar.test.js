@@ -8,6 +8,9 @@ import {
   BAZAAR_PAYMENT_METHODS,
   BAZAAR_UNITS,
   bazaarRangeDayCount,
+  calculateBazaarNormalTotal,
+  calculateBazaarExpectedTotal,
+  calculateBazaarPriceDifference,
   calculateBazaarTotal,
   filterBazaarPurchases,
   getBazaarPurchaseScopedItems,
@@ -15,6 +18,8 @@ import {
   getBazaarRange,
   getBazaarSubmissionAttempt,
   getBazaarUnitCost,
+  getBazaarNormalLineTotal,
+  getBazaarPriceDifference,
   getBazaarDisplayQuantity,
   normalizeBazaarMoney,
   normalizeBazaarProductKey,
@@ -47,6 +52,27 @@ test('daily bazaar normalizes product names, decimal quantities, money, and comp
   assert.equal(BAZAAR_PAYMENT_METHODS.some(method => method.key === 'terminal'), true)
   assert.equal(BAZAAR_ENTRY_PAYMENT_METHODS.some(method => method.key === 'terminal'), false)
   assert.equal(BAZAAR_ENTRY_CATEGORIES.some(category => category.key === 'other'), false)
+})
+
+test('daily bazaar normal price suggests a quantity-scaled paid total', () => {
+  assert.equal(calculateBazaarNormalTotal('2,5', 80_000), 200_000)
+  assert.equal(calculateBazaarNormalTotal(3, '12 000'), 36_000)
+  assert.equal(calculateBazaarNormalTotal('', 80_000), 0)
+})
+
+test('daily bazaar compares paid totals with immutable normal-price snapshots', () => {
+  const items = [
+    { quantity: 1, line_total: 8_000, normal_unit_price: 7_500 },
+    { quantity: 2, line_total: 19_000, normal_unit_price: 10_000 },
+  ]
+  assert.equal(getBazaarNormalLineTotal(items[0]), 7_500)
+  assert.equal(getBazaarPriceDifference(items[0]), 500)
+  assert.equal(calculateBazaarExpectedTotal(items), 27_500)
+  assert.equal(calculateBazaarPriceDifference(items), -500)
+
+  const saved = { ...items[0], normal_line_total: 7_000, price_difference: 1_000 }
+  assert.equal(getBazaarNormalLineTotal(saved), 7_000)
+  assert.equal(getBazaarPriceDifference(saved), 1_000)
 })
 
 test('daily bazaar quick ranges are inclusive and handle month/year boundaries', () => {

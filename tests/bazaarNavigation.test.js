@@ -14,6 +14,16 @@ test('Daily Bazaar route is lazy-loaded and feature-protected', () => {
     app,
     /<Route path="\/admin\/bazaar" element=\{\s*<LazyProtectedRoute page="bazaar"><DailyBazaar \/><\/LazyProtectedRoute>\s*\} \/>/,
   )
+  assert.match(app, /const BazaarIngredients = lazy\(\(\) => import\('\.\/pages\/BazaarIngredients'\)\)/)
+  assert.match(app, /<Route path="\/admin\/bazaar\/ingredients" element=\{\s*<LazyProtectedRoute page="bazaar"><BazaarIngredients \/><\/LazyProtectedRoute>\s*\} \/>/)
+})
+
+test('only owners receive Bazaar ingredient management controls', () => {
+  const page = readSource('src/pages/BazaarIngredients.jsx')
+
+  assert.match(page, /normalizeRole\(profile\?\.role \|\| state\.user\?\.role \|\| 'guest'\) === 'owner'/)
+  assert.match(page, /\{canManage \? \(/)
+  assert.match(page, /\{canManage && <div className="flex justify-end gap-2">/)
 })
 
 test('Daily Bazaar appears in the sidebar and becomes active on its route', () => {
@@ -50,12 +60,29 @@ test('Accounting links to Daily Bazaar and prevents duplicate manual bazaar expe
 
 test('Daily Bazaar entry uses active employees, cash/card entry methods, and durable product suggestions', () => {
   const page = readSource('src/pages/DailyBazaar.jsx')
+  const picker = readSource('src/components/BazaarIngredientPicker.jsx')
 
   assert.match(page, /from\('profiles'\)[\s\S]{0,180}\.eq\('status', 'active'\)/)
   assert.match(page, /value=\{form\.buyer_profile_id \|\| ''\}/)
   assert.match(page, /BAZAAR_ENTRY_PAYMENT_METHODS\.map/)
   assert.match(page, /BAZAAR_ENTRY_CATEGORIES\.map/)
   assert.match(page, /from\('bazaar_product_catalog'\)/)
+  assert.match(page, /\.eq\('is_catalog_managed', true\)/)
+  assert.match(page, /\.eq\('is_active', true\)/)
+  assert.match(page, /value=\{item\.product_key \|\| ''\}/)
+  assert.match(page, /navigate\('\/admin\/bazaar\/ingredients'\)/)
+  assert.doesNotMatch(page, /list="bazaar-product-suggestions"/)
+  assert.doesNotMatch(page, /onChange=\{event => onUpdateItem\(index, 'category'/)
+  assert.match(page, /<BazaarIngredientPicker suggestions=\{suggestions\} value=\{item\.product_key \|\| ''\}/)
+  assert.match(picker, /BAZAAR_ENTRY_CATEGORIES/)
+  assert.match(picker, /visibleSections\.map\(section/)
+  assert.match(picker, /onMouseEnter=\{\(\) => setActiveCategory\(section\.key\)\}/)
+  assert.match(picker, /placeholder=\{l\.search\}/)
+  assert.match(picker, /role="listbox"/)
+  assert.match(page, /getBazaarPriceDifference\(item\)/)
+  assert.match(page, /formatBazaarSignedCurrency\(priceDifference\)/)
+  assert.match(page, /normalTotal=\{formNormalTotal\}/)
+  assert.match(page, /difference=\{formDifference\}/)
   assert.match(page, /\.eq\('status', 'active'\)[\s\S]{0,100}\.neq\('role', 'guest'\)/)
   assert.match(page, /withWriteTimeout\([\s\S]{0,180}save_bazaar_purchase/)
   assert.match(page, /<fieldset disabled=\{saving\} className="contents">/)

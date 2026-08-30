@@ -51,11 +51,18 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 
 ## Daily Bazaar
 
-Main files: `src/pages/DailyBazaar.jsx`, `src/lib/bazaar.js`, and its migration.
+Main files: `src/pages/DailyBazaar.jsx`, `src/pages/BazaarIngredients.jsx`, `src/lib/bazaar.js`, and migrations `097`, `160`–`163`.
 
 - A receipt contains one or more product lines with product, category, quantity, unit, and exact amount.
 - Store the buyer profile id plus historical name snapshot. New entries use cash or card; historical terminal values remain readable.
-- Product suggestions come from `bazaar_product_catalog`, not the selected history range.
+- New purchase lines choose an active canonical ingredient from `bazaar_product_catalog`; arbitrary product names are not accepted.
+- `/admin/bazaar/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Names are immutable after creation; archive a misspelling and add the corrected ingredient.
+- Ingredient catalog add/edit/archive actions are owner-only in both the UI and database. Other staff with Bazaar access may view the catalog; normal Daily Bazaar purchase permissions are unchanged.
+- Migration `161` starts this managed list empty: older free-text suggestions remain hidden compatibility records, while all Daily Bazaar purchases and item snapshots stay intact.
+- Normal unit price suggests the line total, but the exact paid total remains editable and is the historical Accounting source of truth.
+- Each saved line snapshots its normal unit price, quantity-scaled normal total, and signed difference (`paid - normal`). Entry UI and Investor Telegram show per-line and overall differences; positive means paid above normal and negative means paid below normal.
+- Editing a durable line reuses its saved normal-price snapshot even when the current ingredient catalog price has changed.
+- Catalog deletion is archival. Existing purchase lines keep their historical name, category, unit, and exact paid amount snapshots.
 - Keep ISO dates internally and use shared date-format helpers for display.
 - The server calculates totals. Create retries reuse a request UUID.
 - Save/edit/delete atomically maintains exactly one linked `expenses` row with `products_bazaar`; do not ask for duplicate Accounting entry.

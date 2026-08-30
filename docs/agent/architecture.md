@@ -16,7 +16,7 @@ Read this guide for app startup, authentication, routes, permissions, shared sta
 - Waiter routes: `/waiter/tables`, `/waiter/order/:tableId`, `/waiter/take-away`.
 - Kitchen check: `/kitchen-check/:orderId`; the retired `/kitchen` screen redirects to `/admin`.
 - Cashier routes: `/cashier/tables`, bill and receipt routes.
-- Admin routes include dashboard, menu, tech cards, tables, users, reports, audit, settings, Accounting, Salaries, and Daily Bazaar.
+- Admin routes include dashboard, menu, tech cards, tables, users, reports, audit, settings, Accounting, Salaries, Daily Bazaar, and its ingredient catalog at `/admin/bazaar/ingredients`.
 - Centralize role and feature rules in `src/lib/permissions.js`. Do not duplicate access decisions in pages without matching database enforcement.
 
 ## State architecture

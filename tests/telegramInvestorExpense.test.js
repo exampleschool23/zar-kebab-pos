@@ -87,6 +87,25 @@ test('Investor expense message localizes the Daily Bazaar fallback description',
   assert.doesNotMatch(message, /Daily Bazaar purchase/)
 })
 
+test('Investor Bazaar expense message includes line and overall normal-price differences', () => {
+  const message = buildInvestorExpenseGroupMessage({
+    amount: 8_000,
+    expense_date: '2026-08-26',
+    category: 'products_bazaar',
+    description: 'Daily Bazaar purchase (1 item)',
+    actor_name: 'Анна',
+  }, 'en', null, {
+    bazaar_purchase_items: [{
+      id: 'line-1', product_name: 'Kartoshka', quantity: 1, unit: 'kg', line_total: 8_000,
+      normal_unit_price: 7_500, normal_line_total: 7_500, price_difference: 500, sort_order: 0,
+    }],
+  })
+
+  assert.match(message, /Kartoshka/)
+  assert.match(message, /Normal-price total: 7\D500 UZS · Paid: 8\D000 UZS/)
+  assert.match(message, /Difference: <b>\+500 UZS<\/b>/)
+})
+
 test('new expenses queue immutable Investor delivery snapshots without replaying history', () => {
   assert.match(migration, /expense_investor_notification_deliveries/)
   assert.match(migration, /expense_id\s+uuid primary key references public\.expenses\(id\) on delete cascade/i)
@@ -115,7 +134,9 @@ test('Investor expense delivery is creator-bound, Bazaar-authorized, and duplica
   assert.match(endpoint, /canRetryInvestorExpenseDelivery/)
   assert.match(endpoint, /PENDING_DELIVERY_RETRY_MS/)
   assert.match(endpoint, /loadSalaryGroupTarget\(supabase\)/)
-  assert.match(endpoint, /buildInvestorExpenseGroupMessage\(claimed\.data, target\.language, monthTotal\)/)
+  assert.match(endpoint, /from\('bazaar_purchases'\)/)
+  assert.match(endpoint, /normal_unit_price,[\s\S]*normal_line_total,[\s\S]*price_difference/)
+  assert.match(endpoint, /buildInvestorExpenseGroupMessage\(claimed\.data, target\.language, monthTotal, bazaarPurchase\)/)
   assert.match(endpoint, /target: delivery\?\.target_key \|\| 'salary_events'/)
   assert.match(endpoint, /telegram_message_id: telegramMessageId/)
 })

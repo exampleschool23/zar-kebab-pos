@@ -316,6 +316,7 @@ test('database health reports missing tables and missing RPC', async () => {
     'create_menu_item_with_cost',
     'create_menu_item_with_media_and_cost',
     'current_staff_can_access',
+    'current_staff_can_manage_bazaar_ingredients',
     'current_staff_can_view_menu_catalog',
     'current_staff_can_write',
     'delete_bazaar_purchase',
@@ -328,8 +329,10 @@ test('database health reports missing tables and missing RPC', async () => {
     'kitchen_round_receipts_version',
     'order_payments',
     'recall_table_from_cashier',
+    'save_bazaar_ingredient',
     'save_bazaar_purchase',
     'save_menu_item_tech_card',
+    'set_bazaar_ingredient_active',
     'settle_loyalty_wallet_payment',
     'settle_orders_payment',
     'submit_order_to_kitchen',
@@ -345,8 +348,11 @@ test('database health reports missing tables and missing RPC', async () => {
   assert.match(result.failed.find(check => check.name === 'current_staff_can_view_menu_catalog').hint, /095_read_only_menu_catalog_access/)
   assert.match(result.failed.find(check => check.name === 'current_staff_can_access').hint, /097_daily_bazaar/)
   assert.match(result.failed.find(check => check.name === 'current_staff_can_write').hint, /097_daily_bazaar/)
+  assert.match(result.failed.find(check => check.name === 'current_staff_can_manage_bazaar_ingredients').hint, /162_owner_only_bazaar_ingredient_management/)
   assert.match(result.failed.find(check => check.name === 'save_bazaar_purchase').hint, /097_daily_bazaar/)
   assert.match(result.failed.find(check => check.name === 'delete_bazaar_purchase').hint, /097_daily_bazaar/)
+  assert.match(result.failed.find(check => check.name === 'save_bazaar_ingredient').hint, /160_daily_bazaar_ingredient_catalog/)
+  assert.match(result.failed.find(check => check.name === 'set_bazaar_ingredient_active').hint, /160_daily_bazaar_ingredient_catalog/)
   assert.match(result.failed.find(check => check.name === 'get_accounting_paid_order_summary').hint, /109_accounting_paid_order_summary/)
   assert.match(result.failed.find(check => check.name === 'generate_daily_kpi_bonuses').hint, /129_daily_kpi_bonuses/)
 })
