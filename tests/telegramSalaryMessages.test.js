@@ -97,6 +97,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     { status: 'skipped_absent', bonus_amount: 0 },
   ], '2026-07-29', {
     cafeIncome: 3_500_000,
+    cashIncome: 1_200_000,
+    terminalIncome: 2_300_000,
     monthToDateCafeIncome: 87_000_000,
     monthToDateCalendarDayCount: 29,
     regularDineInIncome: 1_925_000,
@@ -111,6 +113,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
   assert.deepEqual(summary, {
     date: '2026-07-29',
     cafeIncomeTotal: 3_500_000,
+    cashIncomeTotal: 1_200_000,
+    terminalIncomeTotal: 2_300_000,
     monthlyAverageCafeIncome: 3_000_000,
     dineInPercentage: 55,
     offPremisePercentage: 25,
@@ -132,6 +136,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
   assert.match(message, /📅 29-июля/)
   assert.doesNotMatch(message, /29\.07\.2026/)
   assert.match(message, /Выручка кафе за день:<\/b> 3 500 000 UZS/)
+  assert.match(message, /Наличные:<\/b> 1 200 000 UZS/)
+  assert.match(message, /Терминал:<\/b> 2 300 000 UZS/)
   assert.match(message, /Средняя дневная выручка кафе за месяц:<\/b> 3 000 000 UZS/)
   assert.match(message, /Доля обычной выручки в зале:<\/b> 55%/)
   assert.match(message, /Доля обычной выручки с собой \+ доставка:<\/b> 25%/)
@@ -156,6 +162,8 @@ test('daily payroll group image contains the full Russian report and renders as 
     { status: 'generated', bonus_amount: 485_015 },
   ], '2026-08-27', {
     cafeIncome: 7_594_000,
+    cashIncome: 2_594_000,
+    terminalIncome: 5_000_000,
     monthToDateCafeIncome: 175_500_000,
     monthToDateCalendarDayCount: 27,
     regularDineInIncome: 3_257_826,
@@ -173,6 +181,12 @@ test('daily payroll group image contains the full Russian report and renders as 
   assert.doesNotMatch(svg, /Зарплата, KPI и прибыль/)
   assert.doesNotMatch(svg, /27-августа/)
   assert.match(svg, /7 594 000 UZS/)
+  assert.match(svg, /НАЛИЧНЫЕ/)
+  assert.match(svg, /2 594 000 UZS/)
+  assert.match(svg, /ТЕРМИНАЛ/)
+  assert.match(svg, /5 000 000 UZS/)
+  assert.match(svg, />34,2%<\/text>/)
+  assert.match(svg, />65,8%<\/text>/)
   assert.match(svg, /● ЗАЛ/)
   assert.match(svg, /Обычная выручка/)
   assert.match(svg, /С собой \+ доставка/)

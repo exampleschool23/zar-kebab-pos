@@ -94,6 +94,17 @@ function expenseRow(label, value, y, { labelSize = 29, accent = '#173B3F' } = {}
 
 export function buildDailyPayrollGroupReportSvg(summary, date) {
   const cafeIncome = normalizeAmount(summary?.cafeIncomeTotal)
+  const cashIncome = normalizeAmount(summary?.cashIncomeTotal)
+  const terminalIncome = normalizeAmount(summary?.terminalIncomeTotal)
+  const cashAndTerminalIncome = cashIncome + terminalIncome
+  const cashPaymentPercentage = cashAndTerminalIncome > 0
+    ? Math.round((cashIncome / cashAndTerminalIncome) * 1000) / 10
+    : 0
+  const terminalPaymentPercentage = cashAndTerminalIncome > 0
+    ? Math.round((100 - cashPaymentPercentage) * 10) / 10
+    : 0
+  const paymentLineWidth = 376
+  const cashPaymentLineWidth = paymentLineWidth * cashPaymentPercentage / 100
   const dineInPercentage = normalizePercent(summary?.dineInPercentage)
   const offPremisePercentage = normalizePercent(summary?.offPremisePercentage)
   const touristPercentage = normalizePercent(summary?.touristPercentage)
@@ -133,6 +144,17 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     <text x="664" y="324" font-size="20" font-weight="700" letter-spacing="2.5" fill="#70817E">ВЫРУЧКА КАФЕ ЗА ДЕНЬ</text>
     <text x="664" y="382" font-size="49" font-weight="800" fill="#173B3F">${escapeSvg(formatMoney(cafeIncome))}</text>
 
+    <rect x="646" y="402" width="424" height="126" rx="22" fill="#F0F7F5"/>
+    <text x="668" y="430" font-size="16" font-weight="800" letter-spacing="1.4" fill="${regularColor}">НАЛИЧНЫЕ</text>
+    <text x="668" y="464" font-size="25" font-weight="800" fill="#173B3F">${escapeSvg(formatMoney(cashIncome))}</text>
+    <text x="1048" y="430" text-anchor="end" font-size="16" font-weight="800" letter-spacing="1.4" fill="${touristColor}">ТЕРМИНАЛ</text>
+    <text x="1048" y="464" text-anchor="end" font-size="25" font-weight="800" fill="#173B3F">${escapeSvg(formatMoney(terminalIncome))}</text>
+    <line x1="668" y1="489" x2="1044" y2="489" stroke="#D8E5E2" stroke-width="10" stroke-linecap="round"/>
+    <line x1="668" y1="489" x2="${(668 + cashPaymentLineWidth).toFixed(1)}" y2="489" stroke="${regularColor}" stroke-width="10" stroke-linecap="round"/>
+    <line x1="${(668 + cashPaymentLineWidth).toFixed(1)}" y1="489" x2="1044" y2="489" stroke="${touristColor}" stroke-width="10" stroke-linecap="round"/>
+    <text x="668" y="516" font-size="16" font-weight="800" fill="${regularColor}">${escapeSvg(formatPercent(cashPaymentPercentage))}</text>
+    <text x="1048" y="516" text-anchor="end" font-size="16" font-weight="800" fill="${touristColor}">${escapeSvg(formatPercent(terminalPaymentPercentage))}</text>
+
     <g transform="translate(${chartCenterX} ${chartCenterY}) rotate(-90)">
       <circle r="${CIRCLE_RADIUS}" fill="none" stroke="#E8EFED" stroke-width="112"/>
       ${donutSegment(dineInPercentage, 0, regularColor)}
@@ -146,16 +168,16 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     ${donutPercentageLabel(offPremisePercentage, firstSegmentLength, chartCenterX, chartCenterY)}
     ${donutPercentageLabel(touristPercentage, firstSegmentLength + secondSegmentLength, chartCenterX, chartCenterY)}
 
-    <text x="664" y="485" font-size="19" font-weight="700" letter-spacing="1.6" fill="${regularColor}">● ЗАЛ</text>
-    <text x="664" y="521" font-size="29" font-weight="700" fill="#173B3F">Обычная выручка</text>
-    <text x="664" y="580" font-size="19" font-weight="700" letter-spacing="1.6" fill="${offPremiseColor}">● ВНЕ ЗАЛА</text>
-    <text x="664" y="616" font-size="29" font-weight="700" fill="#173B3F">С собой + доставка</text>
-    <text x="664" y="675" font-size="19" font-weight="700" letter-spacing="1.6" fill="${touristColor}">● ТУРИСТЫ</text>
-    <text x="664" y="711" font-size="29" font-weight="700" fill="#173B3F">Туристическая выручка</text>
+    <text x="664" y="560" font-size="18" font-weight="700" letter-spacing="1.6" fill="${regularColor}">● ЗАЛ</text>
+    <text x="664" y="592" font-size="27" font-weight="700" fill="#173B3F">Обычная выручка</text>
+    <text x="664" y="635" font-size="18" font-weight="700" letter-spacing="1.6" fill="${offPremiseColor}">● ВНЕ ЗАЛА</text>
+    <text x="664" y="667" font-size="27" font-weight="700" fill="#173B3F">С собой + доставка</text>
+    <text x="664" y="710" font-size="18" font-weight="700" letter-spacing="1.6" fill="${touristColor}">● ТУРИСТЫ</text>
+    <text x="664" y="742" font-size="27" font-weight="700" fill="#173B3F">Туристическая выручка</text>
 
-    <rect x="646" y="760" width="424" height="104" rx="24" fill="#EAF8F3"/>
-    <text x="676" y="802" font-size="22" font-weight="700" fill="#4A6A61">ЧИСТАЯ ПРИБЫЛЬ КАФЕ</text>
-    <text x="676" y="842" font-size="34" font-weight="800" fill="#137A58">${escapeSvg(cafeNetProfit)}</text>
+    <rect x="646" y="774" width="424" height="90" rx="22" fill="#EAF8F3"/>
+    <text x="676" y="808" font-size="20" font-weight="700" fill="#4A6A61">ЧИСТАЯ ПРИБЫЛЬ КАФЕ</text>
+    <text x="676" y="845" font-size="31" font-weight="800" fill="#137A58">${escapeSvg(cafeNetProfit)}</text>
 
     <rect x="68" y="940" width="1064" height="448" rx="34" fill="#FFFFFF" stroke="#DDE8E5" stroke-width="2"/>
     <circle cx="112" cy="992" r="22" fill="#FFF0E7"/>

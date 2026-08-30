@@ -22,7 +22,11 @@ import {
   getRussianMenuItemName,
 } from './_lib/menuAvailabilityMessages.js'
 import { notifyAutomaticKpiBonus } from './employee-notification.js'
-import { getInclusiveCalendarDayCount, getOrderRevenueTotal } from '../../src/lib/analytics.js'
+import {
+  getInclusiveCalendarDayCount,
+  getOrderPayments,
+  getOrderRevenueTotal,
+} from '../../src/lib/analytics.js'
 import { getOrdersCostTotal, hasOrdersCostCoverage } from '../../src/lib/profit.js'
 import { allocateMonthlySalaryToDate } from '../../src/lib/expenses.js'
 import { isDineInOrderType } from '../../src/lib/orderTypes.js'
@@ -650,7 +654,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
       : Promise.resolve(emptyRelatedResult),
     supabase
       .from('orders')
-      .select('status, order_type, price_mode, subtotal, service_fee, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, items:order_items(quantity, sale_unit, price, unit_price, base_price, item_type, is_counter_item, cost_price, status)')
+      .select('status, payment_status, payment_method, order_type, price_mode, subtotal, service_fee, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount, items:order_items(quantity, sale_unit, price, unit_price, base_price, item_type, is_counter_item, cost_price, status), payments:order_payments(method, amount)')
       .eq('payment_status', 'paid')
       .gte('paid_at', `${businessDate}T00:00:00+05:00`)
       .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
@@ -692,6 +696,13 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     (total, order) => total + getOrderRevenueTotal(order),
     0
   )
+  const paymentIncome = paidOrders.reduce((totals, order) => {
+    getOrderPayments(order).forEach(payment => {
+      if (payment.method === 'cash') totals.cash += payment.amount
+      if (payment.method === 'terminal') totals.terminal += payment.amount
+    })
+    return totals
+  }, { cash: 0, terminal: 0 })
   const touristIncome = paidOrders.reduce(
     (total, order) => total + (order?.price_mode === PRICE_MODE_TOURIST ? getOrderRevenueTotal(order) : 0),
     0
@@ -712,6 +723,8 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
   const dailyUtilities = allocateMonthlySalaryToDate(settingsResult.data?.monthly_utilities_uzs, businessDate)
   return getDailyPayrollGroupSummary(salaryProfiles, kpiResults, businessDate, {
     cafeIncome,
+    cashIncome: paymentIncome.cash,
+    terminalIncome: paymentIncome.terminal,
     monthToDateCafeIncome,
     monthToDateCalendarDayCount: getInclusiveCalendarDayCount(monthStart, businessDate),
     regularDineInIncome,

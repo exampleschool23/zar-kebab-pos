@@ -25,6 +25,8 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Kunlik umumiy maosh va KPI hisoboti',
     groupCafeIncome: 'Kunlik kafe daromadi',
+    groupCashIncome: 'Naqd',
+    groupTerminalIncome: 'Terminal',
     groupMonthlyAverageCafeIncome: 'Bu oydagi o‘rtacha kunlik kafe daromadi',
     groupDineInShare: 'Oddiy zaldagi savdo ulushi',
     groupOffPremiseShare: 'Oddiy olib ketish + yetkazib berish ulushi',
@@ -54,6 +56,8 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Общий отчёт по зарплате и KPI',
     groupCafeIncome: 'Выручка кафе за день',
+    groupCashIncome: 'Наличные',
+    groupTerminalIncome: 'Терминал',
     groupMonthlyAverageCafeIncome: 'Средняя дневная выручка кафе за месяц',
     groupDineInShare: 'Доля обычной выручки в зале',
     groupOffPremiseShare: 'Доля обычной выручки с собой + доставка',
@@ -83,6 +87,8 @@ const COPY = {
     currency: 'UZS',
     groupTitle: 'Daily salary and KPI totals',
     groupCafeIncome: 'Daily cafe income',
+    groupCashIncome: 'Cash',
+    groupTerminalIncome: 'Terminal',
     groupMonthlyAverageCafeIncome: 'Average daily cafe income this month',
     groupDineInShare: 'Regular dine-in revenue share',
     groupOffPremiseShare: 'Regular take-away + delivery revenue share',
@@ -245,6 +251,8 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
 
 export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   cafeIncome = 0,
+  cashIncome = 0,
+  terminalIncome = 0,
   monthToDateCafeIncome = 0,
   monthToDateCalendarDayCount = 0,
   regularDineInIncome = 0,
@@ -277,6 +285,8 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     ? Math.round(Number(grossProfit))
     : null
   const cafeIncomeTotal = normalizeExpenseAmount(cafeIncome)
+  const cashIncomeTotal = normalizeExpenseAmount(cashIncome)
+  const terminalIncomeTotal = normalizeExpenseAmount(terminalIncome)
   const monthlyCafeIncomeTotal = normalizeExpenseAmount(monthToDateCafeIncome)
   const monthlyCalendarDayCount = normalizeExpenseAmount(monthToDateCalendarDayCount)
   const monthlyAverageCafeIncome = monthlyCalendarDayCount > 0
@@ -299,6 +309,8 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   return {
     date,
     cafeIncomeTotal,
+    cashIncomeTotal,
+    terminalIncomeTotal,
     monthlyAverageCafeIncome,
     dineInPercentage,
     offPremisePercentage,
@@ -329,6 +341,8 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
   const employeeMealPerEmployeeTotal = normalizeExpenseAmount(summary?.employeeMealPerEmployeeTotal)
   const presentEmployeeCount = normalizeExpenseAmount(summary?.presentEmployeeCount)
   const cafeIncomeTotal = normalizeExpenseAmount(summary?.cafeIncomeTotal)
+  const cashIncomeTotal = normalizeExpenseAmount(summary?.cashIncomeTotal)
+  const terminalIncomeTotal = normalizeExpenseAmount(summary?.terminalIncomeTotal)
   const monthlyAverageCafeIncome = normalizeExpenseAmount(summary?.monthlyAverageCafeIncome)
   const dineInPercentage = Number(summary?.dineInPercentage) || 0
   const offPremisePercentage = Number(summary?.offPremisePercentage) || 0
@@ -347,6 +361,8 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
     `📅 ${escapeTelegramHtml(compactRussianDate)}`,
     '',
     `<b>${copy.groupCafeIncome}:</b> ${formatSalaryNotificationAmount(cafeIncomeTotal)} ${copy.currency}`,
+    `<b>${copy.groupCashIncome}:</b> ${formatSalaryNotificationAmount(cashIncomeTotal)} ${copy.currency}`,
+    `<b>${copy.groupTerminalIncome}:</b> ${formatSalaryNotificationAmount(terminalIncomeTotal)} ${copy.currency}`,
     '',
     `<b>${copy.groupDineInShare}:</b> ${formatSalaryNotificationPercent(dineInPercentage, lang)}`,
     `<b>${copy.groupOffPremiseShare}:</b> ${formatSalaryNotificationPercent(offPremisePercentage, lang)}`,

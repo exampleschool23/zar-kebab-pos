@@ -144,7 +144,7 @@
     {
       "name": "telegram-delivery",
       "keywords": ["bot", "mini app", "telegram", "notification", "delivery", "retry", "cron", "investor", "salary group", "team"],
-      "files": ["src/pages/TelegramMiniApp.jsx", "src/lib/telegramWebApp.js", "src/lib/telegramNotifications.js", "api/telegram/employee-notification.js", "api/telegram/daily-salary.js", "api/telegram/webhook.js", "bots/telegram-bot.js"],
+      "files": ["src/pages/TelegramMiniApp.jsx", "src/lib/telegramWebApp.js", "src/lib/telegramNotifications.js", "api/telegram/employee-notification.js", "api/telegram/daily-salary.js", "api/telegram/_lib/salaryMessages.js", "api/telegram/_lib/payrollReportImage.js", "api/telegram/webhook.js", "bots/telegram-bot.js"],
       "tests": ["tests/telegramOrderStatus.test.js", "tests/telegramSalaryMessages.test.js", "tests/telegramDeliveryRetry.test.js", "tests/telegramDailyBazaar.test.js", "tests/telegramInvestorExpense.test.js", "tests/dailySalaryWatchdog.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
     },
     {

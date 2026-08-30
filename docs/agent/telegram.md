@@ -45,6 +45,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 
 - Combined employee Salary + Bonus summaries are always Russian and contain attendance, earned salary, bonuses, and current due—never repeated fines or payments.
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
+- The aggregate daily report shows the actual cash and terminal income from that day's immutable order-payment rows, with a compact comparison line beside the two amounts. Historical QR normalizes to terminal; historical card and loyalty stay distinct and are not relabeled.
 - Team automatic KPI messages are always Russian and contain only employee name, paid KPI amount, and date. Never disclose restaurant sales base, KPI percentage, salary due, or manager identity.
 
 ## Menu availability
