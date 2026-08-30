@@ -41,14 +41,15 @@ test('ingredient consumption multiplies sale quantity by immutable per-portion T
 test('daily Bazaar and ingredient reports render as separate image layouts', () => {
   const bazaarSvg = buildDailyBazaarReportSvg([{
     bazaar_purchase_items: [
-      { product_name: 'Картошка', category: 'vegetables', quantity: 1, unit: 'kg', line_total: 8_000 },
-      { product_name: 'Курица', category: 'poultry', quantity: 2, unit: 'kg', line_total: 82_000 },
+      { product_name: 'Картошка', category: 'vegetables', quantity: 1, unit: 'kg', line_total: 8_000, normal_unit_price: 10_000 },
+      { product_name: 'Курица', category: 'poultry', quantity: 2, unit: 'kg', line_total: 82_000, normal_unit_price: 39_000 },
       ...Array.from({ length: 18 }, (_, index) => ({
         product_name: `Товар ${index + 1}`,
         category: 'grocery',
         quantity: 1,
         unit: 'pcs',
         line_total: 1_000 + index,
+        normal_unit_price: 1_000 + index,
         sort_order: index + 2,
       })),
     ],
@@ -66,10 +67,23 @@ test('daily Bazaar and ingredient reports render as separate image layouts', () 
   assert.match(bazaarSvg, /ОВОЩИ/)
   assert.match(bazaarSvg, /БАКАЛЕЯ/)
   assert.match(bazaarSvg, /1\. Курица/)
-  assert.match(bazaarSvg, /2 кг · 41\s000 UZS \/ кг/)
+  assert.match(bazaarSvg, /2 кг · куплено 41\s000 UZS \/ кг/)
+  assert.match(bazaarSvg, /норма 39\s000 UZS \/ кг/)
   assert.match(bazaarSvg, /82\s000 UZS/)
+  assert.match(bazaarSvg, /разница \+4\s000 UZS/)
+  assert.match(bazaarSvg, /разница -2\s000 UZS/)
+  assert.match(bazaarSvg, /ОБЩАЯ РАЗНИЦА/)
+  assert.match(bazaarSvg, /fill="#DC2626">разница \+4/)
+  assert.match(bazaarSvg, /fill="#15803D">разница -2/)
+  assert.match(bazaarSvg, /fill="#FCA5A5">\+2/)
   assert.match(bazaarSvg, /20\. Товар 18/)
   assert.doesNotMatch(bazaarSvg, /Ещё позиций/)
+  const missingNormalSvg = buildDailyBazaarReportSvg([{
+    bazaar_purchase_items: [{ product_name: 'Legacy', category: 'grocery', quantity: 1, unit: 'pcs', line_total: 5_000 }],
+  }], '2026-08-30')
+  assert.match(missingNormalSvg, /НОРМАЛЬНАЯ ЦЕНА · 0\/1/)
+  assert.match(missingNormalSvg, /НЕ ЗАДАНА/)
+  assert.match(missingNormalSvg, /разница —/)
   assert.match(ingredientSvg, /Расход ингредиентов/)
   assert.match(ingredientSvg, /0,75 kg/)
   assert.match(ingredientSvg, /без снимка Tech Card: 2/)

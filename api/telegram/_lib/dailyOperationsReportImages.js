@@ -9,8 +9,12 @@ import {
   BAZAAR_CATEGORIES,
   bazaarCategoryLabel,
   bazaarUnitLabel,
+  calculateBazaarExpectedTotal,
+  calculateBazaarPriceDifference,
   calculateBazaarTotal,
   formatBazaarQuantity,
+  getBazaarNormalLineTotal,
+  getBazaarPriceDifference,
   getBazaarUnitCost,
   normalizeBazaarQuantityToBase,
   normalizeBazaarPurchase,
@@ -39,6 +43,18 @@ function configureFonts() {
 
 function quantity(value) {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 3 }).format(Number(value) || 0)
+}
+
+function signedCurrency(value) {
+  const amount = Math.round(Number(value) || 0)
+  return `${amount > 0 ? '+' : ''}${formatCurrency(amount)}`
+}
+
+function varianceColor(value, darkBackground = false) {
+  const amount = Math.round(Number(value) || 0)
+  if (amount > 0) return darkBackground ? '#FCA5A5' : '#DC2626'
+  if (amount < 0) return darkBackground ? '#86EFAC' : '#15803D'
+  return darkBackground ? '#D7E5E2' : '#526461'
 }
 
 function reportShell({ title, subtitle, totalLabel, totalValue, rows, footer = '', accent = '#F97316' }) {
@@ -80,6 +96,10 @@ export function buildDailyBazaarReportSvg(purchases = [], date = '') {
   const normalized = purchases.map(normalizeBazaarPurchase)
   const items = normalized.flatMap(purchase => purchase.items || [])
   const total = normalized.reduce((sum, purchase) => sum + calculateBazaarTotal(purchase.items || []), 0)
+  const expected = calculateBazaarExpectedTotal(items)
+  const difference = calculateBazaarPriceDifference(items)
+  const normalPriceItemCount = items.filter(item => getBazaarNormalLineTotal(item) > 0).length
+  const hasCompleteNormalPrices = items.length > 0 && normalPriceItemCount === items.length
   const groups = BAZAAR_CATEGORIES
     .map(category => ({
       ...category,
@@ -87,11 +107,11 @@ export function buildDailyBazaarReportSvg(purchases = [], date = '') {
     }))
     .filter(group => group.items.length > 0)
   const totalCardY = 54
-  const totalCardHeight = 104
-  const contentStartY = 190
+  const totalCardHeight = 126
+  const contentStartY = 212
   const categoryHeight = 44
   const categoryGap = 12
-  const rowHeight = 66
+  const rowHeight = 84
   const groupGap = 20
   const emptyHeight = 150
   const contentHeight = groups.length > 0
@@ -112,12 +132,20 @@ export function buildDailyBazaarReportSvg(purchases = [], date = '') {
           cursorY += rowHeight
           const display = normalizeBazaarQuantityToBase(item.quantity, item.unit)
           const unitLabel = bazaarUnitLabel(display.unit, 'ru')
-          const detail = `${formatBazaarQuantity(display.quantity)} ${unitLabel} · ${formatCurrency(Math.round(getBazaarUnitCost(item)))} / ${unitLabel}`
+          const normalLineTotal = getBazaarNormalLineTotal(item)
+          const normalUnitCost = display.quantity > 0 ? normalLineTotal / display.quantity : 0
+          const itemDifference = getBazaarPriceDifference(item)
+          const boughtDetail = `${formatBazaarQuantity(display.quantity)} ${unitLabel} · куплено ${formatCurrency(Math.round(getBazaarUnitCost(item)))} / ${unitLabel}`
+          const normalDetail = normalUnitCost > 0
+            ? `норма ${formatCurrency(Math.round(normalUnitCost))} / ${unitLabel}`
+            : 'норма —'
           return `<g>
-            <rect x="64" y="${rowY}" width="1072" height="56" rx="14" fill="${index % 2 ? '#F8FAF9' : '#F1F6F4'}"/>
-            <text x="88" y="${rowY + 37}" font-size="24" font-weight="700" fill="#173B3F">${itemNumber}. ${escapeSvg(item.product_name)}</text>
-            <text x="830" y="${rowY + 37}" text-anchor="end" font-size="21" fill="#526461">${escapeSvg(detail)}</text>
-            <text x="1110" y="${rowY + 37}" text-anchor="end" font-size="23" font-weight="800" fill="#173B3F">${escapeSvg(formatCurrency(item.line_total))}</text>
+            <rect x="64" y="${rowY}" width="1072" height="74" rx="14" fill="${index % 2 ? '#F8FAF9' : '#F1F6F4'}"/>
+            <text x="88" y="${rowY + 31}" font-size="23" font-weight="700" fill="#173B3F">${itemNumber}. ${escapeSvg(item.product_name)}</text>
+            <text x="1110" y="${rowY + 31}" text-anchor="end" font-size="22" font-weight="800" fill="#173B3F">${escapeSvg(formatCurrency(item.line_total))}</text>
+            <text x="88" y="${rowY + 59}" font-size="18" fill="#526461">${escapeSvg(boughtDetail)}</text>
+            <text x="610" y="${rowY + 59}" font-size="18" fill="#526461">${escapeSvg(normalDetail)}</text>
+            <text x="1110" y="${rowY + 59}" text-anchor="end" font-size="19" font-weight="800" fill="${normalLineTotal > 0 ? varianceColor(itemDifference) : '#879592'}">разница ${normalLineTotal > 0 ? escapeSvg(signedCurrency(itemDifference)) : '—'}</text>
           </g>`
         }).join('')
         cursorY += groupGap
@@ -137,9 +165,13 @@ export function buildDailyBazaarReportSvg(purchases = [], date = '') {
     <rect x="28" y="28" width="1144" height="${height - 56}" rx="38" fill="#FFFFFF"/>
     <g font-family="Noto Sans">
       <rect x="64" y="${totalCardY}" width="1072" height="${totalCardHeight}" rx="24" fill="#173B3F"/>
-      <text x="92" y="94" font-size="19" font-weight="700" letter-spacing="1.5" fill="#A8D7D0">ИТОГО ПО БАЗАРУ</text>
-      <text x="92" y="139" font-size="38" font-weight="800" fill="#FFFFFF">${escapeSvg(formatCurrency(total))}</text>
-      <text x="1110" y="132" text-anchor="end" font-size="20" font-weight="700" fill="#A8D7D0">ПОЗИЦИЙ: ${items.length}</text>
+      <text x="92" y="86" font-size="18" font-weight="700" letter-spacing="1.4" fill="#A8D7D0">ИТОГО ПО БАЗАРУ · ПОЗИЦИЙ: ${items.length}</text>
+      <text x="92" y="116" font-size="16" font-weight="700" fill="#A8D7D0">ОПЛАЧЕНО</text>
+      <text x="92" y="151" font-size="31" font-weight="800" fill="#FFFFFF">${escapeSvg(formatCurrency(total))}</text>
+      <text x="515" y="116" font-size="16" font-weight="700" fill="#A8D7D0">НОРМАЛЬНАЯ ЦЕНА · ${normalPriceItemCount}/${items.length}</text>
+      <text x="515" y="151" font-size="31" font-weight="800" fill="#FFFFFF">${hasCompleteNormalPrices ? escapeSvg(formatCurrency(expected)) : 'НЕ ЗАДАНА'}</text>
+      <text x="1110" y="116" text-anchor="end" font-size="16" font-weight="700" fill="#A8D7D0">ОБЩАЯ РАЗНИЦА</text>
+      <text x="1110" y="151" text-anchor="end" font-size="31" font-weight="800" fill="${hasCompleteNormalPrices ? varianceColor(difference, true) : '#D7E5E2'}">${hasCompleteNormalPrices ? escapeSvg(signedCurrency(difference)) : '—'}</text>
       ${groupMarkup}
     </g>
   </svg>`
