@@ -917,11 +917,13 @@ async function updateInvestorReportDeliveryStatus(
 }
 
 async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) {
+  const bazaarDate = addSalaryDateDays(businessDate, -1)
   const payrollDelivery = await claimDailyPayrollGroupDelivery(supabase, businessDate)
-  const bazaarDelivery = await claimDailyBazaarDelivery(supabase, businessDate)
+  const bazaarDelivery = await claimDailyBazaarDelivery(supabase, bazaarDate)
   const duplicateResult = { businessDate, status: 'duplicate' }
+  const duplicateBazaarResult = { businessDate: bazaarDate, status: 'duplicate' }
   if (!payrollDelivery && !bazaarDelivery) {
-    return { payroll: duplicateResult, bazaar: duplicateResult }
+    return { payroll: duplicateResult, bazaar: duplicateBazaarResult }
   }
 
   const target = await loadInvestorGroupTarget(supabase)
@@ -943,7 +945,7 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
         supabase,
         'daily_bazaar_telegram_deliveries',
         'purchase_date',
-        businessDate,
+        bazaarDate,
         'skipped',
         target,
         unavailable
@@ -951,7 +953,9 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
     }
     return {
       payroll: payrollDelivery ? { businessDate, status: 'skipped' } : duplicateResult,
-      bazaar: bazaarDelivery ? { businessDate, status: 'skipped' } : duplicateResult,
+      bazaar: bazaarDelivery
+        ? { businessDate: bazaarDate, status: 'skipped' }
+        : duplicateBazaarResult,
     }
   }
 
@@ -963,7 +967,7 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
       payrollDelivery
         ? loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults)
         : null,
-      bazaarDelivery ? loadDailyBazaarPurchases(supabase, businessDate) : null,
+      bazaarDelivery ? loadDailyBazaarPurchases(supabase, bazaarDate) : null,
     ])
     const photos = []
     if (payrollDelivery) {
@@ -972,18 +976,18 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
         photo: await payrollModule.buildDailyPayrollGroupReportPng(summary, businessDate),
         filename: `zar-kebab-payroll-${businessDate}.png`,
         caption: bazaarDelivery
-          ? operationsModule.buildDailyInvestorReportsCaption(businessDate)
+          ? operationsModule.buildDailyInvestorReportsCaption(businessDate, bazaarDate)
           : payrollModule.buildDailyPayrollGroupReportCaption(businessDate),
       })
     }
     if (bazaarDelivery) {
       photos.push({
         kind: 'bazaar',
-        photo: await operationsModule.buildDailyBazaarReportPng(purchases, businessDate),
-        filename: `zar-kebab-bazaar-${businessDate}.png`,
+        photo: await operationsModule.buildDailyBazaarReportPng(purchases, bazaarDate),
+        filename: `zar-kebab-bazaar-${bazaarDate}.png`,
         caption: payrollDelivery
           ? ''
-          : operationsModule.buildDailyBazaarReportCaption(businessDate),
+          : operationsModule.buildDailyBazaarReportCaption(bazaarDate),
       })
     }
 
@@ -1006,7 +1010,7 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
       } else {
         await markDailyBazaarDeliverySent(
           supabase,
-          businessDate,
+          bazaarDate,
           target,
           telegramMessageIds[index]
         )
@@ -1019,8 +1023,8 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
         ? { businessDate, status: 'sent', format: 'photo', album }
         : duplicateResult,
       bazaar: bazaarDelivery
-        ? { businessDate, status: 'sent', format: 'photo', album }
-        : duplicateResult,
+        ? { businessDate: bazaarDate, status: 'sent', format: 'photo', album }
+        : duplicateBazaarResult,
     }
   } catch (error) {
     if (telegramMessageIds.length === 0) {
@@ -1040,7 +1044,7 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
           supabase,
           'daily_bazaar_telegram_deliveries',
           'purchase_date',
-          businessDate,
+          bazaarDate,
           'failed',
           target,
           error?.message || error

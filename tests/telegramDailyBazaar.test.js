@@ -9,6 +9,10 @@ test('Daily Bazaar is sent with the financial report as a two-photo Investor alb
 
   assert.doesNotMatch(page, /Send selected date to Telegram|Отправить выбранную дату в Telegram|sendSelectedDateToTelegram/)
   assert.match(cron, /sendDailyInvestorReportAlbum/)
+  assert.match(cron, /const bazaarDate = addSalaryDateDays\(businessDate, -1\)/)
+  assert.match(cron, /claimDailyBazaarDelivery\(supabase, bazaarDate\)/)
+  assert.match(cron, /loadDailyBazaarPurchases\(supabase, bazaarDate\)/)
+  assert.match(cron, /buildDailyBazaarReportPng\(purchases, bazaarDate\)/)
   assert.match(cron, /\.from\('bazaar_purchases'\)/)
   assert.match(cron, /\.eq\('purchase_date', purchaseDate\)/)
   assert.match(cron, /\.eq\('entry_source', 'daily_bazaar'\)/)

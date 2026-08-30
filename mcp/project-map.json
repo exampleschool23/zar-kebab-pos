@@ -87,7 +87,7 @@
     },
     {
       "name": "daily salary cron",
-      "aliases": ["payroll cron", "daily KPI salary delivery", "salary watchdog", "Investor report album", "financial and Bazaar photo group"],
+      "aliases": ["payroll cron", "daily KPI salary delivery", "salary watchdog", "Investor report album", "financial and Bazaar photo group", "two-days-ago Bazaar report"],
       "path": "api/telegram/daily-salary.js",
       "symbol": "handler"
     }

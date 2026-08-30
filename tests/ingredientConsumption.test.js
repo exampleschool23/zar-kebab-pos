@@ -58,8 +58,8 @@ test('daily Bazaar and ingredient reports render as separate image layouts', () 
   assert.match(ingredientSvg, /0,75 kg/)
   assert.match(ingredientSvg, /без снимка Tech Card: 2/)
   assert.equal(
-    buildDailyInvestorReportsCaption('2026-08-30'),
-    '📊 <b>Ежедневный финансовый отчёт и базар</b>\n📅 30 августа 2026'
+    buildDailyInvestorReportsCaption('2026-08-30', '2026-08-29'),
+    '📊 <b>Ежедневные отчёты</b>\n💼 Финансы: 30 августа 2026\n🧺 Базар: 29 августа 2026'
   )
 })
 
