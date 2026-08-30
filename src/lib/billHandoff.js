@@ -9,6 +9,31 @@ export function cancelBillPrintWindow(printWindow) {
   }
 }
 
+export function getBillReceiptPath({ tableId, orderId }) {
+  return orderId
+    ? `/receipt/${encodeURIComponent(orderId)}?print=1`
+    : `/receipt/table/${encodeURIComponent(tableId)}?print=1`
+}
+
+export function completeBillPrint({
+  navigate,
+  tableId,
+  orderId,
+  printWindow,
+  browserWindow = globalThis.window,
+}) {
+  const receiptPath = getBillReceiptPath({ tableId, orderId })
+  if (printWindow && !printWindow.closed && typeof printWindow.location?.replace === 'function') {
+    printWindow.location.replace(receiptPath)
+    return
+  }
+  if (typeof navigate === 'function') {
+    navigate(receiptPath)
+    return
+  }
+  browserWindow?.open?.(receiptPath, '_blank', 'noopener')
+}
+
 export function completeBillHandoff({
   navigate,
   tableId,
@@ -19,11 +44,5 @@ export function completeBillHandoff({
   const encodedTableId = encodeURIComponent(tableId)
   navigate(`/cashier/bill/${encodedTableId}`)
   if (!autoPrint) return
-
-  const receiptPath = `/receipt/table/${encodedTableId}?print=1`
-  if (printWindow && !printWindow.closed && typeof printWindow.location?.replace === 'function') {
-    printWindow.location.replace(receiptPath)
-    return
-  }
-  browserWindow?.open?.(receiptPath, '_blank', 'noopener')
+  completeBillPrint({ tableId, printWindow, browserWindow })
 }

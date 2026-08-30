@@ -41,6 +41,7 @@ import { applyLoyaltyToCashierPaymentQuote, canConfirmCashierCheckout, getFreshC
 import { loadCashierBillOrders } from '../lib/db'
 import { withReadTimeout } from '../lib/writeTimeout'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
+import { cancelBillPrintWindow, completeBillPrint, prepareBillPrintWindow } from '../lib/billHandoff'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const PAY_METHODS = [
@@ -502,6 +503,7 @@ export default function CashierBill() {
 
   async function handlePrintBill() {
     if (isPrintingBill || isRefreshingBill) return
+    const printWindow = prepareBillPrintWindow(true)
     setPrintingBill(true)
     setPaymentRefreshMessage('')
     try {
@@ -514,14 +516,13 @@ export default function CashierBill() {
         orderId,
       })
       if (!freshQuote.primaryOrderId) {
+        cancelBillPrintWindow(printWindow)
         setPaymentRefreshMessage(lbl.noOrder)
         return
       }
-      const receiptPath = orderId
-        ? `/receipt/${encodeURIComponent(orderId)}?print=1`
-        : `/receipt/table/${encodeURIComponent(tableId)}?print=1`
-      navigate(receiptPath)
+      completeBillPrint({ navigate, tableId, orderId, printWindow })
     } catch (error) {
+      cancelBillPrintWindow(printWindow)
       setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
     } finally {
       setPrintingBill(false)
