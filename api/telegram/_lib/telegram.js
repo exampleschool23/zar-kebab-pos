@@ -174,6 +174,43 @@ export async function sendTelegramPhoto(chatId, photo, {
   return body
 }
 
+export async function sendTelegramMediaGroup(chatId, photos = []) {
+  const normalizedChatId = String(chatId || '').trim()
+  const normalizedPhotos = Array.isArray(photos) ? photos.filter(item => item?.photo) : []
+  if (!normalizedChatId || normalizedPhotos.length === 0) return { skipped: true }
+  if (normalizedPhotos.length < 2 || normalizedPhotos.length > 10) {
+    throw new Error('Telegram media groups require between 2 and 10 photos')
+  }
+
+  const form = new FormData()
+  form.append('chat_id', normalizedChatId)
+  form.append('media', JSON.stringify(normalizedPhotos.map((item, index) => ({
+    type: 'photo',
+    media: `attach://photo${index}`,
+    ...(item.caption ? {
+      caption: item.caption,
+      parse_mode: item.parseMode || 'HTML',
+    } : {}),
+  }))))
+  normalizedPhotos.forEach((item, index) => {
+    form.append(
+      `photo${index}`,
+      new Blob([item.photo], { type: 'image/png' }),
+      item.filename || `report-${index + 1}.png`
+    )
+  })
+
+  const res = await fetch(`https://api.telegram.org/bot${getBotToken()}/sendMediaGroup`, {
+    method: 'POST',
+    body: form,
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok || body.ok === false) {
+    throw new Error(body.description || `Telegram sendMediaGroup failed with ${res.status}`)
+  }
+  return body
+}
+
 export function escapeTelegramHtml(value) {
   return String(value ?? '').replace(/[&<>]/g, char => ({
     '&': '&amp;',

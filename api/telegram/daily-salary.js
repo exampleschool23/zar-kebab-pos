@@ -1,7 +1,6 @@
 import { json, methodNotAllowed, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import {
-  buildDailyPayrollGroupMessage,
   buildDailySalaryMessage,
   addSalaryDateDays,
   getDailyPayrollGroupSummary,
@@ -10,18 +9,12 @@ import {
   getTashkentDate,
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
-import { escapeTelegramHtml, sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
-import { buildDailyBazaarGroupMessage } from './_lib/dailyBazaarMessages.js'
 import {
-  buildDailyPayrollGroupReportCaption,
-  buildDailyPayrollGroupReportPng,
-} from './_lib/payrollReportImage.js'
-import {
-  buildDailyBazaarReportCaption,
-  buildDailyBazaarReportPng,
-  buildDailyIngredientConsumptionReportCaption,
-  buildDailyIngredientConsumptionReportPng,
-} from './_lib/dailyOperationsReportImages.js'
+  escapeTelegramHtml,
+  sendTelegramMediaGroup,
+  sendTelegramMessage,
+  sendTelegramPhoto,
+} from './_lib/telegram.js'
 import {
   buildDailyUnavailableMenuTeamMessage,
   getRussianMenuCategoryName,
@@ -118,6 +111,16 @@ function getTelegramMessageId(response) {
   const messageId = String(response?.result?.message_id || '').trim()
   if (!messageId) throw new Error('Telegram did not return a message id')
   return messageId
+}
+
+function getTelegramMediaGroupMessageIds(response, expectedCount) {
+  const messageIds = Array.isArray(response?.result)
+    ? response.result.map(message => String(message?.message_id || '').trim())
+    : []
+  if (messageIds.length !== expectedCount || messageIds.some(messageId => !messageId)) {
+    throw new Error('Telegram did not return every media-group message id')
+  }
+  return messageIds
 }
 
 function getOptionalTashkentDate(value) {
@@ -602,48 +605,6 @@ async function markDailyBazaarDeliverySent(supabase, purchaseDate, target, messa
   throw lastError
 }
 
-async function sendDailyBazaarNotification(supabase, purchaseDate) {
-  const purchases = await loadDailyBazaarPurchases(supabase, purchaseDate)
-  const target = await loadInvestorGroupTarget(supabase)
-  if (!target.chatId) throw new Error('ZarKebab Investor Telegram group is not configured')
-  const delivery = await claimDailyBazaarDelivery(supabase, purchaseDate)
-  if (!delivery) return { businessDate: purchaseDate, status: 'duplicate' }
-
-  let telegramMessageId = ''
-  try {
-    let reportImage = null
-    try {
-      reportImage = await buildDailyBazaarReportPng(purchases, purchaseDate)
-    } catch (error) {
-      console.error('[telegram/daily-salary] Bazaar image unavailable; sending text fallback:', error)
-    }
-    const response = reportImage
-      ? await sendTelegramPhoto(target.chatId, reportImage, {
-          caption: buildDailyBazaarReportCaption(purchaseDate),
-          filename: `zar-kebab-bazaar-${purchaseDate}.png`,
-        })
-      : await sendTelegramMessage(
-      target.chatId,
-      buildDailyBazaarGroupMessage(purchases, purchaseDate, target.language)
-        )
-    telegramMessageId = getTelegramMessageId(response)
-    await markDailyBazaarDeliverySent(supabase, purchaseDate, target, telegramMessageId)
-    return { businessDate: purchaseDate, status: 'sent' }
-  } catch (error) {
-    if (!telegramMessageId) {
-      await supabase.from('daily_bazaar_telegram_deliveries').update({
-        status: 'failed',
-        telegram_chat_id: target.chatId,
-        error_message: String(error?.message || error).slice(0, 1000),
-        updated_at: new Date().toISOString(),
-      }).eq('purchase_date', purchaseDate)
-    } else {
-      console.error('[telegram/daily-salary] Bazaar message sent but delivery status was not persisted:', error)
-    }
-    throw error
-  }
-}
-
 async function loadDailyIngredientConsumption(supabase, businessDate) {
   const { data, error } = await supabase
     .from('orders')
@@ -714,6 +675,10 @@ async function sendDailyIngredientConsumptionNotification(supabase, businessDate
   let telegramMessageId = ''
   try {
     const summary = await loadDailyIngredientConsumption(supabase, businessDate)
+    const {
+      buildDailyIngredientConsumptionReportCaption,
+      buildDailyIngredientConsumptionReportPng,
+    } = await import('./_lib/dailyOperationsReportImages.js')
     const reportImage = await buildDailyIngredientConsumptionReportPng(summary, businessDate)
     const response = await sendTelegramPhoto(target.chatId, reportImage, {
       caption: buildDailyIngredientConsumptionReportCaption(businessDate),
@@ -909,80 +874,180 @@ async function claimDailyPayrollGroupDelivery(supabase, businessDate) {
   return claimed.data || null
 }
 
-async function sendDailyPayrollGroupNotification(supabase, businessDate, kpiResults) {
-  const delivery = await claimDailyPayrollGroupDelivery(supabase, businessDate)
-  if (!delivery) return { businessDate, status: 'duplicate' }
+async function markDailyPayrollGroupDeliverySent(supabase, businessDate, target, messageId) {
+  let lastError = null
+  const sentAt = new Date().toISOString()
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const updated = await supabase
+      .from('daily_payroll_group_notification_deliveries')
+      .update({
+        status: 'sent',
+        telegram_chat_id: target.chatId,
+        telegram_message_id: messageId,
+        error_message: '',
+        sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('business_date', businessDate)
+      .select('business_date')
+      .maybeSingle()
+    if (!updated.error && updated.data) return
+    lastError = updated.error || new Error('Daily payroll group delivery row disappeared')
+  }
+  throw lastError
+}
+
+async function updateInvestorReportDeliveryStatus(
+  supabase,
+  table,
+  dateColumn,
+  businessDate,
+  status,
+  target,
+  errorMessage
+) {
+  const updatedAt = new Date().toISOString()
+  const update = await supabase.from(table).update({
+    status,
+    telegram_chat_id: target?.chatId || null,
+    error_message: String(errorMessage || '').slice(0, 1000),
+    updated_at: updatedAt,
+  }).eq(dateColumn, businessDate)
+  if (update.error) throw update.error
+}
+
+async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) {
+  const payrollDelivery = await claimDailyPayrollGroupDelivery(supabase, businessDate)
+  const bazaarDelivery = await claimDailyBazaarDelivery(supabase, businessDate)
+  const duplicateResult = { businessDate, status: 'duplicate' }
+  if (!payrollDelivery && !bazaarDelivery) {
+    return { payroll: duplicateResult, bazaar: duplicateResult }
+  }
 
   const target = await loadInvestorGroupTarget(supabase)
   if (!target.chatId) {
-    const updatedAt = new Date().toISOString()
-    await supabase.from('daily_payroll_group_notification_deliveries').update({
-      status: 'skipped',
-      error_message: 'ZarKebab Investor Telegram group is not configured',
-      updated_at: updatedAt,
-    }).eq('business_date', businessDate)
-    return { businessDate, status: 'skipped' }
+    const unavailable = 'ZarKebab Investor Telegram group is not configured'
+    if (payrollDelivery) {
+      await updateInvestorReportDeliveryStatus(
+        supabase,
+        'daily_payroll_group_notification_deliveries',
+        'business_date',
+        businessDate,
+        'skipped',
+        target,
+        unavailable
+      )
+    }
+    if (bazaarDelivery) {
+      await updateInvestorReportDeliveryStatus(
+        supabase,
+        'daily_bazaar_telegram_deliveries',
+        'purchase_date',
+        businessDate,
+        'skipped',
+        target,
+        unavailable
+      )
+    }
+    return {
+      payroll: payrollDelivery ? { businessDate, status: 'skipped' } : duplicateResult,
+      bazaar: bazaarDelivery ? { businessDate, status: 'skipped' } : duplicateResult,
+    }
   }
 
-  let telegramMessageId = ''
-  let deliveryFormat = 'text'
+  let telegramMessageIds = []
   try {
-    const summary = await loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults)
-    let reportImage = null
-    let reportCaption = ''
-    try {
-      reportImage = await buildDailyPayrollGroupReportPng(summary, businessDate)
-      reportCaption = buildDailyPayrollGroupReportCaption(businessDate)
-    } catch (error) {
-      console.error('[telegram/daily-salary] payroll image unavailable; sending text fallback:', error)
+    const payrollModule = await import('./_lib/payrollReportImage.js')
+    const operationsModule = await import('./_lib/dailyOperationsReportImages.js')
+    const [summary, purchases] = await Promise.all([
+      payrollDelivery
+        ? loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults)
+        : null,
+      bazaarDelivery ? loadDailyBazaarPurchases(supabase, businessDate) : null,
+    ])
+    const photos = []
+    if (payrollDelivery) {
+      photos.push({
+        kind: 'payroll',
+        photo: await payrollModule.buildDailyPayrollGroupReportPng(summary, businessDate),
+        filename: `zar-kebab-payroll-${businessDate}.png`,
+        caption: bazaarDelivery
+          ? operationsModule.buildDailyInvestorReportsCaption(businessDate)
+          : payrollModule.buildDailyPayrollGroupReportCaption(businessDate),
+      })
     }
-    deliveryFormat = reportImage ? 'photo' : 'text'
-    const response = reportImage
-      ? await sendTelegramPhoto(
-          target.chatId,
-          reportImage,
-          {
-            caption: reportCaption,
-            filename: `zar-kebab-payroll-${businessDate}.png`,
-          }
-        )
-      : await sendTelegramMessage(
-          target.chatId,
-          buildDailyPayrollGroupMessage(summary, businessDate, 'ru')
-        )
-    telegramMessageId = getTelegramMessageId(response)
-    const sentAt = new Date().toISOString()
-    let lastError = null
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const updated = await supabase
-        .from('daily_payroll_group_notification_deliveries')
-        .update({
-          status: 'sent',
-          telegram_chat_id: target.chatId,
-          telegram_message_id: telegramMessageId,
-          error_message: '',
-          sent_at: sentAt,
-          updated_at: sentAt,
-        })
-        .eq('business_date', businessDate)
-        .select('business_date')
-        .maybeSingle()
-      if (!updated.error && updated.data) {
-        return { businessDate, status: 'sent', format: deliveryFormat }
-      }
-      lastError = updated.error || new Error('Daily payroll group delivery row disappeared')
+    if (bazaarDelivery) {
+      photos.push({
+        kind: 'bazaar',
+        photo: await operationsModule.buildDailyBazaarReportPng(purchases, businessDate),
+        filename: `zar-kebab-bazaar-${businessDate}.png`,
+        caption: payrollDelivery
+          ? ''
+          : operationsModule.buildDailyBazaarReportCaption(businessDate),
+      })
     }
-    throw lastError
-  } catch (error) {
-    if (!telegramMessageId) {
-      await supabase.from('daily_payroll_group_notification_deliveries').update({
-        status: 'failed',
-        telegram_chat_id: target.chatId,
-        error_message: String(error?.message || error).slice(0, 1000),
-        updated_at: new Date().toISOString(),
-      }).eq('business_date', businessDate)
+
+    if (photos.length === 2) {
+      const response = await sendTelegramMediaGroup(target.chatId, photos)
+      telegramMessageIds = getTelegramMediaGroupMessageIds(response, photos.length)
     } else {
-      console.error('[telegram/daily-salary] Payroll group message sent but delivery status was not persisted:', error)
+      const response = await sendTelegramPhoto(target.chatId, photos[0].photo, photos[0])
+      telegramMessageIds = [getTelegramMessageId(response)]
+    }
+
+    for (let index = 0; index < photos.length; index += 1) {
+      if (photos[index].kind === 'payroll') {
+        await markDailyPayrollGroupDeliverySent(
+          supabase,
+          businessDate,
+          target,
+          telegramMessageIds[index]
+        )
+      } else {
+        await markDailyBazaarDeliverySent(
+          supabase,
+          businessDate,
+          target,
+          telegramMessageIds[index]
+        )
+      }
+    }
+
+    const album = photos.length === 2
+    return {
+      payroll: payrollDelivery
+        ? { businessDate, status: 'sent', format: 'photo', album }
+        : duplicateResult,
+      bazaar: bazaarDelivery
+        ? { businessDate, status: 'sent', format: 'photo', album }
+        : duplicateResult,
+    }
+  } catch (error) {
+    if (telegramMessageIds.length === 0) {
+      if (payrollDelivery) {
+        await updateInvestorReportDeliveryStatus(
+          supabase,
+          'daily_payroll_group_notification_deliveries',
+          'business_date',
+          businessDate,
+          'failed',
+          target,
+          error?.message || error
+        )
+      }
+      if (bazaarDelivery) {
+        await updateInvestorReportDeliveryStatus(
+          supabase,
+          'daily_bazaar_telegram_deliveries',
+          'purchase_date',
+          businessDate,
+          'failed',
+          target,
+          error?.message || error
+        )
+      }
+    } else {
+      console.error('[telegram/daily-salary] Investor report album sent but delivery status was not persisted:', error)
     }
     throw error
   }
@@ -1207,7 +1272,7 @@ export default async function handler(req, res) {
         .select('*')
         .eq('business_date', notificationDate)
       if (kpiResultsError) throw kpiResultsError
-      const result = await sendDailyPayrollGroupNotification(
+      const result = await sendDailyInvestorReportAlbum(
         supabase,
         notificationDate,
         kpiResults || []
@@ -1291,30 +1356,28 @@ export default async function handler(req, res) {
         )
         const failedCount = summaryResults.filter(result => result.status === 'failed').length
         let payrollGroupResult
+        let bazaarResult
         try {
-          payrollGroupResult = await sendDailyPayrollGroupNotification(
+          const investorReports = await sendDailyInvestorReportAlbum(
             supabase,
             kpiRun.businessDate,
             kpiResultsByDate.get(kpiRun.businessDate) || []
           )
+          payrollGroupResult = investorReports.payroll
+          bazaarResult = investorReports.bazaar
         } catch (error) {
           payrollGroupResult = {
             businessDate: kpiRun.businessDate,
             status: 'failed',
             error: String(error?.message || error).slice(0, 1000),
           }
-        }
-        dailyPayrollGroupRuns.push(payrollGroupResult)
-        let bazaarResult
-        try {
-          bazaarResult = await sendDailyBazaarNotification(supabase, kpiRun.businessDate)
-        } catch (error) {
           bazaarResult = {
             businessDate: kpiRun.businessDate,
             status: 'failed',
             error: String(error?.message || error).slice(0, 1000),
           }
         }
+        dailyPayrollGroupRuns.push(payrollGroupResult)
         dailyBazaarRuns.push(bazaarResult)
         let ingredientConsumptionResult
         try {

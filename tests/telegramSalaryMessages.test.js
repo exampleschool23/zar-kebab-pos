@@ -26,7 +26,7 @@ import {
   buildDailyPayrollGroupReportPng,
   buildDailyPayrollGroupReportSvg,
 } from '../api/telegram/_lib/payrollReportImage.js'
-import { sendTelegramPhoto } from '../api/telegram/_lib/telegram.js'
+import { sendTelegramMediaGroup, sendTelegramPhoto } from '../api/telegram/_lib/telegram.js'
 
 const salaryProfile = {
   id: 'salary-1',
@@ -253,6 +253,55 @@ test('Telegram photo delivery uploads the generated PNG as multipart form data',
     assert.equal(request.options.body.get('chat_id'), '-100123')
     assert.equal(request.options.body.get('photo').name, 'daily-report.png')
     assert.equal(request.options.body.get('photo').type, 'image/png')
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalToken == null) delete process.env.TELEGRAM_BOT_TOKEN
+    else process.env.TELEGRAM_BOT_TOKEN = originalToken
+  }
+})
+
+test('Telegram media-group delivery uploads two PNG reports as one album', async () => {
+  const originalFetch = globalThis.fetch
+  const originalToken = process.env.TELEGRAM_BOT_TOKEN
+  process.env.TELEGRAM_BOT_TOKEN = 'test-token'
+  let request
+  globalThis.fetch = async (url, options) => {
+    request = { url, options }
+    return {
+      ok: true,
+      json: async () => ({ ok: true, result: [{ message_id: 401 }, { message_id: 402 }] }),
+    }
+  }
+
+  try {
+    const response = await sendTelegramMediaGroup('-100123', [
+      {
+        photo: Buffer.from([137, 80, 78, 71]),
+        filename: 'daily-report.png',
+        caption: '<b>Daily reports</b>',
+      },
+      {
+        photo: Buffer.from([137, 80, 78, 71]),
+        filename: 'daily-bazaar.png',
+      },
+    ])
+    const media = JSON.parse(request.options.body.get('media'))
+
+    assert.deepEqual(response.result.map(item => item.message_id), [401, 402])
+    assert.match(request.url, /\/bottest-token\/sendMediaGroup$/)
+    assert.equal(request.options.method, 'POST')
+    assert.equal(request.options.body.get('chat_id'), '-100123')
+    assert.deepEqual(media, [
+      {
+        type: 'photo',
+        media: 'attach://photo0',
+        caption: '<b>Daily reports</b>',
+        parse_mode: 'HTML',
+      },
+      { type: 'photo', media: 'attach://photo1' },
+    ])
+    assert.equal(request.options.body.get('photo0').name, 'daily-report.png')
+    assert.equal(request.options.body.get('photo1').name, 'daily-bazaar.png')
   } finally {
     globalThis.fetch = originalFetch
     if (originalToken == null) delete process.env.TELEGRAM_BOT_TOKEN

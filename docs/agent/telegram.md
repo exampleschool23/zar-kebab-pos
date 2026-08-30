@@ -59,9 +59,10 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Message language follows the target and includes amount, date, category, method, optional supplier/description, creator, and recorded monthly total.
-- Each completed Tashkent day produces three Investor report images: the financial/payroll report, Daily Bazaar report, and theoretical Tech Card ingredient-consumption report.
+- Each completed Tashkent day produces three Investor report images. The financial/payroll and Daily Bazaar PNGs are sent together as one two-photo Telegram album; the theoretical Tech Card ingredient-consumption image remains a separate photo.
 - The Daily Bazaar image includes each ingredient's snapshotted normal total, paid total, signed difference, and the overall Bazaar difference. It is still emitted with an empty state when no Bazaar rows exist so the daily image set remains complete.
+- Financial and Daily Bazaar delivery is image-only: if either renderer fails, send no text fallback and leave the claimed report rows retryable. A partial retry may send only the missing PNG without duplicating the photo already recorded as sent.
 - The ingredient image values paid, non-cancelled sold quantities from immutable order-item recipe snapshots and visibly counts legacy sold rows without snapshot coverage.
-- All three image deliveries are independently duplicate-safe and are marked sent only after Telegram returns a message id.
+- All three image deliveries remain independently duplicate-safe; the album records Telegram's separate message id for each photo and marks each ledger sent only after those ids are returned.
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows do not create new cash-expense announcements.

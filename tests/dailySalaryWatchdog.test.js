@@ -44,13 +44,14 @@ test('watchdog suppresses duplicate alerts and does not alert for an active run'
   assert.match(dailySalary, /CRON_FAILURE_ALERT_MARKER/)
 })
 
-test('manual Investor report task sends only the aggregate report from finalized KPI data', () => {
+test('manual Investor report task sends the financial and Bazaar photo album from finalized KPI data', () => {
   assert.match(dailySalary, /cronTask === 'investor-report'/)
   assert.match(dailySalary, /\.from\('employee_daily_kpi_results'\)[\s\S]*?\.eq\('business_date', notificationDate\)/)
-  assert.match(dailySalary, /sendDailyPayrollGroupNotification\([\s\S]*?notificationDate,[\s\S]*?kpiResults \|\| \[\]/)
-  assert.match(dailySalary, /import \{[\s\S]*buildDailyPayrollGroupReportPng[\s\S]*\} from '\.\/_lib\/payrollReportImage\.js'/)
-  assert.doesNotMatch(dailySalary, /await import\('\.\/_lib\/payrollReportImage\.js'\)/)
-  assert.match(dailySalary, /status: 'sent', format: deliveryFormat/)
+  assert.match(dailySalary, /sendDailyInvestorReportAlbum\([\s\S]*?notificationDate,[\s\S]*?kpiResults \|\| \[\]/)
+  assert.doesNotMatch(dailySalary, /import \{[\s\S]*buildDailyPayrollGroupReportPng[\s\S]*\} from '\.\/_lib\/payrollReportImage\.js'/)
+  assert.match(dailySalary, /await import\('\.\/_lib\/payrollReportImage\.js'\)/)
+  assert.match(dailySalary, /sendTelegramMediaGroup\(target\.chatId, photos\)/)
+  assert.match(dailySalary, /payroll:[\s\S]*?bazaar:/)
   assert.equal(
     vercelConfig.functions?.['api/telegram/daily-salary.js']?.includeFiles,
     '{node_modules/@img/sharp-libvips-linux-x64/**,node_modules/notosans-fontface/fonts/*.ttf}'

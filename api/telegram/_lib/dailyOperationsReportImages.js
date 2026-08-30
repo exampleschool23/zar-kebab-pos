@@ -128,6 +128,10 @@ export function buildDailyBazaarReportCaption(date) {
   return `🧺 <b>Ежедневный базар</b>\n📅 ${escapeSvg(formatLongDate(date, 'ru', date))}`
 }
 
+export function buildDailyInvestorReportsCaption(date) {
+  return `📊 <b>Ежедневный финансовый отчёт и базар</b>\n📅 ${escapeSvg(formatLongDate(date, 'ru', date))}`
+}
+
 export function buildDailyIngredientConsumptionReportCaption(date) {
   return `🥕 <b>Расход ингредиентов по Tech Card</b>\n📅 ${escapeSvg(formatLongDate(date, 'ru', date))}`
 }

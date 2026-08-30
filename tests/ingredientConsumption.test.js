@@ -6,6 +6,7 @@ import { aggregateIngredientConsumption } from '../src/lib/ingredientConsumption
 import {
   buildDailyBazaarReportSvg,
   buildDailyIngredientConsumptionReportSvg,
+  buildDailyInvestorReportsCaption,
 } from '../api/telegram/_lib/dailyOperationsReportImages.js'
 
 test('ingredient consumption multiplies sale quantity by immutable per-portion Tech Card quantities', () => {
@@ -56,6 +57,10 @@ test('daily Bazaar and ingredient reports render as separate image layouts', () 
   assert.match(ingredientSvg, /Расход ингредиентов/)
   assert.match(ingredientSvg, /0,75 kg/)
   assert.match(ingredientSvg, /без снимка Tech Card: 2/)
+  assert.equal(
+    buildDailyInvestorReportsCaption('2026-08-30'),
+    '📊 <b>Ежедневный финансовый отчёт и базар</b>\n📅 30 августа 2026'
+  )
 })
 
 test('order item ingredient snapshots are variant-aware immutable and never backfilled', () => {

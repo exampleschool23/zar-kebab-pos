@@ -385,16 +385,16 @@ test('one private daily summary contains both salary and the automatic KPI bonus
   assert.equal((message.match(/Daily salary summary/g) || []).length, 1)
 })
 
-test('daily cron sends one duplicate-safe aggregate salary, KPI, and meal image to the Investor group', () => {
-  assert.match(dailyCron, /sendDailyPayrollGroupNotification/)
+test('daily cron groups the payroll and Bazaar images in one duplicate-safe Investor album', () => {
+  assert.match(dailyCron, /sendDailyInvestorReportAlbum/)
   assert.match(dailyCron, /loadInvestorGroupTarget/)
   assert.doesNotMatch(dailyCron, /^import[\s\S]*?from '.\/_lib\/payrollReportImage\.js'/m)
   assert.match(dailyCron, /await import\('\.\/_lib\/payrollReportImage\.js'\)/)
   assert.match(dailyCron, /buildDailyPayrollGroupReportPng\(summary, businessDate\)/)
-  assert.match(dailyCron, /reportCaption = buildDailyPayrollGroupReportCaption\(businessDate\)/)
-  assert.match(dailyCron, /caption: reportCaption/)
-  assert.match(dailyCron, /sendTelegramPhoto\(/)
-  assert.match(dailyCron, /buildDailyPayrollGroupMessage\(summary, businessDate, 'ru'\)/)
+  assert.match(dailyCron, /buildDailyBazaarReportPng\(purchases, businessDate\)/)
+  assert.match(dailyCron, /sendTelegramMediaGroup\(target\.chatId, photos\)/)
+  assert.match(dailyCron, /getTelegramMediaGroupMessageIds\(response, photos\.length\)/)
+  assert.doesNotMatch(dailyCron, /buildDailyPayrollGroupMessage|sending text fallback/)
   assert.match(dailyCron, /daily_payroll_group_notification_deliveries/)
   assert.match(dailyCron, /\.eq\('target_key', 'salary_events'\)/)
   assert.match(dailyCron, /kpiResultsByDate\.get\(kpiRun\.businessDate\)/)
