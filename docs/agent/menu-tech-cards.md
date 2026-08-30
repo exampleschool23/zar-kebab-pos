@@ -62,6 +62,7 @@ Read this guide for menu products/categories, availability and visibility, media
 - Saving a base recipe synchronizes the protected parent cost; saving a variant recipe synchronizes that option in protected `variant_costs`. Existing order-item cost snapshots remain untouched.
 - Variant recipes may be copied and quantity-scaled, but the destination variant identity and its sellable portion count remain explicit.
 - Structured components may choose a product variant through `selected_options`; empty means the base product.
+- Included-product quantities are positive recipe amounts and may be fractional for every sale unit; the editor accepts decimal points and commas such as `0.3` and `0,5`.
 - Variant calculation uses protected variant cost with protected parent-cost fallback. Changing parent selection clears stale options.
-- Copy chosen options into immutable `order_items.tech_card_component_snapshot`; payment deducts included parent/variant stock once.
+- Copy chosen options into immutable `order_items.tech_card_component_snapshot`; payment deducts whole piece components from integer parent/variant shelf stock once. Fractional recipe components contribute proportionally to protected cost and are never rounded into an integer stock movement.
 - The same parent may repeat only for distinct variants; exact parent-and-variant duplicates are invalid.

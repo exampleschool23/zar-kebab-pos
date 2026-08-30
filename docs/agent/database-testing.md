@@ -22,7 +22,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - salary/Telegram tracking and historical financial freezing: `107`–`119`
   - menu permissions, estimates, archival, stale-item rejection: `121`–`127`
   - KPI and Tourist service: `129`–`130`
-  - Tech Cards, access, components, stock, and variant recipes: `139`–`140`, `149`–`151`, `154`–`156`
+  - Tech Cards, access, components, stock, variant recipes, and fractional included-dish quantities: `139`–`140`, `149`–`151`, `154`–`156`, `159`
   - menu/expense notifications and financial snapshots: `142`–`147`
   - absence notification cleanup and daily-report cron: `148`, `152`
   - Dashboard monthly income snapshots, finalizer cron, and configurable break-even target: `157`–`158`

@@ -189,11 +189,22 @@ test('tech card payload preserves a selected included-item variant', () => {
   })
 })
 
-test('piece-based included items require whole stock quantities', () => {
+test('included menu items accept fractional recipe quantities for every sale unit', () => {
   const card = createBlankTechCard('set-1')
-  card.components = [{ component_menu_item_id: 'coke-1', quantity: '1.5' }]
+  card.components = [
+    { component_menu_item_id: 'salad-1', quantity: '0,3' },
+    { component_menu_item_id: 'coke-1', quantity: '0.5' },
+  ]
   card.preparation_steps = 'Assemble the set.'
 
-  assert.match(validateTechCard(card, [{ id: 'coke-1', sale_unit: 'piece', cost_price: 4_000 }]), /whole quantity/i)
-  assert.equal(validateTechCard(card, [{ id: 'coke-1', sale_unit: 'kg', cost_price: 4_000 }]), '')
+  const menuItems = [
+    { id: 'salad-1', sale_unit: 'piece', cost_price: 5_500 },
+    { id: 'coke-1', sale_unit: 'piece', cost_price: 4_000 },
+  ]
+
+  assert.equal(validateTechCard(card, menuItems), '')
+  assert.deepEqual(buildTechCardPayload(card).components.map(component => component.quantity), [0.3, 0.5])
+
+  const summary = calculateTechCardSummary(card, menuItems)
+  assert.equal(summary.componentCostPerPortion, 3_650)
 })

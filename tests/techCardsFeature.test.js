@@ -111,6 +111,17 @@ test('Tech Card components persist selected variants for cost, snapshots, and st
   assert.match(page, /selectedOptions=\{component\.selected_options\}/)
 })
 
+test('Tech Card included dishes accept fractional recipe quantities', () => {
+  const migration = source('supabase/159_fractional_tech_card_components.sql')
+  const helpers = source('src/lib/techCards.js')
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.match(migration, /drop trigger if exists tech_card_components_validate_quantity/)
+  assert.match(migration, /drop function if exists public\.validate_tech_card_component_quantity\(\)/)
+  assert.doesNotMatch(helpers, /Piece-based included menu items require a whole quantity/)
+  assert.match(page, /inputMode="decimal"[\s\S]{0,120}value=\{component\.quantity\}/)
+})
+
 test('Tech Card included-item picker is searchable and grouped by menu category', () => {
   const picker = source('src/components/MenuItemPicker.jsx')
 

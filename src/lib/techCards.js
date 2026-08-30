@@ -257,9 +257,6 @@ export function validateTechCard(card = {}, menuItems = [], messages = {}) {
         if (!optionExists) return 'The selected included-item variant is no longer available.'
       }
     }
-    if (includedItem && (includedItem.sale_unit || 'piece') === 'piece' && !Number.isInteger(component.quantity)) {
-      return 'Piece-based included menu items require a whole quantity.'
-    }
     const componentKey = `${component.component_menu_item_id}:${JSON.stringify(component.selected_options)}`
     if (componentKeys.has(componentKey)) return 'The same included menu item variant cannot be added twice.'
     componentKeys.add(componentKey)
