@@ -6,14 +6,13 @@ import { fileURLToPath } from 'node:url'
 import { formatLongDate } from '../../../src/lib/dateFormat.js'
 import { formatCurrency } from '../../../src/lib/formatCurrency.js'
 import {
+  BAZAAR_CATEGORIES,
+  bazaarCategoryLabel,
   bazaarUnitLabel,
-  calculateBazaarExpectedTotal,
-  calculateBazaarPriceDifference,
   calculateBazaarTotal,
   formatBazaarQuantity,
-  getBazaarDisplayQuantity,
-  getBazaarNormalLineTotal,
-  getBazaarPriceDifference,
+  getBazaarUnitCost,
+  normalizeBazaarQuantityToBase,
   normalizeBazaarPurchase,
 } from '../../../src/lib/bazaar.js'
 
@@ -36,11 +35,6 @@ function configureFonts() {
   writeFileSync(configPath, `<?xml version="1.0"?><fontconfig><dir>${escapeSvg(fontDirectory)}</dir><cachedir>${escapeSvg(join(tmpdir(), 'zar-kebab-font-cache'))}</cachedir><config></config></fontconfig>`)
   process.env.FONTCONFIG_FILE = configPath
   fontsConfigured = true
-}
-
-function signedMoney(value) {
-  const amount = Math.round(Number(value) || 0)
-  return `${amount > 0 ? '+' : ''}${formatCurrency(amount)}`
 }
 
 function quantity(value) {
@@ -86,25 +80,69 @@ export function buildDailyBazaarReportSvg(purchases = [], date = '') {
   const normalized = purchases.map(normalizeBazaarPurchase)
   const items = normalized.flatMap(purchase => purchase.items || [])
   const total = normalized.reduce((sum, purchase) => sum + calculateBazaarTotal(purchase.items || []), 0)
-  const expected = calculateBazaarExpectedTotal(items)
-  const difference = calculateBazaarPriceDifference(items)
-  return reportShell({
-    title: 'Ежедневный базар',
-    subtitle: formatLongDate(date, 'ru', date),
-    totalLabel: 'ОПЛАЧЕНО · ОБЫЧНАЯ ЦЕНА · РАЗНИЦА',
-    totalValue: `${formatCurrency(total)}  ·  ${formatCurrency(expected)}  ·  ${signedMoney(difference)}`,
-    rows: items.map(item => {
-      const display = getBazaarDisplayQuantity(item.quantity, item.unit)
-      const itemDifference = getBazaarPriceDifference(item)
-      return {
-        name: item.product_name,
-        detail: `${formatBazaarQuantity(display.quantity)} ${bazaarUnitLabel(display.unit, 'ru')} · норма ${formatCurrency(getBazaarNormalLineTotal(item))}`,
-        value: signedMoney(itemDifference),
-        color: itemDifference > 0 ? '#C2410C' : itemDifference < 0 ? '#137A58' : '#526461',
-      }
-    }),
-    footer: `Позиций: ${items.length}`,
-  })
+  const groups = BAZAAR_CATEGORIES
+    .map(category => ({
+      ...category,
+      items: items.filter(item => item.category === category.key),
+    }))
+    .filter(group => group.items.length > 0)
+  const totalCardY = 54
+  const totalCardHeight = 104
+  const contentStartY = 190
+  const categoryHeight = 44
+  const categoryGap = 12
+  const rowHeight = 66
+  const groupGap = 20
+  const emptyHeight = 150
+  const contentHeight = groups.length > 0
+    ? groups.reduce((height, group) => (
+        height + categoryHeight + categoryGap + group.items.length * rowHeight + groupGap
+      ), 0)
+    : emptyHeight
+  const height = contentStartY + contentHeight + 36
+  let itemNumber = 0
+  let cursorY = contentStartY
+  const groupMarkup = groups.length > 0
+    ? groups.map(group => {
+        const categoryY = cursorY
+        cursorY += categoryHeight + categoryGap
+        const itemMarkup = group.items.map((item, index) => {
+          itemNumber += 1
+          const rowY = cursorY
+          cursorY += rowHeight
+          const display = normalizeBazaarQuantityToBase(item.quantity, item.unit)
+          const unitLabel = bazaarUnitLabel(display.unit, 'ru')
+          const detail = `${formatBazaarQuantity(display.quantity)} ${unitLabel} · ${formatCurrency(Math.round(getBazaarUnitCost(item)))} / ${unitLabel}`
+          return `<g>
+            <rect x="64" y="${rowY}" width="1072" height="56" rx="14" fill="${index % 2 ? '#F8FAF9' : '#F1F6F4'}"/>
+            <text x="88" y="${rowY + 37}" font-size="24" font-weight="700" fill="#173B3F">${itemNumber}. ${escapeSvg(item.product_name)}</text>
+            <text x="830" y="${rowY + 37}" text-anchor="end" font-size="21" fill="#526461">${escapeSvg(detail)}</text>
+            <text x="1110" y="${rowY + 37}" text-anchor="end" font-size="23" font-weight="800" fill="#173B3F">${escapeSvg(formatCurrency(item.line_total))}</text>
+          </g>`
+        }).join('')
+        cursorY += groupGap
+        return `<g>
+          <rect x="64" y="${categoryY}" width="1072" height="${categoryHeight}" rx="13" fill="#FFF1E8"/>
+          <circle cx="89" cy="${categoryY + 22}" r="7" fill="#F97316"/>
+          <text x="110" y="${categoryY + 30}" font-size="21" font-weight="800" letter-spacing="0.8" fill="#9A4B16">${escapeSvg(bazaarCategoryLabel(group.key, 'ru').toLocaleUpperCase('ru-RU'))}</text>
+          <text x="1110" y="${categoryY + 30}" text-anchor="end" font-size="18" font-weight="700" fill="#A36B45">${group.items.length} поз.</text>
+          ${itemMarkup}
+        </g>`
+      }).join('')
+    : `<text x="600" y="270" text-anchor="middle" font-size="28" fill="#879592">Нет данных за этот день</text>`
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+  <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${height}" viewBox="0 0 ${WIDTH} ${height}">
+    <rect width="${WIDTH}" height="${height}" rx="48" fill="#EAF0EE"/>
+    <rect x="28" y="28" width="1144" height="${height - 56}" rx="38" fill="#FFFFFF"/>
+    <g font-family="Noto Sans">
+      <rect x="64" y="${totalCardY}" width="1072" height="${totalCardHeight}" rx="24" fill="#173B3F"/>
+      <text x="92" y="94" font-size="19" font-weight="700" letter-spacing="1.5" fill="#A8D7D0">ИТОГО ПО БАЗАРУ</text>
+      <text x="92" y="139" font-size="38" font-weight="800" fill="#FFFFFF">${escapeSvg(formatCurrency(total))}</text>
+      <text x="1110" y="132" text-anchor="end" font-size="20" font-weight="700" fill="#A8D7D0">ПОЗИЦИЙ: ${items.length}</text>
+      ${groupMarkup}
+    </g>
+  </svg>`
 }
 
 export function buildDailyIngredientConsumptionReportSvg(summary = {}, date = '') {

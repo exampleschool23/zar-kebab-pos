@@ -514,6 +514,7 @@ async function loadDailyBazaarPurchases(supabase, purchaseDate) {
       bazaar_purchase_items (
         id,
         product_name,
+        category,
         quantity,
         unit,
         line_total,

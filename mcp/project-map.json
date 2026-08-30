@@ -87,7 +87,7 @@
     },
     {
       "name": "daily salary cron",
-      "aliases": ["payroll cron", "daily KPI salary delivery", "salary watchdog", "Investor report album", "financial and Bazaar photo group", "two-days-ago Bazaar report"],
+      "aliases": ["payroll cron", "daily KPI salary delivery", "salary watchdog", "Investor report album", "financial and Bazaar photo group", "two-days-ago Bazaar report", "category-grouped Bazaar receipt"],
       "path": "api/telegram/daily-salary.js",
       "symbol": "handler"
     }
@@ -143,7 +143,7 @@
     },
     {
       "name": "telegram-delivery",
-      "keywords": ["bot", "mini app", "telegram", "notification", "delivery", "retry", "cron", "investor", "salary group", "team", "media group", "photo album", "Daily Bazaar image"],
+      "keywords": ["bot", "mini app", "telegram", "notification", "delivery", "retry", "cron", "investor", "salary group", "team", "media group", "photo album", "Daily Bazaar image", "category-grouped Bazaar receipt", "purchased unit price"],
       "files": ["src/pages/TelegramMiniApp.jsx", "src/lib/telegramWebApp.js", "src/lib/telegramNotifications.js", "api/telegram/employee-notification.js", "api/telegram/daily-salary.js", "api/telegram/_lib/salaryMessages.js", "api/telegram/_lib/payrollReportImage.js", "api/telegram/_lib/dailyOperationsReportImages.js", "supabase/165_daily_ingredient_consumption_deliveries.sql", "api/telegram/webhook.js", "bots/telegram-bot.js"],
       "tests": ["tests/telegramOrderStatus.test.js", "tests/telegramSalaryMessages.test.js", "tests/telegramDeliveryRetry.test.js", "tests/telegramDailyBazaar.test.js", "tests/telegramInvestorExpense.test.js", "tests/ingredientConsumption.test.js", "tests/dailySalaryWatchdog.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
     },

@@ -40,10 +40,18 @@ test('ingredient consumption multiplies sale quantity by immutable per-portion T
 
 test('daily Bazaar and ingredient reports render as separate image layouts', () => {
   const bazaarSvg = buildDailyBazaarReportSvg([{
-    bazaar_purchase_items: [{
-      product_name: 'Картошка', quantity: 1, unit: 'kg', line_total: 8_000,
-      normal_unit_price: 7_500, normal_line_total: 7_500, price_difference: 500,
-    }],
+    bazaar_purchase_items: [
+      { product_name: 'Картошка', category: 'vegetables', quantity: 1, unit: 'kg', line_total: 8_000 },
+      { product_name: 'Курица', category: 'poultry', quantity: 2, unit: 'kg', line_total: 82_000 },
+      ...Array.from({ length: 18 }, (_, index) => ({
+        product_name: `Товар ${index + 1}`,
+        category: 'grocery',
+        quantity: 1,
+        unit: 'pcs',
+        line_total: 1_000 + index,
+        sort_order: index + 2,
+      })),
+    ],
   }], '2026-08-30')
   const ingredientSvg = buildDailyIngredientConsumptionReportSvg({
     ingredients: [{ name: 'Картошка', quantity: 0.75, unit: 'kg', spent: 6_000 }],
@@ -52,8 +60,16 @@ test('daily Bazaar and ingredient reports render as separate image layouts', () 
     uncoveredItemCount: 2,
   }, '2026-08-30')
 
-  assert.match(bazaarSvg, /Ежедневный базар/)
-  assert.match(bazaarSvg, /\+500/)
+  assert.doesNotMatch(bazaarSvg, /Ежедневный базар|30 августа 2026/)
+  assert.match(bazaarSvg, /ИТОГО ПО БАЗАРУ/)
+  assert.match(bazaarSvg, /ПТИЦА/)
+  assert.match(bazaarSvg, /ОВОЩИ/)
+  assert.match(bazaarSvg, /БАКАЛЕЯ/)
+  assert.match(bazaarSvg, /1\. Курица/)
+  assert.match(bazaarSvg, /2 кг · 41\s000 UZS \/ кг/)
+  assert.match(bazaarSvg, /82\s000 UZS/)
+  assert.match(bazaarSvg, /20\. Товар 18/)
+  assert.doesNotMatch(bazaarSvg, /Ещё позиций/)
   assert.match(ingredientSvg, /Расход ингредиентов/)
   assert.match(ingredientSvg, /0,75 kg/)
   assert.match(ingredientSvg, /без снимка Tech Card: 2/)

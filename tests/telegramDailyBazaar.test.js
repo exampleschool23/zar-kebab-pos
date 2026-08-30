@@ -16,6 +16,7 @@ test('Daily Bazaar is sent with the financial report as a two-photo Investor alb
   assert.match(cron, /\.from\('bazaar_purchases'\)/)
   assert.match(cron, /\.eq\('purchase_date', purchaseDate\)/)
   assert.match(cron, /\.eq\('entry_source', 'daily_bazaar'\)/)
+  assert.match(cron, /bazaar_purchase_items \([\s\S]*category,[\s\S]*line_total/)
   assert.match(cron, /\.eq\('target_key', 'salary_events'\)/)
   assert.match(cron, /buildDailyBazaarReportPng/)
   assert.match(cron, /zar-kebab-bazaar-/)
