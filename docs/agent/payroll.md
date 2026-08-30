@@ -24,7 +24,7 @@ Read this guide for salary profiles, payments, bonuses, fines, absences, advance
 - Every salary mutation is protected by Accounting write access and immutable audit coverage.
 - Today's absence can be undone only for an active employee with an exact row for the current Tashkent date.
 - Undo absence requires confirmation and an exact delete guarded by absence id, salary profile id, and date. Zero affected rows is an error.
-- Deleted bonus/fine/absence/rate events remove their polymorphic Telegram deliveries so they cannot remain retryable.
+- Salary-history deletion retracts each directly tracked employee, Salary-group, and Team Telegram message before deleting the source row. If Telegram refuses a retraction, keep the source row so the operator can retry; deleted bonus/fine/absence/rate events then remove their polymorphic delivery records so they cannot remain retryable.
 - Deactivation/reactivation work boundaries are inclusive; only intervening dates become absences. Archived `deleted_at` is exclusive after the last working date.
 
 ## Daily KPI bonus

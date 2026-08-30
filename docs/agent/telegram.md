@@ -24,6 +24,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 - Employee, Salary group, Team, and Investor delivery attempts are independent and duplicate-safe. A failure/retry for one destination must not duplicate another.
 - The Salaries page combines salary-operation status with five records per page and retry controls for unsent destinations.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
+- Owner salary-history deletion first retracts every directly tracked private, Salary-group, and Team message. Payment delivery snapshots the exact employee chat id so later relinking cannot redirect a retraction. Treat an already-missing Telegram message as successfully retracted, but keep the salary event when any other Telegram deletion fails.
 
 ## Salary destinations
 

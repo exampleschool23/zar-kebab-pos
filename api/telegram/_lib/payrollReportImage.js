@@ -106,6 +106,11 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     ? formatMoney(summary.netProfit)
     : 'Недоступно'
   const employeeMealLabel = `Среднее питание сотрудников (${normalizeAmount(summary?.presentEmployeeCount)} × ${formatSalaryNotificationAmount(summary?.employeeMealPerEmployeeTotal)})`
+  const overallExpense = normalizeAmount(summary?.salaryTotal)
+    + normalizeAmount(summary?.kpiBonusTotal)
+    + normalizeAmount(summary?.rentTotal)
+    + normalizeAmount(summary?.utilitiesTotal)
+    + normalizeAmount(summary?.employeeMealTotal)
   const chartCenterX = 365
   const chartCenterY = 613
   const regularColor = '#0D9488'
@@ -156,6 +161,7 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     <circle cx="112" cy="992" r="22" fill="#FFF0E7"/>
     <path d="M102 992h20 M106 982v20 M118 982v20" stroke="#F97316" stroke-width="4" stroke-linecap="round"/>
     <text x="150" y="1003" font-size="24" font-weight="800" letter-spacing="2" fill="#173B3F">РАСХОДЫ И НАЧИСЛЕНИЯ</text>
+    <text x="1094" y="1003" text-anchor="end" font-size="20" font-weight="800" fill="#173B3F">ОБЩИЙ РАСХОД · ${escapeSvg(formatMoney(overallExpense))}</text>
     <line x1="106" y1="1032" x2="1094" y2="1032" stroke="#E7EEEC" stroke-width="2"/>
     ${expenseRow('Начисленная зарплата', formatMoney(summary?.salaryTotal), 1088, { accent: regularColor })}
     ${expenseRow('Автоматические KPI-бонусы', formatMoney(summary?.kpiBonusTotal), 1152, { accent: touristColor })}

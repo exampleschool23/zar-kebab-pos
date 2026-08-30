@@ -137,6 +137,18 @@ export async function sendTelegramMessage(chatId, text, options = {}) {
   })
 }
 
+export async function deleteTelegramMessage(chatId, messageId) {
+  const normalizedChatId = String(chatId || '').trim()
+  const normalizedMessageId = Number(messageId)
+  if (!normalizedChatId || !Number.isSafeInteger(normalizedMessageId) || normalizedMessageId <= 0) {
+    throw new Error('Telegram chat id and message id are required')
+  }
+  return callTelegramApi('deleteMessage', {
+    chat_id: normalizedChatId,
+    message_id: normalizedMessageId,
+  })
+}
+
 export async function sendTelegramPhoto(chatId, photo, {
   caption = '',
   filename = 'report.png',

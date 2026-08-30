@@ -13,7 +13,7 @@ import {
 } from './_lib/paymentMessages.js'
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
-import { sendTelegramMessage } from './_lib/telegram.js'
+import { deleteTelegramMessage, sendTelegramMessage } from './_lib/telegram.js'
 import {
   buildAbsenceUndoInvestorMessage,
   buildInvestorExpenseGroupMessage,
@@ -53,6 +53,13 @@ const GROUP_EVENT_CONFIG = {
     table: 'employee_salary_rates',
     select: 'id, salary_profile_id, effective_from, amount, rate_unit, note, created_by, created_at, salary_profile:employee_salary_profiles(employee_name)',
   },
+}
+
+const RETRACTABLE_SALARY_EVENT_TABLES = {
+  payment: 'employee_salary_payments',
+  bonus: 'employee_salary_bonuses',
+  fine: 'employee_salary_fines',
+  absence: 'employee_salary_absences',
 }
 
 function isMissingKpiBonusSourceColumns(error) {
@@ -108,6 +115,7 @@ async function requireExpensesWriteAccess(req) {
   return {
     supabase,
     user,
+    role,
     actorName: profile?.full_name || profile?.email || user.email || '',
   }
 }
@@ -1264,6 +1272,127 @@ async function notifyPayment(supabase, user, paymentId) {
   }
 }
 
+function telegramMessageWasAlreadyDeleted(error) {
+  const message = String(error?.message || error || '').toLowerCase()
+  return message.includes('message to delete not found')
+    || message.includes('message_id_invalid')
+}
+
+async function retractTrackedTelegramMessage(target) {
+  try {
+    await deleteTelegramMessage(target.chatId, target.messageId)
+    return { ...target, status: 'deleted' }
+  } catch (error) {
+    if (telegramMessageWasAlreadyDeleted(error)) {
+      return { ...target, status: 'already_deleted' }
+    }
+    throw Object.assign(error instanceof Error ? error : new Error(String(error)), {
+      targetLabel: target.label,
+    })
+  }
+}
+
+function addTrackedRetractionTarget(targets, label, chatId, messageId) {
+  const normalizedMessageId = String(messageId || '').trim()
+  if (!normalizedMessageId) return
+  const normalizedChatId = String(chatId || '').trim()
+  if (!normalizedChatId) {
+    throw Object.assign(
+      new Error(`The stored Telegram chat id is missing for: ${label}`),
+      { status: 409 }
+    )
+  }
+  targets.push({ label, chatId: normalizedChatId, messageId: normalizedMessageId })
+}
+
+async function retractSalaryEventMessages(supabase, eventType, eventId) {
+  const table = RETRACTABLE_SALARY_EVENT_TABLES[eventType]
+  if (!table) throw Object.assign(new Error('Unsupported salary event type'), { status: 400 })
+
+  const { data: event, error: eventError } = await supabase
+    .from(table)
+    .select('id, salary_profile_id')
+    .eq('id', eventId)
+    .maybeSingle()
+  if (eventError) throw eventError
+  if (!event) throw Object.assign(new Error('Salary event not found'), { status: 404 })
+
+  const targets = []
+  if (eventType === 'payment') {
+    const deliveryResult = await supabase
+      .from('employee_salary_payment_notification_deliveries')
+      .select('employee_chat_id, telegram_message_id, group_chat_id, group_telegram_message_id')
+      .eq('payment_id', eventId)
+      .maybeSingle()
+    if (deliveryResult.error) throw deliveryResult.error
+    const delivery = deliveryResult.data
+    addTrackedRetractionTarget(
+      targets,
+      'employee',
+      delivery?.employee_chat_id,
+      delivery?.telegram_message_id
+    )
+    addTrackedRetractionTarget(
+      targets,
+      'salary_group',
+      delivery?.group_chat_id,
+      delivery?.group_telegram_message_id
+    )
+  } else {
+    const { data: delivery, error: deliveryError } = await supabase
+      .from('employee_salary_group_notification_deliveries')
+      .select('telegram_chat_id, telegram_message_id, employee_chat_id, employee_telegram_message_id, team_chat_id, team_telegram_message_id')
+      .eq('event_type', eventType)
+      .eq('event_id', eventId)
+      .maybeSingle()
+    if (deliveryError) throw deliveryError
+    addTrackedRetractionTarget(
+      targets,
+      'employee',
+      delivery?.employee_chat_id,
+      delivery?.employee_telegram_message_id
+    )
+    addTrackedRetractionTarget(
+      targets,
+      'salary_group',
+      delivery?.telegram_chat_id,
+      delivery?.telegram_message_id
+    )
+    addTrackedRetractionTarget(
+      targets,
+      'team_group',
+      delivery?.team_chat_id,
+      delivery?.team_telegram_message_id
+    )
+  }
+
+  const uniqueTargets = [...new Map(
+    targets.map(target => [`${target.chatId}:${target.messageId}`, target])
+  ).values()]
+  const settled = await Promise.allSettled(uniqueTargets.map(retractTrackedTelegramMessage))
+  const failures = settled
+    .filter(result => result.status === 'rejected')
+    .map(result => ({
+      target: result.reason?.targetLabel || 'telegram',
+      error: String(result.reason?.message || result.reason).slice(0, 1000),
+    }))
+  if (failures.length > 0) {
+    const targetNames = failures.map(failure => failure.target).join(', ')
+    const detail = failures.map(failure => failure.error).join('; ')
+    throw Object.assign(
+      new Error(`Could not delete the Telegram message from: ${targetNames}. ${detail}`),
+      { status: 409 }
+    )
+  }
+
+  return {
+    ok: true,
+    eventType,
+    eventId,
+    retracted: settled.map(result => result.value),
+  }
+}
+
 async function notifyInvestorExpense(supabase, user, expenseId) {
   const normalizedExpenseId = String(expenseId || '').trim()
   if (!normalizedExpenseId) {
@@ -1489,7 +1618,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return methodNotAllowed(res)
 
   try {
-    const { type, fineId, paymentId, bonusId, absenceId, rateId, expenseId, menuItemId } = await readJson(req)
+    const {
+      type,
+      eventType,
+      eventId,
+      fineId,
+      paymentId,
+      bonusId,
+      absenceId,
+      rateId,
+      expenseId,
+      menuItemId,
+    } = await readJson(req)
     const notificationType = type
       || (paymentId
         ? 'payment'
@@ -1519,13 +1659,17 @@ export default async function handler(req, res) {
     const isMenuUnavailable = notificationType === 'menu_unavailable'
     const isMenuAvailable = notificationType === 'menu_available'
     const isMenuAvailability = isMenuUnavailable || isMenuAvailable
-    if (!isMenuAvailability && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'expense', 'investor_income'].includes(notificationType)) {
+    const isSalaryRetraction = notificationType === 'retract_salary_event'
+    if (!isMenuAvailability && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'expense', 'investor_income'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (isMenuAvailability && !menuItemId) {
       return json(res, 400, { error: 'menuItemId is required' })
     }
-    if (!isMenuAvailability && !eventIds[notificationType]) {
+    if (isSalaryRetraction && (!eventType || !eventId)) {
+      return json(res, 400, { error: 'eventType and eventId are required' })
+    }
+    if (!isMenuAvailability && !isSalaryRetraction && !eventIds[notificationType]) {
       return json(res, 400, { error: `${notificationType}Id is required` })
     }
 
@@ -1534,9 +1678,14 @@ export default async function handler(req, res) {
       : notificationType === 'expense'
         ? await requireExpenseNotificationAccess(req)
         : await requireExpensesWriteAccess(req)
+    if (isSalaryRetraction && access.role !== 'owner') {
+      throw Object.assign(new Error('Only owners can retract salary messages'), { status: 403 })
+    }
     const { supabase, user, actorName } = access
     let result
-    if (isMenuAvailable) {
+    if (isSalaryRetraction) {
+      result = await retractSalaryEventMessages(supabase, eventType, eventId)
+    } else if (isMenuAvailable) {
       result = await notifyMenuAvailable(supabase, user, menuItemId)
     } else if (isMenuUnavailable) {
       result = await notifyMenuUnavailable(supabase, user, menuItemId)

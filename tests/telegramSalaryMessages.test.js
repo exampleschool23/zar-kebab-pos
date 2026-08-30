@@ -181,6 +181,7 @@ test('daily payroll group image contains the full Russian report and renders as 
   assert.match(svg, /Начисленная зарплата/)
   assert.match(svg, /Автоматические KPI-бонусы/)
   assert.match(svg, /Среднее питание сотрудников/)
+  assert.match(svg, /ОБЩИЙ РАСХОД · 2 354 369 UZS/)
   assert.match(svg, /Чистая прибыль за день/i)
   assert.match(svg, /Средняя дневная/i)
   assert.match(svg, /Выручка кафе за месяц/i)

@@ -16,8 +16,11 @@ async function postAuthenticatedTelegramNotification(body) {
     },
     body: JSON.stringify(body),
   })
-  if (!response.ok) throw new Error(`Telegram notification failed with ${response.status}`)
-  return response.json().catch(() => ({}))
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(result?.error || `Telegram notification failed with ${response.status}`)
+  }
+  return result
 }
 
 export async function notifyTelegramOrderStatus(orderIdOrIds, status) {
@@ -93,6 +96,17 @@ export async function notifyTelegramAbsenceUndo(absenceId) {
 
 export function notifyTelegramEmployeeRate(rateId) {
   return notifyTelegramSalaryEvent('rate', rateId)
+}
+
+export function retractTelegramSalaryEvent(eventType, eventId) {
+  if (!eventId || !['payment', 'bonus', 'fine', 'absence'].includes(eventType)) {
+    return Promise.reject(new Error('Unsupported salary event'))
+  }
+  return postAuthenticatedTelegramNotification({
+    type: 'retract_salary_event',
+    eventType,
+    eventId,
+  })
 }
 
 export async function notifyTelegramInvestorExpense(expenseId) {

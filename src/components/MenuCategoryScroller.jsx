@@ -126,6 +126,9 @@ export default function MenuCategoryScroller({
   topOffset = 0,
   className = '',
   collapsedClassName = '',
+  collapsedContentClassName = '',
+  collapsedMaxWidth = null,
+  collapsedHorizontalInset = 0,
   collapsedSurfaceClass = 'bg-[#FAF6EE]/95',
   collapsedPosition = 'sticky',
   scrollOffset = 84,
@@ -146,6 +149,20 @@ export default function MenuCategoryScroller({
   }, [])
 
   const cards = useMemo(() => categories || [], [categories])
+
+  const collapsedWidthStyle = collapsedPosition === 'fixed' && fixedInsets && Number.isFinite(collapsedMaxWidth)
+    ? (() => {
+        const availableWidth = window.innerWidth - fixedInsets.left - fixedInsets.right
+        const outerWidth = Math.min(collapsedMaxWidth, availableWidth)
+        const inset = Math.min(Math.max(0, collapsedHorizontalInset), outerWidth / 2)
+        const width = outerWidth - (inset * 2)
+        return {
+          left: fixedInsets.left + Math.max(0, (availableWidth - outerWidth) / 2) + inset,
+          right: 'auto',
+          width,
+        }
+      })()
+    : null
 
   function titleFor(category) {
     if (category.id === 'all') {
@@ -325,10 +342,11 @@ export default function MenuCategoryScroller({
         style={{
           top: fixedInsets?.top ?? topOffset,
           ...(fixedInsets ? { left: fixedInsets.left, right: fixedInsets.right } : {}),
+          ...(collapsedWidthStyle || {}),
           maxHeight: collapsedPosition === 'fixed' || collapsed ? COLLAPSED_BAR_HEIGHT : 0,
         }}
       >
-        <div className="flex gap-2 overflow-x-auto overflow-y-hidden px-1" style={{ scrollbarWidth: 'none' }}>
+        <div className={`flex gap-2 overflow-x-auto overflow-y-hidden px-1 ${collapsedContentClassName}`} style={{ scrollbarWidth: 'none' }}>
           {cards.map(category => {
             const title = titleFor(category)
             return (

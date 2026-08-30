@@ -135,7 +135,7 @@ const checks = await Promise.all([
   checkTable('employee_salary_absences', 'id, salary_profile_id, absence_date', false),
   checkTable('employee_salary_telegram_links', 'salary_profile_id, telegram_user_id, chat_id, preferred_language, notifications_enabled, linked_at', false),
   checkTable('employee_salary_notification_deliveries', 'id, salary_profile_id, notification_date, notification_type, status, sent_at', false),
-  checkTable('employee_salary_payment_notification_deliveries', 'id, payment_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, confirmed_at, group_status, group_chat_id, group_telegram_message_id, group_error_message, group_attempted_at, group_sent_at', false),
+  checkTable('employee_salary_payment_notification_deliveries', 'id, payment_id, salary_profile_id, status, employee_chat_id, telegram_message_id, error_message, attempted_at, sent_at, confirmed_at, group_status, group_chat_id, group_telegram_message_id, group_error_message, group_attempted_at, group_sent_at', false),
   checkTable('telegram_notification_targets', 'target_key, chat_id, language, is_enabled, updated_at', false),
   checkTable('employee_salary_group_notification_deliveries', 'id, event_type, event_id, salary_profile_id, status, telegram_chat_id, telegram_message_id, error_message, attempted_at, sent_at, employee_status, employee_chat_id, employee_telegram_message_id, employee_error_message, employee_attempted_at, employee_sent_at, team_status, team_chat_id, team_telegram_message_id, team_error_message, team_attempted_at, team_sent_at', false),
   checkTable('accounting_record_audit', 'id, entity_type, entity_id, action, old_record, new_record, changed_by, changed_at', false),

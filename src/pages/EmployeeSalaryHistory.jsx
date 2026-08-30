@@ -32,6 +32,7 @@ import {
   todayExpenseDate,
 } from '../lib/expenses'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
+import { retractTelegramSalaryEvent } from '../lib/telegramNotifications'
 import {
   buildSalaryHistoryCalendar,
   buildSalaryHistoryEntries,
@@ -150,6 +151,7 @@ export default function EmployeeSalaryHistory() {
       confirm: 'Tasdiqlash',
       cancel: 'Bekor qilish',
       deleteFailed: 'Yozuvni o‘chirib bo‘lmadi.',
+      telegramDeleteFailed: 'Telegramdagi xabarlarni o‘chirib bo‘lmadi, shuning uchun yozuv saqlandi.',
       automaticKpi: 'Avtomatik KPI',
       kpiFormula: 'Restoran dine-in savdosi + xizmat haqi',
       previous: 'Oldingi',
@@ -202,6 +204,7 @@ export default function EmployeeSalaryHistory() {
       confirm: 'Подтвердить',
       cancel: 'Отмена',
       deleteFailed: 'Не удалось удалить запись.',
+      telegramDeleteFailed: 'Не удалось удалить сообщения в Telegram, поэтому запись сохранена.',
       automaticKpi: 'Автоматический KPI',
       kpiFormula: 'Dine-in продажи ресторана + сервис',
       previous: 'Назад',
@@ -254,6 +257,7 @@ export default function EmployeeSalaryHistory() {
       confirm: 'Confirm',
       cancel: 'Cancel',
       deleteFailed: 'Could not delete the record.',
+      telegramDeleteFailed: 'The Telegram messages could not be deleted, so the record was kept.',
       automaticKpi: 'Automatic KPI',
       kpiFormula: 'Restaurant dine-in sales + service',
       previous: 'Previous',
@@ -406,6 +410,14 @@ export default function EmployeeSalaryHistory() {
 
     setSaving(key)
     setError('')
+    try {
+      await retractTelegramSalaryEvent(entry.entryType, entry.id)
+    } catch (telegramError) {
+      setSaving('')
+      setConfirmActionKey('')
+      setError(`${l.telegramDeleteFailed} ${telegramError?.message || ''}`.trim())
+      return
+    }
     const { error: deleteError } = await supabase
       .from(table)
       .delete()

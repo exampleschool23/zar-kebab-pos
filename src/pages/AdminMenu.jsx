@@ -2945,6 +2945,8 @@ export default function AdminMenu() {
                 collapsedPosition="fixed"
                 collapsedSurfaceClass="bg-white/95"
                 collapsedClassName="px-4 shadow-sm"
+                collapsedMaxWidth={1180}
+                collapsedHorizontalInset={16}
               />
               </div>
 
