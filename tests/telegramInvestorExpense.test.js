@@ -87,7 +87,7 @@ test('Investor expense message localizes the Daily Bazaar fallback description',
   assert.doesNotMatch(message, /Daily Bazaar purchase/)
 })
 
-test('Investor Bazaar expense message includes line and overall normal-price differences', () => {
+test('Investor Bazaar expense message builder retains line and overall normal-price differences', () => {
   const message = buildInvestorExpenseGroupMessage({
     amount: 8_000,
     expense_date: '2026-08-26',
@@ -136,9 +136,22 @@ test('Investor expense delivery is creator-bound, Bazaar-authorized, and duplica
   assert.match(endpoint, /loadSalaryGroupTarget\(supabase\)/)
   assert.match(endpoint, /from\('bazaar_purchases'\)/)
   assert.match(endpoint, /normal_unit_price,[\s\S]*normal_line_total,[\s\S]*price_difference/)
-  assert.match(endpoint, /buildInvestorExpenseGroupMessage\(claimed\.data, target\.language, monthTotal, bazaarPurchase\)/)
+  assert.match(endpoint, /buildDailyBazaarReportPng/)
+  assert.match(endpoint, /sendTelegramPhoto\(target\.chatId, photo/)
+  assert.match(endpoint, /zar-kebab-bazaar-expense-\$\{normalizedDate\}\.png/)
+  assert.match(endpoint, /buildInvestorExpenseGroupMessage\([\s\S]*?claimed\.data,[\s\S]*?target\.language,[\s\S]*?monthTotal,[\s\S]*?\)/)
+  assert.doesNotMatch(endpoint, /buildInvestorExpenseGroupMessage\(claimed\.data, target\.language, monthTotal, bazaarPurchase\)/)
+  assert.match(endpoint, /else \{[\s\S]*?sendTelegramMessage\(target\.chatId, text\)/)
   assert.match(endpoint, /target: delivery\?\.target_key \|\| 'salary_events'/)
   assert.match(endpoint, /telegram_message_id: telegramMessageId/)
+})
+
+test('Bazaar expense PNG renderer is bundled with its fonts in the notification function', () => {
+  const vercelConfig = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
+  assert.equal(
+    vercelConfig.functions?.['api/telegram/employee-notification.js']?.includeFiles,
+    '{node_modules/@img/sharp-libvips-linux-x64/**,node_modules/notosans-fontface/fonts/*.ttf}'
+  )
 })
 
 test('database health requires Investor expense delivery tracking', async () => {

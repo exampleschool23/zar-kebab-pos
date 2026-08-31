@@ -46,7 +46,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 
 ## Cash-expense Telegram delivery
 
-- A newly inserted `expenses` cash expense queues one immutable Investor delivery. Manual expenses and new Bazaar purchases share the endpoint.
+- A new cash expense queues one immutable Investor delivery through the shared endpoint: manual entries use text; Bazaar purchases use a PNG receipt and compact caption.
 - Edits/deletes do not announce again. Do not project salary, bonus, employee meal, or calculated rows into this flow.
 - See `docs/agent/telegram.md` for targets, message contents, and retry rules.
 

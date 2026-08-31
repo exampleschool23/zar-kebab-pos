@@ -24,6 +24,28 @@ const WIDTH = 1200
 const MAX_ROWS = 18
 let fontsConfigured = false
 
+const BAZAAR_COPY = {
+  uz: {
+    total: 'BOZOR BO‘YICHA JAMI', items: 'POZITSIYALAR', paid: 'TO‘LANGAN', normalPrice: 'ODATIY NARX',
+    overallDifference: 'UMUMIY FARQ', bought: 'olindi', normal: 'odatdagi', difference: 'farq',
+    unset: 'KIRITILMAGAN', noData: 'Bu kun uchun ma’lumot yo‘q', positions: 'poz.',
+  },
+  ru: {
+    total: 'ИТОГО ПО БАЗАРУ', items: 'ПОЗИЦИЙ', paid: 'ОПЛАЧЕНО', normalPrice: 'НОРМАЛЬНАЯ ЦЕНА',
+    overallDifference: 'ОБЩАЯ РАЗНИЦА', bought: 'куплено', normal: 'норма', difference: 'разница',
+    unset: 'НЕ ЗАДАНА', noData: 'Нет данных за этот день', positions: 'поз.',
+  },
+  en: {
+    total: 'BAZAAR TOTAL', items: 'ITEMS', paid: 'PAID', normalPrice: 'NORMAL PRICE',
+    overallDifference: 'TOTAL DIFFERENCE', bought: 'bought', normal: 'normal', difference: 'difference',
+    unset: 'NOT SET', noData: 'No data for this day', positions: 'items',
+  },
+}
+
+function normalizeLanguage(language) {
+  return ['uz', 'ru', 'en'].includes(language) ? language : 'ru'
+}
+
 function escapeSvg(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;',
@@ -92,7 +114,9 @@ function reportShell({ title, subtitle, totalLabel, totalValue, rows, footer = '
   </svg>`
 }
 
-export function buildDailyBazaarReportSvg(purchases = [], date = '') {
+export function buildDailyBazaarReportSvg(purchases = [], date = '', language = 'ru') {
+  const lang = normalizeLanguage(language)
+  const copy = BAZAAR_COPY[lang]
   const normalized = purchases.map(normalizeBazaarPurchase)
   const items = normalized.flatMap(purchase => purchase.items || [])
   const total = normalized.reduce((sum, purchase) => sum + calculateBazaarTotal(purchase.items || []), 0)
@@ -131,33 +155,33 @@ export function buildDailyBazaarReportSvg(purchases = [], date = '') {
           const rowY = cursorY
           cursorY += rowHeight
           const display = normalizeBazaarQuantityToBase(item.quantity, item.unit)
-          const unitLabel = bazaarUnitLabel(display.unit, 'ru')
+          const unitLabel = bazaarUnitLabel(display.unit, lang)
           const normalLineTotal = getBazaarNormalLineTotal(item)
           const normalUnitCost = display.quantity > 0 ? normalLineTotal / display.quantity : 0
           const itemDifference = getBazaarPriceDifference(item)
-          const boughtDetail = `${formatBazaarQuantity(display.quantity)} ${unitLabel} · куплено ${formatCurrency(Math.round(getBazaarUnitCost(item)))} / ${unitLabel}`
+          const boughtDetail = `${formatBazaarQuantity(display.quantity)} ${unitLabel} · ${copy.bought} ${formatCurrency(Math.round(getBazaarUnitCost(item)))} / ${unitLabel}`
           const normalDetail = normalUnitCost > 0
-            ? `норма ${formatCurrency(Math.round(normalUnitCost))} / ${unitLabel}`
-            : 'норма —'
+            ? `${copy.normal} ${formatCurrency(Math.round(normalUnitCost))} / ${unitLabel}`
+            : `${copy.normal} —`
           return `<g>
             <rect x="64" y="${rowY}" width="1072" height="74" rx="14" fill="${index % 2 ? '#F8FAF9' : '#F1F6F4'}"/>
             <text x="88" y="${rowY + 31}" font-size="23" font-weight="700" fill="#173B3F">${itemNumber}. ${escapeSvg(item.product_name)}</text>
             <text x="1110" y="${rowY + 31}" text-anchor="end" font-size="22" font-weight="800" fill="#173B3F">${escapeSvg(formatCurrency(item.line_total))}</text>
             <text x="88" y="${rowY + 59}" font-size="18" fill="#526461">${escapeSvg(boughtDetail)}</text>
             <text x="610" y="${rowY + 59}" font-size="18" fill="#526461">${escapeSvg(normalDetail)}</text>
-            <text x="1110" y="${rowY + 59}" text-anchor="end" font-size="19" font-weight="800" fill="${normalLineTotal > 0 ? varianceColor(itemDifference) : '#879592'}">разница ${normalLineTotal > 0 ? escapeSvg(signedCurrency(itemDifference)) : '—'}</text>
+            <text x="1110" y="${rowY + 59}" text-anchor="end" font-size="19" font-weight="800" fill="${normalLineTotal > 0 ? varianceColor(itemDifference) : '#879592'}">${escapeSvg(copy.difference)} ${normalLineTotal > 0 ? escapeSvg(signedCurrency(itemDifference)) : '—'}</text>
           </g>`
         }).join('')
         cursorY += groupGap
         return `<g>
           <rect x="64" y="${categoryY}" width="1072" height="${categoryHeight}" rx="13" fill="#FFF1E8"/>
           <circle cx="89" cy="${categoryY + 22}" r="7" fill="#F97316"/>
-          <text x="110" y="${categoryY + 30}" font-size="21" font-weight="800" letter-spacing="0.8" fill="#9A4B16">${escapeSvg(bazaarCategoryLabel(group.key, 'ru').toLocaleUpperCase('ru-RU'))}</text>
-          <text x="1110" y="${categoryY + 30}" text-anchor="end" font-size="18" font-weight="700" fill="#A36B45">${group.items.length} поз.</text>
+          <text x="110" y="${categoryY + 30}" font-size="21" font-weight="800" letter-spacing="0.8" fill="#9A4B16">${escapeSvg(bazaarCategoryLabel(group.key, lang).toLocaleUpperCase(lang === 'ru' ? 'ru-RU' : lang === 'uz' ? 'uz-UZ' : 'en-US'))}</text>
+          <text x="1110" y="${categoryY + 30}" text-anchor="end" font-size="18" font-weight="700" fill="#A36B45">${group.items.length} ${escapeSvg(copy.positions)}</text>
           ${itemMarkup}
         </g>`
       }).join('')
-    : `<text x="600" y="270" text-anchor="middle" font-size="28" fill="#879592">Нет данных за этот день</text>`
+    : `<text x="600" y="270" text-anchor="middle" font-size="28" fill="#879592">${escapeSvg(copy.noData)}</text>`
 
   return `<?xml version="1.0" encoding="UTF-8"?>
   <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${height}" viewBox="0 0 ${WIDTH} ${height}">
@@ -165,12 +189,12 @@ export function buildDailyBazaarReportSvg(purchases = [], date = '') {
     <rect x="28" y="28" width="1144" height="${height - 56}" rx="38" fill="#FFFFFF"/>
     <g font-family="Noto Sans">
       <rect x="64" y="${totalCardY}" width="1072" height="${totalCardHeight}" rx="24" fill="#173B3F"/>
-      <text x="92" y="86" font-size="18" font-weight="700" letter-spacing="1.4" fill="#A8D7D0">ИТОГО ПО БАЗАРУ · ПОЗИЦИЙ: ${items.length}</text>
-      <text x="92" y="116" font-size="16" font-weight="700" fill="#A8D7D0">ОПЛАЧЕНО</text>
+      <text x="92" y="86" font-size="18" font-weight="700" letter-spacing="1.4" fill="#A8D7D0">${escapeSvg(copy.total)} · ${escapeSvg(copy.items)}: ${items.length}</text>
+      <text x="92" y="116" font-size="16" font-weight="700" fill="#A8D7D0">${escapeSvg(copy.paid)}</text>
       <text x="92" y="151" font-size="31" font-weight="800" fill="#FFFFFF">${escapeSvg(formatCurrency(total))}</text>
-      <text x="515" y="116" font-size="16" font-weight="700" fill="#A8D7D0">НОРМАЛЬНАЯ ЦЕНА · ${normalPriceItemCount}/${items.length}</text>
-      <text x="515" y="151" font-size="31" font-weight="800" fill="#FFFFFF">${hasCompleteNormalPrices ? escapeSvg(formatCurrency(expected)) : 'НЕ ЗАДАНА'}</text>
-      <text x="1110" y="116" text-anchor="end" font-size="16" font-weight="700" fill="#A8D7D0">ОБЩАЯ РАЗНИЦА</text>
+      <text x="515" y="116" font-size="16" font-weight="700" fill="#A8D7D0">${escapeSvg(copy.normalPrice)} · ${normalPriceItemCount}/${items.length}</text>
+      <text x="515" y="151" font-size="31" font-weight="800" fill="#FFFFFF">${hasCompleteNormalPrices ? escapeSvg(formatCurrency(expected)) : escapeSvg(copy.unset)}</text>
+      <text x="1110" y="116" text-anchor="end" font-size="16" font-weight="700" fill="#A8D7D0">${escapeSvg(copy.overallDifference)}</text>
       <text x="1110" y="151" text-anchor="end" font-size="31" font-weight="800" fill="${hasCompleteNormalPrices ? varianceColor(difference, true) : '#D7E5E2'}">${hasCompleteNormalPrices ? escapeSvg(signedCurrency(difference)) : '—'}</text>
       ${groupMarkup}
     </g>
@@ -210,9 +234,9 @@ export function buildDailyIngredientConsumptionReportCaption(date) {
   return `🥕 <b>Расход ингредиентов по Tech Card</b>\n📅 ${escapeSvg(formatLongDate(date, 'ru', date))}`
 }
 
-export async function buildDailyBazaarReportPng(purchases, date) {
+export async function buildDailyBazaarReportPng(purchases, date, language = 'ru') {
   configureFonts()
-  return sharp(Buffer.from(buildDailyBazaarReportSvg(purchases, date))).png({ compressionLevel: 9 }).toBuffer()
+  return sharp(Buffer.from(buildDailyBazaarReportSvg(purchases, date, language))).png({ compressionLevel: 9 }).toBuffer()
 }
 
 export async function buildDailyIngredientConsumptionReportPng(summary, date) {

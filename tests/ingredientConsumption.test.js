@@ -78,6 +78,15 @@ test('daily Bazaar and ingredient reports render as separate image layouts', () 
   assert.match(bazaarSvg, /fill="#FCA5A5">\+2/)
   assert.match(bazaarSvg, /20\. Товар 18/)
   assert.doesNotMatch(bazaarSvg, /Ещё позиций/)
+  const englishBazaarSvg = buildDailyBazaarReportSvg([{
+    bazaar_purchase_items: [{
+      product_name: 'Carrot', category: 'vegetables', quantity: 1, unit: 'kg',
+      line_total: 8_000, normal_unit_price: 7_500,
+    }],
+  }], '2026-08-30', 'en')
+  assert.match(englishBazaarSvg, /BAZAAR TOTAL · ITEMS: 1/)
+  assert.match(englishBazaarSvg, /VEGETABLES/)
+  assert.match(englishBazaarSvg, /difference \+500 UZS/)
   const missingNormalSvg = buildDailyBazaarReportSvg([{
     bazaar_purchase_items: [{ product_name: 'Legacy', category: 'grocery', quantity: 1, unit: 'pcs', line_total: 5_000 }],
   }], '2026-08-30')

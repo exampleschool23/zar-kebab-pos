@@ -13,7 +13,7 @@ import {
 } from './_lib/paymentMessages.js'
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
-import { deleteTelegramMessage, sendTelegramMessage } from './_lib/telegram.js'
+import { deleteTelegramMessage, sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
 import {
   buildAbsenceUndoInvestorMessage,
   buildInvestorExpenseGroupMessage,
@@ -1490,8 +1490,27 @@ async function notifyInvestorExpense(supabase, user, expenseId) {
       if (purchaseError) throw purchaseError
       bazaarPurchase = purchase
     }
-    const text = buildInvestorExpenseGroupMessage(claimed.data, target.language, monthTotal, bazaarPurchase)
-    const response = await sendTelegramMessage(target.chatId, text)
+    let response
+    if (bazaarPurchase) {
+      const { buildDailyBazaarReportPng } = await import('./_lib/dailyOperationsReportImages.js')
+      const photo = await buildDailyBazaarReportPng(
+        [bazaarPurchase],
+        normalizedDate,
+        target.language,
+      )
+      const caption = buildInvestorExpenseGroupMessage(
+        claimed.data,
+        target.language,
+        monthTotal,
+      )
+      response = await sendTelegramPhoto(target.chatId, photo, {
+        caption,
+        filename: `zar-kebab-bazaar-expense-${normalizedDate}.png`,
+      })
+    } else {
+      const text = buildInvestorExpenseGroupMessage(claimed.data, target.language, monthTotal)
+      response = await sendTelegramMessage(target.chatId, text)
+    }
     const sentAt = new Date().toISOString()
     const telegramMessageId = getTelegramMessageId(response)
     const { data: sentDelivery, error: updateError } = await supabase
