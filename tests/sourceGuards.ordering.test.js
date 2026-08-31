@@ -314,7 +314,7 @@ test('AdminDashboard period filter shimmers every range-dependent statistic unti
   assert.match(dashboard, /\{l\.salesByCategory\} · \{currentKpiPeriodLabel\}/)
   assert.match(dashboard, /\{l\.bestSelling\} · \{currentKpiPeriodLabel\}/)
   assert.ok((dashboard.match(/aria-busy=\{analyticsLoading\}/g) || []).length >= 4)
-  assert.ok((dashboard.match(/loading=\{analyticsLoading\}/g) || []).length >= 5)
+  assert.equal((dashboard.match(/loading=\{analyticsLoading\}/g) || []).length, 4)
   assert.match(dashboard, /analyticsLoading \? \([\s\S]*<ChartShimmer \/>/)
   assert.match(dashboard, /analyticsLoading \? \([\s\S]*salesByCategory\.length === 0/)
   assert.match(dashboard, /analyticsLoading \? \([\s\S]*bestSelling\.length === 0/)

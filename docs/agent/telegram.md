@@ -13,18 +13,18 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 ## Customer Mini App
 
 - The Telegram Mini App is a read-only customer menu.
-- Customer checkout and My Orders are retired. Do not restore `/api/telegram/order` or `/api/telegram/orders` without an explicit product decision.
+- Checkout and My Orders are retired. Restore their API routes only by explicit product decision.
 - Keep authentication, loyalty lookup, contact data, employee notifications, and POS status notifications separate from retired customer ordering.
 
 ## Delivery records and retries
 
-- Every saved salary payment, bonus, fine, absence, and genuine salary-rate change immediately receives database-first `not_attempted` tracking. Initial salary setup is not a rate-change event.
+- Saved salary events and genuine rate changes get database-first `not_attempted` tracking; initial setup is not a change.
 - Delivery advances independently through pending, sent, failed, skipped, or confirmed states for each destination.
 - Mark sent only after Telegram returns a message id.
-- Employee, Salary group, Team, and Investor delivery attempts are independent and duplicate-safe. A failure/retry for one destination must not duplicate another.
+- Employee, Salary group, Team, and Investor attempts are independent and duplicate-safe.
 - The Salaries page combines salary-operation status with five records per page and retry controls for unsent destinations.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
-- Owner salary-history deletion first retracts every directly tracked private, Salary-group, and Team message. Payment delivery snapshots the exact employee chat id so later relinking cannot redirect a retraction. Treat an already-missing Telegram message as successfully retracted, but keep the salary event when any other Telegram deletion fails.
+- Owner history deletion first retracts tracked private, Salary-group, and Team messages. Payments snapshot the employee chat id. Missing messages count as retracted; other deletion failures preserve the event.
 
 ## Salary destinations
 
