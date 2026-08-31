@@ -1245,7 +1245,7 @@ function BazaarEntryForm({
         </section>
         </div>
 
-        <aside className="sticky bottom-3 z-10 rounded-2xl border border-orange-100 bg-white p-5 shadow-xl shadow-orange-100/40 xl:top-5 xl:bottom-auto xl:z-0">
+        <aside className="rounded-2xl border border-orange-100 bg-white p-5 shadow-xl shadow-orange-100/40 xl:sticky xl:top-5">
         <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-[#ff5a00]">
           <ShoppingBasket size={20} />
         </div>

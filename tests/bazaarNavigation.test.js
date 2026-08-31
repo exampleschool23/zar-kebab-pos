@@ -86,6 +86,8 @@ test('Daily Bazaar entry uses active employees, cash/card entry methods, and dur
   assert.match(page, /\.eq\('status', 'active'\)[\s\S]{0,100}\.neq\('role', 'guest'\)/)
   assert.match(page, /withWriteTimeout\([\s\S]{0,180}save_bazaar_purchase/)
   assert.match(page, /<fieldset disabled=\{saving\} className="contents">/)
+  assert.match(page, /<aside className="[^"]*xl:sticky xl:top-5[^"]*">/)
+  assert.doesNotMatch(page, /<aside className="sticky bottom-3/)
   assert.match(page, /signal => supabase\.rpc\('save_bazaar_purchase',[\s\S]{0,120}\.abortSignal\(signal\)/)
   assert.match(page, /loadedRangeRef\.current !== requestedRange\) setPurchases\(\[\]\)/)
   assert.doesNotMatch(page, /md:grid-cols-2 xl:grid-cols-\[minmax\(180px,1\.5fr\)/)
