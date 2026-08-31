@@ -33,7 +33,7 @@
     },
     {
       "name": "large menu editor",
-      "aliases": ["admin menu editing", "menu product editor"],
+      "aliases": ["admin menu editing", "menu product editor", "owner-only menu deletion", "owner-only catalog archival"],
       "path": "src/pages/AdminMenu.jsx",
       "symbol": "AdminMenu"
     },
@@ -107,9 +107,9 @@
     },
     {
       "name": "menu-media-inventory",
-      "keywords": ["dish", "category", "variant", "price", "currency", "image", "video", "nutrition", "stock", "availability", "archive"],
-      "files": ["src/pages/AdminMenu.jsx", "src/pages/PublicMenu.jsx", "src/pages/TelegramMiniApp.jsx", "src/components/MenuProductCards.jsx", "src/lib/menuItems.js", "src/lib/menuPricing.js", "src/lib/menuMedia.js", "src/store/menuReducer.js", "api/menu-image/upload.js"],
-      "tests": ["tests/menuItems.test.js", "tests/menuArchiveSafety.test.js", "tests/menuMedia.test.js", "tests/menuPricing.test.js", "tests/menuStock.test.js", "tests/nutrition.test.js", "tests/sourceGuards.menu.test.js", "tests/sourceGuards.public-menu.test.js"]
+      "keywords": ["dish", "category", "variant", "price", "currency", "image", "video", "nutrition", "stock", "availability", "archive", "delete", "owner", "permission"],
+      "files": ["src/pages/AdminMenu.jsx", "src/pages/PublicMenu.jsx", "src/pages/TelegramMiniApp.jsx", "src/components/MenuProductCards.jsx", "src/lib/menuItems.js", "src/lib/menuPricing.js", "src/lib/menuMedia.js", "src/lib/permissions.js", "src/lib/db.js", "src/store/menuReducer.js", "api/menu-image/upload.js", "supabase/167_owner_only_menu_catalog_archival.sql"],
+      "tests": ["tests/menuItems.test.js", "tests/menuArchiveSafety.test.js", "tests/menuMedia.test.js", "tests/menuPricing.test.js", "tests/menuStock.test.js", "tests/nutrition.test.js", "tests/permissions.test.js", "tests/sourceGuards.menu.test.js", "tests/sourceGuards.public-menu.test.js"]
     },
     {
       "name": "tech-cards",

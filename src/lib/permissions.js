@@ -191,6 +191,11 @@ export function canChangeMenuItemPublicVisibility(profileOrRole) {
     && canEditMenu(profileOrRole)
 }
 
+export function canDeleteMenuCatalog(profileOrRole) {
+  return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
+    && canEditMenu(profileOrRole)
+}
+
 export function canMoveBackToTable(profileOrRole) {
   return canEditFeature(profileOrRole, 'cashier')
 }

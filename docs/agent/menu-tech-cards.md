@@ -16,6 +16,7 @@ Read this guide for menu products/categories, availability and visibility, media
 - Manage Menu writers may create unavailable products and change availability. The database enforces both access rules.
 - `cashier_only`, schedules, category visibility, option visibility, and `deleted_at` are separate controls.
 - `deleted_at` is the archive boundary. Archived products/categories never reappear because of availability behavior.
+- Product/category archival is owner-only and still requires Manage Menu access; admins retain ordinary menu editing.
 - `stock_count` is shelf inventory and never determines menu visibility or orderability.
 
 ## Product creation, cost, and history
@@ -25,7 +26,7 @@ Read this guide for menu products/categories, availability and visibility, media
 - Protected current costs live in `menu_item_costs`; variant costs live in `variant_costs`. Public option data contains names and selling prices only.
 - `order_items.cost_price` is a sale-time database snapshot. Runtime reporting must never fall back to today's menu cost for missing historical coverage.
 - Later price/cost edits affect future order items only. Never rewrite paid revenue, profit, reports, or saved order-item costs.
-- Product/category deletion is archival; physical catalog deletion is rejected to preserve report lookups.
+- Owner deletion is archival; physical catalog deletion is rejected to preserve reports.
 - The editor's profit margin is a live preview `(selling price - cost) / selling price`, not persisted data.
 
 ## Availability notifications
@@ -50,7 +51,7 @@ Read this guide for menu products/categories, availability and visibility, media
 - Upload error rendering belongs inside `ImageUploadField`; `SortableItemCard` must not access that state.
 - Trim localized names/descriptions at editor, write, display, and database boundaries while preserving internal spaces and description line breaks.
 - `estimated_prep_minutes` is a localized current-catalog expectation from 1–180 minutes (default 15), not a historical order promise.
-- Mobile archive uses touch-safe controls and an in-app retryable confirmation dialog, never `window.confirm()`.
+- Mobile product archive is owner-only and uses a retryable in-app dialog.
 
 ## Tech Cards
 

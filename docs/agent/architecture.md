@@ -18,6 +18,7 @@ Read this guide for app startup, authentication, routes, permissions, shared sta
 - Cashier routes: `/cashier/tables`, bill and receipt routes.
 - Admin routes include dashboard, menu, tech cards, tables, users, reports, audit, settings, Accounting, Salaries, Daily Bazaar, and its ingredient catalog at `/admin/bazaar/ingredients`.
 - Centralize role and feature rules in `src/lib/permissions.js`. Do not duplicate access decisions in pages without matching database enforcement.
+- Menu catalog archival is limited to owners who also have Manage Menu access; admins keep ordinary menu editing. The UI permission and database archive trigger must stay aligned.
 
 ## State architecture
 

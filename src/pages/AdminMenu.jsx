@@ -39,6 +39,7 @@ import { formatMoneyInput, normalizeMoneyInput, numberFromMoneyInput } from '../
 import {
   canChangeMenuItemAvailability,
   canChangeMenuItemPublicVisibility,
+  canDeleteMenuCatalog as canDeleteMenuCatalogForProfile,
   canEditMenu as canEditMenuForProfile,
   canViewPage, normalizeRole,
 } from '../lib/permissions'
@@ -840,7 +841,7 @@ function VisibilityToggleButton({ visible, pending, onClick, lang, kind = 'item'
 
 // ── Sortable grid card ────────────────────────────────────────────────────────
 
-function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, canChangeAvailability = false, isDragging: _isDragging, readOnly = false }) {
+function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, canChangeAvailability = false, canDelete = false, isDragging: _isDragging, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -966,16 +967,18 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
               <Edit2 size={11} />
               {lang === 'uz' ? 'Tahrirl' : lang === 'ru' ? 'Ред.' : 'Edit'}
             </button>
-            <button
-              type="button"
-              onPointerDown={event => event.stopPropagation()}
-              onClick={() => onDelete(item)}
-              disabled={visibilityPending}
-              aria-label={lang === 'uz' ? 'Mahsulotni o‘chirish' : lang === 'ru' ? 'Удалить товар' : 'Delete item'}
-              className="touch-manipulation flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-300 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Trash2 size={12} />
-            </button>
+            {canDelete && (
+              <button
+                type="button"
+                onPointerDown={event => event.stopPropagation()}
+                onClick={() => onDelete(item)}
+                disabled={visibilityPending}
+                aria-label={lang === 'uz' ? 'Mahsulotni o‘chirish' : lang === 'ru' ? 'Удалить товар' : 'Delete item'}
+                className="touch-manipulation flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-300 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -985,7 +988,7 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
 
 // ── Sortable list row ─────────────────────────────────────────────────────────
 
-function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, canChangeAvailability = false, readOnly = false }) {
+function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, canChangeAvailability = false, canDelete = false, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -1066,16 +1069,18 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
             <Edit2 size={12} />
             {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Редакт.' : 'Edit'}
           </button>
-          <button
-            type="button"
-            onPointerDown={event => event.stopPropagation()}
-            onClick={() => onDelete(item)}
-            disabled={visibilityPending}
-            aria-label={lang === 'uz' ? 'Mahsulotni o‘chirish' : lang === 'ru' ? 'Удалить товар' : 'Delete item'}
-            className="touch-manipulation flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Trash2 size={14} />
-          </button>
+          {canDelete && (
+            <button
+              type="button"
+              onPointerDown={event => event.stopPropagation()}
+              onClick={() => onDelete(item)}
+              disabled={visibilityPending}
+              aria-label={lang === 'uz' ? 'Mahsulotni o‘chirish' : lang === 'ru' ? 'Удалить товар' : 'Delete item'}
+              className="touch-manipulation flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1088,7 +1093,7 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
 const CAT_EDIT_GRID = 'grid grid-cols-[20px_52px_minmax(0,1fr)_200px_90px_160px] items-center gap-4 px-5'
 const CAT_READ_ONLY_GRID = 'grid grid-cols-[52px_minmax(260px,1fr)_minmax(220px,280px)_100px] items-center gap-4 px-5'
 
-function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibility, visibilityPending, sortIndex, readOnly = false }) {
+function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibility, visibilityPending, sortIndex, canDelete = false, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id })
   const scheduleLabel = scheduleBadgeLabel(cat)
 
@@ -1185,13 +1190,15 @@ function SortableCatRow({ cat, lang, itemCount, onEdit, onDelete, onToggleVisibi
               <Edit2 size={12} />
               {lang === 'uz' ? 'Tahrirlash' : lang === 'ru' ? 'Ред.' : 'Edit'}
             </button>
-            <button
-              onClick={() => onDelete(cat.id)}
-              disabled={visibilityPending}
-              className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Trash2 size={14} />
-            </button>
+            {canDelete && (
+              <button
+                onClick={() => onDelete(cat.id)}
+                disabled={visibilityPending}
+                className="p-1.5 rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
         </div>
       )}
     </div>
@@ -1643,6 +1650,7 @@ export default function AdminMenu() {
   const isOwner = normalizeRole(profile?.role || state.user?.role) === 'owner'
   const canChangeAvailability = canChangeMenuItemAvailability(profile || { role: state.user?.role })
   const canChangePublicVisibility = canChangeMenuItemPublicVisibility(profile || { role: state.user?.role })
+  const canDeleteMenuCatalog = canDeleteMenuCatalogForProfile(profile || { role: state.user?.role })
   const canViewTechCards = canViewPage(profile || { role: state.user?.role }, 'tech_cards')
   const scheduleLabels = menuScheduleLabels(lang)
   const navigate = useNavigate()
@@ -1701,7 +1709,7 @@ export default function AdminMenu() {
     && isCatFormDirty
 
   useEffect(() => {
-    if (!deleteItemCandidate) return undefined
+    if (!deleteItemCandidate || !canDeleteMenuCatalog) return undefined
     const previousFocus = document.activeElement
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -1712,7 +1720,7 @@ export default function AdminMenu() {
       document.body.style.overflow = previousOverflow
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
     }
-  }, [deleteItemCandidate?.id])
+  }, [canDeleteMenuCatalog, deleteItemCandidate?.id])
 
   useEffect(() => {
     if (!isCategoryEditorPage || !isOwner) return undefined
@@ -2101,7 +2109,7 @@ export default function AdminMenu() {
     }
   }
   async function deleteItem(id) {
-    if (!canEditMenu || savingItemId) return
+    if (!canDeleteMenuCatalog || savingItemId) return
     setSavingItemId(id)
     setMenuNotice(null)
     setDeleteItemError('')
@@ -2125,7 +2133,7 @@ export default function AdminMenu() {
   }
 
   function requestDeleteItem(item) {
-    if (!canEditMenu || savingItemId || !item?.id) return
+    if (!canDeleteMenuCatalog || savingItemId || !item?.id) return
     setDeleteItemError('')
     setDeleteItemCandidate(item)
   }
@@ -2222,7 +2230,7 @@ export default function AdminMenu() {
     }
   }
   function deleteCat(id) {
-    if (!canEditMenu) return
+    if (!canDeleteMenuCatalog) return
     if (id === 'all') return
     if (window.confirm('Delete category?')) dispatch({ type: 'DELETE_CATEGORY', payload: id })
   }
@@ -3089,6 +3097,7 @@ export default function AdminMenu() {
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
                                       canChangeAvailability={canChangeAvailability}
+                                      canDelete={canDeleteMenuCatalog}
                                       readOnly={!canEditMenu}
                                     />
                                   ))}
@@ -3106,6 +3115,7 @@ export default function AdminMenu() {
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
                                       canChangeAvailability={canChangeAvailability}
+                                      canDelete={canDeleteMenuCatalog}
                                       readOnly={!canEditMenu}
                                     />
                                   ))}
@@ -3138,6 +3148,7 @@ export default function AdminMenu() {
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
                                       canChangeAvailability={canChangeAvailability}
+                                      canDelete={canDeleteMenuCatalog}
                                       readOnly={!canEditMenu}
                                     />
                                   ))}
@@ -3155,6 +3166,7 @@ export default function AdminMenu() {
                                       visibilityPending={savingItemId === item.id}
                                       categories={realSortedCats}
                                       canChangeAvailability={canChangeAvailability}
+                                      canDelete={canDeleteMenuCatalog}
                                       readOnly={!canEditMenu}
                                     />
                                   ))}
@@ -3178,6 +3190,7 @@ export default function AdminMenu() {
                                 visibilityPending={savingItemId === item.id}
                                 categories={realSortedCats}
                                 canChangeAvailability={canChangeAvailability}
+                                canDelete={canDeleteMenuCatalog}
                                 readOnly={!canEditMenu}
                               />
                             ))}
@@ -3195,6 +3208,7 @@ export default function AdminMenu() {
                                 visibilityPending={savingItemId === item.id}
                                 categories={realSortedCats}
                                 canChangeAvailability={canChangeAvailability}
+                                canDelete={canDeleteMenuCatalog}
                                 readOnly={!canEditMenu}
                               />
                             ))}
@@ -3280,6 +3294,7 @@ export default function AdminMenu() {
                             onToggleVisibility={toggleCategoryVisibility}
                             visibilityPending={savingCatId === cat.id}
                             sortIndex={idx + 1}
+                            canDelete={canDeleteMenuCatalog}
                             readOnly={!canEditMenu}
                           />
                         ))}
@@ -3388,6 +3403,7 @@ export default function AdminMenu() {
                             visibilityPending={savingItemId === item.id}
                             categories={realSortedCats}
                             canChangeAvailability={canChangeAvailability}
+                            canDelete={canDeleteMenuCatalog}
                             readOnly={!canEditMenu}
                           />
                         ))}
@@ -3417,7 +3433,7 @@ export default function AdminMenu() {
         </div>
       </div>
 
-      {deleteItemCandidate && (
+      {canDeleteMenuCatalog && deleteItemCandidate && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6">
           <button
             type="button"

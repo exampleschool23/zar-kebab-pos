@@ -6,6 +6,7 @@ import {
   FEATURE_KEYS,
   assignableRoles,
   canDeleteTeamMember,
+  canDeleteMenuCatalog,
   canChangeMenuItemAvailability,
   canChangeMenuItemPublicVisibility,
   canEditFeature,
@@ -105,6 +106,17 @@ test('only owners with menu write access can hide meals from the public menu', (
   assert.equal(canChangeMenuItemPublicVisibility({ role: 'owner', feature_access: ['dashboard'] }), false)
   assert.equal(canChangeMenuItemPublicVisibility({ role: 'admin', feature_access: ['menu'] }), false)
   assert.equal(canChangeMenuItemPublicVisibility({ role: 'viewer', feature_access: ['menu'] }), false)
+})
+
+test('only owners with menu write access can archive menu products or categories', () => {
+  const menuAdmin = { role: 'admin', feature_access: ['menu'] }
+
+  assert.equal(canDeleteMenuCatalog('owner'), true)
+  assert.equal(canDeleteMenuCatalog({ role: 'owner', feature_access: ['menu'] }), true)
+  assert.equal(canDeleteMenuCatalog({ role: 'owner', feature_access: ['dashboard'] }), false)
+  assert.equal(canEditMenu(menuAdmin), true)
+  assert.equal(canDeleteMenuCatalog(menuAdmin), false)
+  assert.equal(canDeleteMenuCatalog({ role: 'viewer', feature_access: ['menu'] }), false)
 })
 
 test('feature selection keeps sensitive actions attached to relevant pages', () => {
