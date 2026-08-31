@@ -24,6 +24,10 @@ test('only owners receive Bazaar ingredient management controls', () => {
   assert.match(page, /normalizeRole\(profile\?\.role \|\| state\.user\?\.role \|\| 'guest'\) === 'owner'/)
   assert.match(page, /\{canManage \? \(/)
   assert.match(page, /\{canManage && <div className="flex justify-end gap-2">/)
+  assert.match(page, /runBazaarIngredientWriteWithRecovery/)
+  assert.match(page, /upsertIngredient\(savedIngredientRow\(savedData\)\)/)
+  assert.match(page, /isBazaarIngredientNetworkError\(requestError\)/)
+  assert.doesNotMatch(page, /setNotice\(l\.saved\)[\s\S]{0,80}await loadIngredients\(\)/)
 })
 
 test('Daily Bazaar appears in the sidebar and becomes active on its route', () => {

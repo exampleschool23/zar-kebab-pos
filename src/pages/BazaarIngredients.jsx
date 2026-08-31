@@ -11,18 +11,19 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import { withWriteTimeout } from '../lib/writeTimeout'
 import { BAZAAR_ENTRY_CATEGORIES, BAZAAR_ENTRY_UNITS, bazaarCategoryLabel, bazaarUnitLabel, normalizeBazaarProductKey } from '../lib/bazaar'
+import { bazaarIngredientMatches, isBazaarIngredientNetworkError, runBazaarIngredientWriteWithRecovery } from '../lib/bazaarIngredientWrites'
 
 const INPUT = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-all placeholder:text-[#C3C8D0] focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]'
 
 const COPY = {
   en: {
-    title: 'Bazaar ingredients', sub: 'Keep one canonical name and normal unit price for every ingredient.', back: 'Daily Bazaar', add: 'Add ingredient', edit: 'Edit ingredient', name: 'Ingredient name', nameHint: 'The name cannot be changed later. Archive it and add a corrected ingredient instead.', category: 'Category', unit: 'Purchase unit', normalPrice: 'Normal price per unit', save: 'Save ingredient', saving: 'Saving…', cancel: 'Cancel', search: 'Search ingredients…', active: 'Active', archived: 'Archived', all: 'All', archive: 'Archive', restore: 'Restore', empty: 'No ingredients found.', loadFailed: 'Could not load ingredients.', saveFailed: 'Could not save the ingredient.', statusFailed: 'Could not update the ingredient status.', saved: 'Ingredient saved.', statusUpdated: 'Ingredient status updated.', refresh: 'Refresh', readOnly: 'Your access is read-only.', required: 'Enter a name and a normal price greater than zero.', migrationMissing: 'Apply the latest Bazaar migrations to manage ingredients.'
+    title: 'Bazaar ingredients', sub: 'Keep one canonical name and normal unit price for every ingredient.', back: 'Daily Bazaar', add: 'Add ingredient', edit: 'Edit ingredient', name: 'Ingredient name', nameHint: 'The name cannot be changed later. Archive it and add a corrected ingredient instead.', category: 'Category', unit: 'Purchase unit', normalPrice: 'Normal price per unit', save: 'Save ingredient', saving: 'Saving…', cancel: 'Cancel', search: 'Search ingredients…', active: 'Active', archived: 'Archived', all: 'All', archive: 'Archive', restore: 'Restore', empty: 'No ingredients found.', loadFailed: 'Could not load ingredients.', saveFailed: 'Could not save the ingredient.', statusFailed: 'Could not update the ingredient status.', connectionFailed: 'Connection was interrupted. Please try again; a completed save will not be duplicated.', saved: 'Ingredient saved.', statusUpdated: 'Ingredient status updated.', refresh: 'Refresh', readOnly: 'Your access is read-only.', required: 'Enter a name and a normal price greater than zero.', migrationMissing: 'Apply the latest Bazaar migrations to manage ingredients.'
   },
   ru: {
-    title: 'Ингредиенты базара', sub: 'Единое название и обычная цена за единицу для каждого ингредиента.', back: 'Ежедневный базар', add: 'Добавить ингредиент', edit: 'Изменить ингредиент', name: 'Название ингредиента', nameHint: 'Название потом изменить нельзя. Архивируйте запись и добавьте исправленную.', category: 'Категория', unit: 'Единица закупки', normalPrice: 'Обычная цена за единицу', save: 'Сохранить', saving: 'Сохранение…', cancel: 'Отмена', search: 'Поиск ингредиентов…', active: 'Активные', archived: 'Архивные', all: 'Все', archive: 'В архив', restore: 'Восстановить', empty: 'Ингредиенты не найдены.', loadFailed: 'Не удалось загрузить ингредиенты.', saveFailed: 'Не удалось сохранить ингредиент.', statusFailed: 'Не удалось изменить статус ингредиента.', saved: 'Ингредиент сохранён.', statusUpdated: 'Статус ингредиента изменён.', refresh: 'Обновить', readOnly: 'У вас доступ только для чтения.', required: 'Введите название и обычную цену больше нуля.', migrationMissing: 'Примените последние миграции базара для управления ингредиентами.'
+    title: 'Ингредиенты базара', sub: 'Единое название и обычная цена за единицу для каждого ингредиента.', back: 'Ежедневный базар', add: 'Добавить ингредиент', edit: 'Изменить ингредиент', name: 'Название ингредиента', nameHint: 'Название потом изменить нельзя. Архивируйте запись и добавьте исправленную.', category: 'Категория', unit: 'Единица закупки', normalPrice: 'Обычная цена за единицу', save: 'Сохранить', saving: 'Сохранение…', cancel: 'Отмена', search: 'Поиск ингредиентов…', active: 'Активные', archived: 'Архивные', all: 'Все', archive: 'В архив', restore: 'Восстановить', empty: 'Ингредиенты не найдены.', loadFailed: 'Не удалось загрузить ингредиенты.', saveFailed: 'Не удалось сохранить ингредиент.', statusFailed: 'Не удалось изменить статус ингредиента.', connectionFailed: 'Соединение прервалось. Повторите попытку — уже выполненное сохранение не продублируется.', saved: 'Ингредиент сохранён.', statusUpdated: 'Статус ингредиента изменён.', refresh: 'Обновить', readOnly: 'У вас доступ только для чтения.', required: 'Введите название и обычную цену больше нуля.', migrationMissing: 'Примените последние миграции базара для управления ингредиентами.'
   },
   uz: {
-    title: 'Bozor masalliqlari', sub: 'Har bir masalliq uchun yagona nom va odatiy birlik narxini saqlang.', back: 'Kunlik bozor', add: 'Masalliq qo‘shish', edit: 'Masalliqni tahrirlash', name: 'Masalliq nomi', nameHint: 'Nomni keyin o‘zgartirib bo‘lmaydi. Uni arxivlab, to‘g‘ri nom bilan yangisini qo‘shing.', category: 'Kategoriya', unit: 'Xarid birligi', normalPrice: 'Birlik uchun odatiy narx', save: 'Saqlash', saving: 'Saqlanmoqda…', cancel: 'Bekor qilish', search: 'Masalliq qidirish…', active: 'Faol', archived: 'Arxiv', all: 'Barchasi', archive: 'Arxivlash', restore: 'Tiklash', empty: 'Masalliq topilmadi.', loadFailed: 'Masalliqlarni yuklab bo‘lmadi.', saveFailed: 'Masalliqni saqlab bo‘lmadi.', statusFailed: 'Masalliq holatini o‘zgartirib bo‘lmadi.', saved: 'Masalliq saqlandi.', statusUpdated: 'Masalliq holati yangilandi.', refresh: 'Yangilash', readOnly: 'Sizda faqat ko‘rish huquqi bor.', required: 'Nom va noldan katta odatiy narx kiriting.', migrationMissing: 'Masalliqlarni boshqarish uchun oxirgi bozor migratsiyalarini qo‘llang.'
+    title: 'Bozor masalliqlari', sub: 'Har bir masalliq uchun yagona nom va odatiy birlik narxini saqlang.', back: 'Kunlik bozor', add: 'Masalliq qo‘shish', edit: 'Masalliqni tahrirlash', name: 'Masalliq nomi', nameHint: 'Nomni keyin o‘zgartirib bo‘lmaydi. Uni arxivlab, to‘g‘ri nom bilan yangisini qo‘shing.', category: 'Kategoriya', unit: 'Xarid birligi', normalPrice: 'Birlik uchun odatiy narx', save: 'Saqlash', saving: 'Saqlanmoqda…', cancel: 'Bekor qilish', search: 'Masalliq qidirish…', active: 'Faol', archived: 'Arxiv', all: 'Barchasi', archive: 'Arxivlash', restore: 'Tiklash', empty: 'Masalliq topilmadi.', loadFailed: 'Masalliqlarni yuklab bo‘lmadi.', saveFailed: 'Masalliqni saqlab bo‘lmadi.', statusFailed: 'Masalliq holatini o‘zgartirib bo‘lmadi.', connectionFailed: 'Aloqa uzildi. Qayta urinib ko‘ring — saqlangan yozuv takrorlanmaydi.', saved: 'Masalliq saqlandi.', statusUpdated: 'Masalliq holati yangilandi.', refresh: 'Yangilash', readOnly: 'Sizda faqat ko‘rish huquqi bor.', required: 'Nom va noldan katta odatiy narx kiriting.', migrationMissing: 'Masalliqlarni boshqarish uchun oxirgi bozor migratsiyalarini qo‘llang.'
   },
 }
 
@@ -33,6 +34,10 @@ function emptyIngredient() {
 function isMissingMigration(error) {
   const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
   return text.includes('normal_unit_price') || text.includes('is_catalog_managed') || text.includes('save_bazaar_ingredient') || text.includes('set_bazaar_ingredient_active') || text.includes('pgrst202') || text.includes('pgrst204')
+}
+
+function savedIngredientRow(data) {
+  return Array.isArray(data) ? data[0] : data
 }
 
 export default function BazaarIngredients() {
@@ -52,6 +57,18 @@ export default function BazaarIngredients() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
+  const errorMessage = useCallback((requestError, fallback) => {
+    if (isMissingMigration(requestError)) return l.migrationMissing
+    if (isBazaarIngredientNetworkError(requestError)) return l.connectionFailed
+    return requestError?.message || fallback
+  }, [l.connectionFailed, l.migrationMissing])
+
+  const upsertIngredient = useCallback(ingredient => {
+    if (!ingredient?.product_key) return
+    setIngredients(current => [...current.filter(item => item.product_key !== ingredient.product_key), ingredient]
+      .sort((left, right) => left.product_name.localeCompare(right.product_name)))
+  }, [])
+
   const loadIngredients = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -60,10 +77,10 @@ export default function BazaarIngredients() {
       .select('product_key, product_name, category, unit, normal_unit_price, is_active, is_catalog_managed, last_purchase_date, updated_at')
       .eq('is_catalog_managed', true)
       .order('product_name')
-    if (loadError) setError(isMissingMigration(loadError) ? l.migrationMissing : (loadError.message || l.loadFailed))
+    if (loadError) setError(errorMessage(loadError, l.loadFailed))
     else setIngredients(data || [])
     setLoading(false)
-  }, [l.loadFailed, l.migrationMissing])
+  }, [errorMessage, l.loadFailed])
 
   useEffect(() => { loadIngredients() }, [loadIngredients])
 
@@ -101,16 +118,28 @@ export default function BazaarIngredients() {
         unit: form.unit,
         normal_unit_price: normalizeMoneyInput(form.normal_unit_price),
       }
-      const { error: saveError } = await withWriteTimeout(
-        signal => supabase.rpc('save_bazaar_ingredient', { payload }).abortSignal(signal),
-        'SAVE_BAZAAR_INGREDIENT',
-      )
+      const expectedKey = form.product_key || normalizeBazaarProductKey(payload.product_name)
+      const { data: savedData, error: saveError } = await runBazaarIngredientWriteWithRecovery({
+        write: () => withWriteTimeout(
+          signal => supabase.rpc('save_bazaar_ingredient', { payload }).abortSignal(signal),
+          'SAVE_BAZAAR_INGREDIENT',
+        ),
+        reconcile: async () => {
+          const { data, error: reconcileError } = await supabase
+            .from('bazaar_product_catalog')
+            .select('product_key, product_name, category, unit, normal_unit_price, is_active, is_catalog_managed, last_purchase_date, updated_at')
+            .eq('product_key', expectedKey)
+            .maybeSingle()
+          if (reconcileError) throw reconcileError
+          return bazaarIngredientMatches(data, payload) ? data : null
+        },
+      })
       if (saveError) throw saveError
+      upsertIngredient(savedIngredientRow(savedData))
       setForm(emptyIngredient())
       setNotice(l.saved)
-      await loadIngredients()
     } catch (saveError) {
-      setError(isMissingMigration(saveError) ? l.migrationMissing : (saveError.message || l.saveFailed))
+      setError(errorMessage(saveError, l.saveFailed))
     } finally {
       setSaving(false)
     }
@@ -122,18 +151,30 @@ export default function BazaarIngredients() {
     setError('')
     setNotice('')
     try {
-      const { error: statusError } = await withWriteTimeout(
-        signal => supabase.rpc('set_bazaar_ingredient_active', {
-          p_product_key: ingredient.product_key,
-          p_is_active: !ingredient.is_active,
-        }).abortSignal(signal),
-        'SET_BAZAAR_INGREDIENT_ACTIVE',
-      )
+      const nextActive = !ingredient.is_active
+      const { data: savedData, error: statusError } = await runBazaarIngredientWriteWithRecovery({
+        write: () => withWriteTimeout(
+          signal => supabase.rpc('set_bazaar_ingredient_active', {
+            p_product_key: ingredient.product_key,
+            p_is_active: nextActive,
+          }).abortSignal(signal),
+          'SET_BAZAAR_INGREDIENT_ACTIVE',
+        ),
+        reconcile: async () => {
+          const { data, error: reconcileError } = await supabase
+            .from('bazaar_product_catalog')
+            .select('product_key, product_name, category, unit, normal_unit_price, is_active, is_catalog_managed, last_purchase_date, updated_at')
+            .eq('product_key', ingredient.product_key)
+            .maybeSingle()
+          if (reconcileError) throw reconcileError
+          return bazaarIngredientMatches(data, { is_active: nextActive }) ? data : null
+        },
+      })
       if (statusError) throw statusError
+      upsertIngredient(savedIngredientRow(savedData))
       setNotice(l.statusUpdated)
-      await loadIngredients()
     } catch (statusError) {
-      setError(isMissingMigration(statusError) ? l.migrationMissing : (statusError.message || l.statusFailed))
+      setError(errorMessage(statusError, l.statusFailed))
     } finally {
       setUpdatingKey('')
     }
