@@ -101,7 +101,7 @@ const PURCHASE_COLUMNS = `
   )
 `
 
-const INPUT = 'w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] outline-none transition-all placeholder:text-[#C3C8D0] focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]'
+const INPUT = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-all placeholder:text-[#C3C8D0] focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]'
 const SELECT = `${INPUT} pr-8`
 const LOAD_PAGE_SIZE = 500
 const HISTORY_PAGE_SIZE = 10
@@ -1193,15 +1193,15 @@ function BazaarEntryForm({
               const normalLineTotal = getBazaarNormalLineTotal(item)
               const priceDifference = getBazaarPriceDifference(item)
               return (
-                <div key={item._key} className="rounded-2xl border border-[#E5E7EB] bg-[#FBFCFD] p-3 sm:p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-lg bg-orange-50 px-2 text-xs font-black text-[#ff5a00]">{index + 1}</span>
-                    <button type="button" onClick={() => onRemoveItem(index)} aria-label={l.removeLine} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#9CA3AF] transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600">
+                <div key={item._key} className="rounded-2xl border border-[#E5E7EB] bg-gradient-to-br from-white to-[#FBFCFD] p-3 shadow-sm shadow-slate-100/70 sm:p-4">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-xl bg-orange-50 px-2.5 text-xs font-black text-[#ff5a00] ring-1 ring-orange-100">{index + 1}</span>
+                    <button type="button" onClick={() => onRemoveItem(index)} aria-label={l.removeLine} className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#E5E7EB] bg-white text-[#9CA3AF] transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-sm">
                       <Trash2 size={14} />
                     </button>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(220px,1.6fr)_minmax(145px,0.8fr)_120px_110px_minmax(170px,0.85fr)]">
+                  <div data-bazaar-line-fields="true" className="grid items-end gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(240px,1.45fr)_minmax(160px,0.8fr)_120px_110px_minmax(170px,0.85fr)]">
                     <Field label={l.product} error={lineHasError(index, 'product_name')}>
                       <BazaarIngredientPicker suggestions={suggestions} value={item.product_key || ''} onChange={value => onUpdateProduct(index, value)} lang={lang} disabled={saving} invalid={lineHasError(index, 'product_name')} />
                     </Field>
@@ -1223,19 +1223,28 @@ function BazaarEntryForm({
                     </Field>
                   </div>
 
-                  <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_180px] md:items-end">
+                  <div data-bazaar-line-notes="true" className="mt-4">
                     <Field label={l.lineNotes}>
-                      <input value={item.notes} onChange={event => onUpdateItem(index, 'notes', event.target.value)} placeholder={l.lineNotesPlaceholder} className={INPUT} />
+                      <textarea
+                        value={item.notes}
+                        onChange={event => onUpdateItem(index, 'notes', event.target.value)}
+                        rows={3}
+                        placeholder={l.lineNotesPlaceholder}
+                        className={`${INPUT} min-h-[84px] resize-y py-3 leading-5`}
+                      />
                     </Field>
-                    <div className="rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-right">
+                  </div>
+
+                  <div data-bazaar-line-summary="true" className="mt-3 grid gap-3 sm:ml-auto sm:w-full sm:max-w-[430px] sm:grid-cols-2 sm:items-stretch">
+                    <div className="flex h-full min-h-[70px] flex-col justify-center rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-right shadow-sm shadow-slate-100/60">
                       <p className="text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.unitCost} · {l.normalPrice} {item.normal_unit_price ? formatCurrency(item.normal_unit_price) : '—'}</p>
-                      <p className="mt-0.5 text-sm font-black text-[#1F2937] tabular-nums">
+                      <p className="mt-1 text-sm font-black text-[#1F2937] tabular-nums">
                         {unitCost > 0 ? `${formatCurrency(Math.round(unitCost))} / ${bazaarUnitLabel(base.unit, lang)}` : '—'}
                       </p>
                     </div>
-                    <div className={`rounded-xl border px-3 py-2.5 text-right ${bazaarDifferenceTone(priceDifference)}`}>
+                    <div className={`flex h-full min-h-[70px] flex-col justify-center rounded-xl border px-4 py-3 text-right shadow-sm ${bazaarDifferenceTone(priceDifference)}`}>
                       <p className="text-[10px] font-black uppercase tracking-wide opacity-70">{l.difference}</p>
-                      <p className="mt-0.5 text-sm font-black tabular-nums">{normalLineTotal > 0 && item.line_total ? formatBazaarSignedCurrency(priceDifference) : '—'}</p>
+                      <p className="mt-1 text-sm font-black tabular-nums">{normalLineTotal > 0 && item.line_total ? formatBazaarSignedCurrency(priceDifference) : '—'}</p>
                     </div>
                   </div>
                 </div>

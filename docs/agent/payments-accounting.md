@@ -55,6 +55,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 Main files: `src/pages/DailyBazaar.jsx`, `src/pages/BazaarIngredients.jsx`, `src/lib/bazaar.js`, and migrations `097`, `160`–`163`.
 
 - A receipt contains one or more product lines with product, category, quantity, unit, and exact amount.
+- Product-line controls share one height; each optional line note uses a separate multiline field.
 - Store the buyer profile id plus historical name snapshot. New entries use cash or card; historical terminal values remain readable.
 - New purchase lines choose an active canonical ingredient from `bazaar_product_catalog`; arbitrary product names are not accepted.
 - `/admin/bazaar/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Names are immutable after creation; archive a misspelling and add the corrected ingredient.
