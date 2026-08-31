@@ -38,6 +38,7 @@ import {
   createBlankTechCard,
   createBlankTechCardComponent,
   createBlankTechCardIngredient,
+  isTechCardEligibleMenuItem,
   normalizeTechCard,
   techCardFingerprint,
   techCardStorageKey,
@@ -274,15 +275,17 @@ export default function TechCards() {
   const activeItems = useMemo(() => state.menuItems
     .filter(isActiveMenuItem)
     .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)), [state.menuItems])
+  const techCardItems = useMemo(() => activeItems
+    .filter(item => isTechCardEligibleMenuItem(item, state.categories)), [activeItems, state.categories])
   const categoriesById = useMemo(() => new Map(state.categories.map(category => [category.id, category])), [state.categories])
-  const categoryCounts = useMemo(() => activeItems.reduce((counts, item) => {
+  const categoryCounts = useMemo(() => techCardItems.reduce((counts, item) => {
     if (item.category_id) counts[item.category_id] = (counts[item.category_id] || 0) + 1
     return counts
-  }, {}), [activeItems])
+  }, {}), [techCardItems])
   const mealCategories = useMemo(() => state.categories
     .filter(category => category.id !== 'all' && categoryCounts[category.id])
     .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)), [categoryCounts, state.categories])
-  const editorItem = menuItemId ? activeItems.find(item => item.id === menuItemId) : null
+  const editorItem = menuItemId ? techCardItems.find(item => item.id === menuItemId) : null
   const editorVariants = useMemo(() => editorItem
     ? getMenuItemOptionGroups(editorItem, lang, { includeUnavailable: true }).flatMap(group => group.options)
     : [], [editorItem, lang])
@@ -319,7 +322,7 @@ export default function TechCards() {
 
   const filteredItems = useMemo(() => {
     const needle = search.trim().toLowerCase()
-    return activeItems.filter(item => {
+    return techCardItems.filter(item => {
       const hasCard = Object.keys(cardsByItemId).some(key => key.startsWith(`${item.id}::`))
       if (filter === 'ready' && !hasCard) return false
       if (filter === 'missing' && hasCard) return false
@@ -328,7 +331,7 @@ export default function TechCards() {
       return [item.name_uz, item.name_ru, item.name_en, item.external_id]
         .some(value => String(value || '').toLowerCase().includes(needle))
     })
-  }, [activeItems, cardsByItemId, categoryFilter, filter, search])
+  }, [techCardItems, cardsByItemId, categoryFilter, filter, search])
   const filteredSections = useMemo(() => {
     const sections = mealCategories
       .map(category => ({
@@ -343,7 +346,7 @@ export default function TechCards() {
     return sections
   }, [filteredItems, l.otherCategory, lang, mealCategories])
 
-  const configuredCards = activeItems.filter(item => Object.keys(cardsByItemId).some(key => key.startsWith(`${item.id}::`)))
+  const configuredCards = techCardItems.filter(item => Object.keys(cardsByItemId).some(key => key.startsWith(`${item.id}::`)))
   const averagePortionCost = configuredCards.length
     ? configuredCards.reduce((sum, item) => {
       const card = cardsByItemId[techCardStorageKey(item.id)] || Object.entries(cardsByItemId).find(([key]) => key.startsWith(`${item.id}::`))?.[1]
@@ -808,9 +811,9 @@ export default function TechCards() {
         </div>
         <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
           <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <SummaryTile label={l.total} value={activeItems.length} icon={UtensilsCrossed} />
+            <SummaryTile label={l.total} value={techCardItems.length} icon={UtensilsCrossed} />
             <SummaryTile label={l.configured} value={configuredCards.length} icon={BookOpenCheck} tone="green" />
-            <SummaryTile label={l.needSetup} value={activeItems.length - configuredCards.length} icon={ClipboardList} tone="amber" />
+            <SummaryTile label={l.needSetup} value={techCardItems.length - configuredCards.length} icon={ClipboardList} tone="amber" />
             <SummaryTile label={l.average} value={formatCurrency(Math.round(averagePortionCost))} icon={CircleDollarSign} tone="blue" />
           </div>
 
@@ -825,7 +828,7 @@ export default function TechCards() {
                   key={category.id}
                   category={category}
                   label={category.id === 'all' ? l.all : getCategoryName(category, lang)}
-                  count={category.id === 'all' ? activeItems.length : categoryCounts[category.id]}
+                  count={category.id === 'all' ? techCardItems.length : categoryCounts[category.id]}
                   selected={categoryFilter === category.id}
                   onClick={() => setCategoryFilter(category.id)}
                 />
@@ -870,7 +873,14 @@ export default function TechCards() {
                       const card = cardsByItemId[techCardStorageKey(item.id)]
                         || Object.entries(cardsByItemId).find(([key]) => key.startsWith(`${item.id}::`))?.[1]
                       const summary = card ? calculateTechCardSummary(card, activeItems) : null
-                      const category = categoriesById.get(item.category_id)
+                      const cardVariant = card?.variant_option_id
+                        ? getMenuItemOptionGroups(item, lang, { includeUnavailable: true })
+                          .flatMap(group => group.options)
+                          .find(option => option.id === card.variant_option_id)
+                        : null
+                      const cardProfit = summary?.portionCost == null
+                        ? null
+                        : getSaleProfitSummary(Number(cardVariant?.price ?? item.price ?? 0), summary.portionCost)
                       return (
                         <button
                           key={item.id}
@@ -878,22 +888,23 @@ export default function TechCards() {
                           onClick={() => navigate(`/admin/tech-cards/${encodeURIComponent(item.id)}`)}
                           className="group flex min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
                         >
-                          <div className="h-auto w-28 shrink-0"><TechCardImage item={item} /></div>
+                          <div className="relative h-auto w-28 shrink-0">
+                            <TechCardImage item={item} />
+                            {cardProfit && (
+                              <span className={`absolute -left-5 top-3 w-20 -rotate-45 py-1 text-center text-[10px] font-black tabular-nums shadow-sm ${cardProfit.profit >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                                {formatDecimal(cardProfit.marginPct, lang, 1)}%
+                              </span>
+                            )}
+                          </div>
                           <div className="min-w-0 flex-1 p-4">
                             <div className="flex items-start gap-2">
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-base font-black text-gray-900">{getItemName(item, lang)}</p>
-                                <p className="truncate text-[11px] font-bold text-gray-400">{category ? getCategoryName(category, lang) : '—'}</p>
                               </div>
                               <ChevronRight size={18} className="shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-[#ff5a00]" />
                             </div>
                             {card ? (
                               <>
-                                <div className="mt-3 flex flex-wrap gap-1.5">
-                                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">{l.ready}</span>
-                                  <span className="rounded-full bg-gray-100 px-2 py-1 text-[10px] font-black text-gray-600">{card.ingredients.length} {l.ingredients.toLowerCase()}</span>
-                                  <span className="rounded-full bg-orange-50 px-2 py-1 text-[10px] font-black text-orange-700">{formatDecimal(card.portion_count, lang)} {l.portions.toLowerCase()}</span>
-                                </div>
                                 <p className="mt-3 text-xs font-bold text-gray-400">{l.portionCost}</p>
                                 <p className="text-sm font-black tabular-nums text-gray-900">{summary.portionCost == null ? '—' : formatCurrency(Math.round(summary.portionCost))}</p>
                               </>

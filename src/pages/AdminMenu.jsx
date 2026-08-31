@@ -45,6 +45,7 @@ import {
 } from '../lib/permissions'
 import { getSaleProfitSummary } from '../lib/profit'
 import { getRequiredMenuItemCost, hasRequiredMenuItemCost, isTechCardMenuItemCost } from '../lib/menuItemCosts'
+import { isTechCardEligibleMenuItem } from '../lib/techCards'
 import {
   getMenuItemMediaUrls,
   isMenuVideoUrl,
@@ -2669,7 +2670,7 @@ export default function AdminMenu() {
                    'Manage product details, variant prices, and stock counts'}
                 </p>
               </div>
-              {itemModal === 'edit' && form.id && canViewTechCards && (
+              {itemModal === 'edit' && form.id && canViewTechCards && isTechCardEligibleMenuItem(form, state.categories) && (
                 <button
                   type="button"
                   onClick={() => navigate(`/admin/tech-cards/${encodeURIComponent(form.id)}`)}

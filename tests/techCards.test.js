@@ -5,9 +5,25 @@ import {
   calculateTechCardSummary,
   copyAndScaleTechCard,
   createBlankTechCard,
+  isTechCardEligibleMenuItem,
   techCardStorageKey,
   validateTechCard,
 } from '../src/lib/techCards.js'
+
+test('tech cards exclude alcohol, utensils, and carbonated drink categories', () => {
+  const categories = [
+    { id: 'cat-1', name_en: 'Alcohol' },
+    { id: 'cat-2', name_en: ' Utensils ' },
+    { id: 'cat-3', name_en: 'Carbonated   Drinks' },
+    { id: 'cat-4', name_en: 'Main dishes' },
+  ]
+
+  assert.equal(isTechCardEligibleMenuItem({ category_id: 'cat-1' }, categories), false)
+  assert.equal(isTechCardEligibleMenuItem({ category_id: 'cat-2' }, categories), false)
+  assert.equal(isTechCardEligibleMenuItem({ category_id: 'cat-3' }, categories), false)
+  assert.equal(isTechCardEligibleMenuItem({ category_id: 'cat-4' }, categories), true)
+  assert.equal(isTechCardEligibleMenuItem({ category_id: 'unknown' }, categories), true)
+})
 
 test('variant tech cards keep a stable storage key and payload identity', () => {
   const card = createBlankTechCard('qurutob', 'two_three_people')

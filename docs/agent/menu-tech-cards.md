@@ -55,13 +55,14 @@ Read this guide for menu products/categories, availability and visibility, media
 
 ## Tech Cards
 
+- Exclude Alcohol, Utensils, Carbonated Drinks
 - One active product may have one protected base recipe and one recipe per eligible variant. The empty `variant_option_id` identifies the backward-compatible base recipe.
 - Ingredient rows and included-product component rows belong to the exact product-and-variant recipe. Batch ingredient cost divided by `portion_count`, plus per-portion component cost, is the current portion cost.
 - Save the card and complete ingredient list atomically with `save_menu_item_tech_card(payload jsonb)`.
 - `tech_cards` permission controls route/read access; Manage Menu separately controls writes.
 - Ingredient prices and protected recipes never enter public, Telegram-menu, waiter, cashier, order, or receipt payloads.
 - Saving a base recipe synchronizes the protected parent cost; saving a variant recipe synchronizes that option in protected `variant_costs`. Existing order-item cost snapshots remain untouched.
-- Variant recipes may be copied and quantity-scaled, but the destination variant identity and its sellable portion count remain explicit.
+- Variant recipes may be copied and scaled; keep the destination identity and portion count explicit.
 - Structured components may choose a product variant through `selected_options`; empty means the base product.
 - Included-product quantities are positive recipe amounts and may be fractional for every sale unit; the editor accepts decimal points and commas such as `0.3` and `0,5`.
 - Variant calculation uses protected variant cost with protected parent-cost fallback. Changing parent selection clears stale options.

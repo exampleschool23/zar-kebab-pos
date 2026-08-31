@@ -37,7 +37,18 @@ test('Tech Cards exposes a prominent meal-category filter with counts and locali
   assert.match(page, /aria-labelledby="tech-card-categories-heading"/)
   assert.match(page, /<CategoryFilterTile/)
   assert.match(page, /getCategoryName\(category, lang\)/)
-  assert.match(page, /count=\{category\.id === 'all' \? activeItems\.length : categoryCounts\[category\.id\]\}/)
+  assert.match(page, /count=\{category\.id === 'all' \? techCardItems\.length : categoryCounts\[category\.id\]\}/)
+})
+
+test('Tech Cards omit categories that do not require recipes', () => {
+  const page = source('src/pages/TechCards.jsx')
+  const adminMenu = source('src/pages/AdminMenu.jsx')
+  const helpers = source('src/lib/techCards.js')
+
+  assert.match(helpers, /'alcohol',[\s\S]*'utensils',[\s\S]*'carbonated drinks'/)
+  assert.match(page, /const techCardItems = useMemo[\s\S]{0,180}isTechCardEligibleMenuItem/)
+  assert.match(page, /const editorItem = menuItemId \? techCardItems\.find/)
+  assert.match(adminMenu, /canViewTechCards && isTechCardEligibleMenuItem\(form, state\.categories\)/)
 })
 
 test('Tech Card meals are grouped under visible category section titles', () => {
@@ -50,6 +61,31 @@ test('Tech Card meals are grouped under visible category section titles', () => 
   assert.match(page, /aria-labelledby=\{`tech-card-section-\$\{section\.id\}`\}/)
   assert.match(page, /section\.items\.length/)
   assert.match(page, /section\.items\.map\(item =>/)
+})
+
+test('completed Tech Card list items show estimated profit as a badge', () => {
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.match(page, /const cardProfit = summary\?\.portionCost == null[\s\S]{0,180}getSaleProfitSummary/)
+  assert.match(page, /\{formatDecimal\(cardProfit\.marginPct, lang, 1\)\}%/)
+  assert.doesNotMatch(page, /formatCurrencyWithPercentage\(cardProfit\.profit, cardProfit\.marginPct, lang\)/)
+  assert.doesNotMatch(page, /\{l\.estimatedProfit\}: \{formatCurrencyWithPercentage\(cardProfit\.profit/)
+  assert.match(page, /absolute -left-5 top-3 w-20 -rotate-45/)
+  assert.match(page, /cardProfit\.profit >= 0 \? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'/)
+})
+
+test('Tech Card list items omit the redundant category subtitle', () => {
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.doesNotMatch(page, /truncate text-\[11px\][^>]*>\{category \? getCategoryName\(category, lang\) : '—'\}/)
+})
+
+test('Tech Card list items keep only the profit badge', () => {
+  const page = source('src/pages/TechCards.jsx')
+
+  assert.doesNotMatch(page, />\{l\.ready\}<\/span>/)
+  assert.doesNotMatch(page, /\{card\.ingredients\.length\} \{l\.ingredients\.toLowerCase\(\)\}/)
+  assert.doesNotMatch(page, /formatDecimal\(card\.portion_count, lang\)/)
 })
 
 test('separate Tech Cards access is enforced by the profile constraint and recipe RLS', () => {

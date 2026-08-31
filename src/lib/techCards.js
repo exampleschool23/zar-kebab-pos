@@ -1,5 +1,23 @@
 export const TECH_CARD_UNITS = ['g', 'kg', 'ml', 'l', 'piece']
 
+const TECH_CARD_EXCLUDED_CATEGORY_NAMES = new Set([
+  'alcohol',
+  'utensils',
+  'carbonated drinks',
+])
+
+function normalizeTechCardCategoryName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+export function isTechCardEligibleMenuItem(item, categories = []) {
+  const category = categories.find(candidate => candidate?.id === item?.category_id)
+  if (!category) return true
+
+  return ![category.id, category.name_en, category.name_uz, category.name_ru]
+    .some(value => TECH_CARD_EXCLUDED_CATEGORY_NAMES.has(normalizeTechCardCategoryName(value)))
+}
+
 export function normalizeTechCardNumber(value, fallback = 0) {
   if (value === null || value === undefined || value === '') return fallback
   const parsed = Number(String(value).replace(',', '.'))
