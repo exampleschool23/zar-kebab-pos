@@ -49,11 +49,12 @@ async function notifyTelegramSalaryEvent(type, eventId) {
     group: { status: 'failed' },
     team: { status: 'failed' },
   }
-  if (!eventId || !['payment', 'fine', 'bonus', 'absence', 'rate'].includes(type)) return failedResult
+  if (!eventId || !['payment', 'fine', 'bonus', 'absence', 'rate', 'kpi_rule'].includes(type)) return failedResult
   try {
+    const eventIdKey = type === 'kpi_rule' ? 'kpiRuleEventId' : `${type}Id`
     const result = await postAuthenticatedTelegramNotification({
       type,
-      [`${type}Id`]: eventId,
+      [eventIdKey]: eventId,
     })
     return {
       ...failedResult,
@@ -96,6 +97,10 @@ export async function notifyTelegramAbsenceUndo(absenceId) {
 
 export function notifyTelegramEmployeeRate(rateId) {
   return notifyTelegramSalaryEvent('rate', rateId)
+}
+
+export function notifyTelegramKpiRuleChange(changeEventId) {
+  return notifyTelegramSalaryEvent('kpi_rule', changeEventId)
 }
 
 export function retractTelegramSalaryEvent(eventType, eventId) {

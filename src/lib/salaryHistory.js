@@ -67,6 +67,7 @@ export function buildSalaryHistoryEntries({
         amount: normalizeAmount(bonus.amount),
         detail: bonus.note || '',
         paymentMethod: bonus.payment_method || '',
+        accruesToSalary: bonus.accrues_to_salary === true,
         automaticKpi: bonus.source_type === 'daily_kpi' || Boolean(kpiResult),
         kpiResult: kpiResult || null,
       }

@@ -141,20 +141,26 @@ const TEAM_EVENT_COPY = {
 const EMPLOYEE_EVENT_COPY = {
   uz: {
     greeting: name => `Assalomu alaykum, ${name}!`,
-    bonusRecorded: 'Sizga bonus hisoblandi.',
-    kpiBonusRecorded: 'Sizga kunlik KPI bonusi hisoblandi va to‘landi.',
+    bonusRecorded: 'Bonusingiz hisoblandi va maosh balansiga qo‘shildi.',
+    kpiBonusRecorded: 'Kunlik KPI bonusingiz hisoblandi va maosh balansiga qo‘shildi.',
+    legacyBonusRecorded: 'Sizga bonus hisoblandi.',
+    legacyKpiBonusRecorded: 'Sizga kunlik KPI bonusi hisoblandi va to‘landi.',
     absenceRecorded: 'Sizning yo‘qligingiz qayd etildi.',
   },
   ru: {
     greeting: name => `Здравствуйте, ${name}!`,
-    bonusRecorded: 'Вам начислен бонус.',
-    kpiBonusRecorded: 'Вам рассчитан и сразу выплачен ежедневный KPI-бонус.',
+    bonusRecorded: 'Ваш бонус начислен и добавлен к балансу зарплаты.',
+    kpiBonusRecorded: 'Ваш ежедневный KPI-бонус рассчитан и добавлен к балансу зарплаты.',
+    legacyBonusRecorded: 'Вам начислен бонус.',
+    legacyKpiBonusRecorded: 'Вам рассчитан и сразу выплачен ежедневный KPI-бонус.',
     absenceRecorded: 'Ваше отсутствие зарегистрировано.',
   },
   en: {
     greeting: name => `Hello, ${name}!`,
-    bonusRecorded: 'A bonus was recorded for you.',
-    kpiBonusRecorded: 'Your daily KPI bonus was calculated and paid.',
+    bonusRecorded: 'Your bonus was accrued to your salary balance.',
+    kpiBonusRecorded: 'Your daily KPI bonus was calculated and added to your salary balance.',
+    legacyBonusRecorded: 'A bonus was recorded for you.',
+    legacyKpiBonusRecorded: 'Your daily KPI bonus was calculated and paid.',
     absenceRecorded: 'Your absence was recorded.',
   },
 }
@@ -242,6 +248,39 @@ const SALARY_RATE_COPY = {
   },
 }
 
+const KPI_RULE_COPY = {
+  uz: {
+    addedTitle: 'KPI sozlamasi qo‘shildi',
+    changedTitle: 'KPI sozlamasi o‘zgartirildi',
+    employee: 'Xodim',
+    previousRate: 'Oldingi KPI',
+    newRate: 'Yangi KPI',
+    effectiveFrom: 'Amal qilish sanasi',
+    disabled: 'o‘chirilgan',
+    createdBy: 'O‘zgartirdi',
+  },
+  ru: {
+    addedTitle: 'Настройка KPI добавлена',
+    changedTitle: 'Настройка KPI изменена',
+    employee: 'Сотрудник',
+    previousRate: 'Предыдущий KPI',
+    newRate: 'Новый KPI',
+    effectiveFrom: 'Действует с',
+    disabled: 'выключен',
+    createdBy: 'Изменил',
+  },
+  en: {
+    addedTitle: 'KPI setting added',
+    changedTitle: 'KPI setting changed',
+    employee: 'Employee',
+    previousRate: 'Previous KPI',
+    newRate: 'New KPI',
+    effectiveFrom: 'Effective from',
+    disabled: 'disabled',
+    createdBy: 'Changed by',
+  },
+}
+
 function formatSalaryRate(rate, copy) {
   const unit = rate?.rate_unit === 'monthly' ? copy.monthly : copy.daily
   return `${formatSalaryNotificationAmount(rate?.amount)} UZS (${unit})`
@@ -281,6 +320,35 @@ export function buildSalaryRateGroupMessage(rate, remainingDue = 0, language = '
   lines.push(
     `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,
     `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(rate?.created_by_name || '-')}`
+  )
+  return lines.join('\n')
+}
+
+export function buildKpiRuleGroupMessage(event, language = 'ru') {
+  const lang = normalizeSalaryNotificationLanguage(language)
+  const copy = KPI_RULE_COPY[lang]
+  const isAdded = event?.change_kind === 'added'
+  const formatRule = (rateBps, isEnabled) => (
+    isEnabled === false ? copy.disabled : formatKpiRate(rateBps)
+  )
+  const lines = [
+    `🎯 <b>${isAdded ? copy.addedTitle : copy.changedTitle}</b>`,
+    '',
+    `<b>${copy.employee}:</b> ${escapeTelegramHtml(event?.employee_name || '-')}`,
+  ]
+  if (!isAdded && event?.previous_rate_bps != null) {
+    lines.push(`<b>${copy.previousRate}:</b> ${escapeTelegramHtml(formatRule(
+      event.previous_rate_bps,
+      event.previous_is_enabled
+    ))}`)
+  }
+  lines.push(
+    `<b>${copy.newRate}:</b> ${escapeTelegramHtml(formatRule(
+      event?.new_rate_bps,
+      event?.new_is_enabled
+    ))}`,
+    `<b>${copy.effectiveFrom}:</b> ${escapeTelegramHtml(formatLongDate(event?.effective_from, lang, '-'))}`,
+    `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(event?.created_by_name || '-')}`
   )
   return lines.join('\n')
 }
@@ -410,6 +478,7 @@ export function buildEmployeeSalaryEventMessage(type, event, remainingDue = 0, l
   const normalizedType = type === 'bonus' ? 'bonus' : 'absence'
   const date = normalizedType === 'bonus' ? event?.bonus_date : event?.absence_date
   const employeeName = escapeTelegramHtml(event?.employee_name || '-')
+  const accruesToSalary = event?.accrues_to_salary === true
   const eventTitle = normalizedType === 'bonus' && isDailyKpiBonus(event)
     ? copy.kpiBonus
     : copy[normalizedType]
@@ -419,8 +488,8 @@ export function buildEmployeeSalaryEventMessage(type, event, remainingDue = 0, l
     `<b>${employeeCopy.greeting(employeeName)}</b>`,
     normalizedType === 'bonus'
       ? isDailyKpiBonus(event)
-        ? employeeCopy.kpiBonusRecorded
-        : employeeCopy.bonusRecorded
+        ? accruesToSalary ? employeeCopy.kpiBonusRecorded : employeeCopy.legacyKpiBonusRecorded
+        : accruesToSalary ? employeeCopy.bonusRecorded : employeeCopy.legacyBonusRecorded
       : employeeCopy.absenceRecorded,
     '',
   ]

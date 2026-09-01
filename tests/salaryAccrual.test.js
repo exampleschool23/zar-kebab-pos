@@ -128,6 +128,28 @@ test('monthly commitment and estimate reconcile for joins absences and rate chan
   assert.equal(summary.employeeRemainingThisMonth, 3_400_000)
 })
 
+test('monthly salary liability includes accrued manual and KPI bonuses but preserves legacy paid bonuses', () => {
+  const profile = monthlyProfile({
+    joined_at: '2026-06-01',
+    rates: [{ effective_from: '2026-06-01', amount: 3_000_000, rate_unit: 'monthly' }],
+    payments: [{ paid_date: '2026-06-10', amount: 400_000 }],
+    fines: [{ fine_date: '2026-06-15', amount: 100_000 }],
+    bonuses: [
+      { bonus_date: '2026-06-08', amount: 200_000, source_type: 'manual', accrues_to_salary: true },
+      { bonus_date: '2026-06-14', amount: 300_000, source_type: 'daily_kpi', accrues_to_salary: true },
+      { bonus_date: '2026-06-12', amount: 150_000, source_type: 'manual', accrues_to_salary: false },
+    ],
+  })
+  const summary = getEstimatedMonthlyExpenseSummary([profile], '2026-06-16')
+
+  assert.equal(summary.employeeProjectedMonth, 3_000_000)
+  assert.equal(summary.employeeAccruedBonusToDate, 500_000)
+  assert.equal(summary.employeeCurrentMonthLiability, 3_500_000)
+  assert.equal(summary.employeeRemainingThisMonth, 3_000_000)
+  assert.equal(summary.estimatedMonthlyExpenseUzs, 3_500_000)
+  assert.equal(getSalaryDue(profile, '2026-06-16'), 1_600_000)
+})
+
 test('current-month payments settle each employee opening arrears before current salary', () => {
   const arrearsProfile = monthlyProfile({
     id: 'employee-with-arrears',

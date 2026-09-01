@@ -99,7 +99,7 @@ export async function removeKpiRulePreservingHistory({
         created_by: createdBy,
         created_by_name: createdByName,
       }, { onConflict: 'salary_profile_id,effective_from' })
-      .select('id')
+      .select('id, last_change_event_id')
       .single()
 
     return disableError

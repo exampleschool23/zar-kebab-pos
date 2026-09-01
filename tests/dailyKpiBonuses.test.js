@@ -34,6 +34,14 @@ const financialHistoryMigration = fs.readFileSync(
   new URL('../supabase/147_financial_report_history_snapshots.sql', import.meta.url),
   'utf8'
 )
+const salaryBonusAccrualMigration = fs.readFileSync(
+  new URL('../supabase/169_salary_bonus_accrual.sql', import.meta.url),
+  'utf8'
+)
+const kpiRuleGroupNotificationMigration = fs.readFileSync(
+  new URL('../supabase/170_kpi_rule_group_notifications.sql', import.meta.url),
+  'utf8'
+)
 
 test('daily KPI migration stores effective-dated rules and immutable result snapshots', () => {
   assert.match(migration, /create table if not exists public\.employee_kpi_rules/i)
@@ -49,6 +57,45 @@ test('daily KPI migration stores effective-dated rules and immutable result snap
   assert.match(migration, /unique \(business_date, salary_profile_id\)/i)
   assert.match(migration, /'generated'[\s\S]*?'skipped_absent'[\s\S]*?'skipped_ineligible'[\s\S]*?'skipped_no_sales'[\s\S]*?'voided'/i)
   assert.match(migration, /protect_daily_kpi_finalization/i)
+})
+
+test('new manual and KPI bonuses accrue while legacy paid bonus history stays unchanged', () => {
+  assert.match(
+    salaryBonusAccrualMigration,
+    /add column if not exists accrues_to_salary boolean not null default false/i,
+  )
+  assert.match(salaryBonusAccrualMigration, /alter column accrues_to_salary set default true/i)
+  assert.match(
+    salaryBonusAccrualMigration,
+    /if tg_op = 'INSERT'[\s\S]*?new\.accrues_to_salary := true/i,
+  )
+  assert.match(
+    salaryBonusAccrualMigration,
+    /before insert or update of accrues_to_salary[\s\S]*?enforce_salary_bonus_accrual\(\)/i,
+  )
+  assert.match(salaryBonusAccrualMigration, /Salary bonus settlement mode is immutable/i)
+  assert.doesNotMatch(salaryBonusAccrualMigration, /update public\.employee_salary_bonuses/i)
+  assert.match(salaryBonusAccrualMigration, /notify pgrst, 'reload schema'/i)
+})
+
+test('KPI rule additions and genuine changes queue immutable Salary-group notifications', () => {
+  assert.match(kpiRuleGroupNotificationMigration, /add column if not exists last_change_event_id uuid/i)
+  assert.match(kpiRuleGroupNotificationMigration, /create table if not exists public\.employee_kpi_rule_change_events/i)
+  assert.match(kpiRuleGroupNotificationMigration, /change_kind in \('added', 'changed'\)/i)
+  assert.match(kpiRuleGroupNotificationMigration, /previous_rate_bps[\s\S]*?new_rate_bps/i)
+  assert.match(kpiRuleGroupNotificationMigration, /employee_name_snapshot/i)
+  assert.match(
+    kpiRuleGroupNotificationMigration,
+    /before insert or update on public\.employee_kpi_rules[\s\S]*?stamp_employee_kpi_rule_change_event\(\)/i,
+  )
+  assert.match(
+    kpiRuleGroupNotificationMigration,
+    /after insert or update on public\.employee_kpi_rules[\s\S]*?queue_employee_kpi_rule_change_telegram_delivery\(\)/i,
+  )
+  assert.match(kpiRuleGroupNotificationMigration, /new\.rate_bps is not distinct from old\.rate_bps[\s\S]*?return new/i)
+  assert.match(kpiRuleGroupNotificationMigration, /'kpi_rule'[\s\S]*?'not_attempted'[\s\S]*?'skipped'/i)
+  assert.match(kpiRuleGroupNotificationMigration, /current_staff_can_access\('expenses'\)/i)
+  assert.doesNotMatch(kpiRuleGroupNotificationMigration, /update public\.employee_kpi_rules/i)
 })
 
 test('KPI rule deletion is owner-only and cannot erase a rule used by finalized history', () => {
@@ -355,7 +402,7 @@ test('combined salary and Team automatic KPI deliveries are forced to Russian', 
   assert.match(teamDelivery, /source_type === 'daily_kpi'[\s\S]*?\? 'ru'/)
 })
 
-test('one private daily summary contains both salary and the automatic KPI bonus fields', () => {
+test('one private daily summary adds automatic KPI bonus to accumulated salary due', () => {
   const message = buildDailySalaryMessage({
     id: 'salary-waiter-1',
     employee_name: 'Aziz',
@@ -375,12 +422,14 @@ test('one private daily summary contains both salary and the automatic KPI bonus
       payment_method: 'cash',
       note: 'Автоматический ежедневный KPI: 1.00% от dine-in продаж с сервисом (2026-08-14)',
       source_type: 'daily_kpi',
+      accrues_to_salary: true,
     }],
   }, '2026-08-14', 'en')
 
   assert.match(message, /Daily salary summary/)
   assert.match(message, /Earned today:<\/b> 100 000 UZS/)
   assert.match(message, /Bonuses today:<\/b> 97 750 UZS/)
+  assert.match(message, /Current salary due:<\/b> 1 497 750 UZS/)
   assert.match(message, /Автоматический ежедневный KPI: 1\.00% от dine-in продаж с сервисом/)
   assert.equal((message.match(/Daily salary summary/g) || []).length, 1)
 })

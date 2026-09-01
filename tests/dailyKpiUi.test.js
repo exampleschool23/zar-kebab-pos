@@ -14,6 +14,15 @@ test('Salaries configures effective-dated KPI rules behind Accounting write acce
   assert.match(salaries, /disabled=\{!canManage[\s\S]*labels\.kpiSave/)
 })
 
+test('KPI rule additions and changes trigger retryable Salary-group delivery', () => {
+  assert.match(salaries, /\.select\('id, last_change_event_id'\)\s*\.single\(\)/)
+  assert.match(salaries, /configurationChanged[\s\S]*?runTelegramNotificationInBackground\('kpi_rule', savedRule\?\.last_change_event_id/)
+  assert.match(salaries, /removalResult\.action === 'disabled'[\s\S]*?runTelegramNotificationInBackground\('kpi_rule', removalResult\.rule\?\.last_change_event_id/)
+  assert.match(salaries, /kpi_rule:\s*notifyTelegramKpiRuleChange/)
+  assert.match(salaries, /\.from\('employee_kpi_rule_change_events'\)/)
+  assert.match(salaries, /delivery\.event_type === 'kpi_rule'[\s\S]*?showEmployeeDelivery: delivery\.event_type !== 'kpi_rule'/)
+})
+
 test('only owners can remove active KPI rules and zero-row deletes are rejected', () => {
   assert.match(salaries, /const canRemoveKpiRules = role === 'owner'/)
   assert.match(salaries, /canRemoveRules=\{canRemoveKpiRules\}/)
@@ -69,6 +78,14 @@ test('automatic KPI bonuses are identified and show their immutable formula in e
   assert.match(employeeHistory, /formatKpiRatePercent\(entry\.kpiResult\.rateBps, lang\)/)
   assert.match(employeeHistory, /entry\.kpiResult\.bonusAmountUzs/)
   assert.match(employeeHistory, /label=\{l\.kpiBonusTotal\}[\s\S]*monthSummary\.kpiBonusAmount/)
+})
+
+test('manual and KPI bonuses are presented as salary accruals instead of immediate payments', () => {
+  assert.match(salaries, /employee_salary_bonuses[\s\S]*?accrues_to_salary: true/)
+  assert.match(salaries, /transactionForm\.entry_type === 'payment' && \([\s\S]*?<Field label=\{l\.method\}>/)
+  assert.match(salaries, /labels\.kpiAccruesToSalary/)
+  assert.doesNotMatch(salaries, /kpiPaidImmediately/)
+  assert.match(employeeHistory, /entry\.entryType === 'bonus' && entry\.accruesToSalary && \([\s\S]*?labels\.accruedToSalary/)
 })
 
 test('employee cards show the current effective KPI percentage and enabled state', () => {

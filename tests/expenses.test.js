@@ -29,6 +29,7 @@ import {
   getSalaryAbsenceForDate,
   getSalaryAbsenceDates,
   getSalaryBalance,
+  getSalaryBonusAccruedAmount,
   getSalaryDue,
   getSalaryFineAmount,
   getSalaryCategoryForRole,
@@ -507,7 +508,7 @@ test('salary absence lookup returns the exact record for a same-day undo', () =>
   assert.equal(getSalaryAbsenceForDate(salaryProfile, 'not-a-date'), null)
 })
 
-test('salary bonuses create separate expense rows without changing salary due', () => {
+test('legacy salary bonuses remain separate expenses without changing salary due', () => {
   const waiterProfile = {
     id: 'salary-bonus-1',
     profile_id: 'waiter-3',
@@ -518,7 +519,7 @@ test('salary bonuses create separate expense rows without changing salary due', 
     rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
     payments: [],
     bonuses: [
-      { id: 'bonus-1', bonus_date: '2026-06-16', amount: 500_000, payment_method: 'card', note: 'Great service', created_at: '2026-06-16T09:24:00Z' },
+      { id: 'bonus-1', bonus_date: '2026-06-16', amount: 500_000, payment_method: 'card', note: 'Great service', created_at: '2026-06-16T09:24:00Z', accrues_to_salary: false },
     ],
   }
 
@@ -529,6 +530,34 @@ test('salary bonuses create separate expense rows without changing salary due', 
   assert.equal(bonusRows[0].payment_method, 'card')
   assert.equal(bonusRows[0].created_at, '2026-06-16T09:24:00Z')
   assert.equal(getSalaryDue(waiterProfile, '2026-06-16'), 4_800_000)
+})
+
+test('new manual and automatic KPI bonuses accumulate in salary due until payment', () => {
+  const waiterProfile = {
+    id: 'salary-accrued-bonuses-1',
+    profile_id: 'waiter-accrued-bonuses-1',
+    employee_name: 'Accrued Bonus Waiter',
+    joined_at: '2026-06-01',
+    payment_method: 'cash',
+    profile: { role: 'waiter' },
+    rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
+    payments: [{ id: 'payment-1', paid_date: '2026-06-03', amount: 400_000 }],
+    fines: [],
+    bonuses: [
+      { id: 'manual-accrual', bonus_date: '2026-06-02', amount: 500_000, source_type: 'manual', accrues_to_salary: true },
+      { id: 'kpi-accrual', bonus_date: '2026-06-03', amount: 250_000, source_type: 'daily_kpi', accrues_to_salary: true },
+      { id: 'future-accrual', bonus_date: '2026-06-04', amount: 1_000_000, source_type: 'manual', accrues_to_salary: true },
+      { id: 'legacy-paid', bonus_date: '2026-06-02', amount: 100_000, payment_method: 'card', accrues_to_salary: false },
+    ],
+  }
+
+  assert.equal(getSalaryBonusAccruedAmount(waiterProfile, '2026-06-01', '2026-06-02'), 500_000)
+  assert.equal(getSalaryBonusAccruedAmount(waiterProfile, '', '2026-06-03'), 750_000)
+  assert.equal(getSalaryDue(waiterProfile, '2026-06-03'), 1_250_000)
+  assert.deepEqual(
+    buildSalaryBonusExpenseRows([waiterProfile], '2026-06-01', '2026-06-03').map(row => row.id),
+    ['salary-bonus-legacy-paid'],
+  )
 })
 
 test('salary expense history uses recorded salary payments, not daily accrual rows', () => {
@@ -782,7 +811,7 @@ test('salary transaction payment methods flow into accounting summaries', () => 
   assert.equal(cashflow.byMethod.terminal.left, 1_500_000)
 })
 
-test('salary bonuses do not reduce salary due or mutate payment history balances', () => {
+test('legacy paid bonuses do not alter salary due or payment history balances', () => {
   const waiterProfile = {
     id: 'salary-bonus-due-1',
     profile_id: 'waiter-bonus-due-1',
@@ -792,7 +821,7 @@ test('salary bonuses do not reduce salary due or mutate payment history balances
     profile: { role: 'waiter' },
     rates: [{ effective_from: '2026-06-01', amount: 300_000, rate_unit: 'daily' }],
     payments: [{ id: 'payment-1', paid_date: '2026-06-05', amount: 900_000 }],
-    bonuses: [{ id: 'bonus-1', bonus_date: '2026-06-06', amount: 2_000_000 }],
+    bonuses: [{ id: 'bonus-1', bonus_date: '2026-06-06', amount: 2_000_000, accrues_to_salary: false }],
   }
 
   const paymentRows = buildSalaryPaymentExpenseRows([waiterProfile], '2026-06-01', '2026-06-10')

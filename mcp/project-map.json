@@ -131,8 +131,8 @@
     },
     {
       "name": "payroll-kpi-meals",
-      "keywords": ["employee", "salary", "bonus", "fine", "absence", "advance", "KPI", "meal", "payroll"],
-      "files": ["src/pages/Salaries.jsx", "src/pages/Employees.jsx", "src/pages/EmployeeSalaryHistory.jsx", "src/lib/salaryTransactions.js", "src/lib/salaryHistory.js", "src/lib/dailyKpi.js", "src/lib/expenses.js", "api/telegram/daily-salary.js"],
+      "keywords": ["employee", "salary", "bonus", "accrued bonus", "salary liability", "fine", "absence", "advance", "KPI", "KPI change notification", "Salary group", "meal", "payroll"],
+      "files": ["src/pages/Salaries.jsx", "src/pages/Employees.jsx", "src/pages/EmployeeSalaryHistory.jsx", "src/lib/salaryTransactions.js", "src/lib/salaryHistory.js", "src/lib/dailyKpi.js", "src/lib/expenses.js", "src/lib/telegramNotifications.js", "api/telegram/daily-salary.js", "api/telegram/employee-notification.js", "supabase/169_salary_bonus_accrual.sql", "supabase/170_kpi_rule_group_notifications.sql"],
       "tests": ["tests/salaryTransactions.test.js", "tests/salaryHistory.test.js", "tests/salaryAccrual.test.js", "tests/dailyKpi.test.js", "tests/dailyKpiUi.test.js", "tests/dailyKpiBonuses.test.js", "tests/dailySalaryWatchdog.test.js", "tests/telegramSalaryMessages.test.js"]
     },
     {

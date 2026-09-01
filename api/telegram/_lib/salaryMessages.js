@@ -20,6 +20,7 @@ const COPY = {
     bonuses: 'Bugungi bonuslar',
     fines: 'Bugungi jarimalar',
     payments: 'Bugun to‘langan',
+    accrued: 'Maosh balansiga qo‘shildi',
     none: 'Yo‘q',
     due: 'To‘lanishi kerak',
     currency: 'UZS',
@@ -52,6 +53,7 @@ const COPY = {
     bonuses: 'Бонусы за день',
     fines: 'Штрафы за день',
     payments: 'Выплачено за день',
+    accrued: 'Добавлено к балансу зарплаты',
     none: 'Нет',
     due: 'К выплате',
     currency: 'UZS',
@@ -84,6 +86,7 @@ const COPY = {
     bonuses: 'Bonuses today',
     fines: 'Fines today',
     payments: 'Paid today',
+    accrued: 'Added to salary balance',
     none: 'None',
     due: 'Current salary due',
     currency: 'UZS',
@@ -175,6 +178,7 @@ export function getDailySalaryNotificationSummary(salaryProfile, date) {
       amount: normalizeExpenseAmount(bonus?.amount),
       detail: String(bonus?.note || '').trim(),
       paymentMethod: String(bonus?.payment_method || salaryProfile?.payment_method || 'cash'),
+      accruesToSalary: bonus?.accrues_to_salary === true,
     }))
     .filter(bonus => bonus.amount > 0)
 
@@ -214,7 +218,8 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
   const copy = COPY[lang]
   const summary = getDailySalaryNotificationSummary(salaryProfile, date)
   const transactionLine = transaction => {
-    const detail = transaction.detail || expensePaymentMethodLabel(transaction.paymentMethod, lang)
+    const detail = transaction.detail
+      || (transaction.accruesToSalary ? copy.accrued : expensePaymentMethodLabel(transaction.paymentMethod, lang))
     return `  • ${formatSalaryNotificationAmount(transaction.amount)} ${copy.currency} — ${escapeTelegramHtml(detail)}`
   }
   const bonusLines = summary.bonuses.length > 0

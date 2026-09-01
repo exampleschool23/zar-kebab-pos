@@ -32,7 +32,7 @@ import {
 const EXPENSE_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by_name, created_at'
 const SALARY_PROFILE_COLUMNS = 'id, profile_id, employee_name, payment_method, joined_at, ended_at, deleted_at, is_active'
 const SALARY_PAYMENT_COLUMNS = 'id, salary_profile_id, paid_date, amount, payment_method, note, created_by_name, created_at'
-const SALARY_BONUS_COLUMNS = 'id, salary_profile_id, bonus_date, amount, payment_method, note, created_by_name, created_at'
+const SALARY_BONUS_COLUMNS = 'id, salary_profile_id, bonus_date, amount, payment_method, note, created_by_name, created_at, accrues_to_salary'
 const SALARY_ABSENCE_COLUMNS = 'id, salary_profile_id, absence_date'
 function expenseTone(row) {
   if (normalizeExpenseEntryType(row.entry_type) === 'income') {

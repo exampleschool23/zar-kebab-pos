@@ -235,6 +235,10 @@ test('database health requires the salary group target and event delivery histor
     missingDeliveries.failed.find(check => check.name === 'employee_salary_group_notification_deliveries').hint,
     /119_salary_event_team_notifications/
   )
+  assert.match(
+    missingDeliveries.failed.find(check => check.name === 'employee_salary_group_notification_deliveries').hint,
+    /170_kpi_rule_group_notifications/
+  )
   assert.match(cliHealthSource, /checkTable\('telegram_notification_targets'/)
   assert.match(cliHealthSource, /checkTable\('employee_salary_group_notification_deliveries'/)
 })
@@ -266,6 +270,42 @@ test('database health requires daily KPI calculation and source tracking', async
   assert.match(cliHealthSource, /checkTable\('employee_daily_kpi_results'/)
   assert.match(cliHealthSource, /generate_daily_kpi_bonuses\(p_business_date\)/)
   assert.match(cliHealthSource, /p_business_date: null/)
+})
+
+test('database health requires duplicate-safe KPI rule group notification snapshots', async () => {
+  const missingEvents = await runDbHealthChecks(makeClient({
+    missingTable: 'employee_kpi_rule_change_events',
+  }))
+  const missingPointer = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'employee_kpi_rules',
+    missingColumn: 'last_change_event_id',
+  }))
+
+  assert.equal(missingEvents.ok, false)
+  assert.match(
+    missingEvents.failed.find(check => check.name === 'employee_kpi_rule_change_events').hint,
+    /170_kpi_rule_group_notifications/
+  )
+  assert.equal(missingPointer.ok, false)
+  assert.equal(
+    missingPointer.failed.find(check => check.name === 'employee_kpi_rules').detail,
+    'last_change_event_id'
+  )
+  assert.match(cliHealthSource, /checkTable\('employee_kpi_rule_change_events'/)
+  assert.match(cliHealthSource, /employee_kpi_rules[^\n]*last_change_event_id/)
+})
+
+test('database health requires salary bonus accrual tracking', async () => {
+  const result = await runDbHealthChecks(makeClient({
+    missingColumnTable: 'employee_salary_bonuses',
+    missingColumn: 'accrues_to_salary',
+  }))
+
+  assert.equal(result.ok, false)
+  const failed = result.failed.find(check => check.name === 'employee_salary_bonuses')
+  assert.equal(failed.detail, 'accrues_to_salary')
+  assert.match(failed.hint, /169_salary_bonus_accrual/)
+  assert.match(cliHealthSource, /employee_salary_bonuses[^\n]*accrues_to_salary/)
 })
 
 test('database health requires immutable meal and sold-category snapshots', async () => {

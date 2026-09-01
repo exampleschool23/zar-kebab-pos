@@ -16,6 +16,7 @@ import {
   buildEmployeePaymentMessage,
   buildEmployeeSalaryRateMessage,
   buildEmployeeSalaryEventMessage,
+  buildKpiRuleGroupMessage,
   buildSalaryRateGroupMessage,
   buildSalaryGroupEventMessage,
   buildSalaryTeamEventMessage,
@@ -395,6 +396,7 @@ test('salary group messages cover bonuses, fines, and absences', () => {
     bonus_date: '2026-07-29',
     amount: 100_000,
     payment_method: 'card',
+    accrues_to_salary: true,
     note: '<Отличная работа>',
   }, 250_000, 'ru')
   const fine = buildSalaryGroupEventMessage('fine', {
@@ -542,6 +544,7 @@ test('employee bonus and absence messages are private and localized', () => {
     bonus_date: '2026-07-29',
     amount: 100_000,
     payment_method: 'card',
+    accrues_to_salary: true,
     note: '<Отличная работа>',
   }, 250_000, 'ru')
   const absence = buildEmployeeSalaryEventMessage('absence', {
@@ -549,9 +552,23 @@ test('employee bonus and absence messages are private and localized', () => {
     absence_date: '2026-07-29',
     note: '<Болезнь>',
   }, 80_000, 'ru')
+  const kpi = buildEmployeeSalaryEventMessage('bonus', {
+    ...common,
+    bonus_date: '2026-07-29',
+    amount: 75_000,
+    source_type: 'daily_kpi',
+    accrues_to_salary: true,
+  }, 325_000, 'en')
+  const legacyKpi = buildEmployeeSalaryEventMessage('bonus', {
+    ...common,
+    bonus_date: '2026-07-28',
+    amount: 50_000,
+    source_type: 'daily_kpi',
+    accrues_to_salary: false,
+  }, 250_000, 'en')
 
   assert.match(bonus, /Здравствуйте, Зилола &lt;кассир&gt;!/)
-  assert.match(bonus, /Вам начислен бонус\./)
+  assert.match(bonus, /Ваш бонус начислен и добавлен к балансу зарплаты\./)
   assert.match(bonus, /100 000 UZS/)
   assert.match(bonus, /Дата:<\/b> 29 июля 2026/)
   assert.match(bonus, /&lt;Отличная работа&gt;/)
@@ -562,6 +579,9 @@ test('employee bonus and absence messages are private and localized', () => {
   assert.match(absence, /&lt;Болезнь&gt;/)
   assert.match(absence, /К выплате:<\/b> 80 000 UZS/)
   assert.doesNotMatch(absence, /<Болезнь>/)
+  assert.match(kpi, /daily KPI bonus was calculated and added to your salary balance/i)
+  assert.doesNotMatch(kpi, /calculated and paid/i)
+  assert.match(legacyKpi, /daily KPI bonus was calculated and paid/i)
 })
 
 test('salary rate change messages show localized previous and new rates to the group and employee', () => {
@@ -630,6 +650,38 @@ test('salary rate messages always state whether KPI is disabled or not configure
   assert.match(notConfigured, /KPI rate:<\/b> not configured/)
 })
 
+test('KPI rule additions and changes produce localized Salary-group messages', () => {
+  const added = buildKpiRuleGroupMessage({
+    change_kind: 'added',
+    employee_name: 'Aziz <waiter>',
+    effective_from: '2026-09-02',
+    new_rate_bps: 125,
+    new_is_enabled: true,
+    created_by_name: 'Owner & Co',
+  }, 'en')
+  const changed = buildKpiRuleGroupMessage({
+    change_kind: 'changed',
+    employee_name: 'Азиз',
+    effective_from: '2026-09-03',
+    previous_rate_bps: 125,
+    previous_is_enabled: true,
+    new_rate_bps: 125,
+    new_is_enabled: false,
+    created_by_name: 'Владелец',
+  }, 'ru')
+
+  assert.match(added, /KPI setting added/)
+  assert.match(added, /Employee:<\/b> Aziz &lt;waiter&gt;/)
+  assert.doesNotMatch(added, /Previous KPI/)
+  assert.match(added, /New KPI:<\/b> 1\.25%/)
+  assert.match(added, /Effective from:<\/b> 2 September 2026/)
+  assert.match(added, /Owner &amp; Co/)
+  assert.match(changed, /Настройка KPI изменена/)
+  assert.match(changed, /Предыдущий KPI:<\/b> 1\.25%/)
+  assert.match(changed, /Новый KPI:<\/b> выключен/)
+  assert.match(changed, /Действует с:<\/b> 3 сентября 2026/)
+})
+
 test('salary decreases remain clear and neutral instead of being presented as a celebration', () => {
   const employee = buildEmployeeSalaryRateMessage({
     employee_name: 'Alex',
@@ -645,7 +697,7 @@ test('salary decreases remain clear and neutral instead of being presented as a 
   assert.doesNotMatch(employee, /Congratulations|Great news|🎉|🌟/)
 })
 
-test('salary payments and salary-rate changes never target ZarKebab Team', () => {
+test('salary payments, salary-rate changes, and KPI rule changes never target ZarKebab Team', () => {
   const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
   const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
   const notifyPaymentSource = endpoint.slice(
@@ -662,6 +714,7 @@ test('salary payments and salary-rate changes never target ZarKebab Team', () =>
   assert.doesNotMatch(notifyPaymentSource, /deliverSalaryTeamEvent|loadSalaryTeamTarget|buildSalaryTeamEventMessage|team_events/)
   assert.match(salariesPage, /const teamDeliveryRequired = \['bonus', 'fine', 'absence'\]\.includes\(eventType\)/)
   assert.match(salariesPage, /showTeamDelivery: \['bonus', 'fine', 'absence'\]\.includes\(delivery\.event_type\)/)
+  assert.match(endpoint, /KPI rule changes do not notify ZarKebab Team/)
 })
 
 test('recorded salary operations trigger the authenticated shared Telegram endpoint', () => {
@@ -699,26 +752,33 @@ test('recorded salary operations trigger the authenticated shared Telegram endpo
   assert.match(notifications, /\/api\/telegram\/employee-notification/)
   assert.match(notifications, /keepalive: true/)
   assert.match(notifications, /\[[^\]]*'payment'[^\]]*'rate'[^\]]*\]\.includes\(type\)/)
-  assert.match(notifications, /\[`\\?\$\{type\}Id`\]: eventId/)
+  assert.match(notifications, /const eventIdKey = type === 'kpi_rule' \? 'kpiRuleEventId' : `\$\{type\}Id`/)
+  assert.match(notifications, /\[eventIdKey\]: eventId/)
   assert.match(notifications, /export function notifyTelegramEmployeeRate\(rateId\)/)
   assert.match(notifications, /notifyTelegramSalaryEvent\('rate', rateId\)/)
+  assert.match(notifications, /export function notifyTelegramKpiRuleChange\(changeEventId\)/)
+  assert.match(notifications, /notifyTelegramSalaryEvent\('kpi_rule', changeEventId\)/)
   assert.match(notifications, /team: \{ status: 'failed' \}/)
   assert.match(endpoint, /payment\.created_by !== user\.id/)
   assert.match(endpoint, /loadOwnedSalaryEvent/)
   assert.match(endpoint, /rate:\s*\{[\s\S]*?table:\s*'employee_salary_rates'[\s\S]*?effective_from[\s\S]*?rate_unit[\s\S]*?created_by/)
+  assert.match(endpoint, /kpi_rule:\s*\{[\s\S]*?table:\s*'employee_kpi_rule_change_events'[\s\S]*?previous_rate_bps[\s\S]*?new_rate_bps/)
   assert.match(endpoint, /\.from\('employee_kpi_rules'\)[\s\S]*?\.lte\('effective_from', data\.effective_from\)[\s\S]*?\.maybeSingle\(\)/)
   assert.match(endpoint, /kpi_rule:\s*kpiRule/)
   assert.match(endpoint, /\.eq\('id', eventId\)/)
   assert.match(endpoint, /rate:\s*rateId/)
   assert.match(endpoint, /\[[^\]]*'payment'[^\]]*'rate'[^\]]*\]\.includes\(notificationType\)/)
-  assert.match(endpoint, /requireQueuedSalaryRateDelivery\(supabase, event\.id\)/)
-  assert.match(endpoint, /\.eq\('event_type', 'rate'\)[\s\S]*?\.eq\('event_id', eventId\)/)
+  assert.match(endpoint, /requireQueuedSalaryGroupDelivery\([\s\S]*?'rate',[\s\S]*?event\.id/)
+  assert.match(endpoint, /\.eq\('event_type', type\)[\s\S]*?\.eq\('event_id', eventId\)/)
   assert.match(endpoint, /Initial salary setup is not a salary-change notification/)
   assert.match(endpoint, /buildEmployeePaymentMessage/)
   assert.match(endpoint, /buildSalaryPaymentGroupMessage/)
   assert.match(endpoint, /buildSalaryGroupEventMessage/)
   assert.match(endpoint, /buildEmployeeSalaryEventMessage/)
+  assert.match(endpoint, /salaryProfile\?\.bonuses[\s\S]*?accrues_to_salary/)
   assert.match(endpoint, /buildSalaryRateGroupMessage\(event, remainingDue, target\.language\)/)
+  assert.match(endpoint, /buildKpiRuleGroupMessage\(event, target\.language\)/)
+  assert.match(endpoint, /async function notifyKpiRuleChange[\s\S]*?deliverSalaryGroupEvent\(supabase, 'kpi_rule', event, 0\)/)
   assert.match(endpoint, /buildEmployeeSalaryRateMessage\([\s\S]*?event,[\s\S]*?remainingDue,[\s\S]*?employeeLink\.preferred_language/)
   assert.match(endpoint, /deliverEmployeeSalaryEvent/)
   assert.match(endpoint, /employee_salary_telegram_links/)

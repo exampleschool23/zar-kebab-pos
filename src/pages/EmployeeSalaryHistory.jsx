@@ -153,6 +153,7 @@ export default function EmployeeSalaryHistory() {
       deleteFailed: 'Yozuvni o‘chirib bo‘lmadi.',
       telegramDeleteFailed: 'Telegramdagi xabarlarni o‘chirib bo‘lmadi, shuning uchun yozuv saqlandi.',
       automaticKpi: 'Avtomatik KPI',
+      accruedToSalary: 'Maosh balansiga qo‘shildi',
       kpiFormula: 'Restoran dine-in savdosi + xizmat haqi',
       previous: 'Oldingi',
       next: 'Keyingi',
@@ -206,6 +207,7 @@ export default function EmployeeSalaryHistory() {
       deleteFailed: 'Не удалось удалить запись.',
       telegramDeleteFailed: 'Не удалось удалить сообщения в Telegram, поэтому запись сохранена.',
       automaticKpi: 'Автоматический KPI',
+      accruedToSalary: 'Добавлено к балансу зарплаты',
       kpiFormula: 'Dine-in продажи ресторана + сервис',
       previous: 'Назад',
       next: 'Далее',
@@ -259,6 +261,7 @@ export default function EmployeeSalaryHistory() {
       deleteFailed: 'Could not delete the record.',
       telegramDeleteFailed: 'The Telegram messages could not be deleted, so the record was kept.',
       automaticKpi: 'Automatic KPI',
+      accruedToSalary: 'Added to salary balance',
       kpiFormula: 'Restaurant dine-in sales + service',
       previous: 'Previous',
       next: 'Next',
@@ -831,7 +834,10 @@ function HistoryEntryCard({ entry, lang, labels, canDelete, confirming, saving, 
   const style = styles[entry.entryType] || styles.payment
   const Icon = style.Icon
   const label = labels[entry.entryType]
-  const detail = entry.detail || (entry.paymentMethod ? expensePaymentMethodLabel(entry.paymentMethod, lang) : '')
+  const detail = entry.detail
+    || (entry.entryType === 'bonus' && entry.accruesToSalary
+      ? ''
+      : entry.paymentMethod ? expensePaymentMethodLabel(entry.paymentMethod, lang) : '')
 
   return (
     <article className={`rounded-xl border border-[#E5E7EB] border-l-4 p-3 ${style.row}`}>
@@ -846,6 +852,11 @@ function HistoryEntryCard({ entry, lang, labels, canDelete, confirming, saving, 
               {entry.automaticKpi && (
                 <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black text-violet-700">
                   {labels.automaticKpi}
+                </span>
+              )}
+              {entry.entryType === 'bonus' && entry.accruesToSalary && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">
+                  {labels.accruedToSalary}
                 </span>
               )}
               {entry.createdAt && <span className="text-[10px] font-bold tabular-nums text-[#9CA3AF]">{formatTime(entry.createdAt, '—')}</span>}

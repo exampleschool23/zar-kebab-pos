@@ -39,6 +39,7 @@ import {
   notifyTelegramEmployeeFine,
   notifyTelegramEmployeePayment,
   notifyTelegramEmployeeRate,
+  notifyTelegramKpiRuleChange,
 } from '../lib/telegramNotifications'
 
 const FIELD = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
@@ -186,7 +187,7 @@ export default function Salaries() {
       changeHelp: 'Yangi stavka va u amal qiladigan sanani belgilang.',
       transactionHelp: 'Operatsiya turini tanlang, keyin xodim va summani kiriting.',
       paymentHelp: 'To‘lov xodimga bo‘lgan qarzni kamaytiradi.',
-      bonusHelp: 'Bonus — maoshdan tashqari qo‘shimcha to‘lov.',
+      bonusHelp: 'Bonus maosh balansiga qo‘shiladi va maosh to‘lovi yozilganda to‘lanadi.',
       fineHelp: 'Jarima maosh qarzini kamaytiradi, lekin kassa xarajati hisoblanmaydi.',
       absenceHelp: 'Tanlangan sana uchun ishga kelmagan xodimni belgilang.',
       absenceDuplicate: 'Bu xodimning tanlangan sanadagi yo‘qligi allaqachon belgilangan.',
@@ -212,7 +213,7 @@ export default function Salaries() {
       reactivate: 'Qayta yoqish',
       page: 'Sahifa',
       empty: 'Maosh sozlamalari yo‘q',
-      migration: 'Maosh jadvallari yangilanmagan. supabase/054_employee_salary_profiles.sql dan supabase/063_employee_salary_absences.sql gacha va supabase/099_employee_salary_fines.sql migratsiyalarini ishga tushiring.',
+      migration: 'Maosh jadvallari yangilanmagan. 054–063, 099 va 169 maosh migratsiyalarini ishga tushiring.',
       readOnly: 'Bu sahifa faqat egasi uchun.',
       kpiTitle: 'Kunlik KPI bonuslari',
       kpiHelp: 'Tanlangan xodimga butun restoranning to‘langan dine-in savdosi va xizmat haqidan to‘liq foiz belgilang.',
@@ -223,10 +224,12 @@ export default function Salaries() {
       kpiDisabled: 'KPI o‘chirilgan',
       kpiSave: 'KPI sozlamasini saqlash',
       kpiSaved: 'KPI sozlamasi saqlandi',
+      kpiTelegramFailed: 'KPI sozlamasi saqlandi, lekin Maosh guruhiga Telegram xabari yuborilmadi. 170-migratsiya va yetkazib berish holatini tekshiring.',
+      kpiChangeLabel: 'KPI o‘zgarishi',
       kpiRemove: 'KPI sozlamasini olib tashlash',
       kpiRemoveTitle: 'KPI sozlamasini olib tashlaysizmi?',
       kpiRemoveFrom: 'KPI’ni o‘chirish sanasi',
-      kpiRemoveWarning: 'Tanlangan sanadan oldingi sozlamalar, yakunlangan hisob-kitoblar va to‘langan bonuslar o‘zgarmaydi. KPI faqat tanlangan sanadan boshlab o‘chiriladi.',
+      kpiRemoveWarning: 'Tanlangan sanadan oldingi sozlamalar, yakunlangan hisob-kitoblar va hisoblangan bonuslar o‘zgarmaydi. KPI faqat tanlangan sanadan boshlab o‘chiriladi.',
       kpiRemoveConfirm: 'Olib tashlash',
       kpiRemoveCancel: 'Bekor qilish',
       kpiRemoved: 'KPI sozlamasi olib tashlandi',
@@ -235,8 +238,8 @@ export default function Salaries() {
       kpiRemoveFailed: 'KPI sozlamasini olib tashlab bo‘lmadi.',
       kpiPreview: 'Hisoblash namunasi',
       kpiBaseStatement: 'Asos: butun restoranning kun davomida to‘langan dine-in subtotal summasi + xizmat haqi. Har bir xodimga uning to‘liq foizi alohida hisoblanadi.',
-      kpiPaidImmediately: 'Natija darhol to‘langan Bonus sifatida yoziladi. Xodim uni kunlik maosh xabarida oladi; Maosh guruhi va ZarKebab Team alohida xabardor qilinadi.',
-      kpiMigration: 'Kunlik KPI uchun 129-migratsiyani ishga tushiring.',
+      kpiAccruesToSalary: 'Natija Bonus sifatida maosh balansiga qo‘shiladi va keyingi maosh to‘lovi bilan yopiladi. Xodim uni kunlik xabarda, Maosh guruhi umumiy hisobotda ko‘radi; ZarKebab Team alohida xabardor qilinadi.',
+      kpiMigration: 'Kunlik KPI va guruh xabarlari uchun 129, 169 va 170-migratsiyalarni ishga tushiring.',
       kpiLoadFailed: 'KPI ma’lumotlarini yuklab bo‘lmadi.',
       telegramTitle: 'Telegram xabarnomalari',
       telegramHelp: 'Xodimga 30 daqiqada muddati tugaydigan shaxsiy ulanish havolasini yuboring.',
@@ -246,9 +249,9 @@ export default function Salaries() {
       telegramLinked: 'Telegram ulangan',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME sozlanmagan.',
       telegramDeliveryTitle: 'Maosh xabarlari holati',
-      telegramDeliveryHelp: 'Maosh xabarlarining xodimga, maosh guruhiga va bonus, jarima hamda kelmagan kunlar uchun ZarKebab Team guruhiga yuborilishini kuzating.',
+      telegramDeliveryHelp: 'Maosh xabarlari va KPI sozlamasi o‘zgarishlarining Maosh guruhiga yetkazilishini kuzating.',
       telegramDeliveryEmpty: 'Hali Telegram xabarlari yo‘q.',
-      telegramDeliveryMigration: 'Telegram xabarlari tarixi uchun 108, 110, 111, 112, 113, 116 va 119-migratsiyalarni ishga tushiring.',
+      telegramDeliveryMigration: 'Telegram xabarlari tarixi uchun 108, 110, 111, 112, 113, 116, 119 va 170-migratsiyalarni ishga tushiring.',
       telegramEmployee: 'Xodim',
       telegramSalaryGroup: 'Maosh guruhi',
       telegramTeam: 'ZarKebab Team',
@@ -322,7 +325,7 @@ export default function Salaries() {
       changeHelp: 'Укажите новую ставку и дату, с которой она действует.',
       transactionHelp: 'Сначала выберите тип операции, затем сотрудника и сумму.',
       paymentHelp: 'Выплата уменьшает долг перед сотрудником.',
-      bonusHelp: 'Бонус — дополнительная выплата сверх зарплаты.',
+      bonusHelp: 'Бонус добавляется к балансу зарплаты и выплачивается при регистрации выплаты зарплаты.',
       fineHelp: 'Штраф уменьшает долг по зарплате, но не считается расходом кассы.',
       absenceHelp: 'Отметьте сотрудника, который отсутствовал в выбранную дату.',
       absenceDuplicate: 'Отсутствие этого сотрудника на выбранную дату уже отмечено.',
@@ -348,7 +351,7 @@ export default function Salaries() {
       reactivate: 'Включить снова',
       page: 'Страница',
       empty: 'Настроек зарплаты пока нет',
-      migration: 'Таблицы зарплат не обновлены. Запустите миграции с supabase/054_employee_salary_profiles.sql по supabase/063_employee_salary_absences.sql и supabase/099_employee_salary_fines.sql.',
+      migration: 'Таблицы зарплат не обновлены. Запустите миграции зарплат 054–063, 099 и 169.',
       readOnly: 'Эта страница доступна только владельцу.',
       kpiTitle: 'Ежедневные KPI-бонусы',
       kpiHelp: 'Назначьте выбранному сотруднику полный процент от оплаченных dine-in продаж и сервиса всего ресторана.',
@@ -359,10 +362,12 @@ export default function Salaries() {
       kpiDisabled: 'KPI выключен',
       kpiSave: 'Сохранить настройку KPI',
       kpiSaved: 'Настройка KPI сохранена',
+      kpiTelegramFailed: 'Настройка KPI сохранена, но сообщение в группу зарплат не отправлено. Проверьте миграцию 170 и статус доставки.',
+      kpiChangeLabel: 'Изменение KPI',
       kpiRemove: 'Удалить настройку KPI',
       kpiRemoveTitle: 'Удалить настройку KPI?',
       kpiRemoveFrom: 'Отключить KPI с',
-      kpiRemoveWarning: 'Настройки, завершённые расчёты и выплаченные бонусы до выбранной даты останутся без изменений. KPI будет отключён только с выбранной даты.',
+      kpiRemoveWarning: 'Настройки, завершённые расчёты и начисленные бонусы до выбранной даты останутся без изменений. KPI будет отключён только с выбранной даты.',
       kpiRemoveConfirm: 'Удалить',
       kpiRemoveCancel: 'Отмена',
       kpiRemoved: 'Настройка KPI удалена',
@@ -371,8 +376,8 @@ export default function Salaries() {
       kpiRemoveFailed: 'Не удалось удалить настройку KPI.',
       kpiPreview: 'Пример расчёта',
       kpiBaseStatement: 'База: оплаченный dine-in subtotal всего ресторана за день + сервис. Каждый сотрудник получает свой полный процент отдельно.',
-      kpiPaidImmediately: 'Результат сразу записывается как выплаченный Бонус. Сотрудник получает его в ежедневном сообщении о зарплате; группа зарплат и ZarKebab Team уведомляются отдельно.',
-      kpiMigration: 'Запустите миграцию 129 для ежедневных KPI.',
+      kpiAccruesToSalary: 'Результат начисляется в баланс зарплаты как бонус и погашается следующей выплатой. Сотрудник видит его в ежедневном сообщении, группа зарплат — в общем отчёте; ZarKebab Team получает отдельное уведомление.',
+      kpiMigration: 'Запустите миграции 129, 169 и 170 для ежедневных KPI и групповых уведомлений.',
       kpiLoadFailed: 'Не удалось загрузить данные KPI.',
       telegramTitle: 'Telegram-уведомления',
       telegramHelp: 'Отправьте сотруднику личную ссылку, которая действует 30 минут.',
@@ -382,9 +387,9 @@ export default function Salaries() {
       telegramLinked: 'Telegram подключён',
       telegramBotMissing: 'Не настроен VITE_TELEGRAM_BOT_USERNAME.',
       telegramDeliveryTitle: 'Статус уведомлений о зарплате',
-      telegramDeliveryHelp: 'Проверяйте доставку сообщений сотруднику, в группу зарплат и, для бонусов, штрафов и отсутствий, в ZarKebab Team.',
+      telegramDeliveryHelp: 'Проверяйте доставку сообщений о зарплате и изменениях настроек KPI в группу зарплат.',
       telegramDeliveryEmpty: 'Уведомлений Telegram пока нет.',
-      telegramDeliveryMigration: 'Запустите миграции 108, 110, 111, 112, 113, 116 и 119 для истории уведомлений.',
+      telegramDeliveryMigration: 'Запустите миграции 108, 110, 111, 112, 113, 116, 119 и 170 для истории уведомлений.',
       telegramEmployee: 'Сотрудник',
       telegramSalaryGroup: 'Группа зарплат',
       telegramTeam: 'ZarKebab Team',
@@ -458,7 +463,7 @@ export default function Salaries() {
       changeHelp: 'Set the new rate and the date it takes effect.',
       transactionHelp: 'Choose an operation first, then select the employee and amount.',
       paymentHelp: 'A payment reduces the amount owed to the employee.',
-      bonusHelp: 'A bonus is an additional payment outside regular salary.',
+      bonusHelp: 'A bonus is added to salary balance and paid when a salary payment is recorded.',
       fineHelp: 'A fine reduces payroll liability but is not a cash expense.',
       absenceHelp: 'Mark the employee who was absent on the selected date.',
       absenceDuplicate: 'This employee is already marked absent on the selected date.',
@@ -484,7 +489,7 @@ export default function Salaries() {
       reactivate: 'Reactivate',
       page: 'Page',
       empty: 'No salary settings yet',
-      migration: 'Salary tables are not up to date. Run migrations from supabase/054_employee_salary_profiles.sql through supabase/063_employee_salary_absences.sql, plus supabase/099_employee_salary_fines.sql.',
+      migration: 'Salary tables are not up to date. Run salary migrations 054–063, 099, and 169.',
       readOnly: 'Only the owner can manage this page.',
       kpiTitle: 'Daily KPI bonuses',
       kpiHelp: "Give a selected employee their full percentage of the whole restaurant's paid dine-in sales and service.",
@@ -495,10 +500,12 @@ export default function Salaries() {
       kpiDisabled: 'KPI disabled',
       kpiSave: 'Save KPI setting',
       kpiSaved: 'KPI setting saved',
+      kpiTelegramFailed: 'The KPI setting was saved, but the Salary group message was not sent. Check migration 170 and the delivery status.',
+      kpiChangeLabel: 'KPI change',
       kpiRemove: 'Remove KPI setting',
       kpiRemoveTitle: 'Remove this KPI setting?',
       kpiRemoveFrom: 'Disable KPI from',
-      kpiRemoveWarning: 'Settings, finalized calculations, and paid bonuses before the selected date remain unchanged. KPI is disabled only from the selected date onward.',
+      kpiRemoveWarning: 'Settings, finalized calculations, and accrued bonuses before the selected date remain unchanged. KPI is disabled only from the selected date onward.',
       kpiRemoveConfirm: 'Remove',
       kpiRemoveCancel: 'Cancel',
       kpiRemoved: 'KPI setting removed',
@@ -507,8 +514,8 @@ export default function Salaries() {
       kpiRemoveFailed: 'Could not remove the KPI setting.',
       kpiPreview: 'Calculation example',
       kpiBaseStatement: "Base: the whole restaurant's paid dine-in subtotal for the day + service. Every employee receives their full percentage independently.",
-      kpiPaidImmediately: 'The result is recorded immediately as a paid Bonus. The employee receives it in the daily salary message; Salary group and ZarKebab Team are notified separately.',
-      kpiMigration: 'Run migration 129 to enable daily KPI bonuses.',
+      kpiAccruesToSalary: 'The result is added to salary balance as a bonus and settled by the next salary payment. The employee sees it in the daily message, Salary group in the aggregate report; ZarKebab Team is notified separately.',
+      kpiMigration: 'Run migrations 129, 169, and 170 for daily KPI and group notifications.',
       kpiLoadFailed: 'Could not load KPI data.',
       telegramTitle: 'Telegram notifications',
       telegramHelp: 'Send the employee a private link that expires after 30 minutes.',
@@ -518,9 +525,9 @@ export default function Salaries() {
       telegramLinked: 'Telegram linked',
       telegramBotMissing: 'VITE_TELEGRAM_BOT_USERNAME is not configured.',
       telegramDeliveryTitle: 'Salary notification status',
-      telegramDeliveryHelp: 'Track messages to the employee, salary group, and ZarKebab Team for bonuses, fines, and absences.',
+      telegramDeliveryHelp: 'Track salary messages and KPI setting changes delivered to the Salary group.',
       telegramDeliveryEmpty: 'No Telegram notifications yet.',
-      telegramDeliveryMigration: 'Run migrations 108, 110, 111, 112, 113, 116, and 119 to enable notification history.',
+      telegramDeliveryMigration: 'Run migrations 108, 110, 111, 112, 113, 116, 119, and 170 to enable notification history.',
       telegramEmployee: 'Employee',
       telegramSalaryGroup: 'Salary group',
       telegramTeam: 'ZarKebab Team',
@@ -547,6 +554,7 @@ export default function Salaries() {
   const [paymentDeliveries, setPaymentDeliveries] = useState([])
   const [paymentDeliveriesUnavailable, setPaymentDeliveriesUnavailable] = useState(false)
   const [groupEventDeliveries, setGroupEventDeliveries] = useState([])
+  const [kpiRuleChangeEvents, setKpiRuleChangeEvents] = useState([])
   const [groupEventDeliveriesUnavailable, setGroupEventDeliveriesUnavailable] = useState(false)
   const [telegramSalaryProfileId, setTelegramSalaryProfileId] = useState('')
   const [telegramInviteUrl, setTelegramInviteUrl] = useState('')
@@ -623,7 +631,7 @@ export default function Salaries() {
 
   async function loadTelegramDeliveryData() {
     try {
-      const [paymentDeliveryRes, groupEventDeliveryRes] = await Promise.all([
+      const [paymentDeliveryRes, groupEventDeliveryRes, kpiRuleChangeEventRes] = await Promise.all([
         supabase.from('employee_salary_payment_notification_deliveries')
           .select('id, payment_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, confirmed_at, group_status, group_telegram_message_id, group_error_message, group_attempted_at, group_sent_at')
           .order('attempted_at', { ascending: false })
@@ -632,15 +640,21 @@ export default function Salaries() {
           .select('id, event_type, event_id, salary_profile_id, status, telegram_message_id, error_message, attempted_at, sent_at, employee_status, employee_telegram_message_id, employee_error_message, employee_attempted_at, employee_sent_at, team_status, team_telegram_message_id, team_error_message, team_attempted_at, team_sent_at')
           .order('attempted_at', { ascending: false })
           .limit(100),
+        supabase.from('employee_kpi_rule_change_events')
+          .select('id, salary_profile_id, employee_name_snapshot, change_kind, effective_from, previous_rate_bps, previous_is_enabled, new_rate_bps, new_is_enabled, created_at')
+          .order('created_at', { ascending: false })
+          .limit(100),
       ])
       setPaymentDeliveries(paymentDeliveryRes.error ? [] : paymentDeliveryRes.data || [])
       setPaymentDeliveriesUnavailable(Boolean(paymentDeliveryRes.error))
       setGroupEventDeliveries(groupEventDeliveryRes.error ? [] : groupEventDeliveryRes.data || [])
-      setGroupEventDeliveriesUnavailable(Boolean(groupEventDeliveryRes.error))
+      setKpiRuleChangeEvents(kpiRuleChangeEventRes.error ? [] : kpiRuleChangeEventRes.data || [])
+      setGroupEventDeliveriesUnavailable(Boolean(groupEventDeliveryRes.error || kpiRuleChangeEventRes.error))
     } catch (deliveryError) {
       console.warn('[telegram] salary delivery status refresh failed:', deliveryError)
       setPaymentDeliveriesUnavailable(true)
       setGroupEventDeliveriesUnavailable(true)
+      setKpiRuleChangeEvents([])
     }
   }
 
@@ -694,6 +708,7 @@ export default function Salaries() {
       fine: notifyTelegramEmployeeFine,
       absence: notifyTelegramEmployeeAbsence,
       rate: notifyTelegramEmployeeRate,
+      kpi_rule: notifyTelegramKpiRuleChange,
     }
     const send = senders[eventType]
     if (!send || !eventId) return
@@ -706,7 +721,9 @@ export default function Salaries() {
     void send(eventId)
       .then(telegramResult => {
         const employeeTelegramSent = ['sent', 'confirmed'].includes(telegramResult?.employee?.status)
-        const employeeTelegramSatisfied = employeeTelegramSent
+        const employeeDeliveryRequired = eventType !== 'kpi_rule'
+        const employeeTelegramSatisfied = !employeeDeliveryRequired
+          || employeeTelegramSent
           || telegramResult?.employeeIncludedInDailySummary === true
         const groupTelegramSent = telegramResult?.group?.status === 'sent'
         const teamDeliveryRequired = ['bonus', 'fine', 'absence'].includes(eventType)
@@ -714,7 +731,7 @@ export default function Salaries() {
         const allRequiredDestinationsSent = employeeTelegramSatisfied
           && groupTelegramSent
           && (!teamDeliveryRequired || teamTelegramSent)
-        const anyDestinationSent = employeeTelegramSatisfied
+        const anyDestinationSent = (employeeDeliveryRequired && employeeTelegramSatisfied)
           || groupTelegramSent
           || (teamDeliveryRequired && teamTelegramSent)
         if (!announceResult) {
@@ -821,6 +838,7 @@ export default function Salaries() {
   }, [paymentDeliveries, salaryProfiles])
   const groupEventDeliveryRows = useMemo(() => {
     const salaryProfileMap = new Map(salaryProfiles.map(item => [item.id, item]))
+    const kpiRuleChangeEventMap = new Map(kpiRuleChangeEvents.map(item => [item.id, item]))
     const collections = {
       bonus: 'bonuses',
       fine: 'fines',
@@ -832,11 +850,14 @@ export default function Salaries() {
       fine: 'fine_date',
       absence: 'absence_date',
       rate: 'effective_from',
+      kpi_rule: 'effective_from',
     }
     return groupEventDeliveries.map(delivery => {
       const salaryProfile = salaryProfileMap.get(delivery.salary_profile_id)
-      const event = salaryProfile?.[collections[delivery.event_type]]
-        ?.find(item => item.id === delivery.event_id)
+      const event = delivery.event_type === 'kpi_rule'
+        ? kpiRuleChangeEventMap.get(delivery.event_id)
+        : salaryProfile?.[collections[delivery.event_type]]
+          ?.find(item => item.id === delivery.event_id)
       if (!event) return null
       const employeeIncludedInDailySummary = delivery.event_type === 'bonus'
         && event?.source_type === 'daily_kpi'
@@ -845,10 +866,14 @@ export default function Salaries() {
         ...delivery,
         eventType: delivery.event_type,
         eventId: delivery.event_id,
-        employeeName: salaryProfile?.employee_name || salaryProfile?.profile?.full_name || '—',
+        employeeName: event?.employee_name_snapshot || salaryProfile?.employee_name || salaryProfile?.profile?.full_name || '—',
         amount: event?.amount || 0,
         eventUnit: event?.rate_unit || '',
         eventDate: event?.[dateFields[delivery.event_type]] || '',
+        previousKpiRateBps: event?.previous_rate_bps ?? null,
+        previousKpiEnabled: event?.previous_is_enabled ?? null,
+        newKpiRateBps: event?.new_rate_bps ?? null,
+        newKpiEnabled: event?.new_is_enabled ?? null,
         sortAt: [delivery.attempted_at, delivery.employee_attempted_at, delivery.team_attempted_at]
           .filter(Boolean)
           .sort()
@@ -858,6 +883,7 @@ export default function Salaries() {
         employeeMessageId: delivery.employee_telegram_message_id,
         employeeError: delivery.employee_error_message,
         employeeIncludedInDailySummary,
+        showEmployeeDelivery: delivery.event_type !== 'kpi_rule',
         groupExcludedForAutomaticKpi,
         groupStatus: delivery.status,
         groupTimestamp: delivery.sent_at || delivery.attempted_at,
@@ -870,7 +896,7 @@ export default function Salaries() {
         teamError: delivery.team_error_message,
       }
     }).filter(Boolean)
-  }, [groupEventDeliveries, salaryProfiles])
+  }, [groupEventDeliveries, kpiRuleChangeEvents, salaryProfiles])
   const telegramDeliveryRows = useMemo(() => (
     [...paymentDeliveryRows, ...groupEventDeliveryRows]
       .sort((a, b) => String(b.sortAt || '').localeCompare(String(a.sortAt || '')))
@@ -898,6 +924,7 @@ export default function Salaries() {
     fine: l.fineLabel,
     absence: l.absence,
     rate: l.changeSalary,
+    kpi_rule: l.kpiChangeLabel,
   }
   const paymentDeliveryStatusClasses = {
     pending: 'border-amber-200 bg-amber-50 text-amber-700',
@@ -927,6 +954,10 @@ export default function Salaries() {
     rate: {
       card: 'border-l-emerald-500 bg-emerald-50/40',
       label: 'bg-emerald-100 text-emerald-700',
+    },
+    kpi_rule: {
+      card: 'border-l-violet-500 bg-violet-50/40',
+      label: 'bg-violet-100 text-violet-700',
     },
   }
   const transactionSalaryProfiles = useMemo(() => (
@@ -978,12 +1009,19 @@ export default function Salaries() {
     const salaryProfile = activeSalaryProfiles.find(item => item.id === kpiForm.salary_profile_id)
     const rateBps = parseKpiPercentToBps(kpiForm.rate_percentage)
     if (!canManage || !salaryProfile || !kpiForm.effective_from || kpiForm.effective_from < today || rateBps <= 0) return
+    const existingRule = kpiRules.find(rule => (
+      rule.salary_profile_id === salaryProfile.id
+      && String(rule.effective_from || '').slice(0, 10) === kpiForm.effective_from
+    ))
+    const configurationChanged = !existingRule
+      || Number(existingRule.rate_bps) !== rateBps
+      || Boolean(existingRule.is_enabled) !== Boolean(kpiForm.is_enabled)
 
     setSaving('kpi-rule')
     setKpiRulesError('')
     setError('')
     setMessage('')
-    const { error: saveError } = await supabase
+    const { data: savedRule, error: saveError } = await supabase
       .from('employee_kpi_rules')
       .upsert({
         salary_profile_id: salaryProfile.id,
@@ -993,7 +1031,7 @@ export default function Salaries() {
         created_by: profile?.id || null,
         created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
       }, { onConflict: 'salary_profile_id,effective_from' })
-      .select('id')
+      .select('id, last_change_event_id')
       .single()
     setSaving('')
     if (saveError) {
@@ -1001,6 +1039,11 @@ export default function Salaries() {
       return
     }
     setMessage(l.kpiSaved)
+    if (configurationChanged) {
+      runTelegramNotificationInBackground('kpi_rule', savedRule?.last_change_event_id, {
+        failureMessage: l.kpiTelegramFailed,
+      })
+    }
     await loadKpiRules()
   }
 
@@ -1077,6 +1120,11 @@ export default function Salaries() {
       is_enabled: true,
     })
     setMessage(removalResult.action === 'disabled' ? l.kpiStopped : l.kpiRemoved)
+    if (removalResult.action === 'disabled') {
+      runTelegramNotificationInBackground('kpi_rule', removalResult.rule?.last_change_event_id, {
+        failureMessage: l.kpiTelegramFailed,
+      })
+    }
     await loadKpiRules()
   }
 
@@ -1198,7 +1246,8 @@ export default function Salaries() {
         salary_profile_id: salaryProfile.id,
         bonus_date: paidDate,
         amount,
-        payment_method: transactionForm.payment_method || salaryProfile.payment_method || 'cash',
+        payment_method: salaryProfile.payment_method || 'cash',
+        accrues_to_salary: true,
         note: transactionForm.note || '',
         created_by: profile?.id || null,
         created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
@@ -1577,7 +1626,7 @@ export default function Salaries() {
                       disabled={!canManage || loading}
                     />
                   </Field>
-                  {transactionForm.entry_type !== 'fine' && (
+                  {transactionForm.entry_type === 'payment' && (
                     <Field label={l.method}>
                       <select
                         value={transactionForm.payment_method}
@@ -1868,16 +1917,23 @@ export default function Salaries() {
                           {pagedTelegramDeliveryRows.map(delivery => {
                             const retryKey = `telegram-retry-${delivery.eventType}-${delivery.eventId}`
                             const typeStyle = telegramDeliveryTypeStyles[delivery.eventType] || telegramDeliveryTypeStyles.payment
-                            const deliveryValue = delivery.eventType === 'rate'
-                              ? `${formatCurrency(delivery.amount)} · ${salaryRateUnitLabel(delivery.eventUnit, lang)}`
-                              : delivery.eventType === 'absence'
-                                ? ''
-                                : formatCurrency(delivery.amount)
+                            const kpiValue = (rateBps, enabled) => (
+                              enabled === false ? l.kpiDisabled : formatKpiRatePercent(rateBps, lang)
+                            )
+                            const deliveryValue = delivery.eventType === 'kpi_rule'
+                              ? delivery.previousKpiRateBps == null
+                                ? kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled)
+                                : `${kpiValue(delivery.previousKpiRateBps, delivery.previousKpiEnabled)} → ${kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled)}`
+                              : delivery.eventType === 'rate'
+                                ? `${formatCurrency(delivery.amount)} · ${salaryRateUnitLabel(delivery.eventUnit, lang)}`
+                                : delivery.eventType === 'absence'
+                                  ? ''
+                                  : formatCurrency(delivery.amount)
                             const deliveryDate = delivery.eventDate
                               ? formatLongDate(delivery.eventDate, lang, delivery.eventDate)
                               : ''
                             const canRetry = [
-                              ...(!delivery.employeeIncludedInDailySummary
+                              ...(delivery.showEmployeeDelivery !== false && !delivery.employeeIncludedInDailySummary
                                 ? [delivery.employeeStatus]
                                 : []),
                               ...(!delivery.groupExcludedForAutomaticKpi
@@ -1914,9 +1970,9 @@ export default function Salaries() {
                                     </button>
                                   )}
                                 </div>
-                                <div className={`mt-3 grid gap-2 ${delivery.showTeamDelivery ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                                <div className={`mt-3 grid gap-2 ${delivery.showTeamDelivery ? 'sm:grid-cols-3' : delivery.showEmployeeDelivery === false ? '' : 'sm:grid-cols-2'}`}>
                                   {[
-                                    {
+                                    ...(delivery.showEmployeeDelivery === false ? [] : [{
                                       key: 'employee',
                                       label: l.telegramEmployee,
                                       status: delivery.employeeStatus,
@@ -1925,7 +1981,7 @@ export default function Salaries() {
                                       error: delivery.employeeIncludedInDailySummary
                                         ? l.telegramKpiCombined
                                         : delivery.employeeError,
-                                    },
+                                    }]),
                                     {
                                       key: 'group',
                                       label: l.telegramSalaryGroup,
@@ -2058,7 +2114,7 @@ function DailyKpiSection({
           {!embedded && <CardHeading icon={Percent} title={labels.kpiRuleTitle} description={labels.kpiRuleHelp} tone="violet" />}
           <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50/70 px-3 py-2.5 text-xs font-semibold leading-relaxed text-violet-900">
             <p>{labels.kpiBaseStatement}</p>
-            <p className="mt-1.5 font-black">{labels.kpiPaidImmediately}</p>
+            <p className="mt-1.5 font-black">{labels.kpiAccruesToSalary}</p>
           </div>
           {rulesError && (
             <p role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">

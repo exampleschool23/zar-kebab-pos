@@ -56,6 +56,7 @@ test('salary history decorates automatic KPI bonuses with their immutable formul
       bonus_date: '2026-08-14',
       amount: 97_750,
       source_type: 'daily_kpi',
+      accrues_to_salary: true,
     }],
     kpiResults: [{
       id: 'kpi-result',
@@ -69,6 +70,7 @@ test('salary history decorates automatic KPI bonuses with their immutable formul
   })
 
   assert.equal(entry.automaticKpi, true)
+  assert.equal(entry.accruesToSalary, true)
   assert.equal(entry.kpiResult.baseAmountUzs, 9_775_000)
   assert.equal(entry.kpiResult.rateBps, 100)
   assert.equal(entry.kpiResult.bonusAmountUzs, 97_750)

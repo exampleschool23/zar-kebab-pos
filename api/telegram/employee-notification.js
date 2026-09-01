@@ -5,6 +5,7 @@ import {
   buildEmployeePaymentMessage,
   buildEmployeeSalaryRateMessage,
   buildEmployeeSalaryEventMessage,
+  buildKpiRuleGroupMessage,
   buildSalaryGroupEventMessage,
   buildSalaryPaymentGroupMessage,
   buildSalaryRateGroupMessage,
@@ -54,6 +55,10 @@ const GROUP_EVENT_CONFIG = {
   rate: {
     table: 'employee_salary_rates',
     select: 'id, salary_profile_id, effective_from, amount, rate_unit, note, created_by, created_at, salary_profile:employee_salary_profiles(employee_name)',
+  },
+  kpi_rule: {
+    table: 'employee_kpi_rule_change_events',
+    select: 'id, rule_id, salary_profile_id, employee_name_snapshot, change_kind, effective_from, previous_rate_bps, previous_is_enabled, new_rate_bps, new_is_enabled, created_by, created_by_name, created_at, salary_profile:employee_salary_profiles(employee_name)',
   },
 }
 
@@ -298,7 +303,7 @@ async function loadOwnedSalaryEvent(supabase, user, type, eventId, actorName = '
   }
   return {
     ...data,
-    employee_name: data.salary_profile?.employee_name || '',
+    employee_name: data.employee_name_snapshot || data.salary_profile?.employee_name || '',
     created_by_name: data.created_by_name || actorName,
     previous_rate: previousRate,
     kpi_rule: kpiRule,
@@ -607,7 +612,9 @@ async function deliverSalaryGroupEvent(supabase, type, event, remainingDue) {
       : target.language
     const text = type === 'rate'
       ? buildSalaryRateGroupMessage(event, remainingDue, target.language)
-      : buildSalaryGroupEventMessage(type, event, remainingDue, eventLanguage)
+      : type === 'kpi_rule'
+        ? buildKpiRuleGroupMessage(event, target.language)
+        : buildSalaryGroupEventMessage(type, event, remainingDue, eventLanguage)
     const response = await sendTelegramMessage(target.chatId, text)
     const sentAt = new Date().toISOString()
     const telegramMessageId = getTelegramMessageId(response)
@@ -864,23 +871,65 @@ function normalizeDeliverySettlement(settled) {
       }
 }
 
-async function requireQueuedSalaryRateDelivery(supabase, eventId) {
+async function requireQueuedSalaryGroupDelivery(supabase, type, eventId, missingMessage) {
   const { data, error } = await supabase
     .from('employee_salary_group_notification_deliveries')
     .select('id')
-    .eq('event_type', 'rate')
+    .eq('event_type', type)
     .eq('event_id', eventId)
     .maybeSingle()
   if (error) throw error
   if (!data) {
     throw Object.assign(
-      new Error('Initial salary setup is not a salary-change notification'),
+      new Error(missingMessage),
       { status: 409 }
     )
   }
 }
 
+async function notifyKpiRuleChange(supabase, user, actorName, eventId) {
+  const event = await loadOwnedSalaryEvent(
+    supabase,
+    user,
+    'kpi_rule',
+    eventId,
+    actorName
+  )
+  await requireQueuedSalaryGroupDelivery(
+    supabase,
+    'kpi_rule',
+    event.id,
+    'KPI rule change notification was not queued'
+  )
+  const [groupSettled] = await Promise.allSettled([
+    deliverSalaryGroupEvent(supabase, 'kpi_rule', event, 0),
+  ])
+  const group = normalizeDeliverySettlement(groupSettled)
+  const skippedEmployee = {
+    status: 'skipped',
+    telegramMessageId: null,
+    sentAt: null,
+    errorMessage: 'KPI rule changes notify only the Salary group',
+  }
+  const skippedTeam = {
+    status: 'skipped',
+    telegramMessageId: null,
+    sentAt: null,
+    errorMessage: 'KPI rule changes do not notify ZarKebab Team',
+  }
+  return {
+    ok: group.status === 'sent',
+    allSent: group.status === 'sent',
+    employee: skippedEmployee,
+    group,
+    team: skippedTeam,
+  }
+}
+
 async function notifySalaryEvent(supabase, user, actorName, type, eventId) {
+  if (type === 'kpi_rule') {
+    return notifyKpiRuleChange(supabase, user, actorName, eventId)
+  }
   const event = await loadOwnedSalaryEvent(supabase, user, type, eventId, actorName)
   const isAutomaticKpi = type === 'bonus' && event.source_type === 'daily_kpi'
   return notifyLoadedSalaryEvent(supabase, type, event, {
@@ -894,15 +943,27 @@ async function notifyLoadedSalaryEvent(supabase, type, event, {
   includeGroup = true,
 } = {}) {
   if (type === 'rate') {
-    await requireQueuedSalaryRateDelivery(supabase, event.id)
+    await requireQueuedSalaryGroupDelivery(
+      supabase,
+      'rate',
+      event.id,
+      'Initial salary setup is not a salary-change notification'
+    )
   }
   const salaryProfiles = await loadSalaryProfiles(supabase, [event.salary_profile_id])
   const salaryProfile = salaryProfiles.get(event.salary_profile_id)
+  const salaryEvent = type === 'bonus'
+    ? {
+        ...event,
+        accrues_to_salary: salaryProfile?.bonuses
+          ?.find(bonus => bonus.id === event.id)?.accrues_to_salary === true,
+      }
+    : event
   const remainingDue = salaryProfile
     ? getDailySalaryNotificationSummary(salaryProfile, getTashkentDate()).due
     : 0
   const groupDelivery = includeGroup
-    ? deliverSalaryGroupEvent(supabase, type, event, remainingDue)
+    ? deliverSalaryGroupEvent(supabase, type, salaryEvent, remainingDue)
     : supabase
         .from('employee_salary_group_notification_deliveries')
         .update({
@@ -931,7 +992,7 @@ async function notifyLoadedSalaryEvent(supabase, type, event, {
         })
   const [groupSettled] = await Promise.allSettled([groupDelivery])
   const employeeDelivery = includeEmployee
-    ? deliverEmployeeSalaryEvent(supabase, type, event, remainingDue, salaryProfile)
+    ? deliverEmployeeSalaryEvent(supabase, type, salaryEvent, remainingDue, salaryProfile)
     : Promise.resolve({
         status: 'skipped',
         telegramMessageId: null,
@@ -940,7 +1001,7 @@ async function notifyLoadedSalaryEvent(supabase, type, event, {
       })
   const [employeeSettled, teamSettled] = await Promise.allSettled([
     employeeDelivery,
-    deliverSalaryTeamEvent(supabase, type, event),
+    deliverSalaryTeamEvent(supabase, type, salaryEvent),
   ])
   const employee = normalizeDeliverySettlement(employeeSettled)
   const group = normalizeDeliverySettlement(groupSettled)
@@ -1719,6 +1780,7 @@ export default async function handler(req, res) {
       bonusId,
       absenceId,
       rateId,
+      kpiRuleEventId,
       expenseId,
       menuItemId,
     } = await readJson(req)
@@ -1732,7 +1794,9 @@ export default async function handler(req, res) {
             : absenceId
               ? 'absence'
               : rateId
-                ? 'rate'
+              ? 'rate'
+              : kpiRuleEventId
+                ? 'kpi_rule'
                 : expenseId
                   ? 'investor_income'
                   : menuItemId
@@ -1744,6 +1808,7 @@ export default async function handler(req, res) {
       bonus: bonusId,
       absence: absenceId,
       rate: rateId,
+      kpi_rule: kpiRuleEventId,
       expense: expenseId,
       investor_income: expenseId,
       absence_undo: absenceId,
@@ -1754,7 +1819,7 @@ export default async function handler(req, res) {
     const isMenuArchived = notificationType === 'menu_archived'
     const isMenuEvent = isMenuUnavailable || isMenuAvailable || isMenuCreated || isMenuArchived
     const isSalaryRetraction = notificationType === 'retract_salary_event'
-    if (!isMenuEvent && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'expense', 'investor_income'].includes(notificationType)) {
+    if (!isMenuEvent && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'kpi_rule', 'expense', 'investor_income'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (isMenuEvent && !menuItemId) {

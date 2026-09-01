@@ -29,9 +29,10 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 ## Salary destinations
 
 - Salary payment goes to the linked employee privately (with receipt confirmation) and the dedicated Salary group (without confirmation).
-- The Salary group target is `salary_events`; `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` is deployment-order fallback only. Never fall back to Team or completed-orders groups.
-- Payment, bonus, fine, absence, and salary-rate change notify employee and Salary group, except automatic KPI uses the combined daily summaries.
-- Employee and Salary-group rate-change messages include previous/new salary, effective date, and effective KPI rate/status.
+- Salary group target is `salary_events`; its env fallback must never use Team or completed-orders groups.
+- Payment, accrued bonus, fine, absence, and rate change notify employee and Salary group; automatic KPI uses combined summaries.
+- Rate-change messages show previous/new salary, effective date, and effective KPI status.
+- KPI changes notify only Salary group from immutable snapshots; no-op saves and older rules stay silent.
 
 ## Team salary events
 
@@ -47,7 +48,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
 - The aggregate daily report shows the actual cash and terminal income from that day's immutable order-payment rows, with a compact comparison line beside the two amounts. Historical QR normalizes to terminal; historical card and loyalty stay distinct and are not relabeled.
 - The aggregate daily report estimates soliq as 4% of that day's paid cafe revenue, lists it in expenses, includes it in total expenses, and deducts it from daily net profit.
-- Team automatic KPI messages are always Russian and contain only employee name, paid KPI amount, and date. Never disclose restaurant sales base, KPI percentage, salary due, or manager identity.
+- Team automatic KPI messages are always Russian and contain only employee name, accrued KPI amount, and date. Never disclose restaurant sales base, KPI percentage, salary due, or manager identity.
 
 ## Menu availability
 
