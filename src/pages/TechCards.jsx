@@ -16,6 +16,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
+import BazaarIngredientPicker from '../components/BazaarIngredientPicker'
 import MenuItemPicker from '../components/MenuItemPicker'
 import MenuMedia from '../components/MenuMedia'
 import { getMenuItemOptionGroups } from '../components/MenuProductCards'
@@ -38,6 +39,7 @@ import {
   createBlankTechCard,
   createBlankTechCardComponent,
   createBlankTechCardIngredient,
+  getBazaarIngredientTechCardPatch,
   isTechCardEligibleMenuItem,
   normalizeTechCard,
   techCardFingerprint,
@@ -55,6 +57,7 @@ function labels(lang) {
     listError: 'Texnologik kartalarni yuklab bo‘lmadi', migration: 'Ma’lumotlar bazasiga 156-migratsiyani qo‘llang.',
     editorSubtitle: 'Retsept, ishlab chiqarish chiqishi va haqiqiy masalliq tannarxi', ingredients: 'Masalliqlar',
     ingredientHint: 'Har bir masalliq miqdori va tanlangan birlik uchun narxini kiriting.', addIngredient: 'Masalliq qo‘shish',
+    ingredientCatalogError: 'Bozor masalliqlarini yuklab bo‘lmadi.',
     ingredient: 'Masalliq', quantity: 'Miqdor', unit: 'Birlik', unitPrice: 'Birlik narxi', lineCost: 'Jami',
     includedItems: 'Kiritilgan menyu taomlari', includedItemsHint: 'Set sotilganda auditda hisoblanadigan tayyor taomlarni va ularning miqdorini tanlang.',
     addIncludedItem: 'Taom qo‘shish', selectIncludedItem: 'Taomni tanlang', noIncludedItems: 'Bu taomda kiritilgan menyu mahsulotlari yo‘q.',
@@ -77,6 +80,7 @@ function labels(lang) {
     listError: 'Не удалось загрузить техкарты', migration: 'Примените миграцию базы данных 156.',
     editorSubtitle: 'Рецептура, производственный выход и фактическая стоимость ингредиентов', ingredients: 'Ингредиенты',
     ingredientHint: 'Укажите количество и цену каждого ингредиента за выбранную единицу.', addIngredient: 'Добавить ингредиент',
+    ingredientCatalogError: 'Не удалось загрузить ингредиенты базара.',
     ingredient: 'Ингредиент', quantity: 'Количество', unit: 'Единица', unitPrice: 'Цена за единицу', lineCost: 'Сумма',
     includedItems: 'Включённые блюда меню', includedItemsHint: 'Выберите готовые блюда и их количество, которые нужно учитывать при продаже этого сета.',
     addIncludedItem: 'Добавить блюдо', selectIncludedItem: 'Выберите блюдо', noIncludedItems: 'В это блюдо не включены другие позиции меню.',
@@ -99,6 +103,7 @@ function labels(lang) {
     listError: 'Could not load tech cards', migration: 'Apply database migration 156.',
     editorSubtitle: 'Recipe, production yield, and actual ingredient cost', ingredients: 'Ingredients',
     ingredientHint: 'Enter each ingredient quantity and its price for the selected unit.', addIngredient: 'Add ingredient',
+    ingredientCatalogError: 'Could not load Bazaar ingredients.',
     ingredient: 'Ingredient', quantity: 'Quantity', unit: 'Unit', unitPrice: 'Unit price', lineCost: 'Total',
     includedItems: 'Included menu items', includedItemsHint: 'Choose the prepared meals and quantities counted when this set is sold.',
     addIncludedItem: 'Add menu item', selectIncludedItem: 'Select a meal', noIncludedItems: 'No other menu items are included in this meal.',
@@ -260,6 +265,8 @@ export default function TechCards() {
   const [cardsByItemId, setCardsByItemId] = useState({})
   const [cardsLoading, setCardsLoading] = useState(true)
   const [cardsError, setCardsError] = useState('')
+  const [bazaarIngredients, setBazaarIngredients] = useState([])
+  const [bazaarIngredientsError, setBazaarIngredientsError] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -278,6 +285,13 @@ export default function TechCards() {
   const techCardItems = useMemo(() => activeItems
     .filter(item => isTechCardEligibleMenuItem(item, state.categories)), [activeItems, state.categories])
   const categoriesById = useMemo(() => new Map(state.categories.map(category => [category.id, category])), [state.categories])
+  const bazaarIngredientSuggestions = useMemo(() => bazaarIngredients.map(ingredient => ({
+    key: ingredient.product_key,
+    name: ingredient.product_name,
+    category: ingredient.category,
+    unit: ingredient.unit,
+    normalUnitPrice: Number(ingredient.normal_unit_price) || 0,
+  })), [bazaarIngredients])
   const categoryCounts = useMemo(() => techCardItems.reduce((counts, item) => {
     if (item.category_id) counts[item.category_id] = (counts[item.category_id] || 0) + 1
     return counts
@@ -304,6 +318,30 @@ export default function TechCards() {
       })
       .finally(() => {
         if (active) setCardsLoading(false)
+      })
+    return () => { active = false }
+  }, [loaded, loadError])
+
+  useEffect(() => {
+    if (!loaded || loadError) return undefined
+    let active = true
+    setBazaarIngredientsError('')
+    supabase
+      .from('bazaar_product_catalog')
+      .select('product_key, product_name, category, unit, normal_unit_price')
+      .eq('is_catalog_managed', true)
+      .eq('is_active', true)
+      .order('product_name')
+      .then(({ data, error }) => {
+        if (!active) return
+        if (error) {
+          setBazaarIngredientsError(error.message || l.ingredientCatalogError)
+          return
+        }
+        setBazaarIngredients(data || [])
+      })
+      .catch(error => {
+        if (active) setBazaarIngredientsError(error?.message || l.ingredientCatalogError)
       })
     return () => { active = false }
   }, [loaded, loadError])
@@ -604,6 +642,12 @@ export default function TechCards() {
                     )}
                   </div>
 
+                  {bazaarIngredientsError && (
+                    <p role="alert" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+                      {l.ingredientCatalogError} {bazaarIngredientsError}
+                    </p>
+                  )}
+
                   {form.ingredients.length === 0 ? (
                     <button type="button" onClick={mayEdit ? addIngredient : undefined} className="flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 px-4 py-10 text-center disabled:cursor-default" disabled={!mayEdit}>
                       <ClipboardList size={28} className="mb-2 text-orange-300" />
@@ -613,11 +657,23 @@ export default function TechCards() {
                     <div className="space-y-3">
                       {form.ingredients.map((ingredient, index) => {
                         const line = summary.ingredients[index]
+                        const selectedBazaarIngredient = bazaarIngredientSuggestions.find(item => item.name === ingredient.name)
                         return (
                           <div key={ingredient.id || index} className="grid min-w-0 gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-3 sm:grid-cols-[minmax(140px,1.5fr)_90px_90px_minmax(120px,1fr)_110px_40px] sm:items-end">
                             <label className="min-w-0">
                               <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.ingredient}</span>
-                              <input value={ingredient.name} onChange={event => updateIngredient(index, { name: event.target.value })} disabled={!mayEdit || saving} className="h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                              <BazaarIngredientPicker
+                                suggestions={bazaarIngredientSuggestions}
+                                value={selectedBazaarIngredient?.key || ''}
+                                fallbackLabel={ingredient.name}
+                                onChange={key => {
+                                  const selected = bazaarIngredientSuggestions.find(item => item.key === key)
+                                  if (selected) updateIngredient(index, getBazaarIngredientTechCardPatch(selected))
+                                }}
+                                lang={lang}
+                                disabled={!mayEdit || saving}
+                                invalid={!selectedBazaarIngredient}
+                              />
                             </label>
                             <label>
                               <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.quantity}</span>
@@ -631,7 +687,7 @@ export default function TechCards() {
                             </label>
                             <label className="min-w-0">
                               <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.unitPrice}</span>
-                              <input inputMode="numeric" value={formatMoneyInput(ingredient.unit_price_uzs)} onChange={event => updateIngredient(index, { unit_price_uzs: normalizeMoneyInput(event.target.value) })} disabled={!mayEdit || saving} className="h-10 w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 text-sm tabular-nums outline-none focus:border-[#ff5a00] disabled:bg-gray-100" />
+                              <input inputMode="numeric" value={formatMoneyInput(ingredient.unit_price_uzs)} disabled className="h-10 w-full min-w-0 cursor-not-allowed rounded-xl border border-gray-200 bg-gray-100 px-3 text-sm tabular-nums text-gray-600" />
                             </label>
                             <div>
                               <span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-gray-400">{l.lineCost}</span>

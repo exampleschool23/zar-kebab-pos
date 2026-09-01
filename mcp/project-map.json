@@ -113,8 +113,8 @@
     },
     {
       "name": "tech-cards",
-      "keywords": ["recipe", "ingredient", "component", "portion", "fractional quantity", "real cost", "variant recipe", "ingredient consumption", "recipe snapshot", "tech card eligibility", "excluded categories"],
-      "files": ["src/pages/TechCards.jsx", "src/lib/techCards.js", "src/lib/menuItemCosts.js", "src/lib/ingredientConsumption.js", "src/lib/db.js", "supabase/156_variant_tech_cards.sql", "supabase/159_fractional_tech_card_components.sql", "supabase/164_order_item_tech_card_ingredient_snapshots.sql"],
+      "keywords": ["recipe", "ingredient", "Bazaar ingredient", "locked normal price", "component", "portion", "fractional quantity", "real cost", "variant recipe", "ingredient consumption", "recipe snapshot", "tech card eligibility", "excluded categories"],
+      "files": ["src/pages/TechCards.jsx", "src/components/BazaarIngredientPicker.jsx", "src/lib/techCards.js", "src/lib/menuItemCosts.js", "src/lib/ingredientConsumption.js", "src/lib/db.js", "supabase/156_variant_tech_cards.sql", "supabase/159_fractional_tech_card_components.sql", "supabase/164_order_item_tech_card_ingredient_snapshots.sql", "supabase/171_tech_card_bazaar_ingredient_catalog_access.sql"],
       "tests": ["tests/techCards.test.js", "tests/techCardsFeature.test.js", "tests/menuItemCosts.test.js", "tests/ingredientConsumption.test.js", "tests/sourceGuards.menu.test.js"]
     },
     {

@@ -29,7 +29,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - authoritative Daily Bazaar ingredient catalog, clean reset, owner-only catalog writes, and immutable price-variance snapshots: `160`–`163`
   - immutable sold-item Tech Card ingredient snapshots and duplicate-safe daily ingredient image delivery: `164`–`165`
   - Tashkent-calendar expense backdate enforcement: `166`
-  - salary bonus/KPI accrual and KPI-rule Salary-group notification snapshots: `169`–`170`
+  - salary/KPI accrual, notifications, and Tech Card catalog access: `169`–`171`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants

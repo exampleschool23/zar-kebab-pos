@@ -55,7 +55,8 @@ Read this guide for menu products/categories, availability and visibility, media
 ## Tech Cards
 
 - Exclude Alcohol, Utensils, Carbonated Drinks
-- One active product may have one protected base recipe and one recipe per eligible variant. The empty `variant_option_id` identifies the backward-compatible base recipe.
+- Lock Bazaar prices; keep legacy names until replaced.
+- Each active product has one protected base recipe and one recipe per eligible variant; empty `variant_option_id` means base.
 - Ingredient rows and included-product component rows belong to the exact product-and-variant recipe. Batch ingredient cost divided by `portion_count`, plus per-portion component cost, is the current portion cost.
 - Save the card and complete ingredient list atomically with `save_menu_item_tech_card(payload jsonb)`.
 - `tech_cards` permission controls route/read access; Manage Menu separately controls writes.

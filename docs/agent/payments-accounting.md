@@ -54,18 +54,18 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 
 Main files: `src/pages/DailyBazaar.jsx`, `src/pages/BazaarIngredients.jsx`, `src/lib/bazaar.js`, and migrations `097`, `160`–`163`.
 
-- A receipt contains one or more product lines with product, category, quantity, unit, and exact amount.
+- Receipts contain product, category, quantity, unit, and exact amount.
 - Product-line controls share one height; each optional line note uses a separate multiline field.
-- Store the buyer profile id plus historical name snapshot. New entries use cash or card; historical terminal values remain readable.
+- Store buyer id and name snapshot. New entries use cash or card; historical terminal remains readable.
 - New purchase lines choose an active canonical ingredient from `bazaar_product_catalog`; arbitrary product names are not accepted.
 - `/admin/bazaar/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Names are immutable after creation; archive a misspelling and add the corrected ingredient.
-- Ingredient catalog writes are owner-only; other Bazaar staff retain read access.
-- Migration `161` starts the managed list empty without changing purchase history.
+- Catalog writes are owner-only. Bazaar staff and Tech Card users may read active names, units, and normal prices; Tech Card access never exposes purchases or writes.
+- Migration `161` starts the managed list empty without changing history.
 - Normal unit price suggests the line total, but the exact paid total remains editable and is the historical Accounting source of truth.
 - Each saved line snapshots its normal unit price, quantity-scaled normal total, and signed difference (`paid - normal`). Entry UI and Investor Telegram show per-line and overall differences; positive means paid above normal and negative means paid below normal.
 - Editing a durable line reuses its saved normal-price snapshot even when the current ingredient catalog price has changed.
 - Catalog deletion is archival. Existing purchase lines keep their historical name, category, unit, and exact paid amount snapshots.
-- Ingredient writes reconcile before retry and update the list locally.
+- Ingredient writes reconcile before retry and update locally.
 - Keep ISO dates internally and use shared date-format helpers for display.
 - The server calculates totals. Create retries reuse a request UUID.
 - Save/edit/delete atomically maintains exactly one linked `expenses` row with `products_bazaar`; do not ask for duplicate Accounting entry.

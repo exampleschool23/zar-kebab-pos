@@ -5,10 +5,24 @@ import {
   calculateTechCardSummary,
   copyAndScaleTechCard,
   createBlankTechCard,
+  getBazaarIngredientTechCardPatch,
   isTechCardEligibleMenuItem,
   techCardStorageKey,
   validateTechCard,
 } from '../src/lib/techCards.js'
+
+test('Bazaar ingredient selection prefills the Tech Card name, compatible unit, and locked price value', () => {
+  assert.deepEqual(getBazaarIngredientTechCardPatch({
+    name: 'Beef',
+    unit: 'kg',
+    normalUnitPrice: 85_000,
+  }), {
+    name: 'Beef',
+    unit: 'kg',
+    unit_price_uzs: '85000',
+  })
+  assert.equal(getBazaarIngredientTechCardPatch({ product_name: 'Eggs', unit: 'pcs', normal_unit_price: 2_000 }).unit, 'piece')
+})
 
 test('tech cards exclude alcohol, utensils, and carbonated drink categories', () => {
   const categories = [

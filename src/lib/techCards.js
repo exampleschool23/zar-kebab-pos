@@ -1,5 +1,14 @@
 export const TECH_CARD_UNITS = ['g', 'kg', 'ml', 'l', 'piece']
 
+const BAZAAR_TO_TECH_CARD_UNIT = {
+  g: 'g',
+  kg: 'kg',
+  ml: 'ml',
+  l: 'l',
+  pcs: 'piece',
+  piece: 'piece',
+}
+
 const TECH_CARD_EXCLUDED_CATEGORY_NAMES = new Set([
   'alcohol',
   'utensils',
@@ -16,6 +25,14 @@ export function isTechCardEligibleMenuItem(item, categories = []) {
 
   return ![category.id, category.name_en, category.name_uz, category.name_ru]
     .some(value => TECH_CARD_EXCLUDED_CATEGORY_NAMES.has(normalizeTechCardCategoryName(value)))
+}
+
+export function getBazaarIngredientTechCardPatch(ingredient = {}) {
+  return {
+    name: String(ingredient.name || ingredient.product_name || '').trim(),
+    unit: BAZAAR_TO_TECH_CARD_UNIT[String(ingredient.unit || '').trim().toLowerCase()] || 'piece',
+    unit_price_uzs: String(Math.max(0, Math.round(Number(ingredient.normalUnitPrice ?? ingredient.normal_unit_price) || 0))),
+  }
 }
 
 export function normalizeTechCardNumber(value, fallback = 0) {

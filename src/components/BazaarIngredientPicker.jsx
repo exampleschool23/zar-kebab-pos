@@ -18,6 +18,7 @@ function pickerLabels(lang) {
 export default function BazaarIngredientPicker({
   suggestions = [],
   value = '',
+  fallbackLabel = '',
   onChange,
   lang = 'en',
   disabled = false,
@@ -96,8 +97,8 @@ export default function BazaarIngredientPicker({
         className={`flex h-11 w-full min-w-0 items-center gap-2 rounded-xl border bg-white px-3 text-left outline-none transition-all hover:border-orange-300 focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/10 disabled:bg-gray-50 ${invalid ? 'border-red-300 bg-red-50' : 'border-[#E5E7EB]'}`}
       >
         <Package size={15} className="shrink-0 text-[#9CA3AF]" />
-        <span className={`min-w-0 flex-1 truncate text-sm font-bold ${selected ? 'text-[#1F2937]' : 'text-[#9CA3AF]'}`}>
-          {selected?.name || l.select}
+        <span className={`min-w-0 flex-1 truncate text-sm font-bold ${selected || fallbackLabel ? 'text-[#1F2937]' : 'text-[#9CA3AF]'}`}>
+          {selected?.name || fallbackLabel || l.select}
         </span>
         <ChevronDown size={16} className={`shrink-0 text-[#6B7280] transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
