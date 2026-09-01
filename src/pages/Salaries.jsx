@@ -42,7 +42,7 @@ import {
   notifyTelegramKpiRuleChange,
 } from '../lib/telegramNotifications'
 
-const FIELD = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
+const FIELD = 'h-11 w-full min-w-0 max-w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
 const PAGE_SIZE = 12
 const TELEGRAM_DELIVERY_PAGE_SIZE = 5
 const KPI_PREVIEW_BASE_AMOUNT = 10_000_000
@@ -1420,7 +1420,7 @@ export default function Salaries() {
   return (
     <AppShell title={l.title}>
       <div className="h-full overflow-x-hidden overflow-y-auto bg-[#FAF7F0]">
-        <div className="mx-auto max-w-[1200px] px-4 py-5 sm:px-5 sm:py-6">
+        <div className="mx-auto w-full min-w-0 max-w-[1200px] px-4 py-5 sm:px-5 sm:py-6">
           <header className="mb-6">
             <button onClick={() => navigate('/admin/accounting')} className="mb-3 inline-flex items-center gap-2 text-xs font-black text-[#6B7280] transition-colors hover:text-[#ff5a00]">
               <ArrowLeft size={14} />{l.back}
@@ -1701,7 +1701,7 @@ export default function Salaries() {
               description={l.salarySettingsHelp}
             />
             <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-4">
-              <div className="h-full w-full min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
+              <div className="h-full w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
                 <CardHeading
                   icon={salarySetupMode === 'kpi' ? Percent : salarySetupMode === 'change' ? Save : Plus}
                   title={salarySetupMode === 'kpi' ? l.kpiRuleTitle : salarySetupMode === 'change' ? l.changeSalary : l.add}
@@ -1722,7 +1722,7 @@ export default function Salaries() {
                         onClick={() => setSalarySetupMode(item.key)}
                         disabled={loading}
                         aria-pressed={active}
-                        className={`flex min-h-11 items-center justify-center rounded-xl border px-3 py-2 text-xs font-black transition-colors sm:text-sm ${
+                        className={`flex min-h-11 min-w-0 items-center justify-center break-words rounded-xl border px-3 py-2 text-center text-xs font-black leading-tight transition-colors sm:text-sm ${
                           active && item.key === 'kpi'
                             ? 'border-violet-400 bg-violet-50 text-violet-700 ring-2 ring-violet-100'
                             : active && item.key === 'change'
@@ -2110,9 +2110,9 @@ function DailyKpiSection({
 
   return (
     <>
-      <div className={embedded ? 'min-w-0' : 'h-full min-w-0 rounded-2xl border border-violet-100 bg-white p-4 shadow-sm sm:p-5'}>
+      <div className={embedded ? 'min-w-0 max-w-full' : 'h-full min-w-0 max-w-full rounded-2xl border border-violet-100 bg-white p-4 shadow-sm sm:p-5'}>
           {!embedded && <CardHeading icon={Percent} title={labels.kpiRuleTitle} description={labels.kpiRuleHelp} tone="violet" />}
-          <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50/70 px-3 py-2.5 text-xs font-semibold leading-relaxed text-violet-900">
+          <div className="mb-4 min-w-0 break-words rounded-xl border border-violet-200 bg-violet-50/70 px-3 py-2.5 text-xs font-semibold leading-relaxed text-violet-900">
             <p>{labels.kpiBaseStatement}</p>
             <p className="mt-1.5 font-black">{labels.kpiAccruesToSalary}</p>
           </div>
@@ -2121,7 +2121,7 @@ function DailyKpiSection({
               {rulesError}
             </p>
           )}
-          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
             <div className="min-w-0 sm:col-span-2">
               <Field label={labels.employee}>
                 <select
@@ -2185,7 +2185,7 @@ function DailyKpiSection({
             </button>
             <div id="daily-kpi-rate-preview" className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 sm:col-span-2">
               <p className="text-[10px] font-black uppercase tracking-wide text-violet-600">{labels.kpiPreview}</p>
-              <p className="mt-1 text-sm font-black text-[#1F2937]">
+              <p className="mt-1 break-words text-sm font-black leading-relaxed text-[#1F2937]">
                 {formatCurrency(KPI_PREVIEW_BASE_AMOUNT)} × {previewRateBps > 0 ? formatKpiRatePercent(previewRateBps, lang) : '—'} = {previewRateBps > 0 ? formatCurrency(previewBonus) : '—'}
               </p>
             </div>
@@ -2322,9 +2322,9 @@ function CardHeading({ icon: Icon, title, description, tone = 'orange' }) {
       <span className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${iconTone}`}>
         <Icon size={17} />
       </span>
-      <span className="min-w-0">
-        <span className="block text-base font-black text-[#1F2937]">{title}</span>
-        <span className="mt-0.5 block text-xs font-medium leading-relaxed text-[#6B7280]">{description}</span>
+      <span className="min-w-0 break-words">
+        <span className="block text-base font-black leading-tight text-[#1F2937]">{title}</span>
+        <span className="mt-1 block text-xs font-medium leading-relaxed text-[#6B7280]">{description}</span>
       </span>
     </div>
   )

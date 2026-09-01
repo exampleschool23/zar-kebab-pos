@@ -53,7 +53,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 ## Menu availability
 
 - Authenticated availability changes, product creation, and archival queue immutable Russian Team events with product/employee snapshots; ordinary edits and restoration send nothing.
-- At 08:00 Tashkent, send one duplicate-safe Russian snapshot of unavailable active products grouped by saved Russian category order, or confirm all available.
+- At 08:00 Tashkent, send the duplicate-safe Russian unavailable-products snapshot and optionally reply to Google reviews; review failures do not block it.
 - Exclude archived products and archived categories; preserve exact sent snapshots.
 
 ## Investor notifications

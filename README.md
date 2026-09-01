@@ -172,3 +172,34 @@ primary report schedule.
 The Mini App reads `window.Telegram.WebApp.initData` and sends the raw string to `POST /api/telegram/auth`. The backend validates the signature with `TELEGRAM_BOT_TOKEN` before creating a signed app session. The frontend never trusts `initDataUnsafe` for authentication and never receives the bot token.
 
 The Mini App is a read-only menu with loyalty-balance lookup and restaurant contact information. Its unused customer checkout and order-history endpoints were retired.
+
+## Google Maps review bot
+
+The protected `/api/google-reviews/run` endpoint checks the configured Google Business Profile for unanswered reviews and creates a short reply in the review's language. It uses OpenAI when `OPENAI_API_KEY` is present and a conservative template when it is not. The existing 08:00 Tashkent scheduled job also invokes it; Google review failures are isolated and cannot block Telegram or payroll work.
+
+Add these server-only deployment variables:
+
+```bash
+GOOGLE_BUSINESS_CLIENT_ID=
+GOOGLE_BUSINESS_CLIENT_SECRET=
+GOOGLE_BUSINESS_REFRESH_TOKEN=
+GOOGLE_BUSINESS_ACCOUNT_ID=
+GOOGLE_BUSINESS_LOCATION_ID=
+OPENAI_API_KEY=
+GOOGLE_REVIEW_OPENAI_MODEL=gpt-5.4-mini
+GOOGLE_REVIEW_BUSINESS_NAME=Zar Kebab
+GOOGLE_REVIEW_DEFAULT_LANGUAGE=Russian
+GOOGLE_REVIEW_MAX_PER_RUN=10
+GOOGLE_REVIEW_AUTO_PUBLISH=false
+```
+
+Google requires an approved Cloud project, the Google My Business API enabled, OAuth consent with the `business.manage` scope, and one offline refresh token belonging to an owner or manager of the verified profile. Keep all credentials server-only. Account and location variables accept either bare IDs or `accounts/...` and `locations/...` values.
+
+Leave `GOOGLE_REVIEW_AUTO_PUBLISH=false` for the first run. Preview safely with the same `CRON_SECRET` already used by scheduled endpoints:
+
+```bash
+curl -s "https://www.zarkebab.uz/api/google-reviews/run" \
+  -H "Authorization: Bearer <CRON_SECRET>"
+```
+
+Inspect the returned replies, then set `GOOGLE_REVIEW_AUTO_PUBLISH=true` to enable live replies. The endpoint processes only reviews that do not already have an owner reply, with a maximum of 25 per run.
