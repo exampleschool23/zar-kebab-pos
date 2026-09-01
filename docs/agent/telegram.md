@@ -31,7 +31,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 - Salary payment goes to the linked employee privately (with receipt confirmation) and the dedicated Salary group (without confirmation).
 - The Salary group target is `salary_events`; `TELEGRAM_SALARY_PAYMENTS_CHAT_ID` is deployment-order fallback only. Never fall back to Team or completed-orders groups.
 - Payment, bonus, fine, absence, and salary-rate change notify employee and Salary group, except automatic KPI uses the combined daily summaries.
-- Rate-change messages include applicable previous rate, new amount/unit, and effective date.
+- Employee and Salary-group rate-change messages include previous/new salary, effective date, and effective KPI rate/status.
 
 ## Team salary events
 

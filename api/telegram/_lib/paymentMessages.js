@@ -189,6 +189,9 @@ const SALARY_RATE_COPY = {
     previousRate: 'Oldingi maosh',
     newRate: 'Yangi maosh',
     effectiveFrom: 'Amal qilish sanasi',
+    kpiRate: 'KPI foizi',
+    kpiDisabled: 'o‘chirilgan',
+    kpiNotConfigured: 'sozlanmagan',
     note: 'Izoh',
     due: 'To\u2018lanishi kerak',
     createdBy: 'O\u2018zgartirdi',
@@ -207,6 +210,9 @@ const SALARY_RATE_COPY = {
     previousRate: 'Предыдущая зарплата',
     newRate: 'Новая зарплата',
     effectiveFrom: 'Действует с',
+    kpiRate: 'Процент KPI',
+    kpiDisabled: 'выключен',
+    kpiNotConfigured: 'не настроен',
     note: 'Примечание',
     due: 'К выплате',
     createdBy: 'Изменил',
@@ -225,6 +231,9 @@ const SALARY_RATE_COPY = {
     previousRate: 'Previous salary',
     newRate: 'New salary',
     effectiveFrom: 'Effective from',
+    kpiRate: 'KPI rate',
+    kpiDisabled: 'disabled',
+    kpiNotConfigured: 'not configured',
     note: 'Note',
     due: 'Salary due',
     createdBy: 'Changed by',
@@ -244,7 +253,14 @@ function appendSalaryRateDetails(lines, rate, copy) {
   }
   lines.push(
     `<b>${copy.newRate}:</b> ${escapeTelegramHtml(formatSalaryRate(rate, copy))}`,
-    `<b>${copy.effectiveFrom}:</b> ${escapeTelegramHtml(formatDateOnly(rate?.effective_from, '-'))}`
+    `<b>${copy.effectiveFrom}:</b> ${escapeTelegramHtml(formatDateOnly(rate?.effective_from, '-'))}`,
+    `<b>${copy.kpiRate}:</b> ${escapeTelegramHtml(
+      !rate?.kpi_rule
+        ? copy.kpiNotConfigured
+        : rate.kpi_rule.is_enabled === false
+          ? copy.kpiDisabled
+          : formatKpiRate(rate.kpi_rule.rate_bps)
+    )}`
   )
   if (String(rate?.note || '').trim()) {
     lines.push(`<b>${copy.note}:</b> ${escapeTelegramHtml(rate.note)}`)

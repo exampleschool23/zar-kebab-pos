@@ -574,6 +574,11 @@ test('salary rate change messages show localized previous and new rates to the g
       amount: 7_500_000,
       rate_unit: 'monthly',
     },
+    kpi_rule: {
+      effective_from: '2026-08-10',
+      rate_bps: 125,
+      is_enabled: true,
+    },
     note: '<Повышение>',
     created_by_name: 'Jasurbek & Co',
   }
@@ -586,6 +591,7 @@ test('salary rate change messages show localized previous and new rates to the g
   assert.match(group, /Предыдущая зарплата:<\/b> 7 500 000 UZS \(месячная\)/)
   assert.match(group, /Новая зарплата:<\/b> 8 500 000 UZS \(месячная\)/)
   assert.match(group, /Действует с:<\/b> 15\.08\.2026/)
+  assert.match(group, /Процент KPI:<\/b> 1\.25%/)
   assert.match(group, /&lt;Повышение&gt;/)
   assert.match(group, /Jasurbek &amp; Co/)
   assert.doesNotMatch(group, /Здравствуйте/)
@@ -596,12 +602,32 @@ test('salary rate change messages show localized previous and new rates to the g
   assert.match(employee, /Previous salary:<\/b> 7 500 000 UZS \(monthly\)/)
   assert.match(employee, /New salary:<\/b> 8 500 000 UZS \(monthly\)/)
   assert.match(employee, /Effective from:<\/b> 15\.08\.2026/)
+  assert.match(employee, /KPI rate:<\/b> 1\.25%/)
   assert.match(employee, /Salary due:<\/b> 910 000 UZS/)
   assert.match(employee, /Changed by:<\/b> Jasurbek &amp; Co/)
   assert.match(employee, /Thank you for growing with Zar Kebab/)
   assert.match(employee, /achievements ahead! 🌟/)
   assert.match(employee, /&lt;Повышение&gt;/)
   assert.doesNotMatch(employee, /<Повышение>/)
+})
+
+test('salary rate messages always state whether KPI is disabled or not configured', () => {
+  const baseRate = {
+    employee_name: 'Alex',
+    effective_from: '2026-08-15',
+    amount: 200_000,
+    rate_unit: 'daily',
+    created_by_name: 'Owner',
+  }
+
+  const disabled = buildSalaryRateGroupMessage({
+    ...baseRate,
+    kpi_rule: { rate_bps: 100, is_enabled: false },
+  }, 0, 'ru')
+  const notConfigured = buildEmployeeSalaryRateMessage(baseRate, 0, 'en')
+
+  assert.match(disabled, /Процент KPI:<\/b> выключен/)
+  assert.match(notConfigured, /KPI rate:<\/b> not configured/)
 })
 
 test('salary decreases remain clear and neutral instead of being presented as a celebration', () => {
@@ -680,6 +706,8 @@ test('recorded salary operations trigger the authenticated shared Telegram endpo
   assert.match(endpoint, /payment\.created_by !== user\.id/)
   assert.match(endpoint, /loadOwnedSalaryEvent/)
   assert.match(endpoint, /rate:\s*\{[\s\S]*?table:\s*'employee_salary_rates'[\s\S]*?effective_from[\s\S]*?rate_unit[\s\S]*?created_by/)
+  assert.match(endpoint, /\.from\('employee_kpi_rules'\)[\s\S]*?\.lte\('effective_from', data\.effective_from\)[\s\S]*?\.maybeSingle\(\)/)
+  assert.match(endpoint, /kpi_rule:\s*kpiRule/)
   assert.match(endpoint, /\.eq\('id', eventId\)/)
   assert.match(endpoint, /rate:\s*rateId/)
   assert.match(endpoint, /\[[^\]]*'payment'[^\]]*'rate'[^\]]*\]\.includes\(notificationType\)/)

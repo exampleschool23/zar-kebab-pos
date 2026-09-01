@@ -41,6 +41,7 @@ Read this guide for salary profiles, payments, bonuses, fines, absences, advance
 
 ## Daily salary notifications
 
+- Private and Salary-group salary-rate change messages include the KPI percentage or disabled/not-configured status effective on the salary change date.
 - Automatic KPI employee value is folded into one combined private Salary + Bonus summary. Separate private and Salary-group KPI event rows are skipped; Team KPI remains independently retryable.
 - A failed KPI finalization defers the daily salary summary.
 - See `docs/agent/telegram.md` for language, audience privacy, destination, and delivery-state rules.

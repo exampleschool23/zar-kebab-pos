@@ -74,6 +74,16 @@ function isMissingKpiBonusSourceColumns(error) {
   )
 }
 
+function isMissingKpiRulesTable(error) {
+  const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return message.includes('employee_kpi_rules') && (
+    message.includes('does not exist')
+    || message.includes('schema cache')
+    || message.includes('42p01')
+    || message.includes('pgrst205')
+  )
+}
+
 function isMissingMenuAvailabilityEventColumn(error) {
   const message = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
   return message.includes('availability_event') && (
@@ -255,26 +265,43 @@ async function loadOwnedSalaryEvent(supabase, user, type, eventId, actorName = '
     throw Object.assign(new Error('Salary event not found'), { status: 404 })
   }
   let previousRate = null
+  let kpiRule = null
   if (type === 'rate') {
-    const { data: previous, error: previousError } = await supabase
-      .from('employee_salary_rates')
-      .select('id, amount, rate_unit, effective_from, created_at')
-      .eq('salary_profile_id', data.salary_profile_id)
-      .neq('id', data.id)
-      .lte('effective_from', data.effective_from)
-      .lte('created_at', data.created_at)
-      .order('effective_from', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    if (previousError) throw previousError
-    previousRate = previous || null
+    const [previousRateResult, kpiRuleResult] = await Promise.all([
+      supabase
+        .from('employee_salary_rates')
+        .select('id, amount, rate_unit, effective_from, created_at')
+        .eq('salary_profile_id', data.salary_profile_id)
+        .neq('id', data.id)
+        .lte('effective_from', data.effective_from)
+        .lte('created_at', data.created_at)
+        .order('effective_from', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('employee_kpi_rules')
+        .select('id, effective_from, rate_bps, is_enabled, created_at')
+        .eq('salary_profile_id', data.salary_profile_id)
+        .lte('effective_from', data.effective_from)
+        .order('effective_from', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ])
+    if (previousRateResult.error) throw previousRateResult.error
+    if (kpiRuleResult.error && !isMissingKpiRulesTable(kpiRuleResult.error)) {
+      throw kpiRuleResult.error
+    }
+    previousRate = previousRateResult.data || null
+    kpiRule = kpiRuleResult.error ? null : kpiRuleResult.data || null
   }
   return {
     ...data,
     employee_name: data.salary_profile?.employee_name || '',
     created_by_name: data.created_by_name || actorName,
     previous_rate: previousRate,
+    kpi_rule: kpiRule,
   }
 }
 
