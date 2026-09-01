@@ -63,7 +63,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 - Each completed Tashkent day produces three Investor report images. The financial/payroll PNG uses the just-completed day, while the Daily Bazaar PNG uses the preceding day (two calendar days before the cron's current Tashkent date); they are sent together as one two-photo Telegram album. The theoretical Tech Card ingredient-consumption image remains a separate photo.
 - The Daily Bazaar PNG groups every numbered item by saved Russian category and shows bought price, normal price, line total, and signed variance. Over-price is red, under-price is green, and the top card includes the overall variance. Missing legacy normal prices render as unset, never zero; rows never truncate.
 - Financial and Daily Bazaar delivery is image-only: if either renderer fails, send no text fallback and leave the claimed report rows retryable. A partial retry may send only the missing PNG without duplicating the photo already recorded as sent.
-- The ingredient image values paid, non-cancelled sold quantities from immutable order-item recipe snapshots and visibly counts legacy sold rows without snapshot coverage.
+- The ingredient image values paid, non-cancelled sales from immutable recipe snapshots, shows every ingredient, and counts legacy rows without snapshot coverage.
 - All three image deliveries remain independently duplicate-safe; the album records Telegram's separate message id for each photo and marks each ledger sent only after those ids are returned.
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows do not create new cash-expense announcements.

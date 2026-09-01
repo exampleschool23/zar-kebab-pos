@@ -55,8 +55,16 @@ test('daily Bazaar and ingredient reports render as separate image layouts', () 
     ],
   }], '2026-08-30')
   const ingredientSvg = buildDailyIngredientConsumptionReportSvg({
-    ingredients: [{ name: 'Картошка', quantity: 0.75, unit: 'kg', spent: 6_000 }],
-    totalSpent: 6_000,
+    ingredients: [
+      { name: 'Картошка', quantity: 0.75, unit: 'kg', spent: 6_000 },
+      ...Array.from({ length: 24 }, (_, index) => ({
+        name: `Ингредиент ${index + 2}`,
+        quantity: index + 1,
+        unit: 'kg',
+        spent: 1_000 + index,
+      })),
+    ],
+    totalSpent: 30_276,
     coveredItemCount: 1,
     uncoveredItemCount: 2,
   }, '2026-08-30')
@@ -95,6 +103,8 @@ test('daily Bazaar and ingredient reports render as separate image layouts', () 
   assert.match(missingNormalSvg, /разница —/)
   assert.match(ingredientSvg, /Расход ингредиентов/)
   assert.match(ingredientSvg, /0,75 kg/)
+  assert.match(ingredientSvg, /Ингредиент 25/)
+  assert.doesNotMatch(ingredientSvg, /Ещё позиций/)
   assert.match(ingredientSvg, /без снимка Tech Card: 2/)
   assert.equal(
     buildDailyInvestorReportsCaption('2026-08-30', '2026-08-29'),

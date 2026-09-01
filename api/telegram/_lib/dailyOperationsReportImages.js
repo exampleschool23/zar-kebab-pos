@@ -21,7 +21,6 @@ import {
 } from '../../../src/lib/bazaar.js'
 
 const WIDTH = 1200
-const MAX_ROWS = 18
 let fontsConfigured = false
 
 const BAZAAR_COPY = {
@@ -80,10 +79,9 @@ function varianceColor(value, darkBackground = false) {
 }
 
 function reportShell({ title, subtitle, totalLabel, totalValue, rows, footer = '', accent = '#F97316' }) {
-  const visibleRows = rows.slice(0, MAX_ROWS)
-  const height = 390 + Math.max(visibleRows.length, 1) * 74 + (footer ? 76 : 0)
-  const rowMarkup = visibleRows.length > 0
-    ? visibleRows.map((row, index) => {
+  const height = 390 + Math.max(rows.length, 1) * 74 + (footer ? 76 : 0)
+  const rowMarkup = rows.length > 0
+    ? rows.map((row, index) => {
         const y = 330 + index * 74
         return `<g>
           <rect x="64" y="${y - 42}" width="1072" height="62" rx="16" fill="${index % 2 ? '#F8FAF9' : '#F1F6F4'}"/>
@@ -93,8 +91,6 @@ function reportShell({ title, subtitle, totalLabel, totalValue, rows, footer = '
         </g>`
       }).join('')
     : `<text x="600" y="350" text-anchor="middle" font-size="28" fill="#879592">Нет данных за этот день</text>`
-  const hiddenCount = Math.max(0, rows.length - visibleRows.length)
-  const footerY = 335 + Math.max(visibleRows.length, 1) * 74
   return `<?xml version="1.0" encoding="UTF-8"?>
   <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${height}" viewBox="0 0 ${WIDTH} ${height}">
     <rect width="${WIDTH}" height="${height}" rx="48" fill="#EAF0EE"/>
@@ -108,7 +104,6 @@ function reportShell({ title, subtitle, totalLabel, totalValue, rows, footer = '
       <text x="92" y="199" font-size="19" font-weight="700" letter-spacing="1.5" fill="#A8D7D0">${escapeSvg(totalLabel)}</text>
       <text x="92" y="239" font-size="35" font-weight="800" fill="#FFFFFF">${escapeSvg(totalValue)}</text>
       ${rowMarkup}
-      ${hiddenCount ? `<text x="600" y="${footerY}" text-anchor="middle" font-size="20" fill="#74827F">Ещё позиций: ${hiddenCount}</text>` : ''}
       ${footer ? `<text x="600" y="${height - 62}" text-anchor="middle" font-size="20" fill="#74827F">${escapeSvg(footer)}</text>` : ''}
     </g>
   </svg>`
