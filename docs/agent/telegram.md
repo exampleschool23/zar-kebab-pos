@@ -51,8 +51,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 
 ## Menu availability
 
-- Every authenticated available/unavailable transition queues one immutable Russian Team event with product and employee snapshots.
-- Editing without a transition and product archival send nothing.
+- Authenticated availability changes, product creation, and archival queue immutable Russian Team events with product/employee snapshots; ordinary edits and restoration send nothing.
 - At 08:00 Tashkent, send one duplicate-safe Russian snapshot of unavailable active products grouped by saved Russian category order, or confirm all available.
 - Exclude archived products and archived categories; preserve exact sent snapshots.
 

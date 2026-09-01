@@ -20,7 +20,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - kitchen idempotency and durable receipts: `096`, `128`
   - Bazaar, costs, fines, media, stock: `097`–`106`
   - salary/Telegram tracking and historical financial freezing: `107`–`119`
-  - menu permissions, estimates, archival, stale-item rejection: `121`–`127`, `167`
+  - menu permissions, estimates, archival, stale-item rejection, Team catalog events: `121`–`127`, `167`–`168`
   - KPI and Tourist service: `129`–`130`
   - Tech Cards, access, components, stock, variant recipes, and fractional included-dish quantities: `139`–`140`, `149`–`151`, `154`–`156`, `159`
   - menu/expense notifications and financial snapshots: `142`–`147`

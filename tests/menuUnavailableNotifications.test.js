@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   buildDailyUnavailableMenuTeamMessage,
+  buildMenuArchivedTeamMessage,
   buildMenuAvailableTeamMessage,
+  buildMenuCreatedTeamMessage,
   buildMenuUnavailableTeamMessage,
 } from '../api/telegram/_lib/menuAvailabilityMessages.js'
 import { runDbHealthChecks } from '../src/lib/dbHealth.js'
@@ -22,6 +24,10 @@ const dailyCategoryMigration = readFileSync(
 )
 const availableMigration = readFileSync(
   new URL('../supabase/146_menu_available_team_notifications.sql', import.meta.url),
+  'utf8'
+)
+const catalogMigration = readFileSync(
+  new URL('../supabase/168_menu_catalog_team_notifications.sql', import.meta.url),
   'utf8'
 )
 const endpoint = readFileSync(
@@ -91,6 +97,22 @@ test('available product Team message is Russian and identifies product and actor
   assert.doesNotMatch(message, /Available|Made by|Product:/)
 })
 
+test('created and archived product Team messages are Russian and identify the actor', () => {
+  const event = {
+    menu_item_name: 'Шашлык <Особый>',
+    actor_name: 'Анна & Али',
+  }
+  const created = buildMenuCreatedTeamMessage(event)
+  const archived = buildMenuArchivedTeamMessage(event)
+
+  assert.match(created, /Добавлено новое блюдо/)
+  assert.match(created, /Добавил\(а\):<\/b> Анна &amp; Али/)
+  assert.match(archived, /Блюдо удалено из меню/)
+  assert.match(archived, /Удалил\(а\):<\/b> Анна &amp; Али/)
+  assert.match(created, /Шашлык &lt;Особый&gt;/)
+  assert.match(archived, /Шашлык &lt;Особый&gt;/)
+})
+
 test('daily unavailable-product snapshot is Russian and lists the current state', () => {
   const message = buildDailyUnavailableMenuTeamMessage([
     {
@@ -148,22 +170,44 @@ test('availability event migration queues both transition directions without rep
   assert.doesNotMatch(availableMigration, /insert into public\.menu_item_unavailable_notification_deliveries[\s\S]+select[\s\S]+from public\.menu_items/i)
 })
 
+test('catalog event migration queues authenticated creates and archives without edit noise', () => {
+  assert.match(catalogMigration, /availability_event in \('unavailable', 'available', 'created', 'archived'\)/i)
+  assert.match(catalogMigration, /if tg_op = 'INSERT'/i)
+  assert.match(catalogMigration, /event_name := 'created'/i)
+  assert.match(catalogMigration, /old\.deleted_at is null and new\.deleted_at is not null/i)
+  assert.match(catalogMigration, /event_name := 'archived'/i)
+  assert.match(catalogMigration, /new\.deleted_at is null[\s\S]*old\.available is distinct from new\.available/i)
+  assert.match(catalogMigration, /after insert or update of available, deleted_at on public\.menu_items/i)
+  assert.match(catalogMigration, /changed_by uuid := auth\.uid\(\)/i)
+  assert.doesNotMatch(catalogMigration, /insert into public\.menu_item_unavailable_notification_deliveries[\s\S]+select[\s\S]+from public\.menu_items/i)
+})
+
 test('Admin Menu and kitchen unavailability writes trigger the shared authenticated endpoint', () => {
   assert.match(db, /notifyTelegramMenuAvailable/)
+  assert.match(db, /notifyTelegramMenuCreated/)
+  assert.match(db, /notifyTelegramMenuArchived/)
   assert.match(db, /notifyTelegramMenuUnavailable/)
   assert.match(db, /notifyTelegramOrderStatus/)
   assert.match(db, /markMenuUnavailable[\s\S]*update\(\{ available: false \}\)[\s\S]*notifyTelegramMenuUnavailable\(menuItemId\)/)
   assert.match(db, /case 'UPDATE_MENU_ITEM':[\s\S]*normalizedFields\.available === false[\s\S]*notifyTelegramMenuUnavailable\(id\)/)
   assert.match(db, /case 'UPDATE_MENU_ITEM':[\s\S]*normalizedFields\.available === true[\s\S]*notifyTelegramMenuAvailable\(id\)/)
+  assert.match(db, /case 'ADD_MENU_ITEM':[\s\S]*notifyTelegramMenuCreated\(normalizedFields\.id\)/)
+  assert.match(db, /case 'DELETE_MENU_ITEM':[\s\S]*notifyTelegramMenuArchived\(action\.payload\)/)
   assert.match(notifications, /'menu_unavailable'/)
   assert.match(notifications, /'menu_available'/)
+  assert.match(notifications, /'menu_created'/)
+  assert.match(notifications, /'menu_archived'/)
   assert.match(notifications, /menuItemId/)
   assert.equal((notifications.match(/\/api\/telegram\/employee-notification/g) || []).length, 1)
   assert.match(endpoint, /requireMenuWriteAccess/)
   assert.match(endpoint, /notifyMenuUnavailable\(supabase, user, menuItemId\)/)
   assert.match(endpoint, /notifyMenuAvailable\(supabase, user, menuItemId\)/)
+  assert.match(endpoint, /notifyMenuCreated\(supabase, user, menuItemId\)/)
+  assert.match(endpoint, /notifyMenuArchived\(supabase, user, menuItemId\)/)
   assert.match(endpoint, /\.eq\('availability_event', availabilityEvent\)/)
   assert.match(endpoint, /buildMenuAvailableTeamMessage/)
+  assert.match(endpoint, /buildMenuCreatedTeamMessage/)
+  assert.match(endpoint, /buildMenuArchivedTeamMessage/)
   assert.match(endpoint, /buildMenuUnavailableTeamMessage/)
   assert.match(endpoint, /loadSalaryTeamTarget\(supabase\)/)
   assert.match(endpoint, /\.eq\('actor_id', user\.id\)/)
@@ -181,6 +225,7 @@ test('database health requires unavailable-product delivery tracking', async () 
   assert.equal(result.ok, false)
   assert.match(failed.hint, /142_menu_unavailable_team_notifications/)
   assert.match(failed.hint, /146_menu_available_team_notifications/)
+  assert.match(failed.hint, /168_menu_catalog_team_notifications/)
   assert.match(cliHealth, /checkTable\('menu_item_unavailable_notification_deliveries'/)
 })
 

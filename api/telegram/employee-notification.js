@@ -20,7 +20,9 @@ import {
   buildInvestorIncomeGroupMessage,
 } from './_lib/investorIncomeMessages.js'
 import {
+  buildMenuArchivedTeamMessage,
   buildMenuAvailableTeamMessage,
+  buildMenuCreatedTeamMessage,
   buildMenuUnavailableTeamMessage,
 } from './_lib/menuAvailabilityMessages.js'
 import {
@@ -337,7 +339,7 @@ function savedInvestorExpenseDeliveryResult(delivery, duplicate = true) {
   }
 }
 
-function canRetryMenuUnavailableDelivery(delivery) {
+function canRetryMenuEventDelivery(delivery) {
   if (!delivery) return false
   if (['not_attempted', 'failed'].includes(delivery.status)) return true
   if (delivery.status !== 'pending') return false
@@ -353,13 +355,13 @@ function canRetryInvestorExpenseDelivery(delivery) {
   return !Number.isFinite(attemptedAt) || Date.now() - attemptedAt >= PENDING_DELIVERY_RETRY_MS
 }
 
-async function notifyMenuAvailability(supabase, user, menuItemId, availabilityEvent) {
+async function notifyMenuEvent(supabase, user, menuItemId, availabilityEvent) {
   const normalizedMenuItemId = String(menuItemId || '').trim()
   if (!normalizedMenuItemId) {
     throw Object.assign(new Error('menuItemId is required'), { status: 400 })
   }
-  if (!['unavailable', 'available'].includes(availabilityEvent)) {
-    throw Object.assign(new Error('Unsupported menu availability event'), { status: 400 })
+  if (!['unavailable', 'available', 'created', 'archived'].includes(availabilityEvent)) {
+    throw Object.assign(new Error('Unsupported menu event'), { status: 400 })
   }
 
   let existingResult = await supabase
@@ -388,10 +390,15 @@ async function notifyMenuAvailability(supabase, user, menuItemId, availabilityEv
   const { data: existing, error: existingError } = existingResult
   if (existingError) throw existingError
   if (!existing) {
-    const eventLabel = availabilityEvent === 'available' ? 'Available' : 'Unavailable'
+    const eventLabel = {
+      available: 'Available',
+      unavailable: 'Unavailable',
+      created: 'Created',
+      archived: 'Archived',
+    }[availabilityEvent]
     throw Object.assign(new Error(`${eventLabel} menu item event not found`), { status: 404 })
   }
-  if (!canRetryMenuUnavailableDelivery(existing)) {
+  if (!canRetryMenuEventDelivery(existing)) {
     return savedMenuUnavailableDeliveryResult(existing)
   }
 
@@ -429,9 +436,13 @@ async function notifyMenuAvailability(supabase, user, menuItemId, availabilityEv
   }
 
   try {
-    const text = availabilityEvent === 'available'
-      ? buildMenuAvailableTeamMessage(claimed.data)
-      : buildMenuUnavailableTeamMessage(claimed.data)
+    const messageBuilders = {
+      available: buildMenuAvailableTeamMessage,
+      unavailable: buildMenuUnavailableTeamMessage,
+      created: buildMenuCreatedTeamMessage,
+      archived: buildMenuArchivedTeamMessage,
+    }
+    const text = messageBuilders[availabilityEvent](claimed.data)
     const response = await sendTelegramMessage(target.chatId, text)
     const sentAt = new Date().toISOString()
     const telegramMessageId = getTelegramMessageId(response)
@@ -471,11 +482,19 @@ async function notifyMenuAvailability(supabase, user, menuItemId, availabilityEv
 }
 
 async function notifyMenuUnavailable(supabase, user, menuItemId) {
-  return notifyMenuAvailability(supabase, user, menuItemId, 'unavailable')
+  return notifyMenuEvent(supabase, user, menuItemId, 'unavailable')
 }
 
 async function notifyMenuAvailable(supabase, user, menuItemId) {
-  return notifyMenuAvailability(supabase, user, menuItemId, 'available')
+  return notifyMenuEvent(supabase, user, menuItemId, 'available')
+}
+
+async function notifyMenuCreated(supabase, user, menuItemId) {
+  return notifyMenuEvent(supabase, user, menuItemId, 'created')
+}
+
+async function notifyMenuArchived(supabase, user, menuItemId) {
+  return notifyMenuEvent(supabase, user, menuItemId, 'archived')
 }
 
 async function deliverSalaryGroupEvent(supabase, type, event, remainingDue) {
@@ -1704,22 +1723,24 @@ export default async function handler(req, res) {
     }
     const isMenuUnavailable = notificationType === 'menu_unavailable'
     const isMenuAvailable = notificationType === 'menu_available'
-    const isMenuAvailability = isMenuUnavailable || isMenuAvailable
+    const isMenuCreated = notificationType === 'menu_created'
+    const isMenuArchived = notificationType === 'menu_archived'
+    const isMenuEvent = isMenuUnavailable || isMenuAvailable || isMenuCreated || isMenuArchived
     const isSalaryRetraction = notificationType === 'retract_salary_event'
-    if (!isMenuAvailability && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'expense', 'investor_income'].includes(notificationType)) {
+    if (!isMenuEvent && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'expense', 'investor_income'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
-    if (isMenuAvailability && !menuItemId) {
+    if (isMenuEvent && !menuItemId) {
       return json(res, 400, { error: 'menuItemId is required' })
     }
     if (isSalaryRetraction && (!eventType || !eventId)) {
       return json(res, 400, { error: 'eventType and eventId are required' })
     }
-    if (!isMenuAvailability && !isSalaryRetraction && !eventIds[notificationType]) {
+    if (!isMenuEvent && !isSalaryRetraction && !eventIds[notificationType]) {
       return json(res, 400, { error: `${notificationType}Id is required` })
     }
 
-    const access = isMenuAvailability
+    const access = isMenuEvent
       ? await requireMenuWriteAccess(req)
       : notificationType === 'expense'
         ? await requireExpenseNotificationAccess(req)
@@ -1731,6 +1752,10 @@ export default async function handler(req, res) {
     let result
     if (isSalaryRetraction) {
       result = await retractSalaryEventMessages(supabase, eventType, eventId)
+    } else if (isMenuCreated) {
+      result = await notifyMenuCreated(supabase, user, menuItemId)
+    } else if (isMenuArchived) {
+      result = await notifyMenuArchived(supabase, user, menuItemId)
     } else if (isMenuAvailable) {
       result = await notifyMenuAvailable(supabase, user, menuItemId)
     } else if (isMenuUnavailable) {

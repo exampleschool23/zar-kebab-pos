@@ -133,7 +133,7 @@ export async function notifyTelegramInvestorExpense(expenseId) {
   }
 }
 
-async function notifyTelegramMenuAvailability(menuItemId, type) {
+async function notifyTelegramMenuEvent(menuItemId, type) {
   const failedResult = {
     ok: false,
     status: 'failed',
@@ -158,9 +158,17 @@ async function notifyTelegramMenuAvailability(menuItemId, type) {
 }
 
 export function notifyTelegramMenuUnavailable(menuItemId) {
-  return notifyTelegramMenuAvailability(menuItemId, 'menu_unavailable')
+  return notifyTelegramMenuEvent(menuItemId, 'menu_unavailable')
 }
 
 export function notifyTelegramMenuAvailable(menuItemId) {
-  return notifyTelegramMenuAvailability(menuItemId, 'menu_available')
+  return notifyTelegramMenuEvent(menuItemId, 'menu_available')
+}
+
+export function notifyTelegramMenuCreated(menuItemId) {
+  return notifyTelegramMenuEvent(menuItemId, 'menu_created')
+}
+
+export function notifyTelegramMenuArchived(menuItemId) {
+  return notifyTelegramMenuEvent(menuItemId, 'menu_archived')
 }

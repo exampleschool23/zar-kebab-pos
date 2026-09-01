@@ -14,6 +14,7 @@ import {
   formatKpiRatePercent,
   getEffectiveKpiRule,
   getKpiRuleEditDate,
+  removeKpiRulePreservingHistory,
   parseKpiPercentToBps,
 } from '../lib/dailyKpi'
 import { canEditFeature } from '../lib/permissions'
@@ -65,13 +66,6 @@ function isMissingKpiMigration(error) {
     text.includes('schema cache') ||
     text.includes('42p01')
   )
-}
-
-function isFinalizedKpiRuleError(error) {
-  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
-  return text.includes('kpi rule used by a finalized day')
-    || text.includes('kpi rule effective date must be after the latest finalized kpi date')
-    || text.includes('employee_daily_kpi_results_rule_id_fkey')
 }
 
 function composeSalaryProfiles(rows = [], rates = [], payments = [], bonuses = [], fines = [], absences = [], profiles = []) {
@@ -231,11 +225,12 @@ export default function Salaries() {
       kpiSaved: 'KPI sozlamasi saqlandi',
       kpiRemove: 'KPI sozlamasini olib tashlash',
       kpiRemoveTitle: 'KPI sozlamasini olib tashlaysizmi?',
-      kpiRemoveWarning: 'Faqat ushbu sanadan kuchga kirgan sozlama o‘chiriladi. Yakunlangan KPI tarixi va to‘langan bonuslar saqlanadi.',
+      kpiRemoveFrom: 'KPI’ni o‘chirish sanasi',
+      kpiRemoveWarning: 'Tanlangan sanadan oldingi sozlamalar, yakunlangan hisob-kitoblar va to‘langan bonuslar o‘zgarmaydi. KPI faqat tanlangan sanadan boshlab o‘chiriladi.',
       kpiRemoveConfirm: 'Olib tashlash',
       kpiRemoveCancel: 'Bekor qilish',
       kpiRemoved: 'KPI sozlamasi olib tashlandi',
-      kpiRemoveUsedError: 'Bu KPI sozlamasi yakunlangan kun hisobida ishlatilgan va o‘chirilmaydi. Keyingi sanadan KPI’ni o‘chirish uchun yangi nofaol sozlama saqlang.',
+      kpiStopped: 'KPI tanlangan sanadan boshlab o‘chirildi. Oldingi ma’lumotlar saqlandi.',
       kpiRemoveOwnerOnly: 'KPI sozlamasini faqat egasi olib tashlashi mumkin.',
       kpiRemoveFailed: 'KPI sozlamasini olib tashlab bo‘lmadi.',
       kpiPreview: 'Hisoblash namunasi',
@@ -366,11 +361,12 @@ export default function Salaries() {
       kpiSaved: 'Настройка KPI сохранена',
       kpiRemove: 'Удалить настройку KPI',
       kpiRemoveTitle: 'Удалить настройку KPI?',
-      kpiRemoveWarning: 'Будет удалена только настройка с этой датой начала действия. Завершённая история KPI и выплаченные бонусы сохранятся.',
+      kpiRemoveFrom: 'Отключить KPI с',
+      kpiRemoveWarning: 'Настройки, завершённые расчёты и выплаченные бонусы до выбранной даты останутся без изменений. KPI будет отключён только с выбранной даты.',
       kpiRemoveConfirm: 'Удалить',
       kpiRemoveCancel: 'Отмена',
       kpiRemoved: 'Настройка KPI удалена',
-      kpiRemoveUsedError: 'Эта настройка KPI уже использована в расчёте завершённого дня и не может быть удалена. Чтобы отключить KPI, сохраните новую выключенную настройку с будущей датой.',
+      kpiStopped: 'KPI отключён с выбранной даты. Предыдущие данные сохранены.',
       kpiRemoveOwnerOnly: 'Удалить настройку KPI может только владелец.',
       kpiRemoveFailed: 'Не удалось удалить настройку KPI.',
       kpiPreview: 'Пример расчёта',
@@ -501,11 +497,12 @@ export default function Salaries() {
       kpiSaved: 'KPI setting saved',
       kpiRemove: 'Remove KPI setting',
       kpiRemoveTitle: 'Remove this KPI setting?',
-      kpiRemoveWarning: 'Only this effective-dated setting will be removed. Finalized KPI history and paid bonuses will remain unchanged.',
+      kpiRemoveFrom: 'Disable KPI from',
+      kpiRemoveWarning: 'Settings, finalized calculations, and paid bonuses before the selected date remain unchanged. KPI is disabled only from the selected date onward.',
       kpiRemoveConfirm: 'Remove',
       kpiRemoveCancel: 'Cancel',
       kpiRemoved: 'KPI setting removed',
-      kpiRemoveUsedError: 'This KPI setting was already used for a finalized day and cannot be removed. To stop KPI, save a new disabled setting with a later effective date.',
+      kpiStopped: 'KPI was disabled from the selected date. Earlier data was preserved.',
       kpiRemoveOwnerOnly: 'Only an owner can remove a KPI setting.',
       kpiRemoveFailed: 'Could not remove the KPI setting.',
       kpiPreview: 'Calculation example',
@@ -1007,11 +1004,19 @@ export default function Salaries() {
     await loadKpiRules()
   }
 
-  function requestRemoveKpiRule(salaryProfile, rule) {
-    if (!canRemoveKpiRules || !salaryProfile?.id || !rule?.id) return
+  function requestRemoveKpiRule(salaryProfile, rule, effectiveFrom) {
+    const removalDate = String(effectiveFrom || '').slice(0, 10)
+    if (
+      !canRemoveKpiRules
+      || !salaryProfile?.id
+      || !rule?.id
+      || !/^\d{4}-\d{2}-\d{2}$/.test(removalDate)
+      || removalDate < today
+      || removalDate < String(rule.effective_from || '').slice(0, 10)
+    ) return
     setKpiRulesError('')
     setKpiRuleRemoveError('')
-    setKpiRuleToRemove({ salaryProfile, rule })
+    setKpiRuleToRemove({ salaryProfile, rule, effectiveFrom: removalDate })
   }
 
   function cancelRemoveKpiRule() {
@@ -1022,7 +1027,8 @@ export default function Salaries() {
 
   async function removeKpiRule() {
     const rule = kpiRuleToRemove?.rule
-    if (!canRemoveKpiRules || !rule?.id) {
+    const effectiveFrom = kpiRuleToRemove?.effectiveFrom
+    if (!canRemoveKpiRules || !rule?.id || !effectiveFrom) {
       setKpiRuleRemoveError(l.kpiRemoveOwnerOnly)
       return
     }
@@ -1034,24 +1040,30 @@ export default function Salaries() {
     setError('')
     setMessage('')
 
-    const { data: deletedRules, error: deleteError } = await supabase
-      .from('employee_kpi_rules')
-      .delete()
-      .eq('id', rule.id)
-      .select('id')
+    let removalResult
+    try {
+      removalResult = await removeKpiRulePreservingHistory({
+        client: supabase,
+        rule,
+        effectiveFrom,
+        createdBy: profile?.id || null,
+        createdByName: profile?.full_name || profile?.email || state.user?.name || '',
+      })
+    } catch (removalError) {
+      removalResult = { action: 'failed', error: removalError }
+    } finally {
+      setSaving('')
+    }
 
-    setSaving('')
-    if (deleteError) {
+    if (removalResult.error) {
       setKpiRuleRemoveError(
-        isMissingKpiMigration(deleteError)
+        isMissingKpiMigration(removalResult.error)
           ? l.kpiMigration
-          : isFinalizedKpiRuleError(deleteError)
-            ? l.kpiRemoveUsedError
-            : l.kpiRemoveFailed
+          : l.kpiRemoveFailed
       )
       return
     }
-    if (!Array.isArray(deletedRules) || deletedRules.length !== 1) {
+    if (removalResult.action === 'not_deleted') {
       setKpiRuleRemoveError(l.kpiRemoveOwnerOnly)
       return
     }
@@ -1064,7 +1076,7 @@ export default function Salaries() {
       rate_percentage: '1',
       is_enabled: true,
     })
-    setMessage(l.kpiRemoved)
+    setMessage(removalResult.action === 'disabled' ? l.kpiStopped : l.kpiRemoved)
     await loadKpiRules()
   }
 
@@ -1358,7 +1370,7 @@ export default function Salaries() {
 
   return (
     <AppShell title={l.title}>
-      <div className="h-full overflow-y-auto bg-[#FAF7F0]">
+      <div className="h-full overflow-x-hidden overflow-y-auto bg-[#FAF7F0]">
         <div className="mx-auto max-w-[1200px] px-4 py-5 sm:px-5 sm:py-6">
           <header className="mb-6">
             <button onClick={() => navigate('/admin/accounting')} className="mb-3 inline-flex items-center gap-2 text-xs font-black text-[#6B7280] transition-colors hover:text-[#ff5a00]">
@@ -1639,7 +1651,7 @@ export default function Salaries() {
               title={l.salarySettings}
               description={l.salarySettingsHelp}
             />
-            <div className="grid w-full min-w-0 items-stretch gap-4">
+            <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-4">
               <div className="h-full w-full min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
                 <CardHeading
                   icon={salarySetupMode === 'kpi' ? Percent : salarySetupMode === 'change' ? Save : Plus}
@@ -1795,9 +1807,9 @@ export default function Salaries() {
               )}
               </div>
 
-              <div className="h-full rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
+              <div className="h-full min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
                 <CardHeading icon={Send} title={l.telegramTitle} description={l.telegramHelp} tone="blue" />
-                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <Field label={l.selectEmployee}>
                     <select
                       value={telegramSalaryProfileId}
@@ -1878,7 +1890,7 @@ export default function Salaries() {
                                 <div className="flex flex-wrap items-start justify-between gap-2">
                                   <div className="min-w-0">
                                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                      <p className="flex min-w-0 items-baseline gap-1.5 text-sm font-black text-[#1F2937]">
+                                      <p className="flex min-w-0 flex-wrap items-baseline gap-1.5 text-sm font-black text-[#1F2937]">
                                         <span className="truncate">{delivery.employeeName}</span>
                                         {(deliveryValue || deliveryDate) && <span className="flex-shrink-0 text-gray-400">—</span>}
                                         {deliveryValue && <span className="flex-shrink-0 whitespace-nowrap">{deliveryValue}</span>}
@@ -2032,11 +2044,17 @@ function DailyKpiSection({
   const employeeLabel = salaryProfile => (
     salaryProfile?.employee_name || salaryProfile?.profile?.full_name || salaryProfile?.profile?.email || '—'
   )
-  const canRemoveSelectedRule = canRemoveRules && selectedKpiProfile && selectedRule
+  const canRemoveSelectedRule = canRemoveRules
+    && selectedKpiProfile
+    && selectedRule
+    && selectedRule.is_enabled !== false
+    && /^\d{4}-\d{2}-\d{2}$/.test(String(form.effective_from || '').slice(0, 10))
+    && String(form.effective_from).slice(0, 10) >= String(minimumEffectiveDate || '').slice(0, 10)
+    && String(form.effective_from).slice(0, 10) >= String(selectedRule.effective_from || '').slice(0, 10)
 
   return (
     <>
-      <div className={embedded ? '' : 'h-full rounded-2xl border border-violet-100 bg-white p-4 shadow-sm sm:p-5'}>
+      <div className={embedded ? 'min-w-0' : 'h-full min-w-0 rounded-2xl border border-violet-100 bg-white p-4 shadow-sm sm:p-5'}>
           {!embedded && <CardHeading icon={Percent} title={labels.kpiRuleTitle} description={labels.kpiRuleHelp} tone="violet" />}
           <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50/70 px-3 py-2.5 text-xs font-semibold leading-relaxed text-violet-900">
             <p>{labels.kpiBaseStatement}</p>
@@ -2047,8 +2065,8 @@ function DailyKpiSection({
               {rulesError}
             </p>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="min-w-0 sm:col-span-2">
               <Field label={labels.employee}>
                 <select
                   value={form.salary_profile_id}
@@ -2073,7 +2091,7 @@ function DailyKpiSection({
               />
             </Field>
             <Field label={labels.kpiRate}>
-              <div className="relative">
+              <div className="relative min-w-0">
                 <input
                   type="text"
                   inputMode="decimal"
@@ -2106,7 +2124,7 @@ function DailyKpiSection({
             >
               <span>{form.is_enabled ? labels.kpiEnabled : labels.kpiDisabled}</span>
               <span className={`relative h-6 w-11 rounded-full transition-colors ${form.is_enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden="true">
-                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.is_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                <span className={`absolute left-0 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.is_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
               </span>
             </button>
             <div id="daily-kpi-rate-preview" className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 sm:col-span-2">
@@ -2115,11 +2133,11 @@ function DailyKpiSection({
                 {formatCurrency(KPI_PREVIEW_BASE_AMOUNT)} × {previewRateBps > 0 ? formatKpiRatePercent(previewRateBps, lang) : '—'} = {previewRateBps > 0 ? formatCurrency(previewBonus) : '—'}
               </p>
             </div>
-            <div className={`grid gap-3 sm:col-span-2 ${canRemoveSelectedRule ? 'sm:grid-cols-2' : ''}`}>
+            <div className={`grid min-w-0 grid-cols-1 gap-3 sm:col-span-2 ${canRemoveSelectedRule ? 'sm:grid-cols-2' : ''}`}>
               {canRemoveSelectedRule && (
                 <button
                   type="button"
-                  onClick={() => onRequestRemoveRule(selectedKpiProfile, selectedRule)}
+                  onClick={() => onRequestRemoveRule(selectedKpiProfile, selectedRule, form.effective_from)}
                   disabled={Boolean(removingRuleId) || saving}
                   className="inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-black text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -2157,6 +2175,9 @@ function DailyKpiSection({
                 <p className="mt-1 truncate text-sm font-black text-[#1F2937]">{employeeLabel(ruleToRemove.salaryProfile)}</p>
                 <p className="mt-0.5 text-xs font-semibold text-[#6B7280]">
                   {formatKpiRatePercent(ruleToRemove.rule.rate_bps, lang)} · {labels.effectiveDate}: {formatLongDate(ruleToRemove.rule.effective_from, lang, ruleToRemove.rule.effective_from)}
+                </p>
+                <p className="mt-1 text-xs font-black text-red-600">
+                  {labels.kpiRemoveFrom}: {formatLongDate(ruleToRemove.effectiveFrom, lang, ruleToRemove.effectiveFrom)}
                 </p>
               </div>
             </div>

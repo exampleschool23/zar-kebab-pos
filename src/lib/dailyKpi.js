@@ -67,6 +67,61 @@ export function getEffectiveKpiRule(rules = [], salaryProfileId, date) {
     ))[0] || null
 }
 
+export async function removeKpiRulePreservingHistory({
+  client,
+  rule,
+  effectiveFrom,
+  createdBy = null,
+  createdByName = '',
+}) {
+  const normalizedEffectiveFrom = String(effectiveFrom || '').slice(0, 10)
+  const normalizedRuleStart = String(rule?.effective_from || '').slice(0, 10)
+  if (
+    !ISO_DATE_PATTERN.test(normalizedEffectiveFrom)
+    || !ISO_DATE_PATTERN.test(normalizedRuleStart)
+    || normalizedEffectiveFrom < normalizedRuleStart
+  ) {
+    const error = new Error('KPI removal date must be on or after the rule effective date')
+    error.code = 'KPI_RULE_REMOVAL_DATE_INVALID'
+    return { action: 'failed', rule: null, error }
+  }
+
+  if (normalizedEffectiveFrom > normalizedRuleStart) {
+    // Keep the original rule effective through the day before the selected
+    // boundary. A disabled successor changes only the selected date onward.
+    const { data: disabledRule, error: disableError } = await client
+      .from('employee_kpi_rules')
+      .upsert({
+        salary_profile_id: rule.salary_profile_id,
+        effective_from: normalizedEffectiveFrom,
+        rate_bps: rule.rate_bps,
+        is_enabled: false,
+        created_by: createdBy,
+        created_by_name: createdByName,
+      }, { onConflict: 'salary_profile_id,effective_from' })
+      .select('id')
+      .single()
+
+    return disableError
+      ? { action: 'failed', rule: null, error: disableError }
+      : { action: 'disabled', rule: disabledRule, error: null }
+  }
+
+  const { data: deletedRules, error: deleteError } = await client
+    .from('employee_kpi_rules')
+    .delete()
+    .eq('id', rule.id)
+    .select('id')
+
+  if (!deleteError) {
+    return Array.isArray(deletedRules) && deletedRules.length === 1
+      ? { action: 'deleted', rule: deletedRules[0], error: null }
+      : { action: 'not_deleted', rule: null, error: null }
+  }
+
+  return { action: 'failed', rule: null, error: deleteError }
+}
+
 export function normalizeKpiResult(result = {}) {
   return {
     ...result,

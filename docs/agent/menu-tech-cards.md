@@ -31,9 +31,8 @@ Read this guide for menu products/categories, availability and visibility, media
 
 ## Availability notifications
 
-- Authenticated `available` transitions queue an immutable Telegram Team event with Russian product/staff snapshots.
-- Product saves and quick toggles use the same database event; editing without a transition sends nothing.
-- Archival must not change `available` or create an availability announcement.
+- Authenticated availability changes, product creation, and archival queue immutable Russian Team events with product/staff snapshots.
+- Ordinary edits/restoration send nothing; archival does not change `available`. Product saves and quick toggles share the database event.
 - The daily 08:00 Tashkent snapshot lists unavailable active products by Russian category or confirms all are available. Details live in `docs/agent/telegram.md`.
 
 ## Inventory

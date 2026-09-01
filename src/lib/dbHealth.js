@@ -76,7 +76,7 @@ const MIGRATION_HINTS = {
   orders: 'Run supabase/075_order_actor_tracking.sql, supabase/106_atomic_paid_order_stock_deduction.sql, supabase/150_tech_card_component_stock_deduction.sql, supabase/151_tech_card_component_piece_quantities.sql, and supabase/154_tech_card_component_variants.sql',
   profile_audit: 'Run supabase/028_profile_role_audit.sql',
   menu_items: 'Run supabase/103_menu_item_media_gallery.sql and supabase/105_menu_items_sold_by_weight.sql',
-  menu_item_unavailable_notification_deliveries: 'Run supabase/142_menu_unavailable_team_notifications.sql and supabase/146_menu_available_team_notifications.sql',
+  menu_item_unavailable_notification_deliveries: 'Run supabase/142_menu_unavailable_team_notifications.sql, supabase/146_menu_available_team_notifications.sql, and supabase/168_menu_catalog_team_notifications.sql',
   daily_unavailable_menu_notification_deliveries: 'Run supabase/143_daily_unavailable_menu_team_notifications.sql and supabase/145_daily_unavailable_menu_categories.sql',
   menu_item_costs: 'Run supabase/098_menu_item_costs_and_profit.sql, supabase/100_menu_variant_costs_and_accounting_profit.sql, and supabase/155_tech_card_real_costs.sql',
   menu_item_tech_cards: 'Run supabase/139_menu_item_tech_cards.sql and supabase/156_variant_tech_cards.sql',

@@ -14,15 +14,18 @@ test('Salaries configures effective-dated KPI rules behind Accounting write acce
   assert.match(salaries, /disabled=\{!canManage[\s\S]*labels\.kpiSave/)
 })
 
-test('only owners see the touch-safe KPI rule removal flow and zero-row deletes are rejected', () => {
+test('only owners can remove active KPI rules and zero-row deletes are rejected', () => {
   assert.match(salaries, /const canRemoveKpiRules = role === 'owner'/)
   assert.match(salaries, /canRemoveRules=\{canRemoveKpiRules\}/)
-  assert.match(salaries, /const canRemoveSelectedRule = canRemoveRules && selectedKpiProfile && selectedRule/)
+  assert.match(salaries, /const canRemoveSelectedRule = canRemoveRules[\s\S]*?selectedRule\.is_enabled !== false/)
   assert.match(salaries, /canRemoveSelectedRule && \([\s\S]*?touch-manipulation[\s\S]*?<Trash2/)
   assert.match(salaries, /role="dialog"[\s\S]*?aria-modal="true"[\s\S]*?labels\.kpiRemoveWarning/)
-  assert.match(salaries, /\.from\('employee_kpi_rules'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', rule\.id\)[\s\S]*?\.select\('id'\)/)
-  assert.match(salaries, /!Array\.isArray\(deletedRules\) \|\| deletedRules\.length !== 1/)
-  assert.match(salaries, /isFinalizedKpiRuleError\(deleteError\)[\s\S]*?l\.kpiRemoveUsedError/)
+  assert.match(salaries, /setKpiRuleToRemove\(\{ salaryProfile, rule, effectiveFrom: removalDate \}\)/)
+  assert.match(salaries, /removeKpiRulePreservingHistory\(\{[\s\S]*?effectiveFrom,[\s\S]*?createdBy:/)
+  assert.match(salaries, /labels\.kpiRemoveFrom[\s\S]*?ruleToRemove\.effectiveFrom/)
+  assert.doesNotMatch(salaries, /removeKpiRulePreservingHistory\(\{[\s\S]*?effectiveFrom: today/)
+  assert.match(salaries, /removalResult\.action === 'not_deleted'/)
+  assert.match(salaries, /removalResult\.action === 'disabled' \? l\.kpiStopped : l\.kpiRemoved/)
   assert.doesNotMatch(salaries, /window\.confirm\(/)
 })
 
@@ -44,6 +47,19 @@ test('salary setup forms share one tabbed card', () => {
   assert.match(settingsSection, /\{ key: 'add',[\s\S]*\{ key: 'change',[\s\S]*\{ key: 'kpi'/)
   assert.match(settingsSection, /salarySetupMode === 'add'[\s\S]*salarySetupMode === 'kpi'[\s\S]*<DailyKpiSection[\s\S]*salarySetupMode === 'change'/)
   assert.doesNotMatch(salaries, /<section className="mb-7" aria-labelledby="daily-kpi-heading">/)
+})
+
+test('salary setup keeps KPI content inside the mobile viewport', () => {
+  const settingsSection = salaries.slice(
+    salaries.indexOf('aria-labelledby="salary-settings-heading"'),
+    salaries.indexOf('function DailyKpiSection')
+  )
+
+  assert.match(settingsSection, /grid w-full min-w-0 grid-cols-1 items-stretch gap-4/)
+  assert.match(settingsSection, /h-full w-full min-w-0 rounded-2xl/)
+  assert.match(salaries, /embedded \? 'min-w-0'/)
+  assert.match(salaries, /grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2/)
+  assert.match(salaries, /absolute left-0 top-1 h-4 w-4/)
 })
 
 test('automatic KPI bonuses are identified and show their immutable formula in employee history', () => {

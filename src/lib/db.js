@@ -14,6 +14,8 @@ import {
 } from './priceModes.js'
 import {
   notifyTelegramMenuAvailable,
+  notifyTelegramMenuArchived,
+  notifyTelegramMenuCreated,
   notifyTelegramMenuUnavailable,
   notifyTelegramOrderStatus,
 } from './telegramNotifications.js'
@@ -1539,7 +1541,10 @@ export async function writeToSupabase(action, state, options = {}) {
           variant_costs: normalizedVariantCosts,
         },
       })
-      if (!rpcResult.error) break
+      if (!rpcResult.error) {
+        void notifyTelegramMenuCreated(normalizedFields.id)
+        break
+      }
       if (isMissingRpc(rpcResult.error, 'create_menu_item_with_media_and_cost')) {
         throw new Error('Database migration 103 is required before creating menu products with media.')
       }
@@ -1601,6 +1606,7 @@ export async function writeToSupabase(action, state, options = {}) {
         throw error
       }
       if (!data?.length) throw new Error('Menu item was not archived. Refresh permissions and try again.')
+      void notifyTelegramMenuArchived(action.payload)
       action.meta = { ...(action.meta || {}), deleted_at: deletedAt }
       break
     }
