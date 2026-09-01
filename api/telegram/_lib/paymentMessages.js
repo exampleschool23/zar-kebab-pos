@@ -1,5 +1,5 @@
 import { expensePaymentMethodLabel } from '../../../src/lib/expenses.js'
-import { formatDateOnly, formatLongDate } from '../../../src/lib/dateFormat.js'
+import { formatLongDate } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml } from './telegram.js'
 import {
   formatSalaryNotificationAmount,
@@ -286,13 +286,13 @@ function formatSalaryRate(rate, copy) {
   return `${formatSalaryNotificationAmount(rate?.amount)} UZS (${unit})`
 }
 
-function appendSalaryRateDetails(lines, rate, copy) {
+function appendSalaryRateDetails(lines, rate, copy, lang) {
   if (rate?.previous_rate?.amount) {
     lines.push(`<b>${copy.previousRate}:</b> ${escapeTelegramHtml(formatSalaryRate(rate.previous_rate, copy))}`)
   }
   lines.push(
     `<b>${copy.newRate}:</b> ${escapeTelegramHtml(formatSalaryRate(rate, copy))}`,
-    `<b>${copy.effectiveFrom}:</b> ${escapeTelegramHtml(formatDateOnly(rate?.effective_from, '-'))}`,
+    `<b>${copy.effectiveFrom}:</b> ${escapeTelegramHtml(formatLongDate(rate?.effective_from, lang, '-'))}`,
     `<b>${copy.kpiRate}:</b> ${escapeTelegramHtml(
       !rate?.kpi_rule
         ? copy.kpiNotConfigured
@@ -316,7 +316,7 @@ export function buildSalaryRateGroupMessage(rate, remainingDue = 0, language = '
     '',
     `<b>${copy.employee}:</b> ${escapeTelegramHtml(rate?.employee_name || '-')}`,
   ]
-  appendSalaryRateDetails(lines, rate, copy)
+  appendSalaryRateDetails(lines, rate, copy, lang)
   lines.push(
     `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,
     `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(rate?.created_by_name || '-')}`
@@ -366,7 +366,7 @@ export function buildEmployeeSalaryRateMessage(rate, remainingDue = 0, language 
     isIncrease ? copy.raiseRecorded : copy.employeeRecorded,
     '',
   ]
-  appendSalaryRateDetails(lines, rate, copy)
+  appendSalaryRateDetails(lines, rate, copy, lang)
   lines.push(
     `<b>${copy.due}:</b> ${formatSalaryNotificationAmount(remainingDue)} UZS`,
     `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(rate?.created_by_name || '-')}`
@@ -396,7 +396,7 @@ export function buildSalaryPaymentGroupMessage(payment, remainingDue = 0, langua
     '',
     `<b>${groupCopy.employee}:</b> ${escapeTelegramHtml(payment?.employee_name || '-')}`,
     `<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(payment?.amount)} UZS`,
-    `<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(payment?.paid_date, '-'))}`,
+    `<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(payment?.paid_date, lang, '-'))}`,
     `<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(payment?.payment_method, lang))}`,
   ]
   if (String(payment?.note || '').trim()) {
@@ -523,7 +523,7 @@ export function buildEmployeePaymentMessage(payment, remainingDue = 0, language 
     copy.recorded,
     '',
     `<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(payment?.amount)} UZS`,
-    `<b>${copy.date}:</b> ${escapeTelegramHtml(formatDateOnly(payment?.paid_date, '-'))}`,
+    `<b>${copy.date}:</b> ${escapeTelegramHtml(formatLongDate(payment?.paid_date, lang, '-'))}`,
     `<b>${copy.method}:</b> ${escapeTelegramHtml(expensePaymentMethodLabel(payment?.payment_method, lang))}`,
   ]
   if (String(payment?.note || '').trim()) {

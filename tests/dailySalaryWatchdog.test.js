@@ -17,6 +17,8 @@ test('daily salary cron reports authorized execution failures to the Investor gr
   assert.match(dailySalary, /if \(requestFailed\)[\s\S]*notifyDailySalaryCronFailure/)
   assert.match(dailySalary, /failure alert skipped: Investor group is not configured/)
   assert.match(dailySalary, /CRON_FAILURE_ALERT_MARKER/)
+  assert.match(dailySalary, /formatLongDate\(notificationDate, 'ru'/)
+  assert.match(dailySalary, /formatLongDate\(businessDate, 'ru'/)
 })
 
 test('existing later cron independently checks the daily salary delivery', () => {

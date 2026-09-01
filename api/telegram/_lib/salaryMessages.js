@@ -5,7 +5,7 @@ import {
   getSalaryBalance,
   normalizeExpenseAmount,
 } from '../../../src/lib/expenses.js'
-import { formatDateOnly, formatLongDate } from '../../../src/lib/dateFormat.js'
+import { formatLongDate } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml } from './telegram.js'
 
 const COPY = {
@@ -247,7 +247,7 @@ export function buildDailySalaryMessage(salaryProfile, date, language = 'ru') {
 
   return [
     `💼 <b>${copy.title}</b>`,
-    `📅 ${escapeTelegramHtml(formatDateOnly(date, date))}`,
+    `📅 ${escapeTelegramHtml(formatLongDate(date, lang, date))}`,
     '',
     `<b>${copy.greeting(employeeName)}</b>`,
     copy.gratitude,

@@ -35,6 +35,7 @@ import {
   runGoogleReviewBot,
 } from '../google-reviews/_lib/runReviewBot.js'
 import { aggregateIngredientConsumption } from '../../src/lib/ingredientConsumption.js'
+import { formatLongDate } from '../../src/lib/dateFormat.js'
 
 const KPI_RETRY_LOOKBACK_DAYS = 7
 const KPI_MISSING_DATE_BATCH_SIZE = 31
@@ -169,7 +170,7 @@ function buildDailySalaryCronFailureMessage(notificationDate, error) {
   const detail = String(error?.message || error || 'Unknown cron failure').slice(0, 800)
   return [
     '🚨 <b>Ошибка ежедневного финансового отчёта</b>',
-    `Дата отчёта: ${escapeTelegramHtml(notificationDate || '—')}`,
+    `Дата отчёта: ${escapeTelegramHtml(formatLongDate(notificationDate, 'ru', notificationDate || '—'))}`,
     `Ошибка: ${escapeTelegramHtml(detail)}`,
     '',
     'Отчёт остаётся в очереди и будет доступен для повторной отправки.',
@@ -255,7 +256,7 @@ async function notifySecondaryCronFailure(supabase, businessDate, error) {
   try {
     const response = await sendTelegramMessage(target.chatId, [
       '🚨 <b>Ошибка резервной проверки cron</b>',
-      `Дата: ${escapeTelegramHtml(businessDate || '—')}`,
+      `Дата: ${escapeTelegramHtml(formatLongDate(businessDate, 'ru', businessDate || '—'))}`,
       `Ошибка: ${escapeTelegramHtml(detail)}`,
       '',
       'Проверьте ежедневный финансовый отчёт и список недоступных блюд.',
@@ -281,7 +282,7 @@ function buildDailySalaryWatchdogMessage(businessDate, delivery) {
     .slice(0, 800)
   return [
     '🚨 <b>Ежедневный финансовый отчёт не отправлен</b>',
-    `Дата отчёта: ${escapeTelegramHtml(businessDate)}`,
+    `Дата отчёта: ${escapeTelegramHtml(formatLongDate(businessDate, 'ru', businessDate || '—'))}`,
     `Статус: ${escapeTelegramHtml(status)}`,
     `Причина: ${escapeTelegramHtml(detail || 'Неизвестная ошибка')}`,
     '',

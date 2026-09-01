@@ -1,32 +1,10 @@
 import { escapeTelegramHtml } from './telegram.js'
+import { formatLongDate } from '../../../src/lib/dateFormat.js'
 
 function firstText(...values) {
   return values
     .map(value => String(value || '').trim())
     .find(Boolean) || ''
-}
-
-const RUSSIAN_MONTHS = [
-  'января',
-  'февраля',
-  'марта',
-  'апреля',
-  'мая',
-  'июня',
-  'июля',
-  'августа',
-  'сентября',
-  'октября',
-  'ноября',
-  'декабря',
-]
-
-function formatRussianBusinessDate(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!match) return String(value || '').trim()
-  const [, year, month, day] = match
-  const monthName = RUSSIAN_MONTHS[Number(month) - 1]
-  return monthName ? `${Number(day)} ${monthName} ${year}` : String(value)
 }
 
 export function getRussianMenuItemName(item) {
@@ -99,7 +77,7 @@ export function buildMenuArchivedTeamMessage(event) {
 
 export function buildDailyUnavailableMenuTeamMessage(items, businessDate) {
   const unavailableItems = Array.isArray(items) ? items : []
-  const dateLabel = formatRussianBusinessDate(businessDate)
+  const dateLabel = formatLongDate(businessDate, 'ru', businessDate || '—')
   const header = [
     '🚫 <b>Недоступные блюда</b>',
     `📅 <b>На ${escapeTelegramHtml(dateLabel)}, 08:00</b>`,
