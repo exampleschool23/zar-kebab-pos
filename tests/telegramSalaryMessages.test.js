@@ -463,28 +463,32 @@ test('ZarKebab Team messages publish full bonus, fine, and absence details witho
     '👤 <b>Зилола &lt;кассир&gt;</b> · <b>100 000 UZS</b>',
     '🗓 29 июля 2026',
     '📝 <b>Примечание:</b> &lt;Отличная работа &amp; помощь команде&gt;',
+    '✍️ <b>Оформил:</b> Jasurbek &amp; Co',
   ].join('\n'))
   assert.equal(fine, [
     '⚠️ <b>Штраф сотрудника</b>',
     '👤 <b>Зилола &lt;кассир&gt;</b> · <b>20 000 UZS</b>',
     '🗓 30 июля 2026',
     '📝 <b>Причина:</b> &lt;Опоздание &amp; невыполненная уборка&gt;',
+    '✍️ <b>Оформил:</b> Jasurbek &amp; Co',
   ].join('\n'))
   assert.equal(absence, [
     '📅 <b>Отсутствие сотрудника</b>',
     '👤 <b>Зилола &lt;кассир&gt;</b> · 🗓 31 июля 2026',
     '📝 &lt;Болезнь &amp; визит к врачу&gt;',
+    '✍️ <b>Оформил:</b> Jasurbek &amp; Co',
   ].join('\n'))
   assert.equal(bonusWithoutNote, [
     '🎁 <b>Бонус сотруднику</b>',
     '👤 <b>Зилола &lt;кассир&gt;</b> · <b>93 000 UZS</b>',
     '🗓 29 июля 2026',
+    '✍️ <b>Оформил:</b> Jasurbek &amp; Co',
   ].join('\n'))
 
   for (const message of [bonus, fine, absence, bonusWithoutNote]) {
     assert.doesNotMatch(message, /\n\n/)
     assert.doesNotMatch(message, /К выплате|Осталось к выплате|Salary due|Remaining salary due/)
-    assert.doesNotMatch(message, /Jasurbek|Оформил|Recorded by/)
+    assert.match(message, /Jasurbek/)
     assert.doesNotMatch(message, /<(?:кассир|Отличная|Опоздание|Болезнь)/)
   }
 })
@@ -526,11 +530,13 @@ test('ZarKebab Team bonus and fine messages localize while absence stays Russian
   assert.equal(uzAbsence, [
     '📅 <b>Отсутствие сотрудника</b>',
     '👤 <b>Gavhar</b> · 🗓 9 августа 2026',
+    '✍️ <b>Оформил:</b> Система',
   ].join('\n'))
   assert.equal(enAbsence, [
     '📅 <b>Отсутствие сотрудника</b>',
     '👤 <b>Gavhar</b> · 🗓 9 августа 2026',
     '📝 Sick leave',
+    '✍️ <b>Оформил:</b> Система',
   ].join('\n'))
 })
 

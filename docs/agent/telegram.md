@@ -37,7 +37,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 ## Team salary events
 
 - Manual bonus, fine, and absence notify Team; salary payments and rate changes have terminal skipped Team status.
-- Team messages include saved amount and full fine reason/absence note, but omit remaining salary balance and manager identity.
+- Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
 - Bonus messages omit payment method for employee, Salary group, and Team.
 - Use shared localized long-date formatting. Optional empty notes are omitted; Team copy stays compact.
 - Historical rows are skipped during migration and never broadcast retroactively.

@@ -119,6 +119,8 @@ const TEAM_EVENT_COPY = {
     absenceTitle: 'Xodim yo\u2018qligi',
     note: 'Izoh',
     reason: 'Sabab',
+    createdBy: 'Rasmiylashtirdi',
+    systemActor: 'Tizim',
   },
   ru: {
     bonusTitle: 'Бонус сотруднику',
@@ -127,6 +129,8 @@ const TEAM_EVENT_COPY = {
     absenceTitle: 'Отсутствие сотрудника',
     note: 'Примечание',
     reason: 'Причина',
+    createdBy: 'Оформил',
+    systemActor: 'Система',
   },
   en: {
     bonusTitle: 'Employee bonus',
@@ -135,6 +139,8 @@ const TEAM_EVENT_COPY = {
     absenceTitle: 'Employee absence',
     note: 'Note',
     reason: 'Reason',
+    createdBy: 'Recorded by',
+    systemActor: 'System',
   },
 }
 
@@ -453,6 +459,7 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
     if (String(detail || '').trim()) {
       lines.push(`📝 ${escapeTelegramHtml(String(detail).trim())}`)
     }
+    lines.push(`✍️ <b>${absenceCopy.createdBy}:</b> ${escapeTelegramHtml(event?.created_by_name || absenceCopy.systemActor)}`)
     return lines.join('\n')
   }
   const lines = [
@@ -468,6 +475,7 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
     const detailLabel = normalizedType === 'fine' ? copy.reason : copy.note
     lines.push(`📝 <b>${detailLabel}:</b> ${escapeTelegramHtml(String(detail).trim())}`)
   }
+  lines.push(`✍️ <b>${copy.createdBy}:</b> ${escapeTelegramHtml(event?.created_by_name || copy.systemActor)}`)
   return lines.join('\n')
 }
 
