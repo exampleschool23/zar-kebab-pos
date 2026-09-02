@@ -10,6 +10,7 @@ import {
   Clock3,
   CreditCard,
   HandCoins,
+  Info,
   Loader2,
   Plus,
   ReceiptText,
@@ -21,6 +22,7 @@ import {
   UtensilsCrossed,
   WalletCards,
   ShoppingBasket,
+  X,
 } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import DateRangePicker from '../components/DateRangePicker'
@@ -204,6 +206,10 @@ function loadPagedResult(loadPage) {
     .catch(error => ({ data: [], error }))
 }
 
+function toKpiDetail([calculation, included]) {
+  return { calculation, included }
+}
+
 export default function Expenses() {
   const { state } = useApp()
   const { profile } = useAuth()
@@ -226,6 +232,7 @@ export default function Expenses() {
   const [message, setMessage] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState('')
   const [deletingExpenseId, setDeletingExpenseId] = useState('')
+  const [selectedKpi, setSelectedKpi] = useState(null)
   const loadRequestRef = useRef(0)
   const [form, setForm] = useState({
     entry_type: 'expense',
@@ -335,6 +342,11 @@ export default function Expenses() {
       confirmDelete: 'Tasdiqlash',
       deleteFailed: 'Xarajatni o‘chirib bo‘lmadi.',
       readOnly: 'Bu rol faqat ko‘ra oladi.',
+      calculationDetails: 'Hisoblash tafsilotlari',
+      howCalculated: 'Qanday hisoblangan',
+      included: 'Nimalar kiritilgan',
+      close: 'Yopish',
+      tapForDetails: 'Hisoblashni ko‘rish uchun bosing',
     },
     ru: {
       title: 'Бухгалтерия',
@@ -433,6 +445,11 @@ export default function Expenses() {
       confirmDelete: 'Подтвердить',
       deleteFailed: 'Не удалось удалить расход.',
       readOnly: 'Эта роль может только просматривать.',
+      calculationDetails: 'Расчёт показателя',
+      howCalculated: 'Как рассчитано',
+      included: 'Что включено',
+      close: 'Закрыть',
+      tapForDetails: 'Нажмите, чтобы увидеть расчёт',
     },
     en: {
       title: 'Accounting',
@@ -531,6 +548,11 @@ export default function Expenses() {
       confirmDelete: 'Confirm',
       deleteFailed: 'Could not delete expense.',
       readOnly: 'This role can view only.',
+      calculationDetails: 'Calculation details',
+      howCalculated: 'How it is calculated',
+      included: 'What is included',
+      close: 'Close',
+      tapForDetails: 'Tap to see the calculation',
     },
   }
   const l = L[lang] || L.en
@@ -706,7 +728,9 @@ export default function Expenses() {
     employeeMealExpensesTotal,
     investorSupportTotal,
     otherIncomeTotal,
+    incomeSummary,
   } = accountingSummary
+  const costTotal = Math.max(0, Number(paidOrderSummary.costTotal ?? paidOrderSummary.cost_total) || 0)
   const currentAccountingDate = todayExpenseDate()
   const salaryDueDate = dateTo < currentAccountingDate ? dateTo : currentAccountingDate
   const payableSalaryProfiles = useMemo(
@@ -722,6 +746,55 @@ export default function Expenses() {
     () => getTotalSalaryDue(payableSalaryProfiles, salaryMonthEndDate),
     [payableSalaryProfiles, salaryMonthEndDate]
   )
+  const periodLabel = `${formatLongDate(dateFrom, lang, dateFrom)} — ${formatLongDate(dateTo, lang, dateTo)}`
+  const kpiDetails = useMemo(() => {
+    const text = {
+      uz: {
+        cafeIncome: ['Tanlangan davrdagi to‘langan buyurtmalardan olingan haqiqiy tushum.', ['Naqd, karta va terminal orqali olingan to‘lovlar', `Loyallik mablag‘i (${formatCurrency(loyaltyIncome)}) alohida ko‘rsatiladi va sarflanadigan tushumga qo‘shilmaydi`]],
+        netProfit: [`${formatCurrency(cafeIncome)} − ${formatCurrency(costTotal)} = ${formatCurrency(netProfit)}`, ['Kafe daromadi', 'Sotilgan mahsulotlarning buyurtma vaqtida saqlangan tannarxi', `Foiz: sof foyda ÷ kafe daromadi = ${profitMarginPct == null ? '—' : `${String(profitMarginPct).replace('.', ',')}%`}`]],
+        average: [`${formatCurrency(selectedRangeCafeIncome.total)} ÷ ${selectedRangeCafeIncome.dayCount} kun = ${formatCurrency(selectedRangeCafeIncome.averageDaily)}`, ['Tanlangan davrning barcha kalendar kunlari (savdo bo‘lmagan kunlar ham)', 'Faqat kafe daromadi; loyallik mablag‘i kiritilmaydi']],
+        investor: ['Tanlangan davrdagi “Investor yordami” turidagi daromad yozuvlari yig‘indisi.', ['Investor yordami yozuvlari', `Boshqa daromad (${formatCurrency(otherIncomeTotal)}) alohida hisoblanadi va bu kartaga qo‘shilmaydi`]],
+        expenses: ['Tanlangan davrdagi barcha xarajat yozuvlari yig‘indisi.', ['Qo‘lda kiritilgan xarajatlar va Kunlik bozor', 'To‘langan maoshlar va bonuslar', 'Yakunlangan xodimlar ovqati hisoblari', 'Daromad yozuvlari kiritilmaydi']],
+        meals: ['Tanlangan davrdagi yakunlangan kunlik ovqat xarajatlari yig‘indisi.', ['Har kun uchun: o‘rtacha ovqat summasi × qatnashgan xodimlar soni', 'Faqat yakunlangan kunlik snapshotlar']],
+        left: [`${formatCurrency(cafeIncome)} + ${formatCurrency(incomeSummary.total)} − ${formatCurrency(summary.total)} = ${formatCurrency(netIncome)}`, ['Kafe daromadi', 'Investor yordami va boshqa tashqi daromadlar', 'Barcha qayd etilgan xarajatlar', 'Loyallik mablag‘i kiritilmaydi']],
+        salaryDue: ['Hisoblangan maosh + bonuslar − jarimalar − to‘lovlar.', ['Ish boshlagan kundan ko‘rsatilgan sanagacha kunlik stavkalar', 'Yo‘qlik kunlari hisoblanmaydi', 'Oldingi qarzlar, bonuslar, jarimalar va amalga oshirilgan to‘lovlar']],
+        salaryMonthEnd: ['Oy oxirigacha prognoz maosh + bonuslar − jarimalar − to‘lovlar.', ['Joriy maosh stavkalari oy oxirigacha davom etadi deb olinadi', 'Ma’lum yo‘qlik kunlari hisoblanmaydi', 'Oldingi qarzlar va qayd etilgan tuzatishlar']],
+      },
+      ru: {
+        cafeIncome: ['Фактически полученные деньги по оплаченным заказам за выбранный период.', ['Оплаты наличными, картой и терминалом', `Оплата лояльностью (${formatCurrency(loyaltyIncome)}) показана отдельно и не входит в доступную выручку`]],
+        netProfit: [`${formatCurrency(cafeIncome)} − ${formatCurrency(costTotal)} = ${formatCurrency(netProfit)}`, ['Доход кафе', 'Историческая себестоимость проданных позиций, сохранённая в заказах', `Процент: чистая прибыль ÷ доход кафе = ${profitMarginPct == null ? '—' : `${String(profitMarginPct).replace('.', ',')}%`}`]],
+        average: [`${formatCurrency(selectedRangeCafeIncome.total)} ÷ ${selectedRangeCafeIncome.dayCount} дн. = ${formatCurrency(selectedRangeCafeIncome.averageDaily)}`, ['Все календарные дни выбранного периода, включая дни без продаж', 'Только доход кафе; оплата лояльностью не включена']],
+        investor: ['Сумма записей дохода с категорией «Поддержка инвестора» за выбранный период.', ['Внесённая поддержка инвестора', `Другой доход (${formatCurrency(otherIncomeTotal)}) считается отдельно и в эту карточку не входит`]],
+        expenses: ['Сумма всех расходных записей за выбранный период.', ['Ручные расходы и Ежедневный базар', 'Выплаченные зарплаты и бонусы', 'Завершённые расчёты питания сотрудников', 'Записи дохода не включены']],
+        meals: ['Сумма завершённых дневных расчётов питания за выбранный период.', ['За каждый день: средняя стоимость питания × количество присутствовавших сотрудников', 'Только финализированные дневные снимки']],
+        left: [`${formatCurrency(cafeIncome)} + ${formatCurrency(incomeSummary.total)} − ${formatCurrency(summary.total)} = ${formatCurrency(netIncome)}`, ['Доход кафе', 'Поддержка инвестора и другой внешний доход', 'Все учтённые расходы', 'Оплата лояльностью не включена']],
+        salaryDue: ['Начисленная зарплата + бонусы − штрафы − выплаты.', ['Дневные ставки с даты начала работы по указанную дату', 'Дни отсутствия не начисляются', 'Прошлый долг, бонусы, штрафы и произведённые выплаты']],
+        salaryMonthEnd: ['Прогноз начислений до конца месяца + бонусы − штрафы − выплаты.', ['Текущие ставки продолжаются до конца месяца', 'Известные дни отсутствия не начисляются', 'Прошлый долг и записанные корректировки']],
+      },
+      en: {
+        cafeIncome: ['Money actually received from paid orders in the selected period.', ['Cash, card, and terminal payments', `Loyalty value (${formatCurrency(loyaltyIncome)}) is shown separately and is not spendable revenue`]],
+        netProfit: [`${formatCurrency(cafeIncome)} − ${formatCurrency(costTotal)} = ${formatCurrency(netProfit)}`, ['Cafe income', 'Historical cost of sold items saved with the orders', `Percentage: net profit ÷ cafe income = ${profitMarginPct == null ? '—' : `${profitMarginPct}%`}`]],
+        average: [`${formatCurrency(selectedRangeCafeIncome.total)} ÷ ${selectedRangeCafeIncome.dayCount} days = ${formatCurrency(selectedRangeCafeIncome.averageDaily)}`, ['Every calendar day in the selected period, including days with no sales', 'Cafe income only; loyalty value is excluded']],
+        investor: ['Total income entries categorized as Investor support in the selected period.', ['Recorded investor support', `Other income (${formatCurrency(otherIncomeTotal)}) is separate and excluded from this card`]],
+        expenses: ['Total of all expense entries in the selected period.', ['Manual expenses and Daily Bazaar', 'Paid salaries and bonuses', 'Finalized employee meal calculations', 'Income entries are excluded']],
+        meals: ['Total finalized daily employee-meal calculations in the selected period.', ['Per day: average meal amount × employees present', 'Finalized daily snapshots only']],
+        left: [`${formatCurrency(cafeIncome)} + ${formatCurrency(incomeSummary.total)} − ${formatCurrency(summary.total)} = ${formatCurrency(netIncome)}`, ['Cafe income', 'Investor support and other external income', 'All recorded expenses', 'Loyalty value is excluded']],
+        salaryDue: ['Accrued salary + bonuses − fines − payments.', ['Daily rates from employment start through the as-of date', 'Absence days are not accrued', 'Earlier debt, bonuses, fines, and completed payments']],
+        salaryMonthEnd: ['Projected accrual through month end + bonuses − fines − payments.', ['Current rates are projected through month end', 'Known absence days are not accrued', 'Earlier debt and recorded adjustments']],
+      },
+    }[lang] || null
+    return {
+      cafeIncome: { title: l.cafeIncome, value: formatCurrency(cafeIncome), ...toKpiDetail(text.cafeIncome) },
+      netProfit: { title: l.netProfit, value: formatCurrencyWithPercentage(netProfit, profitMarginPct, lang), ...toKpiDetail(text.netProfit) },
+      average: { title: l.avgDailyCafeIncome, value: formatCurrency(selectedRangeCafeIncome.averageDaily), ...toKpiDetail(text.average) },
+      investor: { title: l.investorSupport, value: formatCurrency(investorSupportTotal), ...toKpiDetail(text.investor) },
+      expenses: { title: l.expenses, value: formatCurrency(summary.total), ...toKpiDetail(text.expenses) },
+      meals: { title: l.employeeMeals, value: formatCurrency(employeeMealExpensesTotal), ...toKpiDetail(text.meals) },
+      left: { title: l.left, value: formatCurrency(netIncome), ...toKpiDetail(text.left) },
+      salaryDue: { title: l.salaryDue, value: formatCurrency(totalSalaryDue), ...toKpiDetail(text.salaryDue) },
+      salaryMonthEnd: { title: l.salaryDueMonthEnd, value: formatCurrency(totalSalaryDueByMonthEnd), ...toKpiDetail(text.salaryMonthEnd) },
+    }
+  }, [lang, l, cafeIncome, loyaltyIncome, costTotal, netProfit, profitMarginPct, selectedRangeCafeIncome, otherIncomeTotal, investorSupportTotal, incomeSummary.total, summary.total, employeeMealExpensesTotal, netIncome, totalSalaryDue, totalSalaryDueByMonthEnd])
   const categoryRows = Object.entries(summary.byCategory)
     .sort((a, b) => b[1] - a[1])
 
@@ -892,7 +965,7 @@ export default function Expenses() {
               description={`${l.overviewHelp} · ${formatLongDate(dateFrom, lang, dateFrom)} — ${formatLongDate(dateTo, lang, dateTo)}`}
             />
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi icon={WalletCards} label={l.cafeIncome} value={loading ? '—' : formatCurrency(cafeIncome)} sub={loading ? '' : `${l.loyaltyIncome}: ${formatCurrency(loyaltyIncome)}`} tone="green" />
+            <Kpi icon={WalletCards} label={l.cafeIncome} value={loading ? '—' : formatCurrency(cafeIncome)} sub={loading ? '' : `${l.loyaltyIncome}: ${formatCurrency(loyaltyIncome)}`} tone="green" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.cafeIncome)} />
             <Kpi
               icon={BadgeDollarSign}
               label={l.netProfit}
@@ -900,6 +973,8 @@ export default function Expenses() {
               sub={l.netProfitSub}
               tone={netProfit >= 0 ? 'green' : 'red'}
               emphasizeValue
+              detailHint={l.tapForDetails}
+              onClick={loading ? null : () => setSelectedKpi(kpiDetails.netProfit)}
             />
             <Kpi
               icon={CalendarDays}
@@ -907,6 +982,8 @@ export default function Expenses() {
               value={loading ? '—' : formatCurrency(selectedRangeCafeIncome.averageDaily)}
               sub={loading ? l.periodHelp : `${l.periodCafeIncome}: ${formatCurrency(selectedRangeCafeIncome.total)} · ${l.loyaltyIncome}: ${formatCurrency(selectedRangeCafeIncome.loyaltyTotal)}`}
               tone="blue"
+              detailHint={l.tapForDetails}
+              onClick={loading ? null : () => setSelectedKpi(kpiDetails.average)}
             />
             <Kpi
               icon={HandCoins}
@@ -914,16 +991,20 @@ export default function Expenses() {
               value={loading ? '—' : formatCurrency(investorSupportTotal)}
               sub={loading ? l.periodHelp : otherIncomeTotal > 0 ? `${l.otherIncomeSub}: ${formatCurrency(otherIncomeTotal)}` : l.investorSupportSub}
               tone="purple"
+              detailHint={l.tapForDetails}
+              onClick={loading ? null : () => setSelectedKpi(kpiDetails.investor)}
             />
-            <Kpi icon={ReceiptText} label={l.expenses} value={loading ? '—' : formatCurrency(summary.total)} sub={loading ? l.periodHelp : `${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" />
-            <Kpi icon={UtensilsCrossed} label={l.employeeMeals} value={loading ? '—' : formatCurrency(employeeMealExpensesTotal)} sub={l.employeeMealsSub} tone="orange" />
-            <Kpi icon={Banknote} label={l.left} value={loading ? '—' : formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} />
+            <Kpi icon={ReceiptText} label={l.expenses} value={loading ? '—' : formatCurrency(summary.total)} sub={loading ? l.periodHelp : `${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.expenses)} />
+            <Kpi icon={UtensilsCrossed} label={l.employeeMeals} value={loading ? '—' : formatCurrency(employeeMealExpensesTotal)} sub={l.employeeMealsSub} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.meals)} />
+            <Kpi icon={Banknote} label={l.left} value={loading ? '—' : formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.left)} />
             <Kpi
               icon={Users}
               label={l.salaryDue}
               value={loading ? '—' : formatCurrency(totalSalaryDue)}
               sub={`${l.salaryDueAsOf}: ${formatLongDate(salaryDueDate, lang, salaryDueDate)}`}
               tone={totalSalaryDue > 0 ? 'orange' : 'green'}
+              detailHint={l.tapForDetails}
+              onClick={loading ? null : () => setSelectedKpi(kpiDetails.salaryDue)}
             />
             <Kpi
               icon={CalendarDays}
@@ -931,9 +1012,20 @@ export default function Expenses() {
               value={loading ? '—' : formatCurrency(totalSalaryDueByMonthEnd)}
               sub={`${l.salaryDueProjection}: ${formatLongDate(salaryMonthEndDate, lang, salaryMonthEndDate)}`}
               tone={totalSalaryDueByMonthEnd > 0 ? 'red' : 'green'}
+              detailHint={l.tapForDetails}
+              onClick={loading ? null : () => setSelectedKpi(kpiDetails.salaryMonthEnd)}
             />
             </div>
           </section>
+
+          {selectedKpi && (
+            <KpiExplanationDialog
+              detail={selectedKpi}
+              period={periodLabel}
+              labels={l}
+              onClose={() => setSelectedKpi(null)}
+            />
+          )}
 
           <section className="mb-7" aria-labelledby="accounting-operations-heading">
             <SectionHeading id="accounting-operations-heading" title={l.operations} description={l.operationsHelp} />
@@ -1395,7 +1487,7 @@ function Field({ label, children }) {
   )
 }
 
-function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange', emphasizeValue = false }) {
+function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange', emphasizeValue = false, detailHint = '', onClick = null }) {
   const tones = {
     green: 'bg-green-50 text-green-600',
     orange: 'bg-orange-50 text-[#ff5a00]',
@@ -1411,18 +1503,74 @@ function Kpi({ icon: Icon, label, value, sub = '', tone = 'orange', emphasizeVal
     purple: 'text-purple-700',
   }
   const valueTone = emphasizeValue ? valueTones[tone] || valueTones.orange : 'text-[#1F2937]'
+  const Component = onClick ? 'button' : 'div'
   return (
-    <div className="h-full min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+    <Component
+      {...(onClick ? { type: 'button', onClick, 'aria-label': `${label}. ${detailHint}` } : {})}
+      className={`group h-full min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 text-left shadow-sm ${onClick ? 'cursor-pointer transition-all hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a00]/40' : ''}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-bold text-[#6B7280]">{label}</p>
           <p className={`mt-1 break-words text-xl font-black leading-tight tabular-nums ${valueTone}`}>{value}</p>
         </div>
-        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${tones[tone] || tones.orange}`}>
-          <Icon size={18} />
+        <div className={`relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${tones[tone] || tones.orange}`}>
+          <Icon size={18} className={onClick ? 'transition-opacity group-hover:opacity-0' : ''} />
+          {onClick && <Info size={18} className="absolute opacity-0 transition-opacity group-hover:opacity-100" />}
         </div>
       </div>
       {sub && <p className="mt-3 min-h-[30px] text-xs font-medium leading-relaxed text-[#9CA3AF]">{sub}</p>}
+    </Component>
+  )
+}
+
+function KpiExplanationDialog({ detail, period, labels, onClose }) {
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={event => event.target === event.currentTarget && onClose()}>
+      <section role="dialog" aria-modal="true" aria-labelledby="kpi-explanation-title" className="max-h-[88vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-lg sm:rounded-3xl">
+        <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-[#EEF0F3] bg-white px-5 py-4 sm:px-6">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-wider text-[#ff5a00]">{labels.calculationDetails}</p>
+            <h2 id="kpi-explanation-title" className="mt-1 text-xl font-black text-[#1F2937]">{detail.title}</h2>
+            <p className="mt-1 text-xs font-semibold text-[#9CA3AF]">{period}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label={labels.close} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 text-[#6B7280] transition-colors hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a00]/40">
+            <X size={19} />
+          </button>
+        </div>
+        <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+          <div className="rounded-2xl bg-[#FAF7F0] p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-[#9CA3AF]">{detail.title}</p>
+            <p className="mt-1 break-words text-2xl font-black tabular-nums text-[#1F2937]">{detail.value}</p>
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-[#1F2937]">{labels.howCalculated}</h3>
+            <p className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold leading-relaxed text-blue-800">{detail.calculation}</p>
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-[#1F2937]">{labels.included}</h3>
+            <ul className="mt-2 space-y-2">
+              {detail.included.map(item => (
+                <li key={item} className="flex gap-2.5 text-sm font-semibold leading-relaxed text-[#4B5563]">
+                  <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#ff5a00]" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={onClose} className="h-12 w-full rounded-xl bg-[#1F2937] text-sm font-black text-white transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a00]/40">
+            {labels.close}
+          </button>
+        </div>
+      </section>
     </div>
   )
 }
