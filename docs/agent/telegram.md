@@ -48,7 +48,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
 - The aggregate daily report shows the actual cash and terminal income from that day's immutable order-payment rows, with a compact comparison line beside the two amounts. Historical QR normalizes to terminal; historical card and loyalty stay distinct and are not relabeled.
 - The aggregate daily report estimates soliq as 4% of that day's paid cafe revenue, lists it in expenses, includes it in total expenses, and deducts it from daily net profit.
-- Team automatic KPI messages are always Russian and contain only employee name, accrued KPI amount, and date. Never disclose restaurant sales base, KPI percentage, salary due, or manager identity.
+- Team automatic KPI messages are RU and contain only name, amount, and date. Delivery is duplicate-safe; migration `172` restores and backfills missing queue rows. Never expose sales base, KPI rate, salary due, or manager.
 
 ## Menu availability
 

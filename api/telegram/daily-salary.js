@@ -1157,6 +1157,30 @@ async function finalizeEmployeeMealDate(supabase, businessDate) {
   return data?.[0] || null
 }
 
+async function ensureAutomaticKpiDeliveryQueued(supabase, result) {
+  const attemptedAt = new Date().toISOString()
+  const { error } = await supabase
+    .from('employee_salary_group_notification_deliveries')
+    .upsert({
+      event_type: 'bonus',
+      event_id: result.bonus_id,
+      salary_profile_id: result.salary_profile_id,
+      status: 'skipped',
+      error_message: 'Automatic KPI details are sent only to ZarKebab Team',
+      attempted_at: attemptedAt,
+      employee_status: 'skipped',
+      employee_error_message: 'Automatic KPI is included in the combined daily salary summary',
+      employee_attempted_at: attemptedAt,
+      team_status: 'not_attempted',
+      team_error_message: 'Notification request has not started',
+      team_attempted_at: attemptedAt,
+    }, {
+      onConflict: 'event_type,event_id',
+      ignoreDuplicates: true,
+    })
+  if (error) throw error
+}
+
 async function deliverAutomaticKpiBonuses(supabase, results) {
   const generatedResults = (results || []).filter(
     result => result.status === 'generated' && result.bonus_id
@@ -1164,6 +1188,9 @@ async function deliverAutomaticKpiBonuses(supabase, results) {
   const deliveries = []
   for (const result of generatedResults) {
     try {
+      // Self-heal a missing database trigger/ledger row before attempting Team
+      // delivery. The unique event identity keeps cron retries duplicate-safe.
+      await ensureAutomaticKpiDeliveryQueued(supabase, result)
       const delivery = await notifyAutomaticKpiBonus(supabase, result.bonus_id)
       deliveries.push({
         businessDate: result.business_date,

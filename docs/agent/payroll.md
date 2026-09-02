@@ -7,7 +7,7 @@ Read this guide for salary profiles, payments, bonuses, fines, absences, advance
 - UI: `src/pages/Salaries.jsx`, `src/pages/Employees.jsx`, `src/pages/EmployeeSalaryHistory.jsx`
 - Shared logic: `src/lib/salaryTransactions.js`, `src/lib/salaryHistory.js`, `src/lib/dailyKpi.js`, `src/lib/teamProfiles.js`, `src/lib/expenses.js`
 - Notifications and scheduled finalization: `api/telegram/employee-notification.js`, `api/telegram/daily-salary.js`
-- Schema: migrations `099`, `107`–`119`, `124`–`129`, `136`, `141`, `148`, and `169`–`170`
+- Schema: migrations `099`, `107`–`119`, `124`–`129`, `136`, `141`, `148`, and `169`–`170`, `172`
 - Focused tests: `tests/salaryTransactions.test.js`, `tests/salaryHistory.test.js`, `tests/dailyKpi.test.js`, `tests/dailyKpiUi.test.js`, `tests/dailyKpiBonuses.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/telegramSalaryMessages.test.js`
 
 ## Salary ledger
@@ -46,6 +46,7 @@ Read this guide for salary profiles, payments, bonuses, fines, absences, advance
 - Private and Salary-group salary-rate change messages include the KPI percentage or disabled/not-configured status effective on the salary change date.
 - KPI rule additions and changes notify only the dedicated Salary group, with employee, previous/new KPI, effective date, and actor. Employee and Team destinations stay terminally skipped.
 - Automatic KPI employee value is folded into one combined private Salary + Bonus summary. Separate private and Salary-group KPI event rows are skipped; Team KPI remains independently retryable.
+- The daily cron self-heals a missing automatic-KPI delivery ledger row before Team delivery; migration `172` restores the insert trigger and queues any missed generated KPI bonuses.
 - A failed KPI finalization defers the daily salary summary.
 - See `docs/agent/telegram.md` for language, audience privacy, destination, and delivery-state rules.
 

@@ -42,6 +42,10 @@ const kpiRuleGroupNotificationMigration = fs.readFileSync(
   new URL('../supabase/170_kpi_rule_group_notifications.sql', import.meta.url),
   'utf8'
 )
+const kpiTeamQueueRepairMigration = fs.readFileSync(
+  new URL('../supabase/172_repair_daily_kpi_team_delivery_queue.sql', import.meta.url),
+  'utf8'
+)
 
 test('daily KPI migration stores effective-dated rules and immutable result snapshots', () => {
   assert.match(migration, /create table if not exists public\.employee_kpi_rules/i)
@@ -155,6 +159,9 @@ test('automatic bonuses queue Team delivery but skip private and Salary-group de
   assert.match(skipAutomaticKpiGroupMigration, /case when is_automatic_kpi then 'skipped' else 'not_attempted' end/i)
   assert.match(skipAutomaticKpiGroupMigration, /Automatic KPI details are sent only to ZarKebab Team/i)
   assert.match(skipAutomaticKpiGroupMigration, /team_status[\s\S]*?'not_attempted'/i)
+  assert.match(kpiTeamQueueRepairMigration, /create trigger queue_salary_bonus_telegram_delivery_trigger/i)
+  assert.match(kpiTeamQueueRepairMigration, /bonus\.source_type = 'daily_kpi'/i)
+  assert.match(kpiTeamQueueRepairMigration, /not exists \([\s\S]*?employee_salary_group_notification_deliveries/i)
 })
 
 test('automatic KPI runtime suppresses private and Salary-group detail while retaining Team delivery', () => {
@@ -232,6 +239,8 @@ test('daily cron retries recent deliveries and heals older missing KPI dates in 
   assert.match(dailyCron, /supabase\.rpc\('generate_daily_kpi_bonuses'/)
   assert.match(dailyCron, /supabase\.rpc\('generate_employee_daily_meal_expense'/)
   assert.match(dailyCron, /notifyAutomaticKpiBonus\(supabase, result\.bonus_id\)/)
+  assert.match(dailyCron, /ensureAutomaticKpiDeliveryQueued\(supabase, result\)/)
+  assert.match(dailyCron, /onConflict: 'event_type,event_id'[\s\S]*?ignoreDuplicates: true/)
   assert.match(dailyCron, /existing\.status === 'sent'/)
   assert.match(dailyCron, /existing\.status === 'pending'[\s\S]*?canRetryPending/i)
   assert.ok(
