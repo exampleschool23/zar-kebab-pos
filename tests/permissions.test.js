@@ -5,6 +5,7 @@ import {
   FEATURE_DEFINITIONS,
   FEATURE_KEYS,
   assignableRoles,
+  canChangeCompletedOrderPaymentMethod,
   canDeleteTeamMember,
   canDeleteMenuCatalog,
   canChangeMenuItemAvailability,
@@ -124,6 +125,15 @@ test('feature selection keeps sensitive actions attached to relevant pages', () 
     updateFeatureAccessSelection([], 'delete_paid_orders', true),
     ['dashboard', 'delete_paid_orders']
   )
+})
+
+test('delete paid orders access also permits completed-order payment corrections', () => {
+  const paidOrderEditor = { role: 'admin', feature_access: ['reports', 'delete_paid_orders'] }
+
+  assert.equal(canChangeCompletedOrderPaymentMethod(paidOrderEditor), true)
+  assert.equal(canChangeCompletedOrderPaymentMethod({ role: 'admin', feature_access: ['reports'] }), false)
+  assert.equal(canChangeCompletedOrderPaymentMethod({ role: 'viewer', feature_access: ['reports', 'delete_paid_orders'] }), false)
+  assert.equal(canChangeCompletedOrderPaymentMethod('owner'), true)
 })
 
 test('take away and delivery orders require their explicit action plus Tables write access', () => {

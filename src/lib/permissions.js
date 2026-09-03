@@ -179,7 +179,7 @@ export function canDeletePaidOrders(profileOrRole) {
 }
 
 export function canChangeCompletedOrderPaymentMethod(profileOrRole) {
-  return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
+  return canDeletePaidOrders(profileOrRole)
 }
 
 export function canChangeMenuItemAvailability(profileOrRole) {

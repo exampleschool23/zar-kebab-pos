@@ -20,16 +20,17 @@ test('cashier waits for authenticated POS hydration before showing totals', () =
   assert.doesNotMatch(db, /catch \{\s*return null\s*\}/)
 })
 
-test('owner can change completed-order payment methods individually', () => {
+test('delete-paid-orders editors can change completed-order payment methods individually', () => {
   const reports = readSource('src/pages/Reports.jsx')
   const permissions = readSource('src/lib/permissions.js')
   const appContext = readSource('src/store/AppContext.jsx')
   const db = readSource('src/lib/db.js')
   const migration = readSource('supabase/090_owner_change_completed_order_payment_method.sql')
   const individualMigration = readSource('supabase/117_owner_change_individual_payment_methods.sql')
+  const featureAccessMigration = readSource('supabase/173_paid_order_edit_feature_access.sql')
 
   assert.match(permissions, /function canChangeCompletedOrderPaymentMethod/)
-  assert.match(permissions, /=== 'owner'/)
+  assert.match(permissions, /function canChangeCompletedOrderPaymentMethod[\s\S]*canDeletePaidOrders\(profileOrRole\)/)
   assert.match(reports, /Change payment method/)
   assert.match(reports, /Each payment method can be changed separately\. Amounts and loyalty data stay unchanged\./)
   assert.match(reports, /function PaymentMethodBadges/)
@@ -62,6 +63,10 @@ test('owner can change completed-order payment methods individually', () => {
   assert.match(individualMigration, /when method_count > 1 then 'mixed'/)
   assert.match(individualMigration, /grant execute on function public\.change_paid_order_payment_methods_owner\(jsonb\) to authenticated/)
   assert.doesNotMatch(individualMigration, /delete from public\.(order_payments|loyalty_transactions)/)
+  assert.match(featureAccessMigration, /current_staff_can_access\(''delete_paid_orders''\)/)
+  assert.match(featureAccessMigration, /guard_and_audit_order_payment\(\)/)
+  assert.match(featureAccessMigration, /change_paid_order_payment_method_owner\(text\[\],text\)/)
+  assert.match(featureAccessMigration, /change_paid_order_payment_methods_owner\(jsonb\)/)
 })
 
 test('completed order payment metadata uses a full-width responsive amount layout', () => {

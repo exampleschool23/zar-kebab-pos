@@ -119,7 +119,7 @@
     },
     {
       "name": "payments-cashier",
-      "keywords": ["cashier", "bill", "payment", "service", "split", "settlement", "receipt", "loyalty"],
+      "keywords": ["cashier", "bill", "payment", "service", "split", "settlement", "receipt", "loyalty", "delete paid orders", "payment correction"],
       "files": ["src/pages/CashierBill.jsx", "src/pages/CashierTables.jsx", "src/pages/Receipt.jsx", "src/lib/analytics.js", "src/lib/cashierCheckout.js", "src/lib/cashierBills.js", "src/lib/loyalty.js", "src/lib/db.js"],
       "tests": ["tests/orderPayment.test.js", "tests/cashierCheckout.test.js", "tests/cashierPaymentFixes.test.js", "tests/atomicPaymentSettlement.test.js", "tests/loyaltyCards.test.js", "tests/sourceGuards.payments-reporting.test.js"]
     },

@@ -30,11 +30,12 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - immutable sold-item Tech Card ingredient snapshots and duplicate-safe daily ingredient image delivery: `164`–`165`
   - Tashkent-calendar expense backdate enforcement: `166`
   - salary/KPI accrual, notifications, Tech Card catalog access, and Team queue repair: `169`–`172`
+  - paid-order correction feature access: `173`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants
 
-- Use atomic RPCs for multi-table writes such as kitchen submission, menu item + protected cost, Tech Cards, Daily Bazaar, and owner payment corrections.
+- Use atomic RPCs for multi-table writes such as kitchen submission, menu item + protected cost, Tech Cards, Daily Bazaar, and payment corrections.
 - Pair frontend access checks with RLS/RPC enforcement.
 - Preserve immutable historical order, cost, category, payroll-calculation, notification, and audit snapshots.
 - Retries of externally uncertain writes reuse request/round ids and reconcile durable receipts before issuing another mutation.
