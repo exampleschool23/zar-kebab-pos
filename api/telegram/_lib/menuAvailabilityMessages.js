@@ -47,9 +47,8 @@ export function buildMenuAvailableTeamMessage(event) {
   const actorName = firstText(event?.actor_name, 'Неизвестный сотрудник')
 
   return [
-    '✅ <b>Блюдо снова доступно</b>',
-    `🍽 <b>Блюдо:</b> ${escapeTelegramHtml(itemName)}`,
-    `👤 <b>Изменил(а):</b> ${escapeTelegramHtml(actorName)}`,
+    `✅ <b>Снова доступно:</b> ${escapeTelegramHtml(itemName)}`,
+    `👤 ${escapeTelegramHtml(actorName)}`,
   ].join('\n')
 }
 

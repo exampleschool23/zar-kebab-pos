@@ -91,9 +91,9 @@ test('available product Team message is Russian and identifies product and actor
     actor_name: 'Анна & Али',
   })
 
-  assert.match(message, /Блюдо снова доступно/)
-  assert.match(message, /Блюдо:<\/b> Шашлык &lt;Особый&gt;/)
-  assert.match(message, /Изменил\(а\):<\/b> Анна &amp; Али/)
+  assert.match(message, /Снова доступно:<\/b> Шашлык &lt;Особый&gt;/)
+  assert.match(message, /👤 Анна &amp; Али/)
+  assert.equal(message.split('\n').length, 2)
   assert.doesNotMatch(message, /Available|Made by|Product:/)
 })
 
