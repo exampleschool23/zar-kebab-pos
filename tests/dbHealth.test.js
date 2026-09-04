@@ -362,6 +362,7 @@ test('database health reports missing tables and missing RPC', async () => {
     'delete_bazaar_purchase',
     'generate_daily_kpi_bonuses',
     'generate_employee_daily_meal_expense',
+    'get_accounting_all_time_balance',
     'get_accounting_paid_order_summary',
     'get_dashboard_monthly_average_income',
     'get_pending_daily_kpi_dates',

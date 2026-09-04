@@ -130,6 +130,7 @@ const MIGRATION_HINTS = {
   create_menu_item_with_media_and_cost: 'Run supabase/103_menu_item_media_gallery.sql',
   save_menu_item_tech_card: 'Run supabase/139_menu_item_tech_cards.sql, supabase/149_tech_card_menu_item_components.sql, and supabase/154_tech_card_component_variants.sql',
   get_accounting_paid_order_summary: 'Run supabase/109_accounting_paid_order_summary.sql',
+  get_accounting_all_time_balance: 'Run supabase/177_accounting_all_time_balance.sql',
 }
 
 function missingColumnMessage(error) {
@@ -208,6 +209,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
     p_date_from: '2000-01-01',
     p_date_to: '2000-01-01',
   }))
+  checks.push(await checkRpc(dbClient, 'get_accounting_all_time_balance', {}))
   checks.push(await checkRpc(dbClient, 'generate_daily_kpi_bonuses', { p_business_date: null }))
   checks.push(await checkRpc(dbClient, 'generate_employee_daily_meal_expense', { p_business_date: null }))
   checks.push(await checkRpc(dbClient, 'get_pending_daily_kpi_dates', { p_limit: 1 }))

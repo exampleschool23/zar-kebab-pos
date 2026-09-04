@@ -30,7 +30,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 
 - Initial POS state is not an Accounting history result. Do not display today-only operational orders while a selected history range loads.
 - Keep explicit readiness for expenses, paid-order summary/history, and salary data before ending the page loading state.
-- Overview cards use the compact permission-checked paid-order aggregate; do not download complete paid orders for summary KPIs.
+- KPIs use permission-checked aggregates, never full history. The all-time cash remainder excludes unpaid salary liability.
 - Detailed order rows belong to reports, receipts, and drilldowns.
 - Keep the seven KPI cards readable (four then three on large screens). Payment-method balances remain collapsed in the left column.
 

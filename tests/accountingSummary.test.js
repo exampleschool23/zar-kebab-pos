@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-import { loadAccountingPaidOrderSummary } from '../src/lib/accountingSummary.js'
+import { loadAccountingAllTimeBalance, loadAccountingPaidOrderSummary } from '../src/lib/accountingSummary.js'
 
 const migration = readFileSync(
   new URL('../supabase/109_accounting_paid_order_summary.sql', import.meta.url),
@@ -12,6 +12,32 @@ const immutableSnapshotsMigration = readFileSync(
   new URL('../supabase/114_freeze_historical_order_prices_and_costs.sql', import.meta.url),
   'utf8'
 )
+const allTimeBalanceMigration = readFileSync(
+  new URL('../supabase/177_accounting_all_time_balance.sql', import.meta.url),
+  'utf8'
+)
+
+test('Accounting all-time balance loader returns one compact aggregate', async () => {
+  const calls = []
+  const dbClient = {
+    rpc(name, args) {
+      calls.push({ name, args })
+      return Promise.resolve({ data: { balance: '4512450' }, error: null })
+    },
+  }
+
+  assert.equal(await loadAccountingAllTimeBalance({ dbClient }), 4_512_450)
+  assert.deepEqual(calls, [{ name: 'get_accounting_all_time_balance', args: undefined }])
+})
+
+test('Accounting all-time balance includes paid records and excludes salary liability', () => {
+  assert.match(allTimeBalanceMigration, /current_staff_can_access\('expenses'\)/)
+  assert.match(allTimeBalanceMigration, /public\.employee_salary_payments/)
+  assert.match(allTimeBalanceMigration, /b\.accrues_to_salary is not true/)
+  assert.match(allTimeBalanceMigration, /public\.employee_daily_meal_expenses/)
+  assert.doesNotMatch(allTimeBalanceMigration, /employee_salary_rates|employee_salary_fines|getSalaryDue/)
+  assert.match(allTimeBalanceMigration, /grant execute on function public\.get_accounting_all_time_balance\(\)/)
+})
 
 test('Accounting summary loader uses one RPC and returns no complete order rows', async () => {
   const calls = []

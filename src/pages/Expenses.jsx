@@ -36,7 +36,7 @@ import {
   getAccountingPageSummaryFromOrderSummary,
   getAccountingQuickRange,
 } from '../lib/accounting'
-import { loadAccountingPaidOrderSummary } from '../lib/accountingSummary'
+import { loadAccountingAllTimeBalance, loadAccountingPaidOrderSummary } from '../lib/accountingSummary'
 import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
 import { formatLongDate, formatTime } from '../lib/dateFormat'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
@@ -226,6 +226,7 @@ export default function Expenses() {
   const [salaryProfiles, setSalaryProfiles] = useState([])
   const [employeeMealSnapshots, setEmployeeMealSnapshots] = useState([])
   const [paidOrderSummary, setPaidOrderSummary] = useState({})
+  const [allTimeBalance, setAllTimeBalance] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -262,6 +263,8 @@ export default function Expenses() {
       employeeMeals: 'Xodimlar ovqatining o‘rtacha qiymati',
       employeeMealsSub: 'Davomat bo‘yicha hisoblangan',
       left: 'Qolgan pul',
+      allTimeLeft: 'Barcha vaqtdagi qoldiq',
+      allTimeLeftSub: 'Barcha qayd etilgan kirim minus to‘langan xarajatlar',
       add: 'Xarajat qo‘shish',
       addIncome: 'Investor yordamini qo‘shish',
       date: 'Sana',
@@ -365,6 +368,8 @@ export default function Expenses() {
       employeeMeals: 'Среднее питание сотрудников',
       employeeMealsSub: 'Рассчитано по посещаемости',
       left: 'Остаток',
+      allTimeLeft: 'Остаток за всё время',
+      allTimeLeftSub: 'Все учтённые поступления минус оплаченные расходы',
       add: 'Добавить расход',
       addIncome: 'Добавить поддержку инвестора',
       date: 'Дата',
@@ -468,6 +473,8 @@ export default function Expenses() {
       employeeMeals: 'Avg employees meal',
       employeeMealsSub: 'Calculated from attendance',
       left: 'Left',
+      allTimeLeft: 'All-time left',
+      allTimeLeftSub: 'All recorded income minus paid expenses',
       add: 'Add expense',
       addIncome: 'Add investor support',
       date: 'Date',
@@ -603,13 +610,17 @@ export default function Expenses() {
     const orderPromise = loadAccountingPaidOrderSummary(dateFrom, dateTo, { fallbackMenuItemMap })
       .then(data => ({ data, error: null }))
       .catch(error => ({ data: {}, error }))
+    const allTimeBalancePromise = loadAccountingAllTimeBalance()
+      .then(data => ({ data, error: null }))
+      .catch(error => ({ data: null, error }))
 
     const [
       expenseResult,
       orderHistoryResult,
+      allTimeBalanceResult,
       employeeMealResult,
       [salaryProfileResult, salaryRateResult, salaryPaymentResult, salaryBonusResult, salaryFineResult, salaryAbsenceResult, teamResult],
-    ] = await Promise.all([expensePromise, orderPromise, employeeMealPromise, salaryPromise])
+    ] = await Promise.all([expensePromise, orderPromise, allTimeBalancePromise, employeeMealPromise, salaryPromise])
     if (requestId !== loadRequestRef.current) return
 
     let loadError = ''
@@ -628,6 +639,8 @@ export default function Expenses() {
     } else {
       setPaidOrderSummary(orderHistoryResult.data || {})
     }
+
+    setAllTimeBalance(allTimeBalanceResult.error ? null : allTimeBalanceResult.data)
 
     if (employeeMealResult.error) {
       setEmployeeMealSnapshots([])
@@ -1003,6 +1016,7 @@ export default function Expenses() {
             <Kpi icon={ReceiptText} label={l.expenses} value={loading ? '—' : formatCurrency(summary.total)} sub={loading ? l.periodHelp : `${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.expenses)} />
             <Kpi icon={UtensilsCrossed} label={l.employeeMeals} value={loading ? '—' : formatCurrency(employeeMealExpensesTotal)} sub={l.employeeMealsSub} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.meals)} />
             <Kpi icon={Banknote} label={l.left} value={loading ? '—' : formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.left)} />
+            <Kpi icon={WalletCards} label={l.allTimeLeft} value={loading || allTimeBalance == null ? '—' : formatCurrency(allTimeBalance)} sub={l.allTimeLeftSub} tone={allTimeBalance == null || allTimeBalance >= 0 ? 'blue' : 'red'} />
             <Kpi
               icon={Users}
               label={l.salaryDue}

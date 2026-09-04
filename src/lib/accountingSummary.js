@@ -35,3 +35,10 @@ export async function loadAccountingPaidOrderSummary(dateFrom, dateTo, options =
     options.fallbackMenuItemMap
   )
 }
+
+export async function loadAccountingAllTimeBalance(options = {}) {
+  const dbClient = options.dbClient || supabase
+  const { data, error } = await dbClient.rpc('get_accounting_all_time_balance')
+  if (error) throw error
+  return Math.round(Number(data?.balance ?? data) || 0)
+}
