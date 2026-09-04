@@ -291,6 +291,12 @@ export default function Expenses() {
       periodHelp: 'Quyidagi barcha ko‘rsatkichlar va tarix tanlangan davrga tegishli.',
       overview: 'Moliyaviy ko‘rinish',
       overviewHelp: 'Kafe daromadi, xarajatlar va qolgan mablag‘ bir joyda.',
+      overviewIncome: 'Daromad va foyda',
+      overviewIncomeHelp: 'Tanlangan davrdagi savdo natijalari va tashqi tushumlar.',
+      overviewCash: 'Xarajatlar va qoldiq',
+      overviewCashHelp: 'Pul chiqimi va hozir mavjud bo‘lgan mablag‘.',
+      overviewSalary: 'Maosh majburiyatlari',
+      overviewSalaryHelp: 'Hozirgi qarz va oy oxirigacha kutilayotgan summa.',
       operations: 'Yozuv va tahlil',
       operationsHelp: 'Yangi operatsiyani yozing va pul qayerga ketayotganini ko‘ring.',
       recentActivity: 'So‘nggi operatsiyalar',
@@ -396,6 +402,12 @@ export default function Expenses() {
       periodHelp: 'Все показатели и история ниже относятся к выбранному периоду.',
       overview: 'Финансовый обзор',
       overviewHelp: 'Доход кафе, расходы и остаток собраны в одном месте.',
+      overviewIncome: 'Доход и прибыль',
+      overviewIncomeHelp: 'Результаты продаж и внешние поступления за выбранный период.',
+      overviewCash: 'Расходы и остаток',
+      overviewCashHelp: 'Отток денег и доступные средства на текущий момент.',
+      overviewSalary: 'Зарплатные обязательства',
+      overviewSalaryHelp: 'Текущий долг и прогнозируемая сумма к концу месяца.',
       operations: 'Запись и анализ',
       operationsHelp: 'Запишите новую операцию и посмотрите, куда уходят деньги.',
       recentActivity: 'Последние операции',
@@ -501,6 +513,12 @@ export default function Expenses() {
       periodHelp: 'All totals and history below use the selected period.',
       overview: 'Financial overview',
       overviewHelp: 'Cafe income, expenses, and remaining money in one place.',
+      overviewIncome: 'Income and profit',
+      overviewIncomeHelp: 'Sales performance and external income for the selected period.',
+      overviewCash: 'Spending and balances',
+      overviewCashHelp: 'Money going out and the funds currently available.',
+      overviewSalary: 'Salary obligations',
+      overviewSalaryHelp: 'Amount due now and projected through the end of the month.',
       operations: 'Record and analyse',
       operationsHelp: 'Record a new transaction and see where the money is going.',
       recentActivity: 'Recent activity',
@@ -983,7 +1001,10 @@ export default function Expenses() {
               title={l.overview}
               description={`${l.overviewHelp} · ${formatLongDate(dateFrom, lang, dateFrom)} — ${formatLongDate(dateTo, lang, dateTo)}`}
             />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-5">
+              <div aria-labelledby="accounting-income-heading">
+                <OverviewGroupHeading id="accounting-income-heading" title={l.overviewIncome} description={l.overviewIncomeHelp} tone="green" />
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi icon={WalletCards} label={l.cafeIncome} value={loading ? '—' : formatCurrency(cafeIncome)} sub={loading ? '' : `${l.loyaltyIncome}: ${formatCurrency(loyaltyIncome)}`} tone="green" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.cafeIncome)} />
             <Kpi
               icon={BadgeDollarSign}
@@ -1013,10 +1034,22 @@ export default function Expenses() {
               detailHint={l.tapForDetails}
               onClick={loading ? null : () => setSelectedKpi(kpiDetails.investor)}
             />
+                </div>
+              </div>
+
+              <div aria-labelledby="accounting-cash-heading">
+                <OverviewGroupHeading id="accounting-cash-heading" title={l.overviewCash} description={l.overviewCashHelp} tone="orange" />
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi icon={ReceiptText} label={l.expenses} value={loading ? '—' : formatCurrency(summary.total)} sub={loading ? l.periodHelp : `${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.expenses)} />
             <Kpi icon={UtensilsCrossed} label={l.employeeMeals} value={loading ? '—' : formatCurrency(employeeMealExpensesTotal)} sub={l.employeeMealsSub} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.meals)} />
             <Kpi icon={Banknote} label={l.left} value={loading ? '—' : formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.left)} />
             <Kpi icon={WalletCards} label={l.allTimeLeft} value={loading || allTimeBalance == null ? '—' : formatCurrency(allTimeBalance)} sub={l.allTimeLeftSub} tone={allTimeBalance == null || allTimeBalance >= 0 ? 'blue' : 'red'} />
+                </div>
+              </div>
+
+              <div aria-labelledby="accounting-salary-heading">
+                <OverviewGroupHeading id="accounting-salary-heading" title={l.overviewSalary} description={l.overviewSalaryHelp} tone="red" />
+                <div className="grid gap-3 sm:grid-cols-2 lg:max-w-[calc(50%-0.375rem)]">
             <Kpi
               icon={Users}
               label={l.salaryDue}
@@ -1035,6 +1068,8 @@ export default function Expenses() {
               detailHint={l.tapForDetails}
               onClick={loading ? null : () => setSelectedKpi(kpiDetails.salaryMonthEnd)}
             />
+                </div>
+              </div>
             </div>
           </section>
 
@@ -1276,6 +1311,23 @@ function SectionHeading({ id, title, description }) {
     <div className="mb-3">
       <h2 id={id} className="text-lg font-black text-[#1F2937]">{title}</h2>
       <p className="mt-0.5 text-sm font-medium text-[#6B7280]">{description}</p>
+    </div>
+  )
+}
+
+function OverviewGroupHeading({ id, title, description, tone }) {
+  const dotTone = {
+    green: 'bg-green-500',
+    orange: 'bg-orange-500',
+    red: 'bg-red-500',
+  }
+  return (
+    <div className="mb-2.5 flex items-start gap-2.5">
+      <span aria-hidden="true" className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${dotTone[tone] || dotTone.orange}`} />
+      <div>
+        <h3 id={id} className="text-sm font-black text-[#374151]">{title}</h3>
+        <p className="mt-0.5 text-xs font-medium text-[#9CA3AF]">{description}</p>
+      </div>
     </div>
   )
 }
