@@ -1040,9 +1040,9 @@ export default function Expenses() {
               <div aria-labelledby="accounting-cash-heading">
                 <OverviewGroupHeading id="accounting-cash-heading" title={l.overviewCash} description={l.overviewCashHelp} tone="orange" />
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi icon={ReceiptText} label={l.expenses} value={loading ? '—' : formatCurrency(summary.total)} sub={loading ? l.periodHelp : `${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.expenses)} />
+            <Kpi icon={ReceiptText} label={l.expenses} value={loading ? '—' : formatCurrency(summary.total)} sub={loading ? l.periodHelp : `${l.period}: ${periodLabel} · ${summary.count} ${l.expenses.toLowerCase()}`} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.expenses)} />
             <Kpi icon={UtensilsCrossed} label={l.employeeMeals} value={loading ? '—' : formatCurrency(employeeMealExpensesTotal)} sub={l.employeeMealsSub} tone="orange" detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.meals)} />
-            <Kpi icon={Banknote} label={l.left} value={loading ? '—' : formatCurrency(netIncome)} tone={netIncome >= 0 ? 'blue' : 'red'} detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.left)} />
+            <Kpi icon={Banknote} label={l.left} value={loading ? '—' : formatCurrency(netIncome)} sub={loading ? l.periodHelp : `${l.period}: ${periodLabel}`} tone={netIncome >= 0 ? 'blue' : 'red'} detailHint={l.tapForDetails} onClick={loading ? null : () => setSelectedKpi(kpiDetails.left)} />
             <Kpi icon={WalletCards} label={l.allTimeLeft} value={loading || allTimeBalance == null ? '—' : formatCurrency(allTimeBalance)} sub={l.allTimeLeftSub} tone={allTimeBalance == null || allTimeBalance >= 0 ? 'blue' : 'red'} />
                 </div>
               </div>
