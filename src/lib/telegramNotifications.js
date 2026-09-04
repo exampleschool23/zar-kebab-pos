@@ -95,6 +95,23 @@ export async function notifyTelegramAbsenceUndo(absenceId) {
   }
 }
 
+export async function notifyTelegramEmployeeLifecycle(salaryProfileId, lifecycleEventType) {
+  const failedResult = { ok: false, status: 'failed', errorMessage: '' }
+  if (!salaryProfileId || !['created', 'activated', 'deactivated'].includes(lifecycleEventType)) {
+    return failedResult
+  }
+  try {
+    return await postAuthenticatedTelegramNotification({
+      type: 'employee_lifecycle',
+      salaryProfileId,
+      lifecycleEventType,
+    })
+  } catch (error) {
+    console.warn('[telegram] Investor employee lifecycle notification failed:', error)
+    return { ...failedResult, errorMessage: String(error?.message || error) }
+  }
+}
+
 export function notifyTelegramEmployeeRate(rateId) {
   return notifyTelegramSalaryEvent('rate', rateId)
 }

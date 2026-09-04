@@ -37,6 +37,7 @@ import {
   notifyTelegramEmployeeAbsence,
   notifyTelegramEmployeeBonus,
   notifyTelegramEmployeeFine,
+  notifyTelegramEmployeeLifecycle,
   notifyTelegramEmployeePayment,
   notifyTelegramEmployeeRate,
   notifyTelegramKpiRuleChange,
@@ -192,6 +193,7 @@ export default function Salaries() {
       absenceHelp: 'Tanlangan sana uchun ishga kelmagan xodimni belgilang.',
       absenceDuplicate: 'Bu xodimning tanlangan sanadagi yo‘qligi allaqachon belgilangan.',
       createdMessage: 'Xodim maoshi qo‘shildi',
+      lifecycleTelegramFailed: 'Xodim o‘zgarishi saqlandi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
       rateSavedMessage: 'Yangi maosh stavkasi saqlandi',
       rateTelegramFailed: 'Maosh stavkasi saqlandi, lekin Telegram xabarlari yuborilmadi. 116-migratsiya va yetkazib berish holatini tekshiring.',
       transactionSavedMessage: 'Operatsiya saqlandi',
@@ -330,6 +332,7 @@ export default function Salaries() {
       absenceHelp: 'Отметьте сотрудника, который отсутствовал в выбранную дату.',
       absenceDuplicate: 'Отсутствие этого сотрудника на выбранную дату уже отмечено.',
       createdMessage: 'Зарплата сотрудника добавлена',
+      lifecycleTelegramFailed: 'Изменение сотрудника сохранено, но сообщение в группу ZarKebab Investor не отправлено.',
       rateSavedMessage: 'Новая ставка зарплаты сохранена',
       rateTelegramFailed: 'Ставка зарплаты сохранена, но сообщения в Telegram не отправлены. Проверьте миграцию 116 и статус доставки.',
       transactionSavedMessage: 'Операция сохранена',
@@ -468,6 +471,7 @@ export default function Salaries() {
       absenceHelp: 'Mark the employee who was absent on the selected date.',
       absenceDuplicate: 'This employee is already marked absent on the selected date.',
       createdMessage: 'Employee salary added',
+      lifecycleTelegramFailed: 'The employee change was saved, but the ZarKebab Investor group notification was not sent.',
       rateSavedMessage: 'New salary rate saved',
       rateTelegramFailed: 'The salary rate was saved, but Telegram messages were not sent. Check migration 116 and the delivery status.',
       transactionSavedMessage: 'Transaction saved',
@@ -1172,6 +1176,8 @@ export default function Salaries() {
     setMessage(l.createdMessage)
     setForm(current => ({ ...current, employee_name: '', salary_amount: '' }))
     await loadData({ refreshTelegram: false })
+    const notification = await notifyTelegramEmployeeLifecycle(salaryProfile.id, 'created')
+    if (!notification?.ok) setError(l.lifecycleTelegramFailed)
   }
 
   async function addRate() {
@@ -1377,6 +1383,11 @@ export default function Salaries() {
       return
     }
     await loadData()
+    const notification = await notifyTelegramEmployeeLifecycle(
+      salaryProfile.id,
+      nextActive ? 'activated' : 'deactivated',
+    )
+    if (!notification?.ok) setError(l.lifecycleTelegramFailed)
   }
 
   async function removeSalaryProfile(salaryProfile) {
@@ -1402,6 +1413,8 @@ export default function Salaries() {
       return
     }
     await loadData()
+    const notification = await notifyTelegramEmployeeLifecycle(salaryProfile.id, 'deactivated')
+    if (!notification?.ok) setError(l.lifecycleTelegramFailed)
   }
 
   if (loading) {

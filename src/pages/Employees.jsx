@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
 import { compareSalaryAbsencesNewestFirst } from '../lib/salaryTransactions'
 import { formatKpiRatePercent, getEffectiveKpiRule } from '../lib/dailyKpi'
-import { notifyTelegramAbsenceUndo } from '../lib/telegramNotifications'
+import { notifyTelegramAbsenceUndo, notifyTelegramEmployeeLifecycle } from '../lib/telegramNotifications'
 import {
   getDailySalaryAmount,
   getSalaryAbsenceForDate,
@@ -110,6 +110,7 @@ export default function Employees() {
       confirm: 'Tasdiqlash',
       empty: 'Xodimlar hali qo‘shilmagan',
       migration: 'Maosh jadvallari yangilanmagan. Supabase SQL editorida employee_salary migratsiyalarini ishga tushiring.',
+      lifecycleNotificationFailed: 'Xodim holati saqlandi, lekin ZarKebab Investor guruhiga xabar yuborilmadi.',
     },
     ru: {
       title: 'Сотрудники',
@@ -156,6 +157,7 @@ export default function Employees() {
       confirm: 'Подтвердить',
       empty: 'Сотрудники еще не добавлены',
       migration: 'Таблицы зарплат не обновлены. Запустите миграции employee_salary в Supabase SQL Editor.',
+      lifecycleNotificationFailed: 'Статус сотрудника сохранён, но сообщение в группу ZarKebab Investor не отправлено.',
     },
     en: {
       title: 'Employees',
@@ -202,6 +204,7 @@ export default function Employees() {
       confirm: 'Confirm',
       empty: 'No employees added yet',
       migration: 'Salary tables are not up to date. Run the employee_salary migrations in Supabase SQL Editor.',
+      lifecycleNotificationFailed: 'The employee status was saved, but the ZarKebab Investor group notification was not sent.',
     },
   }
   const l = L[lang] || L.en
@@ -338,7 +341,12 @@ export default function Employees() {
       delete next[employee.id]
       return next
     })
+    const notification = await notifyTelegramEmployeeLifecycle(
+      employee.id,
+      nextActive ? 'activated' : 'deactivated',
+    )
     await loadEmployees()
+    if (!notification?.ok) setError(l.lifecycleNotificationFailed)
   }
 
   async function undoEmployeeAbsence(employee) {

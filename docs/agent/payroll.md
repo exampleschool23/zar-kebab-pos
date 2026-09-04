@@ -27,6 +27,7 @@ Read this guide for salary profiles, payments, bonuses, fines, absences, advance
 - Undo absence requires confirmation and an exact delete guarded by absence id, salary profile id, and date. Zero affected rows is an error.
 - Salary-history deletion retracts each directly tracked employee, Salary-group, and Team Telegram message before deleting the source row. If Telegram refuses a retraction, keep the source row so the operator can retry; deleted bonus/fine/absence/rate events then remove their polymorphic delivery records so they cannot remain retryable.
 - Deactivation/reactivation work boundaries are inclusive; only intervening dates become absences. Archived `deleted_at` is exclusive after the last working date.
+- Employee creation, activation, and deactivation queue immutable Investor lifecycle notifications at the database boundary. Both Salaries and Employees request the same retry-safe delivery after a successful workflow.
 
 ## Daily KPI bonus
 

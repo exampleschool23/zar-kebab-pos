@@ -8,7 +8,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 - Notification client and server endpoints: `src/lib/telegramNotifications.js`, `api/telegram/`
 - Shared server delivery logic: `api/telegram/_lib/`
 - Bot polling fallback: `bots/telegram-bot.js`
-- Focused tests: `tests/telegramOrderStatus.test.js`, `tests/telegramSalaryMessages.test.js`, `tests/telegramDeliveryRetry.test.js`, `tests/telegramDailyBazaar.test.js`, `tests/telegramInvestorExpense.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
+- Focused tests include `tests/telegramEmployeeLifecycle.test.js`, `tests/dailySalaryWatchdog.test.js`, and `tests/sourceGuards.accounting-reporting.test.js`.
 
 ## Customer Mini App
 
@@ -58,6 +58,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 
 ## Investor notifications
 
+- Employee creation, activation, and deactivation queue immutable, retry-safe Investor events with employee, date, and actor snapshots.
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Order deletes and payment corrections queue immutable Investor alerts with order, total, actor, and tender snapshots.
 - Manual cash-expense alerts remain localized text. A new Daily Bazaar purchase is sent as one localized PNG receipt with a short photo caption containing amount, date, category, optional description, creator, and the recorded monthly total; do not also send the numbered text receipt.

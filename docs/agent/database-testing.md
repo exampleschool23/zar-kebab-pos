@@ -33,6 +33,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - paid-order correction feature access: `173`
   - Investor alerts for order deletes and payment corrections, including the shared-trigger row-type repair: `175`–`176`
   - compact all-time Accounting remainder: `177`
+  - employee lifecycle Investor notification queue: `178`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants

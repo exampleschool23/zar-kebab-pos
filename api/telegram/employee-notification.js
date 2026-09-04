@@ -17,6 +17,7 @@ import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { deleteTelegramMessage, sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
 import {
   buildAbsenceUndoInvestorMessage,
+  buildEmployeeLifecycleInvestorMessage,
   buildInvestorExpenseGroupMessage,
   buildInvestorIncomeGroupMessage,
   buildInvestorOrderChangeMessage,
@@ -381,6 +382,19 @@ function savedInvestorExpenseDeliveryResult(delivery, duplicate = true) {
     status: delivery?.status || 'pending',
     duplicate,
     deliveryId: delivery?.expense_id || null,
+    target: delivery?.target_key || 'salary_events',
+    telegramMessageId: delivery?.telegram_message_id || null,
+    sentAt: delivery?.sent_at || null,
+    errorMessage: delivery?.error_message || '',
+  }
+}
+
+function savedEmployeeLifecycleDeliveryResult(delivery, duplicate = true) {
+  return {
+    ok: delivery?.status === 'sent',
+    status: delivery?.status || 'pending',
+    duplicate,
+    deliveryId: delivery?.id || null,
     target: delivery?.target_key || 'salary_events',
     telegramMessageId: delivery?.telegram_message_id || null,
     sentAt: delivery?.sent_at || null,
@@ -1672,6 +1686,89 @@ async function notifyInvestorExpense(supabase, user, expenseId) {
   }
 }
 
+async function notifyEmployeeLifecycle(supabase, user, salaryProfileId, lifecycleEventType) {
+  const normalizedProfileId = String(salaryProfileId || '').trim()
+  const normalizedEventType = String(lifecycleEventType || '').trim()
+  if (!normalizedProfileId || !['created', 'activated', 'deactivated'].includes(normalizedEventType)) {
+    throw Object.assign(new Error('salaryProfileId and a valid lifecycleEventType are required'), { status: 400 })
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from('employee_lifecycle_investor_notification_deliveries')
+    .select('*')
+    .eq('salary_profile_id', normalizedProfileId)
+    .eq('event_type', normalizedEventType)
+    .eq('actor_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (!existing) throw Object.assign(new Error('Employee lifecycle notification event not found'), { status: 404 })
+  if (!canRetryInvestorExpenseDelivery(existing)) {
+    return savedEmployeeLifecycleDeliveryResult(existing)
+  }
+
+  const target = await loadSalaryGroupTarget(supabase)
+  const now = new Date().toISOString()
+  const pendingFields = {
+    status: target.chatId ? 'pending' : 'skipped',
+    telegram_chat_id: target.chatId || null,
+    telegram_message_id: null,
+    error_message: target.chatId ? '' : 'ZarKebab Investor Telegram group is not configured',
+    attempted_at: now,
+    sent_at: null,
+    updated_at: now,
+  }
+  const claimed = await supabase
+    .from('employee_lifecycle_investor_notification_deliveries')
+    .update(pendingFields)
+    .eq('id', existing.id)
+    .eq('status', existing.status)
+    .eq('updated_at', existing.updated_at)
+    .select('*')
+    .maybeSingle()
+  if (claimed.error) throw claimed.error
+  if (!claimed.data) {
+    const { data: concurrent, error: concurrentError } = await supabase
+      .from('employee_lifecycle_investor_notification_deliveries')
+      .select('*')
+      .eq('id', existing.id)
+      .single()
+    if (concurrentError) throw concurrentError
+    return savedEmployeeLifecycleDeliveryResult(concurrent)
+  }
+  if (!target.chatId) return savedEmployeeLifecycleDeliveryResult(claimed.data, false)
+
+  try {
+    const response = await sendTelegramMessage(
+      target.chatId,
+      buildEmployeeLifecycleInvestorMessage(claimed.data, target.language),
+    )
+    const sentAt = new Date().toISOString()
+    const { data: sentDelivery, error: updateError } = await supabase
+      .from('employee_lifecycle_investor_notification_deliveries')
+      .update({
+        status: 'sent',
+        telegram_message_id: getTelegramMessageId(response),
+        error_message: '',
+        sent_at: sentAt,
+        updated_at: sentAt,
+      })
+      .eq('id', existing.id)
+      .select('*')
+      .single()
+    if (updateError) throw updateError
+    return savedEmployeeLifecycleDeliveryResult(sentDelivery, false)
+  } catch (error) {
+    const errorMessage = String(error?.message || error).slice(0, 1000)
+    await supabase
+      .from('employee_lifecycle_investor_notification_deliveries')
+      .update({ status: 'failed', error_message: errorMessage, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+    return { ...savedEmployeeLifecycleDeliveryResult(existing, false), ok: false, status: 'failed', errorMessage }
+  }
+}
+
 async function notifyInvestorIncome(supabase, user, expenseId) {
   const { data: expense, error } = await supabase
     .from('expenses')
@@ -1849,6 +1946,8 @@ export default async function handler(req, res) {
       expenseId,
       orderIds,
       menuItemId,
+      salaryProfileId,
+      lifecycleEventType,
     } = await readJson(req)
     const notificationType = type
       || (paymentId
@@ -1879,6 +1978,7 @@ export default async function handler(req, res) {
       investor_income: expenseId,
       absence_undo: absenceId,
       order_change: orderIds?.[0],
+      employee_lifecycle: salaryProfileId,
     }
     const isMenuUnavailable = notificationType === 'menu_unavailable'
     const isMenuAvailable = notificationType === 'menu_available'
@@ -1886,7 +1986,7 @@ export default async function handler(req, res) {
     const isMenuArchived = notificationType === 'menu_archived'
     const isMenuEvent = isMenuUnavailable || isMenuAvailable || isMenuCreated || isMenuArchived
     const isSalaryRetraction = notificationType === 'retract_salary_event'
-    if (!isMenuEvent && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'kpi_rule', 'expense', 'investor_income', 'order_change'].includes(notificationType)) {
+    if (!isMenuEvent && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'kpi_rule', 'expense', 'investor_income', 'order_change', 'employee_lifecycle'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (isMenuEvent && !menuItemId) {
@@ -1929,6 +2029,8 @@ export default async function handler(req, res) {
       result = await notifyInvestorIncome(supabase, user, expenseId)
     } else if (notificationType === 'absence_undo') {
       result = await notifyAbsenceUndo(supabase, user, absenceId)
+    } else if (notificationType === 'employee_lifecycle') {
+      result = await notifyEmployeeLifecycle(supabase, user, salaryProfileId, lifecycleEventType)
     } else if (notificationType === 'payment') {
       result = await notifyPayment(supabase, user, paymentId)
     } else {

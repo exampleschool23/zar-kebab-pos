@@ -174,6 +174,47 @@ export function buildAbsenceUndoInvestorMessage(delivery, language = 'ru') {
   return lines.join('\n')
 }
 
+export function buildEmployeeLifecycleInvestorMessage(delivery, language = 'ru') {
+  const lang = normalizeLanguage(language)
+  const copy = {
+    uz: {
+      created: 'Yangi xodim qo‘shildi',
+      activated: 'Xodim faollashtirildi',
+      deactivated: 'Xodim faolsizlantirildi',
+      employee: 'Xodim',
+      date: 'Sana',
+      actor: 'Amalni bajargan',
+    },
+    ru: {
+      created: 'Добавлен новый сотрудник',
+      activated: 'Сотрудник активирован',
+      deactivated: 'Сотрудник деактивирован',
+      employee: 'Сотрудник',
+      date: 'Дата',
+      actor: 'Изменил(а)',
+    },
+    en: {
+      created: 'New employee added',
+      activated: 'Employee activated',
+      deactivated: 'Employee deactivated',
+      employee: 'Employee',
+      date: 'Date',
+      actor: 'Changed by',
+    },
+  }[lang]
+  const eventType = ['created', 'activated', 'deactivated'].includes(delivery?.event_type)
+    ? delivery.event_type
+    : 'created'
+  const icon = eventType === 'deactivated' ? '⛔️' : eventType === 'activated' ? '✅' : '👤'
+  const lines = [
+    `${icon} <b>${copy[eventType]}</b>`,
+    `${copy.employee}: <b>${escapeTelegramHtml(delivery?.employee_name || '—')}</b>`,
+    `${copy.date}: ${escapeTelegramHtml(formatLongDate(delivery?.effective_date, lang, delivery?.effective_date || '—'))}`,
+  ]
+  if (delivery?.actor_name) lines.push(`${copy.actor}: ${escapeTelegramHtml(delivery.actor_name)}`)
+  return lines.join('\n')
+}
+
 export function buildInvestorOrderChangeMessage(delivery, language = 'ru') {
   const lang = normalizeLanguage(language)
   const copy = {
