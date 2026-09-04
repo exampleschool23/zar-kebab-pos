@@ -140,6 +140,7 @@ export default function EmployeeSalaryHistory() {
       fine: 'Jarima',
       absence: 'Kelmagan',
       paidTotal: 'To‘langan',
+      salaryEarnedTotal: 'Hisoblangan maosh',
       bonusTotal: 'Bonuslar',
       kpiBonusTotal: 'KPI bonuslari',
       fineTotal: 'Jarimalar',
@@ -194,6 +195,7 @@ export default function EmployeeSalaryHistory() {
       fine: 'Штраф',
       absence: 'Отсутствовал',
       paidTotal: 'Выплачено',
+      salaryEarnedTotal: 'Начисленная зарплата',
       bonusTotal: 'Бонусы',
       kpiBonusTotal: 'KPI-бонусы',
       fineTotal: 'Штрафы',
@@ -248,6 +250,7 @@ export default function EmployeeSalaryHistory() {
       fine: 'Fine',
       absence: 'Absent',
       paidTotal: 'Paid',
+      salaryEarnedTotal: 'Earned salary',
       bonusTotal: 'Bonuses',
       kpiBonusTotal: 'KPI bonuses',
       fineTotal: 'Fines',
@@ -352,7 +355,7 @@ export default function EmployeeSalaryHistory() {
     [entries, visibleMonth]
   )
   const headerTotals = useMemo(() => {
-    if (!employee || !visibleMonth) return { earned: 0, due: 0 }
+    if (!employee || !visibleMonth) return { salaryEarned: 0, earned: 0, due: 0 }
     const monthStart = `${visibleMonth}-01`
     const [year, month] = visibleMonth.split('-').map(Number)
     const monthEnd = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10)
@@ -363,6 +366,7 @@ export default function EmployeeSalaryHistory() {
       ? getSalaryAccruedAmount(employee, monthStart, accrualEnd)
       : 0
     return {
+      salaryEarned,
       earned: salaryEarned + monthSummary.bonusAmount,
       due: getSalaryDue(employee, today),
     }
@@ -554,7 +558,8 @@ export default function EmployeeSalaryHistory() {
             </div>
           )}
 
-          <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5" aria-label={formatMonthYear(visibleMonth, lang, visibleMonth)}>
+          <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" aria-label={formatMonthYear(visibleMonth, lang, visibleMonth)}>
+            <SummaryCard icon={CalendarDays} label={l.salaryEarnedTotal} value={formatCurrency(headerTotals.salaryEarned)} tone="emerald" />
             <SummaryCard icon={Banknote} label={l.paidTotal} value={formatCurrency(monthSummary.paymentAmount)} tone="orange" />
             <SummaryCard icon={Gift} label={l.bonusTotal} value={formatCurrency(monthSummary.bonusAmount)} tone="blue" />
             <SummaryCard icon={Percent} label={l.kpiBonusTotal} value={formatCurrency(monthSummary.kpiBonusAmount)} tone="emerald" />

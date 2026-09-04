@@ -1742,7 +1742,7 @@ async function notifyEmployeeLifecycle(supabase, user, salaryProfileId, lifecycl
   try {
     const response = await sendTelegramMessage(
       target.chatId,
-      buildEmployeeLifecycleInvestorMessage(claimed.data, target.language),
+      buildEmployeeLifecycleInvestorMessage(claimed.data, 'ru'),
     )
     const sentAt = new Date().toISOString()
     const { data: sentDelivery, error: updateError } = await supabase

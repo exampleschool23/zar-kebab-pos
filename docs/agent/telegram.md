@@ -58,7 +58,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 
 ## Investor notifications
 
-- Employee creation, activation, and deactivation queue immutable, retry-safe Investor events with employee, date, and actor snapshots.
+- Employee creation, activation, and deactivation queue immutable, retry-safe Russian Investor events with employee, date, and actor snapshots.
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Order deletes and payment corrections queue immutable Investor alerts with order, total, actor, and tender snapshots.
 - Manual cash-expense alerts remain localized text. A new Daily Bazaar purchase is sent as one localized PNG receipt with a short photo caption containing amount, date, category, optional description, creator, and the recorded monthly total; do not also send the numbered text receipt.

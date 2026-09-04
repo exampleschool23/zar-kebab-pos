@@ -29,6 +29,10 @@ test('employee lifecycle messages identify the event, employee, date, and actor'
   assert.match(created, /&lt;New Employee&gt;/)
   assert.match(created, /Owner &amp; Manager/)
   assert.match(created, /4 September 2026/)
+
+  assert.match(buildEmployeeLifecycleInvestorMessage({ ...base, event_type: 'created' }, 'ru'), /Добавлен новый сотрудник/)
+  assert.match(buildEmployeeLifecycleInvestorMessage({ ...base, event_type: 'activated' }, 'ru'), /Сотрудник активирован/)
+  assert.match(buildEmployeeLifecycleInvestorMessage({ ...base, event_type: 'deactivated' }, 'ru'), /Сотрудник деактивирован/)
 })
 
 test('employee lifecycle transitions queue immutable Investor deliveries at the database boundary', () => {
@@ -44,6 +48,7 @@ test('both employee management screens request retry-safe lifecycle delivery', (
   assert.match(client, /type: 'employee_lifecycle'/)
   assert.match(endpoint, /notifyEmployeeLifecycle/)
   assert.match(endpoint, /buildEmployeeLifecycleInvestorMessage/)
+  assert.match(endpoint, /buildEmployeeLifecycleInvestorMessage\(claimed\.data, 'ru'\)/)
   assert.match(endpoint, /loadSalaryGroupTarget/)
   assert.match(endpoint, /\.eq\('actor_id', user\.id\)/)
   assert.match(salaries, /notifyTelegramEmployeeLifecycle\(salaryProfile\.id, 'created'\)/)
