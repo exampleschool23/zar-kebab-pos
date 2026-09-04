@@ -41,3 +41,14 @@ test('Investor order-change message contains immutable audit details', () => {
   assert.match(message, /Card — 125\D000 UZS/)
   assert.match(message, /Owner &lt;One&gt;/)
 })
+
+test('deleted-order alert is compact and omits unavailable payment history', () => {
+  const message = buildInvestorOrderChangeMessage({
+    event_type: 'order_deleted', order_number: 'DL-0109', table_name: 'Delivery',
+    total: 185000, actor_name: 'Javoxirbek Shomurodov', old_payment_methods: [],
+  }, 'ru')
+  assert.match(message, /🗑 <b>Удалён заказ #DL-0109<\/b> · Доставка · <b>185\D000 UZS<\/b>/)
+  assert.match(message, /👤 Javoxirbek Shomurodov/)
+  assert.doesNotMatch(message, /Было|—/)
+  assert.equal(message.split('\n').length, 2)
+})
