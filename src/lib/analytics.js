@@ -194,6 +194,13 @@ function hasOrderLoyaltyWalletPaymentField(order) {
 }
 
 export function getOrderRevenueTotal(o, fallbackServicePct = 20) {
+  const storedTotal = Number(o?.total)
+  // Checkout freezes the amount actually collected on the order. Historical
+  // loaders do not always include every item/service field needed to rebuild
+  // that amount, so recalculating a paid order can silently change revenue.
+  if (isPaidOrder(o) && o?.total != null && Number.isFinite(storedTotal)) {
+    return Math.max(0, Math.round(storedTotal))
+  }
   const summary = getOrderPaymentSummary(o, getOrderItems(o), fallbackServicePct)
   return summary.total
 }
@@ -413,7 +420,7 @@ export function getOrderPayments(order) {
 
   if (!isPaidOrder(order)) return []
 
-  const total = getOrderTotal(order)
+  const total = getOrderRevenueTotal(order)
   if (total <= 0) return []
 
   return [{

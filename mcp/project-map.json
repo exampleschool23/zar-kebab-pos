@@ -138,7 +138,7 @@
     {
       "name": "reporting-history",
       "keywords": ["dashboard", "report", "profit", "history", "snapshot", "date range", "closeout", "dish sales", "average daily income", "break-even", "ingredient consumption"],
-      "files": ["src/pages/AdminDashboard.jsx", "src/pages/AdminSettings.jsx", "src/pages/Reports.jsx", "src/lib/dashboardAnalytics.js", "src/lib/monthlyIncome.js", "src/lib/dishSales.js", "src/lib/profit.js", "src/lib/orderHistory.js", "src/lib/accountingSummary.js", "src/lib/closeout.js", "src/lib/ingredientConsumption.js", "api/telegram/_lib/dailyOperationsReportImages.js", "supabase/157_dashboard_monthly_income_snapshots.sql", "supabase/158_business_settings_daily_break_even_income.sql"],
+      "files": ["src/pages/AdminDashboard.jsx", "src/pages/AdminSettings.jsx", "src/pages/Reports.jsx", "src/lib/dashboardAnalytics.js", "src/lib/monthlyIncome.js", "src/lib/dishSales.js", "src/lib/profit.js", "src/lib/orderHistory.js", "src/lib/accountingSummary.js", "src/lib/closeout.js", "src/lib/ingredientConsumption.js", "api/telegram/_lib/dailyOperationsReportImages.js", "supabase/157_dashboard_monthly_income_snapshots.sql", "supabase/158_business_settings_daily_break_even_income.sql", "supabase/174_dashboard_monthly_income_completed_days.sql"],
       "tests": ["tests/dashboardAnalytics.test.js", "tests/monthlyIncomeSnapshots.test.js", "tests/dishSales.test.js", "tests/profit.test.js", "tests/orderHistory.test.js", "tests/financialHistorySnapshots.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
     },
     {

@@ -13,6 +13,10 @@ const migration = fs.readFileSync(
   new URL('../supabase/157_dashboard_monthly_income_snapshots.sql', import.meta.url),
   'utf8'
 )
+const completedDayMigration = fs.readFileSync(
+  new URL('../supabase/174_dashboard_monthly_income_completed_days.sql', import.meta.url),
+  'utf8'
+)
 const loader = fs.readFileSync(new URL('../src/lib/monthlyIncome.js', import.meta.url), 'utf8')
 const dashboard = fs.readFileSync(new URL('../src/pages/AdminDashboard.jsx', import.meta.url), 'utf8')
 const settings = fs.readFileSync(new URL('../src/pages/AdminSettings.jsx', import.meta.url), 'utf8')
@@ -157,4 +161,15 @@ test('Dashboard monthly chart reads snapshots plus only the live current month a
   assert.match(dashboard, /monthlyIncomeChartRows\.map/)
   assert.match(dashboard, /formatCompactIncome\(row\.averageDailyIncome, lang\)/)
   assert.match(dashboard, /Average Daily Income by Month/)
+})
+
+test('current Dashboard month includes completed Tashkent days only', () => {
+  assert.match(completedDayMigration, /create or replace function public\.get_dashboard_monthly_average_income/i)
+  assert.match(completedDayMigration, /v_to_instant_exclusive timestamptz := timezone\('Asia\/Tashkent', now\(\)\)::date::timestamp at time zone 'Asia\/Tashkent'/i)
+  assert.match(completedDayMigration, /v_completed_day_count smallint := greatest\(v_today - v_current_month, 0\)::smallint/i)
+  assert.match(completedDayMigration, /"order"\.paid_at < v_to_instant_exclusive/i)
+  assert.match(completedDayMigration, /requested\.requested_month = v_current_month and v_completed_day_count > 0/i)
+  assert.match(completedDayMigration, /round\(current_total\.income::numeric \/ v_completed_day_count\)::bigint/i)
+  assert.match(completedDayMigration, /when requested\.requested_month = v_current_month then 0/i)
+  assert.doesNotMatch(completedDayMigration, /v_today - v_current_month \+ 1/)
 })

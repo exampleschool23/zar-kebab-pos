@@ -1230,6 +1230,47 @@ test('paid order revenue is stable across refresh and regrouping', () => {
   assert.equal(paidRevenue(groupOrdersBySession([order])), getOrderTotal(order))
 })
 
+test('paid revenue uses the immutable saved total instead of recalculating incomplete history', () => {
+  const paidTakeaway = {
+    id: 'saved-paid-takeaway',
+    status: 'paid',
+    payment_status: 'paid',
+    paid_at: '2026-09-02T12:00:00.000Z',
+    subtotal: 100_000,
+    service_fee: 0,
+    total: 100_000,
+  }
+  const paidTouristDineIn = {
+    id: 'saved-paid-tourist',
+    status: 'paid',
+    payment_status: 'paid',
+    paid_at: '2026-09-02T13:00:00.000Z',
+    subtotal: 200_000,
+    service_fee: 30_000,
+    total: 230_000,
+  }
+
+  assert.equal(getOrderRevenueTotal(paidTakeaway), 100_000)
+  assert.equal(getOrderRevenueTotal(paidTouristDineIn), 230_000)
+  assert.equal(getOrderRevenueTotal({ ...paidTakeaway, total: 0 }), 0)
+  assert.deepEqual(getOrderPaymentBreakdown({
+    ...paidTakeaway,
+    payment_method: 'cash',
+  }), [{ method: 'cash', amount: 100_000 }])
+})
+
+test('unpaid order totals still recalculate from current items instead of stale saved totals', () => {
+  const order = activeOrder({
+    id: 'active-stale-total',
+    order_type: 'take_away',
+    service_rate_pct: 0,
+    total: 999_999,
+    items: [item({ id: 'active-item', menu_item_id: 'kebab', quantity: 2, price: 25_000 })],
+  })
+
+  assert.equal(getOrderRevenueTotal(order), 50_000)
+})
+
 test('service fee is consistent across dine-in takeaway and mixed orders for 0 17 and 20 percent', () => {
   const flows = [
     [item({ id: 'd', menu_item_id: 'kebab', quantity: 2, price: 25000, order_type: 'dine_in' })],

@@ -16,7 +16,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 - Regular and Tourist service settings are separate; new dine-in orders snapshot the rate chosen by authoritative `price_mode`.
 - Reuse an unpaid order's saved service rate only when its saved price mode matches the submitted mode. Empty/stale Regular shells cannot leak Regular service into Tourist orders.
 - Active and paid orders keep their rate snapshot after settings change. Pending kitchen retries retain the original rate.
-- Apply loyalty and counter-item rules through shared helpers. Paid revenue must remain stable across refresh and regrouping.
+- Use shared loyalty/counter-item helpers. Reports read paid `orders.total`; unpaid bills recalculate from items.
 
 ## Split payments and corrections
 
