@@ -173,3 +173,32 @@ export function buildAbsenceUndoInvestorMessage(delivery, language = 'ru') {
   if (delivery?.actor_name) lines.push(`${copy.actor}: ${escapeTelegramHtml(delivery.actor_name)}`)
   return lines.join('\n')
 }
+
+export function buildInvestorOrderChangeMessage(delivery, language = 'ru') {
+  const lang = normalizeLanguage(language)
+  const copy = {
+    uz: { deleted: 'Buyurtma o‘chirildi', changed: 'To‘lov turi o‘zgartirildi', order: 'Buyurtma', table: 'Stol', total: 'Jami', before: 'Oldin', after: 'Keyin', actor: 'O‘zgartirgan' },
+    ru: { deleted: 'Заказ удалён', changed: 'Способ оплаты изменён', order: 'Заказ', table: 'Стол', total: 'Итого', before: 'Было', after: 'Стало', actor: 'Изменил(а)' },
+    en: { deleted: 'Order deleted', changed: 'Payment method changed', order: 'Order', table: 'Table', total: 'Total', before: 'Before', after: 'After', actor: 'Changed by' },
+  }[lang]
+  const formatMethods = rows => (Array.isArray(rows) ? rows : [])
+    .map(row => `${expensePaymentMethodLabel(row?.method, lang)} — ${formatCurrency(row?.amount || 0)}`)
+    .join(', ') || '—'
+  const deleted = delivery?.event_type === 'order_deleted'
+  const lines = [
+    `${deleted ? '🗑' : '🔄'} <b>${deleted ? copy.deleted : copy.changed}</b>`,
+    `${copy.order}: <b>#${escapeTelegramHtml(delivery?.order_number || delivery?.order_id || '—')}</b>`,
+  ]
+  if (delivery?.table_name) lines.push(`${copy.table}: ${escapeTelegramHtml(delivery.table_name)}`)
+  lines.push(`${copy.total}: <b>${escapeTelegramHtml(formatCurrency(delivery?.total || 0))}</b>`)
+  if (deleted) {
+    lines.push(`${copy.before}: ${escapeTelegramHtml(formatMethods(delivery?.old_payment_methods))}`)
+  } else {
+    lines.push(
+      `${copy.before}: ${escapeTelegramHtml(formatMethods(delivery?.old_payment_methods))}`,
+      `${copy.after}: ${escapeTelegramHtml(formatMethods(delivery?.new_payment_methods))}`,
+    )
+  }
+  if (delivery?.actor_name) lines.push(`${copy.actor}: ${escapeTelegramHtml(delivery.actor_name)}`)
+  return lines.join('\n')
+}

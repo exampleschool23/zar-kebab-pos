@@ -19,6 +19,7 @@ import {
   buildAbsenceUndoInvestorMessage,
   buildInvestorExpenseGroupMessage,
   buildInvestorIncomeGroupMessage,
+  buildInvestorOrderChangeMessage,
 } from './_lib/investorIncomeMessages.js'
 import {
   buildMenuArchivedTeamMessage,
@@ -163,6 +164,22 @@ async function requireExpenseNotificationAccess(req) {
     throw Object.assign(new Error('Forbidden'), { status: 403 })
   }
 
+  return { supabase, user }
+}
+
+async function requireOrderChangeNotificationAccess(req) {
+  const token = getBearerToken(req)
+  if (!token) throw Object.assign(new Error('Authentication required'), { status: 401 })
+  const supabase = getSupabaseAdmin()
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+  if (authError || !user) throw Object.assign(new Error('Invalid or expired session'), { status: 401 })
+  const { data: profile, error } = await supabase.from('profiles')
+    .select('role, status, feature_access').eq('id', user.id).maybeSingle()
+  if (error) throw error
+  const access = Array.isArray(profile?.feature_access) ? profile.feature_access : null
+  if (profile?.status !== 'active' || !(profile?.role === 'owner' || access?.includes('delete_paid_orders'))) {
+    throw Object.assign(new Error('Forbidden'), { status: 403 })
+  }
   return { supabase, user }
 }
 
@@ -1700,6 +1717,54 @@ async function notifyInvestorIncome(supabase, user, expenseId) {
   }
 }
 
+async function notifyInvestorOrderChanges(supabase, user, orderIds) {
+  const ids = [...new Set((Array.isArray(orderIds) ? orderIds : []).map(String).filter(Boolean))]
+  if (ids.length === 0) throw Object.assign(new Error('orderIds is required'), { status: 400 })
+  const { data: deliveries, error } = await supabase
+    .from('order_change_investor_notification_deliveries').select('*')
+    .in('order_id', ids).eq('actor_id', user.id).order('created_at', { ascending: true })
+  if (error) throw error
+  if (!deliveries?.length) throw Object.assign(new Error('Order change notification event not found'), { status: 404 })
+  const target = await loadSalaryGroupTarget(supabase)
+  const results = []
+  for (const delivery of deliveries) {
+    if (!canRetryInvestorExpenseDelivery(delivery)) {
+      results.push(savedInvestorExpenseDeliveryResult(delivery))
+      continue
+    }
+    const now = new Date().toISOString()
+    const pending = {
+      status: target.chatId ? 'pending' : 'skipped', telegram_chat_id: target.chatId || null,
+      telegram_message_id: null, error_message: target.chatId ? '' : 'ZarKebab Investor Telegram group is not configured',
+      attempted_at: now, sent_at: null, updated_at: now,
+    }
+    const claimed = await supabase.from('order_change_investor_notification_deliveries')
+      .update(pending).eq('id', delivery.id).eq('status', delivery.status)
+      .eq('updated_at', delivery.updated_at).select('*').maybeSingle()
+    if (claimed.error) throw claimed.error
+    if (!claimed.data || !target.chatId) {
+      results.push(savedInvestorExpenseDeliveryResult(claimed.data || delivery, !claimed.data))
+      continue
+    }
+    try {
+      const response = await sendTelegramMessage(target.chatId, buildInvestorOrderChangeMessage(claimed.data, target.language))
+      const sentAt = new Date().toISOString()
+      const telegramMessageId = getTelegramMessageId(response)
+      const saved = await supabase.from('order_change_investor_notification_deliveries').update({
+        status: 'sent', telegram_message_id: telegramMessageId, error_message: '', sent_at: sentAt, updated_at: sentAt,
+      }).eq('id', delivery.id).select('*').single()
+      if (saved.error) throw saved.error
+      results.push(savedInvestorExpenseDeliveryResult(saved.data, false))
+    } catch (sendError) {
+      const errorMessage = String(sendError?.message || sendError).slice(0, 1000)
+      await supabase.from('order_change_investor_notification_deliveries')
+        .update({ status: 'failed', error_message: errorMessage, updated_at: new Date().toISOString() }).eq('id', delivery.id)
+      results.push({ ok: false, status: 'failed', errorMessage })
+    }
+  }
+  return { ok: results.every(result => result.ok), deliveries: results }
+}
+
 async function notifyAbsenceUndo(supabase, user, absenceId) {
   const { data: delivery, error } = await supabase
     .from('salary_absence_undo_notification_deliveries')
@@ -1782,6 +1847,7 @@ export default async function handler(req, res) {
       rateId,
       kpiRuleEventId,
       expenseId,
+      orderIds,
       menuItemId,
     } = await readJson(req)
     const notificationType = type
@@ -1812,6 +1878,7 @@ export default async function handler(req, res) {
       expense: expenseId,
       investor_income: expenseId,
       absence_undo: absenceId,
+      order_change: orderIds?.[0],
     }
     const isMenuUnavailable = notificationType === 'menu_unavailable'
     const isMenuAvailable = notificationType === 'menu_available'
@@ -1819,7 +1886,7 @@ export default async function handler(req, res) {
     const isMenuArchived = notificationType === 'menu_archived'
     const isMenuEvent = isMenuUnavailable || isMenuAvailable || isMenuCreated || isMenuArchived
     const isSalaryRetraction = notificationType === 'retract_salary_event'
-    if (!isMenuEvent && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'kpi_rule', 'expense', 'investor_income'].includes(notificationType)) {
+    if (!isMenuEvent && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'kpi_rule', 'expense', 'investor_income', 'order_change'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (isMenuEvent && !menuItemId) {
@@ -1834,6 +1901,8 @@ export default async function handler(req, res) {
 
     const access = isMenuEvent
       ? await requireMenuWriteAccess(req)
+      : notificationType === 'order_change'
+        ? await requireOrderChangeNotificationAccess(req)
       : notificationType === 'expense'
         ? await requireExpenseNotificationAccess(req)
         : await requireExpensesWriteAccess(req)
@@ -1854,6 +1923,8 @@ export default async function handler(req, res) {
       result = await notifyMenuUnavailable(supabase, user, menuItemId)
     } else if (notificationType === 'expense') {
       result = await notifyInvestorExpense(supabase, user, expenseId)
+    } else if (notificationType === 'order_change') {
+      result = await notifyInvestorOrderChanges(supabase, user, orderIds)
     } else if (notificationType === 'investor_income') {
       result = await notifyInvestorIncome(supabase, user, expenseId)
     } else if (notificationType === 'absence_undo') {

@@ -21,9 +21,10 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 ## Split payments and corrections
 
 - Completed split payment rows retain fixed amounts and have independent method selectors.
-- Delete completed orders access permits atomic non-loyalty method corrections; recalculate the summary as cash/card/terminal/mixed.
+- Delete completed orders access permits atomic non-loyalty tender corrections.
 - Loyalty rows are visible but immutable without a separate wallet reversal workflow.
 - Corrections never change amounts, items, totals, paid state/time, loyalty data, service snapshots, or stock deductions.
+- Order deletes and payment corrections queue Investor alerts.
 
 ## Accounting loading and presentation
 

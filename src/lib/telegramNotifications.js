@@ -138,6 +138,17 @@ export async function notifyTelegramInvestorExpense(expenseId) {
   }
 }
 
+export async function notifyTelegramInvestorOrderChange(orderIdOrIds) {
+  const orderIds = (Array.isArray(orderIdOrIds) ? orderIdOrIds : [orderIdOrIds]).filter(Boolean)
+  if (orderIds.length === 0) return { ok: false, status: 'failed' }
+  try {
+    return await postAuthenticatedTelegramNotification({ type: 'order_change', orderIds })
+  } catch (error) {
+    console.warn('[telegram] Investor order change notification failed:', error)
+    return { ok: false, status: 'failed', errorMessage: String(error?.message || error) }
+  }
+}
+
 async function notifyTelegramMenuEvent(menuItemId, type) {
   const failedResult = {
     ok: false,

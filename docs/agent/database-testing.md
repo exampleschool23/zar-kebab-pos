@@ -31,6 +31,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - Tashkent-calendar expense backdate enforcement: `166`
   - salary/KPI accrual, notifications, Tech Card catalog access, and Team queue repair: `169`–`172`
   - paid-order correction feature access: `173`
+  - Investor alerts for order deletes and payment corrections: `175`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants

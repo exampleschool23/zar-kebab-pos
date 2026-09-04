@@ -17,6 +17,7 @@ import {
   notifyTelegramMenuArchived,
   notifyTelegramMenuCreated,
   notifyTelegramMenuUnavailable,
+  notifyTelegramInvestorOrderChange,
   notifyTelegramOrderStatus,
 } from './telegramNotifications.js'
 import {
@@ -1397,6 +1398,7 @@ export async function writeToSupabase(action, state, options = {}) {
         p_payment_method: paymentMethod,
       })
       if (error) throw error
+      void notifyTelegramInvestorOrderChange(orderIds)
       break
     }
 
@@ -1408,10 +1410,11 @@ export async function writeToSupabase(action, state, options = {}) {
         }))
         .filter(row => row.paymentId && row.method)
       if (changes.length === 0) return
-      const { error } = await supabase.rpc('change_paid_order_payment_methods_owner', {
+      const { data, error } = await supabase.rpc('change_paid_order_payment_methods_owner', {
         p_changes: changes,
       })
       if (error) throw error
+      void notifyTelegramInvestorOrderChange(data?.orderIds || data?.order_ids || [])
       break
     }
 
@@ -1420,6 +1423,7 @@ export async function writeToSupabase(action, state, options = {}) {
       if (!orderId) return
       const { error } = await supabase.rpc('delete_order_owner', { p_order_id: orderId })
       if (error) throw error
+      void notifyTelegramInvestorOrderChange(orderId)
       break
     }
 
