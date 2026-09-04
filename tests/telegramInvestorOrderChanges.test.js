@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { buildInvestorOrderChangeMessage } from '../api/telegram/_lib/investorIncomeMessages.js'
 
 const migration = readFileSync(new URL('../supabase/175_order_change_investor_notifications.sql', import.meta.url), 'utf8')
+const repairMigration = readFileSync(new URL('../supabase/176_repair_order_change_investor_trigger.sql', import.meta.url), 'utf8')
 const endpoint = readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
 const db = readFileSync(new URL('../src/lib/db.js', import.meta.url), 'utf8')
 
@@ -15,6 +16,20 @@ test('order deletion and tender correction are queued transactionally for Invest
   assert.match(migration, /old_payment_methods[\s\S]*new_payment_methods/)
   assert.match(migration, /target_key\s+text not null default 'salary_events'/i)
   assert.match(migration, /on conflict \(event_type, order_id, transaction_id\) do update/i)
+})
+
+test('order payment notification trigger reads table-specific records safely', () => {
+  for (const sql of [migration, repairMigration]) {
+    const triggerFunction = sql.slice(
+      sql.indexOf('create or replace function public.queue_order_change_investor_notification()'),
+      sql.indexOf('revoke all on function public.queue_order_change_investor_notification()'),
+    )
+    assert.match(triggerFunction, /v_old jsonb := to_jsonb\(old\)/i)
+    assert.match(triggerFunction, /v_new jsonb := to_jsonb\(new\)/i)
+    assert.match(triggerFunction, /v_old->>'payment_method'/i)
+    assert.match(triggerFunction, /v_old->>'method'/i)
+    assert.doesNotMatch(triggerFunction, /old\.payment_method|new\.payment_method|old\.method|new\.method/i)
+  }
 })
 
 test('successful order mutations request duplicate-safe Investor delivery', () => {
