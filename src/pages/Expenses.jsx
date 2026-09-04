@@ -915,7 +915,13 @@ export default function Expenses() {
               <p className="mt-1 text-sm font-medium text-[#6B7280]">{l.sub}</p>
             </div>
             <nav aria-label={l.title} className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto">
-              <AccountingShortcut icon={Users} label={l.salaries} tone="orange" onClick={() => navigate('/admin/accounting/salaries')} />
+              <AccountingShortcut
+                icon={Users}
+                label={l.salaries}
+                count={loading ? null : payableSalaryProfiles.filter(salaryProfile => salaryProfile.is_active !== false).length}
+                tone="orange"
+                onClick={() => navigate('/admin/accounting/salaries')}
+              />
               <AccountingShortcut icon={ReceiptText} label={l.estimate} tone="blue" onClick={() => navigate('/admin/accounting/estimate')} />
               <AccountingShortcut icon={ShoppingBasket} label={l.dailyBazaar} tone="teal" onClick={() => navigate('/admin/bazaar')} />
             </nav>
@@ -1228,7 +1234,7 @@ export default function Expenses() {
   )
 }
 
-function AccountingShortcut({ icon: Icon, label, tone = 'orange', onClick }) {
+function AccountingShortcut({ icon: Icon, label, count = null, tone = 'orange', onClick }) {
   const tones = {
     orange: 'border-orange-200 bg-orange-50 text-[#ff5a00] hover:bg-orange-100',
     blue: 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100',
@@ -1240,7 +1246,13 @@ function AccountingShortcut({ icon: Icon, label, tone = 'orange', onClick }) {
       onClick={onClick}
       className={`inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-black shadow-sm transition-colors ${tones[tone] || tones.orange}`}
     >
-      <Icon size={17} />{label}
+      <Icon size={17} />
+      <span>{label}</span>
+      {count != null && (
+        <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-white px-2 py-0.5 text-xs text-[#1F2937] shadow-sm">
+          {count}
+        </span>
+      )}
     </button>
   )
 }
