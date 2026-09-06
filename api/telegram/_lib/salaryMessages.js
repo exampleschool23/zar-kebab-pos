@@ -265,6 +265,7 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   monthToDateCalendarDayCount = 0,
   regularDineInIncome = 0,
   regularOffPremiseIncome = 0,
+  gameClubIncome = 0,
   touristIncome = 0,
   grossProfit = null,
   rent = 0,
@@ -305,7 +306,9 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
   const dineInIncomeTotal = normalizeExpenseAmount(regularDineInIncome)
   const offPremiseIncomeTotal = normalizeExpenseAmount(regularOffPremiseIncome)
   const touristIncomeTotal = normalizeExpenseAmount(touristIncome)
-  const classifiedIncomeTotal = dineInIncomeTotal + offPremiseIncomeTotal + touristIncomeTotal
+  const gameClubIncomeTotal = normalizeExpenseAmount(gameClubIncome)
+  const classifiedIncomeTotal = dineInIncomeTotal + offPremiseIncomeTotal + touristIncomeTotal + gameClubIncomeTotal
+  const gameClubPercentage = classifiedIncomeTotal > 0 ? Math.round(gameClubIncomeTotal / classifiedIncomeTotal * 1000) / 10 : 0
   const dineInPercentage = classifiedIncomeTotal > 0
     ? Math.round((dineInIncomeTotal / classifiedIncomeTotal) * 1000) / 10
     : 0
@@ -313,7 +316,7 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     ? Math.round((offPremiseIncomeTotal / classifiedIncomeTotal) * 1000) / 10
     : 0
   const touristPercentage = classifiedIncomeTotal > 0
-    ? Math.round((100 - dineInPercentage - offPremisePercentage) * 10) / 10
+    ? Math.round((100 - dineInPercentage - offPremisePercentage - gameClubPercentage) * 10) / 10
     : 0
 
   return {
@@ -325,6 +328,8 @@ export function getDailyPayrollGroupSummary(salaryProfiles, kpiResults, date, {
     dineInIncomeTotal,
     offPremiseIncomeTotal,
     touristIncomeTotal,
+    gameClubIncomeTotal,
+    gameClubPercentage,
     dineInPercentage,
     offPremisePercentage,
     touristPercentage,
@@ -382,6 +387,7 @@ export function buildDailyPayrollGroupMessage(summary, date, language = 'ru') {
     '',
     `<b>${copy.groupDineInShare}:</b> ${formatSalaryNotificationPercent(dineInPercentage, lang)}`,
     `<b>${copy.groupOffPremiseShare}:</b> ${formatSalaryNotificationPercent(offPremisePercentage, lang)}`,
+    `<b>🎮 ${lang === 'ru' ? 'Игровой клуб' : 'Game Club'}:</b> ${formatSalaryNotificationAmount(summary?.gameClubIncomeTotal || 0)} ${copy.currency} (${formatSalaryNotificationPercent(summary?.gameClubPercentage || 0, lang)})`,
     `<b>${copy.groupTouristShare}:</b> ${formatSalaryNotificationPercent(touristPercentage, lang)}`,
     `<b>${copy.groupCafeNetProfit}:</b> ${cafeNetProfit == null
       ? copy.unavailable

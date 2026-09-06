@@ -288,6 +288,7 @@ function KpiCard({ label, value, sub, accent, icon: Icon, iconBg, iconColor }) {
 
 function TableStatusBadge({ status, lang }) {
   const l = L[lang] || L.en
+  if (status === 'game_club') return <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">{orderTypeLabel(status, lang)}</span>
   if (status === 'delivery') {
     return (
       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
@@ -335,8 +336,6 @@ function BillCard({
   deleteError,
 }) {
   const l = L[lang] || L.en
-  const isTakeAway = isTakeAwayBill(order)
-  const isDelivery = isDeliveryOrderType(inferOrderType(order))
   const orderType = inferOrderType(order)
   const priceMode = normalizePriceMode(order.price_mode)
 
@@ -377,7 +376,7 @@ function BillCard({
               </p>
             </div>
           </div>
-          <TableStatusBadge status={isDelivery ? 'delivery' : isTakeAway ? 'take_away' : table?.status || order.status} lang={lang} />
+          <TableStatusBadge status={isOffPremiseOrderType(orderType) ? orderType : table?.status || order.status} lang={lang} />
         </div>
 
         <div className="flex items-center gap-4 mt-3 text-[11px] text-[#9CA3AF]">
@@ -796,6 +795,7 @@ export default function CashierTables() {
     { value: 'active',     label: l.activeNotReady },
     { value: 'take_away',  label: l.takeAway       },
     { value: 'delivery',   label: l.delivery       },
+    { value: 'game_club', label: orderTypeLabel('game_club', lang) },
   ]
 
   const sortOptions = SORT_OPTIONS(l).map(o => ({ value: o.key, label: o.label }))
@@ -825,10 +825,11 @@ export default function CashierTables() {
       result = result.filter(o => {
         const isTakeAway = isTakeAwayBill(o)
         const isDelivery = isDeliveryOrderType(inferOrderType(o))
-        if (filterStatus === 'needs_bill') return !isTakeAway && !isDelivery && o.status === 'needs_bill'
-        if (filterStatus === 'active') return !isTakeAway && !isDelivery && o.status !== 'needs_bill'
+        if (filterStatus === 'needs_bill') return !isOffPremiseOrderType(inferOrderType(o)) && o.status === 'needs_bill'
+        if (filterStatus === 'active') return !isOffPremiseOrderType(inferOrderType(o)) && o.status !== 'needs_bill'
         if (filterStatus === 'take_away') return isTakeAway
         if (filterStatus === 'delivery') return isDelivery
+        if (filterStatus === 'game_club') return inferOrderType(o) === 'game_club'
         return false
       })
     }
@@ -860,8 +861,9 @@ export default function CashierTables() {
       { key: 'active', title: l.activeTableBills, tone: 'amber', icon: Receipt, bills: active },
       { key: 'take_away', title: l.takeAwayBills, tone: 'blue', icon: Receipt, bills: takeAway },
       { key: 'delivery', title: l.deliveryBills, tone: 'purple', icon: Receipt, bills: delivery },
+      { key: 'game_club', title: orderTypeLabel('game_club', lang), tone: 'purple', icon: Receipt, bills: filteredBills.filter(o => inferOrderType(o) === 'game_club') },
     ].filter(section => section.bills.length > 0)
-  }, [filteredBills, l])
+  }, [filteredBills, l, lang])
 
   const visibleBillCount = billSections.reduce((sum, section) => sum + section.bills.length, 0)
 

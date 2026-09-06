@@ -34,6 +34,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - Investor alerts for order deletes and payment corrections, including the shared-trigger row-type repair: `175`–`176`
   - compact all-time Accounting remainder: `177`
   - employee lifecycle Investor notification queue: `178`
+  - Game Club order type, off-premise permission and service checks: `179`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants
@@ -84,3 +85,5 @@ Do not loosen a guard simply because implementation changed. First determine whi
 - Protected routes redirect unauthenticated checks to `/menu`; use an authorized profile for visual verification.
 - The known Vite large-chunk warning is not a failing build.
 - Preserve unrelated dirty-worktree changes and report any validation you could not run.
+
+- Migration `179_game_club_orders.sql` must precede the Game Club frontend release. It extends order/item constraints and current permission/settlement functions without changing historical rows. Never require the reopening function retired by `090`. Focused coverage: `tests/gameClubOrders.test.js`.

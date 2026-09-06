@@ -463,8 +463,8 @@ test('dashboard empty selected period returns zero and empty widget states', () 
   assert.deepEqual(payments, [])
   assert.deepEqual(categories, [])
   assert.deepEqual(best, [])
-  assert.deepEqual(orderTypes.map(row => row.key), ['dine_in', 'take_away', 'delivery'])
-  assert.deepEqual(orderTypes.map(row => row.revenue), [0, 0, 0])
+  assert.deepEqual(orderTypes.map(row => row.key), ['dine_in', 'take_away', 'delivery', 'game_club'])
+  assert.deepEqual(orderTypes.map(row => row.revenue), [0, 0, 0, 0])
   assert.deepEqual(staff, [])
 })
 
@@ -500,8 +500,8 @@ test('dashboard order type performance ranks dine in take away and delivery reve
     }),
   ], 'en')
 
-  assert.deepEqual(rows.map(row => row.key), ['delivery', 'dine_in', 'take_away'])
-  assert.deepEqual(rows.map(row => row.label), ['Delivery', 'Dine In', 'Take Away'])
+  assert.deepEqual(rows.map(row => row.key), ['delivery', 'dine_in', 'take_away', 'game_club'])
+  assert.deepEqual(rows.map(row => row.label), ['Delivery', 'Dine In', 'Take Away', 'Game Club'])
   assert.equal(rows[0].revenue, 200000)
   assert.equal(rows[0].orders, 2)
   assert.equal(rows[0].items, 6)

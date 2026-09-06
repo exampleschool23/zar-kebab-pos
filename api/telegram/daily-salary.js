@@ -28,7 +28,8 @@ import {
 } from '../../src/lib/analytics.js'
 import { getOrdersCostTotal, hasOrdersCostCoverage } from '../../src/lib/profit.js'
 import { allocateMonthlySalaryToDate } from '../../src/lib/expenses.js'
-import { isDineInOrderType } from '../../src/lib/orderTypes.js'
+import { getGameClubRevenue } from '../../src/lib/gameClubRevenue.js'
+import { inferOrderType, isDineInOrderType } from '../../src/lib/orderTypes.js'
 import { PRICE_MODE_TOURIST } from '../../src/lib/priceModes.js'
 import {
   isGoogleReviewBotConfigured,
@@ -717,7 +718,7 @@ async function sendDailyIngredientConsumptionNotification(supabase, businessDate
   }
 }
 
-async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) {
+export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) {
   const monthStart = `${businessDate.slice(0, 8)}01`
   const { data: profileRows, error: profilesError } = await supabase
     .from('employee_salary_profiles')
@@ -795,8 +796,9 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     })
     return totals
   }, { cash: 0, terminal: 0 })
+  const gameClubIncome = getGameClubRevenue(paidOrders)
   const touristIncome = paidOrders.reduce(
-    (total, order) => total + (order?.price_mode === PRICE_MODE_TOURIST ? getOrderRevenueTotal(order) : 0),
+    (total, order) => total + (order?.price_mode === PRICE_MODE_TOURIST && inferOrderType(order) !== 'game_club' ? getOrderRevenueTotal(order) : 0),
     0
   )
   const regularDineInIncome = paidOrders.reduce(
@@ -807,7 +809,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     ),
     0
   )
-  const regularOffPremiseIncome = cafeIncome - touristIncome - regularDineInIncome
+  const regularOffPremiseIncome = cafeIncome - touristIncome - regularDineInIncome - gameClubIncome
   const grossProfit = hasOrdersCostCoverage(paidOrders)
     ? cafeIncome - getOrdersCostTotal(paidOrders)
     : null
@@ -821,6 +823,7 @@ async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) 
     monthToDateCalendarDayCount: getInclusiveCalendarDayCount(monthStart, businessDate),
     regularDineInIncome,
     regularOffPremiseIncome,
+    gameClubIncome,
     touristIncome,
     grossProfit,
     rent: dailyRent,

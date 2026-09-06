@@ -37,7 +37,7 @@ import {
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
 import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
-import { ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { ORDER_TYPE_KEYS, ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import {
   buildSalaryBonusExpenseRows,
@@ -1188,7 +1188,7 @@ function PaymentMethodsTab({ orders, lang }) {
 function OrderTypesTab({ orders, lang }) {
   const data = useMemo(() => {
     const totalRevenue = orders.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
-    return ['dine_in', 'take_away', 'delivery']
+    return ORDER_TYPE_KEYS
       .map(type => {
         const rows = orders.filter(order => inferOrderType(order) === type)
         const revenue = rows.reduce((sum, order) => sum + getOrderRevenueTotal(order), 0)
@@ -1213,6 +1213,7 @@ function OrderTypesTab({ orders, lang }) {
     dine_in: '#ff5a00',
     take_away: '#2563EB',
     delivery: '#7C3AED',
+    game_club: '#059669',
   }
   const total = data.reduce((sum, row) => sum + row.revenue, 0)
   const maxRev = Math.max(...data.map(row => row.revenue), 1)

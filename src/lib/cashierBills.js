@@ -2,7 +2,7 @@ import {
   getOrderPaymentSummary,
   isCancelledOrderItem,
 } from './analytics.js'
-import { inferOrderType, isDeliveryOrderType, isTakeAwayOrderType } from './orderTypes.js'
+import { inferOrderType, isOffPremiseOrderType, isDeliveryOrderType, isTakeAwayOrderType } from './orderTypes.js'
 
 export function isTakeAwayBill(order) {
   return isTakeAwayOrderType(inferOrderType(order))
@@ -13,7 +13,7 @@ export function isDeliveryBill(order) {
 }
 
 export function isOffPremiseBill(order) {
-  return isTakeAwayBill(order) || isDeliveryBill(order)
+  return isOffPremiseOrderType(inferOrderType(order))
 }
 
 export function getCashierBillableItems(order) {

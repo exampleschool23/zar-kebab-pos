@@ -1,6 +1,6 @@
 # Telegram Menus, Targets, Notifications, and Delivery
 
-Read this guide for the Telegram Mini App, bot/API endpoints, notification targets, message formats, retries, and scheduled delivery.
+Telegram menu, API, notification targets, messages, retries, and schedules.
 
 ## Entry points
 
@@ -12,9 +12,9 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 
 ## Customer Mini App
 
-- The Telegram Mini App is a read-only customer menu.
+- The Mini App is a read-only menu.
 - Checkout and My Orders are retired. Restore their API routes only by explicit product decision.
-- Keep authentication, loyalty lookup, contact data, employee notifications, and POS status notifications separate from retired customer ordering.
+- Keep auth, loyalty, contacts, employee and POS notifications separate from retired ordering.
 
 ## Delivery records and retries
 
@@ -46,6 +46,7 @@ Read this guide for the Telegram Mini App, bot/API endpoints, notification targe
 
 - Combined employee Salary + Bonus summaries are always Russian and contain attendance, earned salary, bonuses, and current due—never repeated fines or payments.
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
+- Game Club paid revenue (both price modes) has its own text/PNG bucket, excluded from Tourist and other off-premise buckets.
 - Daily/MTD cafe income uses immutable `orders.total`. Cash/terminal uses payment rows; QR maps to terminal, while card/loyalty stay distinct.
 - The aggregate daily report estimates soliq as 4% of that day's paid cafe revenue, lists it in expenses, includes it in total expenses, and deducts it from daily net profit.
 - Team automatic KPI messages are RU and contain only name, amount, and date. Delivery is duplicate-safe; migration `172` restores and backfills missing queue rows. Never expose sales base, KPI rate, salary due, or manager.

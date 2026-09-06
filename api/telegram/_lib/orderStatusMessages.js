@@ -1,4 +1,4 @@
-import { inferOrderType, orderTypeLabel } from '../../../src/lib/orderTypes.js'
+import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../../../src/lib/orderTypes.js'
 import { formatDateTime } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml, TELEGRAM_STATUS_MESSAGES } from './telegram.js'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../../../src/lib/menuSaleUnits.js'
@@ -147,11 +147,12 @@ function isPaidOrder(order) {
 
 function isOffPremiseOrder(order) {
   const type = inferOrderType(order)
-  return type === 'take_away' || type === 'delivery'
+  return isOffPremiseOrderType(type)
 }
 
 function orderTypeIcon(order) {
   const type = inferOrderType(order)
+  if (type === 'game_club') return '🎮'
   if (type === 'delivery') return '🚚'
   if (type === 'take_away') return '🥡'
   return '🍽️'

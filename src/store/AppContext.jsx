@@ -358,7 +358,7 @@ export function AppProvider({ children }) {
           _submittedAt: submittedAt,
           _kitchenRoundId: kitchenRoundId,
           _orderId: action._orderId || (isOffPremise
-            ? `${orderType === 'delivery' ? 'dl' : 'ta'}-${Date.now()}`
+            ? `${orderType === 'game_club' ? 'gc' : orderType === 'delivery' ? 'dl' : 'ta'}-${Date.now()}`
             : stateRef.current.orders.find(o =>
               o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
             )?.id || 'o' + Date.now()),

@@ -101,9 +101,9 @@
     },
     {
       "name": "waiter-kitchen",
-      "keywords": ["cart", "waiter", "kitchen", "submit", "order", "round", "table", "reservation"],
-      "files": ["src/pages/WaiterTables.jsx", "src/pages/WaiterOrder.jsx", "src/pages/KitchenCheckReceipt.jsx", "src/components/CartPanel.jsx", "src/store/ordersReducer.js", "src/store/cartReducer.js", "src/lib/kitchenCheck.js", "src/lib/db.js"],
-      "tests": ["tests/operationalFlows.test.js", "tests/kitchenCheck.test.js", "tests/kitchenSubmissionRecovery.test.js", "tests/kitchenSubmissionReducer.test.js", "tests/priceModes.test.js", "tests/writeTimeout.test.js", "tests/sourceGuards.ordering.test.js"]
+      "keywords": ["game club", "cart", "waiter", "kitchen", "submit", "order", "round", "table", "reservation"],
+      "files": ["src/lib/orderTypes.js", "src/lib/gameClubRevenue.js", "supabase/179_game_club_orders.sql", "src/pages/WaiterTables.jsx", "src/pages/WaiterOrder.jsx", "src/pages/KitchenCheckReceipt.jsx", "src/components/CartPanel.jsx", "src/store/ordersReducer.js", "src/store/cartReducer.js", "src/lib/kitchenCheck.js", "src/lib/db.js"],
+      "tests": ["tests/gameClubOrders.test.js", "tests/operationalFlows.test.js", "tests/kitchenCheck.test.js", "tests/kitchenSubmissionRecovery.test.js", "tests/kitchenSubmissionReducer.test.js", "tests/priceModes.test.js", "tests/writeTimeout.test.js", "tests/sourceGuards.ordering.test.js"]
     },
     {
       "name": "menu-media-inventory",

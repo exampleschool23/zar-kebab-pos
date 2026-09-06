@@ -847,6 +847,13 @@ export default function WaiterTables() {
                     <Plus size={15} className="shrink-0" />
                     <span className="truncate whitespace-nowrap">{tr(lang, 'deliveryOrder')}</span>
                   </button>
+                  <button
+                    onClick={() => navigate('/waiter/take-away?orderType=game_club')}
+                    className="flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-emerald-700"
+                  >
+                    <Plus size={15} className="shrink-0" />
+                    <span className="truncate whitespace-nowrap">Game Club</span>
+                  </button>
                 </>
               )}
               {canManageTables && (

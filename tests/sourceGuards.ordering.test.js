@@ -470,7 +470,7 @@ test('delivery order type is wired through POS surfaces and reports', () => {
   assert.match(db, /orderTypeLabel\(orderType, 'en'\)/)
   assert.match(reports, /key: 'order_types'/)
   assert.match(reports, /function OrderTypesTab/)
-  assert.match(reports, /\['dine_in', 'take_away', 'delivery'\]/)
+  assert.match(reports, /return ORDER_TYPE_KEYS/)
   assert.match(waiterTables, /deliveryOrder: 'Delivery Order'/)
   assert.match(waiterTables, /function handleDelivery\(\)/)
   assert.match(waiterTables, /navigate\('\/waiter\/take-away\?orderType=delivery'\)/)

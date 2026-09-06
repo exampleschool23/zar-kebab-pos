@@ -48,3 +48,5 @@ Read this guide for dashboard analytics, reports, historical drilldowns, immutab
 - Overview aggregates are lightweight. Detailed order/item rows belong to reports, receipts, and drilldowns.
 - Selected-month forecast uses that month's actual/expected operating costs only, not prior-period arrears.
 - Fines are payroll deductions, never cash expenses. Employee meal snapshots are calculated operating costs without payment methods.
+
+- Game Club (`game_club`) is a separate order-type revenue bucket in Dashboard and Reports. Its immutable paid totals remain included in overall Accounting, category, payment, and date-range totals. Never reclassify historical take-away/delivery sales. Regression coverage: `tests/gameClubOrders.test.js`.

@@ -111,6 +111,9 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
   const dineInIncome = normalizeAmount(summary?.dineInIncomeTotal)
   const offPremiseIncome = normalizeAmount(summary?.offPremiseIncomeTotal)
   const touristIncome = normalizeAmount(summary?.touristIncomeTotal)
+  const gameClubIncome = normalizeAmount(summary?.gameClubIncomeTotal)
+  const gameClubPercentage = normalizePercent(summary?.gameClubPercentage)
+  const gameClubOffset = CIRCLE_LENGTH * (dineInPercentage + offPremisePercentage + touristPercentage) / 100
   const firstSegmentLength = CIRCLE_LENGTH * dineInPercentage / 100
   const secondSegmentLength = CIRCLE_LENGTH * offPremisePercentage / 100
   const cafeNetProfit = Number.isFinite(Number(summary?.cafeNetProfit))
@@ -164,6 +167,7 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
       ${donutSegment(dineInPercentage, 0, regularColor)}
       ${donutSegment(offPremisePercentage, firstSegmentLength, offPremiseColor)}
       ${donutSegment(touristPercentage, firstSegmentLength + secondSegmentLength, touristColor)}
+      ${donutSegment(gameClubPercentage, gameClubOffset, "#2563EB")}
     </g>
     <circle cx="${chartCenterX}" cy="${chartCenterY}" r="143" fill="#FFFFFF"/>
     <text x="${chartCenterX}" y="602" text-anchor="middle" font-size="20" font-weight="700" letter-spacing="2" fill="#82918F">СТРУКТУРА</text>
@@ -171,6 +175,7 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     ${donutPercentageLabel(dineInPercentage, 0, chartCenterX, chartCenterY)}
     ${donutPercentageLabel(offPremisePercentage, firstSegmentLength, chartCenterX, chartCenterY)}
     ${donutPercentageLabel(touristPercentage, firstSegmentLength + secondSegmentLength, chartCenterX, chartCenterY)}
+    ${donutPercentageLabel(gameClubPercentage, gameClubOffset, chartCenterX, chartCenterY)}
 
     <text x="664" y="560" font-size="18" font-weight="700" letter-spacing="1.6" fill="${regularColor}">● ЗАЛ</text>
     <text x="1048" y="560" text-anchor="end" font-size="18" font-weight="700" fill="${regularColor}">${escapeSvg(formatMoney(dineInIncome))}</text>
@@ -182,9 +187,12 @@ export function buildDailyPayrollGroupReportSvg(summary, date) {
     <text x="1048" y="710" text-anchor="end" font-size="18" font-weight="700" fill="${touristColor}">${escapeSvg(formatMoney(touristIncome))}</text>
     <text x="664" y="742" font-size="27" font-weight="700" fill="#173B3F">Туристическая выручка</text>
 
-    <rect x="646" y="774" width="424" height="90" rx="22" fill="#EAF8F3"/>
-    <text x="676" y="808" font-size="20" font-weight="700" fill="#4A6A61">ЧИСТАЯ ПРИБЫЛЬ КАФЕ</text>
-    <text x="676" y="845" font-size="31" font-weight="800" fill="#137A58">${escapeSvg(cafeNetProfit)}</text>
+    <text x="664" y="785" font-size="18" font-weight="700" fill="#2563EB">● ИГРОВОЙ КЛУБ</text>
+    <text x="1048" y="785" text-anchor="end" font-size="18" font-weight="700" fill="#2563EB">${escapeSvg(formatMoney(gameClubIncome))}</text>
+
+    <rect x="646" y="804" width="424" height="90" rx="22" fill="#EAF8F3"/>
+    <text x="676" y="838" font-size="20" font-weight="700" fill="#4A6A61">ЧИСТАЯ ПРИБЫЛЬ КАФЕ</text>
+    <text x="676" y="875" font-size="31" font-weight="800" fill="#137A58">${escapeSvg(cafeNetProfit)}</text>
 
     <rect x="68" y="940" width="1064" height="448" rx="34" fill="#FFFFFF" stroke="#DDE8E5" stroke-width="2"/>
     <circle cx="112" cy="992" r="22" fill="#FFF0E7"/>

@@ -23,6 +23,7 @@ const ORDER_TYPES = [
   { key: 'dine_in', ...ORDER_TYPE_LABELS.dine_in },
   { key: 'take_away', ...ORDER_TYPE_LABELS.take_away },
   { key: 'delivery', ...ORDER_TYPE_LABELS.delivery },
+  { key: 'game_club', ...ORDER_TYPE_LABELS.game_club },
 ]
 
 function submitErrorMessage(lang, error) {

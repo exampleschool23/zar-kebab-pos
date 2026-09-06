@@ -12,7 +12,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 ## Payment and service math
 
 - Use `normalizeServiceRatePct()`, `getOrderPaymentSummary()`, and `getOrderPaymentFields()` from `src/lib/analytics.js`; do not hand-roll totals in pages.
-- Dine-in may include service. Take-away and delivery always use zero service.
+- Dine-in may include service. Take-away, delivery, and Game Club use zero service.
 - Regular and Tourist service settings are separate; new dine-in orders snapshot the rate chosen by authoritative `price_mode`.
 - Reuse an unpaid order's saved service rate only when its saved price mode matches the submitted mode. Empty/stale Regular shells cannot leak Regular service into Tourist orders.
 - Active and paid orders keep their rate snapshot after settings change. Pending kitchen retries retain the original rate.

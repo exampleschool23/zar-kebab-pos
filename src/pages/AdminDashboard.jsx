@@ -324,6 +324,7 @@ function groupPaidRecentOrders(orders, lang) {
 
 function orderContextBadge(order, lang, fallback) {
   const orderType = inferOrderType(order)
+  if (orderType === 'game_club') return { label: orderTypeLabel(orderType, lang), cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
   if (orderType === 'delivery') {
     return {
       label: orderTypeLabel(orderType, lang),
@@ -690,6 +691,7 @@ const PAYMENT_COLORS = {
 }
 
 const ORDER_TYPE_PERFORMANCE_STYLE = {
+  game_club: { Icon: Package, panel: 'bg-emerald-50 border-emerald-200', icon: 'bg-white text-emerald-700', text: 'text-emerald-700', bar: 'bg-emerald-600' },
   dine_in: {
     Icon: Users,
     panel: 'bg-orange-50 border-orange-200',

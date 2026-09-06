@@ -120,6 +120,8 @@ test('daily payroll group message reports aggregate earned salary and automatic 
     dineInIncomeTotal: 1_925_000,
     offPremiseIncomeTotal: 875_000,
     touristIncomeTotal: 700_000,
+    gameClubIncomeTotal: 0,
+    gameClubPercentage: 0,
     dineInPercentage: 55,
     offPremisePercentage: 25,
     touristPercentage: 20,

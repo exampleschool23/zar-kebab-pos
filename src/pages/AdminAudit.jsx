@@ -97,6 +97,8 @@ function statusLabel(status, lang) {
     pending: { uz: 'Kutilmoqda', ru: 'Ожидает', en: 'Pending' },
     take_away: ORDER_TYPE_LABELS.take_away,
     delivery: ORDER_TYPE_LABELS.delivery,
+    game_club: ORDER_TYPE_LABELS.game_club,
+    'Game Club': ORDER_TYPE_LABELS.game_club,
     'Take Away': ORDER_TYPE_LABELS.take_away,
     Delivery: ORDER_TYPE_LABELS.delivery,
   }
