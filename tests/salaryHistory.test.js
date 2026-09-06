@@ -77,6 +77,20 @@ test('salary history decorates automatic KPI bonuses with their immutable formul
   assert.equal(summarizeSalaryHistoryMonth([entry], '2026-08').kpiBonusAmount, 97_750)
 })
 
+test('monthly bonus cards separate manually added bonuses from automatic KPI', () => {
+  const entries = buildSalaryHistoryEntries({
+    bonuses: [
+      { id: 'manual', bonus_date: '2026-08-12', amount: 500_000 },
+      { id: 'kpi', bonus_date: '2026-08-31', amount: 3_001_681, source_type: 'daily_kpi' },
+      { id: 'next-month', bonus_date: '2026-09-01', amount: 100_000, source_type: 'daily_kpi' },
+    ],
+  })
+  const summary = summarizeSalaryHistoryMonth(entries, '2026-08')
+  assert.equal(summary.bonusAmount, 500_000)
+  assert.equal(summary.kpiBonusAmount, 3_001_681)
+  assert.equal(summary.bonusAmount + summary.kpiBonusAmount, 3_501_681)
+})
+
 test('salary history calendar is Monday-first, fixed-height, and marks activity and today', () => {
   const entries = buildSalaryHistoryEntries({
     payments: [{ id: 'payment', paid_date: '2026-08-08', amount: 500000 }],

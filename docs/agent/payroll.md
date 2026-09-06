@@ -40,7 +40,7 @@ Read this guide for salary profiles, payments, bonuses, fines, absences, advance
 - Only owners remove KPI rules. The form's selected effective date is the removal boundary: the original rule and all finalized or paid data before it stay unchanged, while a disabled successor stops KPI from that date onward. A rule is physically deleted only when the selected boundary equals its own effective date and the rule is still unused. The disabled successor is not offered for removal because exposing the older enabled rule would reactivate KPI.
 - Employee cards show the rule effective today, not a future scheduled rule. Missing migration support reports locally without blocking the cards.
 - Adding a KPI rule or genuinely changing its rate/status creates an immutable before/after event and a duplicate-safe Salary-group delivery. A no-op save creates no new notification; migration `170` deliberately does not backfill older rules.
-- Salary History shows selected-month automatic KPI separately while retaining it in all-bonus totals.
+- Salary History separates monthly manual Bonuses from KPI bonuses. Salary + bonuses includes salary and both bonus types once each.
 - Effective dates cannot enter already finalized periods. Recovery scans missing older dates in bounded batches.
 
 ## Daily salary notifications

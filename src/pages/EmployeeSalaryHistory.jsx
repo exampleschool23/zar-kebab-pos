@@ -369,10 +369,10 @@ export default function EmployeeSalaryHistory() {
       : 0
     return {
       salaryEarned,
-      earned: salaryEarned + monthSummary.bonusAmount,
+      earned: salaryEarned + monthSummary.bonusAmount + monthSummary.kpiBonusAmount,
       due: getSalaryDue(employee, today),
     }
-  }, [employee, monthSummary.bonusAmount, today, visibleMonth])
+  }, [employee, monthSummary.bonusAmount, monthSummary.kpiBonusAmount, today, visibleMonth])
   const pageCount = Math.max(1, Math.ceil(visibleEntries.length / PAGE_SIZE))
   const pagedEntries = useMemo(
     () => visibleEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),

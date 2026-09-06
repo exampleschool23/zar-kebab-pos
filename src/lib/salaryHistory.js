@@ -143,8 +143,8 @@ export function summarizeSalaryHistoryMonth(entries = [], month = '') {
     if (entry.entryType === 'payment') summary.paymentAmount += normalizeAmount(entry.amount)
     if (entry.entryType === 'bonus') {
       const amount = normalizeAmount(entry.amount)
-      summary.bonusAmount += amount
       if (entry.automaticKpi) summary.kpiBonusAmount += amount
+      else summary.bonusAmount += amount
     }
     if (entry.entryType === 'fine') summary.fineAmount += normalizeAmount(entry.amount)
     if (entry.entryType === 'absence') summary.absenceCount += 1
