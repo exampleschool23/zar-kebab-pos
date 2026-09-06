@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, CalendarCheck2, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Percent, Power, RefreshCw, UserRound, Users, WalletCards, X } from 'lucide-react'
+import { ArrowLeft, CalendarCheck2, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Percent, Power, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import { useApp } from '../store/AppContext'
@@ -69,7 +69,6 @@ export default function Employees() {
       title: 'Xodimlar',
       sub: 'Maosh tizimidagi xodimlar ro‘yxati',
       back: 'Maoshlarga qaytish',
-      refresh: 'Yangilash',
       active: 'Faol',
       inactive: 'Nofaol',
       inactiveSection: 'Faolsizlantirilgan xodimlar',
@@ -116,7 +115,6 @@ export default function Employees() {
       title: 'Сотрудники',
       sub: 'Список сотрудников в зарплатной системе',
       back: 'Назад к зарплатам',
-      refresh: 'Обновить',
       active: 'Активен',
       inactive: 'Неактивен',
       inactiveSection: 'Деактивированные сотрудники',
@@ -163,7 +161,6 @@ export default function Employees() {
       title: 'Employees',
       sub: 'Employee list from the salary system',
       back: 'Back to salaries',
-      refresh: 'Refresh',
       active: 'Active',
       inactive: 'Inactive',
       inactiveSection: 'Deactivated employees',
@@ -436,9 +433,6 @@ export default function Employees() {
               <Kpi icon={CalendarX2} label={l.absentToday} value={absentTodayCount} danger={absentTodayCount > 0} />
               <Kpi icon={CalendarDays} label={l.activeDaily} value={formatCurrency(activeDailySalary)} />
               <Kpi icon={WalletCards} label={l.due} value={formatCurrency(totalDue)} hot={totalDue > 0} />
-              <button onClick={loadEmployees} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-black text-[#6B7280] shadow-sm">
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />{l.refresh}
-              </button>
             </div>
           </div>
 
