@@ -98,6 +98,7 @@ test('manual and KPI bonuses are presented as salary accruals instead of immedia
   assert.match(salaries, /labels\.kpiAccruesToSalary/)
   assert.doesNotMatch(salaries, /kpiPaidImmediately/)
   assert.match(employeeHistory, /entry\.entryType === 'bonus' && entry\.accruesToSalary && \([\s\S]*?labels\.accruedToSalary/)
+  assert.match(employeeHistory, /setEmployee\(\{[\s\S]*?bonuses: bonusRes\.data \|\| \[\][\s\S]*?\}\)/)
 })
 
 test('employee cards show the current effective KPI percentage and enabled state', () => {

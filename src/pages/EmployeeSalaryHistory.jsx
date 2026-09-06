@@ -312,6 +312,7 @@ export default function EmployeeSalaryHistory() {
         ...employeeRes.data,
         rates: rateRes.data || [],
         payments: paymentRes.data || [],
+        bonuses: bonusRes.data || [],
         fines: fineRes.error ? [] : fineRes.data || [],
         absences: absenceRes.data || [],
       })
