@@ -1,6 +1,6 @@
 # Telegram Menus, Targets, Notifications, and Delivery
 
-Telegram menu, API, notification targets, messages, retries, and schedules.
+Telegram notifications and schedules.
 
 ## Entry points
 
@@ -8,13 +8,11 @@ Telegram menu, API, notification targets, messages, retries, and schedules.
 - Notification client and server endpoints: `src/lib/telegramNotifications.js`, `api/telegram/`
 - Shared server delivery logic: `api/telegram/_lib/`
 - Bot polling fallback: `bots/telegram-bot.js`
-- Focused tests include `tests/telegramEmployeeLifecycle.test.js`, `tests/dailySalaryWatchdog.test.js`, and `tests/sourceGuards.accounting-reporting.test.js`.
+- Tests: `tests/gameClubNotifications.test.js`, `tests/telegramEmployeeLifecycle.test.js`, `tests/dailySalaryWatchdog.test.js`.
 
 ## Customer Mini App
 
-- The Mini App is a read-only menu.
-- Checkout and My Orders are retired. Restore their API routes only by explicit product decision.
-- Keep auth, loyalty, contacts, employee and POS notifications separate from retired ordering.
+- Mini App is read-only; Checkout/My Orders are retired. Keep auth, loyalty, contacts and notifications separate.
 
 ## Delivery records and retries
 
@@ -46,7 +44,8 @@ Telegram menu, API, notification targets, messages, retries, and schedules.
 
 - Combined employee Salary + Bonus summaries are always Russian and contain attendance, earned salary, bonuses, and current due—never repeated fines or payments.
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
-- Game Club paid revenue (both price modes) has its own text/PNG bucket, excluded from Tourist and other off-premise buckets.
+- Game Club paid revenue has its own text/PNG bucket, excluded from other buckets.
+- Migration `180` sends new Game Club rounds to Team: RU date, Добавил, menu mode, item table and total. No costs/tenders. Vault cron dispatches immediately and every minute; uncertain sends remain held for review, never blindly resent.
 - Daily/MTD cafe income uses immutable `orders.total`. Cash/terminal uses payment rows; QR maps to terminal, while card/loyalty stay distinct.
 - The aggregate daily report estimates soliq as 4% of that day's paid cafe revenue, lists it in expenses, includes it in total expenses, and deducts it from daily net profit.
 - Team automatic KPI messages are RU and contain only name, amount, and date. Delivery is duplicate-safe; migration `172` restores and backfills missing queue rows. Never expose sales base, KPI rate, salary due, or manager.

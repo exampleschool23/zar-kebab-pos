@@ -227,7 +227,7 @@ function truncateText(value, maxLength) {
   return text.length > maxLength ? `${text.slice(0, Math.max(0, maxLength - 1))}.` : text
 }
 
-function buildItemRows(items) {
+export function buildItemRows(items) {
   const rows = [
     `${'Позиция'.padEnd(22)} ${'Кол'.padStart(3)} ${'Сумма'.padStart(10)}`,
   ]

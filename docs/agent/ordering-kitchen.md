@@ -53,3 +53,5 @@ Read this guide for waiter tables, table entry, carts, price modes, reservations
 - Never hard-delete a table with active orders or historical references; verify history on demand before archival/deletion decisions.
 
 - Game Club uses `/waiter/take-away?orderType=game_club`, a distinct off-premise channel with `GC` order numbers, no table, zero service, and the existing off-premise permission. Regression coverage: `tests/gameClubOrders.test.js`.
+
+- Migration `180` queues each new Game Club round at commit, with only that round’s items and the actual submitting actor. Team delivery runs independently of the browser.

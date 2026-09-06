@@ -1,3 +1,4 @@
+import { drainGameClubNotifications } from './_lib/gameClubNotifications.js'
 import { json, methodNotAllowed, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import {
@@ -1306,6 +1307,9 @@ export default async function handler(req, res) {
     cronAuthorized = true
     cronTask = getCronTask(req)
     supabase = getSupabaseAdmin()
+    if (cronTask === 'game-club-orders') {
+      return json(res, 200, await drainGameClubNotifications(supabase))
+    }
     if (cronTask === 'investor-report') {
       const { data: kpiResults, error: kpiResultsError } = await supabase
         .from('employee_daily_kpi_results')
@@ -1537,6 +1541,9 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('[telegram/daily-salary]', error)
+    if (cronTask === 'game-club-orders') {
+      return json(res, error?.status || 500, { error: error.message || 'Game Club notifications failed' })
+    }
     if (cronAuthorized) {
       if (cronTask === 'unavailable-products') {
         await notifySecondaryCronFailure(supabase, getTashkentDate(now), error)

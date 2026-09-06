@@ -35,6 +35,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - compact all-time Accounting remainder: `177`
   - employee lifecycle Investor notification queue: `178`
   - Game Club order type, off-premise permission and service checks: `179`
+  - Game Club immutable per-round Team queue and cron: `180`
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants
@@ -87,3 +88,5 @@ Do not loosen a guard simply because implementation changed. First determine whi
 - Preserve unrelated dirty-worktree changes and report any validation you could not run.
 
 - Migration `179_game_club_orders.sql` must precede the Game Club frontend release. It extends order/item constraints and current permission/settlement functions without changing historical rows. Never require the reopening function retired by `090`. Focused coverage: `tests/gameClubOrders.test.js`.
+
+- Optional isolated SQL check: `scripts/check-game-club-migration.mjs` accepts a PGlite module path and tests migration `180` without production access.
