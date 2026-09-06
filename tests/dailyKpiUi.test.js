@@ -102,6 +102,8 @@ test('manual and KPI bonuses are presented as salary accruals instead of immedia
 })
 
 test('employee cards show the current effective KPI percentage and enabled state', () => {
+  assert.match(employees, /\.from\('employee_salary_bonuses'\)\.select\('\*'\)/)
+  assert.match(employees, /bonuses: bonuses\.filter\(bonus => bonus\.salary_profile_id === row\.id\)/)
   assert.match(employees, /\.from\('employee_kpi_rules'\)[\s\S]*?\.lte\('effective_from', today\)/)
   assert.match(employees, /getEffectiveKpiRule\(kpiRules, employee\.id, today\)/)
   assert.match(employees, /<EmployeeKpiRow[\s\S]*?rule=\{effectiveKpiRule\}/)

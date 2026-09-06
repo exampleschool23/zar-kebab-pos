@@ -34,7 +34,7 @@ function isMissingSalaryMigration(error) {
   )
 }
 
-function composeEmployees(rows = [], rates = [], payments = [], fines = [], absences = [], profiles = []) {
+function composeEmployees(rows = [], rates = [], payments = [], bonuses = [], fines = [], absences = [], profiles = []) {
   const profileMap = Object.fromEntries(profiles.map(profile => [profile.id, profile]))
   return rows.map(row => ({
     ...row,
@@ -43,6 +43,7 @@ function composeEmployees(rows = [], rates = [], payments = [], fines = [], abse
       .filter(rate => rate.salary_profile_id === row.id)
       .sort((a, b) => String(b.effective_from || '').localeCompare(String(a.effective_from || ''))),
     payments: payments.filter(payment => payment.salary_profile_id === row.id),
+    bonuses: bonuses.filter(bonus => bonus.salary_profile_id === row.id),
     fines: fines.filter(fine => fine.salary_profile_id === row.id),
     absences: absences
       .filter(absence => absence.salary_profile_id === row.id)
@@ -221,11 +222,12 @@ export default function Employees() {
   async function loadEmployees() {
     setLoading(true)
     setError('')
-    const [teamRes, profileRes, rateRes, paymentRes, fineRes, absenceRes, kpiRuleRes] = await Promise.all([
+    const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, kpiRuleRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
       supabase.from('employee_salary_profiles').select('*').order('employee_name'),
       supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
       supabase.from('employee_salary_payments').select('*'),
+      supabase.from('employee_salary_bonuses').select('*'),
       supabase.from('employee_salary_fines').select('*'),
       supabase.from('employee_salary_absences').select('*'),
       supabase.from('employee_kpi_rules')
@@ -238,7 +240,7 @@ export default function Employees() {
     setKpiRules(kpiRuleRes.error ? [] : kpiRuleRes.data || [])
     setKpiRulesAvailable(!kpiRuleRes.error)
 
-    const salaryError = profileRes.error || rateRes.error || paymentRes.error || absenceRes.error
+    const salaryError = profileRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
     if (salaryError) {
       setError(isMissingSalaryMigration(salaryError) ? l.migration : salaryError.message)
       setEmployees([])
@@ -248,6 +250,7 @@ export default function Employees() {
         profileRes.data || [],
         rateRes.data || [],
         paymentRes.data || [],
+        bonusRes.data || [],
         fineRes.error ? [] : fineRes.data || [],
         absenceRes.data || [],
         teamRes.data || [],
