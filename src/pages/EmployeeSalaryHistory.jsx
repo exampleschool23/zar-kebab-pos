@@ -24,6 +24,7 @@ import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate, formatMonthYear, formatTime } from '../lib/dateFormat'
 import { formatKpiRatePercent } from '../lib/dailyKpi'
+import { loadSalaryRows } from '../lib/salaryData'
 import {
   expensePaymentMethodLabel,
   getSalaryAccruedAmount,
@@ -290,14 +291,14 @@ export default function EmployeeSalaryHistory() {
     try {
       const [employeeRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, kpiResultRes] = await Promise.all([
         supabase.from('employee_salary_profiles').select('*').eq('id', employeeId).maybeSingle(),
-        supabase.from('employee_salary_rates').select('*').eq('salary_profile_id', employeeId),
-        supabase.from('employee_salary_payments').select('*').eq('salary_profile_id', employeeId),
-        supabase.from('employee_salary_bonuses').select('*').eq('salary_profile_id', employeeId),
-        supabase.from('employee_salary_fines').select('*').eq('salary_profile_id', employeeId),
-        supabase.from('employee_salary_absences').select('*').eq('salary_profile_id', employeeId),
-        supabase.from('employee_daily_kpi_results')
+        loadSalaryRows(() => supabase.from('employee_salary_rates').select('*').eq('salary_profile_id', employeeId)),
+        loadSalaryRows(() => supabase.from('employee_salary_payments').select('*').eq('salary_profile_id', employeeId)),
+        loadSalaryRows(() => supabase.from('employee_salary_bonuses').select('*').eq('salary_profile_id', employeeId)),
+        loadSalaryRows(() => supabase.from('employee_salary_fines').select('*').eq('salary_profile_id', employeeId)),
+        loadSalaryRows(() => supabase.from('employee_salary_absences').select('*').eq('salary_profile_id', employeeId)),
+        loadSalaryRows(() => supabase.from('employee_daily_kpi_results')
           .select('id, business_date, salary_profile_id, sales_base_amount, rate_bps, bonus_amount, bonus_id, status')
-          .eq('salary_profile_id', employeeId),
+          .eq('salary_profile_id', employeeId)),
       ])
       const loadError = employeeRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
       if (loadError) throw loadError
@@ -440,12 +441,14 @@ export default function EmployeeSalaryHistory() {
     setEntries(current => current.filter(item => !(
       item.id === entry.id && item.entryType === entry.entryType
     )))
-    if (entry.entryType === 'payment' || entry.entryType === 'fine' || entry.entryType === 'absence') {
+    if (entry.entryType === 'payment' || entry.entryType === 'bonus' || entry.entryType === 'fine' || entry.entryType === 'absence') {
       const collection = entry.entryType === 'payment'
         ? 'payments'
-        : entry.entryType === 'fine'
-          ? 'fines'
-          : 'absences'
+        : entry.entryType === 'bonus'
+          ? 'bonuses'
+          : entry.entryType === 'fine'
+            ? 'fines'
+            : 'absences'
       setEmployee(current => current ? {
         ...current,
         [collection]: (current[collection] || []).filter(item => item.id !== entry.id),

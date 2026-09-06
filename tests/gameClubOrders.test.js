@@ -112,11 +112,16 @@ test('daily Telegram loader classifies both Game Club price modes once and retai
       ? { average_daily_amount: 0, present_employee_count: 0 } : []
     const builder = {
       select(columns) { query.columns = columns; return this },
+      order(...args) { query.order = args; return this },
+      range(from, to) { query.range = [from, to]; return this },
       eq(...args) { query.filters.push(['eq', ...args]); return this },
       gte(...args) { query.filters.push(['gte', ...args]); return this },
       lt(...args) { query.filters.push(['lt', ...args]); return this },
       maybeSingle() { return this },
-      then(resolve) { return Promise.resolve({ data, error: null }).then(resolve) },
+      then(resolve) {
+        const page = query.range && Array.isArray(data) ? data.slice(query.range[0], query.range[1] + 1) : data
+        return Promise.resolve({ data: page, error: null }).then(resolve)
+      },
     }
     return builder
   } }

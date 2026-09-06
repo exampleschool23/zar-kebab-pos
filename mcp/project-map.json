@@ -56,6 +56,12 @@
       "symbol": "getTotalSalaryDue"
     },
     {
+      "name": "complete salary ledger loading",
+      "aliases": ["salary balance missing bonuses", "payroll pagination", "Telegram salary balance consistency"],
+      "path": "src/lib/salaryData.js",
+      "symbol": "loadSalaryRows"
+    },
+    {
       "name": "variant tech card payload",
       "aliases": ["variant recipe save", "tech card variant identity"],
       "path": "src/lib/techCards.js",
@@ -133,7 +139,7 @@
       "name": "payroll-kpi-meals",
       "keywords": ["employee", "salary", "bonus", "accrued bonus", "salary liability", "fine", "absence", "advance", "KPI", "KPI change notification", "Salary group", "meal", "payroll"],
       "files": ["src/pages/Salaries.jsx", "src/pages/Employees.jsx", "src/pages/EmployeeSalaryHistory.jsx", "src/lib/salaryTransactions.js", "src/lib/salaryHistory.js", "src/lib/dailyKpi.js", "src/lib/expenses.js", "src/lib/telegramNotifications.js", "api/telegram/daily-salary.js", "api/telegram/employee-notification.js", "supabase/169_salary_bonus_accrual.sql", "supabase/170_kpi_rule_group_notifications.sql", "supabase/172_repair_daily_kpi_team_delivery_queue.sql", "supabase/178_employee_lifecycle_investor_notifications.sql"],
-      "tests": ["tests/salaryTransactions.test.js", "tests/salaryHistory.test.js", "tests/salaryAccrual.test.js", "tests/dailyKpi.test.js", "tests/dailyKpiUi.test.js", "tests/dailyKpiBonuses.test.js", "tests/dailySalaryWatchdog.test.js", "tests/telegramSalaryMessages.test.js", "tests/telegramEmployeeLifecycle.test.js"]
+      "tests": ["tests/salaryTransactions.test.js", "tests/salaryHistory.test.js", "tests/salaryAccrual.test.js", "tests/salaryBalanceConsistency.test.js", "tests/dailyKpi.test.js", "tests/dailyKpiUi.test.js", "tests/dailyKpiBonuses.test.js", "tests/dailySalaryWatchdog.test.js", "tests/telegramSalaryMessages.test.js", "tests/telegramEmployeeLifecycle.test.js"]
     },
     {
       "name": "reporting-history",

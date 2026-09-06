@@ -6,6 +6,7 @@ import { OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { loadSalaryRows } from '../lib/salaryData'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatDateTime, formatLongDate } from '../lib/dateFormat'
 import {
@@ -668,12 +669,12 @@ export default function Salaries() {
     try {
       const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, telegramLinkRes] = await Promise.all([
         supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
-        supabase.from('employee_salary_profiles').select('*').order('employee_name'),
-        supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
-        supabase.from('employee_salary_payments').select('*').order('paid_date', { ascending: false }),
-        supabase.from('employee_salary_bonuses').select('*').order('bonus_date', { ascending: false }),
-        supabase.from('employee_salary_fines').select('*').order('fine_date', { ascending: false }),
-        supabase.from('employee_salary_absences').select('*').order('absence_date', { ascending: false }),
+        loadSalaryRows(() => supabase.from('employee_salary_profiles').select('*').order('employee_name')),
+        loadSalaryRows(() => supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false })),
+        loadSalaryRows(() => supabase.from('employee_salary_payments').select('*').order('paid_date', { ascending: false })),
+        loadSalaryRows(() => supabase.from('employee_salary_bonuses').select('*').order('bonus_date', { ascending: false })),
+        loadSalaryRows(() => supabase.from('employee_salary_fines').select('*').order('fine_date', { ascending: false })),
+        loadSalaryRows(() => supabase.from('employee_salary_absences').select('*').order('absence_date', { ascending: false })),
         supabase.from('employee_salary_telegram_links').select('salary_profile_id, telegram_user_id, linked_at, notifications_enabled'),
         refreshTelegram ? loadTelegramDeliveryData() : Promise.resolve(),
       ])

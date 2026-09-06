@@ -17,6 +17,7 @@ Read this guide for salary profiles, payments, bonuses, fines, absences, advance
 - `getSalaryDue()` is the nonnegative liability for one employee. `getTotalSalaryDue()` sums per-employee liabilities so one advance never hides another employee's due.
 - Allow a positive manual salary payment even when current balance is zero or negative.
 - Combined history sorts by effective date, then `created_at` newest-first for the same date.
+- Page complete payroll ledgers via `src/lib/salaryData.js`; include accrued bonuses and remove deleted bonuses from balance state. Coverage: `tests/salaryBalanceConsistency.test.js`.
 
 ## Fines, bonuses, and absence
 

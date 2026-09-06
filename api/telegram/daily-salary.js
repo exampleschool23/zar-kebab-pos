@@ -10,6 +10,7 @@ import {
   getTashkentDate,
 } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
+import { loadSalaryRows } from '../../src/lib/salaryData.js'
 import {
   escapeTelegramHtml,
   sendTelegramMediaGroup,
@@ -721,9 +722,9 @@ async function sendDailyIngredientConsumptionNotification(supabase, businessDate
 
 export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiResults) {
   const monthStart = `${businessDate.slice(0, 8)}01`
-  const { data: profileRows, error: profilesError } = await supabase
+  const { data: profileRows, error: profilesError } = await loadSalaryRows(() => supabase
     .from('employee_salary_profiles')
-    .select('id, employee_name, joined_at, ended_at, deleted_at, is_active')
+    .select('id, employee_name, joined_at, ended_at, deleted_at, is_active'))
   if (profilesError) throw profilesError
 
   const eligibleProfiles = (profileRows || []).filter(profile => (
@@ -733,18 +734,18 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
   const emptyRelatedResult = { data: [], error: null }
   const [ratesResult, absencesResult, salesResult, monthlySalesResult, settingsResult, employeeMealResult] = await Promise.all([
     profileIds.length > 0
-      ? supabase
+      ? loadSalaryRows(() => supabase
           .from('employee_salary_rates')
           .select('id, salary_profile_id, effective_from, amount, rate_unit')
           .in('salary_profile_id', profileIds)
-          .lte('effective_from', businessDate)
+          .lte('effective_from', businessDate))
       : Promise.resolve(emptyRelatedResult),
     profileIds.length > 0
-      ? supabase
+      ? loadSalaryRows(() => supabase
           .from('employee_salary_absences')
           .select('id, salary_profile_id, absence_date')
           .in('salary_profile_id', profileIds)
-          .eq('absence_date', businessDate)
+          .eq('absence_date', businessDate))
       : Promise.resolve(emptyRelatedResult),
     supabase
       .from('orders')

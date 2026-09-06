@@ -9,6 +9,7 @@ import { formatLongDate } from '../lib/dateFormat'
 import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
 import { compareSalaryAbsencesNewestFirst } from '../lib/salaryTransactions'
+import { loadSalaryRows } from '../lib/salaryData'
 import { formatKpiRatePercent, getEffectiveKpiRule } from '../lib/dailyKpi'
 import { notifyTelegramAbsenceUndo, notifyTelegramEmployeeLifecycle } from '../lib/telegramNotifications'
 import {
@@ -224,12 +225,12 @@ export default function Employees() {
     setError('')
     const [teamRes, profileRes, rateRes, paymentRes, bonusRes, fineRes, absenceRes, kpiRuleRes] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, role, status, created_at').order('full_name'),
-      supabase.from('employee_salary_profiles').select('*').order('employee_name'),
-      supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false }),
-      supabase.from('employee_salary_payments').select('*'),
-      supabase.from('employee_salary_bonuses').select('*'),
-      supabase.from('employee_salary_fines').select('*'),
-      supabase.from('employee_salary_absences').select('*'),
+      loadSalaryRows(() => supabase.from('employee_salary_profiles').select('*').order('employee_name')),
+      loadSalaryRows(() => supabase.from('employee_salary_rates').select('*').order('effective_from', { ascending: false })),
+      loadSalaryRows(() => supabase.from('employee_salary_payments').select('*')),
+      loadSalaryRows(() => supabase.from('employee_salary_bonuses').select('*')),
+      loadSalaryRows(() => supabase.from('employee_salary_fines').select('*')),
+      loadSalaryRows(() => supabase.from('employee_salary_absences').select('*')),
       supabase.from('employee_kpi_rules')
         .select('id, salary_profile_id, effective_from, rate_bps, is_enabled, created_at, updated_at')
         .lte('effective_from', today)

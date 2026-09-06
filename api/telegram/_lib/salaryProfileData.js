@@ -1,3 +1,5 @@
+import { loadSalaryRows } from '../../../src/lib/salaryData.js'
+
 function composeSalaryProfile(row, related) {
   return {
     ...row,
@@ -14,12 +16,12 @@ export async function loadSalaryProfiles(supabase, profileIds = []) {
   if (uniqueIds.length === 0) return new Map()
 
   const [profiles, rates, payments, bonuses, fines, absences] = await Promise.all([
-    supabase.from('employee_salary_profiles').select('*').in('id', uniqueIds),
-    supabase.from('employee_salary_rates').select('*').in('salary_profile_id', uniqueIds),
-    supabase.from('employee_salary_payments').select('*').in('salary_profile_id', uniqueIds),
-    supabase.from('employee_salary_bonuses').select('*').in('salary_profile_id', uniqueIds),
-    supabase.from('employee_salary_fines').select('*').in('salary_profile_id', uniqueIds),
-    supabase.from('employee_salary_absences').select('*').in('salary_profile_id', uniqueIds),
+    loadSalaryRows(() => supabase.from('employee_salary_profiles').select('*').in('id', uniqueIds)),
+    loadSalaryRows(() => supabase.from('employee_salary_rates').select('*').in('salary_profile_id', uniqueIds)),
+    loadSalaryRows(() => supabase.from('employee_salary_payments').select('*').in('salary_profile_id', uniqueIds)),
+    loadSalaryRows(() => supabase.from('employee_salary_bonuses').select('*').in('salary_profile_id', uniqueIds)),
+    loadSalaryRows(() => supabase.from('employee_salary_fines').select('*').in('salary_profile_id', uniqueIds)),
+    loadSalaryRows(() => supabase.from('employee_salary_absences').select('*').in('salary_profile_id', uniqueIds)),
   ])
   const failed = [profiles, rates, payments, bonuses, fines, absences].find(result => result.error)
   if (failed?.error) throw failed.error
