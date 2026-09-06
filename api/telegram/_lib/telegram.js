@@ -226,3 +226,18 @@ export const TELEGRAM_STATUS_MESSAGES = {
   completed: '✅ Order completed',
   cancelled: 'Order cancelled',
 }
+
+export async function editTelegramPhoto(chatId, messageId, photo) {
+  const form = new FormData()
+  form.append('chat_id', String(chatId))
+  form.append('message_id', String(messageId))
+  form.append('media', JSON.stringify({ type: 'photo', media: 'attach://photo' }))
+  form.append('photo', new Blob([photo], { type: 'image/png' }), 'team-kpi.png')
+  const response = await fetch(`https://api.telegram.org/bot${getBotToken()}/editMessageMedia`, { method: 'POST', body: form })
+  const body = await response.json()
+  if (!response.ok || body.ok === false) {
+    if (/message is not modified/i.test(body.description || '')) return body
+    throw new Error(body.description || 'Telegram image update failed')
+  }
+  return body
+}

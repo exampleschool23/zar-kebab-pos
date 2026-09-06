@@ -1,8 +1,8 @@
 import { drainGameClubNotifications } from './_lib/gameClubNotifications.js'
+import { renderEmployeePayrollImage } from './_lib/employeePayrollImages.js'
 import { json, methodNotAllowed, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import {
-  buildDailySalaryMessage,
   addSalaryDateDays,
   getDailyPayrollGroupSummary,
   getCompletedTashkentDate,
@@ -1251,13 +1251,10 @@ async function sendDailySalaryNotifications(supabase, notificationDate) {
 
     let telegramMessageId = ''
     try {
-      const response = await sendTelegramMessage(
+      const response = await sendTelegramPhoto(
         link.chat_id,
-        buildDailySalaryMessage(
-          salaryProfile,
-          notificationDate,
-          'ru'
-        )
+        await renderEmployeePayrollImage(salaryProfile, notificationDate),
+        { filename: 'daily-salary.png' }
       )
       telegramMessageId = getTelegramMessageId(response)
       const sentAt = new Date().toISOString()

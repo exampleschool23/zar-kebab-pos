@@ -1,14 +1,14 @@
 # Telegram Menus, Targets, Notifications, and Delivery
 
-Telegram notifications and schedules.
+Telegram delivery.
 
 ## Entry points
 
-- Customer surface and browser integration: `src/pages/TelegramMiniApp.jsx`, `src/lib/telegramWebApp.js`
+- Customer UI: `src/pages/TelegramMiniApp.jsx`, `src/lib/telegramWebApp.js`
 - Notification client and server endpoints: `src/lib/telegramNotifications.js`, `api/telegram/`
-- Shared server delivery logic: `api/telegram/_lib/`
+- Server delivery: `api/telegram/_lib/`, including `teamDailyKpiDelivery.js`
 - Bot polling fallback: `bots/telegram-bot.js`
-- Tests: `tests/gameClubNotifications.test.js`, `tests/telegramEmployeeLifecycle.test.js`, `tests/dailySalaryWatchdog.test.js`.
+- Tests: `tests/teamDailyKpiDelivery.test.js`, `tests/employeePayrollImages.test.js`.
 
 ## Customer Mini App
 
@@ -42,13 +42,13 @@ Telegram notifications and schedules.
 
 ## Automatic daily payroll privacy and language
 
-- Combined employee Salary + Bonus summaries are always Russian and contain attendance, earned salary, bonuses, and current due—never repeated fines or payments.
+- Combined employee Salary + Bonus summaries are Russian PNGs: attendance, salary, manual/KPI bonuses, daily total, balance (negative = advance); no fines/payments.
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
 - Game Club paid revenue has its own text/PNG bucket, excluded from other buckets.
 - Migration `180` sends new Game Club rounds to Team: RU date, Добавил, menu mode, item table and total. No costs/tenders. Vault cron dispatches immediately and every minute; uncertain sends remain held for review, never blindly resent.
 - Daily/MTD cafe income uses immutable `orders.total`. Cash/terminal uses payment rows; QR maps to terminal, while card/loyalty stay distinct.
 - The aggregate daily report estimates soliq as 4% of that day's paid cafe revenue, lists it in expenses, includes it in total expenses, and deducts it from daily net profit.
-- Team automatic KPI messages are RU and contain only name, amount, and date. Delivery is duplicate-safe; migration `172` restores and backfills missing queue rows. Never expose sales base, KPI rate, salary due, or manager.
+- Team KPI: one Russian PNG per finalized date with all employee awards, total, date, system author. Migration `181` claims dates; unknown sends stay held. No text fallback or sales/rate/balance data. Deleting an award edits only its row in the shared image.
 
 ## Menu availability
 

@@ -36,6 +36,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - employee lifecycle Investor notification queue: `178`
   - Game Club order type, off-premise permission and service checks: `179`
   - Game Club immutable per-round Team queue and cron: `180`
+  - Daily Team KPI image claims and legacy-delivery suppression: `181` (apply before deploying image delivery)
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants

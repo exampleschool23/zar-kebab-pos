@@ -22,7 +22,7 @@ function escapeFontConfigPath(value) {
   })[character])
 }
 
-function configurePayrollFonts() {
+export function configurePayrollFonts() {
   if (payrollFontsConfigured) return
   const fontDirectory = fileURLToPath(
     new URL('../../../node_modules/notosans-fontface/fonts/', import.meta.url)

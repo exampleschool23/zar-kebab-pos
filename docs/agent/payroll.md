@@ -1,6 +1,6 @@
 # Employees, Payroll, KPI, Absence, and Employee Meals
 
-Read this guide for salary profiles, payments, bonuses, fines, absences, advances, effective-dated KPI rules, daily payroll, and average employee meals.
+Salary profiles, payments, bonuses, fines, absences, advances, KPI rules, daily payroll, and employee meals.
 
 ## Entry points
 
@@ -47,7 +47,7 @@ Read this guide for salary profiles, payments, bonuses, fines, absences, advance
 
 - Private and Salary-group salary-rate change messages include the KPI percentage or disabled/not-configured status effective on the salary change date.
 - KPI rule additions and changes notify only the dedicated Salary group, with employee, previous/new KPI, effective date, and actor. Employee and Team destinations stay terminally skipped.
-- Automatic KPI employee value is folded into one combined private Salary + Bonus summary. Separate private and Salary-group KPI event rows are skipped; Team KPI remains independently retryable.
+- Automatic KPI employee value is folded into one combined private Salary + Bonus summary. Separate private and Salary-group KPI event rows are skipped; Team KPI uses one image per day (migration `181`).
 - The daily cron self-heals a missing automatic-KPI delivery ledger row before Team delivery; migration `172` restores the insert trigger and queues any missed generated KPI bonuses.
 - A failed KPI finalization defers the daily salary summary.
 - See `docs/agent/telegram.md` for language, audience privacy, destination, and delivery-state rules.

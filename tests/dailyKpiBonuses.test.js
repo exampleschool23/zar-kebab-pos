@@ -407,7 +407,11 @@ test('combined salary and Team automatic KPI deliveries are forced to Russian', 
     employeeNotification.indexOf('async function deliverEmployeeSalaryEvent')
   )
 
-  assert.match(salaryDelivery, /buildDailySalaryMessage\([\s\S]*?notificationDate,\s*'ru'\s*\)/)
+  assert.match(salaryDelivery, /sendTelegramPhoto\([\s\S]*?renderEmployeePayrollImage\(salaryProfile, notificationDate\)/)
+  const imageRenderer = fs.readFileSync(new URL('../api/telegram/_lib/employeePayrollImages.js', import.meta.url), 'utf8')
+  assert.match(imageRenderer, /formatLongDate\(date, 'ru', date\)/)
+  assert.match(imageRenderer, /Зарплата и бонусы за день/)
+  assert.match(teamDelivery, /deliverTeamDailyKpi\(supabase, event.bonus_date, target.chatId\)/)
   assert.match(teamDelivery, /source_type === 'daily_kpi'[\s\S]*?\? 'ru'/)
 })
 

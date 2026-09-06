@@ -15,6 +15,7 @@ import {
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { deleteTelegramMessage, sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
+import { deliverTeamDailyKpi, retractTeamDailyKpiItem } from './_lib/teamDailyKpiDelivery.js'
 import {
   buildAbsenceUndoInvestorMessage,
   buildEmployeeLifecycleInvestorMessage,
@@ -466,6 +467,18 @@ async function notifyMenuEvent(supabase, user, menuItemId, availabilityEvent) {
   }
 
   const target = await loadSalaryTeamTarget(supabase)
+  if (type === 'bonus' && event.source_type === 'daily_kpi') {
+    const daily = await deliverTeamDailyKpi(supabase, event.bonus_date, target.chatId)
+    if (daily.status === 'sent') {
+      const updated = await supabase.from('employee_salary_group_notification_deliveries')
+        .update({ team_status: 'sent', team_chat_id: target.chatId,
+          team_telegram_message_id: null, team_sent_at: daily.sentAt,
+          team_error_message: '', updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+      if (updated.error) throw updated.error
+    }
+    return daily
+  }
   const now = new Date().toISOString()
   const pendingFields = {
     status: target.chatId ? 'pending' : 'skipped',
@@ -704,6 +717,18 @@ async function deliverSalaryTeamEvent(supabase, type, event) {
   }
 
   const target = await loadSalaryTeamTarget(supabase)
+  if (type === 'bonus' && event.source_type === 'daily_kpi') {
+    const daily = await deliverTeamDailyKpi(supabase, event.bonus_date, target.chatId)
+    if (daily.status === 'sent') {
+      const updated = await supabase.from('employee_salary_group_notification_deliveries')
+        .update({ team_status: 'sent', team_chat_id: target.chatId,
+          team_telegram_message_id: null, team_sent_at: daily.sentAt,
+          team_error_message: '', updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+      if (updated.error) throw updated.error
+    }
+    return daily
+  }
   const now = new Date().toISOString()
   const pendingFields = {
     team_status: target.chatId ? 'pending' : 'skipped',
@@ -1449,11 +1474,15 @@ async function retractSalaryEventMessages(supabase, eventType, eventId) {
 
   const { data: event, error: eventError } = await supabase
     .from(table)
-    .select('id, salary_profile_id')
+    .select(eventType === 'bonus' ? 'id, salary_profile_id, source_type, bonus_date' : 'id, salary_profile_id')
     .eq('id', eventId)
     .maybeSingle()
   if (eventError) throw eventError
   if (!event) throw Object.assign(new Error('Salary event not found'), { status: 404 })
+
+  if (eventType === 'bonus' && event.source_type === 'daily_kpi') {
+    await retractTeamDailyKpiItem(supabase, event.bonus_date, eventId)
+  }
 
   const targets = []
   if (eventType === 'payment') {
