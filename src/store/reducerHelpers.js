@@ -42,9 +42,9 @@ export function loadInitialLang() {
       localStorage.setItem('zk_public_default_lang_ru_v1', '1')
       return 'ru'
     }
-    if (!localStorage.getItem('zk_default_lang_ru_applied')) {
+    if (!localStorage.getItem('zk_default_lang_ru_v2')) {
       localStorage.setItem('zk_lang', 'ru')
-      localStorage.setItem('zk_default_lang_ru_applied', '1')
+      localStorage.setItem('zk_default_lang_ru_v2', '1')
       return 'ru'
     }
     return localStorage.getItem('zk_lang') || 'ru'
