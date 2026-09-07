@@ -41,6 +41,7 @@ import { applyLoyaltyToCashierPaymentQuote, canConfirmCashierCheckout, getFreshC
 import { loadCashierBillOrders } from '../lib/db'
 import { withReadTimeout } from '../lib/writeTimeout'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
+import { getBillReceiptPath } from '../lib/billHandoff'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const PAY_METHODS = [
@@ -517,7 +518,7 @@ export default function CashierBill() {
         setPaymentRefreshMessage(lbl.noOrder)
         return
       }
-      window.print()
+      navigate(getBillReceiptPath({ tableId, orderId }))
     } catch (error) {
       setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
     } finally {
