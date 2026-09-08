@@ -1304,7 +1304,7 @@ export default async function handler(req, res) {
     requireCronSecret(req)
     cronAuthorized = true
     cronTask = getCronTask(req)
-    supabase = getSupabaseAdmin()
+    supabase = getSupabaseAdmin({ retryReportReads: true })
     if (cronTask === 'game-club-orders') {
       return json(res, 200, await drainGameClubNotifications(supabase))
     }

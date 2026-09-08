@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
+import { createReportReadFetch } from './reportReadFetch.js'
 
-export function getSupabaseAdmin() {
+export function getSupabaseAdmin({ retryReportReads = false } = {}) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -9,6 +10,7 @@ export function getSupabaseAdmin() {
   }
 
   return createClient(url, key, {
+    ...(retryReportReads ? { global: { fetch: createReportReadFetch() } } : {}),
     auth: {
       persistSession: false,
       autoRefreshToken: false,

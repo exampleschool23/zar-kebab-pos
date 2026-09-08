@@ -1,7 +1,5 @@
 # Telegram Menus, Targets, Notifications, and Delivery
 
-Telegram delivery.
-
 ## Entry points
 
 - Customer UI: `src/pages/TelegramMiniApp.jsx`, `src/lib/telegramWebApp.js`
@@ -15,6 +13,8 @@ Telegram delivery.
 - Mini App is read-only; Checkout/My Orders are retired. Keep auth, loyalty, contacts and notifications separate.
 
 ## Delivery records and retries
+
+- Read retries: `database-testing.md`.
 
 - Saved salary events and genuine rate changes get database-first `not_attempted` tracking; initial setup is not a change.
 - Delivery advances independently through pending, sent, failed, skipped, or confirmed states for each destination.

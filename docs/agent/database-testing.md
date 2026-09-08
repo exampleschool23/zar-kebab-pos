@@ -43,6 +43,8 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
 
 ## Database invariants
 
+- Report reads retry network/502/503/504 errors: 3 attempts, 15s each, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write/send retries. Tests: `tests/reportReadFetch.test.js`.
+
 - Use atomic RPCs for multi-table writes such as kitchen submission, menu item + protected cost, Tech Cards, Daily Bazaar, and payment corrections.
 - Pair frontend access checks with RLS/RPC enforcement.
 - Preserve immutable historical order, cost, category, payroll-calculation, notification, and audit snapshots.
