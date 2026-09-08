@@ -27,7 +27,7 @@ Read this guide for menu products/categories, availability and visibility, media
 - `order_items.cost_price` is a sale-time database snapshot. Runtime reporting must never fall back to today's menu cost for missing historical coverage.
 - Later price/cost edits affect future order items only. Never rewrite paid revenue, profit, reports, or saved order-item costs.
 - Owner deletion is archival; physical catalog deletion is rejected to preserve reports.
-- The editor's profit margin is a live preview `(selling price - cost) / selling price`, not persisted data.
+- Profit margin `(selling price - cost) / selling price` is a live preview only.
 
 ## Availability notifications
 
@@ -58,14 +58,14 @@ Read this guide for menu products/categories, availability and visibility, media
 - Lock Bazaar prices; keep legacy names until replaced.
 - Each active product has one protected base recipe and one recipe per eligible variant; empty `variant_option_id` means base.
 - Ingredient rows and included-product component rows belong to the exact product-and-variant recipe. Batch ingredient cost divided by `portion_count`, plus per-portion component cost, is the current portion cost.
-- Save the card and complete ingredient list atomically with `save_menu_item_tech_card(payload jsonb)`.
+- Save the card and complete ingredient list atomically with `save_menu_item_tech_card(payload jsonb)`. Migration `183` batches cost sync, skips unchanged costs, and stops at convergence; base/variant dependencies still propagate.
 - `tech_cards` permission controls route/read access; Manage Menu separately controls writes.
 - Ingredient prices and protected recipes never enter public, Telegram-menu, waiter, cashier, order, or receipt payloads.
 - Saving a base recipe synchronizes the protected parent cost; saving a variant recipe synchronizes that option in protected `variant_costs`. Existing order-item cost snapshots remain untouched.
 - Variant recipes may be copied and scaled; keep the destination identity and portion count explicit.
-- Structured components may choose a product variant through `selected_options`; empty means the base product.
+- Components use `selected_options` for variants; empty means base.
 - Included-product quantities are positive recipe amounts and may be fractional for every sale unit; the editor accepts decimal points and commas such as `0.3` and `0,5`.
 - Variant calculation uses protected variant cost with protected parent-cost fallback. Changing parent selection clears stale options.
 - Copy chosen options into immutable `order_items.tech_card_component_snapshot`; payment deducts whole piece components from integer parent/variant shelf stock once. Fractional recipe components contribute proportionally to protected cost and are never rounded into an integer stock movement.
 - New order items freeze direct and nested ingredient quantities, units, and prices in service-only `order_item_tech_card_ingredient_snapshots`. Daily consumption uses paid, non-cancelled quantities; never expose or backfill these snapshots.
-- The same parent may repeat only for distinct variants; exact parent-and-variant duplicates are invalid.
+- Allow repeated parents only for distinct variants.

@@ -37,6 +37,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - Game Club order type, off-premise permission and service checks: `179`
   - Game Club immutable per-round Team queue and cron: `180`
   - Daily Team KPI image claims and legacy-delivery suppression: `181` (apply before deploying image delivery)
+- Tech Card cost-sync batching and convergence: `183` (apply to enable faster saves). Coverage: `tests/techCardCostSyncMigration.test.js`; isolated PostgreSQL benchmark: `scripts/check-tech-card-cost-sync.mjs` (pass a PGlite module path).
 - Ingredient name editing with stable catalog keys and unchanged purchase snapshots: `182`.
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
