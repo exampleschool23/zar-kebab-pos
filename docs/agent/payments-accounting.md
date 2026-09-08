@@ -28,16 +28,16 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 
 ## Receipt printing
 
-- Auto-print handoff navigates to the cashier bill with a one-time print request. The cashier loads the receipt in an in-page dialog and opens the browser print dialog without creating a tab or window.
-- Manual printing on the cashier bill uses the same in-page receipt dialog after refreshing the authoritative bill.
+- Auto-print handoff opens the cashier bill with a one-time print request. An in-page receipt opens browser printing without a new tab/window.
+- Manual printing refreshes the bill and uses the same receipt dialog.
 
 ## Accounting loading and presentation
 
-- Initial POS state is not an Accounting history result. Do not display today-only operational orders while a selected history range loads.
-- Keep explicit readiness for expenses, paid-order summary/history, and salary data before ending the page loading state.
+- Do not show today-only POS orders while Accounting history loads.
+- Wait for expenses, paid-order summary/history, and salary data before ending loading.
 - KPIs use permission-checked aggregates, never full history. The all-time cash remainder excludes unpaid salary liability.
 - Detailed order rows belong to reports, receipts, and drilldowns.
-- Keep the seven KPI cards readable (four then three on large screens). Payment-method balances remain collapsed in the left column.
+- Use four then three KPI cards on large screens; collapse payment-method balances in the left column.
 
 ## Expense history and monthly estimate
 
@@ -52,23 +52,23 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 
 ## Cash-expense Telegram delivery
 
-- A new cash expense queues one immutable Investor delivery through the shared endpoint: manual entries use text; Bazaar purchases use a PNG receipt and compact caption.
+- New cash expenses queue one immutable Investor delivery: manual text or a Bazaar PNG receipt and caption.
 - Edits/deletes do not announce again. Do not project salary, bonus, employee meal, or calculated rows into this flow.
 - See `docs/agent/telegram.md` for targets, message contents, and retry rules.
 
 ## Daily Bazaar
 
-Main files: `src/pages/DailyBazaar.jsx`, `src/pages/BazaarIngredients.jsx`, `src/lib/bazaar.js`, and migrations `097`, `160`–`163`.
+Files: `src/pages/DailyBazaar.jsx`, `src/pages/BazaarIngredients.jsx`, `src/lib/bazaar.js`; migrations `097`, `160`–`163`, `182`.
 
 - Receipts contain product, category, quantity, unit, and exact amount.
 - Product-line controls share one height; each optional line note uses a separate multiline field.
 - Store buyer id and name snapshot. New entries use cash or card; historical terminal remains readable.
 - New purchase lines choose an active canonical ingredient from `bazaar_product_catalog`; arbitrary product names are not accepted.
-- `/admin/bazaar/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Names are immutable after creation; archive a misspelling and add the corrected ingredient.
-- Catalog writes are owner-only. Bazaar staff and Tech Card users may read active names, units, and normal prices; Tech Card access never exposes purchases or writes.
+- `/admin/bazaar/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Migration `182` allows owner renames; saves keep catalog keys and historical snapshots.
+- Only owners write the catalog. Bazaar/Tech Card users read active names, units, and prices; Tech Card access excludes purchases and writes.
 - Migration `161` starts the managed list empty without changing history.
 - Normal unit price suggests the line total, but the exact paid total remains editable and is the historical Accounting source of truth.
-- Each saved line snapshots its normal unit price, quantity-scaled normal total, and signed difference (`paid - normal`). Entry UI and Investor Telegram show per-line and overall differences; positive means paid above normal and negative means paid below normal.
+- Each saved line snapshots its normal unit price, quantity-scaled normal total, and signed difference (`paid - normal`). UI and Investor Telegram show line/total differences: positive is above normal, negative below.
 - Editing a durable line reuses its saved normal-price snapshot even when the current ingredient catalog price has changed.
 - Catalog deletion is archival. Existing purchase lines keep their historical name, category, unit, and exact paid amount snapshots.
 - Ingredient writes reconcile before retry and update locally.
