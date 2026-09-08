@@ -513,7 +513,8 @@ test('WaiterTables lets occupied tables request the bill from the card action', 
 
   assert.match(source, /status === 'occupied'\) return \{ label: tr\(lang, 'requestBill'\)/)
   assert.match(functionBody(source, 'handleCardAction'), /if \(status === 'occupied'\) \{[\s\S]*moveTableToCashier\(table\)/)
-  assert.match(functionBody(source, 'moveTableToCashier'), /state\.settings\?\.autoPrint[\s\S]*prepareBillPrintWindow[\s\S]*MARK_TABLE_NEEDS_BILL[\s\S]*result\?\.error[\s\S]*completeBillHandoff/)
+  assert.match(functionBody(source, 'moveTableToCashier'), /state\.settings\?\.autoPrint[\s\S]*MARK_TABLE_NEEDS_BILL[\s\S]*result\?\.error[\s\S]*completeBillHandoff/)
+  assert.doesNotMatch(source, /prepareBillPrintWindow|window\.open|_blank/)
 })
 
 test('WaiterTables lets waiting kitchen orders move to cashier from the card action', () => {

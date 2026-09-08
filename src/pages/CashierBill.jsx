@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, Printer, CheckCircle2, Banknote,
   Receipt, Users, Clock, Tag, UtensilsCrossed, Menu as MenuIcon,
-  Monitor, MoreHorizontal, Plus, Minus, Trash2, ClipboardPaste,
+  Monitor, MoreHorizontal, Plus, Minus, Trash2, ClipboardPaste, X,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -88,6 +88,7 @@ function cashierRefreshErrorMessage(error, lang) {
 export default function CashierBill() {
   const { tableId, orderId }  = useParams()
   const navigate     = useNavigate()
+  const location     = useLocation()
   const { state, dispatch } = useApp()
   const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
@@ -105,6 +106,7 @@ export default function CashierBill() {
   const [isCheckingLoyalty, setCheckingLoyalty] = useState(false)
   const [isProcessingPayment, setProcessingPayment] = useState(false)
   const [isPrintingBill, setPrintingBill] = useState(false)
+  const [printRequest, setPrintRequest] = useState(null)
   const [isRefreshingBill, setRefreshingBill] = useState(true)
   const [paymentRefreshMessage, setPaymentRefreshMessage] = useState('')
   const [isDeletingOrder, setDeletingOrder] = useState(false)
@@ -256,6 +258,18 @@ export default function CashierBill() {
     if (syncResult?.error) throw syncResult.error
     return freshOrders
   }, [dispatch, tableId, orderId])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('print') !== '1') return
+    setPrintRequest({
+      path: getBillReceiptPath({ tableId, orderId }),
+      key: Date.now(),
+    })
+    params.delete('print')
+    const search = params.toString()
+    navigate(`${location.pathname}${search ? `?${search}` : ''}`, { replace: true })
+  }, [location.pathname, location.search, navigate, orderId, tableId])
 
   useEffect(() => {
     let active = true
@@ -518,7 +532,10 @@ export default function CashierBill() {
         setPaymentRefreshMessage(lbl.noOrder)
         return
       }
-      navigate(getBillReceiptPath({ tableId, orderId }))
+      setPrintRequest({
+        path: getBillReceiptPath({ tableId, orderId }),
+        key: Date.now(),
+      })
     } catch (error) {
       setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
     } finally {
@@ -1491,6 +1508,40 @@ export default function CashierBill() {
           )}
         </div>
       </div>
+
+      {printRequest && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={lang === 'uz' ? 'Chekni chop etish' : lang === 'ru' ? 'Печать чека' : 'Print receipt'}
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-3 sm:p-6"
+        >
+          <div className="flex h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Printer size={17} className="text-[#ff5a00]" />
+                <p className="text-sm font-black text-[#1F2937]">
+                  {lang === 'uz' ? 'Chekni chop etish' : lang === 'ru' ? 'Печать чека' : 'Print receipt'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPrintRequest(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-[#6B7280] hover:bg-gray-100 hover:text-[#1F2937]"
+                aria-label={lang === 'uz' ? 'Yopish' : lang === 'ru' ? 'Закрыть' : 'Close'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <iframe
+              key={printRequest.key}
+              src={printRequest.path}
+              title={lang === 'uz' ? 'Chek' : lang === 'ru' ? 'Чек' : 'Receipt'}
+              className="min-h-0 flex-1 border-0 bg-white"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

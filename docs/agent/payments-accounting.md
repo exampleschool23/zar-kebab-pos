@@ -5,7 +5,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 ## Entry points
 
 - UI: `src/pages/CashierBill.jsx`, `src/pages/Receipt.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`, `src/pages/MonthlyEstimate.jsx`, `src/pages/DailyBazaar.jsx`
-- Shared logic: `src/lib/analytics.js`, `src/lib/cashierCheckout.js`, `src/lib/accounting.js`, `src/lib/accountingSummary.js`, `src/lib/expenses.js`, `src/lib/monthlyEstimate.js`, `src/lib/bazaar.js`
+- Shared logic: `src/lib/analytics.js`, `src/lib/cashierCheckout.js`, `src/lib/billHandoff.js`, `src/lib/accounting.js`, `src/lib/accountingSummary.js`, `src/lib/expenses.js`, `src/lib/monthlyEstimate.js`, `src/lib/bazaar.js`
 - Database boundaries: `src/lib/db.js`, migrations `083`, `090`, `097`, `109`, and `135`
 - Focused tests: `tests/orderPayment.test.js`, `tests/atomicPaymentSettlement.test.js`, `tests/cashierCheckout.test.js`, `tests/accountingPages.test.js`, `tests/monthlyEstimate.test.js`, `tests/bazaar.test.js`, `tests/sourceGuards.payments-reporting.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
 
@@ -25,6 +25,11 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 - Loyalty rows are visible but immutable without a separate wallet reversal workflow.
 - Corrections never change amounts, items, totals, paid state/time, loyalty data, service snapshots, or stock deductions.
 - Order deletes and payment corrections queue Investor alerts.
+
+## Receipt printing
+
+- Auto-print handoff navigates to the cashier bill with a one-time print request. The cashier loads the receipt in an in-page dialog and opens the browser print dialog without creating a tab or window.
+- Manual printing on the cashier bill uses the same in-page receipt dialog after refreshing the authoritative bill.
 
 ## Accounting loading and presentation
 

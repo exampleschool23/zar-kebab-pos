@@ -41,7 +41,7 @@ import {
 import { useGuestModeSession } from '../hooks/useGuestModeSession'
 import { GuestModeUtilities, GuestPinDialog, GuestSelectionReady, guestModeCopy } from '../components/GuestModeUI'
 import { formatWriteError } from '../lib/writeErrorMessage'
-import { cancelBillPrintWindow, completeBillHandoff, prepareBillPrintWindow } from '../lib/billHandoff'
+import { completeBillHandoff } from '../lib/billHandoff'
 import {
   changeMenuQuantity,
   formatMenuQuantity,
@@ -250,11 +250,9 @@ function OrderActionPanel({ order, tableId, lang, dispatch, menuItemMap, canEdit
   }
   async function handleRequestBill() {
     if (busy || !canEditOrder) return
-    const printWindow = prepareBillPrintWindow(autoPrintBill)
     setBusy(true)
     const result = await dispatch({ type: 'MARK_TABLE_NEEDS_BILL', payload: tableId })
-    if (!result?.error) onMovedToCashier?.(printWindow)
-    else cancelBillPrintWindow(printWindow)
+    if (!result?.error) onMovedToCashier?.()
     setBusy(false)
   }
 
@@ -1652,11 +1650,10 @@ export default function WaiterOrder() {
                   canEditOrder={canEditTables && !orderLocked}
                   autoPrintBill={!!state.settings?.autoPrint}
                   onPrintKitchenCheck={orderLocked ? () => {} : handlePrintKitchenCheck}
-                  onMovedToCashier={printWindow => completeBillHandoff({
+                  onMovedToCashier={() => completeBillHandoff({
                     navigate,
                     tableId,
                     autoPrint: !!state.settings?.autoPrint,
-                    printWindow,
                   })}
                 />
               </div>
