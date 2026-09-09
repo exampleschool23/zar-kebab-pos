@@ -1,6 +1,6 @@
 # Payments, Service, Accounting, Expenses, and Daily Bazaar
 
-Guide to cashier, payments, Accounting, expenses, and Daily Bazaar.
+Cashier, Accounting, expenses, and Daily Bazaar.
 
 ## Entry points
 
@@ -58,14 +58,14 @@ Guide to cashier, payments, Accounting, expenses, and Daily Bazaar.
 
 ## Daily Bazaar
 
-Files: `src/pages/DailyBazaar.jsx`, `src/pages/BazaarIngredients.jsx`, `src/lib/bazaar.js`; migrations `097`, `160`–`163`, `182`.
+Migrations `097`, `160`–`163`, `182`.
 
 - Receipts contain product, category, quantity, unit, and exact amount.
 - Product-line controls share one height; each optional line note uses a separate multiline field.
 - Store buyer id and name snapshot. New entries use cash or card; historical terminal remains readable.
 - New purchase lines choose an active canonical ingredient from `bazaar_product_catalog`; arbitrary product names are not accepted.
-- `/admin/bazaar/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Migration `182` allows owner renames; saves keep catalog keys and historical snapshots.
-- Only owners write the catalog. Bazaar/Tech Card users read active names, units, and prices; Tech Card access excludes purchases and writes.
+- `/admin/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Migration `182` allows owner renames; saves keep catalog keys and historical snapshots.
+- Migration `186` delegates catalog writes to active owners/admins with the independent `ingredients` Team feature; viewers only read. Bazaar/Tech Card users retain catalog reads but do not inherit Ingredients access or writes.
 - Migration `161` starts the managed list empty without changing history.
 - Normal unit price suggests the line total, but the exact paid total remains editable and is the historical Accounting source of truth.
 - Each saved line snapshots its normal unit price, quantity-scaled normal total, and signed difference (`paid - normal`). UI and Investor Telegram show line/total differences: positive is above normal, negative below.

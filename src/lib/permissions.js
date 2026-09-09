@@ -59,6 +59,12 @@ export const FEATURE_DEFINITIONS = [
     description: { uz: 'Kunlik bozor xaridlari va tahlil', ru: 'Ежедневные закупки и аналитика базара', en: 'Daily bazaar purchases and analytics' },
   },
   {
+    key: 'ingredients',
+    kind: 'page',
+    labels: { uz: 'Masalliqlar', ru: 'Ингредиенты', en: 'Ingredients' },
+    description: { uz: 'Masalliqlar, xaridlar va retsept bo‘yicha sarf', ru: 'Ингредиенты, закупки и расход по рецептам', en: 'Ingredient catalog, purchases, and recipe usage' },
+  },
+  {
     key: 'tech_cards',
     kind: 'page',
     labels: { uz: 'Texnologik kartalar', ru: 'Техкарты', en: 'Tech Cards' },
@@ -267,6 +273,7 @@ export function defaultPath(role) {
   if (canViewPage(profile, 'loyalty')) return '/admin/loyalty'
   if (canViewPage(profile, 'expenses')) return '/admin/accounting'
   if (canViewPage(profile, 'bazaar')) return '/admin/bazaar'
+  if (canViewPage(profile, 'ingredients')) return '/admin/ingredients'
   if (canViewPage(profile, 'tech_cards')) return '/admin/tech-cards'
   if (canViewPage(profile, 'team')) return '/admin/users'
   if (canViewPage(profile, 'reports')) return '/admin/reports'

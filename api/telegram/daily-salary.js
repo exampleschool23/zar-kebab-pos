@@ -1,3 +1,4 @@
+import { drainIngredientNotifications } from './_lib/ingredientNotifications.js'
 import { retractDeletedOrderStatusMessages } from './_lib/orderStatusDelivery.js'
 import { drainGameClubNotifications } from './_lib/gameClubNotifications.js'
 import { renderEmployeePayrollImage } from './_lib/employeePayrollImages.js'
@@ -1309,6 +1310,9 @@ export default async function handler(req, res) {
     if (cronTask === 'order-status-cleanup') {
       return json(res, 200, await retractDeletedOrderStatusMessages(supabase))
     }
+    if (cronTask === 'ingredient-events') {
+      return json(res, 200, await drainIngredientNotifications(supabase))
+    }
     if (cronTask === 'game-club-orders') {
       return json(res, 200, await drainGameClubNotifications(supabase))
     }
@@ -1545,6 +1549,9 @@ export default async function handler(req, res) {
     console.error('[telegram/daily-salary]', error)
     if (cronTask === 'order-status-cleanup') {
       return json(res, error?.status || 500, { error: error.message || 'Order status cleanup failed' })
+    }
+    if (cronTask === 'ingredient-events') {
+      return json(res, error?.status || 500, { error: error.message || 'Ingredient notifications failed' })
     }
     if (cronTask === 'game-club-orders') {
       return json(res, error?.status || 500, { error: error.message || 'Game Club notifications failed' })

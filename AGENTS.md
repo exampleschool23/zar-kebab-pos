@@ -53,6 +53,8 @@ The former 58 KB instruction file is preserved at `docs/agent/legacy-context.md`
 
 ## Universal invariants
 
+- Language changes update presentation only: never reload, remount pages, reset forms/filters, or refetch language-independent data. Keep language/translation objects out of data-loader dependencies; translate stored error codes at render time.
+
 - Preserve historical financial data. Paid order prices, costs, service rates, payment amounts, and reporting snapshots are immutable inputs.
 - Catalog deletion is archival. Do not physically delete products or categories referenced by history.
 - Keep protected costs, recipes, payroll, and accounting data out of public, waiter, cashier, and Telegram-menu payloads.

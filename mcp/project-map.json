@@ -109,7 +109,7 @@
       "name": "architecture-auth-realtime",
       "keywords": ["startup", "login", "oauth", "profile", "route", "role", "permission", "realtime", "hydration"],
       "files": ["src/App.jsx", "src/contexts/AuthContext.jsx", "src/store/AppContext.jsx", "src/store/appHooks.js", "src/lib/permissions.js", "src/lib/profileLoading.js", "src/lib/db.js"],
-      "tests": ["tests/permissions.test.js", "tests/profileLoading.test.js", "tests/dbRealtime.test.js", "tests/sourceGuards.architecture.test.js"]
+      "tests": ["tests/ingredientsFeature.test.js", "tests/permissions.test.js", "tests/profileLoading.test.js", "tests/dbRealtime.test.js", "tests/sourceGuards.architecture.test.js"]
     },
     {
       "name": "waiter-kitchen",
@@ -138,8 +138,8 @@
     {
       "name": "accounting-bazaar",
       "keywords": ["expense", "income", "estimate", "accounting", "all-time remainder", "bazaar", "supplier", "cashflow", "expense backdate limit", "previous three days"],
-      "files": ["src/pages/Expenses.jsx", "src/pages/AccountingHistory.jsx", "src/pages/MonthlyEstimate.jsx", "src/pages/DailyBazaar.jsx", "src/pages/BazaarIngredients.jsx", "src/lib/accounting.js", "src/lib/accountingSummary.js", "src/lib/expenses.js", "src/lib/monthlyEstimate.js", "src/lib/bazaar.js", "src/lib/bazaarIngredientWrites.js", "supabase/160_daily_bazaar_ingredient_catalog.sql", "supabase/161_reset_daily_bazaar_ingredient_catalog.sql", "supabase/162_owner_only_bazaar_ingredient_management.sql", "supabase/163_daily_bazaar_price_variance_snapshots.sql", "supabase/166_expense_backdate_limit.sql", "supabase/177_accounting_all_time_balance.sql", "supabase/182_rename_bazaar_ingredients.sql"],
-      "tests": ["tests/accountingPages.test.js", "tests/accountingSummary.test.js", "tests/expenses.test.js", "tests/monthlyEstimate.test.js", "tests/bazaar.test.js", "tests/bazaarMigration.test.js", "tests/bazaarIngredientCatalogMigration.test.js", "tests/bazaarIngredientRename.test.js", "tests/bazaarIngredientCatalogResetMigration.test.js", "tests/bazaarIngredientOwnerAccessMigration.test.js", "tests/bazaarPriceVarianceMigration.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
+      "files": ["src/pages/Expenses.jsx", "src/pages/AccountingHistory.jsx", "src/pages/MonthlyEstimate.jsx", "src/pages/DailyBazaar.jsx", "src/pages/BazaarIngredients.jsx", "src/components/IngredientMovement.jsx", "src/components/IngredientNavigation.jsx", "src/pages/IngredientUsage.jsx", "supabase/186_ingredients_feature_and_movement.sql", "supabase/187_ingredient_movement_categories.sql", "supabase/188_managed_ingredient_movement.sql", "supabase/189_ingredient_investor_notifications.sql", "api/telegram/_lib/ingredientNotifications.js", "scripts/check-ingredient-notifications.mjs", "scripts/check-ingredient-movement.mjs", "src/lib/accounting.js", "src/lib/accountingSummary.js", "src/lib/expenses.js", "src/lib/monthlyEstimate.js", "src/lib/bazaar.js", "src/lib/bazaarIngredientWrites.js", "supabase/160_daily_bazaar_ingredient_catalog.sql", "supabase/161_reset_daily_bazaar_ingredient_catalog.sql", "supabase/162_owner_only_bazaar_ingredient_management.sql", "supabase/163_daily_bazaar_price_variance_snapshots.sql", "supabase/166_expense_backdate_limit.sql", "supabase/177_accounting_all_time_balance.sql", "supabase/182_rename_bazaar_ingredients.sql"],
+      "tests": ["tests/accountingPages.test.js", "tests/accountingSummary.test.js", "tests/expenses.test.js", "tests/monthlyEstimate.test.js", "tests/bazaar.test.js", "tests/bazaarMigration.test.js", "tests/bazaarIngredientCatalogMigration.test.js", "tests/bazaarIngredientRename.test.js", "tests/ingredientsFeature.test.js", "tests/ingredientNotifications.test.js", "tests/bazaarIngredientCatalogResetMigration.test.js", "tests/bazaarIngredientOwnerAccessMigration.test.js", "tests/bazaarPriceVarianceMigration.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
     },
     {
       "name": "payroll-kpi-meals",

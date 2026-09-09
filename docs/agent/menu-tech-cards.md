@@ -1,6 +1,6 @@
 # Menu, Inventory, Media, Costs, and Tech Cards
 
-Read this guide for menu products/categories, availability and visibility, media, prices/costs, inventory, archival, preparation estimates, and Tech Cards.
+Menu, availability, media, costs, inventory, archival, and Tech Cards.
 
 ## Entry points
 
@@ -66,6 +66,8 @@ Read this guide for menu products/categories, availability and visibility, media
 - Components use `selected_options` for variants; empty means base.
 - Included-product quantities are positive recipe amounts and may be fractional for every sale unit; the editor accepts decimal points and commas such as `0.3` and `0,5`.
 - Variant calculation uses protected variant cost with protected parent-cost fallback. Changing parent selection clears stale options.
-- Copy chosen options into immutable `order_items.tech_card_component_snapshot`; payment deducts whole piece components from integer parent/variant shelf stock once. Fractional recipe components contribute proportionally to protected cost and are never rounded into an integer stock movement.
+- `order_items.tech_card_component_snapshot` freezes chosen options. Payment deducts whole piece components once. Fractional components contribute proportional cost, never rounded integer stock movements.
 - New order items freeze direct and nested ingredient quantities, units, and prices in service-only `order_item_tech_card_ingredient_snapshots`. Daily consumption uses paid, non-cancelled quantities; never expose or backfill these snapshots.
 - Allow repeated parents only for distinct variants.
+
+- Migration `186`: `/admin/ingredients` has Team access and movement totals; see the reporting guide. Future ingredient snapshots include canonical keys when unambiguous.

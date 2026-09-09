@@ -5,6 +5,7 @@ const TABLE_CHECKS = [
   { name: 'table_zones', columns: ['id', 'name', 'sort_order', 'is_active'] },
   { name: 'orders', columns: ['id', 'table_id', 'status', 'payment_status', 'total', 'service_rate_pct', 'loyalty_card_number', 'loyalty_used_amount', 'cashback_earned', 'price_mode', 'opened_by_name', 'completed_by_name', 'stock_deducted_at'] },
   { name: 'order_items', columns: ['id', 'order_id', 'menu_item_id', 'status', 'quantity', 'sale_unit', 'base_price', 'unit_price', 'price_mode', 'selected_options', 'cost_price', 'category_id_snapshot', 'category_snapshot_captured', 'tech_card_component_snapshot'] },
+  { name: 'ingredient_investor_notifications', columns: ['id', 'product_key', 'event_type', 'snapshot', 'status', 'chat_id', 'telegram_message_ids', 'error_message', 'attempted_at', 'sent_at', 'created_at'], access: 'service_only' },
   { name: 'order_item_tech_card_ingredient_snapshots', columns: ['order_item_id', 'ingredients', 'is_complete', 'captured_at'], access: 'service_only' },
   { name: 'order_kitchen_rounds', columns: ['order_id', 'kitchen_round_id', 'item_ids', 'table_id', 'submitted_by', 'submitted_at', 'created_at'] },
   { name: 'order_payments', columns: ['id', 'order_id', 'method', 'amount'] },
@@ -73,6 +74,7 @@ const MIGRATION_HINTS = {
   daily_bazaar_telegram_deliveries: 'Run supabase/131_daily_bazaar_telegram_deliveries.sql',
   daily_payroll_group_notification_deliveries: 'Run supabase/134_daily_payroll_group_notifications.sql',
   daily_ingredient_consumption_deliveries: 'Run supabase/165_daily_ingredient_consumption_deliveries.sql',
+  ingredient_investor_notifications: 'Run supabase/189_ingredient_investor_notifications.sql',
   order_item_tech_card_ingredient_snapshots: 'Run supabase/164_order_item_tech_card_ingredient_snapshots.sql',
   order_items: 'Run supabase/070_price_modes.sql, supabase/072_order_item_selected_options.sql, supabase/098_menu_item_costs_and_profit.sql, supabase/105_menu_items_sold_by_weight.sql, supabase/114_freeze_historical_order_prices_and_costs.sql, supabase/147_financial_report_history_snapshots.sql, and supabase/149_tech_card_menu_item_components.sql',
   order_kitchen_rounds: 'Run supabase/128_durable_kitchen_round_receipts.sql',
@@ -119,6 +121,7 @@ const MIGRATION_HINTS = {
   current_staff_can_write: 'Run the latest supabase/097_daily_bazaar.sql',
   save_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
   delete_bazaar_purchase: 'Run supabase/097_daily_bazaar.sql',
+  get_ingredient_movement: 'Run supabase/186_ingredients_feature_and_movement.sql',
   save_bazaar_ingredient: 'Run supabase/160_daily_bazaar_ingredient_catalog.sql',
   set_bazaar_ingredient_active: 'Run supabase/160_daily_bazaar_ingredient_catalog.sql',
   current_staff_can_manage_bazaar_ingredients: 'Run supabase/162_owner_only_bazaar_ingredient_management.sql',
@@ -205,6 +208,7 @@ export async function runDbHealthChecks(dbClient = supabase) {
   checks.push(await checkRpc(dbClient, 'current_staff_can_manage_bazaar_ingredients', {}))
   checks.push(await checkRpc(dbClient, 'save_bazaar_purchase'))
   checks.push(await checkRpc(dbClient, 'delete_bazaar_purchase', { p_purchase_id: '00000000-0000-0000-0000-000000000000' }))
+  checks.push(await checkRpc(dbClient, 'get_ingredient_movement', { p_date_from: null, p_date_to: null }))
   checks.push(await checkRpc(dbClient, 'save_bazaar_ingredient'))
   checks.push(await checkRpc(dbClient, 'set_bazaar_ingredient_active', { p_product_key: '__db_health_check__', p_is_active: false }))
   checks.push(await checkRpc(dbClient, 'get_accounting_paid_order_summary', {

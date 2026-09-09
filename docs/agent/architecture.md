@@ -16,7 +16,8 @@ Read this guide for app startup, authentication, routes, permissions, shared sta
 - Waiter routes: `/waiter/tables`, `/waiter/order/:tableId`, `/waiter/take-away`.
 - Kitchen check: `/kitchen-check/:orderId`; the retired `/kitchen` screen redirects to `/admin`.
 - Cashier routes: `/cashier/tables`, bill and receipt routes.
-- Admin routes include dashboard, menu, tech cards, tables, users, reports, audit, settings, Accounting, Salaries, Daily Bazaar, and its ingredient catalog at `/admin/bazaar/ingredients`.
+- Admin routes include dashboard, menu, tech cards, tables, users, reports, audit, settings, Accounting, Salaries, Daily Bazaar, and Ingredients at `/admin/ingredients` (the old `/admin/bazaar/ingredients` redirects).
+- `ingredients` is an independent Team feature: owner/admin holders edit the catalog, viewer holders read only. Bazaar and Tech Cards access do not grant Ingredients access.
 - Centralize role and feature rules in `src/lib/permissions.js`. Do not duplicate access decisions in pages without matching database enforcement.
 - Menu catalog archival is limited to owners who also have Manage Menu access; admins keep ordinary menu editing. The UI permission and database archive trigger must stay aligned.
 
@@ -47,3 +48,7 @@ Critical invariants:
 `src/lib/db.js` contains temporary fallbacks for missing RPCs/relations so the UI remains usable during deployment order. Production should still apply every migration. Use `npm run db:health` before changing loading code when the console reports missing database objects.
 
 - Order deletion always opens the shared `src/store/useOrderDeletion.jsx` reason dialog. Migration `184` requires a trimmed 1–1000 character reason in `delete_order_owner(text, text)` and snapshots it in the Investor delivery; deploy it before the frontend. Existing alerts remain unchanged.
+
+- Ingredients catalog/add stays at `/admin/ingredients`; `/admin/ingredients/usage` lazy-loads Purchases & usage. Both require `ingredients`. Only the usage page mounts the movement loader; adding ingredients never requests purchases/usage.
+
+- Language switching is presentation-only: preserve loaded data, forms, filters, and mounted pages. Data effects/callbacks must not depend on `lang`, translated labels, or translation callbacks unless the server response itself is language-specific. Store loader errors as codes/raw errors and localize during render. Ingredients regression coverage lives in `tests/ingredientsFeature.test.js`.

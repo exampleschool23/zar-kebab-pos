@@ -4,7 +4,7 @@ import {
   UtensilsCrossed, LayoutDashboard, Table2, BookOpen,
   Receipt, Users, BarChart2, ShieldCheck, Settings, LogOut,
   BadgeDollarSign, WalletCards, ShoppingBasket,
-  ClipboardList,
+  ClipboardList, PackagePlus,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -62,6 +62,12 @@ const NAV = [
     path: '/admin/bazaar',
   },
   {
+    key: 'ingredients',
+    icon: PackagePlus,
+    labels: { uz: 'Masalliqlar', ru: 'Ингредиенты', en: 'Ingredients' },
+    path: '/admin/ingredients',
+  },
+  {
     key: 'team',
     icon: Users,
     labels: { uz: 'Jamoa', ru: 'Команда', en: 'Team' },
@@ -102,6 +108,7 @@ function activeKey(pathname) {
   if (pathname.startsWith('/admin/loyalty'))  return 'loyalty'
   if (pathname.startsWith('/admin/accounting')) return 'expenses'
   if (pathname.startsWith('/admin/expenses')) return 'expenses'
+  if (pathname.startsWith('/admin/ingredients')) return 'ingredients'
   if (pathname.startsWith('/admin/bazaar'))   return 'bazaar'
   if (pathname.startsWith('/admin/tech-cards')) return 'tech_cards'
   if (pathname.startsWith('/admin/menu'))     return 'menu'

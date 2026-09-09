@@ -56,15 +56,16 @@
 
 ## Investor notifications
 
-- Employee creation, activation, and deactivation queue immutable, retry-safe Russian Investor events with employee, date, and actor snapshots.
+- Employee lifecycle changes queue immutable Russian Investor events with employee, date, and actor snapshots.
+- Ingredient create/edit/archive/restore alerts (`189`) snapshot before/after values and actor. Unchanged saves, purchase metadata, imports, and history stay silent. The cron-authenticated `ingredient-events` task sends to `salary_events`; unknown sends stay held.
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Order deletes require a reason popup; migration `184` saves it in Investor alerts. Alerts snapshot order, total, actor, and tenders. Payment corrections also notify Investor.
 - Manual cash-expense alerts remain localized text. A new Daily Bazaar purchase is sent as one localized PNG receipt with a short photo caption containing amount, date, category, optional description, creator, and the recorded monthly total; do not also send the numbered text receipt.
 - Daily Investor images: financial/payroll covers yesterday in Tashkent; Daily Bazaar covers two days ago. Send both as one album; Tech Card consumption is a separate photo.
-- Daily Bazaar PNG groups numbered items by saved Russian category: bought/normal prices, line total, signed variance. Over-price is red, under-price is green, and the top card includes the overall variance. Missing legacy normal prices render as unset, never zero; rows never truncate.
+- Bazaar PNGs group numbered items by saved Russian category with paid/normal prices and signed variance (red above, green below), plus total variance. Missing normal prices stay unset; rows never truncate.
 - Financial and Daily Bazaar delivery is image-only: if either renderer fails, send no text fallback and leave the claimed report rows retryable. A partial retry may send only the missing PNG without duplicating the photo already recorded as sent.
-- The ingredient image values paid, non-cancelled sales from immutable recipe snapshots, shows every ingredient, and counts legacy rows without snapshot coverage.
-- All three deliveries are duplicate-safe; album ledgers mark sent only after Telegram returns each photo’s message id.
+- Ingredient images use immutable paid-sale recipe snapshots and count missing coverage.
+- Album ledgers mark sent only after each photo’s Telegram message id.
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows never announce new cash expenses.
 

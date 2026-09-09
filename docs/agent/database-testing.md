@@ -10,10 +10,10 @@
 
 ## Database workflow
 
-- Apply all migrations in numeric order, including when `src/lib/db.js` has compatibility fallbacks.
+- Apply migrations in numeric order, even with `src/lib/db.js` compatibility fallbacks.
 - Run `npm run db:health` first when a page loads forever or the console reports missing tables, columns, or RPCs.
-- Do not assume applying the kitchen RPC migration means earlier settings or split-payment migrations exist.
-- Important migration families:
+- Kitchen migrations do not replace earlier settings/payment migrations.
+- Migration families:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`
   - Bazaar, costs, fines, media, stock: `097`–`106`
@@ -67,11 +67,11 @@ npm test
 npm run build
 ```
 
-For changes to `AGENTS.md`, focused guides, the repository navigator/map, or source-guard organization, also run `npm run docs:check` and `npm run mcp:benchmark`.
+For guide, navigator, map, or source-guard changes, also run `npm run docs:check` and `npm run mcp:benchmark`.
 
 ## Source-guard policy
 
-Do not loosen a guard simply because implementation changed. First determine which production regression it protects. Guards cover, among other things:
+Understand each guard’s protected regression before changing it. Guards cover:
 
 - stable `ProfileSync`, `dbDispatch`, and unique realtime channels;
 - parent-owned kitchen sending state and snapshot-only cart removal;
@@ -85,9 +85,9 @@ Do not loosen a guard simply because implementation changed. First determine whi
 
 ## Browser/build verification
 
-- Protected routes redirect unauthenticated checks to `/menu`; use an authorized profile for visual verification.
-- The known Vite large-chunk warning is not a failing build.
-- Preserve unrelated dirty-worktree changes and report any validation you could not run.
+- Protected routes require an authorized profile for visual checks.
+- Vite large-chunk warnings are non-fatal.
+- Preserve unrelated edits; report unrun checks.
 
 - Migration `179_game_club_orders.sql` must precede the Game Club frontend release. It extends order/item constraints and current permission/settlement functions without changing historical rows. Never require the reopening function retired by `090`. Focused coverage: `tests/gameClubOrders.test.js`.
 
@@ -95,4 +95,7 @@ Do not loosen a guard simply because implementation changed. First determine whi
 
 - Migration `184` requires deletion reasons and snapshots them for Investor alerts. Apply before frontend deployment.
 
-- Migration `185` tracks status-group messages independently of deleted orders and queues minute cleanup retries. Apply before deploying the updated Telegram sender. Coverage: `tests/orderStatusDelivery.test.js`.
+- `185`: independent status-message tracking and minute cleanup retries. Apply before the Telegram sender. Tests: `tests/orderStatusDelivery.test.js`.
+
+- `186`–`188`: Ingredients access, writes, snapshot keys, and movement totals. Tests: `tests/ingredientsFeature.test.js`; SQL: `scripts/check-ingredient-movement.mjs`.
+- `189`: ingredient Investor queue and minute dispatch. Tests: `tests/ingredientNotifications.test.js`; SQL: `scripts/check-ingredient-notifications.mjs` (PGlite path). Deploy the sender before applying.

@@ -15,13 +15,13 @@ test('Daily Bazaar route is lazy-loaded and feature-protected', () => {
     /<Route path="\/admin\/bazaar" element=\{\s*<LazyProtectedRoute page="bazaar"><DailyBazaar \/><\/LazyProtectedRoute>\s*\} \/>/,
   )
   assert.match(app, /const BazaarIngredients = lazy\(\(\) => import\('\.\/pages\/BazaarIngredients'\)\)/)
-  assert.match(app, /<Route path="\/admin\/bazaar\/ingredients" element=\{\s*<LazyProtectedRoute page="bazaar"><BazaarIngredients \/><\/LazyProtectedRoute>\s*\} \/>/)
+  assert.match(app, /<Route path="\/admin\/ingredients" element=\{\s*<LazyProtectedRoute page="ingredients"><BazaarIngredients \/><\/LazyProtectedRoute>\s*\} \/>/)
 })
 
-test('only owners receive Bazaar ingredient management controls', () => {
+test('ingredient editors receive management controls through the delegated feature', () => {
   const page = readSource('src/pages/BazaarIngredients.jsx')
 
-  assert.match(page, /normalizeRole\(profile\?\.role \|\| state\.user\?\.role \|\| 'guest'\) === 'owner'/)
+  assert.match(page, /canEditFeature\(profile \|\| state.user, 'ingredients'\)/)
   assert.match(page, /\{canManage \? \(/)
   assert.match(page, /\{canManage && <div className="flex justify-end gap-2">/)
   assert.match(page, /runBazaarIngredientWriteWithRecovery/)
@@ -74,7 +74,7 @@ test('Daily Bazaar entry uses active employees, cash/card entry methods, and dur
   assert.match(page, /\.eq\('is_catalog_managed', true\)/)
   assert.match(page, /\.eq\('is_active', true\)/)
   assert.match(page, /value=\{item\.product_key \|\| ''\}/)
-  assert.match(page, /navigate\('\/admin\/bazaar\/ingredients'\)/)
+  assert.doesNotMatch(page, /navigate\('\/admin\/bazaar\/ingredients'\)/)
   assert.doesNotMatch(page, /list="bazaar-product-suggestions"/)
   assert.doesNotMatch(page, /onChange=\{event => onUpdateItem\(index, 'category'/)
   assert.match(page, /<BazaarIngredientPicker suggestions=\{suggestions\} value=\{item\.product_key \|\| ''\}/)

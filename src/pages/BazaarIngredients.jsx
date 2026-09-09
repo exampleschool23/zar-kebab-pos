@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Archive, ArrowLeft, Edit3, Loader2, PackagePlus, Plus, RefreshCw, RotateCcw, Save, Search, X } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Archive, Edit3, Loader2, PackagePlus, Plus, RotateCcw, Save, Search, X } from 'lucide-react'
+import IngredientNavigation from '../components/IngredientNavigation'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { normalizeRole } from '../lib/permissions'
+import { canEditFeature } from '../lib/permissions'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import { withWriteTimeout } from '../lib/writeTimeout'
@@ -17,13 +17,13 @@ const INPUT = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text
 
 const COPY = {
   en: {
-    title: 'Bazaar ingredients', sub: 'Keep one canonical name and normal unit price for every ingredient.', back: 'Daily Bazaar', add: 'Add ingredient', edit: 'Edit ingredient', name: 'Ingredient name', nameHint: 'You can change the name. Past purchases keep their original names.', category: 'Category', unit: 'Purchase unit', normalPrice: 'Normal price per unit', save: 'Save ingredient', saving: 'Saving…', cancel: 'Cancel', search: 'Search ingredients…', active: 'Active', archived: 'Archived', all: 'All', archive: 'Archive', restore: 'Restore', empty: 'No ingredients found.', loadFailed: 'Could not load ingredients.', saveFailed: 'Could not save the ingredient.', statusFailed: 'Could not update the ingredient status.', connectionFailed: 'Connection was interrupted. Please try again; a completed save will not be duplicated.', saved: 'Ingredient saved.', statusUpdated: 'Ingredient status updated.', refresh: 'Refresh', readOnly: 'Your access is read-only.', required: 'Enter a name and a normal price greater than zero.', migrationMissing: 'Apply the latest Bazaar migrations to manage ingredients.'
+    title: 'Ingredients', sub: 'Keep one canonical name and normal unit price for every ingredient.', back: 'Daily Bazaar', add: 'Add ingredient', edit: 'Edit ingredient', name: 'Ingredient name', nameHint: 'You can change the name. Past purchases keep their original names.', category: 'Category', unit: 'Purchase unit', normalPrice: 'Normal price per unit', save: 'Save ingredient', saving: 'Saving…', cancel: 'Cancel', search: 'Search ingredients…', active: 'Active', archived: 'Archived', all: 'All', archive: 'Archive', restore: 'Restore', empty: 'No ingredients found.', loadFailed: 'Could not load ingredients.', saveFailed: 'Could not save the ingredient.', statusFailed: 'Could not update the ingredient status.', connectionFailed: 'Connection was interrupted. Please try again; a completed save will not be duplicated.', saved: 'Ingredient saved.', statusUpdated: 'Ingredient status updated.', retry: 'Try again', readOnly: 'Your access is read-only.', required: 'Enter a name and a normal price greater than zero.', migrationMissing: 'Apply the latest Bazaar migrations to manage ingredients.'
   },
   ru: {
-    title: 'Ингредиенты базара', sub: 'Единое название и обычная цена за единицу для каждого ингредиента.', back: 'Ежедневный базар', add: 'Добавить ингредиент', edit: 'Изменить ингредиент', name: 'Название ингредиента', nameHint: 'Название можно изменить. В прошлых закупках сохранится прежнее название.', category: 'Категория', unit: 'Единица закупки', normalPrice: 'Обычная цена за единицу', save: 'Сохранить', saving: 'Сохранение…', cancel: 'Отмена', search: 'Поиск ингредиентов…', active: 'Активные', archived: 'Архивные', all: 'Все', archive: 'В архив', restore: 'Восстановить', empty: 'Ингредиенты не найдены.', loadFailed: 'Не удалось загрузить ингредиенты.', saveFailed: 'Не удалось сохранить ингредиент.', statusFailed: 'Не удалось изменить статус ингредиента.', connectionFailed: 'Соединение прервалось. Повторите попытку — уже выполненное сохранение не продублируется.', saved: 'Ингредиент сохранён.', statusUpdated: 'Статус ингредиента изменён.', refresh: 'Обновить', readOnly: 'У вас доступ только для чтения.', required: 'Введите название и обычную цену больше нуля.', migrationMissing: 'Примените последние миграции базара для управления ингредиентами.'
+    title: 'Ингредиенты', sub: 'Единое название и обычная цена за единицу для каждого ингредиента.', back: 'Ежедневный базар', add: 'Добавить ингредиент', edit: 'Изменить ингредиент', name: 'Название ингредиента', nameHint: 'Название можно изменить. В прошлых закупках сохранится прежнее название.', category: 'Категория', unit: 'Единица закупки', normalPrice: 'Обычная цена за единицу', save: 'Сохранить', saving: 'Сохранение…', cancel: 'Отмена', search: 'Поиск ингредиентов…', active: 'Активные', archived: 'Архивные', all: 'Все', archive: 'В архив', restore: 'Восстановить', empty: 'Ингредиенты не найдены.', loadFailed: 'Не удалось загрузить ингредиенты.', saveFailed: 'Не удалось сохранить ингредиент.', statusFailed: 'Не удалось изменить статус ингредиента.', connectionFailed: 'Соединение прервалось. Повторите попытку — уже выполненное сохранение не продублируется.', saved: 'Ингредиент сохранён.', statusUpdated: 'Статус ингредиента изменён.', retry: 'Повторить', readOnly: 'У вас доступ только для чтения.', required: 'Введите название и обычную цену больше нуля.', migrationMissing: 'Примените последние миграции базара для управления ингредиентами.'
   },
   uz: {
-    title: 'Bozor masalliqlari', sub: 'Har bir masalliq uchun yagona nom va odatiy birlik narxini saqlang.', back: 'Kunlik bozor', add: 'Masalliq qo‘shish', edit: 'Masalliqni tahrirlash', name: 'Masalliq nomi', nameHint: 'Nomni o‘zgartirish mumkin. Oldingi xaridlarda eski nom saqlanadi.', category: 'Kategoriya', unit: 'Xarid birligi', normalPrice: 'Birlik uchun odatiy narx', save: 'Saqlash', saving: 'Saqlanmoqda…', cancel: 'Bekor qilish', search: 'Masalliq qidirish…', active: 'Faol', archived: 'Arxiv', all: 'Barchasi', archive: 'Arxivlash', restore: 'Tiklash', empty: 'Masalliq topilmadi.', loadFailed: 'Masalliqlarni yuklab bo‘lmadi.', saveFailed: 'Masalliqni saqlab bo‘lmadi.', statusFailed: 'Masalliq holatini o‘zgartirib bo‘lmadi.', connectionFailed: 'Aloqa uzildi. Qayta urinib ko‘ring — saqlangan yozuv takrorlanmaydi.', saved: 'Masalliq saqlandi.', statusUpdated: 'Masalliq holati yangilandi.', refresh: 'Yangilash', readOnly: 'Sizda faqat ko‘rish huquqi bor.', required: 'Nom va noldan katta odatiy narx kiriting.', migrationMissing: 'Masalliqlarni boshqarish uchun oxirgi bozor migratsiyalarini qo‘llang.'
+    title: 'Masalliqlar', sub: 'Har bir masalliq uchun yagona nom va odatiy birlik narxini saqlang.', back: 'Kunlik bozor', add: 'Masalliq qo‘shish', edit: 'Masalliqni tahrirlash', name: 'Masalliq nomi', nameHint: 'Nomni o‘zgartirish mumkin. Oldingi xaridlarda eski nom saqlanadi.', category: 'Kategoriya', unit: 'Xarid birligi', normalPrice: 'Birlik uchun odatiy narx', save: 'Saqlash', saving: 'Saqlanmoqda…', cancel: 'Bekor qilish', search: 'Masalliq qidirish…', active: 'Faol', archived: 'Arxiv', all: 'Barchasi', archive: 'Arxivlash', restore: 'Tiklash', empty: 'Masalliq topilmadi.', loadFailed: 'Masalliqlarni yuklab bo‘lmadi.', saveFailed: 'Masalliqni saqlab bo‘lmadi.', statusFailed: 'Masalliq holatini o‘zgartirib bo‘lmadi.', connectionFailed: 'Aloqa uzildi. Qayta urinib ko‘ring — saqlangan yozuv takrorlanmaydi.', saved: 'Masalliq saqlandi.', statusUpdated: 'Masalliq holati yangilandi.', retry: 'Qayta urinish', readOnly: 'Sizda faqat ko‘rish huquqi bor.', required: 'Nom va noldan katta odatiy narx kiriting.', migrationMissing: 'Masalliqlarni boshqarish uchun oxirgi bozor migratsiyalarini qo‘llang.'
   },
 }
 
@@ -41,12 +41,11 @@ function savedIngredientRow(data) {
 }
 
 export default function BazaarIngredients() {
-  const navigate = useNavigate()
   const { state } = useApp()
   const { profile } = useAuth()
   const lang = state.lang || 'ru'
   const l = COPY[lang] || COPY.en
-  const canManage = normalizeRole(profile?.role || state.user?.role || 'guest') === 'owner'
+  const canManage = canEditFeature(profile || state.user, 'ingredients')
   const [ingredients, setIngredients] = useState([])
   const [form, setForm] = useState(emptyIngredient)
   const [query, setQuery] = useState('')
@@ -55,6 +54,7 @@ export default function BazaarIngredients() {
   const [saving, setSaving] = useState(false)
   const [updatingKey, setUpdatingKey] = useState('')
   const [error, setError] = useState('')
+  const [loadFailure, setLoadFailure] = useState(null)
   const [notice, setNotice] = useState('')
 
   const errorMessage = useCallback((requestError, fallback) => {
@@ -72,15 +72,22 @@ export default function BazaarIngredients() {
   const loadIngredients = useCallback(async () => {
     setLoading(true)
     setError('')
-    const { data, error: loadError } = await supabase
-      .from('bazaar_product_catalog')
-      .select('product_key, product_name, category, unit, normal_unit_price, is_active, is_catalog_managed, last_purchase_date, updated_at')
-      .eq('is_catalog_managed', true)
-      .order('product_name')
-    if (loadError) setError(errorMessage(loadError, l.loadFailed))
-    else setIngredients(data || [])
-    setLoading(false)
-  }, [errorMessage, l.loadFailed])
+    setLoadFailure(null)
+    try {
+      const { data, error: loadError } = await supabase
+        .from('bazaar_product_catalog')
+        .select('product_key, product_name, category, unit, normal_unit_price, is_active, is_catalog_managed, last_purchase_date, updated_at')
+        .eq('is_catalog_managed', true)
+        .order('product_name')
+      if (loadError) throw loadError
+      setIngredients(data || [])
+    } catch (loadError) {
+      setLoadFailure(loadError)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+  const displayedError = error || (loadFailure ? errorMessage(loadFailure, l.loadFailed) : '')
 
   useEffect(() => { loadIngredients() }, [loadIngredients])
 
@@ -184,16 +191,15 @@ export default function BazaarIngredients() {
     <AppShell title={l.title}>
       <div className="min-h-full bg-[#FAF7F0] px-4 py-5 sm:px-5 sm:py-6 lg:px-6 2xl:px-8">
         <div className="mx-auto max-w-7xl">
+          <IngredientNavigation lang={lang} />
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <button type="button" onClick={() => navigate('/admin/bazaar')} className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#1F2937] px-3 text-xs font-black text-white"><ArrowLeft size={14} />{l.back}</button>
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-50 text-[#ff5a00]"><PackagePlus size={21} /></div>
               <div><h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1><p className="mt-1 text-sm font-medium text-[#6B7280]">{l.sub}</p></div>
             </div>
-            <button type="button" onClick={loadIngredients} disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-3 text-xs font-black text-[#6B7280]"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} />{l.refresh}</button>
           </div>
 
-          {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div>}
+          {displayedError && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{displayedError}</div>}
           {notice && !error && <div role="status" className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">{notice}</div>}
 
           {canManage ? (
@@ -217,7 +223,7 @@ export default function BazaarIngredients() {
               <div className="relative w-full sm:max-w-sm"><Search size={16} className="absolute left-3 top-3.5 text-[#9CA3AF]" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={l.search} className={`${INPUT} pl-9`} /></div>
               <div className="flex rounded-xl bg-[#F3F4F6] p-1">{['active', 'archived', 'all'].map(key => <button key={key} type="button" onClick={() => setStatus(key)} className={`rounded-lg px-3 py-2 text-xs font-black ${status === key ? 'bg-white text-[#ff5a00] shadow-sm' : 'text-[#6B7280]'}`}>{l[key]}</button>)}</div>
             </div>
-            {loading ? <OperationalLoading title={l.title} description="" /> : error && ingredients.length === 0 ? <OperationalError title={l.loadFailed} description={error} actionLabel={l.refresh} onAction={loadIngredients} /> : filtered.length === 0 ? <p className="p-10 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</p> : (
+            {loading ? <OperationalLoading title={l.title} description="" /> : displayedError && ingredients.length === 0 ? <OperationalError title={l.loadFailed} description={displayedError} actionLabel={l.retry} onAction={loadIngredients} /> : filtered.length === 0 ? <p className="p-10 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</p> : (
               <div className="divide-y divide-[#F3F4F6]">{filtered.map(ingredient => (
                 <div key={ingredient.product_key} className="grid gap-3 p-4 sm:grid-cols-[minmax(180px,1fr)_minmax(150px,0.7fr)_110px_minmax(180px,0.7fr)_auto] sm:items-center">
                   <div><p className="font-black text-[#1F2937]">{ingredient.product_name}</p><span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black ${ingredient.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{ingredient.is_active ? l.active : l.archived}</span></div>

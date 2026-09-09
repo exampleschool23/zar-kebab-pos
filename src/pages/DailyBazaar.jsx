@@ -15,7 +15,6 @@ import {
   Scale,
   Search,
   ShoppingBasket,
-  Tags,
   Terminal,
   Trash2,
   TrendingDown,
@@ -24,7 +23,6 @@ import {
   WalletCards,
   X,
 } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
 import BazaarIngredientPicker from '../components/BazaarIngredientPicker'
 import DateRangePicker from '../components/DateRangePicker'
@@ -436,7 +434,6 @@ function bazaarDifferenceTone(value) {
 }
 
 export default function DailyBazaar() {
-  const navigate = useNavigate()
   const { state } = useApp()
   const { profile } = useAuth()
   const lang = state.lang || 'ru'
@@ -842,7 +839,6 @@ export default function DailyBazaar() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {canManage && <button type="button" onClick={() => navigate('/admin/bazaar/ingredients')} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-3 text-xs font-black text-white"><Tags size={14} />{l.ingredientCatalog}</button>}
               <button
                 type="button"
                 onClick={loadPurchases}
@@ -1181,7 +1177,6 @@ function BazaarEntryForm({
           {suggestions.length === 0 && (
             <div className="mx-3 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 sm:mx-4">
               <span>{l.noIngredients}</span>
-              <Link to="/admin/bazaar/ingredients" className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-black text-amber-800 shadow-sm"><Tags size={14} />{l.ingredientCatalog}</Link>
             </div>
           )}
 
