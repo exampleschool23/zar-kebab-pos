@@ -1,5 +1,6 @@
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../../../src/lib/orderTypes.js'
 import { formatLongDateTime } from '../../../src/lib/dateFormat.js'
+import { getOrderPaymentSummary } from '../../../src/lib/analytics.js'
 import { escapeTelegramHtml, TELEGRAM_STATUS_MESSAGES } from './telegram.js'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../../../src/lib/menuSaleUnits.js'
 
@@ -111,6 +112,7 @@ export function mergeCompletedOrders(orders = []) {
     service_fee: rows.reduce((sum, order) => sum + (Number(order.service_fee) || 0), 0),
     total: rows.reduce((sum, order) => sum + (Number(order.total) || 0), 0),
     loyalty_used_amount: rows.reduce((sum, order) => sum + getLoyaltyUsedAmount(order), 0),
+    cashback_earned: rows.reduce((sum, order) => sum + getOrderPaymentSummary(order).cashbackEarned, 0),
     loyalty_customer_name: loyaltyOwnerNames.join(', '),
     items: rows.flatMap(order => getOrderItems(order)),
     payments: paymentsByMethod.size > 0
@@ -307,6 +309,10 @@ export function buildCompletedOrderGroupMessage(order) {
     }
   }
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
+  const cashbackEarned = getOrderPaymentSummary(order).cashbackEarned
+  if (cashbackEarned > 0) {
+    lines.push(`Начислен кешбэк: + ${escapeTelegramHtml(formatMoney(cashbackEarned))}`)
+  }
   if (order?.orderNetProfit != null && Number.isFinite(Number(order.orderNetProfit))) {
     const margin = order?.orderProfitMarginPct != null && Number.isFinite(Number(order.orderProfitMarginPct))
       ? ` · ${formatPercent(order.orderProfitMarginPct)}`

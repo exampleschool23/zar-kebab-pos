@@ -45,7 +45,7 @@
 - Game Club paid revenue has its own text/PNG bucket, excluded from other buckets.
 - Migration `180` sends new Game Club rounds to Team: RU date, Добавил, menu mode, item table and total. No costs/tenders. Vault cron dispatches immediately and every minute; uncertain sends remain held for review, never blindly resent.
 - Daily/MTD cafe income uses immutable `orders.total`. Cash/terminal uses payment rows; QR maps to terminal, while card/loyalty stay distinct.
-- The aggregate daily report estimates soliq as 4% of that day's paid cafe revenue, lists it in expenses, includes it in total expenses, and deducts it from daily net profit.
+- Daily soliq is 4% of paid cafe revenue, included in expenses and deducted from net profit.
 - Team KPI: one Russian PNG per finalized date with all employee awards, total, date, system author. Migration `181` claims dates; unknown sends stay held. No text fallback or sales/rate/balance data. Deleting an award edits only its row in the shared image.
 
 ## Menu availability
@@ -68,6 +68,8 @@
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows never announce new cash expenses.
 
-## Status-group message removal
+## Status-group messages
+
+- Status orders show saved `cashback_earned`, summed across rounds; omit zero. Test: `tests/telegramOrderStatus.test.js`.
 
 - Apply `185` before deployment. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages cannot be removed. Telegram permits deletion within 48h. Tests: `tests/orderStatusDelivery.test.js`.
