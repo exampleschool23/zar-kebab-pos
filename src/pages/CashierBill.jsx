@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react'
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, Printer, CheckCircle2, Banknote,
@@ -25,6 +25,7 @@ import {
 } from '../lib/analytics'
 import { supabase } from '../lib/supabase'
 import { getLoyaltyCardCashbackPercent, getLoyaltyCardCashbackType } from '../lib/loyalty'
+import CashierLoyaltyNameSearch from '../components/CashierLoyaltyNameSearch'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import StatusBadge from '../components/StatusBadge'
 import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem } from '../lib/menuItems'
@@ -99,6 +100,8 @@ export default function CashierBill() {
   const [payMethod,  setPayMethod]  = useState('cash')
   const [splitPayments, setSplitPayments] = useState([{ id: 'payment-1', method: 'cash', amount: '' }])
   const [activePaymentId, setActivePaymentId] = useState('payment-1')
+  const loyaltyLookupRequest = useRef(0)
+  useEffect(() => () => { loyaltyLookupRequest.current += 1 }, [])
   const [loyaltyCardNumber, setLoyaltyCardNumber] = useState('')
   const [loyaltyCard, setLoyaltyCard] = useState(null)
   const [loyaltyRedeemAmount, setLoyaltyRedeemAmount] = useState('')
@@ -377,9 +380,11 @@ export default function CashierBill() {
   }
 
   async function checkLoyaltyCard(cardNumberOverride) {
+    const requestId = ++loyaltyLookupRequest.current
     const cardNumber = String(cardNumberOverride ?? loyaltyCardNumber ?? '').trim()
     setLoyaltyCard(null)
     setLoyaltyLookupMessage('')
+    setCheckingLoyalty(false)
     if (!/^\d{8}$/.test(cardNumber)) {
       setLoyaltyLookupMessage(lbl.loyaltyInvalid)
       return
@@ -392,6 +397,7 @@ export default function CashierBill() {
         .select('*')
         .eq('card_number', cardNumber)
         .maybeSingle()
+      if (requestId !== loyaltyLookupRequest.current) return
       if (error) throw error
       if (!data || data.is_active === false) {
         setLoyaltyLookupMessage(lbl.loyaltyNotFound)
@@ -401,9 +407,10 @@ export default function CashierBill() {
       setLoyaltyCard({ ...data, balance })
       setLoyaltyLookupMessage(lbl.loyaltyFound)
     } catch (error) {
+      if (requestId !== loyaltyLookupRequest.current) return
       setLoyaltyLookupMessage(error?.message || lbl.loyaltyLookupFailed)
     } finally {
-      setCheckingLoyalty(false)
+      if (requestId === loyaltyLookupRequest.current) setCheckingLoyalty(false)
     }
   }
 
@@ -446,6 +453,8 @@ export default function CashierBill() {
   }
 
   function clearLoyaltyEntry() {
+    loyaltyLookupRequest.current += 1
+    setCheckingLoyalty(false)
     setLoyaltyCardNumber('')
     setLoyaltyCard(null)
     setLoyaltyRedeemAmount('')
@@ -1115,12 +1124,23 @@ export default function CashierBill() {
                   <Tag size={15} className="text-[#ff5a00]" />
                   <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">{lbl.loyaltyLabel}</p>
                 </div>
+                <CashierLoyaltyNameSearch
+                  lang={lang}
+                  onSearchChange={clearLoyaltyEntry}
+                  onSelect={cardNumber => {
+                    clearLoyaltyEntry()
+                    setLoyaltyCardNumber(cardNumber)
+                    checkLoyaltyCard(cardNumber)
+                  }}
+                />
                 <div className="flex gap-2">
                   <input
                     type="text"
                     inputMode="numeric"
                     value={String(loyaltyCardNumber || '').replace(/(\d{4})(?=\d)/g, '$1 ')}
                     onChange={e => {
+                      loyaltyLookupRequest.current += 1
+                      setCheckingLoyalty(false)
                       setLoyaltyCardNumber(e.target.value.replace(/\D/g, '').slice(0, 8))
                       setLoyaltyCard(null)
                       setLoyaltyRedeemAmount('')
