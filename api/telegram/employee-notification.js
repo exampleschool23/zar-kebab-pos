@@ -467,18 +467,6 @@ async function notifyMenuEvent(supabase, user, menuItemId, availabilityEvent) {
   }
 
   const target = await loadSalaryTeamTarget(supabase)
-  if (type === 'bonus' && event.source_type === 'daily_kpi') {
-    const daily = await deliverTeamDailyKpi(supabase, event.bonus_date, target.chatId)
-    if (daily.status === 'sent') {
-      const updated = await supabase.from('employee_salary_group_notification_deliveries')
-        .update({ team_status: 'sent', team_chat_id: target.chatId,
-          team_telegram_message_id: null, team_sent_at: daily.sentAt,
-          team_error_message: '', updated_at: new Date().toISOString() })
-        .eq('id', existing.id)
-      if (updated.error) throw updated.error
-    }
-    return daily
-  }
   const now = new Date().toISOString()
   const pendingFields = {
     status: target.chatId ? 'pending' : 'skipped',

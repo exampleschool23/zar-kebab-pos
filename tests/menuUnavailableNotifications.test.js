@@ -267,3 +267,63 @@ test('database health requires daily unavailable-menu snapshots', async () => {
   assert.match(failed.hint, /145_daily_unavailable_menu_categories/)
   assert.match(cliHealth, /checkTable\('daily_unavailable_menu_notification_deliveries'/)
 })
+
+// Execute the actual handler with isolated database/Telegram dependencies so
+// unrelated notification branches cannot introduce runtime failures here.
+for (const availabilityEvent of ['available', 'unavailable', 'created', 'archived']) {
+  test(`${availabilityEvent} event sends to Team and records delivery once`, async () => {
+    let row = {
+      id: 'delivery-1', menu_item_id: 'meal-1', actor_id: 'staff-1',
+      availability_event: availabilityEvent, status: 'not_attempted',
+      updated_at: '2026-09-09T00:00:00Z',
+      menu_item_name: 'Плов', actor_name: 'Али',
+    }
+    const sent = []
+    const supabase = {
+      from(table) {
+        assert.equal(table, 'menu_item_unavailable_notification_deliveries')
+        let patch
+        const query = {
+          select() { return this },
+          eq() { return this },
+          order() { return this },
+          limit() { return this },
+          update(fields) { patch = fields; return this },
+          async maybeSingle() {
+            if (patch) row = { ...row, ...patch }
+            return { data: { ...row }, error: null }
+          },
+          single() { return this.maybeSingle() },
+        }
+        return query
+      },
+    }
+    const dependencies = {
+      canRetryMenuEventDelivery: delivery => delivery.status === 'not_attempted',
+      loadSalaryTeamTarget: async () => ({ chatId: 'team-chat' }),
+      savedMenuUnavailableDeliveryResult: delivery => ({ status: delivery.status }),
+      buildMenuAvailableTeamMessage, buildMenuUnavailableTeamMessage,
+      buildMenuCreatedTeamMessage, buildMenuArchivedTeamMessage,
+      sendTelegramMessage: async (chatId, text) => {
+        sent.push({ chatId, text })
+        return { message_id: 42 }
+      },
+      getTelegramMessageId: response => response.message_id,
+    }
+    const source = endpoint.slice(
+      endpoint.indexOf('async function notifyMenuEvent('),
+      endpoint.indexOf('async function notifyMenuUnavailable('),
+    )
+    const handler = new Function(...Object.keys(dependencies), `${source}; return notifyMenuEvent`)(
+      ...Object.values(dependencies),
+    )
+    assert.equal((await handler(supabase, { id: 'staff-1' }, 'meal-1', availabilityEvent)).status, 'sent')
+    assert.equal(row.telegram_message_id, 42)
+    assert.equal(sent.length, 1)
+    assert.equal(sent[0].chatId, 'team-chat')
+    assert.match(sent[0].text, /Плов/)
+    assert.match(sent[0].text, /Али/)
+    await handler(supabase, { id: 'staff-1' }, 'meal-1', availabilityEvent)
+    assert.equal(sent.length, 1, 'a delivered event must not be sent again')
+  })
+}
