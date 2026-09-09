@@ -237,7 +237,8 @@ export function buildInvestorOrderChangeMessage(delivery, language = 'ru') {
     return [
       `🗑 <b>${copy.compactDeleted} #${orderLabel}</b> · ${details}`,
       `👤 ${escapeTelegramHtml(delivery?.actor_name || '—')}`,
-    ].join('\n')
+      delivery?.deletion_reason && `${lang === 'ru' ? 'Причина' : lang === 'uz' ? 'Sabab' : 'Reason'}: ${escapeTelegramHtml(delivery.deletion_reason)}`,
+    ].filter(Boolean).join('\n')
   }
   const lines = [
     `🔄 <b>${copy.changed}</b>`,

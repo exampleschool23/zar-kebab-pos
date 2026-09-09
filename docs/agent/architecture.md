@@ -45,3 +45,5 @@ Critical invariants:
 ## Compatibility
 
 `src/lib/db.js` contains temporary fallbacks for missing RPCs/relations so the UI remains usable during deployment order. Production should still apply every migration. Use `npm run db:health` before changing loading code when the console reports missing database objects.
+
+- Order deletion always opens the shared `src/store/useOrderDeletion.jsx` reason dialog. Migration `184` requires a trimmed 1–1000 character reason in `delete_order_owner(text, text)` and snapshots it in the Investor delivery; deploy it before the frontend. Existing alerts remain unchanged.

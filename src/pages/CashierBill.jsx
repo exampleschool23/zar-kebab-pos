@@ -545,10 +545,6 @@ export default function CashierBill() {
 
   async function handleDeleteOrder() {
     if (!canDeleteOrder || !order?.id || isDeletingOrder) return
-    if (!confirmDeleteOrder) {
-      setConfirmDeleteOrder(true)
-      return
-    }
     setDeletingOrder(true)
     try {
       const result = await dispatch({

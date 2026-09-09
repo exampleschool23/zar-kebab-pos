@@ -1,6 +1,6 @@
 # Payments, Service, Accounting, Expenses, and Daily Bazaar
 
-Read this guide for cashier settlement, split payments, service fees, Accounting overview/history, cash expenses, monthly estimates, and Daily Bazaar.
+Guide to cashier, payments, Accounting, expenses, and Daily Bazaar.
 
 ## Entry points
 
@@ -24,7 +24,7 @@ Read this guide for cashier settlement, split payments, service fees, Accounting
 - Delete completed orders access permits atomic non-loyalty tender corrections.
 - Loyalty rows are visible but immutable without a separate wallet reversal workflow.
 - Corrections never change amounts, items, totals, paid state/time, loyalty data, service snapshots, or stock deductions.
-- Order deletes and payment corrections queue Investor alerts.
+- Order deletes require a reason popup; migration `184` snapshots reasons for Investor alerts. Payment corrections also notify Investor.
 
 ## Receipt printing
 

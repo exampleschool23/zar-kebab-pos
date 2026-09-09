@@ -2027,11 +2027,6 @@ export default function Reports() {
 
   async function deleteOrder(order) {
     if (!canDeleteOrder || !order?.id || deletingOrderId) return
-    if (confirmDeleteOrderId !== order.id) {
-      setPaymentMethodOrderId('')
-      setConfirmDeleteOrderId(order.id)
-      return
-    }
     setDeletingOrderId(order.id)
     try {
       const result = await dispatch({ type: 'DELETE_ORDER', payload: { orderId: order.id } })

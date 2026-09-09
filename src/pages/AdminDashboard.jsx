@@ -1168,14 +1168,11 @@ export default function AdminDashboard() {
   async function deleteRecentOrder(order) {
     if (!canDeleteOrder || !order?.id || deletingOrderId) return
     setDeleteErrorByOrderId(errors => ({ ...errors, [order.id]: '' }))
-    if (confirmDeleteOrderId !== order.id) {
-      setConfirmDeleteOrderId(order.id)
-      return
-    }
 
     setDeletingOrderId(order.id)
     try {
       const result = await dispatch({ type: 'DELETE_ORDER', payload: { orderId: order.id } })
+      if (result?.cancelled) return
       if (result?.error) {
         setDeleteErrorByOrderId(errors => ({
           ...errors,

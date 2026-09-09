@@ -1421,7 +1421,9 @@ export async function writeToSupabase(action, state, options = {}) {
     case 'DELETE_ORDER': {
       const orderId = typeof action.payload === 'string' ? action.payload : action.payload?.orderId
       if (!orderId) return
-      const { error } = await supabase.rpc('delete_order_owner', { p_order_id: orderId })
+      const reason = String(action.payload?.reason || '').trim()
+      if (!reason || reason.length > 1000) throw new Error('A deletion reason of 1–1000 characters is required')
+      const { error } = await supabase.rpc('delete_order_owner', { p_order_id: orderId, p_reason: reason })
       if (error) throw error
       void notifyTelegramInvestorOrderChange(orderId)
       break

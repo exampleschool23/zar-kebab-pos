@@ -20,7 +20,7 @@
 - Delivery advances independently through pending, sent, failed, skipped, or confirmed states for each destination.
 - Mark sent only after Telegram returns a message id.
 - Employee, Salary group, Team, and Investor attempts are independent and duplicate-safe.
-- The Salaries page combines salary-operation status with five records per page and retry controls for unsent destinations.
+- Salaries shows status, five records per page, and unsent-delivery retries.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
 - Owner history deletion first retracts tracked private, Salary-group, and Team messages. Payments snapshot the employee chat id. Missing messages count as retracted; other deletion failures preserve the event.
 
@@ -60,7 +60,7 @@
 
 - Employee creation, activation, and deactivation queue immutable, retry-safe Russian Investor events with employee, date, and actor snapshots.
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
-- Order deletes and payment corrections queue immutable Investor alerts with order, total, actor, and tender snapshots.
+- Order deletes require a reason popup; migration `184` saves it in Investor alerts. Alerts snapshot order, total, actor, and tenders. Payment corrections also notify Investor.
 - Manual cash-expense alerts remain localized text. A new Daily Bazaar purchase is sent as one localized PNG receipt with a short photo caption containing amount, date, category, optional description, creator, and the recorded monthly total; do not also send the numbered text receipt.
 - Each completed Tashkent day produces three Investor report images. The financial/payroll PNG uses the just-completed day, while the Daily Bazaar PNG uses the preceding day (two calendar days before the cron's current Tashkent date); they are sent together as one two-photo Telegram album. The theoretical Tech Card ingredient-consumption image remains a separate photo.
 - The Daily Bazaar PNG groups every numbered item by saved Russian category and shows bought price, normal price, line total, and signed variance. Over-price is red, under-price is green, and the top card includes the overall variance. Missing legacy normal prices render as unset, never zero; rows never truncate.

@@ -1,3 +1,4 @@
+import { useOrderDeletion } from './useOrderDeletion'
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react'
 import { isRecoverableIdleError, loadOperationalTableData, loadPOSData, refreshSupabaseSession, waitForKitchenRoundSubmission, writeToSupabase, subscribeToRealtime } from '../lib/db'
 import { appMetaReducer } from './appMetaReducer'
@@ -647,8 +648,10 @@ export function AppProvider({ children }) {
     }
   }, [authLoading, sessionUserId])
 
+  const { guardedDispatch, deletionDialog } = useOrderDeletion(dbDispatch, state.lang)
+
   return (
-    <AppContext.Provider value={{ state, dispatch: dbDispatch, refreshPOSData, pendingKitchenSubmission }}>
+    <AppContext.Provider value={{ state, dispatch: guardedDispatch, refreshPOSData, pendingKitchenSubmission }}>
       {state.connectionNotice && (
         <div role="alert" className={`fixed top-3 left-1/2 z-[9999] max-w-[calc(100vw-2rem)] -translate-x-1/2 break-words rounded-xl px-4 py-2 text-center text-sm font-semibold shadow-lg ${
           state.connectionNotice.tone === 'error'
@@ -661,6 +664,7 @@ export function AppProvider({ children }) {
         </div>
       )}
       {children}
+      {deletionDialog}
     </AppContext.Provider>
   )
 }

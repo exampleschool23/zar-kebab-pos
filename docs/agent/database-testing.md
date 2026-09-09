@@ -1,6 +1,6 @@
 # Database, Migrations, Tests, and Verification
 
-Read this guide for SQL migrations, schema compatibility, database health, regression tests, source guards, and deployment verification.
+Guide to migrations, database health, tests, and deployment checks.
 
 ## Entry points
 
@@ -12,7 +12,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
 
 ## Database workflow
 
-- Run migrations in numeric order. Production should have all migrations applied even when `src/lib/db.js` has rolling-deployment fallbacks.
+- Apply all migrations in numeric order, including when `src/lib/db.js` has compatibility fallbacks.
 - Run `npm run db:health` first when a page loads forever or the console reports missing tables, columns, or RPCs.
 - Do not assume applying the kitchen RPC migration means earlier settings or split-payment migrations exist.
 - Important migration families:
@@ -36,7 +36,7 @@ Read this guide for SQL migrations, schema compatibility, database health, regre
   - employee lifecycle Investor notification queue: `178`
   - Game Club order type, off-premise permission and service checks: `179`
   - Game Club immutable per-round Team queue and cron: `180`
-  - Daily Team KPI image claims and legacy-delivery suppression: `181` (apply before deploying image delivery)
+  - Daily Team KPI image claims and legacy-delivery suppression: `181`
 - Tech Card cost-sync batching and convergence: `183` (apply to enable faster saves). Coverage: `tests/techCardCostSyncMigration.test.js`; isolated PostgreSQL benchmark: `scripts/check-tech-card-cost-sync.mjs` (pass a PGlite module path).
 - Ingredient name editing with stable catalog keys and unchanged purchase snapshots: `182`.
 - `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
@@ -95,3 +95,5 @@ Do not loosen a guard simply because implementation changed. First determine whi
 - Migration `179_game_club_orders.sql` must precede the Game Club frontend release. It extends order/item constraints and current permission/settlement functions without changing historical rows. Never require the reopening function retired by `090`. Focused coverage: `tests/gameClubOrders.test.js`.
 
 - Optional isolated SQL check: `scripts/check-game-club-migration.mjs` accepts a PGlite module path and tests migration `180` without production access.
+
+- Migration `184` requires deletion reasons and snapshots them for Investor alerts. Apply before frontend deployment.

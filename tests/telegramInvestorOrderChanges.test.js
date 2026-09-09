@@ -67,3 +67,25 @@ test('deleted-order alert is compact and omits unavailable payment history', () 
   assert.doesNotMatch(message, /Было|—/)
   assert.equal(message.split('\n').length, 2)
 })
+
+
+test('deletion reason is included and HTML-escaped in Investor alerts', () => {
+  for (const [lang, label] of [['ru', 'Причина'], ['uz', 'Sabab'], ['en', 'Reason']]) {
+    const message = buildInvestorOrderChangeMessage({ event_type: 'order_deleted', deletion_reason: '<wrong> & duplicate' }, lang)
+    assert.ok(message.includes(`${label}: &lt;wrong&gt; &amp; duplicate`))
+  }
+})
+
+test('all deletion entry points share a required reason dialog and database enforcement', () => {
+  const hook = readFileSync(new URL('../src/store/useOrderDeletion.jsx', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../supabase/184_order_deletion_reason.sql', import.meta.url), 'utf8')
+  assert.match(hook, /action.type !== 'DELETE_ORDER'/)
+  assert.match(hook, /role="dialog" aria-modal="true"/)
+  assert.match(hook, /!reason.trim\(\) \|\| busy/)
+  assert.match(hook, /reason: reason.trim\(\)/)
+  assert.match(db, /p_reason: reason/)
+  assert.match(sql, /drop function public.delete_order_owner\(text\)/)
+  assert.match(sql, /nullif\(btrim\(p_reason\), ''\) is null/)
+  assert.match(sql, /set_config\('app.order_deletion_reason', btrim\(p_reason\), true\)/)
+  assert.match(sql, /alter column deletion_reason set default nullif\(current_setting/)
+})
