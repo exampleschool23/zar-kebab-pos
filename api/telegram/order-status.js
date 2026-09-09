@@ -1,3 +1,4 @@
+import { sendTrackedOrderStatusMessage } from './_lib/orderStatusDelivery.js'
 import { json, methodNotAllowed, readJson } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { sendTelegramMessage, TELEGRAM_STATUS_MESSAGES } from './_lib/telegram.js'
@@ -203,7 +204,7 @@ export default async function handler(req, res) {
       })
       for (const chatId of getCompletedOrdersChatIds()) {
         sends.push(
-          sendTelegramMessage(chatId, text)
+          sendTrackedOrderStatusMessage(supabase, completedOrders.map(order => order.id), chatId, text)
             .then(() => { completedGroupSentCount += 1 })
         )
       }

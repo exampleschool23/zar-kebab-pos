@@ -2,19 +2,17 @@
 
 ## Entry points
 
-- Customer UI: `src/pages/TelegramMiniApp.jsx`, `src/lib/telegramWebApp.js`
-- Notification client and server endpoints: `src/lib/telegramNotifications.js`, `api/telegram/`
-- Server delivery: `api/telegram/_lib/`, including `teamDailyKpiDelivery.js`
-- Bot polling fallback: `bots/telegram-bot.js`
+- UI: `src/pages/TelegramMiniApp.jsx`, `src/lib/telegramWebApp.js`
+- Notifications: `src/lib/telegramNotifications.js`, `api/telegram/`
+- Delivery: `api/telegram/_lib/`
+- Polling: `bots/telegram-bot.js`
 - Tests: `tests/teamDailyKpiDelivery.test.js`, `tests/employeePayrollImages.test.js`.
 
 ## Customer Mini App
 
-- Mini App is read-only; Checkout/My Orders are retired. Keep auth, loyalty, contacts and notifications separate.
+- Mini App is read-only; Checkout/My Orders are retired.
 
 ## Delivery records and retries
-
-- Read retries: `database-testing.md`.
 
 - Saved salary events and genuine rate changes get database-first `not_attempted` tracking; initial setup is not a change.
 - Delivery advances independently through pending, sent, failed, skipped, or confirmed states for each destination.
@@ -62,10 +60,14 @@
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Order deletes require a reason popup; migration `184` saves it in Investor alerts. Alerts snapshot order, total, actor, and tenders. Payment corrections also notify Investor.
 - Manual cash-expense alerts remain localized text. A new Daily Bazaar purchase is sent as one localized PNG receipt with a short photo caption containing amount, date, category, optional description, creator, and the recorded monthly total; do not also send the numbered text receipt.
-- Each completed Tashkent day produces three Investor report images. The financial/payroll PNG uses the just-completed day, while the Daily Bazaar PNG uses the preceding day (two calendar days before the cron's current Tashkent date); they are sent together as one two-photo Telegram album. The theoretical Tech Card ingredient-consumption image remains a separate photo.
-- The Daily Bazaar PNG groups every numbered item by saved Russian category and shows bought price, normal price, line total, and signed variance. Over-price is red, under-price is green, and the top card includes the overall variance. Missing legacy normal prices render as unset, never zero; rows never truncate.
+- Daily Investor images: financial/payroll covers yesterday in Tashkent; Daily Bazaar covers two days ago. Send both as one album; Tech Card consumption is a separate photo.
+- Daily Bazaar PNG groups numbered items by saved Russian category: bought/normal prices, line total, signed variance. Over-price is red, under-price is green, and the top card includes the overall variance. Missing legacy normal prices render as unset, never zero; rows never truncate.
 - Financial and Daily Bazaar delivery is image-only: if either renderer fails, send no text fallback and leave the claimed report rows retryable. A partial retry may send only the missing PNG without duplicating the photo already recorded as sent.
 - The ingredient image values paid, non-cancelled sales from immutable recipe snapshots, shows every ingredient, and counts legacy rows without snapshot coverage.
 - All three deliveries are duplicate-safe; album ledgers mark sent only after Telegram returns each photo’s message id.
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
-- Edits/deletes and calculated salary/bonus rows do not create new cash-expense announcements.
+- Edits/deletes and calculated salary/bonus rows never announce new cash expenses.
+
+## Status-group message removal
+
+- Apply `185` before deployment. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages cannot be removed. Telegram permits deletion within 48h. Tests: `tests/orderStatusDelivery.test.js`.

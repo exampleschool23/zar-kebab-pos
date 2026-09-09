@@ -1,7 +1,5 @@
 # Database, Migrations, Tests, and Verification
 
-Guide to migrations, database health, tests, and deployment checks.
-
 ## Entry points
 
 - Database client and health inventory: `src/lib/db.js`, `src/lib/dbHealth.js`
@@ -39,7 +37,6 @@ Guide to migrations, database health, tests, and deployment checks.
   - Daily Team KPI image claims and legacy-delivery suppression: `181`
 - Tech Card cost-sync batching and convergence: `183` (apply to enable faster saves). Coverage: `tests/techCardCostSyncMigration.test.js`; isolated PostgreSQL benchmark: `scripts/check-tech-card-cost-sync.mjs` (pass a PGlite module path).
 - Ingredient name editing with stable catalog keys and unchanged purchase snapshots: `182`.
-- `docs/agent/legacy-context.md` contains the old per-migration descriptions when older deployment history is specifically needed.
 
 ## Database invariants
 
@@ -63,7 +60,7 @@ Tests use Node's built-in runner. Main coverage areas:
 - `tests/salaryTransactions.test.js`: salary ledger and deterministic history ordering.
 - `tests/sourceGuards.*.test.js`: domain-split source-level protection for regressions that reached users.
 
-Run the smallest relevant test while iterating, then normally run:
+Validate focused tests, then:
 
 ```bash
 npm test
@@ -97,3 +94,5 @@ Do not loosen a guard simply because implementation changed. First determine whi
 - Optional isolated SQL check: `scripts/check-game-club-migration.mjs` accepts a PGlite module path and tests migration `180` without production access.
 
 - Migration `184` requires deletion reasons and snapshots them for Investor alerts. Apply before frontend deployment.
+
+- Migration `185` tracks status-group messages independently of deleted orders and queues minute cleanup retries. Apply before deploying the updated Telegram sender. Coverage: `tests/orderStatusDelivery.test.js`.

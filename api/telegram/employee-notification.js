@@ -1,3 +1,4 @@
+import { retractDeletedOrderStatusMessages } from './_lib/orderStatusDelivery.js'
 import { json, methodNotAllowed, readJson, getBearerToken } from './_lib/http.js'
 import { getSupabaseAdmin } from './_lib/supabaseAdmin.js'
 import { buildEmployeeFineMessage } from './_lib/fineMessages.js'
@@ -2041,6 +2042,11 @@ export default async function handler(req, res) {
     } else if (notificationType === 'expense') {
       result = await notifyInvestorExpense(supabase, user, expenseId)
     } else if (notificationType === 'order_change') {
+      try {
+        await retractDeletedOrderStatusMessages(supabase, orderIds)
+      } catch (error) {
+        console.error('[telegram] Order status cleanup deferred to cron:', error)
+      }
       result = await notifyInvestorOrderChanges(supabase, user, orderIds)
     } else if (notificationType === 'investor_income') {
       result = await notifyInvestorIncome(supabase, user, expenseId)

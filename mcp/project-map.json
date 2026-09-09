@@ -20,6 +20,12 @@
   ],
   "tasks": [
     {
+      "name": "order status Telegram message cleanup",
+      "aliases": ["delete order status message", "statuses group removal"],
+      "path": "api/telegram/_lib/orderStatusDelivery.js",
+      "symbol": "retractDeletedOrderStatusMessages"
+    },
+    {
       "name": "atomic cashier settlement",
       "aliases": ["atomic payment write", "cashier transaction settlement"],
       "path": "supabase/083_atomic_order_payment_settlement.sql",
