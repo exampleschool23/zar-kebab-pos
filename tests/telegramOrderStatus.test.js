@@ -170,7 +170,7 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
   assert.doesNotMatch(message, /Стол: Table &lt;1&gt;/)
   assert.doesNotMatch(message, /Официант:/)
   assert.doesNotMatch(message, /Закрыл:/)
-  assert.match(message, /Дата: 09\.07\.2026, 00:09/)
+  assert.match(message, /Дата: 9 июля \| 00:09/)
   assert.match(message, /Тип меню: 🧳 Турист/)
   assert.doesNotMatch(message, /Итого: 163 300 UZS/)
   assert.equal((message.match(/🥡 Тип: Заказ с собой/g) || []).length, 1)

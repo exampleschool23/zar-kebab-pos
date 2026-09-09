@@ -1,5 +1,5 @@
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../../../src/lib/orderTypes.js'
-import { formatDateTime } from '../../../src/lib/dateFormat.js'
+import { formatLongDateTime } from '../../../src/lib/dateFormat.js'
 import { escapeTelegramHtml, TELEGRAM_STATUS_MESSAGES } from './telegram.js'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../../../src/lib/menuSaleUnits.js'
 
@@ -246,7 +246,7 @@ export function buildItemRows(items) {
 }
 
 function formatTelegramDateTime(value) {
-  return formatDateTime(value, '-').replace(' ', ', ')
+  return formatLongDateTime(value, 'ru', '-', { includeYear: false }).replace(/ (\d{2}:\d{2})$/, ' | $1')
 }
 
 export function getCompletedOrdersChatIds(env = process.env) {
