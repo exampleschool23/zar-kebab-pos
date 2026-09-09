@@ -1,7 +1,9 @@
 import sharp from 'sharp'
 import { configurePayrollFonts } from './payrollReportImage.js'
-import { getDailySalaryNotificationSummary, formatSalaryNotificationAmount } from './salaryMessages.js'
+import { formatSalaryNotificationAmount } from './salaryMessages.js'
 import { formatLongDate } from '../../../src/lib/dateFormat.js'
+
+import { buildEmployeePayrollCalendarSvg } from './employeePayrollCalendar.js'
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c])
 const money = value => `${formatSalaryNotificationAmount(value)} сум`
@@ -27,17 +29,8 @@ export function buildTeamKpiImageSvg(event) {
     [['KPI-бонус', money(event.amount)]], 'Оформил: Система')
 }
 
-export function buildEmployeePayrollImageSvg(profile, date) {
-  const summary = getDailySalaryNotificationSummary(profile, date)
-  const kpi = (profile.bonuses || []).filter(b => b.bonus_date?.slice(0, 10) === date && b.source_type === 'daily_kpi')
-    .reduce((sum, b) => sum + Math.max(0, Number(b.amount) || 0), 0)
-  return card('Зарплата и бонусы за день', nameOf(profile), date, [
-    ['Зарплата', money(summary.earned)],
-    ['KPI-бонусы', money(kpi)],
-    ['Ручные бонусы', money(summary.bonusTotal - kpi)],
-    ['Всего за день', money(summary.earned + summary.bonusTotal)],
-    [summary.due < 0 ? 'Аванс / переплата' : 'Остаток к выплате', money(Math.abs(summary.due))],
-  ], summary.absence ? 'Отсутствие · Зарплата за день не начислена' : 'Рабочий день · Спасибо за вашу работу!')
+export function buildEmployeePayrollImageSvg(profile, date, startDate) {
+  return buildEmployeePayrollCalendarSvg(profile, date, startDate)
 }
 
 async function render(svg) {

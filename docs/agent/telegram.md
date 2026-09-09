@@ -42,7 +42,7 @@
 
 ## Automatic daily payroll privacy and language
 
-- Combined employee Salary + Bonus summaries are Russian PNGs: attendance, salary, manual/KPI bonuses, daily total, balance (negative = advance); no fines/payments.
+- Private Russian PNG calendars show month-to-date salary, KPI, bonuses, fines and absences through the completed day, starting no earlier than joining. Totals are before payments, not balance. Custom ranges allow up to 62 days.
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
 - Game Club paid revenue has its own text/PNG bucket, excluded from other buckets.
 - Migration `180` sends new Game Club rounds to Team: RU date, Добавил, menu mode, item table and total. No costs/tenders. Vault cron dispatches immediately and every minute; uncertain sends remain held for review, never blindly resent.
@@ -66,6 +66,6 @@
 - The Daily Bazaar PNG groups every numbered item by saved Russian category and shows bought price, normal price, line total, and signed variance. Over-price is red, under-price is green, and the top card includes the overall variance. Missing legacy normal prices render as unset, never zero; rows never truncate.
 - Financial and Daily Bazaar delivery is image-only: if either renderer fails, send no text fallback and leave the claimed report rows retryable. A partial retry may send only the missing PNG without duplicating the photo already recorded as sent.
 - The ingredient image values paid, non-cancelled sales from immutable recipe snapshots, shows every ingredient, and counts legacy rows without snapshot coverage.
-- All three image deliveries remain independently duplicate-safe; the album records Telegram's separate message id for each photo and marks each ledger sent only after those ids are returned.
+- All three deliveries are duplicate-safe; album ledgers mark sent only after Telegram returns each photo’s message id.
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows do not create new cash-expense announcements.

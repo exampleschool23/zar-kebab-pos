@@ -125,7 +125,7 @@ export default function EmployeeSalaryHistory() {
       previousMonth: 'Oldingi oy',
       nextMonth: 'Keyingi oy',
       calendar: 'Faoliyat taqvimi',
-      calendarHelp: 'Kunni tanlab, faqat shu kundagi yozuvlarni ko‘ring.',
+      calendarHelp: 'Kunlarda bonus, KPI, to‘lov va jarimalar ko‘rsatilgan. Tafsilotlar uchun kunni bosing. Telefonda taqvimni yon tomonga suring.',
       allMonth: 'Butun oy',
       monthActivity: 'Oylik faoliyat',
       selectedDayActivity: 'Tanlangan kun',
@@ -180,7 +180,7 @@ export default function EmployeeSalaryHistory() {
       previousMonth: 'Предыдущий месяц',
       nextMonth: 'Следующий месяц',
       calendar: 'Календарь операций',
-      calendarHelp: 'Выберите день, чтобы увидеть только его записи.',
+      calendarHelp: 'В ячейках — бонусы, KPI, выплаты и штрафы. Нажмите на день для подробностей. На телефоне листайте календарь вбок.',
       allMonth: 'Весь месяц',
       monthActivity: 'Операции за месяц',
       selectedDayActivity: 'Выбранный день',
@@ -235,7 +235,7 @@ export default function EmployeeSalaryHistory() {
       previousMonth: 'Previous month',
       nextMonth: 'Next month',
       calendar: 'Activity calendar',
-      calendarHelp: 'Choose a day to see only its records.',
+      calendarHelp: 'Each day shows bonuses, KPI, payments and fines. Select a day for details. On mobile, swipe sideways to see the week.',
       allMonth: 'All month',
       monthActivity: 'Monthly activity',
       selectedDayActivity: 'Selected day',
@@ -571,8 +571,8 @@ export default function EmployeeSalaryHistory() {
             <SummaryCard icon={CalendarX2} label={l.absenceTotal} value={monthSummary.absenceCount} tone="violet" />
           </section>
 
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(380px,1.05fr)]">
-            <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5 xl:sticky xl:top-4" aria-labelledby="salary-history-calendar-heading">
+          <div className="grid grid-cols-1 items-start gap-5">
+            <section className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5" aria-labelledby="salary-history-calendar-heading">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
                   <h2 id="salary-history-calendar-heading" className="text-base font-black text-[#1F2937]">{l.calendar}</h2>
@@ -611,7 +611,8 @@ export default function EmployeeSalaryHistory() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-7 gap-1" role="grid" aria-label={`${l.calendar}: ${formatMonthYear(visibleMonth, lang, visibleMonth)}`}>
+              <div className="overflow-x-auto pb-2">
+              <div className="grid min-w-[770px] grid-cols-7 gap-1.5" role="grid" aria-label={`${l.calendar}: ${formatMonthYear(visibleMonth, lang, visibleMonth)}`}>
                 {l.weekdays.map(day => (
                   <div key={day} role="columnheader" className="pb-1 text-center text-[10px] font-black uppercase tracking-wide text-[#9CA3AF] sm:text-xs">
                     {day}
@@ -619,17 +620,25 @@ export default function EmployeeSalaryHistory() {
                 ))}
                 {calendarDays.map(day => {
                   const selected = selectedDate === day.date
+                  const absent = day.entryTypes.includes('absence')
                   return (
                     <button
                       key={day.date}
                       type="button"
                       role="gridcell"
                       aria-label={`${formatLongDate(day.date, lang, day.date)} · ${formatRecordCount(day.entries.length, lang)}`}
+                      aria-describedby={`calendar-summary-${day.date}`}
                       aria-current={day.isToday ? 'date' : undefined}
                       aria-pressed={selected}
                       onClick={() => selectCalendarDay(day)}
-                      className={`relative flex min-h-[52px] min-w-0 flex-col items-center justify-between rounded-xl border px-1 py-1.5 text-sm font-black transition-all sm:min-h-[66px] sm:py-2 ${
-                        selected
+                      className={`relative flex min-h-[120px] min-w-0 flex-col items-stretch gap-2 rounded-xl border p-1.5 text-sm font-black transition-all sm:min-h-[132px] sm:p-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${
+                        absent
+                          ? selected
+                            ? 'border-red-600 bg-red-100 text-red-900 ring-2 ring-red-500 ring-offset-1'
+                            : day.isToday
+                              ? 'border-red-400 bg-red-50 text-red-900 ring-2 ring-orange-300 hover:bg-red-100'
+                              : 'border-red-200 bg-red-50 text-red-900 hover:border-red-400 hover:bg-red-100'
+                          : selected
                           ? 'border-[#ff5a00] bg-[#ff5a00] text-white shadow-sm shadow-orange-200'
                           : day.isToday
                             ? 'border-orange-300 bg-orange-50 text-[#ff5a00]'
@@ -638,12 +647,8 @@ export default function EmployeeSalaryHistory() {
                               : 'border-transparent bg-white text-[#D1D5DB] hover:bg-gray-50'
                       }`}
                     >
-                      <span>{day.day}</span>
-                      <span className="flex min-h-2 items-center justify-center gap-0.5" aria-hidden="true">
-                        {day.entryTypes.map(type => (
-                          <span key={type} className={`h-1.5 w-1.5 rounded-full ${selected ? 'bg-white' : calendarDotClass(type)}`} />
-                        ))}
-                      </span>
+                      <span className="text-left text-base">{day.day}</span>
+                      <CalendarDaySummary id={`calendar-summary-${day.date}`} entries={day.entries} labels={l} />
                       {day.entries.length > 1 && (
                         <span className={`absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[8px] font-black ${selected ? 'bg-white/20 text-white' : 'bg-white text-[#6B7280] shadow-sm'}`}>
                           {day.entries.length}
@@ -652,6 +657,7 @@ export default function EmployeeSalaryHistory() {
                     </button>
                   )
                 })}
+              </div>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-[#F0F1F3] pt-4">
@@ -798,6 +804,34 @@ function HeaderAmount({ label, value, tone }) {
     <span className={`inline-flex items-baseline gap-1.5 rounded-xl border px-2.5 py-1.5 shadow-sm ${colors}`}>
       <span className="text-[9px] font-black uppercase tracking-wide sm:text-[10px]">{label}</span>
       <span className="whitespace-nowrap text-xs font-black text-[#1F2937] sm:text-sm">{formatCurrency(value)}</span>
+    </span>
+  )
+}
+
+function CalendarDaySummary({ id, entries, labels }) {
+  const categories = [
+    { key: 'payment', label: labels.payment, tone: 'bg-orange-100 text-orange-800' },
+    { key: 'bonus', label: labels.bonus, tone: 'bg-blue-100 text-blue-800' },
+    { key: 'kpi', label: labels.kpiBonusTotal, tone: 'bg-emerald-100 text-emerald-800' },
+    { key: 'fine', label: labels.fine, tone: 'bg-red-100 text-red-800' },
+    { key: 'absence', label: labels.absence, tone: 'bg-violet-100 text-violet-800' },
+  ]
+  return (
+    <span id={id} className="flex w-full flex-col gap-1 text-left">
+      {categories.map(({ key, label, tone }) => {
+        const records = entries.filter(entry => key === 'kpi'
+          ? entry.entryType === 'bonus' && entry.automaticKpi
+          : entry.entryType === key && !(key === 'bonus' && entry.automaticKpi))
+        if (!records.length) return null
+        const amount = records.reduce((total, entry) => total + entry.amount, 0)
+        const sign = key === 'fine' ? '−' : ['bonus', 'kpi'].includes(key) ? '+' : ''
+        return (
+          <span key={key} className={`block rounded-md px-1.5 py-1 text-[11px] leading-tight ${tone}`}>
+            <span className="block font-semibold">{label}</span>
+            {key !== 'absence' && <span className="mt-0.5 block break-words font-extrabold">{sign}{formatCurrency(amount)}</span>}
+          </span>
+        )
+      })}
     </span>
   )
 }
