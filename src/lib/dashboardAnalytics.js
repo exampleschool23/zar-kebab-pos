@@ -221,11 +221,11 @@ export function formatReadableDateTime(date, locale = 'en-US') {
   return formatDateTime(date)
 }
 
-// Uses the same paid sessions and reporting timestamp as the dashboard KPIs.
+// Creation time reflects when demand reached the cafe, even if payment was delayed.
 export function getDashboardBusyHours(orders = []) {
   const hours = Array.from({ length: 12 }, (_, index) => ({ hour: index * 2, count: 0 }))
   for (const order of orders) {
-    const date = getOrderDate(order)
+    const date = order?.created_at
     if (!date || !toLocalDateStr(date)) continue
     hours[Math.floor(getRestaurantHour(date) / 2)].count += 1
   }

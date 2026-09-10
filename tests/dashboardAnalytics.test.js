@@ -598,16 +598,17 @@ test('merged recent order sessions keep the newest status update time', () => {
   assert.equal(session.updated_at, '2026-06-29T07:59:00.000Z')
 })
 
-test('busy hours use Tashkent payment hours, legacy dates, and ignore invalid timestamps', () => {
+test('busy hours use Tashkent creation hours even when payment is delayed', () => {
   const hours = getDashboardBusyHours([
     { paid_at: '2026-09-10T18:30:00Z', created_at: '2026-09-10T10:00:00Z' },
-    { paid_at: '2026-09-10T19:05:00Z' },
+    { paid_at: '2026-09-10T19:05:00Z', created_at: '2026-09-10T11:05:00Z' },
     { created_at: '2026-09-10T18:00:00Z' },
-    { paid_at: 'invalid' }, {},
+    { paid_at: '2026-09-10T12:00:00Z', created_at: 'invalid' }, {},
   ])
   assert.equal(hours.length, 12)
-  assert.equal(hours[11].count, 2)
-  assert.equal(hours[0].count, 1)
+  assert.equal(hours[7].count, 1)
+  assert.equal(hours[8].count, 1)
+  assert.equal(hours[11].count, 1)
   assert.equal(hours.reduce((sum, row) => sum + row.count, 0), 3)
   assert.ok(getDashboardBusyHours().every(row => row.count === 0))
 })
