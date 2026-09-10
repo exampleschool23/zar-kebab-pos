@@ -503,7 +503,7 @@ function BottomTableChips({ currentTableId, onNewOrder, disabled = false }) {
 }
 
 // ── Product section (used inside "All" grouped view) ──────────────────────────
-function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDecrement, onOpenDetail, eagerCount = 0 }) {
+function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDecrement, onOpenDetail, eagerCount = 0, audience = 'waiter' }) {
   return (
     <div>
       <div className="mb-4 flex items-center gap-4 sm:mb-5 sm:gap-5">
@@ -521,6 +521,7 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
             qty={cartQtyMap[item.id] || 0}
             lang={lang}
             eager={index < eagerCount}
+            audience={audience}
             density="compact"
             onAdd={onAdd}
             onIncrement={onIncrement}
@@ -1578,6 +1579,7 @@ export default function WaiterOrder() {
                   className="scroll-mt-20"
                 >
                   <ProductSection
+                    audience={menuAudience}
                     cat={cat}
                     items={items}
                     eagerCount={sections[0]?.cat.id === cat.id ? 6 : 0}
@@ -1596,6 +1598,7 @@ export default function WaiterOrder() {
                   qty={cartQtyMap[item.id] || 0}
                   lang={lang}
                   eager={index < 8}
+                  audience={menuAudience}
                   density="compact"
                   onAdd={handleAdd}
                   onIncrement={handleIncrement}

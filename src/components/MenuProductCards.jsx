@@ -3,11 +3,11 @@ import { ArrowLeft, Check, Clock3, Copy, LayoutGrid, Minus, Play, Plus, Utensils
 import { getCategoryName, getItemDesc, getItemName, t } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
-import { getMenuPricing } from '../lib/menuPricing'
+import { getMenuOptionPricing, getSelectedMenuBasePrice } from '../lib/menuPricing'
 import { getMenuItemPublicUrl } from '../lib/menuLinks'
 import { getMenuItemMediaUrls, isMenuVideoUrl } from '../lib/menuMedia'
 import { menuPrepTimeLabel } from '../lib/menuPrepTime'
-import { calculateUnitPrice, getOrderItemBasePrice, normalizePriceMode } from '../lib/priceModes'
+import { calculateUnitPrice, normalizePriceMode } from '../lib/priceModes'
 import {
   changeMenuQuantity,
   formatMenuQuantity,
@@ -259,14 +259,14 @@ export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
   )
 }
 
-export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu', density = 'comfortable' }) {
+export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu', density = 'comfortable', audience = readOnly ? 'public' : 'waiter' }) {
   const inCart = !readOnly && qty > 0
   const unavailable = !readOnly && item?.available === false
   const [copied, setCopied] = useState(false)
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
-  const pricing = getMenuPricing(item)
+  const pricing = getMenuOptionPricing(item, getMenuItemOptionGroups(item, lang, { audience }))
   const priceUnit = menuPriceUnitSuffix(item, lang)
   const prepTime = menuPrepTimeLabel(item, lang)
   const hasVideo = isMenuVideoUrl(item.image_url)
@@ -375,7 +375,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
               <p className={`${showCompactPublicCard ? 'text-[13px]' : 'text-[12px]'} font-bold text-[#9CA3AF] line-through`}>{formatPrice(pricing.oldPrice)}</p>
             )}
             <p className={`${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#ff5a00]'} ${showCompactPublicCard ? 'text-[15px] sm:text-[19px]' : dense ? 'text-[15px]' : 'text-[16px]'} font-black tracking-tight`}>
-              {formatPrice(pricing.price)}{priceUnit}
+              {formatPrice(pricing.price)}{pricing.maxPrice > pricing.price ? ` – ${formatPrice(pricing.maxPrice)}` : ''}{priceUnit}
             </p>
           </div>
           {!showCompactPublicCard && (grams || millilitres || kcal) && (
@@ -456,7 +456,6 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
   const kcal = kcalLabel(item, lang)
   const grams = gramsLabel(item, lang)
   const millilitres = millilitresLabel(item, lang)
-  const pricing = getMenuPricing(item)
   const soldByWeight = isMenuItemSoldByWeight(item)
   const priceUnit = menuPriceUnitSuffix(item, lang)
   const prepTime = menuPrepTimeLabel(item, lang)
@@ -468,11 +467,8 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
     group.required && !group.options.some(option => option.id === selectedOptions[group.id])
   ))
   const itemPriceMode = normalizePriceMode(item.price_mode || item.priceMode)
-  const selectedOptionBasePrice = optionGroups.reduce((price, group) => {
-    const option = group.options.find(item => item.id === selectedOptions[group.id])
-    if (Number(option?.price) > 0) return Number(option.price)
-    return price + (Number(option?.price_delta) || 0)
-  }, getOrderItemBasePrice(item))
+  const selectedOptionBasePrice = getSelectedMenuBasePrice(item, optionGroups, selectedOptions)
+  const pricing = getMenuOptionPricing(item, optionGroups, Object.keys(selectedOptions).length ? selectedOptions : null)
   const selectedOptionFullPrice = calculateUnitPrice(selectedOptionBasePrice, itemPriceMode)
   const optionNotes = optionNoteLine(optionGroups, selectedOptions)
   const finalNotes = [optionNotes, notes.trim()].filter(Boolean).join('\n')
@@ -554,8 +550,8 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
               {formatPrice(pricing.oldPrice)}
             </p>
           )}
-          <p className={`whitespace-nowrap text-xl sm:text-2xl font-black tabular-nums ${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#FF4D00]'}`}>
-            {formatPrice(pricing.price)}{priceUnit}
+          <p className={`text-xl sm:text-2xl font-black tabular-nums ${unavailable ? 'text-[#6B7280]' : pricing.discounted ? 'text-red-600' : 'text-[#FF4D00]'}`}>
+            {formatPrice(pricing.price)}{pricing.maxPrice > pricing.price ? ` – ${formatPrice(pricing.maxPrice)}` : ''}{priceUnit}
           </p>
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-black text-amber-700 ring-1 ring-amber-200">
             <Clock3 size={12} /> {prepTime}
@@ -652,7 +648,7 @@ export function ProductDetailPage({ item, category, currentQty, currentNotes, la
                     <p className="text-sm font-bold text-[#9CA3AF] line-through">{formatPrice(pricing.oldPrice)}</p>
                   )}
                   <p className={`${unavailable ? 'text-lg text-[#6B7280]' : pricing.discounted ? 'text-xl text-red-600' : 'text-lg text-[#FF4D00]'} font-black`}>
-                    {formatPrice(pricing.price)}{priceUnit}
+                    {formatPrice(pricing.price)}{pricing.maxPrice > pricing.price ? ` – ${formatPrice(pricing.maxPrice)}` : ''}{priceUnit}
                   </p>
                   {grams && (
                     <span className="rounded-full bg-[#FFF4ED] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#FF4D00] ring-1 ring-[#FFD8BF]">

@@ -545,7 +545,7 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(productCards, /disabled=\{readOnly\}/)
   assert.doesNotMatch(productCards, /!\s*readOnly && optionGroups\.length > 0/)
   assert.match(productCards, /missingRequiredOptions/)
-  assert.match(productCards, /const selectedOptionBasePrice = optionGroups\.reduce/)
+  assert.match(productCards, /const selectedOptionBasePrice = getSelectedMenuBasePrice\(item, optionGroups, selectedOptions\)/)
   assert.match(productCards, /calculateUnitPrice\(selectedOptionBasePrice, itemPriceMode\)/)
   assert.match(productCards, /onAddToCart\(item, qty, finalNotes, selectedOptions, selectedOptionBasePrice\)/)
   assert.match(productCards, /optionNoteLine/)
