@@ -50,7 +50,7 @@
 
 ## Tests
 
-Tests use Node's built-in runner. Main coverage areas:
+Node test coverage:
 
 - `tests/orderPayment.test.js`: totals, service, loyalty, cart, split payments, cashier, take-away, reporting.
 - `tests/dbRealtime.test.js`: realtime, settings reload, connection notices.
@@ -99,3 +99,5 @@ Understand each guard’s protected regression before changing it. Guards cover:
 
 - `186`–`188`: Ingredients access, writes, snapshot keys, and movement totals. Tests: `tests/ingredientsFeature.test.js`; SQL: `scripts/check-ingredient-movement.mjs`.
 - `189`: ingredient Investor queue and minute dispatch. Tests: `tests/ingredientNotifications.test.js`; SQL: `scripts/check-ingredient-notifications.mjs` (PGlite path). Deploy the sender before applying.
+
+- `190`–`191`: ten-day income indexes/RPCs; apply before UI.

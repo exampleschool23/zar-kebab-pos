@@ -36,6 +36,7 @@ import {
   isOrderInDashboardPeriod,
 } from '../lib/dashboardAnalytics'
 import AppShell from '../components/AppShell'
+import WeeklyIncomeChart from '../components/WeeklyIncomeChart'
 import { inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { canDeletePaidOrders } from '../lib/permissions'
 import { loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
@@ -880,7 +881,7 @@ export default function AdminDashboard() {
       .catch(error => {
         if (cancelled) return
         setMonthlyIncomeRows([])
-        setMonthlyIncomeError(error?.message || l.monthlyIncomeFailed)
+        setMonthlyIncomeError(error?.message || 'monthly_income_failed')
         setMonthlyIncomeLoading(false)
       })
 
@@ -888,7 +889,7 @@ export default function AdminDashboard() {
       cancelled = true
       controller.abort()
     }
-  }, [l.monthlyIncomeFailed, monthlyIncomeRequestKey])
+  }, [monthlyIncomeRequestKey])
 
   // ── Core derived sets ─────────────────────────────────────────────────────
   const dashboardOrders = useMemo(
@@ -1684,6 +1685,8 @@ export default function AdminDashboard() {
             </div>
           )}
         </section>
+
+        <WeeklyIncomeChart lang={lang} target={dailyBreakEvenIncome} />
 
         {/* Footer */}
         <p className="text-center text-xs text-[#9CA3AF] mt-6">
