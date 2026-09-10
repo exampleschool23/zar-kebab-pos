@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   formatReadableDateTime,
   getDashboardBestSelling,
+  getDashboardProductContribution,
   getDashboardBusyHours,
   getDashboardOrderTypePerformance,
   getDashboardPaymentMethods,
@@ -611,4 +612,17 @@ test('busy hours use Tashkent creation hours even when payment is delayed', () =
   assert.equal(hours[11].count, 1)
   assert.equal(hours.reduce((sum, row) => sum + row.count, 0), 3)
   assert.ok(getDashboardBusyHours().every(row => row.count === 0))
+})
+
+test('product contribution ranks revenue and preserves missing historical cost coverage', () => {
+  const rows = getDashboardProductContribution([{
+    items: [
+      { menu_item_id: 'kebab', name: 'Kebab', quantity: 2, price: 20_000, cost_price: 8_000 },
+      { menu_item_id: 'cola', name: 'Cola', quantity: 1, price: 10_000 },
+    ],
+  }], menuItemMap)
+  assert.deepEqual(rows.map(row => row.menuItemId), ['kebab', 'cola'])
+  assert.deepEqual([rows[0].revenue, rows[0].profit, rows[0].marginPct, rows[0].revenueSharePct], [40_000, 24_000, 60, 80])
+  assert.equal(rows[1].profit, null)
+  assert.equal(rows[1].marginPct, null)
 })

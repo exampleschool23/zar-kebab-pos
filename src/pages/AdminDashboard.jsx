@@ -24,7 +24,7 @@ import {
 } from '../lib/analytics'
 import {
   formatReadableDateTime,
-  getDashboardBestSelling,
+  getDashboardProductContribution,
   getDashboardOrderTypePerformance,
   getDashboardPaymentMethods,
   getDashboardPeriodOrders,
@@ -35,6 +35,7 @@ import {
 import AppShell from '../components/AppShell'
 import WeeklyIncomeChart from '../components/WeeklyIncomeChart'
 import BusyHoursCard from '../components/BusyHoursCard'
+import ProductContributionCard from '../components/ProductContributionCard'
 import { loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 import {
   buildDashboardMonthlyIncomeChartRows,
@@ -847,9 +848,8 @@ export default function AdminDashboard() {
     return getDashboardOrderTypePerformance(periodPaidOrders, lang)
   }, [periodPaidOrders, lang])
 
-  // ── Best-selling dishes ───────────────────────────────────────────────────
-  const bestSelling = useMemo(() => {
-    return getDashboardBestSelling(periodPaidOrders, menuItemMap)
+  const productContribution = useMemo(() => {
+    return getDashboardProductContribution(periodPaidOrders, menuItemMap)
   }, [periodPaidOrders, menuItemMap])
 
   // ── KPI badges ────────────────────────────────────────────────────────────
@@ -1128,35 +1128,7 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Best-selling */}
-          <div aria-busy={analyticsLoading} className="col-span-12 xl:col-span-4 bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 min-w-0">
-            <h3 className="font-black text-[#1F2937] text-base mb-4">{l.bestSelling} · {currentKpiPeriodLabel}</h3>
-            {analyticsLoading ? (
-              <ListShimmer rows={6} withAvatar />
-            ) : bestSelling.length === 0 ? (
-              <p className="text-sm text-[#9CA3AF] text-center py-6">{l.noSales}</p>
-            ) : (
-              <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
-                {bestSelling.map((item, i) => (
-                  <div key={item.menuItemId || i} className="flex items-center gap-2.5 py-1.5 border-b border-[#F9FAFB] last:border-0">
-                    <span className="w-5 text-center text-xs font-black text-[#9CA3AF] flex-shrink-0">
-                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
-                    </span>
-                    {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} className="w-9 h-9 rounded-xl object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-xl bg-gray-100 flex-shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1F2937] truncate">{item.name}</p>
-                      <p className="text-xs text-[#9CA3AF]">{item.qty} {l.pcs}</p>
-                    </div>
-                    <p className="text-xs font-black text-[#1F2937] flex-shrink-0 whitespace-nowrap">{formatCurrency(item.revenue)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ProductContributionCard rows={productContribution} lang={lang} periodLabel={currentKpiPeriodLabel} loading={analyticsLoading} LoadingView={() => <ListShimmer rows={6} withAvatar />} />
 
           <BusyHoursCard lang={lang} />
         </div>

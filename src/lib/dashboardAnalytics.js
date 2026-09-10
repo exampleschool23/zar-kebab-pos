@@ -12,6 +12,7 @@ import {
 } from './analytics.js'
 import { getOrderItemUnitPrice } from './priceModes.js'
 import { ORDER_TYPE_KEYS, inferOrderType, orderTypeLabel } from './orderTypes.js'
+import { getOrderItemCostPrice } from './profit.js'
 
 function localDateStr(value) {
   return toLocalDateStr(value instanceof Date ? value.toISOString() : value)
@@ -124,6 +125,45 @@ export function getDashboardBestSelling(orders, menuItemMap) {
     .sort((a, b) => b.qty - a.qty)
     .slice(0, 10)
     .map(row => ({ ...row, image_url: menuItemMap[row.menuItemId]?.image_url || '' }))
+}
+
+export function getDashboardProductContribution(orders = [], menuItemMap = {}) {
+  const products = new Map()
+  for (const order of orders || []) {
+    for (const item of getSoldOrderItems(order)) {
+      const key = item.menu_item_id || item.name
+      const quantity = Math.max(0, Number(item.quantity) || 1)
+      const revenue = getOrderItemUnitPrice(item) * quantity
+      const rawCost = item?.cost_price ?? item?.costPrice ?? item?.real_cost ?? item?.realCost
+      const hasCost = rawCost !== null && rawCost !== undefined && rawCost !== '' && Number.isFinite(Number(rawCost))
+      const row = products.get(key) || {
+        menuItemId: item.menu_item_id,
+        name: item.name,
+        quantity: 0,
+        revenue: 0,
+        cost: 0,
+        hasCostCoverage: true,
+      }
+      row.quantity += quantity
+      row.revenue += revenue
+      row.hasCostCoverage = row.hasCostCoverage && hasCost
+      if (hasCost) row.cost += getOrderItemCostPrice(item) * quantity
+      products.set(key, row)
+    }
+  }
+  const totalRevenue = [...products.values()].reduce((sum, row) => sum + row.revenue, 0)
+  return [...products.values()]
+    .map(row => ({
+      ...row,
+      imageUrl: menuItemMap[row.menuItemId]?.image_url || '',
+      revenueSharePct: totalRevenue > 0 ? Math.round(row.revenue / totalRevenue * 1000) / 10 : 0,
+      profit: row.hasCostCoverage ? Math.round(row.revenue - row.cost) : null,
+      marginPct: row.hasCostCoverage && row.revenue > 0
+        ? Math.round((row.revenue - row.cost) / row.revenue * 1000) / 10
+        : null,
+    }))
+    .sort((a, b) => b.revenue - a.revenue || b.quantity - a.quantity)
+    .slice(0, 10)
 }
 
 export function getDashboardOrderTypePerformance(orders, lang = 'en') {

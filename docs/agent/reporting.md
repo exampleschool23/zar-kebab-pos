@@ -38,7 +38,7 @@ Reporting guide.
 
 - Recent Orders and receipt/delete controls live in Reports, not Dashboard.
 - Sales by Category shows every category represented by sold items in the selected period.
-- Best-Selling Dishes shows up to ten ranked sold products and may scroll internally.
+- Product Contribution ranks ten products by revenue and shows quantity, revenue share, immutable-cost profit, and margin. Missing cost snapshots show unavailable profit. It reuses selected-period orders.
 - Never fabricate unsold products or empty categories. Monthly Busy Hours uses migrations `192`–`193` to return 12 two-hour buckets for the current Tashkent month. It attributes paid demand to `created_at`, scans one indexed month, returns no order details, and highlights tied peaks.
 - Average Daily Income by Month always shows the latest 12 calendar-month positions, suppresses numeric zero labels, and overlays the `business_settings.average_daily_break_even_income_uzs` target as a red dotted horizontal line. Completed actual months come only from immutable `dashboard_monthly_income_snapshots`; the current month aggregates only completed Tashkent days live from orders.
 - Migration `157` performs the one-time completed-history backfill. Its duplicate-safe daily cron finalizes the previous Tashkent month, so normal Dashboard reads never rescan completed order history for this chart.
@@ -56,8 +56,4 @@ Reporting guide.
 
 - Migrations `187`–`188` add categories and restrict movement to explicitly added (`is_catalog_managed`) ingredients, including archived ones with history. Category/search filters and name/quantity/movement/purchase-amount sorting operate locally without refetching.
 
-- Ten-day income below the monthly chart uses migrations `190`–`191`, `src/components/WeeklyIncomeChart.jsx`, and `src/lib/weeklyIncome.js`. Periods: 1–10, 11–20, 21–month end. The last period covers month end. Exclude future periods; use completed days. The permission-checked RPC returns the latest 20 periods through the selected month from one indexed scan bounded to eight months of paid totals, excludes today in Tashkent, and includes zero-sale days in denominators. Cache by month/day; language changes never refetch. Tests: `tests/weeklyIncome.test.js`. Apply migration before frontend release.
-
-- Ten-day chart hides whole zero-income months locally; zero periods within active months remain. Show empty state when needed.
-
-- Ten-day month options start at the earliest recorded order month (one-row loader). Month colors are stable.
+- Ten-day income (`190`–`191`) shows the latest 20 periods (1–10, 11–20, 21–end) through a selected month. It scans at most eight indexed months, excludes today/future periods, caches results, hides empty months, starts choices at the earliest order month, and uses stable month colors. Zero periods in active months remain. Tests: `tests/weeklyIncome.test.js`.
