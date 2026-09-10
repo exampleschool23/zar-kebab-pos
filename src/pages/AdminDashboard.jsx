@@ -1,25 +1,22 @@
 import React, { useMemo, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingBag, Package, Receipt,
   Clock, ArrowUpRight, ArrowDownRight, Users, Loader2,
-  Printer, CreditCard, Trash2, Wallet, Monitor, BadgeDollarSign,
+  BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
-import { formatDateOnly, formatLongDate, formatMonthYear, formatTime, normalizeDateLang, parseInstantDate } from '../lib/dateFormat'
+import { formatDateOnly, formatLongDate, formatMonthYear, normalizeDateLang } from '../lib/dateFormat'
 import {
   addRestaurantDays,
   getRestaurantHour,
   getOrderDate,
-  getOrderActivityDate,
   getOrderItems,
   getOrderLoyaltyIncomeTotal,
   getOrderRevenueTotal,
   getOrderTotal,
   groupOrdersBySession,
-  isActiveNeedsBillOrder,
   isPaidOrder,
   restaurantTodayStr,
   getSoldOrderItems,
@@ -37,8 +34,7 @@ import {
 } from '../lib/dashboardAnalytics'
 import AppShell from '../components/AppShell'
 import WeeklyIncomeChart from '../components/WeeklyIncomeChart'
-import { inferOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { canDeletePaidOrders } from '../lib/permissions'
+import BusyHoursCard from '../components/BusyHoursCard'
 import { loadPaidOrdersForRange, mergePaidOrderHistory } from '../lib/orderHistory'
 import {
   buildDashboardMonthlyIncomeChartRows,
@@ -89,12 +85,9 @@ const L = {
     topOrderType:    'Eng yaxshisi',
     bestSelling:    "Eng ko'p sotilgan taomlar",
     noSales:        "Savdo ma'lumotlari yo'q",
-    recentOrders:   "So'nggi buyurtmalar",
-    recentOrdersSub:'Hisoblarni tez chop eting va to‘langan buyurtmalarni ko‘ring',
     needBillCount:  n => `${n} hisob kerak`,
     needsBillSection:'HISOB KERAK',
     paidSection:    "TO'LANGAN",
-    printBill:      'Chop etish',
     view:           "Ko'rish",
     noOrders:       "Buyurtma yo'q",
     table:          'Stol',
@@ -114,10 +107,6 @@ const L = {
     footer:         'Barcha ma\'lumotlar to\'langan buyurtmalarga asoslangan',
     loading:        'Yuklanmoqda...',
     noData:         "Ma'lumot yo'q",
-    deleteOrder:    "O'chirish",
-    confirmDelete:  "Tasdiqlash",
-    deleting:       "O'chirilmoqda",
-    deleteFailed:   "Buyurtmani o'chirib bo'lmadi",
   },
   ru: {
     title:          'Панель управления',
@@ -159,12 +148,9 @@ const L = {
     topOrderType:    'Лучший',
     bestSelling:    'Самые продаваемые',
     noSales:        'Данных о продажах нет',
-    recentOrders:   'Последние заказы',
-    recentOrdersSub:'Быстро печатайте счета и проверяйте оплаченные заказы',
     needBillCount:  n => `${n} требуют счёт`,
     needsBillSection:'НУЖЕН СЧЁТ',
     paidSection:    'ОПЛАЧЕНЫ',
-    printBill:      'Печать счёта',
     view:           'Открыть',
     noOrders:       'Нет заказов',
     table:          'Стол',
@@ -184,10 +170,6 @@ const L = {
     footer:         'Все данные основаны на оплаченных заказах',
     loading:        'Загрузка...',
     noData:         'Нет данных',
-    deleteOrder:    'Удалить',
-    confirmDelete:  'Подтвердить',
-    deleting:       'Удаление',
-    deleteFailed:   'Не удалось удалить заказ',
   },
   en: {
     title:          'Dashboard',
@@ -229,12 +211,9 @@ const L = {
     topOrderType:    'Best',
     bestSelling:    'Best-Selling Dishes',
     noSales:        'No sales data yet',
-    recentOrders:   'Recent Orders',
-    recentOrdersSub:'Quickly print bills and review paid orders',
     needBillCount:  n => `${n} Need Bill`,
     needsBillSection:'NEEDS BILL',
     paidSection:    'PAID',
-    printBill:      'Print Bill',
     view:           'View',
     noOrders:       'No orders yet',
     table:          'Table',
@@ -254,10 +233,6 @@ const L = {
     footer:         'All data is based on paid orders',
     loading:        'Loading...',
     noData:         'No data yet',
-    deleteOrder:    'Delete',
-    confirmDelete:  'Confirm',
-    deleting:       'Deleting',
-    deleteFailed:   'Could not delete order',
   },
 }
 
@@ -281,67 +256,6 @@ function formatCompactIncome(amount, lang = 'uz') {
 
 function isOrderInPeriod(order, period) {
   return isOrderInDashboardPeriod(order, period)
-}
-
-function recentOrderActivityAt(order) {
-  return order?._recentActivityAt || getOrderActivityDate(order) || getOrderDate(order) || order?.created_at
-}
-
-function recentDateTimeLabel(iso, lang) {
-  if (!iso) return ''
-  const date = formatLongDate(iso, lang, '', { includeYear: false })
-  const time = formatTime(iso)
-  return date && time ? `${date}, ${time}` : date || time
-}
-
-function recentTimeLabel(iso) {
-  return formatTime(iso)
-}
-
-function groupPaidRecentOrders(orders, lang) {
-  const groups = []
-  const byKey = new Map()
-
-  orders.forEach(order => {
-    const paidAt = order?.paid_at || getOrderDate(order) || recentOrderActivityAt(order)
-    const key = toRestaurantDateStr(paidAt) || 'unknown'
-    let group = byKey.get(key)
-
-    if (!group) {
-      group = {
-        key,
-        label: formatLongDate(paidAt || key, lang, key, { includeYear: false }) || key,
-        orders: [],
-      }
-      byKey.set(key, group)
-      groups.push(group)
-    }
-
-    group.orders.push(order)
-  })
-
-  return groups
-}
-
-function orderContextBadge(order, lang, fallback) {
-  const orderType = inferOrderType(order)
-  if (orderType === 'game_club') return { label: orderTypeLabel(orderType, lang), cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
-  if (orderType === 'delivery') {
-    return {
-      label: orderTypeLabel(orderType, lang),
-      cls: 'bg-purple-50 text-purple-700 border-purple-200',
-    }
-  }
-  if (orderType === 'take_away') {
-    return {
-      label: orderTypeLabel(orderType, lang),
-      cls: 'bg-blue-50 text-blue-700 border-blue-200',
-    }
-  }
-  return {
-    label: order?.table_name || fallback,
-    cls: 'bg-orange-50 text-[#c2410c] border-orange-200',
-  }
 }
 
 function shortLabel(ds, mode) {
@@ -511,179 +425,6 @@ function ListShimmer({ rows = 5, withAvatar = false }) {
   )
 }
 
-function OrderBadge({ status, lang }) {
-  const l = L[lang] || L.en
-  const map = {
-    sent_to_kitchen: { cls: 'bg-blue-50 text-blue-600 border-blue-100',      label: l.new       },
-    new:             { cls: 'bg-blue-50 text-blue-600 border-blue-100',      label: l.new       },
-    preparing:       { cls: 'bg-orange-50 text-[#ff5a00] border-orange-100', label: l.preparing },
-    needs_bill:      { cls: 'bg-red-50 text-[#DC2626] border-red-100',       label: l.needsBill },
-    ready:           { cls: 'bg-blue-50 text-blue-700 border-blue-200',      label: l.ready     },
-    paid:            { cls: 'bg-gray-100 text-[#6B7280] border-gray-200',    label: l.paid      },
-    cancelled:       { cls: 'bg-gray-100 text-[#6B7280] border-gray-200',    label: l.cancelled },
-  }
-  const c = map[status] || map.new
-  return (
-    <span className={`text-xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${c.cls}`}>{c.label}</span>
-  )
-}
-
-function RecentStatusPill({ status, lang }) {
-  const l = L[lang] || L.en
-  const isNeedsBill = status === 'needs_bill'
-  return (
-    <span className={`text-[11px] font-black px-2.5 py-1 rounded-full border whitespace-nowrap ${
-      isNeedsBill
-        ? 'bg-[#FFF1F1] text-[#B42318] border-[#FFCDCA]'
-        : 'bg-[#EEF7F1] text-[#157347] border-[#CDEBD6]'
-    }`}>
-      {isNeedsBill ? l.needsBill : l.paid}
-    </span>
-  )
-}
-
-function RecentSectionHeader({ title, count, urgent }) {
-  return (
-    <div className="flex items-center justify-between gap-2 px-1 pt-1 mb-2 min-w-0">
-      <p className="text-[11px] font-black tracking-[0.18em] text-[#8EA0BB] truncate min-w-0">
-        {title}
-      </p>
-      <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#F1F5F9] text-[#8EA0BB] flex-shrink-0">
-        {count}
-      </span>
-    </div>
-  )
-}
-
-function RecentOrderRow({
-  order,
-  lang,
-  paymentMeta,
-  onPrintBill,
-  onView,
-  canDelete,
-  onDelete,
-  confirmDelete,
-  isDeleting,
-  deleteError,
-  showDate = true,
-}) {
-  const l = L[lang] || L.en
-  const isNeedsBill = order.status === 'needs_bill'
-  const shortId = String(order.id).slice(-4).toUpperCase()
-  const activityAt = recentOrderActivityAt(order)
-  const timeText = showDate ? recentDateTimeLabel(activityAt, lang) : recentTimeLabel(activityAt)
-  const contextBadge = orderContextBadge(order, lang, l.table)
-  const PaymentIcon = paymentMeta?.Icon
-  const LeadingIcon = !isNeedsBill && PaymentIcon ? PaymentIcon : Receipt
-  const leadingIconClass = isNeedsBill
-    ? 'bg-white text-[#EF3D32]'
-    : paymentMeta
-      ? `bg-[#F8FAFC] ${paymentMeta.cls}`
-      : 'bg-[#FFF7ED] text-[#FF5A00]'
-
-  function openOrder() {
-    onView?.(order)
-  }
-
-  function handleKeyDown(event) {
-    if (event.key !== 'Enter' && event.key !== ' ') return
-    event.preventDefault()
-    openOrder()
-  }
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={openOrder}
-      onKeyDown={handleKeyDown}
-      className={`cursor-pointer rounded-xl border px-3 py-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-[#ff5a00]/20 ${
-      isNeedsBill
-        ? 'bg-[#FFF8F8] border-[#FFD6D3]'
-        : 'bg-white border-[#EDF1F5] hover:bg-[#FAFBFC]'
-    }`}>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-center max-[1320px]:grid-cols-1">
-        <div className="flex items-start gap-3 min-w-0">
-          <div
-            className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${leadingIconClass}`}
-            title={!isNeedsBill && paymentMeta ? paymentMeta.label : undefined}
-            aria-label={!isNeedsBill && paymentMeta ? paymentMeta.label : undefined}
-          >
-            <LeadingIcon size={14} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-              <p className="text-[15px] font-black text-[#1F2937] leading-none flex-shrink-0">#{shortId}</p>
-              <span className={`inline-flex max-w-[150px] items-center rounded-full border px-2 py-0.5 text-[11px] font-black leading-none ${contextBadge.cls}`}>
-                <span className="truncate">{contextBadge.label}</span>
-              </span>
-              {isNeedsBill && <RecentStatusPill status="needs_bill" lang={lang} />}
-            </div>
-
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#8EA0BB] min-w-0">
-              <span className="inline-flex items-center gap-1 whitespace-nowrap flex-shrink-0">
-                <Clock size={13} />
-                {timeText}
-              </span>
-              {order.waiter_name && (
-                <span className="font-semibold text-[#63738A] whitespace-normal break-words">· {order.waiter_name}</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-end gap-2 flex-shrink-0 max-[1320px]:flex-row max-[1320px]:justify-between max-[1320px]:items-center">
-          <p className="text-[14px] font-black text-[#111827] tabular-nums whitespace-nowrap">
-            {formatCurrency(getOrderTotal(order))}
-          </p>
-          {isNeedsBill ? (
-            <button
-              type="button"
-              onClick={event => {
-                event.stopPropagation()
-                onPrintBill(order)
-              }}
-              onKeyDown={event => event.stopPropagation()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0F3B2E] text-white text-[12px] font-black hover:bg-[#0A2A20] active:scale-[0.98] transition-all shadow-[0_3px_8px_rgba(15,59,46,0.22)]"
-            >
-              <Printer size={13} />
-              {l.printBill}
-            </button>
-          ) : (
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={event => {
-                    event.stopPropagation()
-                    onDelete(order)
-                  }}
-                  onKeyDown={event => event.stopPropagation()}
-                  disabled={isDeleting}
-                  className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-black transition-colors disabled:opacity-60 ${
-                    confirmDelete
-                      ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'bg-red-50 text-red-600 hover:bg-red-100'
-                  }`}
-                >
-                  {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                  {isDeleting ? l.deleting : confirmDelete ? l.confirmDelete : l.deleteOrder}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-      {deleteError && (
-        <p className="mt-2 rounded-lg bg-red-50 px-2 py-1.5 text-[11px] font-bold text-red-600">
-          {l.deleteFailed}: {deleteError}
-        </p>
-      )}
-    </div>
-  )
-}
-
 const PAYMENT_COLORS = {
   cash:     '#16A34A',
   card:     '#7C3AED',
@@ -818,18 +559,14 @@ function OrderTypePerformanceCard({ rows, lang, loading = false }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
-  const { state, dispatch } = useApp()
+  const { state } = useApp()
   const { profile } = useAuth()
-  const navigate = useNavigate()
   const lang = normalizeDateLang(state.lang || 'ru')
   const l    = L[lang] || L.en
 
   const displayName = profile?.full_name || state.user?.name || 'Admin'
 
   const [period, setPeriod]           = useState('today')
-  const [confirmDeleteOrderId, setConfirmDeleteOrderId] = useState('')
-  const [deletingOrderId, setDeletingOrderId] = useState('')
-  const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
   const [paidHistoryOrders, setPaidHistoryOrders] = useState([])
   const [historyError, setHistoryError] = useState('')
   const [historyLoading, setHistoryLoading] = useState(true)
@@ -838,7 +575,6 @@ export default function AdminDashboard() {
   const [monthlyIncomeLoading, setMonthlyIncomeLoading] = useState(true)
   const [monthlyIncomeError, setMonthlyIncomeError] = useState('')
   const [monthlyIncomeRequestKey, setMonthlyIncomeRequestKey] = useState(0)
-  const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
 
   const dashboardHistoryRange = useMemo(() => getDashboardHistoryRange(period), [period])
   const requestedHistoryRangeKey = dashboardHistoryRangeKey(dashboardHistoryRange)
@@ -1116,77 +852,6 @@ export default function AdminDashboard() {
     return getDashboardBestSelling(periodPaidOrders, menuItemMap)
   }, [periodPaidOrders, menuItemMap])
 
-  // ── Recent orders: action-needed bills first, paid history second ─────────
-  const recentOrderGroups = useMemo(() => {
-    const grouped = groupOrdersBySession([
-      ...dashboardOrders,
-      ...state.orders.filter(order => !isPaidOrder(order)),
-    ])
-      .filter(o => {
-        if (isPaidOrder(o)) return true
-        return isActiveNeedsBillOrder(o, state.tables)
-      })
-      .map(order => ({
-        ...order,
-        _recentActivityAt: getOrderActivityDate(order, state.tables),
-      }))
-      .sort((a, b) => parseInstantDate(b._recentActivityAt || getOrderDate(b) || b.created_at) - parseInstantDate(a._recentActivityAt || getOrderDate(a) || a.created_at))
-
-    const needsBill = grouped.filter(o => isActiveNeedsBillOrder(o, state.tables))
-    const paid = grouped.filter(isPaidOrder)
-    const visibleNeedsBill = needsBill.slice(0, 8)
-    const visiblePaid = paid.slice(0, Math.max(0, 8 - visibleNeedsBill.length))
-
-    return {
-      needsBill: visibleNeedsBill,
-      paid: visiblePaid,
-      paidDateGroups: groupPaidRecentOrders(visiblePaid, lang),
-      needsBillTotal: needsBill.length,
-    }
-  }, [dashboardOrders, state.orders, state.tables, lang])
-
-  const recentOrdersCount = recentOrderGroups.needsBill.length + recentOrderGroups.paid.length
-
-  function getPaymentMeta(order) {
-    const method = (order.payment_method || '').toLowerCase()
-    const map = {
-      cash: { Icon: Wallet, label: l.cash, cls: 'text-green-600' },
-      card: { Icon: CreditCard, label: l.card, cls: 'text-violet-600' },
-      terminal: { Icon: Monitor, label: l.terminal, cls: 'text-blue-600' },
-      loyalty: { Icon: CreditCard, label: lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty', cls: 'text-emerald-600' },
-    }
-    return map[method] || null
-  }
-
-  function printRecentBill(order) {
-    navigate(`/receipt/table/${order.table_id}?print=1`)
-  }
-
-  function viewRecentOrder(order) {
-    navigate(`/receipt/${order.id}`)
-  }
-
-  async function deleteRecentOrder(order) {
-    if (!canDeleteOrder || !order?.id || deletingOrderId) return
-    setDeleteErrorByOrderId(errors => ({ ...errors, [order.id]: '' }))
-
-    setDeletingOrderId(order.id)
-    try {
-      const result = await dispatch({ type: 'DELETE_ORDER', payload: { orderId: order.id } })
-      if (result?.cancelled) return
-      if (result?.error) {
-        setDeleteErrorByOrderId(errors => ({
-          ...errors,
-          [order.id]: result.error.message || String(result.error),
-        }))
-        return
-      }
-      setConfirmDeleteOrderId('')
-    } finally {
-      setDeletingOrderId('')
-    }
-  }
-
   // ── KPI badges ────────────────────────────────────────────────────────────
   function pctBadge(change) {
     if (change === null) return null
@@ -1433,7 +1098,7 @@ export default function AdminDashboard() {
 
         <OrderTypePerformanceCard rows={orderTypePerformance} lang={lang} loading={analyticsLoading} />
 
-        {/* ── Row 3: Sales by Category + Best-Selling + Recent Orders ── */}
+        {/* ── Row 3: Sales by Category + Best-Selling + Busy Hours ── */}
         <div className="grid grid-cols-12 gap-4 mb-4 min-w-0">
 
           {/* Sales by Category */}
@@ -1493,78 +1158,7 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Recent Orders */}
-          <div className="col-span-12 xl:col-span-4 bg-white rounded-[24px] border border-[#E5E7EB] shadow-[0_2px_8px_rgba(15,23,42,0.05)] p-5 min-w-0">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="min-w-0 flex-1">
-                <h3 className="font-black text-[#1F2937] text-xl leading-tight">{l.recentOrders}</h3>
-                <p className="text-sm text-[#8EA0BB] mt-2 leading-snug">{l.recentOrdersSub}</p>
-              </div>
-              <div className="min-w-[76px] max-w-[92px] px-2 h-16 rounded-2xl bg-[#0F3B2E] text-white flex flex-col items-center justify-center shadow-[0_6px_14px_rgba(15,59,46,0.18)] flex-shrink-0">
-                <span className="text-xl font-black leading-none">{recentOrderGroups.needsBillTotal}</span>
-                <span className="text-[9px] font-bold tracking-wide uppercase text-[#C9DCD5] mt-1 text-center leading-tight">{l.needsBill}</span>
-              </div>
-            </div>
-
-            {recentOrdersCount === 0 ? (
-              <p className="text-sm text-[#9CA3AF] text-center py-4">{l.noOrders}</p>
-            ) : (
-              <div className="space-y-4 max-h-[520px] overflow-y-auto pr-0.5">
-                {recentOrderGroups.needsBill.length > 0 && (
-                  <div>
-                    <RecentSectionHeader title={l.needsBillSection} count={recentOrderGroups.needsBill.length} urgent />
-                    <div className="space-y-2.5">
-                    {recentOrderGroups.needsBill.map(order => (
-                      <RecentOrderRow
-                        key={order.id}
-                        order={order}
-                        lang={lang}
-                        paymentMeta={getPaymentMeta(order)}
-                        onPrintBill={printRecentBill}
-                        onView={viewRecentOrder}
-                        canDelete={false}
-                      />
-                    ))}
-                    </div>
-                  </div>
-                )}
-
-                {recentOrderGroups.paid.length > 0 && (
-                  <div>
-                    <RecentSectionHeader title={l.paidSection} count={recentOrderGroups.paid.length} />
-                    <div className="space-y-3">
-                    {recentOrderGroups.paidDateGroups.map(group => (
-                      <div key={group.key} className="space-y-2">
-                        <div className="flex items-center justify-between gap-2 px-1.5 py-0.5 text-[11px] font-black text-[#64748B]">
-                          <span className="uppercase tracking-[0.12em]">{group.label}</span>
-                          <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[#8EA0BB]">{group.orders.length}</span>
-                        </div>
-                        <div className="space-y-2">
-                          {group.orders.map(order => (
-                            <RecentOrderRow
-                              key={order.id}
-                              order={order}
-                              lang={lang}
-                              paymentMeta={getPaymentMeta(order)}
-                              onPrintBill={printRecentBill}
-                              onView={viewRecentOrder}
-                              canDelete={canDeleteOrder}
-                              onDelete={deleteRecentOrder}
-                              confirmDelete={confirmDeleteOrderId === order.id}
-                              isDeleting={deletingOrderId === order.id}
-                              deleteError={deleteErrorByOrderId[order.id]}
-                              showDate={false}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <BusyHoursCard lang={lang} />
         </div>
 
         <section

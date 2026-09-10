@@ -2,6 +2,7 @@ import {
   addRestaurantDays,
   getCafeIncomeForRange,
   getOrderDate,
+  getRestaurantHour,
   getOrderItemCategoryId,
   getOrderPaymentBreakdown,
   getOrderRevenueTotal,
@@ -218,4 +219,15 @@ export function getDashboardStaffPerformance(orders, staffProfiles = []) {
 
 export function formatReadableDateTime(date, locale = 'en-US') {
   return formatDateTime(date)
+}
+
+// Uses the same paid sessions and reporting timestamp as the dashboard KPIs.
+export function getDashboardBusyHours(orders = []) {
+  const hours = Array.from({ length: 12 }, (_, index) => ({ hour: index * 2, count: 0 }))
+  for (const order of orders) {
+    const date = getOrderDate(order)
+    if (!date || !toLocalDateStr(date)) continue
+    hours[Math.floor(getRestaurantHour(date) / 2)].count += 1
+  }
+  return hours
 }

@@ -1,6 +1,6 @@
-# Dashboard, Reports, Profit, and Historical Data
+# Dashboard and Reports
 
-Guide for dashboard analytics, reports, historical snapshots, date ranges, and profit.
+Dashboard reporting guide.
 
 ## Entry points
 
@@ -36,16 +36,17 @@ Guide for dashboard analytics, reports, historical snapshots, date ranges, and p
 
 ## Dashboard presentation
 
+- Recent Orders and receipt/delete controls live in Reports, not Dashboard.
 - Sales by Category shows every category represented by sold items in the selected period.
 - Best-Selling Dishes shows up to ten ranked sold products and may scroll internally.
-- Never fabricate unsold products or empty categories to fill visual space.
+- Never fabricate unsold products or empty categories. Monthly Busy Hours uses migration `192` to return 12 two-hour order-count buckets for the current Tashkent month. It scans one indexed month, returns no order details, and highlights tied peaks.
 - Average Daily Income by Month always shows the latest 12 calendar-month positions, suppresses numeric zero labels, and overlays the `business_settings.average_daily_break_even_income_uzs` target as a red dotted horizontal line. Completed actual months come only from immutable `dashboard_monthly_income_snapshots`; the current month aggregates only completed Tashkent days live from orders.
 - Migration `157` performs the one-time completed-history backfill. Its duplicate-safe daily cron finalizes the previous Tashkent month, so normal Dashboard reads never rescan completed order history for this chart.
 - Monthly averages use total paid cafe income divided by all calendar days. The current month excludes today and divides by completed days through yesterday; day one safely returns zero.
 
 ## Accounting/report separation
 
-- Overview aggregates are lightweight. Detailed order/item rows belong to reports, receipts, and drilldowns.
+- Keep overview aggregates lightweight; order details belong in reports and receipts.
 - Selected-month forecast uses that month's actual/expected operating costs only, not prior-period arrears.
 - Fines are payroll deductions, never cash expenses. Employee meal snapshots are calculated operating costs without payment methods.
 
@@ -55,8 +56,8 @@ Guide for dashboard analytics, reports, historical snapshots, date ranges, and p
 
 - Migrations `187`–`188` add categories and restrict movement to explicitly added (`is_catalog_managed`) ingredients, including archived ones with history. Category/search filters and name/quantity/movement/purchase-amount sorting operate locally without refetching.
 
-- Ten-day income below the monthly chart uses migrations `190`–`191`, `src/components/WeeklyIncomeChart.jsx`, and `src/lib/weeklyIncome.js`. The three periods are 1–10, 11–20, and 21–month end (28/29/30/31). The last period covers month end. Exclude future periods; use completed days. The permission-checked RPC returns the latest 20 periods through the selected month from one indexed scan bounded to eight months of paid totals, excludes today in Tashkent, and includes zero-sale days in denominators. A component-local month/day cache avoids repeat requests. Language changes do not refetch. Tests: `tests/weeklyIncome.test.js`. Apply migration before frontend release.
+- Ten-day income below the monthly chart uses migrations `190`–`191`, `src/components/WeeklyIncomeChart.jsx`, and `src/lib/weeklyIncome.js`. Periods: 1–10, 11–20, 21–month end. The last period covers month end. Exclude future periods; use completed days. The permission-checked RPC returns the latest 20 periods through the selected month from one indexed scan bounded to eight months of paid totals, excludes today in Tashkent, and includes zero-sale days in denominators. Cache by month/day; language changes never refetch. Tests: `tests/weeklyIncome.test.js`. Apply migration before frontend release.
 
-- Ten-day chart hides whole zero-income months locally; zero periods within active months remain. Empty results show an explicit no-income state.
+- Ten-day chart hides whole zero-income months locally; zero periods within active months remain. Show empty state when needed.
 
-- Ten-day month options start at the earliest recorded order month (one-row loader). Each month has a stable distinct bar/border hue and matching pale background.
+- Ten-day month options start at the earliest recorded order month (one-row loader). Month colors are stable.

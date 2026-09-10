@@ -1,0 +1,58 @@
+import React, { useEffect, useState } from 'react'
+import { restaurantTodayStr } from '../lib/analytics'
+import { formatMonthYear } from '../lib/dateFormat'
+import { loadDashboardMonthlyBusyHours } from '../lib/monthlyBusyHours'
+
+const labels = {
+  en: { title: 'Monthly Busy Hours', sub: 'Paid orders in 2-hour periods · Tashkent time', peak: 'Busiest period', orders: 'orders', none: 'No paid orders this month', loading: 'Loading…', error: 'Could not load busy hours', retry: 'Retry' },
+  uz: { title: 'Oylik gavjum soatlar', sub: 'To‘langan buyurtmalar 2 soatlik davrlarda · Toshkent vaqti', peak: 'Eng gavjum davr', orders: 'buyurtma', none: 'Bu oyda to‘langan buyurtmalar yo‘q', loading: 'Yuklanmoqda…', error: 'Gavjum soatlarni yuklab bo‘lmadi', retry: 'Qayta urinish' },
+  ru: { title: 'Часы пик за месяц', sub: 'Оплаченные заказы по 2-часовым периодам · время Ташкента', peak: 'Самый загруженный период', orders: 'заказов', none: 'Нет оплаченных заказов за месяц', loading: 'Загрузка…', error: 'Не удалось загрузить часы пик', retry: 'Повторить' },
+}
+const hourLabel = hour => String(hour).padStart(2, '0') + ':00'
+const rangeLabel = hour => `${hourLabel(hour)}–${hourLabel((hour + 2) % 24)}`
+
+export default function BusyHoursCard({ lang }) {
+  const l = labels[lang] || labels.en
+  const monthStart = restaurantTodayStr().slice(0, 7) + '-01'
+  const [hours, setHours] = useState(null)
+  const [failed, setFailed] = useState(false)
+  const [retry, setRetry] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let cancelled = false
+    setHours(null)
+    setFailed(false)
+    loadDashboardMonthlyBusyHours(monthStart, { signal: controller.signal })
+      .then(rows => { if (!cancelled) setHours(rows) })
+      .catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true; controller.abort() }
+  }, [monthStart, retry])
+
+  const safeHours = hours || []
+  const max = Math.max(0, ...safeHours.map(row => row.count))
+  const peaks = safeHours.filter(row => row.count === max && max > 0)
+
+  return <section aria-busy={hours === null && !failed} className="col-span-12 xl:col-span-4 min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+    <h3 className="mb-2 text-base font-black text-[#1F2937]">{l.title} · {formatMonthYear(monthStart, lang)}</h3>
+    <p className="mb-4 text-xs text-gray-500">{l.sub}</p>
+    {failed ? <p role="alert" className="py-12 text-center text-sm text-red-600">{l.error}<button type="button" className="ml-2 rounded border px-2 py-1" onClick={() => setRetry(value => value + 1)}>{l.retry}</button></p>
+      : hours === null ? <p role="status" className="py-12 text-center text-sm text-gray-500">{l.loading}</p>
+      : max === 0 ? <p className="py-12 text-center text-sm text-gray-500">{l.none}</p>
+      : <>
+        <div className="mb-4 rounded-xl bg-orange-50 p-3 text-sm text-orange-900">
+          <p className="text-xs font-bold">{l.peak} · {max} {l.orders}</p>
+          <p className="mt-1 font-black">{peaks.map(row => rangeLabel(row.hour)).join(', ')}</p>
+        </div>
+        <div role="list" aria-label={l.title} className="grid grid-cols-4 gap-2">
+          {safeHours.map(row => <div key={row.hour} role="listitem" tabIndex={0}
+            aria-label={`${rangeLabel(row.hour)}: ${row.count} ${l.orders}`}
+            className={`rounded-lg border px-1 py-2 text-center focus:outline-none focus:ring-2 focus:ring-orange-500 ${row.count === max ? 'border-orange-500' : 'border-transparent'}`}
+            style={{ backgroundColor: row.count > 0 ? `hsl(24 95% ${96 - row.count / max * 58}%)` : '#F3F4F6', color: row.count / max > 0.55 ? '#FFFFFF' : '#374151' }}>
+            <p className="text-[10px] font-semibold">{rangeLabel(row.hour)}</p>
+            <p className="mt-1 text-sm font-black tabular-nums">{row.count}</p>
+          </div>)}
+        </div>
+      </>}
+  </section>
+}

@@ -183,44 +183,13 @@ test('WaiterTables elapsed label uses server item time before stale client submi
   assert.doesNotMatch(getPreparationCounts, /createdAt: active\.reduce\(\(earliest, o\)/)
 })
 
-test('AdminDashboard recent order date label uses status activity time', () => {
+test('dashboard omits order lists while bill requests preserve activity timestamps', () => {
   const source = readSource('src/pages/AdminDashboard.jsx')
-  const row = functionBody(source, 'RecentOrderRow')
   const appContext = readSource('src/store/AppContext.jsx')
   const reducer = readSource('src/store/ordersReducer.js')
-
-  assert.match(source, /getOrderActivityDate/)
-  assert.match(source, /_recentActivityAt: getOrderActivityDate\(order, state\.tables\)/)
-  assert.match(source, /function recentOrderActivityAt\(order\)/)
-  assert.match(source, /groupPaidRecentOrders\(visiblePaid, lang\)/)
-  assert.match(source, /groupOrdersBySession\(\[\s*\.\.\.dashboardOrders,\s*\.\.\.state\.orders\.filter\(order => !isPaidOrder\(order\)\)/)
-  assert.match(source, /toRestaurantDateStr\(paidAt\)/)
-  assert.match(row, /const activityAt = recentOrderActivityAt\(order\)/)
-  assert.match(row, /showDate \? recentDateTimeLabel\(activityAt, lang\) : recentTimeLabel\(activityAt\)/)
-  assert.match(row, /order\.waiter_name/)
-  assert.match(source, /formatLongDate/)
-  assert.match(source, /formatTime/)
-  assert.match(source, /parseInstantDate/)
-  assert.doesNotMatch(row, /elapsedSince\(getOrderDate\(order\) \|\| order\.created_at\)/)
-  assert.doesNotMatch(row, /formatElapsedSince/)
+  assert.doesNotMatch(source, /RecentOrderRow|recentOrderGroups|recentOrders/)
   assert.match(appContext, /_statusChangedAt: action\._statusChangedAt \|\| new Date\(\)\.toISOString\(\)/)
   assert.match(reducer, /status: 'needs_bill', updated_at: statusChangedAt/)
-})
-
-test('AdminDashboard recent orders show explicit colored order context badges', () => {
-  const source = readSource('src/pages/AdminDashboard.jsx')
-  const row = functionBody(source, 'RecentOrderRow')
-
-  assert.match(source, /function orderContextBadge\(order, lang, fallback\)/)
-  assert.match(source, /orderType === 'delivery'/)
-  assert.match(source, /orderType === 'take_away'/)
-  assert.match(source, /bg-purple-50 text-purple-700 border-purple-200/)
-  assert.match(source, /bg-blue-50 text-blue-700 border-blue-200/)
-  assert.match(source, /bg-orange-50 text-\[#c2410c\] border-orange-200/)
-  assert.match(row, /const contextBadge = orderContextBadge\(order, lang, l\.table\)/)
-  assert.match(row, /contextBadge\.cls/)
-  assert.match(row, /contextBadge\.label/)
-  assert.doesNotMatch(row, /orderTableLabel\(order, lang, l\.table\)/)
 })
 
 test('elapsed labels use timezone-safe instant parsing instead of browser-local timestamp math', () => {
@@ -228,7 +197,6 @@ test('elapsed labels use timezone-safe instant parsing instead of browser-local 
     'src/pages/WaiterTables.jsx',
     'src/pages/CashierTables.jsx',
     'src/pages/CashierBill.jsx',
-    'src/pages/AdminDashboard.jsx',
   ]
 
   for (const file of files) {
@@ -316,6 +284,7 @@ test('AdminDashboard period filter shimmers every range-dependent statistic unti
   assert.match(dashboard, /\{l\.bestSelling\} · \{currentKpiPeriodLabel\}/)
   assert.ok((dashboard.match(/aria-busy=\{analyticsLoading\}/g) || []).length >= 4)
   assert.equal((dashboard.match(/loading=\{analyticsLoading\}/g) || []).length, 4)
+  assert.match(dashboard, /<BusyHoursCard lang=\{lang\} \/>/)
   assert.match(dashboard, /analyticsLoading \? \([\s\S]*<ChartShimmer \/>/)
   assert.match(dashboard, /analyticsLoading \? \([\s\S]*salesByCategory\.length === 0/)
   assert.match(dashboard, /analyticsLoading \? \([\s\S]*bestSelling\.length === 0/)
