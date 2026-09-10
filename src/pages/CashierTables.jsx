@@ -549,7 +549,7 @@ function BillsSection({ title, count, icon: Icon, tone, children }) {
 
   return (
     <section className="mb-8 border-t border-[#E5E7EB] pt-5 first:border-t-0 first:pt-0">
-      <div className="sticky top-0 z-10 -mx-1 mb-3 flex items-center justify-between gap-3 bg-[#FAF7F0]/95 px-1 py-2 backdrop-blur">
+      <div className="sticky top-0 z-10 -mx-5 mb-3 flex items-center justify-between gap-3 border-b border-[#E5E7EB] bg-[#FAF7F0] px-5 py-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className={`w-8 h-8 rounded-xl border flex items-center justify-center flex-shrink-0 ${toneClasses}`}>
             <Icon size={16} />
@@ -996,7 +996,9 @@ export default function CashierTables() {
         </header>
 
         {/* Scrollable content */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-5">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          {/* Keep padding inside the scrollport so sticky headings reach its top edge. */}
+          <div className="p-5">
 
           {/* ── KPI cards ── */}
           <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3 mb-4">
@@ -1157,6 +1159,7 @@ export default function CashierTables() {
             onOpenReceipt={order => navigate(`/receipt/${order.id}`)}
           />
 
+          </div>
         </main>
       </div>
     </div>
