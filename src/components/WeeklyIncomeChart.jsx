@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { hideZeroIncomeMonths, loadDashboardWeeklyIncome } from '../lib/weeklyIncome'
-import { restaurantTodayStr } from '../lib/analytics'
+import { buildIncomeMonthOptions, incomeMonthColors, hideZeroIncomeMonths, loadDashboardWeeklyIncome } from '../lib/weeklyIncome'
+import { loadEarliestOrderDate } from '../lib/db'
+import { restaurantTodayStr, toRestaurantDateStr } from '../lib/analytics'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatMonthYear } from '../lib/dateFormat'
 
@@ -14,11 +15,21 @@ export default function WeeklyIncomeChart({ lang, target = 0 }) {
   const l = labels[lang] || labels.en
   const today = restaurantTodayStr()
   const [month, setMonth] = useState(() => today.slice(0, 7))
+  const [firstMonth, setFirstMonth] = useState(null)
+  const [startFailed, setStartFailed] = useState(false)
   const [result, setResult] = useState(null)
   const [failed, setFailed] = useState(false)
   const [retry, setRetry] = useState(0)
   const cache = useRef(new Map())
   const scrollContainer = useRef(null)
+  useEffect(() => {
+    let cancelled = false
+    setStartFailed(false)
+    loadEarliestOrderDate().then(date => {
+      if (!cancelled) setFirstMonth(date ? toRestaurantDateStr(date).slice(0, 7) : '')
+    }).catch(() => { if (!cancelled) setStartFailed(true) })
+    return () => { cancelled = true }
+  }, [retry])
   const key = month + ':' + today
   useEffect(() => {
     const controller = new AbortController()
@@ -50,13 +61,13 @@ export default function WeeklyIncomeChart({ lang, target = 0 }) {
     let group = monthGroups[monthGroups.length - 1]
     const startsMonth = group?.key !== monthKey
     if (startsMonth) {
-      const alternate = Number(monthKey.slice(5)) % 2 === 0
-      group = { key: monthKey, count: 0, background: alternate ? '#F0FDFA' : '#EFF6FF', border: alternate ? '#0D9488' : '#3B82F6' }
+      group = { key: monthKey, count: 0, ...incomeMonthColors(monthKey) }
       monthGroups.push(group)
     }
     group.count += 1
-    return { ...row, monthStyle: { backgroundColor: group.background, borderLeft: startsMonth ? '2px solid ' + group.border : '2px solid transparent' } }
+    return { ...row, barColor: group.border, monthStyle: { backgroundColor: group.background, borderLeft: startsMonth ? '2px solid ' + group.border : '2px solid transparent' } }
   })
+  const monthOptions = buildIncomeMonthOptions(firstMonth || today.slice(0, 7), today.slice(0, 7))
   const max = Math.max(target * 1.2, ...(rows || []).map(row => row.averageDailyIncome * 1.2), 1)
   return (
     <section aria-busy={!rows && !failed} className="mb-4 min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
@@ -66,12 +77,13 @@ export default function WeeklyIncomeChart({ lang, target = 0 }) {
           <p className="mt-1 text-xs text-gray-500">{l.sub}</p>
         </div>
         <label className="text-xs font-bold text-gray-600">{l.month}
-          <input type="month" value={month} max={today.slice(0, 7)} onChange={event => {
-            if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value) && event.target.value <= today.slice(0, 7)) setMonth(event.target.value)
-          }} className="ml-2 rounded-lg border border-gray-200 p-2" />
+          <select disabled={firstMonth === null || startFailed} value={month} onChange={event => setMonth(event.target.value)}
+            className="ml-2 rounded-lg border border-gray-200 bg-white p-2">
+            {monthOptions.map(value => <option key={value} value={value}>{formatMonthYear(value, lang)}</option>)}
+          </select>
         </label>
       </div>
-      {failed ? <div role="alert" className="text-sm text-red-700">{l.error} <button type="button" onClick={() => setRetry(value => value + 1)} className="ml-3 rounded border px-3 py-1">{l.retry}</button></div>
+      {failed || startFailed ? <div role="alert" className="text-sm text-red-700">{l.error} <button type="button" onClick={() => setRetry(value => value + 1)} className="ml-3 rounded border px-3 py-1">{l.retry}</button></div>
         : !rows ? <p role="status" className="py-16 text-center text-sm text-gray-500">{l.loading}</p>
         : rows.length === 0 ? <p className="py-16 text-center text-sm text-gray-500">{l.empty}</p>
         : <div ref={scrollContainer} className="overflow-x-auto">
@@ -90,13 +102,13 @@ export default function WeeklyIncomeChart({ lang, target = 0 }) {
                 aria-label={row.weekStart + ' – ' + row.weekEnd + ': ' + formatCurrency(row.averageDailyIncome)}
                 title={l.total + ': ' + formatCurrency(row.totalIncome) + ' · ' + row.dayCount + ' ' + l.days}
                 className="flex h-full min-w-0 flex-1 items-end px-2" style={row.monthStyle}>
-                <div className={'w-full rounded-t-lg ' + (row.dayCount === 0 ? 'bg-gray-100' : 'bg-teal-700')}
-                  style={{ height: Math.max(1, row.averageDailyIncome / max * 100) + '%' }} />
+                <div className="w-full rounded-t-lg"
+                  style={{ backgroundColor: row.dayCount === 0 ? '#E5E7EB' : row.barColor, height: Math.max(1, row.averageDailyIncome / max * 100) + '%' }} />
               </div>)}
             </div>
             <div className="flex">{chartRows.map(row => <div key={row.weekStart} className="min-w-0 flex-1 px-2 pb-3 pt-2 text-center text-xs text-gray-500" style={row.monthStyle}>
               <p>{Number(row.weekStart.slice(8))}–{Number(row.weekEnd.slice(8))}</p>
-              <p className="mt-1 font-bold text-teal-700">{row.averageDailyIncome > 0 ? formatCurrency(row.averageDailyIncome) : '—'}</p>
+              <p className="mt-1 font-bold" style={{ color: row.barColor }}>{row.averageDailyIncome > 0 ? formatCurrency(row.averageDailyIncome) : '—'}</p>
               <p className="mt-1 text-[10px]">{row.dayCount} {l.days}</p>
             </div>)}</div>
           </div>

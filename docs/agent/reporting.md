@@ -1,6 +1,6 @@
 # Dashboard, Reports, Profit, and Historical Data
 
-Read this guide for dashboard analytics, reports, historical drilldowns, immutable snapshots, date ranges, profit, and monthly/all-accounting views.
+Guide for dashboard analytics, reports, historical snapshots, date ranges, and profit.
 
 ## Entry points
 
@@ -55,6 +55,8 @@ Read this guide for dashboard analytics, reports, historical drilldowns, immutab
 
 - Migrations `187`–`188` add categories and restrict movement to explicitly added (`is_catalog_managed`) ingredients, including archived ones with history. Category/search filters and name/quantity/movement/purchase-amount sorting operate locally without refetching.
 
-- Ten-day income below the monthly chart uses migrations `190`–`191`, `src/components/WeeklyIncomeChart.jsx`, and `src/lib/weeklyIncome.js`. The three periods are 1–10, 11–20, and 21–month end (28/29/30/31). The final period includes every remaining day. Future periods are excluded; the current period uses completed days. The permission-checked RPC returns the latest 20 periods through the selected month from one indexed scan bounded to eight months of paid totals, excludes today in Tashkent, and includes zero-sale days in denominators. A component-local month/day cache avoids repeat requests. Language changes do not refetch. Tests: `tests/weeklyIncome.test.js`. Apply migration before frontend release.
+- Ten-day income below the monthly chart uses migrations `190`–`191`, `src/components/WeeklyIncomeChart.jsx`, and `src/lib/weeklyIncome.js`. The three periods are 1–10, 11–20, and 21–month end (28/29/30/31). The last period covers month end. Exclude future periods; use completed days. The permission-checked RPC returns the latest 20 periods through the selected month from one indexed scan bounded to eight months of paid totals, excludes today in Tashkent, and includes zero-sale days in denominators. A component-local month/day cache avoids repeat requests. Language changes do not refetch. Tests: `tests/weeklyIncome.test.js`. Apply migration before frontend release.
 
 - Ten-day chart hides whole zero-income months locally; zero periods within active months remain. Empty results show an explicit no-income state.
+
+- Ten-day month options start at the earliest recorded order month (one-row loader). Each month has a stable distinct bar/border hue and matching pale background.

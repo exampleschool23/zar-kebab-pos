@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { hideZeroIncomeMonths, loadDashboardWeeklyIncome } from '../src/lib/weeklyIncome.js'
+import { buildIncomeMonthOptions, incomeMonthColors, hideZeroIncomeMonths, loadDashboardWeeklyIncome } from '../src/lib/weeklyIncome.js'
 test('weekly loader is bounded by selected ending month and normalizes money', async () => {
   const rows = await loadDashboardWeeklyIncome('2026-02-01', { dbClient: { rpc: async (name, args) => {
     assert.equal(name, 'get_dashboard_recent_period_income')
@@ -26,4 +26,14 @@ test('hides wholly zero-income months but preserves zero periods in active month
   assert.deepEqual(hideZeroIncomeMonths(rows.slice(0, 2)), [])
   assert.deepEqual(hideZeroIncomeMonths([]), [])
   assert.equal(rows.length, 5)
+})
+
+test('month options stop at cafe opening month across year boundaries', () => {
+  assert.deepEqual(buildIncomeMonthOptions('2025-11', '2026-02'), ['2026-02', '2026-01', '2025-12', '2025-11'])
+  assert.deepEqual(buildIncomeMonthOptions('2026-06', '2026-06'), ['2026-06'])
+})
+test('month colors remain stable with distinct colors across the visible range', () => {
+  const months = buildIncomeMonthOptions('2025-09', '2026-09')
+  assert.equal(new Set(months.map(month => incomeMonthColors(month).border)).size, months.length)
+  assert.deepEqual(incomeMonthColors('2026-09'), incomeMonthColors('2026-09'))
 })

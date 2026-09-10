@@ -20,3 +20,19 @@ export function hideZeroIncomeMonths(rows = []) {
   const activeMonths = new Set(rows.filter(row => row.totalIncome > 0).map(row => row.weekStart.slice(0, 7)))
   return rows.filter(row => activeMonths.has(row.weekStart.slice(0, 7)))
 }
+
+export function buildIncomeMonthOptions(firstMonth, currentMonth) {
+  const result = []
+  const [firstYear, firstNumber] = firstMonth.split('-').map(Number)
+  const [year, number] = currentMonth.split('-').map(Number)
+  for (let index = year * 12 + number - 1; index >= firstYear * 12 + firstNumber - 1; index -= 1) {
+    result.push(Math.floor(index / 12) + '-' + String(index % 12 + 1).padStart(2, '0'))
+  }
+  return result
+}
+
+export function incomeMonthColors(month) {
+  const [year, number] = month.split('-').map(Number)
+  const hue = Math.round(((year * 12 + number - 1) * 137.508) % 360)
+  return { background: 'hsl(' + hue + ' 65% 96%)', border: 'hsl(' + hue + ' 65% 32%)' }
+}
