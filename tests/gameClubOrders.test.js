@@ -115,6 +115,8 @@ test('daily Telegram loader classifies both Game Club price modes once and retai
       order(...args) { query.order = args; return this },
       range(from, to) { query.range = [from, to]; return this },
       eq(...args) { query.filters.push(['eq', ...args]); return this },
+      neq(...args) { query.filters.push(['neq', ...args]); return this },
+      in(...args) { query.filters.push(['in', ...args]); return this },
       gte(...args) { query.filters.push(['gte', ...args]); return this },
       lt(...args) { query.filters.push(['lt', ...args]); return this },
       maybeSingle() { return this },

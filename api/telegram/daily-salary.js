@@ -773,8 +773,9 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
       .maybeSingle(),
     supabase
       .from('orders')
-      .select('id, table_id, table_name, order_type, created_at, subtotal, service_fee, total, status, payment_status, items:order_items(name, quantity, price, unit_price, status)')
+      .select('id, table_id, table_name, order_type, created_at, subtotal, service_fee, total, status, payment_status, items:order_items(menu_item_id, name, quantity, price, unit_price, status, selected_options, notes)')
       .eq('payment_status', 'unpaid')
+      .neq('status', 'cancelled')
       .order('created_at', { ascending: true }),
   ])
   if (ratesResult.error) throw ratesResult.error
@@ -784,6 +785,18 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
   if (settingsResult.error) throw settingsResult.error
   if (employeeMealResult.error) throw employeeMealResult.error
   if (openOrdersResult.error) throw openOrdersResult.error
+  const openOrders = openOrdersResult.data || []
+  const menuIds = [...new Set(openOrders.flatMap(order => (order.items || [])
+    .filter(item => item.status !== 'cancelled').map(item => item.menu_item_id)).filter(Boolean))]
+  if (menuIds.length > 0) {
+    const { data: menuItems, error } = await supabase.from('menu_items')
+      .select('id, name_ru, option_groups').in('id', menuIds)
+    if (error) throw error
+    const menuById = new Map((menuItems || []).map(item => [item.id, item]))
+    for (const order of openOrders) {
+      order.items = (order.items || []).map(item => ({ ...item, menu_item: menuById.get(item.menu_item_id) }))
+    }
+  }
   if (!employeeMealResult.data) throw new Error(`Employee meal expense was not finalized for ${businessDate}`)
 
   const salaryProfiles = eligibleProfiles.map(profile => ({
@@ -843,7 +856,7 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
   })
   return {
     ...summary,
-    openOrders: openOrdersResult.data || [],
+    openOrders,
   }
 }
 

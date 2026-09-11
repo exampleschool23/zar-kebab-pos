@@ -31,8 +31,45 @@ test('Investor report shows a clear state when all orders are closed', () => {
 
 test('daily report queries current unpaid non-cancelled orders without a business-date filter', () => {
   const source = fs.readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
-  assert.match(source, /select\('id, table_id, table_name, order_type, created_at, subtotal, service_fee, total, status, payment_status, items:order_items\(name, quantity, price, unit_price, status\)'\)[\s\S]*?\.eq\('payment_status', 'unpaid'\)[\s\S]*?\.order\('created_at', \{ ascending: true \}\)/)
-  assert.match(source, /openOrders: openOrdersResult\.data \|\| \[\]/)
+  assert.match(source, /select\('id, table_id, table_name, order_type, created_at, subtotal, service_fee, total, status, payment_status, items:order_items\(menu_item_id, name, quantity, price, unit_price, status, selected_options, notes\)'\)[\s\S]*?\.eq\('payment_status', 'unpaid'\)\s*\.neq\('status', 'cancelled'\)\s*\.order\('created_at', \{ ascending: true \}\)/)
+  assert.match(source, /const openOrders = openOrdersResult\.data \|\| \[\]/)
   assert.match(source, /kind: 'openOrders'[\s\S]*buildOpenOrdersReportPng\(summary\.openOrders\)/)
   assert.match(source, /photos\.length > 1/)
+})
+
+
+test('open report excludes cancelled and paid orders and cancelled items', () => {
+  const svg = buildOpenOrdersReportSvg([
+    { id: 'cancel', status: 'cancelled', payment_status: 'unpaid' },
+    { id: 'paid', status: 'served', payment_status: 'paid' },
+    { id: 'void', payment_status: 'cancelled' },
+    { id: 'active', status: 'delivered', payment_status: 'unpaid', items: [
+      { name: 'Удалённая позиция', status: 'cancelled', quantity: 1 },
+      { name: 'Чай', quantity: 1 },
+    ] },
+  ])
+  assert.match(svg, /НЕЗАКРЫТЫЕ ЗАКАЗЫ · 1/)
+  assert.match(svg, /Доставлен/)
+  assert.doesNotMatch(svg, /CANCEL|PAID|VOID|Удалённая позиция|cancelled/)
+})
+
+test('open report localizes saved place labels and catalog item variants', () => {
+  const svg = buildOpenOrdersReportSvg([
+    { table_name: 'Stol 3', items: [{ name: 'Osh Seti', quantity: 2, price: 40000,
+      selected_options: { size: 'large' }, menu_item: { name_ru: 'Сет с пловом', option_groups: [
+        { id: 'size', options: [{ id: 'large', label_ru: 'Большой' }] },
+      ] } }] },
+    { table_name: 'Take Away', order_type: 'take_away' },
+    { table_name: 'Delivery', order_type: 'delivery' },
+    { table_name: 'Game Club', order_type: 'game_club' },
+    { table_name: 'Table 9' },
+  ])
+  assert.match(svg, /Стол 3/)
+  assert.match(svg, /Стол 9/)
+  assert.match(svg, /Заказ с собой/)
+  assert.match(svg, /Доставка/)
+  assert.match(svg, /Игровой клуб/)
+  assert.match(svg, /2 × Сет с пловом · Большой/)
+  assert.match(svg, /80.000 UZS/)
+  assert.doesNotMatch(svg, /Stol|Table|Take Away|Delivery|Game Club|Osh Seti/)
 })

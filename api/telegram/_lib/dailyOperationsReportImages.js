@@ -1,4 +1,6 @@
 import sharp from 'sharp'
+import { inferOrderType, orderTypeLabel } from '../../../src/lib/orderTypes.js'
+import { getRussianOrderItemDisplayName } from './orderStatusMessages.js'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -215,19 +217,19 @@ export function buildDailyIngredientConsumptionReportSvg(summary = {}, date = ''
 }
 
 function openOrderStatusLabel(status) {
-  return ({ sent_to_kitchen: 'На кухне', preparing: 'Готовится', ready: 'Готов', served: 'Подан', needs_bill: 'Нужен счёт', new: 'Новый' })[status]
-    || String(status || 'Открыт')
+  return ({ sent_to_kitchen: 'На кухне', preparing: 'Готовится', ready: 'Готов', served: 'Подан', needs_bill: 'Нужен счёт', new: 'Новый', delivered: 'Доставлен' })[status]
+    || 'Открыт'
 }
 
 function openOrderPlace(order) {
-  if (order?.table_name) return order.table_name
-  return ({ delivery: 'Доставка', take_away: 'С собой', game_club: 'Игровой клуб' })[order?.order_type]
-    || order?.order_type
-    || 'Заказ'
+  const type = inferOrderType(order)
+  if (type !== 'dine_in') return orderTypeLabel(type, 'ru')
+  return String(order?.table_name || '').replace(/^(?:stol|table)\s*(?=\d)/i, 'Стол ') || 'В зале'
 }
 
 export function buildOpenOrdersReportSvg(orders = []) {
-  const normalized = (orders || []).map(order => ({
+  const normalized = (orders || []).filter(order => order && order.status !== 'cancelled'
+    && !['paid', 'cancelled'].includes(order.payment_status)).map(order => ({
     ...order,
     items: (order?.items || []).filter(item => item?.status !== 'cancelled'),
   }))
@@ -243,7 +245,7 @@ export function buildOpenOrdersReportSvg(orders = []) {
       const rowY = cursorY
       cursorY += 48
       const itemTotal = getOrderItemUnitPrice(item) * Math.max(0, Number(item?.quantity) || 0)
-      return `<text x="112" y="${rowY}" font-size="20" fill="#4B5563">${escapeSvg(`${Number(item?.quantity) || 0} × ${item?.name || 'Без названия'}`)}</text>
+      return `<text x="112" y="${rowY}" font-size="20" fill="#4B5563">${escapeSvg(`${Number(item?.quantity) || 0} × ${getRussianOrderItemDisplayName(item, item?.menu_item) || 'Без названия'}`)}</text>
         <text x="1086" y="${rowY}" text-anchor="end" font-size="20" font-weight="700" fill="#374151">${item?.quantity ? escapeSvg(formatCurrency(itemTotal)) : ''}</text>
         ${itemIndex < itemRows.length - 1 ? `<line x1="112" y1="${rowY + 15}" x2="1086" y2="${rowY + 15}" stroke="#F3F4F6"/>` : ''}`
     }).join('')

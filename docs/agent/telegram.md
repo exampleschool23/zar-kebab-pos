@@ -61,7 +61,7 @@
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Order deletes require a reason popup; migration `184` saves it in Investor alerts. Alerts snapshot order, total, actor, and tenders. Payment corrections also notify Investor.
 - Cash-expense alerts are text. Daily Bazaar sends one localized PNG and caption; never duplicate it with a text receipt.
-- Daily Investor album: financial/payroll covers yesterday; Bazaar covers two days ago; a separate live image lists every unpaid order at send time with table/type, id, creation time, status, total, and non-cancelled items with quantities and amounts. Tech Card consumption is separate. The open-order warning is not restricted to the report date.
+- Daily Investor album: financial/payroll covers yesterday; Bazaar covers two days ago; a live image lists unpaid, non-cancelled orders with place, id, time, status, total, and non-cancelled items/quantities/amounts. Tech Card consumption is separate. Use Russian places/statuses and catalog dish/variant names (saved-name fallback). Renderer excludes paid/cancelled orders too. No report-date filter.
 - Bazaar PNGs group numbered items by saved Russian category with paid/normal prices and signed variance (red above, green below), plus total variance. Missing normal prices stay unset; rows never truncate.
 - Financial and Daily Bazaar delivery is image-only: if either renderer fails, send no text fallback and leave the claimed report rows retryable. A partial retry may send only the missing PNG without duplicating the photo already recorded as sent.
 - Ingredient images use immutable paid-sale recipe snapshots and count missing coverage.
