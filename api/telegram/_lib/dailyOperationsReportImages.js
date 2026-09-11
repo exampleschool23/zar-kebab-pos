@@ -3,8 +3,9 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { formatLongDate } from '../../../src/lib/dateFormat.js'
+import { formatLongDate, formatTime } from '../../../src/lib/dateFormat.js'
 import { formatCurrency } from '../../../src/lib/formatCurrency.js'
+import { getOrderItemUnitPrice } from '../../../src/lib/priceModes.js'
 import {
   BAZAAR_CATEGORIES,
   bazaarCategoryLabel,
@@ -213,6 +214,62 @@ export function buildDailyIngredientConsumptionReportSvg(summary = {}, date = ''
   })
 }
 
+function openOrderStatusLabel(status) {
+  return ({ sent_to_kitchen: 'На кухне', preparing: 'Готовится', ready: 'Готов', served: 'Подан', needs_bill: 'Нужен счёт', new: 'Новый' })[status]
+    || String(status || 'Открыт')
+}
+
+function openOrderPlace(order) {
+  if (order?.table_name) return order.table_name
+  return ({ delivery: 'Доставка', take_away: 'С собой', game_club: 'Игровой клуб' })[order?.order_type]
+    || order?.order_type
+    || 'Заказ'
+}
+
+export function buildOpenOrdersReportSvg(orders = []) {
+  const normalized = (orders || []).map(order => ({
+    ...order,
+    items: (order?.items || []).filter(item => item?.status !== 'cancelled'),
+  }))
+  const contentHeight = normalized.reduce((height, order) => height + 104 + Math.max(order.items.length, 1) * 48, 0)
+  const height = 270 + Math.max(contentHeight, 120)
+  let cursorY = 192
+  const orderMarkup = normalized.length > 0 ? normalized.map((order, orderIndex) => {
+    const orderY = cursorY
+    const id = String(order?.id || '').slice(-6).toUpperCase()
+    const itemRows = order.items.length > 0 ? order.items : [{ name: 'Нет позиций', quantity: 0 }]
+    cursorY += 96
+    const items = itemRows.map((item, itemIndex) => {
+      const rowY = cursorY
+      cursorY += 48
+      const itemTotal = getOrderItemUnitPrice(item) * Math.max(0, Number(item?.quantity) || 0)
+      return `<text x="112" y="${rowY}" font-size="20" fill="#4B5563">${escapeSvg(`${Number(item?.quantity) || 0} × ${item?.name || 'Без названия'}`)}</text>
+        <text x="1086" y="${rowY}" text-anchor="end" font-size="20" font-weight="700" fill="#374151">${item?.quantity ? escapeSvg(formatCurrency(itemTotal)) : ''}</text>
+        ${itemIndex < itemRows.length - 1 ? `<line x1="112" y1="${rowY + 15}" x2="1086" y2="${rowY + 15}" stroke="#F3F4F6"/>` : ''}`
+    }).join('')
+    cursorY += 8
+    return `<g>
+      <rect x="64" y="${orderY - 32}" width="1072" height="${88 + itemRows.length * 48}" rx="22" fill="${orderIndex % 2 ? '#FFF7ED' : '#FFFBEB'}" stroke="#FED7AA"/>
+      <text x="92" y="${orderY + 8}" font-size="25" font-weight="800" fill="#9A3412">${escapeSvg(`${orderIndex + 1}. ${openOrderPlace(order)} · #${id}`)}</text>
+      <text x="1090" y="${orderY + 8}" text-anchor="end" font-size="25" font-weight="800" fill="#9A3412">${escapeSvg(formatCurrency(order?.total))}</text>
+      <text x="92" y="${orderY + 40}" font-size="19" font-weight="600" fill="#C2410C">${escapeSvg(`${formatTime(order?.created_at, '')} · ${openOrderStatusLabel(order?.status)}`)}</text>
+      ${items}
+    </g>`
+  }).join('') : '<text x="600" y="246" text-anchor="middle" font-size="30" font-weight="700" fill="#15803D">Все заказы закрыты</text>'
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+  <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${height}" viewBox="0 0 ${WIDTH} ${height}">
+    <rect width="${WIDTH}" height="${height}" rx="48" fill="#FFF7ED"/>
+    <rect x="28" y="28" width="1144" height="${height - 56}" rx="38" fill="#FFFFFF"/>
+    <g font-family="Noto Sans">
+      <circle cx="92" cy="91" r="34" fill="#FFEDD5"/><text x="92" y="102" text-anchor="middle" font-size="32">!</text>
+      <text x="146" y="86" font-size="34" font-weight="800" fill="#7C2D12">НЕЗАКРЫТЫЕ ЗАКАЗЫ · ${normalized.length}</text>
+      <text x="146" y="121" font-size="21" fill="#9A3412">Состояние на момент отправки отчёта · время Ташкента</text>
+      ${orderMarkup}
+    </g>
+  </svg>`
+}
+
 export function buildDailyBazaarReportCaption(date) {
   return `🧺 <b>Ежедневный базар</b>\n📅 ${escapeSvg(formatLongDate(date, 'ru', date))}`
 }
@@ -237,4 +294,9 @@ export async function buildDailyBazaarReportPng(purchases, date, language = 'ru'
 export async function buildDailyIngredientConsumptionReportPng(summary, date) {
   configureFonts()
   return sharp(Buffer.from(buildDailyIngredientConsumptionReportSvg(summary, date))).png({ compressionLevel: 9 }).toBuffer()
+}
+
+export async function buildOpenOrdersReportPng(orders) {
+  configureFonts()
+  return sharp(Buffer.from(buildOpenOrdersReportSvg(orders))).png({ compressionLevel: 9 }).toBuffer()
 }

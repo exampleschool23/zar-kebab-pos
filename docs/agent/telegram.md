@@ -57,11 +57,11 @@
 ## Investor notifications
 
 - Employee lifecycle changes queue immutable Russian Investor events with employee, date, and actor snapshots.
-- Ingredient create/edit/archive/restore alerts (`189`) snapshot before/after values and actor. Unchanged saves, purchase metadata, imports, and history stay silent. The cron-authenticated `ingredient-events` task sends to `salary_events`; unknown sends stay held.
+- Ingredient changes (`189`) snapshot before/after values and actor. Unchanged saves and imports stay silent. The `ingredient-events` task sends to `salary_events`; unknown sends stay held.
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Order deletes require a reason popup; migration `184` saves it in Investor alerts. Alerts snapshot order, total, actor, and tenders. Payment corrections also notify Investor.
-- Manual cash-expense alerts remain localized text. A new Daily Bazaar purchase is sent as one localized PNG receipt with a short photo caption containing amount, date, category, optional description, creator, and the recorded monthly total; do not also send the numbered text receipt.
-- Daily Investor images: financial/payroll covers yesterday in Tashkent; Daily Bazaar covers two days ago. Send both as one album; Tech Card consumption is a separate photo.
+- Cash-expense alerts are text. Daily Bazaar sends one localized PNG and caption; never duplicate it with a text receipt.
+- Daily Investor album: financial/payroll covers yesterday; Bazaar covers two days ago; a separate live image lists every unpaid order at send time with table/type, id, creation time, status, total, and non-cancelled items with quantities and amounts. Tech Card consumption is separate. The open-order warning is not restricted to the report date.
 - Bazaar PNGs group numbered items by saved Russian category with paid/normal prices and signed variance (red above, green below), plus total variance. Missing normal prices stay unset; rows never truncate.
 - Financial and Daily Bazaar delivery is image-only: if either renderer fails, send no text fallback and leave the claimed report rows retryable. A partial retry may send only the missing PNG without duplicating the photo already recorded as sent.
 - Ingredient images use immutable paid-sale recipe snapshots and count missing coverage.

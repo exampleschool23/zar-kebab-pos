@@ -734,7 +734,7 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
   ))
   const profileIds = eligibleProfiles.map(profile => profile.id)
   const emptyRelatedResult = { data: [], error: null }
-  const [ratesResult, absencesResult, salesResult, monthlySalesResult, settingsResult, employeeMealResult] = await Promise.all([
+  const [ratesResult, absencesResult, salesResult, monthlySalesResult, settingsResult, employeeMealResult, openOrdersResult] = await Promise.all([
     profileIds.length > 0
       ? loadSalaryRows(() => supabase
           .from('employee_salary_rates')
@@ -771,6 +771,11 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
       .select('business_date, average_daily_amount, present_employee_count, total_amount')
       .eq('business_date', businessDate)
       .maybeSingle(),
+    supabase
+      .from('orders')
+      .select('id, table_id, table_name, order_type, created_at, subtotal, service_fee, total, status, payment_status, items:order_items(name, quantity, price, unit_price, status)')
+      .eq('payment_status', 'unpaid')
+      .order('created_at', { ascending: true }),
   ])
   if (ratesResult.error) throw ratesResult.error
   if (absencesResult.error) throw absencesResult.error
@@ -778,6 +783,7 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
   if (monthlySalesResult.error) throw monthlySalesResult.error
   if (settingsResult.error) throw settingsResult.error
   if (employeeMealResult.error) throw employeeMealResult.error
+  if (openOrdersResult.error) throw openOrdersResult.error
   if (!employeeMealResult.data) throw new Error(`Employee meal expense was not finalized for ${businessDate}`)
 
   const salaryProfiles = eligibleProfiles.map(profile => ({
@@ -819,7 +825,7 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
     : null
   const dailyRent = allocateMonthlySalaryToDate(settingsResult.data?.monthly_rent_uzs, businessDate)
   const dailyUtilities = allocateMonthlySalaryToDate(settingsResult.data?.monthly_utilities_uzs, businessDate)
-  return getDailyPayrollGroupSummary(salaryProfiles, kpiResults, businessDate, {
+  const summary = getDailyPayrollGroupSummary(salaryProfiles, kpiResults, businessDate, {
     cafeIncome,
     cashIncome: paymentIncome.cash,
     terminalIncome: paymentIncome.terminal,
@@ -835,6 +841,10 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
     employeeMealPerEmployee: employeeMealResult.data.average_daily_amount,
     employeeMealPresentEmployeeCount: employeeMealResult.data.present_employee_count,
   })
+  return {
+    ...summary,
+    openOrders: openOrdersResult.data || [],
+  }
 }
 
 async function claimDailyPayrollGroupDelivery(supabase, businessDate) {
@@ -992,6 +1002,12 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
           ? operationsModule.buildDailyInvestorReportsCaption(businessDate, bazaarDate)
           : payrollModule.buildDailyPayrollGroupReportCaption(businessDate),
       })
+      photos.push({
+        kind: 'openOrders',
+        photo: await operationsModule.buildOpenOrdersReportPng(summary.openOrders),
+        filename: `zar-kebab-open-orders-${businessDate}.png`,
+        caption: '',
+      })
     }
     if (bazaarDelivery) {
       photos.push({
@@ -1004,7 +1020,7 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
       })
     }
 
-    if (photos.length === 2) {
+    if (photos.length > 1) {
       const response = await sendTelegramMediaGroup(target.chatId, photos)
       telegramMessageIds = getTelegramMediaGroupMessageIds(response, photos.length)
     } else {
@@ -1020,7 +1036,7 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
           target,
           telegramMessageIds[index]
         )
-      } else {
+      } else if (photos[index].kind === 'bazaar') {
         await markDailyBazaarDeliverySent(
           supabase,
           bazaarDate,
@@ -1030,7 +1046,7 @@ async function sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults) 
       }
     }
 
-    const album = photos.length === 2
+    const album = photos.length > 1
     return {
       payroll: payrollDelivery
         ? { businessDate, status: 'sent', format: 'photo', album }
