@@ -5,8 +5,8 @@ import {
 } from 'lucide-react'
 import { getBrandLogo } from '../lib/brandLogo'
 
-const PHONE_DISPLAY = '+998 90 509-55-45'
-const PHONE_HREF = 'tel:+998905095545'
+const PHONE_DISPLAY = '+998 91-509-55-45'
+const PHONE_HREF = 'tel:+998915095545'
 const INSTAGRAM_HREF = 'https://www.instagram.com/zarkebab'
 
 const heroImages = [

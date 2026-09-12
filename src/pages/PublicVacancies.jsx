@@ -7,7 +7,7 @@ import { getBrandLogo } from '../lib/brandLogo'
 import { useApp } from '../store/AppContext'
 
 const TELEGRAM_URL = 'https://t.me/zarkebab_managerr'
-const PHONE_HREF = 'tel:+998905095545'
+const PHONE_HREF = 'tel:+998915095545'
 
 const COPY = {
   uz: {

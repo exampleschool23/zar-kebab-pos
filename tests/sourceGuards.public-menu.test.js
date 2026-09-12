@@ -10,7 +10,7 @@ test('Catering public page is routed and has Russian SEO and contact CTAs', () =
   assert.match(app, /path="\/catering"/)
   assert.match(page, /Кейтеринг и корпоративное питание от Zar Kebab/)
   assert.match(page, /Кейтеринг и корпоративное питание в Ташкенте \| Zar Kebab/)
-  assert.match(page, /tel:\+998905095545/)
+  assert.match(page, /tel:\+998915095545/)
   assert.match(page, /https:\/\/www\.instagram\.com\/zarkebab/)
   assert.match(page, /Ташкент, Матбуотчилар, 17/)
   assert.match(page, /кейтеринг Ташкент, корпоративное питание Ташкент/)

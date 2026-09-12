@@ -261,7 +261,7 @@ test('PublicMenu exposes public contact actions', () => {
 
   assert.match(publicMenu, /const PUBLIC_CONTACTS = \{/)
   assert.match(publicMenu, /https:\/\/t\.me\/zarkebab/)
-  assert.match(publicMenu, /tel:\+998905095545/)
+  assert.match(publicMenu, /tel:\+998915095545/)
   assert.match(publicMenu, /https:\/\/www\.instagram\.com\/zarkebab/)
   assert.match(publicMenu, /aria-label=\{PUBLIC_CONTACTS\.telegram\.label\}/)
   assert.match(publicMenu, /<Send size=\{16\}/)

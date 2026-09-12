@@ -32,8 +32,8 @@ const PUBLIC_CONTACTS = {
     href: 'https://t.me/zarkebab',
   },
   phone: {
-    label: '+998 90 509-55-45',
-    href: 'tel:+998905095545',
+    label: '+998 91-509-55-45',
+    href: 'tel:+998915095545',
   },
   instagram: {
     label: '@zarkebab',
@@ -49,19 +49,19 @@ const PUBLIC_MENU_SEO = {
   uz: {
     title: 'Zar Kebab — O‘zbek, Uyg‘ur va Turk restorani',
     heading: 'Zar Kebab — Toshkentdagi O‘zbek, Uyg‘ur va Turk restorani',
-    description: 'Nonushta · Tushlik · Kechki ovqat. Zar Kebab — Toshkentdagi O‘zbek, Uyg‘ur va Turk restorani. Menyu · Joy band qilish · Aksiyalar · Aloqa. +998 90 509-55-45. Har kuni 08:00 dan 01:00 gacha.',
+    description: 'Nonushta · Tushlik · Kechki ovqat. Zar Kebab — Toshkentdagi O‘zbek, Uyg‘ur va Turk restorani. Menyu · Joy band qilish · Aksiyalar · Aloqa. +998 91-509-55-45. Har kuni 08:00 dan 01:00 gacha.',
     locale: 'uz_UZ',
   },
   ru: {
     title: 'Zar Kebab — узбекская, уйгурская и турецкая кухня',
     heading: 'Zar Kebab — ресторан узбекской, уйгурской и турецкой кухни в Ташкенте',
-    description: 'Завтрак · Обед · Ужин. Zar Kebab — узбекская, уйгурская и турецкая кухня в Ташкенте. Меню · Бронирование · Акции · Контакты. +998 90 509-55-45. Ежедневно с 08:00 до 01:00.',
+    description: 'Завтрак · Обед · Ужин. Zar Kebab — узбекская, уйгурская и турецкая кухня в Ташкенте. Меню · Бронирование · Акции · Контакты. +998 91-509-55-45. Ежедневно с 08:00 до 01:00.',
     locale: 'ru_RU',
   },
   en: {
     title: 'Zar Kebab — Uzbek, Uyghur & Turkish restaurant',
     heading: 'Zar Kebab — Uzbek, Uyghur & Turkish restaurant in Tashkent',
-    description: 'Breakfast · Lunch · Dinner. Zar Kebab — Uzbek, Uyghur and Turkish restaurant in Tashkent. Menu · Reservations · Promotions · Contacts. +998 90 509-55-45. Open daily from 08:00 to 01:00.',
+    description: 'Breakfast · Lunch · Dinner. Zar Kebab — Uzbek, Uyghur and Turkish restaurant in Tashkent. Menu · Reservations · Promotions · Contacts. +998 91-509-55-45. Open daily from 08:00 to 01:00.',
     locale: 'en_US',
   },
 }
