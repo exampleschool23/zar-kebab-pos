@@ -43,7 +43,7 @@
 - Private Russian PNG calendars show month-to-date salary, KPI, bonuses, fines and absences through the completed day, starting no earlier than joining. Totals are before payments, not balance. Custom ranges allow up to 62 days.
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
 - Game Club paid revenue has its own text/PNG bucket, excluded from other buckets.
-- Migration `180` sends new Game Club rounds to Team: RU date, Добавил, menu mode, item table and total. No costs/tenders. Vault cron dispatches immediately and every minute; uncertain sends remain held for review, never blindly resent.
+- `180`: Game Club rounds send Team RU date, actor, menu, items, total. Snapshots paid daily income at send: Tashkent paid_at (created_at fallback), saved totals; read errors stay queued. Cron retries; unknown sends held. No costs/tenders.
 - Daily/MTD cafe income uses immutable `orders.total`. Cash/terminal uses payment rows; QR maps to terminal, while card/loyalty stay distinct.
 - Daily soliq is 4% of paid cafe revenue, included in expenses and deducted from net profit.
 - Team KPI: one Russian PNG per finalized date with all employee awards, total, date, system author. Migration `181` claims dates; unknown sends stay held. No text fallback or sales/rate/balance data. Deleting an award edits only its row in the shared image.

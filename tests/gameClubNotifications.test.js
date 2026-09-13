@@ -1,16 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildGameClubTeamMessages, deliverGameClubNotification, loadGameClubTeamTarget } from '../api/telegram/_lib/gameClubNotifications.js'
+import { loadGameClubDayIncome, buildGameClubTeamMessages, deliverGameClubNotification, loadGameClubTeamTarget } from '../api/telegram/_lib/gameClubNotifications.js'
 
 const snapshot = {
-  actor_name: 'Jasurbek', submitted_at: '2026-09-06T13:45:00Z', price_mode: 'regular', total: 60000,
+  actor_name: 'Jasurbek', submitted_at: '2026-09-06T13:45:00Z', price_mode: 'regular', total: 60000, day_income: 129000,
   items: [{ name: 'Люля-кебаб', quantity: 2, price: 24000 }, { name: 'Кока-Кола', quantity: 1, price: 12000 }],
 }
 
 function ledger(snapshotValue = snapshot) {
   const row = { id: 'r1', status: 'queued', snapshot: snapshotValue }
-  return { row, from() {
+  return { row, from(table) {
+    if (table === 'orders') return { select(){return this}, eq(){return this}, or(){return this}, order(){return this}, range: async () => ({data: [], error: null}) }
     let patch = null
     const filters = []
     const query = {
@@ -27,7 +28,7 @@ function ledger(snapshotValue = snapshot) {
   } }
 }
 
-test('approved Team format uses adding actor, Tashkent date, receipt table and subtotal only', () => {
+test('approved Team format uses adding actor, Tashkent date, receipt table, subtotal and paid daily income', () => {
   const [message] = buildGameClubTeamMessages(snapshot)
   assert.match(message, /Новый заказ — Игровой клуб/)
   assert.match(message, /Дата: 06\.09\.2026, 18:45/)
@@ -36,7 +37,8 @@ test('approved Team format uses adding actor, Tashkent date, receipt table and s
   assert.match(message, /<pre>Позиция\s+Кол\s+Сумма/)
   assert.match(message, /Люля-кебаб\s+2\s+48 000/)
   assert.match(message, /Сумма заказа: 60 000 UZS/)
-  assert.doesNotMatch(message, /Официант|GC-|Отправлен|Прибыль|Доход|Оплата|Сервис/)
+  assert.match(message, /Доход игрового клуба за день \(оплачено\): 129 000 UZS/)
+  assert.doesNotMatch(message, /Официант|GC-|Отправлен|Прибыль|Оплата|Сервис/)
 })
 
 test('message escapes actor/product HTML and supports Tourist prices and weighted items', () => {
@@ -99,4 +101,34 @@ test('database snapshots complete new rounds at commit, with actor identity and 
   assert.doesNotMatch(sql, /cost_price|profit|recipe/i)
   const endpoint = readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
   assert.ok(endpoint.indexOf('requireCronSecret(req)', endpoint.indexOf('export default')) < endpoint.indexOf("cronTask === 'game-club-orders'"))
+})
+
+
+test('daily income uses Tashkent boundaries, paginates and excludes unpaid/cancelled sales', async () => {
+  const filters = []
+  const paid = {order_type: 'game_club', payment_status: 'paid', total: 1000}
+  const db = {from(table) {
+    assert.equal(table, 'orders')
+    return {select(){return this}, eq(k,v){assert.equal(v,'game_club');return this},
+      or(value){filters.push(value);return this}, order(){return this},
+      range: async (start) => ({data: start === 0 ? Array(1000).fill(paid) : [
+        {...paid, total: 29000}, {...paid, payment_status: 'unpaid', total: 70000},
+        {...paid, status: 'cancelled', total: 50000},
+      ], error: null})}
+  }}
+  assert.equal(await loadGameClubDayIncome(db, '2026-09-12T20:00:00Z'), 1029000)
+  assert.equal(filters.length, 2)
+  assert.match(filters[0], /paid_at.gte.2026-09-13T00:00:00\+05:00/)
+  assert.match(filters[0], /paid_at.lt.2026-09-14T00:00:00\+05:00/)
+})
+
+test('income read failure leaves the round queued without sending', async () => {
+  const db = ledger()
+  const original = db.from
+  db.from = table => table === 'orders' ? {
+    select(){return this}, eq(){return this}, or(){return this}, order(){return this},
+    range: async () => ({data: null, error: new Error('offline')}),
+  } : original(table)
+  await assert.rejects(deliverGameClubNotification(db, db.row, 'team', () => assert.fail('must not send')), /offline/)
+  assert.equal(db.row.status, 'queued')
 })

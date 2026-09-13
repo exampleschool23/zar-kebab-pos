@@ -1,4 +1,6 @@
 import { formatDateTime } from '../../../src/lib/dateFormat.js'
+import { addRestaurantDays, toRestaurantDateStr } from '../../../src/lib/analytics.js'
+import { getGameClubRevenue } from '../../../src/lib/gameClubRevenue.js'
 import { buildItemRows } from './orderStatusMessages.js'
 import { escapeTelegramHtml, sendTelegramMessage } from './telegram.js'
 
@@ -8,6 +10,25 @@ export async function loadGameClubTeamTarget(supabase, env = process.env) {
   if (error) throw error
   if (data && !data.is_enabled) return ''
   return String(data?.chat_id || env.TELEGRAM_TEAM_CHAT_ID || '').trim()
+}
+
+// Read before claiming: database failures leave the notification safely queued.
+export async function loadGameClubDayIncome(supabase, submittedAt) {
+  const day = toRestaurantDateStr(submittedAt)
+  if (!day) throw new Error('Game Club submission date is missing')
+  const start = `${day}T00:00:00+05:00`
+  const end = `${addRestaurantDays(day, 1)}T00:00:00+05:00`
+  let total = 0
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await supabase.from('orders')
+      .select('id, order_type, status, payment_status, paid_at, total')
+      .eq('order_type', 'game_club')
+      .or(`and(paid_at.gte.${start},paid_at.lt.${end}),and(paid_at.is.null,created_at.gte.${start},created_at.lt.${end})`)
+      .order('id').range(offset, offset + 999)
+    if (error) throw error
+    total += getGameClubRevenue(data || [])
+    if ((data || []).length < 1000) return total
+  }
 }
 
 export function buildGameClubTeamMessages(snapshot) {
@@ -20,7 +41,8 @@ export function buildGameClubTeamMessages(snapshot) {
     `Тип меню: ${snapshot.price_mode === 'tourist' ? 'Туристическое' : 'Обычное'}`,
   ].join('\n')
   const money = new Intl.NumberFormat('ru-RU').format(Math.round(Number(snapshot.total) || 0)).replace(/\s/g, ' ')
-  const footer = `\n\n<b>Сумма заказа: ${money} UZS</b>`
+  const income = new Intl.NumberFormat('ru-RU').format(Math.round(Number(snapshot.day_income) || 0)).replace(/\s/g, ' ')
+  const footer = `\n\n<b>Сумма заказа: ${money} UZS</b>\nДоход игрового клуба за день (оплачено): ${income} UZS`
   const messages = []
   let batch = []
   for (const item of items) {
@@ -38,9 +60,11 @@ export function buildGameClubTeamMessages(snapshot) {
 // A compare-and-set claim prevents parallel workers from sending the same round.
 // An uncertain Telegram result stays processing for review, never blindly resent.
 export async function deliverGameClubNotification(supabase, row, chatId, send = sendTelegramMessage) {
+  if (row.status !== 'queued') return { status: 'duplicate' }
+  const dayIncome = await loadGameClubDayIncome(supabase, row.snapshot.submitted_at)
   const table = 'game_club_team_notifications'
   const { data: claimed, error } = await supabase.from(table)
-    .update({ status: 'processing', chat_id: chatId, attempted_at: new Date().toISOString() })
+    .update({ status: 'processing', snapshot: { ...row.snapshot, day_income: dayIncome }, chat_id: chatId, attempted_at: new Date().toISOString() })
     .eq('id', row.id).eq('status', 'queued').select('*').maybeSingle()
   if (error) throw error
   if (!claimed) return { status: 'duplicate' }
