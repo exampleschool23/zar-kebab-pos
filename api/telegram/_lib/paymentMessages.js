@@ -480,7 +480,9 @@ export function buildSalaryTeamEventMessage(type, event, language = 'ru') {
 }
 
 export function buildEmployeeSalaryEventMessage(type, event, remainingDue = 0, language = 'ru') {
-  const lang = normalizeSalaryNotificationLanguage(language)
+  const lang = type === 'bonus' && !isDailyKpiBonus(event)
+    ? 'ru'
+    : normalizeSalaryNotificationLanguage(language)
   const copy = GROUP_EVENT_COPY[lang]
   const employeeCopy = EMPLOYEE_EVENT_COPY[lang]
   const normalizedType = type === 'bonus' ? 'bonus' : 'absence'

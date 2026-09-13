@@ -1027,3 +1027,22 @@ test('daily salary cron runs at 01:00 Tashkent and reports the completed day', (
   assert.match(dailySalaryEndpoint, /get_pending_employee_meal_dates/)
   assert.match(dailySalaryEndpoint, /finalizeDailyKpiDate[\s\S]*?sendDailySalaryNotifications/)
 })
+
+
+test('private manual bonus notifications use Russian regardless of employee language', () => {
+  for (const language of ['ru', 'uz', 'en']) {
+    const message = buildEmployeeSalaryEventMessage('bonus', {
+      employee_name: 'Азиз',
+      bonus_date: '2026-09-13',
+      amount: 150_000,
+      accrues_to_salary: true,
+      note: 'Отличная работа',
+      created_by_name: 'Администратор',
+    }, 500_000, language)
+    assert.match(message, /Здравствуйте, Азиз!/)
+    assert.match(message, /Ваш бонус начислен и добавлен к балансу зарплаты/)
+    assert.match(message, /150 000 UZS/)
+    assert.match(message, /13 сентября 2026/)
+    assert.match(message, /Отличная работа/)
+  }
+})

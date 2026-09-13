@@ -34,8 +34,8 @@
 
 - Manual bonus, fine, and absence notify Team; salary payments and rate changes have terminal skipped Team status.
 - Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
-- Bonus messages omit payment method for employee, Salary group, and Team.
-- Use shared localized long-date formatting. Optional empty notes are omitted; Team copy stays compact.
+- Bonuses omit payment method. Private manual bonuses/fines use Russian long dates.
+- Use shared localized long-date formatting. Empty notes are omitted; Team copy stays compact.
 - Historical rows are skipped during migration and never broadcast retroactively.
 
 ## Automatic daily payroll privacy and language
