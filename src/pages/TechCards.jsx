@@ -18,6 +18,7 @@ import {
 import AppShell from '../components/AppShell'
 import BazaarIngredientPicker from '../components/BazaarIngredientPicker'
 import MenuItemPicker from '../components/MenuItemPicker'
+import TechCardPdfDownload from '../components/TechCardPdfDownload'
 import MenuMedia from '../components/MenuMedia'
 import { getMenuItemOptionGroups } from '../components/MenuProductCards'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
@@ -33,6 +34,7 @@ import { getSaleProfitSummary } from '../lib/profit'
 import { supabase } from '../lib/supabase'
 import {
   TECH_CARD_UNITS,
+  techCardUnitLabel as unitLabel,
   buildTechCardPayload,
   calculateTechCardSummary,
   copyAndScaleTechCard,
@@ -117,17 +119,6 @@ function labels(lang) {
     productMissingHint: 'This product was archived or no longer exists.', unsaved: 'Tech card not completed',
     baseRecipe: 'Base recipe', copyRecipe: 'Copy recipe', copyFrom: 'Source', scale: 'Scale', copy: 'Copy', variantRecipe: 'Variant recipe',
   }
-}
-
-function unitLabel(unit, lang) {
-  const unitLabels = {
-    g: { uz: 'g', ru: 'г', en: 'g' },
-    kg: { uz: 'kg', ru: 'кг', en: 'kg' },
-    ml: { uz: 'ml', ru: 'мл', en: 'ml' },
-    l: { uz: 'l', ru: 'л', en: 'l' },
-    piece: { uz: 'dona', ru: 'шт', en: 'piece' },
-  }
-  return unitLabels[unit]?.[lang] || unitLabels[unit]?.en || unit
 }
 
 function formatDecimal(value, lang, maximumFractionDigits = 3) {
@@ -857,7 +848,7 @@ export default function TechCards() {
   }
 
   return (
-    <AppShell title={l.title}>
+    <AppShell title={l.title} headerActions={<TechCardPdfDownload items={techCardItems} cards={cardsByItemId} categories={state.categories} allItems={activeItems} lang={lang} labels={l} />}>
       <div className="min-h-full bg-[#FAF6EE]">
         <div className="border-b border-gray-100 bg-white px-4 py-5 sm:px-6">
           <div className="mx-auto w-full max-w-[1180px]">

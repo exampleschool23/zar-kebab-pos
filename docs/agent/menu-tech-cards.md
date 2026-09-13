@@ -1,12 +1,10 @@
 # Menu, Inventory, Media, Costs, and Tech Cards
 
-Menu, availability, media, costs, inventory, archival, and Tech Cards.
-
 ## Entry points
 
-- Editors and customer surfaces: `src/pages/AdminMenu.jsx`, `src/pages/TechCards.jsx`, `src/pages/PublicMenu.jsx`, `src/pages/TelegramMiniApp.jsx`
-- Shared menu and recipe logic: `src/lib/menuItems.js`, `src/lib/menuPricing.js`, `src/lib/menuMedia.js`, `src/lib/menuItemCosts.js`, `src/lib/techCards.js`
-- Database writes and schema: `src/lib/db.js`, migrations `139`, `149`–`151`, and `154`–`156`
+- Pages: `src/pages/AdminMenu.jsx`, `src/pages/TechCards.jsx`, `src/pages/PublicMenu.jsx`, `src/pages/TelegramMiniApp.jsx`
+- Helpers: `src/lib/menuItems.js`, `src/lib/menuPricing.js`, `src/lib/menuMedia.js`, `src/lib/menuItemCosts.js`, `src/lib/techCards.js`
+- Database: `src/lib/db.js`, migrations `139`, `149`–`151`, and `154`–`156`
 - Focused tests: `tests/menuItems.test.js`, `tests/menuArchiveSafety.test.js`, `tests/menuStock.test.js`, `tests/menuMedia.test.js`, `tests/techCards.test.js`, `tests/techCardsFeature.test.js`, `tests/sourceGuards.menu.test.js`, `tests/sourceGuards.public-menu.test.js`
 
 ## Visibility and availability
@@ -61,13 +59,15 @@ Menu, availability, media, costs, inventory, archival, and Tech Cards.
 - Save the card and complete ingredient list atomically with `save_menu_item_tech_card(payload jsonb)`. Migration `183` batches cost sync, skips unchanged costs, and stops at convergence; base/variant dependencies still propagate.
 - `tech_cards` permission controls route/read access; Manage Menu separately controls writes.
 - Ingredient prices and protected recipes never enter public, Telegram-menu, waiter, cashier, order, or receipt payloads.
-- Saving a base recipe synchronizes the protected parent cost; saving a variant recipe synchronizes that option in protected `variant_costs`. Existing order-item cost snapshots remain untouched.
+- Saving a base recipe synchronizes the protected parent cost; saving a variant recipe synchronizes that option in protected `variant_costs`. Preserve order-item cost snapshots.
 - Variant recipes may be copied and scaled; keep the destination identity and portion count explicit.
 - Components use `selected_options` for variants; empty means base.
-- Included-product quantities are positive recipe amounts and may be fractional for every sale unit; the editor accepts decimal points and commas such as `0.3` and `0,5`.
+- Included-product quantities are positive recipe amounts and may be fractional for every sale unit; accept decimal points and commas: `0.3` and `0,5`.
 - Variant calculation uses protected variant cost with protected parent-cost fallback. Changing parent selection clears stale options.
 - `order_items.tech_card_component_snapshot` freezes chosen options. Payment deducts whole piece components once. Fractional components contribute proportional cost, never rounded integer stock movements.
 - New order items freeze direct and nested ingredient quantities, units, and prices in service-only `order_item_tech_card_ingredient_snapshots`. Daily consumption uses paid, non-cancelled quantities; never expose or backfill these snapshots.
 - Allow repeated parents only for distinct variants.
 
 - Migration `186`: `/admin/ingredients` has Team access and movement totals; see the reporting guide. Future ingredient snapshots include canonical keys when unambiguous.
+
+- PDF export (saved recipes, batch quantities): `src/components/TechCardPdfDownload.jsx`; `tests/techCardPdfData.test.js`.

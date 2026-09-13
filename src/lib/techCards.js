@@ -303,3 +303,14 @@ export function validateTechCard(card = {}, menuItems = [], messages = {}) {
 export function techCardFingerprint(card = {}) {
   return JSON.stringify(buildTechCardPayload(card))
 }
+
+export function techCardUnitLabel(unit, lang) {
+  const unitLabels = {
+    g: { uz: 'g', ru: 'г', en: 'g' },
+    kg: { uz: 'kg', ru: 'кг', en: 'kg' },
+    ml: { uz: 'ml', ru: 'мл', en: 'ml' },
+    l: { uz: 'l', ru: 'л', en: 'l' },
+    piece: { uz: 'dona', ru: 'шт', en: 'piece' },
+  }
+  return unitLabels[unit]?.[lang] || unitLabels[unit]?.en || unit
+}

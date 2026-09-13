@@ -61,7 +61,9 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            if ((id.includes('commonjsHelpers') || id.includes('vite/preload-helper'))) return 'vendor'
             if (!id.includes('node_modules')) return undefined
+            if (/node_modules\/(jspdf|fflate|fast-png|iobuffer|pako|html2canvas|dompurify|canvg|raf|rgbcolor|stackblur-canvas|text-segmentation|utrie|base64-arraybuffer|core-js|svg-pathdata)\//.test(id)) return 'pdf-vendor'
             if (id.includes('@supabase')) return 'supabase'
             if (id.includes('@dnd-kit')) return 'dnd'
             if (id.includes('react')) return 'react-vendor'

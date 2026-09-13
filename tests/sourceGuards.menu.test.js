@@ -207,7 +207,7 @@ test('AdminMenu preserves menu scroll when returning from product editor', () =>
   const openEditItem = functionBody(adminMenu, 'openEditItem')
   const openNewItem = functionBody(adminMenu, 'openNewItem')
 
-  assert.match(appShell, /function AppShell\(\{ children, title, contentRef \}\)/)
+  assert.match(appShell, /function AppShell\(\{ children, title, contentRef, headerActions \}\)/)
   assert.match(appShell, /<main ref=\{contentRef\}/)
   assert.match(adminMenu, /const ADMIN_MENU_SCROLL_KEY = 'zar-admin-menu-scroll-top'/)
   assert.match(adminMenu, /const shellScrollRef = useRef\(null\)/)

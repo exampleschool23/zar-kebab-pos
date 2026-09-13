@@ -5,7 +5,7 @@ import { LogOut, Menu as MenuIcon } from 'lucide-react'
 import UnifiedSidebar from './UnifiedSidebar'
 import { normalizeRole } from '../lib/permissions'
 
-export default function AppShell({ children, title, contentRef }) {
+export default function AppShell({ children, title, contentRef, headerActions }) {
   const { profile, signOut } = useAuth()
   const { state, dispatch } = useApp()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -53,6 +53,7 @@ export default function AppShell({ children, title, contentRef }) {
           <h1 className="font-black text-[#1F2937] text-[15px] leading-tight truncate flex-1">
             {title}
           </h1>
+          {headerActions && <div className="ml-auto flex shrink-0 items-center gap-2">{headerActions}</div>}
           {!shouldShowSidebar && (
             <div className="flex items-center gap-1.5">
               {['uz', 'ru', 'en'].map(l => (
