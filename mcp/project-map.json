@@ -20,6 +20,12 @@
   ],
   "tasks": [
     {
+      "name": "public menu corporate sets before deals",
+      "aliases": ["catering category priority", "public menu section order"],
+      "path": "src/pages/PublicMenu.jsx",
+      "symbol": "CORPORATE_SETS_CATEGORY_ID"
+    },
+    {
       "name": "order status Telegram message cleanup",
       "aliases": ["delete order status message", "statuses group removal"],
       "path": "api/telegram/_lib/orderStatusDelivery.js",

@@ -26,6 +26,9 @@ import {
   ProductDetailPage as MenuProductDetailPage,
 } from '../components/MenuProductCards'
 
+// Stable catalog identity: the Catering category is now Corporate Sets.
+const CORPORATE_SETS_CATEGORY_ID = 'c1789462941735'
+
 const PUBLIC_CONTACTS = {
   telegram: {
     label: 'Telegram',
@@ -585,7 +588,8 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
     return counts
   }, [displayItems])
   const categoryCards = useMemo(
-    () => [{ id: 'all' }, ...displayCategories.filter(category => (itemCounts[category.id] || 0) > 0)],
+    () => [{ id: 'all' }, ...displayCategories.filter(category => (itemCounts[category.id] || 0) > 0)
+      .sort((a, b) => Number(b.id === CORPORATE_SETS_CATEGORY_ID) - Number(a.id === CORPORATE_SETS_CATEGORY_ID))],
     [displayCategories, itemCounts]
   )
 
@@ -636,6 +640,33 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
     displayCategories.forEach(cat => { map[cat.id] = cat })
     return map
   }, [displayCategories])
+
+  function renderCategorySection(section) {
+    return (
+      <section
+        key={section.cat.id}
+        id={menuCategorySectionId('public-menu-category', section.cat.id)}
+        className="scroll-mt-32"
+      >
+        <MenuSectionHeader title={getCategoryName(section.cat, lang)} />
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+          {section.items.map((item, index) => (
+            <MenuProductCard
+              key={item.id}
+              item={item}
+              qty={0}
+              lang={lang}
+              eager={(section.cat.id === CORPORATE_SETS_CATEGORY_ID || groupedSections[0]?.cat.id === section.cat.id) && index < 6}
+              onOpenDetail={openDetail}
+              readOnly
+              formatPrice={priceFormatter}
+              linkBasePath={menuBasePath}
+            />
+          ))}
+        </div>
+      </section>
+    )
+  }
 
   function openDetail(item) {
     savedScrollRef.current = window.scrollY
@@ -883,6 +914,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
         ) : (
           groupedSections ? (
             <div className="space-y-7">
+              {groupedSections.filter(section => section.cat.id === CORPORATE_SETS_CATEGORY_ID).map(renderCategorySection)}
               {dealItems.length > 0 && (
                 <section id="public-menu-deals" className="scroll-mt-32">
                   <MenuSectionHeader title={dealsTitle} tone="deal" />
@@ -903,30 +935,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
                   </div>
                 </section>
               )}
-              {groupedSections.map(section => (
-                <section
-                  key={section.cat.id}
-                  id={menuCategorySectionId('public-menu-category', section.cat.id)}
-                  className="scroll-mt-32"
-                >
-                  <MenuSectionHeader title={getCategoryName(section.cat, lang)} />
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
-                    {section.items.map((item, index) => (
-                      <MenuProductCard
-                        key={item.id}
-                        item={item}
-                        qty={0}
-                        lang={lang}
-                        eager={groupedSections[0]?.cat.id === section.cat.id && index < 6}
-                        onOpenDetail={openDetail}
-                        readOnly
-                        formatPrice={priceFormatter}
-                        linkBasePath={menuBasePath}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
+              {groupedSections.filter(section => section.cat.id !== CORPORATE_SETS_CATEGORY_ID).map(renderCategorySection)}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">

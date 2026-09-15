@@ -9,6 +9,8 @@
 
 ## Visibility and availability
 
+- Public order: Corporate Sets (`c1789462941735`), Deals, other categories. Its card follows All. Visibility rules apply.
+
 - `menu_items.available` affects waiter orderability only. Public and Telegram menus still show active unavailable meals.
 - `public_hidden` is independent and owner-controlled. Non-owner saves preserve the stored value; new non-owner products default to public visibility.
 - Manage Menu writers may create unavailable products and change availability. The database enforces both access rules.
@@ -19,7 +21,7 @@
 
 ## Product creation, cost, and history
 
-- Normal and cashier-quick products require a positive protected parent cost.
+- Normal/cashier-quick products require positive protected parent cost.
 - Create a product and its cost atomically through the current media-aware creation RPC. Do not directly insert a public product first.
 - Protected current costs live in `menu_item_costs`; variant costs live in `variant_costs`. Public option data contains names and selling prices only.
 - `order_items.cost_price` is a sale-time database snapshot. Runtime reporting must never fall back to today's menu cost for missing historical coverage.
@@ -31,7 +33,7 @@
 
 - Authenticated availability changes, product creation, and archival queue immutable Russian Team events with product/staff snapshots.
 - Ordinary edits/restoration send nothing; archival does not change `available`. Product saves and quick toggles share the database event.
-- The daily 08:00 Tashkent snapshot lists unavailable active products by Russian category or confirms all are available. Details live in `docs/agent/telegram.md`.
+- The daily 08:00 Tashkent snapshot lists unavailable active products by Russian category or confirms all are available. See `telegram.md`.
 
 ## Inventory
 
@@ -43,7 +45,7 @@
 ## Media and text
 
 - `media_urls[0]` is the cover and stays synchronized with `image_url`.
-- Supported gallery media include images, GIF, MP4, and WebM. Cards/Telegram use the cover; customer and waiter detail views expose the gallery.
+- Gallery supports images, GIF, MP4, WebM. Cards/Telegram use the cover; customer/waiter details show the gallery.
 - Delete removed existing R2 media only after a successful product save. Clean up new temporary uploads on cancel or removal before save.
 - Upload error rendering belongs inside `ImageUploadField`; `SortableItemCard` must not access that state.
 - Trim localized names/descriptions at editor, write, display, and database boundaries while preserving internal spaces and description line breaks.
@@ -65,7 +67,7 @@
 - Included-product quantities are positive recipe amounts and may be fractional for every sale unit; accept decimal points and commas: `0.3` and `0,5`.
 - Variant calculation uses protected variant cost with protected parent-cost fallback. Changing parent selection clears stale options.
 - `order_items.tech_card_component_snapshot` freezes chosen options. Payment deducts whole piece components once. Fractional components contribute proportional cost, never rounded integer stock movements.
-- New order items freeze direct and nested ingredient quantities, units, and prices in service-only `order_item_tech_card_ingredient_snapshots`. Daily consumption uses paid, non-cancelled quantities; never expose or backfill these snapshots.
+- New orders freeze direct and nested ingredient quantities, units, and prices in service-only `order_item_tech_card_ingredient_snapshots`. Daily consumption uses paid, non-cancelled quantities; never expose or backfill these snapshots.
 - Allow repeated parents only for distinct variants.
 
 - Migration `186`: `/admin/ingredients` has Team access and movement totals; see the reporting guide. Future ingredient snapshots include canonical keys when unambiguous.
