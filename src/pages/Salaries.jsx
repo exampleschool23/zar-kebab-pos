@@ -178,7 +178,9 @@ export default function Salaries() {
       balance: 'Maosh balansi',
       due: 'To‘lanishi kerak',
       totalDue: 'Jami qarzdorlik',
+      totalDueHelp: 'Bugungacha hisoblangan, hali to‘lanmagan maosh va bonuslar, jarimalar chegirilgan.',
       monthlyPayroll: 'Oylik maoshlar',
+      monthlyPayrollHelp: 'Faol xodimlarning shu oy uchun hisoblangan maoshi. Bonus va jarimalarsiz.',
       employees: 'Xodimlar',
       openEmployees: 'Xodimlar ro‘yxatini ochish',
       quickActions: 'Kundalik operatsiyalar',
@@ -317,7 +319,9 @@ export default function Salaries() {
       balance: 'Баланс зарплаты',
       due: 'К выплате',
       totalDue: 'Общий долг',
+      totalDueHelp: 'Начисленные на сегодня, но ещё не выплаченные зарплаты и бонусы, за вычетом штрафов.',
       monthlyPayroll: 'Зарплаты в месяц',
+      monthlyPayrollHelp: 'Расчёт зарплат активных сотрудников за весь текущий месяц. Без бонусов и штрафов.',
       employees: 'Сотрудники',
       openEmployees: 'Открыть список сотрудников',
       quickActions: 'Ежедневные операции',
@@ -456,7 +460,9 @@ export default function Salaries() {
       balance: 'Salary balance',
       due: 'Salary due',
       totalDue: 'Total due',
+      totalDueHelp: 'Salary and bonuses earned through today but not yet paid, minus fines.',
       monthlyPayroll: 'Monthly salaries',
+      monthlyPayrollHelp: 'Calculated salaries for active employees for the full current month. Excludes bonuses and fines.',
       employees: 'Employees',
       openEmployees: 'Open employee list',
       quickActions: 'Daily operations',
@@ -1447,12 +1453,14 @@ export default function Salaries() {
               <MetricCard
                 icon={BadgeMinus}
                 label={l.totalDue}
+                description={l.totalDueHelp}
                 value={loading ? '—' : formatCurrency(totalDue)}
                 tone="orange"
               />
               <MetricCard
                 icon={WalletCards}
                 label={l.monthlyPayroll}
+                description={l.monthlyPayrollHelp}
                 value={loading ? '—' : formatCurrency(monthlyPayrollTotal)}
                 tone="blue"
               />
@@ -2285,7 +2293,7 @@ function DailyKpiSection({
   )
 }
 
-function MetricCard({ icon: Icon, label, value, tone = 'orange' }) {
+function MetricCard({ icon: Icon, label, value, description, tone = 'orange' }) {
   const tones = {
     orange: {
       card: 'border-orange-200 bg-orange-50/70',
@@ -2307,6 +2315,7 @@ function MetricCard({ icon: Icon, label, value, tone = 'orange' }) {
       <span className="min-w-0">
         <span className={`block text-[11px] font-black uppercase tracking-wide ${colors.label}`}>{label}</span>
         <span className="mt-1 block text-base font-black leading-tight text-[#1F2937] lg:text-lg">{value}</span>
+        {description && <span className="mt-2 block text-xs font-medium leading-relaxed text-[#6B7280]">{description}</span>}
       </span>
     </div>
   )
