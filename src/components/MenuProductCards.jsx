@@ -304,20 +304,20 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   return (
     <>
     {compactMobileGrid && !readOnly && (
-      <div data-menu-product-card className={`flex h-full flex-col gap-0.5 rounded-lg border bg-white p-1.5 sm:hidden ${inCart ? 'border-orange-300' : 'border-[#E5E7EB]'}`}>
-        <button type="button" onClick={() => onOpenDetail(item)} className="flex w-full min-w-0 items-center gap-1 text-left">
-          <span data-menu-product-image className="h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-orange-50">
+      <div data-menu-product-card className={`flex h-full flex-col gap-1 rounded-xl border bg-white p-2 sm:hidden ${inCart ? 'border-orange-300' : 'border-[#E5E7EB]'}`}>
+        <button type="button" onClick={() => onOpenDetail(item)} className="flex w-full min-w-0 items-center gap-2 text-left">
+          <span data-menu-product-image className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-orange-50">
             <SafeMenuImage src={item.image_url} alt="" className="h-full w-full object-cover" loading={eager ? 'eager' : 'lazy'} fallbackIconSize={24} />
           </span>
           <span className="min-w-0">
-            <span className="line-clamp-2 text-[12px] font-bold leading-tight text-[#1F2937]">{getItemName(item, lang)}</span>
+            <span className="line-clamp-2 text-[13px] font-bold leading-tight text-[#1F2937]">{getItemName(item, lang)}</span>
 
           </span>
         </button>
-        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-0.5">
-          <div className="min-w-[56px] flex-1">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-1">
+          <div className="min-w-[70px] flex-1">
             {pricing.discounted && <span className="block text-[10px] text-gray-400 line-through">{formatPrice(pricing.oldPrice)}</span>}
-            <span className="block text-[11px] font-black leading-tight text-[#ff5a00]">
+            <span className="mt-1 block text-[12px] font-black leading-tight text-[#ff5a00]">
               {formatPrice(pricing.price)}{pricing.maxPrice > pricing.price ? ` – ${formatPrice(pricing.maxPrice)}` : ''}{priceUnit}
             </span>
           </div>
@@ -326,7 +326,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
             <button type="button" aria-label={`${lang === 'ru' ? 'Уменьшить' : lang === 'uz' ? 'Kamaytirish' : 'Decrease'}: ${getItemName(item, lang)}`} onClick={() => onDecrement(item)} className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 text-gray-600"><Minus size={18} /></button>
             <span className="min-w-5 text-center text-sm font-black text-[#ff5a00]">{formatMenuQuantity(qty, item)}</span>
           </>}
-          <button type="button" disabled={unavailable} aria-label={`${unavailable ? labels.unavailable : lang === 'ru' ? 'Добавить' : lang === 'uz' ? "Qo'shish" : 'Add'}: ${getItemName(item, lang)}`} onClick={e => inCart ? onIncrement(item, cartAnimationPayload(e)) : onAdd(item, cartAnimationPayload(e))} className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-50 text-[#ff5a00] disabled:opacity-40"><Plus size={20} /></button>
+          <button type="button" disabled={unavailable} aria-label={`${unavailable ? labels.unavailable : lang === 'ru' ? 'Добавить' : lang === 'uz' ? "Qo'shish" : 'Add'}: ${getItemName(item, lang)}`} onClick={e => inCart ? onIncrement(item, cartAnimationPayload(e)) : onAdd(item, cartAnimationPayload(e))} className="flex h-11 w-16 max-[359px]:w-14 items-center justify-center rounded-lg bg-orange-50 text-[#ff5a00] disabled:opacity-40"><Plus size={20} /></button>
           </div>
         </div>
       </div>

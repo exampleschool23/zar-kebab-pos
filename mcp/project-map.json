@@ -119,7 +119,7 @@
     },
     {
       "name": "waiter-kitchen",
-      "keywords": ["game club", "compact mobile product grid", "three-column phone grid", "sticky mobile categories", "cart", "waiter", "kitchen", "submit", "order", "round", "table", "reservation"],
+      "keywords": ["game club", "compact mobile product grid", "sticky mobile categories", "cart", "waiter", "kitchen", "submit", "order", "round", "table", "reservation"],
       "files": ["src/lib/menuPricing.js", "src/components/MenuProductCards.jsx", "supabase/180_game_club_team_notifications.sql", "scripts/check-game-club-migration.mjs", "api/telegram/_lib/gameClubNotifications.js", "src/lib/dateFormat.js", "src/lib/orderTypes.js", "src/lib/gameClubRevenue.js", "supabase/179_game_club_orders.sql", "src/pages/WaiterTables.jsx", "src/pages/WaiterOrder.jsx", "src/pages/KitchenCheckReceipt.jsx", "src/components/CartPanel.jsx", "src/store/ordersReducer.js", "src/store/cartReducer.js", "src/lib/kitchenCheck.js", "src/lib/db.js"],
       "tests": ["tests/menuPricing.test.js", "tests/gameClubNotifications.test.js", "tests/gameClubOrders.test.js", "tests/operationalFlows.test.js", "tests/kitchenCheck.test.js", "tests/kitchenSubmissionRecovery.test.js", "tests/kitchenSubmissionReducer.test.js", "tests/priceModes.test.js", "tests/writeTimeout.test.js", "tests/sourceGuards.ordering.test.js"]
     },
