@@ -1,3 +1,4 @@
+import { employeeJobFunctionLabel } from '../lib/employeeJobFunctions'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CalendarCheck2, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Percent, Power, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -561,7 +562,7 @@ export default function Employees() {
                               )}
                             </div>
                           )}
-                          <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{employee.profile?.role || l.status}</p>
+                          <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{employeeJobFunctionLabel(employee.job_function, lang) || employee.profile?.role || l.status}</p>
                         </div>
                       </div>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-black ${

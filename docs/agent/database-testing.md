@@ -8,9 +8,11 @@
 - Navigator implementation and checks: `mcp/`, `tests/repoNavigatorMcp.test.js`, `scripts/benchmark-repo-nav.js`
 - Source guards: `tests/sourceGuards.*.test.js`
 
+- 194: nullable employee job function; apply before the new employee dropdown.
+
 ## Database workflow
 
-- Apply migrations in numeric order, even with `src/lib/db.js` compatibility fallbacks.
+- Apply migrations in order, including `src/lib/db.js` compatibility fallbacks.
 - Run `npm run db:health` first when a page loads forever or the console reports missing tables, columns, or RPCs.
 - Kitchen migrations do not replace earlier settings/payment migrations.
 - Migration families:
@@ -60,14 +62,14 @@ Node test coverage:
 - `tests/salaryTransactions.test.js`: salary ledger and deterministic history ordering.
 - `tests/sourceGuards.*.test.js`: domain-split source-level protection for regressions that reached users.
 
-Validate focused tests, then:
+Validate, then:
 
 ```bash
 npm test
 npm run build
 ```
 
-For guide, navigator, map, or source-guard changes, also run `npm run docs:check` and `npm run mcp:benchmark`.
+For docs/map/guard changes, run `npm run docs:check` and `npm run mcp:benchmark`.
 
 ## Source-guard policy
 
@@ -85,7 +87,7 @@ Understand each guard’s protected regression before changing it. Guards cover:
 
 ## Browser/build verification
 
-- Protected routes require an authorized profile for visual checks.
+- Protected routes need authentication.
 - Vite large-chunk warnings are non-fatal.
 - Preserve unrelated edits; report unrun checks.
 

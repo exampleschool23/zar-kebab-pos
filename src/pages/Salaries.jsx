@@ -1,3 +1,4 @@
+import { EMPLOYEE_JOB_FUNCTIONS, employeeJobFunctionLabel } from '../lib/employeeJobFunctions'
 import React, { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BadgeMinus, CalendarX2, ChevronLeft, ChevronRight, Copy, Loader2, Percent, Plus, Save, Send, Trash2, Users, WalletCards } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -141,7 +142,9 @@ export default function Salaries() {
       back: 'Buxgalteriyaga qaytish',
       loadingTitle: 'Maosh ma’lumotlari yuklanmoqda',
       loadingDescription: 'Xodimlar, operatsiyalar va qoldiqlar tayyorlanmoqda.',
-      add: 'Xodim maoshi qo‘shish',
+      add: 'Yangi xodim',
+      jobFunction: 'Lavozim',
+      selectJobFunction: 'Lavozimni tanlang',
       employee: 'Xodim',
       employeeName: 'Xodim ismi',
       joined: 'Ishga kirgan sana',
@@ -282,7 +285,9 @@ export default function Salaries() {
       back: 'Назад к бухгалтерии',
       loadingTitle: 'Загрузка данных о зарплатах',
       loadingDescription: 'Подготавливаем сотрудников, операции и остатки.',
-      add: 'Добавить зарплату сотрудника',
+      add: 'Новый сотрудник',
+      jobFunction: 'Должность',
+      selectJobFunction: 'Выберите должность',
       employee: 'Сотрудник',
       employeeName: 'Имя сотрудника',
       joined: 'Дата выхода',
@@ -423,7 +428,9 @@ export default function Salaries() {
       back: 'Back to accounting',
       loadingTitle: 'Loading salary data',
       loadingDescription: 'Preparing employees, operations, and balances.',
-      add: 'Add employee salary',
+      add: 'New employee',
+      jobFunction: 'Job function',
+      selectJobFunction: 'Select a job function',
       employee: 'Employee',
       employeeName: 'Employee name',
       joined: 'Joining date',
@@ -579,6 +586,7 @@ export default function Salaries() {
   const [telegramDeliveryPage, setTelegramDeliveryPage] = useState(1)
   const [form, setForm] = useState({
     employee_name: '',
+    job_function: '',
     joined_at: today,
     salary_amount: '',
     salary_unit: 'daily',
@@ -1146,13 +1154,14 @@ export default function Salaries() {
     setMessage('')
     const employeeName = String(form.employee_name || '').trim()
     const amount = normalizeExpenseAmount(form.salary_amount)
-    if (!employeeName || !form.joined_at || amount <= 0) return
+    if (!employeeName || !EMPLOYEE_JOB_FUNCTIONS.some(item => item.value === form.job_function) || !form.joined_at || amount <= 0) return
     setSaving('create')
     const { data: salaryProfile, error: profileError } = await supabase
       .from('employee_salary_profiles')
       .insert({
         profile_id: null,
         employee_name: employeeName,
+        job_function: form.job_function,
         joined_at: form.joined_at,
         pay_schedule: 'monthly',
         payment_method: form.payment_method,
@@ -1181,7 +1190,7 @@ export default function Salaries() {
       return
     }
     setMessage(l.createdMessage)
-    setForm(current => ({ ...current, employee_name: '', salary_amount: '' }))
+    setForm(current => ({ ...current, employee_name: '', job_function: '', salary_amount: '' }))
     await loadData({ refreshTelegram: false })
     const notification = await notifyTelegramEmployeeLifecycle(salaryProfile.id, 'created')
     if (!notification?.ok) setError(l.lifecycleTelegramFailed)
@@ -1761,7 +1770,7 @@ export default function Salaries() {
                 </div>
                 {salarySetupMode === 'add' && (
                 <form onSubmit={createSalaryProfile} className="grid gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
+                  <div>
                     <Field label={l.employeeName}>
                       <input
                         type="text"
@@ -1772,6 +1781,21 @@ export default function Salaries() {
                       />
                     </Field>
                   </div>
+                  <Field label={l.jobFunction}>
+                    <select
+                      value={form.job_function}
+                      onChange={event => setForm(current => ({ ...current, job_function: event.target.value }))}
+                      aria-label={l.jobFunction}
+                      required
+                      className={FIELD}
+                      disabled={!canManage || loading}
+                    >
+                      <option value="" disabled>{l.selectJobFunction}</option>
+                      {EMPLOYEE_JOB_FUNCTIONS.map(item => (
+                        <option key={item.value} value={item.value}>{employeeJobFunctionLabel(item.value, lang)}</option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field label={l.effectiveDate}>
                     <DateInput value={form.joined_at} lang={lang} onChange={value => setForm(current => ({ ...current, joined_at: value }))} disabled={!canManage || loading} />
                   </Field>
@@ -1784,7 +1808,7 @@ export default function Salaries() {
                     </select>
                   </Field>
                   <button
-                    disabled={!canManage || loading || !form.employee_name.trim() || normalizeExpenseAmount(form.salary_amount) <= 0 || saving === 'create'}
+                    disabled={!canManage || loading || !form.employee_name.trim() || !form.job_function || normalizeExpenseAmount(form.salary_amount) <= 0 || saving === 'create'}
                     className="flex h-11 self-end items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-[#e85100] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
                   >
                     {saving === 'create' ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}{l.save}

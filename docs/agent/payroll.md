@@ -1,6 +1,8 @@
 # Employees, Payroll, KPI, Absence, and Employee Meals
 
-Active cards sort by displayed daily salary ascending, then name. Inactive cards remain newest-ended first.
+Active cards sort by daily salary, then name; inactive by newest end date.
+
+- Migration 194 adds nullable job_function. New employees require a job; it grants no permissions. Legacy jobs stay unset.
 
 ## Entry points
 
@@ -8,7 +10,7 @@ Active cards sort by displayed daily salary ascending, then name. Inactive cards
 - Shared logic: `src/lib/salaryTransactions.js`, `src/lib/salaryHistory.js`, `src/lib/dailyKpi.js`, `src/lib/teamProfiles.js`, `src/lib/expenses.js`
 - Notifications and scheduled finalization: `api/telegram/employee-notification.js`, `api/telegram/daily-salary.js`
 - Schema: migrations `099`, `107`–`119`, `124`–`129`, `136`, `141`, `148`, and `169`–`170`, `172`
-- Focused tests: `tests/salaryTransactions.test.js`, `tests/salaryHistory.test.js`, `tests/dailyKpi.test.js`, `tests/dailyKpiUi.test.js`, `tests/dailyKpiBonuses.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/telegramSalaryMessages.test.js`
+- Tests: `tests/salaryTransactions.test.js`, `tests/salaryHistory.test.js`, `tests/dailyKpi.test.js`, `tests/dailyKpiUi.test.js`, `tests/dailyKpiBonuses.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/telegramSalaryMessages.test.js`
 
 ## Salary ledger
 
@@ -35,10 +37,10 @@ Active cards sort by displayed daily salary ascending, then name. Inactive cards
 - Each enabled effective-dated rule receives its full basis-point percentage of restaurant-wide finalized paid dine-in `subtotal + service_fee`; loyalty does not reduce the base.
 - Skip absences and dates outside employment boundaries.
 - Date runs and employee results are immutable and duplicate-safe. Only the service-role finalizer creates `daily_kpi` bonuses.
-- Generated bonuses accrue into the employee's salary balance. Their formula and settlement mode are immutable; later salary payments record the cash expense.
+- Generated bonuses accrue into the employee's salary balance. Formula/settlement are immutable; salary payments record cash expense.
 - Deleting a generated bonus marks its result voided; retries never recreate it.
 - Only owners remove KPI rules. The form's selected effective date is the removal boundary: the original rule and all finalized or paid data before it stay unchanged, while a disabled successor stops KPI from that date onward. A rule is physically deleted only when the selected boundary equals its own effective date and the rule is still unused. The disabled successor is not offered for removal because exposing the older enabled rule would reactivate KPI.
-- Employee cards show the rule effective today, not a future scheduled rule. Missing migration support reports locally without blocking the cards.
+- Employee cards show today’s effective rule. Report missing migrations locally.
 - Adding a KPI rule or genuinely changing its rate/status creates an immutable before/after event and a duplicate-safe Salary-group delivery. A no-op save creates no new notification; migration `170` deliberately does not backfill older rules.
 - Salary History separates monthly manual Bonuses from KPI bonuses. Salary + bonuses includes salary and both bonus types once each.
 - Effective dates cannot enter already finalized periods. Recovery scans missing older dates in bounded batches.
