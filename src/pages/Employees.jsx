@@ -270,10 +270,10 @@ export default function Employees() {
   ), [activeEmployees, today])
   const sortedActiveEmployees = useMemo(() => (
     [...activeEmployees].sort((a, b) => (
-      Number(absentTodayEmployeeIds.has(b.id)) - Number(absentTodayEmployeeIds.has(a.id)) ||
+      getDailySalaryAmount(a, getSalaryActiveUntil(a, today)) - getDailySalaryAmount(b, getSalaryActiveUntil(b, today)) ||
       employeeName(a).localeCompare(employeeName(b))
     ))
-  ), [activeEmployees, absentTodayEmployeeIds])
+  ), [activeEmployees, today])
   const inactiveEmployees = useMemo(() => (
     employees
       .filter(item => item.is_active === false)

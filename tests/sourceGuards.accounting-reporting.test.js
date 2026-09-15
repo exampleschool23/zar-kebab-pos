@@ -231,7 +231,7 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(employees, /const activeEmployees = useMemo\(\(\) => employees\.filter\(item => item\.is_active !== false\), \[employees\]\)/)
   assert.match(employees, /const absentTodayEmployeeIds = useMemo\(\(\) => new Set\(/)
   assert.match(employees, /getSalaryAbsenceDates\(employee\)\.has\(today\)/)
-  assert.match(employees, /Number\(absentTodayEmployeeIds\.has\(b\.id\)\) - Number\(absentTodayEmployeeIds\.has\(a\.id\)\)/)
+  assert.match(employees, /getDailySalaryAmount\(a, getSalaryActiveUntil\(a, today\)\) - getDailySalaryAmount\(b, getSalaryActiveUntil\(b, today\)\) \|\|\s*employeeName\(a\)\.localeCompare\(employeeName\(b\)\)/)
   assert.match(employees, /label=\{l\.absentToday\} value=\{absentTodayCount\} danger=\{absentTodayCount > 0\}/)
   assert.match(employees, /absentToday\s*\?\s*'border-red-300 bg-red-50\/80 ring-2 ring-red-100'/)
   assert.match(employees, /absentToday \? l\.absentToday : l\.active/)

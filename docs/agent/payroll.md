@@ -1,6 +1,6 @@
 # Employees, Payroll, KPI, Absence, and Employee Meals
 
-Salary profiles, payments, bonuses, fines, absences, advances, KPI rules, daily payroll, and employee meals.
+Active cards sort by displayed daily salary ascending, then name. Inactive cards remain newest-ended first.
 
 ## Entry points
 
