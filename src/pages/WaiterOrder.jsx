@@ -513,7 +513,7 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
         </h2>
         <div className="hidden h-px min-w-0 flex-1 bg-[#C9C9C9] sm:block" />
       </div>
-      <div className={`grid ${compactMobileGrid ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-3'} sm:grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 sm:gap-4`}>
+      <div className={`grid ${compactMobileGrid ? 'grid-cols-2 min-[420px]:max-sm:grid-cols-3 gap-1.5' : 'grid-cols-2 gap-3'} sm:grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 sm:gap-4`}>
         {items.map((item, index) => (
           <ProductCard
             key={item.id}
@@ -1608,7 +1608,7 @@ export default function WaiterOrder() {
             </div>
           ) : (
             // Flat grid for specific category or search results
-            <div className={`grid ${!isGuestTabletMode && mobileMenuView === 'compact' ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-3'} sm:grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 sm:gap-4`}>
+            <div className={`grid ${!isGuestTabletMode && mobileMenuView === 'compact' ? 'grid-cols-2 min-[420px]:max-sm:grid-cols-3 gap-1.5' : 'grid-cols-2 gap-3'} sm:grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 sm:gap-4`}>
               {pricedFilteredItems.map((item, index) => (
                 <ProductCard
                   key={item.id}
