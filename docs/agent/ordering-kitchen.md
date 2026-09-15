@@ -22,6 +22,8 @@ Read this guide for waiter tables, table entry, carts, price modes, reservations
 
 ## Cart and waiter availability
 
+- Mobile staff ordering defaults to a compact two-column product grid below 640px, with a locally saved compact/large card switch. Mobile categories use one sticky chip row. Guest tablet mode keeps cards. Both views share price, variant, and cart handlers; details retain descriptions and nutrition.
+
 - Product cards show the available variant price range for the current audience; detail prices follow selected options using `src/lib/menuPricing.js`, matching the base price passed to the cart. Coverage: `tests/menuPricing.test.js`.
 - Configured-option additions start at quantity one and increment only the matching `cart_item_key`.
 - Reject unavailable or archived products at add, increment, detail submit, kitchen submit, and the database boundary.

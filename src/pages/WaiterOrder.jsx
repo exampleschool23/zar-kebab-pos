@@ -4,7 +4,7 @@ import {
   Search, ShoppingCart, Plus, UtensilsCrossed,
   Menu as MenuIcon, X, CheckCircle2, Clock,
   Receipt, Loader2, ArrowLeft, LogOut, Minus, Printer,
-  LockKeyhole,
+  LockKeyhole, Minimize2, Maximize2,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -503,17 +503,17 @@ function BottomTableChips({ currentTableId, onNewOrder, disabled = false }) {
 }
 
 // ── Product section (used inside "All" grouped view) ──────────────────────────
-function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDecrement, onOpenDetail, eagerCount = 0, audience = 'waiter' }) {
+function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDecrement, onOpenDetail, eagerCount = 0, audience = 'waiter', compactMobileGrid = false }) {
   return (
     <div>
-      <div className="mb-4 flex items-center gap-4 sm:mb-5 sm:gap-5">
-        <div className="h-px min-w-0 flex-1 bg-[#C9C9C9]" />
-        <h2 className="max-w-[70%] flex-shrink-0 text-center text-[24px] font-black leading-none tracking-tight text-[#1F2937] sm:text-[30px]">
+      <div className="mb-2 flex items-center gap-4 sm:mb-5 sm:gap-5">
+        <div className="hidden h-px min-w-0 flex-1 bg-[#C9C9C9] sm:block" />
+        <h2 className="max-w-[70%] flex-shrink-0 text-left text-[15px] font-black leading-none tracking-tight text-[#1F2937] sm:text-[30px]">
           {getCategoryName(cat, lang)}
         </h2>
-        <div className="h-px min-w-0 flex-1 bg-[#C9C9C9]" />
+        <div className="hidden h-px min-w-0 flex-1 bg-[#C9C9C9] sm:block" />
       </div>
-      <div className="grid grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
+      <div className={`grid ${compactMobileGrid ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-3'} sm:grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 sm:gap-4`}>
         {items.map((item, index) => (
           <ProductCard
             key={item.id}
@@ -522,6 +522,7 @@ function ProductSection({ cat, items, cartQtyMap, lang, onAdd, onIncrement, onDe
             lang={lang}
             eager={index < eagerCount}
             audience={audience}
+            compactMobileGrid={compactMobileGrid}
             density="compact"
             onAdd={onAdd}
             onIncrement={onIncrement}
@@ -621,6 +622,9 @@ export default function WaiterOrder() {
   const staffLang           = state.lang || 'en'
   const shouldShowSidebar   = role !== 'guest' && !isGuestTabletMode
   const canEditTables       = canEditFeature(profile || { role }, 'tables')
+  const [mobileMenuView, setMobileMenuView] = useState(() => {
+    try { return localStorage.getItem('waiter-mobile-grid-view') === 'grid' ? 'grid' : 'compact' } catch { return 'compact' }
+  })
   const [search,        setSearch]       = useState('')
   const [activeCategory,setCategory]     = useState('all')
   const [cartOpen,      setCartOpen]     = useState(false)
@@ -1363,7 +1367,9 @@ export default function WaiterOrder() {
         searchLabel={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
         clearLabel={lang === 'uz' ? 'Qidiruvni tozalash' : lang === 'ru' ? 'Очистить поиск' : 'Clear search'}
         closeLabel={lang === 'uz' ? 'Qidiruvni yopish' : lang === 'ru' ? 'Закрыть поиск' : 'Close search'}
-        alwaysOpen
+        alwaysOpen={isGuestTabletMode}
+        variant={isGuestTabletMode ? 'inline' : 'overlay'}
+        buttonClassName="!h-11 !w-11"
         className={className}
       />
     )
@@ -1459,13 +1465,13 @@ export default function WaiterOrder() {
           <>
 
         {/* Public-menu style search */}
-        <div className="flex-shrink-0 px-4 pt-4 pb-0">
-          <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+        <div className="flex-shrink-0 px-3 pt-2 pb-0 sm:px-4 sm:pt-4">
+          <div className="relative rounded-2xl sm:rounded-[28px] border border-[#E5E7EB] bg-white p-2 sm:p-4 shadow-sm">
             {isGuestTabletMode ? (
               <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
                 <div className="flex min-w-0 items-center gap-3 xl:contents">
                   <div className="min-w-0 flex-1 xl:max-w-[240px] xl:flex-none">
-                    <p className="truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
+                    <p className="hidden sm:block truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
                     <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
                   </div>
                   <div className="ml-auto xl:hidden">
@@ -1491,7 +1497,7 @@ export default function WaiterOrder() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-3 sm:flex-nowrap">
                 {shouldShowSidebar && (
                   <button
                     onClick={() => { if (!orderLocked) setSidebarOpen(true) }}
@@ -1504,17 +1510,27 @@ export default function WaiterOrder() {
                 <button
                   onClick={() => { if (!orderLocked) navigate('/waiter/tables') }}
                   disabled={orderLocked}
-                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-[#ff5a00]"
+                  className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] text-[#6B7280] transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-[#ff5a00]"
                   title={lang === 'uz' ? 'Stollar' : lang === 'ru' ? 'Столы' : 'Tables'}
                 >
                   <ArrowLeft size={17} />
                 </button>
-                <div className="min-w-[92px] max-w-[180px] flex-shrink-0 sm:max-w-[240px]">
-                  <p className="truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
+                <div className="min-w-0 max-w-[180px] flex-1 sm:max-w-[240px]">
+                  <p className="hidden sm:block truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
                   <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
                 </div>
                 {renderSearchControl()}
                 {renderCartButton('ml-auto')}
+                <button type="button"
+                  aria-label={mobileMenuView === 'compact' ? (lang === 'ru' ? 'Крупные карточки' : lang === 'uz' ? 'Katta kartochkalar' : 'Large cards') : (lang === 'ru' ? 'Компактные карточки' : lang === 'uz' ? 'Ixcham kartochkalar' : 'Compact cards')}
+                  onClick={() => {
+                    const view = mobileMenuView === 'compact' ? 'grid' : 'compact'
+                    setMobileMenuView(view)
+                    try { localStorage.setItem('waiter-mobile-grid-view', view) } catch {}
+                  }}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E5E7EB] text-gray-500 sm:hidden">
+                  {mobileMenuView === 'compact' ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
+                </button>
                 {!shouldShowSidebar && (
                   <div className="flex items-center gap-1.5">
                     {['uz', 'ru', 'en'].map(l => (
@@ -1546,6 +1562,7 @@ export default function WaiterOrder() {
         {/* Product area */}
         <div ref={productScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4 pt-0">
           <MenuCategoryScroller
+            compactMobile={!isGuestTabletMode}
             categories={allCategoryCards}
             activeCategoryId={activeCategory}
             onCategoryClick={setCategory}
@@ -1554,7 +1571,7 @@ export default function WaiterOrder() {
             itemCounts={categoryItemCounts}
             sectionPrefix="waiter-menu-category"
             scrollContainerRef={productScrollRef}
-            className="pt-4 mb-4"
+            className="pt-1 mb-2 sm:pt-4 sm:mb-4"
             collapsedClassName="-mx-4 px-4"
           />
           {pricedFilteredItems.length === 0 ? (
@@ -1571,7 +1588,7 @@ export default function WaiterOrder() {
             </div>
           ) : sections ? (
             // Grouped by category when "All" selected, no search
-            <div className="space-y-8">
+            <div className="space-y-4 sm:space-y-8">
               {sections.map(({ cat, items }) => (
                 <div
                   key={cat.id}
@@ -1579,6 +1596,7 @@ export default function WaiterOrder() {
                   className="scroll-mt-20"
                 >
                   <ProductSection
+                    compactMobileGrid={!isGuestTabletMode && mobileMenuView === 'compact'}
                     audience={menuAudience}
                     cat={cat}
                     items={items}
@@ -1590,7 +1608,7 @@ export default function WaiterOrder() {
             </div>
           ) : (
             // Flat grid for specific category or search results
-            <div className="grid grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
+            <div className={`grid ${!isGuestTabletMode && mobileMenuView === 'compact' ? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-3'} sm:grid-cols-2 min-[700px]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 sm:gap-4`}>
               {pricedFilteredItems.map((item, index) => (
                 <ProductCard
                   key={item.id}
@@ -1599,6 +1617,7 @@ export default function WaiterOrder() {
                   lang={lang}
                   eager={index < 8}
                   audience={menuAudience}
+                  compactMobileGrid={!isGuestTabletMode && mobileMenuView === 'compact'}
                   density="compact"
                   onAdd={handleAdd}
                   onIncrement={handleIncrement}

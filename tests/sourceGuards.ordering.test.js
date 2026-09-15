@@ -589,14 +589,16 @@ test('AnimatedSearch provides reusable smooth expandable search controls', () =>
   assert.match(waiterOrder, /<AnimatedSearch/)
 })
 
-test('WaiterOrder keeps tablet product grids at three columns', () => {
+test('WaiterOrder offers compact mobile grids while keeping tablet product grids at three columns', () => {
   const source = readSource('src/pages/WaiterOrder.jsx')
   const productSection = functionBody(source, 'ProductSection')
 
-  assert.match(productSection, /grid grid-cols-2 min-\[700px\]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
-  assert.match(source, /grid grid-cols-2 min-\[700px\]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
-  assert.match(productSection, /<div className="h-px min-w-0 flex-1 bg-\[#C9C9C9\]" \/>/)
-  assert.match(productSection, /<h2 className="max-w-\[70%\] flex-shrink-0 text-center text-\[24px\]/)
+  assert.match(productSection, /sm:grid-cols-2 min-\[700px\]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
+  assert.match(source, /sm:grid-cols-2 min-\[700px\]:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
+  assert.match(productSection, /<div className="hidden h-px min-w-0 flex-1 bg-\[#C9C9C9\] sm:block" \/>/)
+  assert.match(productSection, /<h2 className="max-w-\[70%\] flex-shrink-0 text-left text-\[15px\][^"]*sm:text-\[30px\]/)
+  assert.match(productSection, /compactMobileGrid \? 'grid-cols-2 gap-2' : 'grid-cols-2 gap-3'/)
+  assert.match(source, /compactMobileGrid=\{!isGuestTabletMode && mobileMenuView === 'compact'\}/)
   assert.doesNotMatch(productSection, /\{items\.length\}/)
   assert.doesNotMatch(source, /grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5/)
 })

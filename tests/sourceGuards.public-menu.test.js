@@ -90,7 +90,7 @@ test('MenuCategoryScroller collapsed chips do not overlap expanded category card
   assert.doesNotMatch(source, /rounded-t-\[16px\]/)
   assert.doesNotMatch(source, /rounded-b-\[16px\]/)
   assert.match(source, /if \(scrollToCategory\(category\.id\)\) \{/)
-  assert.match(source, /const stickyBarOffset = collapsed && collapsedPosition === 'sticky'/)
+  assert.match(source, /const stickyBarOffset = !compactViewport && collapsed && collapsedPosition === 'sticky'/)
   assert.match(source, /getMenuCategoryScrollTarget\(\{/)
   assert.match(source, /pendingCategoryRef\.current = category\.id/)
   assert.match(source, /pendingCategoryTimerRef\.current = window\.setTimeout/)
@@ -574,4 +574,12 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(cashierTables, /getOrderItemOptionLines\(item, mi, lang\)/)
   assert.match(db, /selected_options: i\.selected_options \|\| i\.selectedOptions \|\| \{\}/)
   assert.match(rpc, /selected_options/)
+})
+
+ test('compact mobile categories use one sticky row without the duplicate collapsed bar', () => {
+  const source = readSource('src/components/MenuCategoryScroller.jsx')
+  assert.match(source, /compactMobile \? 'max-sm:sticky max-sm:top-0 max-sm:z-30/)
+  assert.match(source, /compactMobile \? 'max-sm:hidden' : ''/)
+  assert.match(source, /const compactViewport = compactMobile && window.innerWidth < 640/)
+  assert.match(source, /const stickyBarOffset = !compactViewport && collapsed/)
 })

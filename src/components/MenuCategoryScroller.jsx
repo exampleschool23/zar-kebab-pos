@@ -116,6 +116,7 @@ function findScrollContainer(element) {
 
 export default function MenuCategoryScroller({
   categories,
+  compactMobile = false,
   activeCategoryId,
   onCategoryClick,
   onActiveCategoryChange,
@@ -182,7 +183,8 @@ export default function MenuCategoryScroller({
   function scrollToCategory(categoryId) {
     const root = getScrollRoot()
     const scroller = getScrollElement()
-    const stickyBarOffset = collapsed && collapsedPosition === 'sticky'
+    const compactViewport = compactMobile && window.innerWidth < 640
+    const stickyBarOffset = !compactViewport && collapsed && collapsedPosition === 'sticky'
       ? COLLAPSED_BAR_HEIGHT
       : 0
     if (categoryId === 'all') {
@@ -318,11 +320,16 @@ export default function MenuCategoryScroller({
 
   return (
     <>
-      <div ref={sentinelRef} className={className}>
+      <div ref={sentinelRef} className={`${className} ${compactMobile ? 'max-sm:sticky max-sm:top-0 max-sm:z-30 max-sm:bg-[#FAF6EE]' : ''}`}>
         <div className="flex gap-2 overflow-x-auto pb-1 sm:gap-3" style={{ scrollbarWidth: 'none' }}>
           {cards.map(category => {
             const title = titleFor(category)
             return (
+              <React.Fragment key={category.id}>
+                {compactMobile && <div className="shrink-0 sm:hidden">
+                  <CategoryChip category={category} title={title} count={itemCounts[category.id]} active={activeCategoryId === category.id} onClick={() => handleClick(category)} />
+                </div>}
+                <div className={compactMobile ? 'hidden shrink-0 sm:block' : 'contents'}>
               <LargeCategoryCard
                 key={category.id}
                 category={category}
@@ -330,6 +337,8 @@ export default function MenuCategoryScroller({
                 active={activeCategoryId === category.id}
                 onClick={() => handleClick(category)}
               />
+                </div>
+              </React.Fragment>
             )
           })}
         </div>
@@ -338,7 +347,7 @@ export default function MenuCategoryScroller({
       <div
         className={`${collapsedPosition === 'fixed' ? 'fixed left-0 right-0' : 'sticky -mx-1 overflow-hidden'} z-30 border-b border-[#E5E7EB] ${collapsedSurfaceClass} px-1 py-1.5 backdrop-blur transition-all duration-200 ${
           collapsed ? 'translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
-        } ${collapsedClassName}`}
+        } ${compactMobile ? 'max-sm:hidden' : ''} ${collapsedClassName}`}
         style={{
           top: fixedInsets?.top ?? topOffset,
           ...(fixedInsets ? { left: fixedInsets.left, right: fixedInsets.right } : {}),

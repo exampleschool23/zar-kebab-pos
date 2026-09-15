@@ -259,7 +259,7 @@ export function CategoryCard({ cat, active, onClick, lang, eager = false }) {
   )
 }
 
-export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu', density = 'comfortable', audience = readOnly ? 'public' : 'waiter' }) {
+export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpenDetail, lang, readOnly = false, eager = false, formatPrice = formatCurrency, linkBasePath = '/menu', density = 'comfortable', compactMobileGrid = false, audience = readOnly ? 'public' : 'waiter' }) {
   const inCart = !readOnly && qty > 0
   const unavailable = !readOnly && item?.available === false
   const [copied, setCopied] = useState(false)
@@ -302,13 +302,42 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
   }
 
   return (
+    <>
+    {compactMobileGrid && !readOnly && (
+      <div data-menu-product-card className={`flex h-full flex-col gap-1 rounded-xl border bg-white p-2 sm:hidden ${inCart ? 'border-orange-300' : 'border-[#E5E7EB]'}`}>
+        <button type="button" onClick={() => onOpenDetail(item)} className="flex w-full min-w-0 items-center gap-2 text-left">
+          <span data-menu-product-image className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-orange-50">
+            <SafeMenuImage src={item.image_url} alt="" className="h-full w-full object-cover" loading={eager ? 'eager' : 'lazy'} fallbackIconSize={24} />
+          </span>
+          <span className="min-w-0">
+            <span className="line-clamp-2 text-[13px] font-bold leading-tight text-[#1F2937]">{getItemName(item, lang)}</span>
+
+          </span>
+        </button>
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-1">
+          <div className="min-w-[70px] flex-1">
+            {pricing.discounted && <span className="block text-[10px] text-gray-400 line-through">{formatPrice(pricing.oldPrice)}</span>}
+            <span className="mt-1 block text-[12px] font-black leading-tight text-[#ff5a00]">
+              {formatPrice(pricing.price)}{pricing.maxPrice > pricing.price ? ` – ${formatPrice(pricing.maxPrice)}` : ''}{priceUnit}
+            </span>
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+          {inCart && <>
+            <button type="button" aria-label={`${lang === 'ru' ? 'Уменьшить' : lang === 'uz' ? 'Kamaytirish' : 'Decrease'}: ${getItemName(item, lang)}`} onClick={() => onDecrement(item)} className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 text-gray-600"><Minus size={18} /></button>
+            <span className="min-w-5 text-center text-sm font-black text-[#ff5a00]">{formatMenuQuantity(qty, item)}</span>
+          </>}
+          <button type="button" disabled={unavailable} aria-label={`${unavailable ? labels.unavailable : lang === 'ru' ? 'Добавить' : lang === 'uz' ? "Qo'shish" : 'Add'}: ${getItemName(item, lang)}`} onClick={e => inCart ? onIncrement(item, cartAnimationPayload(e)) : onAdd(item, cartAnimationPayload(e))} className="flex h-11 w-11 items-center justify-center rounded-lg bg-orange-50 text-[#ff5a00] disabled:opacity-40"><Plus size={20} /></button>
+          </div>
+        </div>
+      </div>
+    )}
     <div
       data-menu-product-card
       onClick={() => onOpenDetail(item)}
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onOpenDetail(item)}
-      className={`group flex h-full flex-col overflow-hidden transition-all cursor-pointer select-none ${
+      className={`group flex h-full flex-col ${compactMobileGrid && !readOnly ? 'max-sm:hidden' : ''} overflow-hidden transition-all cursor-pointer select-none ${
         unavailable
           ? 'rounded-[18px] border-2 border-[#D1D5DB] bg-[#F3F4F6] shadow-none'
           : inCart
@@ -432,6 +461,7 @@ export function ProductCard({ item, qty, onAdd, onIncrement, onDecrement, onOpen
         )}
       </div>
     </div>
+    </>
   )
 }
 
