@@ -439,7 +439,6 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [detailItem, setDetailItem] = useState(null)
-  const [missingItemLink, setMissingItemLink] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [searchCategoryId, setSearchCategoryId] = useState('all')
   const [headerOffset, setHeaderOffset] = useState(() => globalThis.window?.innerWidth < 640 ? 122 : 73)
@@ -574,13 +573,14 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
     if (loading) return
     if (!itemId) {
       setDetailItem(null)
-      setMissingItemLink(false)
       return
     }
     const linkedItem = findMenuItemByLinkKey(displayItems, itemId)
     setDetailItem(linkedItem)
-    setMissingItemLink(!linkedItem)
-  }, [displayItems, itemId, loading])
+    if (error || !linkedItem) {
+      navigate('/', { replace: true })
+    }
+  }, [displayItems, error, itemId, loading, navigate])
 
   const itemCounts = useMemo(() => {
     const counts = { all: displayItems.length }
@@ -879,24 +879,6 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
               className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-black text-red-700 shadow-sm"
             >
               {lang === 'uz' ? 'Qayta urinish' : lang === 'ru' ? 'Попробовать снова' : 'Try again'}
-            </button>
-          </div>
-        ) : missingItemLink ? (
-          <div className="rounded-[28px] border border-[#E5E7EB] bg-white p-10 text-center shadow-sm">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
-              <UtensilsCrossed size={28} className="text-orange-300" />
-            </div>
-            <p className="font-black text-[#1F2937]">
-              {lang === 'uz' ? 'Bu mahsulot topilmadi' : lang === 'ru' ? 'Позиция не найдена' : 'Item not found'}
-            </p>
-            <p className="mt-1 text-sm text-[#8A94A6]">
-              {lang === 'uz' ? 'U o‘chirilgan yoki hozir mavjud emas.' : lang === 'ru' ? 'Возможно, она удалена или сейчас недоступна.' : 'It may have been removed or is not currently available.'}
-            </p>
-            <button
-              onClick={() => navigate(menuBasePath)}
-              className="mt-4 rounded-xl bg-[#ff5a00] px-4 py-2 text-sm font-black text-white shadow-sm"
-            >
-              {lang === 'uz' ? 'Menyuga qaytish' : lang === 'ru' ? 'Вернуться в меню' : 'Back to menu'}
             </button>
           </div>
         ) : displayItems.length === 0 ? (

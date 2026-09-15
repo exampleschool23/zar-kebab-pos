@@ -12,6 +12,8 @@ Read this guide for app startup, authentication, routes, permissions, shared sta
 
 ## Routes and access
 
+- Public product links redirect to `/` with history replacement after loading finishes if the product cannot be resolved or the menu request fails.
+
 - Public routes: `/menu`, `/telegram`, authentication and password-reset routes.
 - Waiter routes: `/waiter/tables`, `/waiter/order/:tableId`, `/waiter/take-away`.
 - Kitchen check: `/kitchen-check/:orderId`; the retired `/kitchen` screen redirects to `/admin`.
