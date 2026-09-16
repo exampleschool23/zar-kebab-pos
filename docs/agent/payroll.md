@@ -34,14 +34,15 @@ Active cards sort by daily salary, then name; inactive by newest end date.
 
 ## Daily KPI bonus
 
-- Each enabled effective-dated rule receives its full basis-point percentage of restaurant-wide finalized paid dine-in `subtotal + service_fee`; loyalty does not reduce the base.
+- `195`: from Tashkent date `2026-09-16`, KPI uses paid dine-in `subtotal + service_fee` where `orders.opened_by = employee_salary_profiles.profile_id`, on payment date. Ignore names/cashier/loyalty. Unlinked/no-sales employees get `skipped_no_sales`.
+- Earlier catch-up/run totals stay restaurant-wide; finalized dates replay unchanged. Results snapshot personal sales. SQL tests: `tests/employeeOpenedOrderKpi.test.js`.
 - Skip absences and dates outside employment boundaries.
 - Date runs and employee results are immutable and duplicate-safe. Only the service-role finalizer creates `daily_kpi` bonuses.
-- Generated bonuses accrue into the employee's salary balance. Formula/settlement are immutable; salary payments record cash expense.
+- Bonuses accrue into salary. Formula/settlement are immutable; payments record cash expense.
 - Deleting a generated bonus marks its result voided; retries never recreate it.
-- Only owners remove KPI rules. The form's selected effective date is the removal boundary: the original rule and all finalized or paid data before it stay unchanged, while a disabled successor stops KPI from that date onward. A rule is physically deleted only when the selected boundary equals its own effective date and the rule is still unused. The disabled successor is not offered for removal because exposing the older enabled rule would reactivate KPI.
+- Only owners remove KPI rules. The selected effective date is the boundary: preserve earlier rules/data and insert a disabled successor. Physically delete only unused rules whose effective date equals the boundary. Never offer disabled successors for removal: that would reactivate the older rule.
 - Employee cards show today’s effective rule. Report missing migrations locally.
-- Adding a KPI rule or genuinely changing its rate/status creates an immutable before/after event and a duplicate-safe Salary-group delivery. A no-op save creates no new notification; migration `170` deliberately does not backfill older rules.
+- KPI rate/status changes create immutable before/after events and duplicate-safe Salary-group delivery. A no-op save creates no new notification; migration `170` deliberately does not backfill older rules.
 - Salary History separates monthly manual Bonuses from KPI bonuses. Salary + bonuses includes salary and both bonus types once each.
 - Effective dates cannot enter already finalized periods. Recovery scans missing older dates in bounded batches.
 

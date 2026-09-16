@@ -2,19 +2,19 @@
 
 ## Entry points
 
-- Database client and health inventory: `src/lib/db.js`, `src/lib/dbHealth.js`
+- Database/health: `src/lib/db.js`, `src/lib/dbHealth.js`
 - Migration runner and health commands: `supabase/migrate.js`, `scripts/check-db-health.js`
 - SQL migrations: `supabase/`
-- Navigator implementation and checks: `mcp/`, `tests/repoNavigatorMcp.test.js`, `scripts/benchmark-repo-nav.js`
+- Navigator: `mcp/`, `tests/repoNavigatorMcp.test.js`, `scripts/benchmark-repo-nav.js`
 - Source guards: `tests/sourceGuards.*.test.js`
 
 - 194: nullable employee job function; apply before the new employee dropdown.
 
 ## Database workflow
 
-- Apply migrations in order, including `src/lib/db.js` compatibility fallbacks.
+- Apply migrations in order; keep `src/lib/db.js` fallbacks.
 - Run `npm run db:health` first when a page loads forever or the console reports missing tables, columns, or RPCs.
-- Kitchen migrations do not replace earlier settings/payment migrations.
+- Kitchen migrations require prior settings/payment migrations.
 - Migration families:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`
@@ -52,7 +52,7 @@
 
 ## Tests
 
-Node test coverage:
+Coverage:
 
 - `tests/orderPayment.test.js`: totals, service, loyalty, cart, split payments, cashier, take-away, reporting.
 - `tests/dbRealtime.test.js`: realtime, settings reload, connection notices.
@@ -62,18 +62,18 @@ Node test coverage:
 - `tests/salaryTransactions.test.js`: salary ledger and deterministic history ordering.
 - `tests/sourceGuards.*.test.js`: domain-split source-level protection for regressions that reached users.
 
-Validate, then:
+Validate:
 
 ```bash
 npm test
 npm run build
 ```
 
-For docs/map/guard changes, run `npm run docs:check` and `npm run mcp:benchmark`.
+Docs/map/guard checks: `npm run docs:check` and `npm run mcp:benchmark`.
 
 ## Source-guard policy
 
-Understand each guard’s protected regression before changing it. Guards cover:
+Guards protect:
 
 - stable `ProfileSync`, `dbDispatch`, and unique realtime channels;
 - parent-owned kitchen sending state and snapshot-only cart removal;
@@ -87,9 +87,9 @@ Understand each guard’s protected regression before changing it. Guards cover:
 
 ## Browser/build verification
 
-- Protected routes need authentication.
+- Authenticate protected routes.
 - Vite large-chunk warnings are non-fatal.
-- Preserve unrelated edits; report unrun checks.
+- Keep unrelated edits; report unrun checks.
 
 - Migration `179_game_club_orders.sql` must precede the Game Club frontend release. It extends order/item constraints and current permission/settlement functions without changing historical rows. Never require the reopening function retired by `090`. Focused coverage: `tests/gameClubOrders.test.js`.
 
@@ -103,3 +103,5 @@ Understand each guard’s protected regression before changing it. Guards cover:
 - `189`: ingredient Investor queue and minute dispatch. Tests: `tests/ingredientNotifications.test.js`; SQL: `scripts/check-ingredient-notifications.mjs` (PGlite path). Deploy the sender before applying.
 
 - `190`–`193`: ten-day income and monthly Busy Hours RPCs; apply before UI.
+
+- `195`: apply for own-order KPI from `2026-09-16`; preserves history. SQL tests: `tests/employeeOpenedOrderKpi.test.js` (PGlite).
