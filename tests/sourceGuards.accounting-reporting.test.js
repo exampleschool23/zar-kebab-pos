@@ -167,10 +167,11 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
     'daily salary operations should appear before salary setup'
   )
   assert.doesNotMatch(salaries, /className=\{SECTION_GRID\}/)
-  assert.match(salaries, /salary-operations-heading[\s\S]*className="grid items-stretch gap-4"/)
+  assert.match(salaries, /salary-operations-heading[\s\S]*className="grid min-w-0 grid-cols-1 items-stretch gap-4"/)
   assert.match(salaries, /const \[salarySetupMode, setSalarySetupMode\] = useState\('add'\)/)
   assert.match(salaries, /\{ key: 'add',[\s\S]*\{ key: 'change',[\s\S]*\{ key: 'kpi'/)
-  assert.match(salaries, /salary-settings-heading[\s\S]*grid w-full min-w-0 grid-cols-1 items-stretch gap-4[\s\S]*h-full w-full min-w-0[\s\S]*lg:col-span-2/)
+  assert.match(salaries, /salary-settings-heading[\s\S]*grid w-full min-w-0 grid-cols-1 items-stretch gap-4[\s\S]*h-full w-full min-w-0/)
+  assert.doesNotMatch(salaries, /lg:col-span-2/)
   assert.match(salaries, /grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-\[minmax\(0,1fr\)_auto\]/)
   assert.ok((salaries.match(/h-11 self-end items-center/g) || []).length >= 3)
   assert.match(salaries, /aria-pressed=\{active\}/)

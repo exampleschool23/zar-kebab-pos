@@ -1519,7 +1519,7 @@ export default function Salaries() {
               <h1 className="text-2xl font-black text-[#1F2937] sm:text-3xl">{l.title}</h1>
               <p className="mt-1 text-sm font-medium text-[#6B7280]">{l.sub}</p>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-3">
               <MetricCard
                 icon={BadgeMinus}
                 label={l.totalDue}
@@ -1561,10 +1561,10 @@ export default function Salaries() {
               title={l.quickActions}
               description={l.quickActionsHelp}
             />
-            <div className="grid items-stretch gap-4">
-              <div className="flex h-full flex-col rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+            <div className="grid min-w-0 grid-cols-1 items-stretch gap-4">
+              <div className="flex h-full min-w-0 flex-col rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
                 <CardHeading icon={WalletCards} title={l.paymentBonus} description={l.transactionHelp} tone="orange" />
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:grid-cols-4" role="group" aria-label={l.paymentBonus}>
                     {['payment', 'bonus', 'fine', 'absence'].map(entryType => {
                       const active = transactionForm.entry_type === entryType
@@ -1793,7 +1793,7 @@ export default function Salaries() {
               description={l.salarySettingsHelp}
             />
             <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-4">
-              <div className="h-full w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
+              <div className="h-full w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
                 <CardHeading
                   icon={salarySetupMode === 'kpi' ? Percent : salarySetupMode === 'change' ? Save : Plus}
                   title={salarySetupMode === 'kpi' ? l.kpiRuleTitle : salarySetupMode === 'change' ? l.changeSalary : l.add}
@@ -1830,7 +1830,7 @@ export default function Salaries() {
                   })}
                 </div>
                 {salarySetupMode === 'add' && (
-                <form onSubmit={createSalaryProfile} className="grid gap-4 sm:grid-cols-2">
+                <form onSubmit={createSalaryProfile} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <Field label={l.employeeName}>
                       <input
@@ -1911,7 +1911,7 @@ export default function Salaries() {
               )}
 
               {salarySetupMode === 'change' && (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <Field label={l.selectEmployee}>
                       <select
@@ -1966,7 +1966,7 @@ export default function Salaries() {
               )}
               </div>
 
-              <div className="h-full min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-2">
+              <div className="h-full min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
                 <CardHeading icon={Send} title={l.telegramTitle} description={l.telegramHelp} tone="blue" />
                 <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <Field label={l.selectEmployee}>
@@ -2080,7 +2080,7 @@ export default function Salaries() {
                                     </button>
                                   )}
                                 </div>
-                                <div className={`mt-3 grid gap-2 ${delivery.showTeamDelivery ? 'sm:grid-cols-3' : delivery.showEmployeeDelivery === false ? '' : 'sm:grid-cols-2'}`}>
+                                <div className={`mt-3 grid min-w-0 grid-cols-1 gap-2 ${delivery.showTeamDelivery ? 'sm:grid-cols-3' : delivery.showEmployeeDelivery === false ? '' : 'sm:grid-cols-2'}`}>
                                   {[
                                     ...(delivery.showEmployeeDelivery === false ? [] : [{
                                       key: 'employee',
@@ -2141,7 +2141,7 @@ export default function Salaries() {
                           })}
                         </div>
                         {telegramDeliveryPageCount > 1 && (
-                          <div className="mt-3 flex items-center justify-between gap-3 border-t border-blue-100 pt-3">
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-blue-100 pt-3">
                             <button
                               type="button"
                               aria-label={l.previous}
