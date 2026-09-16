@@ -128,6 +128,8 @@ test('a later selected removal date preserves the original KPI rule before its d
   const originalRule = {
     id: 'rule-1',
     salary_profile_id: 'employee-1',
+    sales_basis: 'restaurant',
+    order_opener_profile_id: null,
     effective_from: '2026-08-17',
     rate_bps: 125,
     is_enabled: true,
@@ -152,6 +154,8 @@ test('a later selected removal date preserves the original KPI rule before its d
       salary_profile_id: 'employee-1',
       effective_from: '2026-09-01',
       rate_bps: 125,
+      sales_basis: 'restaurant',
+      order_opener_profile_id: null,
       is_enabled: false,
       created_by: 'owner-1',
       created_by_name: 'Owner',

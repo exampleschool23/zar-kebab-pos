@@ -118,3 +118,14 @@ test('employee cards show the current effective KPI percentage and enabled state
   assert.match(cardRow, /disabledLabel/)
   assert.match(cardRow, /notConfiguredLabel/)
 })
+
+test('KPI configuration saves the basis and requires an account only for own orders', () => {
+  assert.match(salaries, /value="employee_opened_orders"/)
+  assert.match(salaries, /value="restaurant"/)
+  assert.match(salaries, /sales_basis: kpiForm.sales_basis/)
+  assert.match(salaries, /order_opener_profile_id: openerId/)
+  assert.match(salaries, /form.is_enabled && form.sales_basis === 'employee_opened_orders' && !form.order_opener_profile_id/)
+  assert.match(salaries, /existingRule.sales_basis !== kpiForm.sales_basis/)
+  assert.match(salaries, /existingRule.order_opener_profile_id \|\| null/)
+  assert.match(employees, /formatKpiSalesBasis\(rule.sales_basis, lang\)/)
+})

@@ -104,4 +104,4 @@ Guards protect:
 
 - `190`–`193`: ten-day income and monthly Busy Hours RPCs; apply before UI.
 
-- `195`: apply for own-order KPI from `2026-09-16`; preserves history. SQL tests: `tests/employeeOpenedOrderKpi.test.js` (PGlite).
+- `195`/`196`: own/all dine-in KPI from `2026-09-16`; apply before UI. History preserved. SQL: `tests/employeeOpenedOrderKpi.test.js` (PGlite).

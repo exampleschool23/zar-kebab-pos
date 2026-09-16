@@ -28,7 +28,7 @@
 - Salary group target is `salary_events`; its env fallback must never use Team or completed-orders groups.
 - Payment, accrued bonus, fine, absence, and rate change notify employee and Salary group; automatic KPI uses combined summaries.
 - Rate-change messages show previous/new salary, effective date, and effective KPI status.
-- KPI changes notify only Salary group from immutable snapshots; no-op saves and older rules stay silent.
+- KPI changes notify Salary group from immutable rate/basis/account snapshots (`196`); no-op saves stay silent.
 
 ## Team salary events
 
@@ -36,7 +36,7 @@
 - Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
 - Bonuses omit payment method. Private manual bonuses/fines use Russian long dates.
 - Use shared localized long-date formatting. Empty notes are omitted; Team copy stays compact.
-- Historical rows are skipped during migration and never broadcast retroactively.
+- Historical rows are never broadcast retroactively.
 
 ## Automatic daily payroll privacy and language
 

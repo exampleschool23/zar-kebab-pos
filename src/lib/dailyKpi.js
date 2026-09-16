@@ -95,6 +95,7 @@ export async function removeKpiRulePreservingHistory({
         salary_profile_id: rule.salary_profile_id,
         effective_from: normalizedEffectiveFrom,
         rate_bps: rule.rate_bps,
+        ...(rule.sales_basis ? { sales_basis: rule.sales_basis, order_opener_profile_id: rule.order_opener_profile_id || null } : {}),
         is_enabled: false,
         created_by: createdBy,
         created_by_name: createdByName,
@@ -135,4 +136,13 @@ export function indexKpiResultsByBonusId(results = []) {
   return new Map(results
     .filter(result => result?.bonus_id)
     .map(result => [result.bonus_id, normalizeKpiResult(result)]))
+}
+
+export function formatKpiSalesBasis(basis, lang = 'en') {
+  const labels = {
+    en: ['Own opened orders', 'All paid dine-in orders'],
+    ru: ['Свои открытые заказы', 'Все оплаченные dine-in заказы'],
+    uz: ['O‘zi ochgan buyurtmalar', 'Barcha to‘langan dine-in buyurtmalari'],
+  }
+  return (labels[lang] || labels.en)[basis === 'restaurant' ? 1 : 0]
 }

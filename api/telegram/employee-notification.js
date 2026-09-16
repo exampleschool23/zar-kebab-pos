@@ -62,7 +62,7 @@ const GROUP_EVENT_CONFIG = {
   },
   kpi_rule: {
     table: 'employee_kpi_rule_change_events',
-    select: 'id, rule_id, salary_profile_id, employee_name_snapshot, change_kind, effective_from, previous_rate_bps, previous_is_enabled, new_rate_bps, new_is_enabled, created_by, created_by_name, created_at, salary_profile:employee_salary_profiles(employee_name)',
+    select: 'id, rule_id, salary_profile_id, employee_name_snapshot, change_kind, effective_from, previous_rate_bps, previous_is_enabled, new_rate_bps, new_is_enabled, previous_sales_basis, new_sales_basis, previous_order_opener_name, new_order_opener_name, created_by, created_by_name, created_at, salary_profile:employee_salary_profiles(employee_name)',
   },
 }
 

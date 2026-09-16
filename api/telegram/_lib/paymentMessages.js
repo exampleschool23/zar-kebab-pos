@@ -356,6 +356,19 @@ export function buildKpiRuleGroupMessage(event, language = 'ru') {
     `<b>${copy.effectiveFrom}:</b> ${escapeTelegramHtml(formatLongDate(event?.effective_from, lang, '-'))}`,
     `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(event?.created_by_name || '-')}`
   )
+  const basisCopy = {
+    ru: ['База KPI', 'Свои открытые заказы', 'Все dine-in заказы', 'POS-аккаунт'],
+    uz: ['KPI asosi', 'O‘zi ochgan buyurtmalar', 'Barcha dine-in buyurtmalar', 'POS akkaunt'],
+    en: ['KPI basis', 'Own opened orders', 'All dine-in orders', 'POS account'],
+  }[lang]
+  const basisLabel = value => value === 'restaurant' ? basisCopy[2] : basisCopy[1]
+  if (event?.new_sales_basis) {
+    const before = event.previous_sales_basis ? `${basisLabel(event.previous_sales_basis)} → ` : ''
+    lines.push(`<b>${basisCopy[0]}:</b> ${escapeTelegramHtml(before + basisLabel(event.new_sales_basis))}`)
+  }
+  if (event?.new_order_opener_name || event?.previous_order_opener_name) {
+    lines.push(`<b>${basisCopy[3]}:</b> ${escapeTelegramHtml(`${event.previous_order_opener_name || '—'} → ${event.new_order_opener_name || '—'}`)}`)
+  }
   return lines.join('\n')
 }
 

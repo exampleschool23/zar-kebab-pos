@@ -75,7 +75,7 @@ async function loadPage(page, tables) {
     setSalaryProfiles: value => { employees = value },
     setEmployee: value => { employees = [value] },
     setEntries() {}, setLoading() {}, setError: value => { error = value },
-    setKpiRules() {}, setKpiRulesAvailable() {}, setTelegramLinks() {}, loadTelegramDeliveryData() {},
+    setKpiAccounts() {}, setKpiRules() {}, setKpiRulesAvailable() {}, setTelegramLinks() {}, loadTelegramDeliveryData() {},
     isMissingSalaryMigration: () => false, l: {},
   }
   if (page !== 'EmployeeSalaryHistory') {

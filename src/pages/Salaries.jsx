@@ -14,6 +14,7 @@ import {
   calculateDailyKpiBonus,
   formatKpiRateInput,
   formatKpiRatePercent,
+  formatKpiSalesBasis,
   getEffectiveKpiRule,
   getKpiRuleEditDate,
   removeKpiRulePreservingHistory,
@@ -224,7 +225,13 @@ export default function Salaries() {
       migration: 'Maosh jadvallari yangilanmagan. 054–063, 099 va 169 maosh migratsiyalarini ishga tushiring.',
       readOnly: 'Bu sahifa faqat egasi uchun.',
       kpiTitle: 'Kunlik KPI bonuslari',
-      kpiHelp: 'Xodimga o‘zi ochgan va to‘langan dine-in buyurtmalari hamda xizmat haqidan KPI foizini belgilang.',
+      kpiHelp: "Har bir xodim uchun o‘z buyurtmalari yoki barcha dine-in savdosidan KPI belgilang.",
+      kpiBasis: "Hisoblash asosi",
+      kpiOwnOrders: "O‘zi ochgan buyurtmalar",
+      kpiAllDineIn: "Barcha to‘langan dine-in buyurtmalari",
+      kpiAccount: "Buyurtmalarni ochuvchi POS akkaunt",
+      kpiSelectAccount: "POS akkauntni tanlang",
+      kpiAccountRequired: "O‘z buyurtmalari uchun POS akkauntni tanlang.",
       kpiRuleTitle: 'Xodim KPI foizi',
       kpiRuleHelp: 'Yangi sana yangi sozlama yaratadi. Hali hisoblanmagan sanani qayta saqlab tuzatish mumkin.',
       kpiRate: 'KPI foizi',
@@ -245,9 +252,9 @@ export default function Salaries() {
       kpiRemoveOwnerOnly: 'KPI sozlamasini faqat egasi olib tashlashi mumkin.',
       kpiRemoveFailed: 'KPI sozlamasini olib tashlab bo‘lmadi.',
       kpiPreview: 'Hisoblash namunasi',
-      kpiBaseStatement: '16.09.2026 dan asos: xodimning o‘zi ochgan, shu kuni to‘langan dine-in buyurtmalari subtotal summasi + xizmat haqi. Avvalgi sanalarda restoran bo‘yicha asos saqlanadi. Hisobga ulanmagan xodimga KPI hisoblanmaydi.',
+      kpiBaseStatement: "Asos: tanlangan savdolarning to‘langan subtotal summasi + xizmat haqi, to‘lov sanasi bo‘yicha. Xostes va menejer uchun barcha dine-in buyurtmalarini tanlash mumkin. 16.09.2026 dan oldingi hisoblar o‘zgarmaydi.",
       kpiAccruesToSalary: 'Natija Bonus sifatida maosh balansiga qo‘shiladi va keyingi maosh to‘lovi bilan yopiladi. Xodim uni kunlik xabarda, Maosh guruhi umumiy hisobotda ko‘radi; ZarKebab Team alohida xabardor qilinadi.',
-      kpiMigration: 'Kunlik KPI va guruh xabarlari uchun 129, 169 va 170-migratsiyalarni ishga tushiring.',
+      kpiMigration: 'Kunlik KPI va guruh xabarlari uchun 129, 169 va 170, 196-migratsiyalarni ishga tushiring.',
       kpiLoadFailed: 'KPI ma’lumotlarini yuklab bo‘lmadi.',
       telegramTitle: 'Telegram xabarnomalari',
       telegramHelp: 'Xodimga 30 daqiqada muddati tugaydigan shaxsiy ulanish havolasini yuboring.',
@@ -367,7 +374,13 @@ export default function Salaries() {
       migration: 'Таблицы зарплат не обновлены. Запустите миграции зарплат 054–063, 099 и 169.',
       readOnly: 'Эта страница доступна только владельцу.',
       kpiTitle: 'Ежедневные KPI-бонусы',
-      kpiHelp: 'Назначьте сотруднику процент от оплаченных dine-in заказов, которые он открыл, включая сервис.',
+      kpiHelp: "Для каждого сотрудника выберите KPI от своих заказов или всех dine-in продаж.",
+      kpiBasis: "База расчёта",
+      kpiOwnOrders: "Свои открытые заказы",
+      kpiAllDineIn: "Все оплаченные dine-in заказы",
+      kpiAccount: "POS-аккаунт, открывающий заказы",
+      kpiSelectAccount: "Выберите POS-аккаунт",
+      kpiAccountRequired: "Для своих заказов выберите POS-аккаунт.",
       kpiRuleTitle: 'KPI-процент сотрудника',
       kpiRuleHelp: 'Новая дата создаёт новую настройку. Настройку ещё не рассчитанного дня можно исправить той же датой.',
       kpiRate: 'Процент KPI',
@@ -388,9 +401,9 @@ export default function Salaries() {
       kpiRemoveOwnerOnly: 'Удалить настройку KPI может только владелец.',
       kpiRemoveFailed: 'Не удалось удалить настройку KPI.',
       kpiPreview: 'Пример расчёта',
-      kpiBaseStatement: 'С 16.09.2026 база: subtotal + сервис по dine-in заказам, открытым сотрудником и оплаченным за день. Для более ранних дат сохраняется база всего ресторана. Без привязанного аккаунта KPI не начисляется.',
+      kpiBaseStatement: "База: оплаченный subtotal + сервис по выбранным заказам, по дате оплаты. Для хостес и менеджера можно выбрать все dine-in заказы. Расчёты до 16.09.2026 не меняются.",
       kpiAccruesToSalary: 'Результат начисляется в баланс зарплаты как бонус и погашается следующей выплатой. Сотрудник видит его в ежедневном сообщении, группа зарплат — в общем отчёте; ZarKebab Team получает отдельное уведомление.',
-      kpiMigration: 'Запустите миграции 129, 169 и 170 для ежедневных KPI и групповых уведомлений.',
+      kpiMigration: 'Запустите миграции 129, 169 и 170, 196 для ежедневных KPI и групповых уведомлений.',
       kpiLoadFailed: 'Не удалось загрузить данные KPI.',
       telegramTitle: 'Telegram-уведомления',
       telegramHelp: 'Отправьте сотруднику личную ссылку, которая действует 30 минут.',
@@ -510,7 +523,13 @@ export default function Salaries() {
       migration: 'Salary tables are not up to date. Run salary migrations 054–063, 099, and 169.',
       readOnly: 'Only the owner can manage this page.',
       kpiTitle: 'Daily KPI bonuses',
-      kpiHelp: "Set an employee’s KPI percentage on paid dine-in orders they opened, including service.",
+      kpiHelp: "Choose KPI from an employee’s own orders or all dine-in sales.",
+      kpiBasis: "Calculation basis",
+      kpiOwnOrders: "Own opened orders",
+      kpiAllDineIn: "All paid dine-in orders",
+      kpiAccount: "POS account opening orders",
+      kpiSelectAccount: "Select a POS account",
+      kpiAccountRequired: "Select a POS account for own-order KPI.",
       kpiRuleTitle: 'Employee KPI percentage',
       kpiRuleHelp: 'A new date creates a new setting. An unprocessed date can be corrected by saving the same date.',
       kpiRate: 'KPI percentage',
@@ -531,9 +550,9 @@ export default function Salaries() {
       kpiRemoveOwnerOnly: 'Only an owner can remove a KPI setting.',
       kpiRemoveFailed: 'Could not remove the KPI setting.',
       kpiPreview: 'Calculation example',
-      kpiBaseStatement: "From 16 Sep 2026: paid dine-in subtotal + service for orders opened by this employee, counted on the payment date. Earlier dates retain the restaurant-wide base. Employees without a linked account receive no KPI.",
+      kpiBaseStatement: "Base: paid subtotal + service for the selected orders, counted on the payment date. Choose all dine-in for hostesses and managers. Calculations before 16 Sep 2026 stay unchanged.",
       kpiAccruesToSalary: 'The result is added to salary balance as a bonus and settled by the next salary payment. The employee sees it in the daily message, Salary group in the aggregate report; ZarKebab Team is notified separately.',
-      kpiMigration: 'Run migrations 129, 169, and 170 for daily KPI and group notifications.',
+      kpiMigration: 'Run migrations 129, 169, and 170, 196 for daily KPI and group notifications.',
       kpiLoadFailed: 'Could not load KPI data.',
       telegramTitle: 'Telegram notifications',
       telegramHelp: 'Send the employee a private link that expires after 30 minutes.',
@@ -568,6 +587,7 @@ export default function Salaries() {
   }
   const l = L[lang] || L.en
   const [salaryProfiles, setSalaryProfiles] = useState([])
+  const [kpiAccounts, setKpiAccounts] = useState([])
   const [telegramLinks, setTelegramLinks] = useState([])
   const [paymentDeliveries, setPaymentDeliveries] = useState([])
   const [paymentDeliveriesUnavailable, setPaymentDeliveriesUnavailable] = useState(false)
@@ -622,6 +642,8 @@ export default function Salaries() {
     salary_profile_id: '',
     effective_from: today,
     rate_percentage: '1',
+    sales_basis: 'employee_opened_orders',
+    order_opener_profile_id: '',
     is_enabled: true,
   })
 
@@ -660,7 +682,7 @@ export default function Salaries() {
           .order('attempted_at', { ascending: false })
           .limit(100),
         supabase.from('employee_kpi_rule_change_events')
-          .select('id, salary_profile_id, employee_name_snapshot, change_kind, effective_from, previous_rate_bps, previous_is_enabled, new_rate_bps, new_is_enabled, created_at')
+          .select('id, salary_profile_id, employee_name_snapshot, change_kind, effective_from, previous_rate_bps, previous_is_enabled, new_rate_bps, new_is_enabled, previous_sales_basis, new_sales_basis, created_at')
           .order('created_at', { ascending: false })
           .limit(100),
       ])
@@ -699,6 +721,7 @@ export default function Salaries() {
       } else {
         if (fineRes.error) setError(isMissingSalaryMigration(fineRes.error) ? l.migration : fineRes.error.message)
         const teamRows = teamRes.data || []
+        setKpiAccounts(teamRows)
         setSalaryProfiles(composeSalaryProfiles(profileRes.data || [], rateRes.data || [], paymentRes.data || [], bonusRes.data || [], fineRes.error ? [] : fineRes.data || [], absenceRes.data || [], teamRows)
           .filter(salaryProfile => !salaryProfile.deleted_at))
         setTelegramLinks(telegramLinkRes.error ? [] : telegramLinkRes.data || [])
@@ -893,6 +916,8 @@ export default function Salaries() {
         previousKpiEnabled: event?.previous_is_enabled ?? null,
         newKpiRateBps: event?.new_rate_bps ?? null,
         newKpiEnabled: event?.new_is_enabled ?? null,
+        previousKpiBasis: event?.previous_sales_basis,
+        newKpiBasis: event?.new_sales_basis,
         sortAt: [delivery.attempted_at, delivery.employee_attempted_at, delivery.team_attempted_at]
           .filter(Boolean)
           .sort()
@@ -1020,6 +1045,8 @@ export default function Salaries() {
       salary_profile_id: salaryProfileId,
       effective_from: getKpiRuleEditDate(requestedRule?.effective_from, today),
       rate_percentage: currentRule ? formatKpiRateInput(currentRule.rate_bps) : '1',
+      sales_basis: currentRule?.sales_basis || 'employee_opened_orders',
+      order_opener_profile_id: currentRule?.order_opener_profile_id || activeSalaryProfiles.find(item => item.id === salaryProfileId)?.profile_id || '',
       is_enabled: currentRule?.is_enabled !== false,
     })
   }
@@ -1028,11 +1055,18 @@ export default function Salaries() {
     const salaryProfile = activeSalaryProfiles.find(item => item.id === kpiForm.salary_profile_id)
     const rateBps = parseKpiPercentToBps(kpiForm.rate_percentage)
     if (!canManage || !salaryProfile || !kpiForm.effective_from || kpiForm.effective_from < today || rateBps <= 0) return
+    if (kpiForm.is_enabled && kpiForm.sales_basis === 'employee_opened_orders' && !kpiForm.order_opener_profile_id) {
+      setKpiRulesError(l.kpiAccountRequired)
+      return
+    }
+    const openerId = kpiForm.sales_basis === 'employee_opened_orders' ? kpiForm.order_opener_profile_id || null : null
     const existingRule = kpiRules.find(rule => (
       rule.salary_profile_id === salaryProfile.id
       && String(rule.effective_from || '').slice(0, 10) === kpiForm.effective_from
     ))
     const configurationChanged = !existingRule
+      || existingRule.sales_basis !== kpiForm.sales_basis
+      || (existingRule.order_opener_profile_id || null) !== openerId
       || Number(existingRule.rate_bps) !== rateBps
       || Boolean(existingRule.is_enabled) !== Boolean(kpiForm.is_enabled)
 
@@ -1046,6 +1080,8 @@ export default function Salaries() {
         salary_profile_id: salaryProfile.id,
         effective_from: kpiForm.effective_from,
         rate_bps: rateBps,
+        sales_basis: kpiForm.sales_basis,
+        order_opener_profile_id: openerId,
         is_enabled: Boolean(kpiForm.is_enabled),
         created_by: profile?.id || null,
         created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
@@ -1136,6 +1172,8 @@ export default function Salaries() {
       salary_profile_id: '',
       effective_from: today,
       rate_percentage: '1',
+      sales_basis: 'employee_opened_orders',
+      order_opener_profile_id: '',
       is_enabled: true,
     })
     setMessage(removalResult.action === 'disabled' ? l.kpiStopped : l.kpiRemoved)
@@ -1826,6 +1864,7 @@ export default function Salaries() {
                 canRemoveRules={canRemoveKpiRules}
                 loading={loading}
                 activeSalaryProfiles={activeSalaryProfiles}
+                kpiAccounts={kpiAccounts}
                 selectedKpiProfile={selectedKpiProfile}
                 form={kpiForm}
                 onSelectEmployee={selectKpiEmployee}
@@ -1963,13 +2002,13 @@ export default function Salaries() {
                           {pagedTelegramDeliveryRows.map(delivery => {
                             const retryKey = `telegram-retry-${delivery.eventType}-${delivery.eventId}`
                             const typeStyle = telegramDeliveryTypeStyles[delivery.eventType] || telegramDeliveryTypeStyles.payment
-                            const kpiValue = (rateBps, enabled) => (
-                              enabled === false ? l.kpiDisabled : formatKpiRatePercent(rateBps, lang)
+                            const kpiValue = (rateBps, enabled, basis) => (
+                              enabled === false ? l.kpiDisabled : `${formatKpiRatePercent(rateBps, lang)}${basis ? ` · ${formatKpiSalesBasis(basis, lang)}` : ''}`
                             )
                             const deliveryValue = delivery.eventType === 'kpi_rule'
                               ? delivery.previousKpiRateBps == null
-                                ? kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled)
-                                : `${kpiValue(delivery.previousKpiRateBps, delivery.previousKpiEnabled)} → ${kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled)}`
+                                ? kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled, delivery.newKpiBasis)
+                                : `${kpiValue(delivery.previousKpiRateBps, delivery.previousKpiEnabled, delivery.previousKpiBasis)} → ${kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled, delivery.newKpiBasis)}`
                               : delivery.eventType === 'rate'
                                 ? `${formatCurrency(delivery.amount)} · ${salaryRateUnitLabel(delivery.eventUnit, lang)}`
                                 : delivery.eventType === 'absence'
@@ -2125,6 +2164,7 @@ function DailyKpiSection({
   canRemoveRules,
   loading,
   activeSalaryProfiles,
+  kpiAccounts,
   selectedKpiProfile,
   form,
   onSelectEmployee,
@@ -2192,6 +2232,31 @@ function DailyKpiSection({
                 disabled={!canManage || loading || rulesLoading}
               />
             </Field>
+            <div className="min-w-0 sm:col-span-2">
+              <Field label={labels.kpiBasis}>
+                <select value={form.sales_basis} className={FIELD}
+                  disabled={!canManage || loading || rulesLoading}
+                  onChange={event => onFormChange(current => ({ ...current, sales_basis: event.target.value }))}>
+                  <option value="employee_opened_orders">{labels.kpiOwnOrders}</option>
+                  <option value="restaurant">{labels.kpiAllDineIn}</option>
+                </select>
+              </Field>
+            </div>
+            {form.sales_basis === 'employee_opened_orders' && (
+              <div className="min-w-0 sm:col-span-2">
+                <Field label={labels.kpiAccount}>
+                  <select value={form.order_opener_profile_id} className={FIELD}
+                    disabled={!canManage || loading || rulesLoading}
+                    onChange={event => onFormChange(current => ({ ...current, order_opener_profile_id: event.target.value }))}>
+                    <option value="">{labels.kpiSelectAccount}</option>
+                    {kpiAccounts.filter(account => account.status === 'active' || account.id === form.order_opener_profile_id).map(account => (
+                      <option key={account.id} value={account.id}>{account.full_name || account.email}</option>
+                    ))}
+                  </select>
+                </Field>
+                {!form.order_opener_profile_id && <p className="mt-2 text-xs font-bold text-amber-700">{labels.kpiAccountRequired}</p>}
+              </div>
+            )}
             <Field label={labels.kpiRate}>
               <div className="relative min-w-0">
                 <input
@@ -2250,7 +2315,7 @@ function DailyKpiSection({
               <button
                 type="button"
                 onClick={onSave}
-                disabled={!canManage || loading || rulesLoading || !selectedKpiProfile || !form.effective_from || previewRateBps <= 0 || saving}
+                disabled={!canManage || loading || rulesLoading || !selectedKpiProfile || !form.effective_from || previewRateBps <= 0 || (form.is_enabled && form.sales_basis === 'employee_opened_orders' && !form.order_opener_profile_id) || saving}
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}
