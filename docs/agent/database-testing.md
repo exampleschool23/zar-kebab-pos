@@ -105,4 +105,4 @@ Guards protect:
 
 - `195`/`196`: own/all dine-in KPI from `2026-09-16`; apply before UI. History preserved. SQL: `tests/employeeOpenedOrderKpi.test.js` (PGlite).
 
-- `197`: paid-order KPI notices; deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.
+- `197`/`198`: paid-order notices and daily KPI; deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.

@@ -10,7 +10,7 @@
 
 ## Mini App
 
-- Mini App is read-only; Checkout/My Orders retired.
+- Mini App is read-only.
 
 ## Delivery records and retries
 
@@ -36,7 +36,7 @@
 - Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
 - Bonuses omit payment method. Private manual bonuses/fines use Russian long dates.
 - Use shared localized long-date formatting. Empty notes are omitted; Team copy stays compact.
-- Historical rows are never broadcast retroactively.
+- No historical broadcasts.
 
 ## Automatic daily payroll privacy and language
 
@@ -77,4 +77,4 @@
 
 - Deploy after `185`. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages stay. Telegram permits deletion within 48h. Test: `tests/orderStatusDelivery.test.js`.
 
-- `197`: paid orders privately notify the linked opener with total and estimated KPI; no bonus write/backfill. Atomic claims hold uncertain sends; minute retries use `task=employee-order-kpi`. Deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.
+- `197`/`198`: paid orders privately notify the opener with total, order cut and running daily KPI (effective own/all dine-in base, rounded once). No accrual/backfill. Claims hold uncertain sends; minute retries: `task=employee-order-kpi`. Deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.

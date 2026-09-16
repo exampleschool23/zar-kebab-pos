@@ -4,10 +4,10 @@ const money = value => new Intl.NumberFormat('ru-RU').format(Number(value) || 0)
 
 export function buildEmployeeOrderKpiMessage(snapshot) {
   return [
-    `✅ Заказ №${escapeTelegramHtml(snapshot.order_number)} оплачен`,
-    `Сумма: ${money(snapshot.total)} сум`,
-    `Ваш KPI (${money(snapshot.rate_bps / 100)}%): ≈ ${money(snapshot.cut)} сум`,
-    'Итог KPI — после закрытия дня.',
+    `✅ Заказ №${escapeTelegramHtml(snapshot.order_number)} оплачен — ${money(snapshot.total)} сум`,
+    snapshot.cut > 0 ? '🎉 Спасибо за вашу работу!' : '🙌 Спасибо за вашу работу!',
+    `💰 Бонус с заказа: ≈ ${money(snapshot.cut)} сум`,
+    ...(snapshot.daily_cut != null ? [`📈 Ваш KPI за сегодня: ≈ ${money(snapshot.daily_cut)} сум`] : []),
   ].join('\n')
 }
 
