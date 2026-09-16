@@ -448,7 +448,7 @@ export default function Employees() {
           ) : employees.length === 0 ? (
             <div className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-16 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {employeeGridEntries.map(entry => {
                 if (entry.type === 'inactive-toggle') {
                   return (
@@ -491,14 +491,14 @@ export default function Employees() {
                 const deactivateDate = normalizeSalaryEndDate(employee, deactivateDates[employee.id], today)
                 const effectiveKpiRule = getEffectiveKpiRule(kpiRules, employee.id, today)
                 return (
-                  <section key={employee.id} className={`rounded-2xl border p-4 shadow-sm ${
+                  <section key={employee.id} className={`min-w-0 rounded-2xl border p-4 shadow-sm ${
                     inactive
                       ? 'border-[#E5E7EB] bg-[#F3F4F6]'
                       : absentToday
                         ? 'border-red-300 bg-red-50/80 ring-2 ring-red-100'
                         : 'border-[#E5E7EB] bg-white'
                   }`}>
-                    <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
                         <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
                           inactive
@@ -686,9 +686,9 @@ function Kpi({ icon: Icon, label, value, hot = false, danger = false }) {
 
 function Row({ icon: Icon, label, value, hot = false, negative = false }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] px-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] px-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-[#9CA3AF]">{Icon && <Icon size={13} />}{label}</span>
-      <span className={`text-right font-black ${negative ? 'text-red-600' : hot ? 'text-[#ff5a00]' : 'text-[#1F2937]'}`}>{value}</span>
+      <span className={`min-w-0 break-words text-right font-black ${negative ? 'text-red-600' : hot ? 'text-[#ff5a00]' : 'text-[#1F2937]'}`}>{value}</span>
     </div>
   )
 }
@@ -714,9 +714,9 @@ function EmployeeKpiRow({
         : disabledLabel
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] px-3 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#F9FAFB] px-3 py-2">
       <span className="inline-flex items-center gap-1.5 text-[#9CA3AF]"><Percent size={13} />{label}</span>
-      <span className="flex min-w-0 items-center justify-end gap-2 text-right">
+      <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 text-right">
         {configured && available && (
           <span className={`font-black ${enabled ? 'text-violet-600' : 'text-[#6B7280]'}`}>
             {formatKpiRatePercent(rule.rate_bps, lang)}
