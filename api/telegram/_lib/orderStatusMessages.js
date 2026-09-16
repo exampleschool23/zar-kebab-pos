@@ -295,6 +295,7 @@ export function buildCompletedOrderGroupMessage(order) {
       ? `${typeIcon} Тип: ${escapeTelegramHtml(orderTypeLabel(inferOrderType(order), 'ru'))}`
       : `${typeIcon} Стол: ${escapeTelegramHtml(order?.table_name || '-')}`,
     `Дата: ${escapeTelegramHtml(closedAt)}`,
+    `Официант: ${escapeTelegramHtml(String(order?.waiter_name || '').trim() || 'Не указан')}`,
     `${escapeTelegramHtml(formatPriceModeLine(order))}${turboBadge}`,
   ]
 

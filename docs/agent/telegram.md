@@ -8,17 +8,17 @@
 - Polling: `bots/telegram-bot.js`
 - Tests: `tests/teamDailyKpiDelivery.test.js`, `tests/employeePayrollImages.test.js`.
 
-## Customer Mini App
+## Mini App
 
-- Mini App is read-only; Checkout/My Orders are retired.
+- Mini App is read-only; Checkout/My Orders retired.
 
 ## Delivery records and retries
 
 - Saved salary events and genuine rate changes get database-first `not_attempted` tracking; initial setup is not a change.
 - Delivery advances independently through pending, sent, failed, skipped, or confirmed states for each destination.
-- Mark sent only after Telegram returns a message id.
+- Mark sent only with a Telegram message id.
 - Employee, Salary group, Team, and Investor attempts are independent and duplicate-safe.
-- Salaries shows status, five records per page, and unsent-delivery retries.
+- Salaries: status, five rows/page, unsent retries.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
 - Owner history deletion first retracts tracked private, Salary-group, and Team messages. Payments snapshot the employee chat id. Missing messages count as retracted; other deletion failures preserve the event.
 
@@ -57,7 +57,7 @@
 ## Investor notifications
 
 - Employee lifecycle changes queue immutable Russian Investor events with employee, date, and actor snapshots.
-- Ingredient changes (`189`) snapshot before/after values and actor. Unchanged saves and imports stay silent. The `ingredient-events` task sends to `salary_events`; unknown sends stay held.
+- Ingredient changes (`189`) snapshot before/after values and actor. Unchanged saves and imports stay silent. `ingredient-events` sends to `salary_events`; unknown sends stay held.
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Order deletes require a reason popup; migration `184` saves it in Investor alerts. Alerts snapshot order, total, actor, and tenders. Payment corrections also notify Investor.
 - Cash-expense alerts are text. Daily Bazaar sends one localized PNG and caption; never duplicate it with a text receipt.
@@ -69,8 +69,10 @@
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows never announce new cash expenses.
 
-## Status-group messages
+## Status messages
 
-- Status orders show saved `cashback_earned`, summed across rounds; omit zero. Test: `tests/telegramOrderStatus.test.js`.
+- `Официант`: saved `waiter_name`, merged across rounds; missing: `Не указан`. Never use the closer.
 
-- Apply `185` before deployment. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages cannot be removed. Telegram permits deletion within 48h. Tests: `tests/orderStatusDelivery.test.js`.
+- Status: saved `cashback_earned`, summed across rounds; omit zero. Test: `tests/telegramOrderStatus.test.js`.
+
+- Deploy after `185`. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages stay. Telegram permits deletion within 48h. Test: `tests/orderStatusDelivery.test.js`.

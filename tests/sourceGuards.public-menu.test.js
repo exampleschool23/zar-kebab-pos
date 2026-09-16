@@ -314,7 +314,7 @@ test('menu costs stay private, snapshot onto sold items, and drive profit output
   assert.match(telegramMessage, /Доход:/)
   assert.match(telegramMessage, /dailyProfitMarginPct/)
   assert.doesNotMatch(telegramMessage, /· Заказ|· Сегодня|Маржа прибыли/)
-  assert.doesNotMatch(telegramMessage, /`Официант:/)
+  assert.match(telegramMessage, /`Официант:.*order\?\.waiter_name/)
   assert.doesNotMatch(telegramMessage, /`Закрыл:/)
   assert.match(dbHealth, /menu_item_costs/)
   assert.match(cliHealth, /menu_item_costs/)
