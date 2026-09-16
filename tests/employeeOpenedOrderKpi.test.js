@@ -195,7 +195,32 @@ test('employee opened-order KPI executes the production finalizer in PostgreSQL'
     assert.equal(await count(),n+1)
     await db.query(`update employee_kpi_rules set order_opener_profile_id=$1 where salary_profile_id=$2 and effective_from='2026-09-19'`,[id(101),id(1)])
 
-    const results = byEmployee(await finalize('2026-09-19'))
+    // Reproduce the production drift: an older English guard rejects the
+    // current Russian finalizer label. Failed finalization must remain atomic.
+    const guard = sql('129_daily_kpi_bonuses.sql').match(
+      /create or replace function public\.protect_daily_kpi_bonus_source\(\)[\s\S]*?\$\$;/,
+    )[0]
+    await db.exec(guard.replace('Автоматический KPI', 'Automatic KPI'))
+    await assert.rejects(finalize('2026-09-19'), /only by the automatic finalizer/)
+    assert.equal((await db.query("select count(*)::int n from employee_daily_kpi_runs where business_date='2026-09-19'")).rows[0].n, 0)
+    assert.equal((await db.query("select count(*)::int n from employee_salary_bonuses where bonus_date='2026-09-19'")).rows[0].n, 0)
+    await db.exec(sql('200_repair_daily_kpi_creator_guard.sql'))
+    await db.exec(sql('200_repair_daily_kpi_creator_guard.sql'))
+    assert.deepEqual(await finalize('2026-09-17'), before)
+    for (const label of ['Automatic KPI', null]) {
+      await assert.rejects(db.query(`insert into employee_salary_bonuses
+        (id,salary_profile_id,bonus_date,amount,source_type,created_by_name)
+        values(gen_random_uuid(),$1,'2026-09-19',1,'daily_kpi',$2)`, [id(1),label]), /only by the automatic finalizer/)
+    }
+    await assert.rejects(db.query(`insert into employee_salary_bonuses
+      (id,salary_profile_id,bonus_date,amount,source_type,created_by_name,created_by)
+      values(gen_random_uuid(),$1,'2026-09-19',1,'daily_kpi','Автоматический KPI',$2)`, [id(1),id(101)]), /only by the automatic finalizer/)
+    await db.exec(`create or replace function auth.uid() returns uuid language sql as $$ select '${id(101)}'::uuid $$`)
+    await assert.rejects(finalize('2026-09-19'), /only by the automatic finalizer/)
+    await db.exec('create or replace function auth.uid() returns uuid language sql as $$ select null::uuid $$')
+    const finalized = await finalize('2026-09-19')
+    assert.deepEqual(await finalize('2026-09-19'), finalized)
+    const results = byEmployee(finalized)
     assert.equal(results.get(id(1)).bonus_amount,25000)
     assert.equal(results.get(id(2)).bonus_amount,60000)
     assert.equal(results.get(id(3)).bonus_amount,30000)
@@ -206,6 +231,7 @@ test('employee opened-order KPI executes the production finalizer in PostgreSQL'
     assert.equal(Number(results.get(id(4)).sales_base_amount),6000000)
     const bonuses = (await db.query("select * from employee_salary_bonuses where bonus_date='2026-09-19'")).rows
     const hostess = bonuses.find(b=>b.salary_profile_id===id(4))
+    await assert.rejects(db.query('update employee_salary_bonuses set amount=amount+1 where id=$1',[hostess.id]), /immutable/)
     assert.equal(hostess.source_metadata.sales_basis,'restaurant')
     assert.equal(hostess.source_metadata.opened_by,null)
     const items = bonuses.map(b=>({employee_name:b.salary_profile_id,amount:b.amount}))

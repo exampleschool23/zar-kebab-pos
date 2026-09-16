@@ -13,9 +13,9 @@
 ## Database workflow
 
 - Use full filenames in order; legacy duplicate prefixes `073`, `108`, `157` stay distinct. New duplicates fail.
-- `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. Unknown legacy history stays untracked; never bulk replay/baseline. Writes and receipts are atomic, matching receipts skip, changed checksums fail. Reconcile lost responses before retry.
-- Tests: `tests/migrationTools.test.js`; helpers: `scripts/migrationTools.js`. Health compares recent definitions, triggers and cron, not just RPC existence.
-- Run `npm run db:health` first for endless loading or missing schema/RPC warnings.
+- `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. Never bulk replay/baseline legacy history. Writes and receipts are atomic, matching receipts skip, changed checksums fail. Reconcile lost responses.
+- Tests: `tests/migrationTools.test.js`; helpers: `scripts/migrationTools.js`. Health checks definitions, triggers and cron.
+- For loading/schema/RPC errors, first run `npm run db:health`.
 - Migration families:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`
@@ -53,7 +53,7 @@
 
 ## Tests
 
-Use the feature guide’s focused tests.
+Use focused feature tests.
 
 Validate:
 
@@ -62,7 +62,7 @@ npm test
 npm run build
 ```
 
-Docs/map/guard checks: `npm run docs:check` and `npm run mcp:benchmark`.
+Docs/map checks: `npm run docs:check` and `npm run mcp:benchmark`.
 
 ## Source-guard policy
 
@@ -100,3 +100,5 @@ Guards protect:
 - `195`/`196`: own/all dine-in KPI from `2026-09-16`; apply before UI. History preserved. SQL: `tests/employeeOpenedOrderKpi.test.js` (PGlite).
 
 - `197`/`198`: paid-order notices and daily KPI; deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.
+
+- `200`: repair KPI creator-label drift; preserve actor checks/history. Tests: `tests/employeeOpenedOrderKpi.test.js`.

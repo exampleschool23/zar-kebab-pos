@@ -1,6 +1,6 @@
 # Employees, Payroll, KPI, Absence, and Employee Meals
 
-Cards sort by salary/name; inactive by newest end date.
+Cards: salary/name; inactive: end date.
 
 - Migration 194 adds nullable job_function. New employees require a job; it grants no permissions.
 
@@ -37,7 +37,7 @@ Cards sort by salary/name; inactive by newest end date.
 - `195`/`196`: from `2026-09-16`, effective rules choose `sales_basis`: `employee_opened_orders` (default) or `restaurant`. Base is paid dine-in subtotal + service, by Tashkent payment date; ignore loyalty. Own orders match `order_opener_profile_id`, falling back to payroll `profile_id`. Require an account when saving enabled own-order rules; restaurant KPI needs none.
 - Earlier catch-up/run totals stay restaurant-wide; finalized dates replay unchanged. Results/bonus metadata freeze amounts/basis. SQL + image coverage: `tests/employeeOpenedOrderKpi.test.js`.
 - Skip absences and dates outside employment boundaries.
-- Runs/results are immutable and duplicate-safe. Only service-role finalization creates `daily_kpi` bonuses.
+- Runs/results are immutable and duplicate-safe. Only service-role finalization creates `daily_kpi` bonuses. `200`: creator-label repair.
 - Bonuses accrue into salary. Formula/settlement are immutable; payments record cash expense.
 - Deleting a generated bonus marks its result voided; retries never recreate it.
 - Only owners remove KPI rules. The selected effective date is the boundary: preserve earlier rules/data and insert a disabled successor. Physically delete only unused rules whose effective date equals the boundary. Never offer disabled successors for removal: that would reactivate the older rule.
