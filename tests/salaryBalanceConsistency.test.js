@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { getActiveKpiAccounts } from '../src/lib/dailyKpi.js'
 import { loadSalaryRows } from '../src/lib/salaryData.js'
 import { compareSalaryAbsencesNewestFirst } from '../src/lib/salaryTransactions.js'
 import { buildSalaryHistoryEntries } from '../src/lib/salaryHistory.js'
@@ -75,7 +76,8 @@ async function loadPage(page, tables) {
     setSalaryProfiles: value => { employees = value },
     setEmployee: value => { employees = [value] },
     setEntries() {}, setLoading() {}, setError: value => { error = value },
-    setKpiAccounts() {}, setKpiRules() {}, setKpiRulesAvailable() {}, setTelegramLinks() {}, loadTelegramDeliveryData() {},
+    getActiveKpiAccounts,
+    setKpiAccountsError() {}, setKpiAccounts() {}, setKpiRules() {}, setKpiRulesAvailable() {}, setTelegramLinks() {}, loadTelegramDeliveryData() {},
     isMissingSalaryMigration: () => false, l: {},
   }
   if (page !== 'EmployeeSalaryHistory') {

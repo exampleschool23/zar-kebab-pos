@@ -141,8 +141,13 @@ export function indexKpiResultsByBonusId(results = []) {
 export function formatKpiSalesBasis(basis, lang = 'en') {
   const labels = {
     en: ['Own opened orders', 'All paid dine-in orders'],
-    ru: ['Свои открытые заказы', 'Все оплаченные dine-in заказы'],
-    uz: ['O‘zi ochgan buyurtmalar', 'Barcha to‘langan dine-in buyurtmalari'],
+    ru: ['Свои открытые заказы', 'Все оплаченные заказы в зале'],
+    uz: ['O‘zi ochgan buyurtmalar', 'Zaldagi barcha to‘langan buyurtmalar'],
   }
   return (labels[lang] || labels.en)[basis === 'restaurant' ? 1 : 0]
+}
+
+export function getActiveKpiAccounts(accounts = []) {
+  return accounts.filter(account => account?.id && account.status === 'active')
+    .sort((a, b) => String(a.full_name || a.email || '').localeCompare(String(b.full_name || b.email || '')))
 }

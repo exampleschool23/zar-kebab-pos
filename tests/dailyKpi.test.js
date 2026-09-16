@@ -6,6 +6,7 @@ import {
   formatKpiRatePercent,
   formatKpiRateInput,
   getEffectiveKpiRule,
+  getActiveKpiAccounts,
   getKpiRuleEditDate,
   getDefaultKpiHistoryRange,
   indexKpiResultsByBonusId,
@@ -223,4 +224,18 @@ test('KPI results can decorate their generated salary bonuses by durable bonus i
     bonusAmountUzs: 97_750,
     rateBps: 100,
   })
+})
+
+test('KPI account choices include only active POS accounts and preserve the source list', () => {
+  const accounts = [
+    { id: 'zilola', full_name: 'Zilola', status: 'active' },
+    { id: 'pending', full_name: 'Applicant', status: 'pending' },
+    { id: 'malika', full_name: 'Malika', status: 'active' },
+    { id: 'inactive', full_name: 'Former employee', status: 'inactive' },
+    { id: 'blocked', full_name: 'Blocked', status: 'blocked' },
+  ]
+  const original = structuredClone(accounts)
+  assert.deepEqual(getActiveKpiAccounts(accounts).map(account => account.id), ['malika', 'zilola'])
+  assert.deepEqual(accounts, original)
+  assert.deepEqual(getActiveKpiAccounts(), [])
 })

@@ -357,8 +357,8 @@ export function buildKpiRuleGroupMessage(event, language = 'ru') {
     `<b>${copy.createdBy}:</b> ${escapeTelegramHtml(event?.created_by_name || '-')}`
   )
   const basisCopy = {
-    ru: ['База KPI', 'Свои открытые заказы', 'Все dine-in заказы', 'POS-аккаунт'],
-    uz: ['KPI asosi', 'O‘zi ochgan buyurtmalar', 'Barcha dine-in buyurtmalar', 'POS akkaunt'],
+    ru: ['База KPI', 'Свои открытые заказы', 'Все заказы в зале', 'POS-аккаунт'],
+    uz: ['KPI asosi', 'O‘zi ochgan buyurtmalar', 'Zaldagi barcha buyurtmalar', 'POS akkaunt'],
     en: ['KPI basis', 'Own opened orders', 'All dine-in orders', 'POS account'],
   }[lang]
   const basisLabel = value => value === 'restaurant' ? basisCopy[2] : basisCopy[1]
