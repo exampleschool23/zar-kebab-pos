@@ -1,3 +1,4 @@
+import { drainEmployeeOrderKpiNotifications } from './_lib/employeeOrderKpiNotifications.js'
 import { drainIngredientNotifications } from './_lib/ingredientNotifications.js'
 import { retractDeletedOrderStatusMessages } from './_lib/orderStatusDelivery.js'
 import { drainGameClubNotifications } from './_lib/gameClubNotifications.js'
@@ -1336,6 +1337,9 @@ export default async function handler(req, res) {
     cronAuthorized = true
     cronTask = getCronTask(req)
     supabase = getSupabaseAdmin({ retryReportReads: true })
+    if (cronTask === 'employee-order-kpi') {
+      return json(res, 200, await drainEmployeeOrderKpiNotifications(supabase))
+    }
     if (cronTask === 'order-status-cleanup') {
       return json(res, 200, await retractDeletedOrderStatusMessages(supabase))
     }
@@ -1576,6 +1580,9 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     console.error('[telegram/daily-salary]', error)
+    if (cronTask === 'employee-order-kpi') {
+      return json(res, error?.status || 500, { error: error.message || 'Employee order notifications failed' })
+    }
     if (cronTask === 'order-status-cleanup') {
       return json(res, error?.status || 500, { error: error.message || 'Order status cleanup failed' })
     }

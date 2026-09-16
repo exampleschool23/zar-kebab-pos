@@ -61,9 +61,9 @@
 - New cash expense inserts and Daily Bazaar purchases notify the independently configured Investor group using the legacy `salary_events` target key.
 - Order deletes require a reason popup; migration `184` saves it in Investor alerts. Alerts snapshot order, total, actor, and tenders. Payment corrections also notify Investor.
 - Cash-expense alerts are text. Daily Bazaar sends one localized PNG and caption; never duplicate it with a text receipt.
-- Daily Investor album: financial/payroll covers yesterday; Bazaar covers two days ago; a live image lists unpaid, non-cancelled orders with place, id, time, status, total, and non-cancelled items/quantities/amounts. Tech Card consumption is separate. Use Russian places/statuses and catalog dish/variant names (saved-name fallback). Renderer excludes paid/cancelled orders too. No report-date filter.
+- Investor album: yesterday’s financial/payroll, Bazaar from two days ago, plus all live unpaid/non-cancelled orders (place/id/time/status/total/items). Russian labels and catalog names, saved-name fallback. Renderer also filters paid/cancelled. Tech Card consumption is separate.
 - Bazaar PNGs group numbered items by saved Russian category with paid/normal prices and signed variance (red above, green below), plus total variance. Missing normal prices stay unset; rows never truncate.
-- Financial and Daily Bazaar delivery is image-only: if either renderer fails, send no text fallback and leave the claimed report rows retryable. A partial retry may send only the missing PNG without duplicating the photo already recorded as sent.
+- Financial/Bazaar are image-only: renderer failures remain retryable, no text fallback. Partial retries send only missing PNGs.
 - Ingredient images use immutable paid-sale recipe snapshots and count missing coverage.
 - Album ledgers mark sent only after each photo’s Telegram message id.
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
@@ -71,8 +71,10 @@
 
 ## Status messages
 
-- `Официант`: saved `waiter_name`, merged across rounds; missing: `Не указан`. Never use the closer.
+- `Официант`: saved `waiter_name`, merged across rounds; missing: `Не указан`, never the closer.
 
 - Status: saved `cashback_earned`, summed across rounds; omit zero. Test: `tests/telegramOrderStatus.test.js`.
 
 - Deploy after `185`. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages stay. Telegram permits deletion within 48h. Test: `tests/orderStatusDelivery.test.js`.
+
+- `197`: paid orders privately notify the linked opener with total and estimated KPI; no bonus write/backfill. Atomic claims hold uncertain sends; minute retries use `task=employee-order-kpi`. Deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.

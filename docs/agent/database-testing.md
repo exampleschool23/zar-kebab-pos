@@ -12,9 +12,8 @@
 
 ## Database workflow
 
-- Apply migrations in order; keep `src/lib/db.js` fallbacks.
-- Run `npm run db:health` first when a page loads forever or the console reports missing tables, columns, or RPCs.
-- Kitchen migrations require prior settings/payment migrations.
+- Apply migrations in order; keep DB fallbacks.
+- Run `npm run db:health` first for endless loading or missing schema/RPC warnings.
 - Migration families:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`
@@ -105,3 +104,5 @@ Guards protect:
 - `190`–`193`: ten-day income and monthly Busy Hours RPCs; apply before UI.
 
 - `195`/`196`: own/all dine-in KPI from `2026-09-16`; apply before UI. History preserved. SQL: `tests/employeeOpenedOrderKpi.test.js` (PGlite).
+
+- `197`: paid-order KPI notices; deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.
