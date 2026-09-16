@@ -203,3 +203,30 @@ curl -s "https://www.zarkebab.uz/api/google-reviews/run" \
 ```
 
 Inspect the returned replies, then set `GOOGLE_REVIEW_AUTO_PUBLISH=true` to enable live replies. The endpoint processes only reviews that do not already have an owner reply, with a maximum of 25 per run.
+
+
+### Database migration receipts and drift checks
+
+Run `npm run db:health` with `SUPABASE_SERVICE_ROLE_KEY` to check schema,
+recent function definitions, required triggers and cron schedules, and tracked checksums.
+The key stays server-side. Ordinary permission responses are not missing migrations.
+
+Use `node supabase/migrate.js --help`. The runner requires exact filenames,
+including both distinct files for historical duplicate prefixes 073, 108 and 157.
+Do not rename old migrations or replay the directory: it includes historical
+cleanup and one-time data operations. New duplicate numbers are rejected.
+
+For an existing database, initialize receipts once using
+`node supabase/migrate.js --sql 199_migration_tracking.sql` and execute the output
+in its SQL Editor. Then export only reviewed repairs, for example:
+`node supabase/migrate.js --sql 182_rename_bazaar_ingredients.sql`.
+Each exported script commits its SHA-256 receipt with the schema change.
+`--apply` executes the same SQL through the Management API using
+`SUPABASE_PROJECT_REF` and `SUPABASE_TOKEN`; `--status` is read-only.
+No arguments prints help and changes nothing.
+
+Older files without receipts are **legacy-untracked**, not automatically missing
+or applied. Inspect live definitions before selecting a repair. Never bulk-mark
+old history as applied. Matching receipts skip reruns; checksum changes fail.
+If a write response is lost, check status before resubmitting the same filename.
+Deploy the ingredient notification sender before applying migration 189.

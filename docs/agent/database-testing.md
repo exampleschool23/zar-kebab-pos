@@ -12,7 +12,9 @@
 
 ## Database workflow
 
-- Apply migrations in order; keep DB fallbacks.
+- Use full filenames in order; legacy duplicate prefixes `073`, `108`, `157` stay distinct. New duplicates fail.
+- `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. Unknown legacy history stays untracked; never bulk replay/baseline. Writes and receipts are atomic, matching receipts skip, changed checksums fail. Reconcile lost responses before retry.
+- Tests: `tests/migrationTools.test.js`; helpers: `scripts/migrationTools.js`. Health compares recent definitions, triggers and cron, not just RPC existence.
 - Run `npm run db:health` first for endless loading or missing schema/RPC warnings.
 - Migration families:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
@@ -51,15 +53,7 @@
 
 ## Tests
 
-Coverage:
-
-- `tests/orderPayment.test.js`: totals, service, loyalty, cart, split payments, cashier, take-away, reporting.
-- `tests/dbRealtime.test.js`: realtime, settings reload, connection notices.
-- `tests/dashboardAnalytics.test.js`: dashboard periods and ranking behavior.
-- `tests/profit.test.js`: cost snapshots, missing legacy coverage, cancellation, net profit.
-- `tests/bazaar.test.js`: exact money, quantities, filters, analytics.
-- `tests/salaryTransactions.test.js`: salary ledger and deterministic history ordering.
-- `tests/sourceGuards.*.test.js`: domain-split source-level protection for regressions that reached users.
+Use the feature guide’s focused tests.
 
 Validate:
 

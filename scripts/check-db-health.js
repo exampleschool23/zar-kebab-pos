@@ -1,3 +1,4 @@
+import { migrationFiles, migrationStatus, migrationHealthIssues } from './migrationTools.js'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
@@ -121,6 +122,8 @@ async function checkRpc(name, invoke, expectedError, required = true) {
 }
 
 const checks = await Promise.all([
+  checkTable('ingredient_investor_notifications', 'id, product_key, event_type, snapshot, status, chat_id, telegram_message_ids, error_message, attempted_at, sent_at, created_at'),
+  checkTable('app_schema_migrations', 'filename, sha256, applied_at'),
   checkTable('profiles', 'id, role, status, full_name, email, feature_access'),
   checkTable('employee_salary_profiles', 'id, profile_id, employee_name, joined_at, ended_at, deleted_at, pay_schedule, payment_method, is_active', false),
   checkTable('employee_salary_rates', 'id, salary_profile_id, effective_from, amount, rate_unit', false),
@@ -200,7 +203,7 @@ const checks = await Promise.all([
   checkRpc(
     'save_menu_item_tech_card(payload)',
     () => supabase.rpc('save_menu_item_tech_card', { payload: {} }),
-    'manage menu access is required'
+    'manage menu and tech cards access are required'
   ),
   checkRpc(
     'settle_orders_payment(payload)',
@@ -210,7 +213,7 @@ const checks = await Promise.all([
   checkRpc(
     'change_paid_order_payment_methods_owner(p_changes)',
     () => supabase.rpc('change_paid_order_payment_methods_owner', { p_changes: [] }),
-    'only owner can change a completed order payment method'
+    'delete completed orders access is required'
   ),
   checkRpc(
     'recall_table_from_cashier(p_table_id)',
@@ -277,10 +280,28 @@ const checks = await Promise.all([
   checkRpc(
     'remove_loyalty_card(p_card_id)',
     () => supabase.rpc('remove_loyalty_card', { p_card_id: '00000000-0000-0000-0000-000000000000' }),
-    'loyalty card not found',
+    'only owner can remove loyalty cards',
     false
   ),
 ])
+
+if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  const { data: catalog, error: catalogError } = await supabase.rpc('get_database_migration_health')
+  const issues = catalogError ? [catalogError.message] : migrationHealthIssues(catalog || {})
+  checks.push(makeCheck('migration definitions, triggers and schedules', !issues.length,
+    issues.length ? issues.join('; ') : 'Recent function bodies and required triggers/cron match repository'))
+  const { data: receipts, error: receiptError } = await supabase.from('app_schema_migrations').select('filename,sha256')
+  if (!receiptError) {
+    const statuses = migrationStatus(migrationFiles(), receipts || [])
+    const failures = statuses.filter(row => ['CHANGED', 'PENDING', 'MISSING_FILE'].includes(row.status))
+    checks.push(makeCheck('migration receipts', !failures.length,
+      failures.length ? failures.map(row => `${row.status}: ${row.filename}`).join('; ')
+        : 'Tracked checksums match; legacy-untracked files are not assumed applied'))
+  }
+} else {
+  checks.push(makeCheck('migration definitions and receipts', false,
+    'Set SUPABASE_SERVICE_ROLE_KEY to verify function drift and protected migration receipts', false))
+}
 
 const failedRequired = checks.filter(check => check.required && !check.ok)
 const failedOptional = checks.filter(check => !check.required && !check.ok)
@@ -302,7 +323,7 @@ if (failedRequired.length > 0) {
   if (networkFailures === failedRequired.length) {
     console.log('\nRequired checks failed because Supabase could not be reached. Check network access and Supabase env values, then rerun this script.')
   } else {
-    console.log('\nRequired checks failed. Apply missing migrations in order from supabase/ and rerun this script.')
+    console.log('\nRequired checks failed. Inspect the failures and migration status; apply only reviewed missing repairs. Do not replay legacy migrations blindly.')
   }
   process.exit(1)
 }
