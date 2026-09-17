@@ -217,6 +217,9 @@ export default function BazaarIngredients() {
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-50 text-[#ff5a00]"><PackagePlus size={21} /></div>
               <div><h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1><p className="mt-1 text-sm font-medium text-[#6B7280]">{l.sub}</p></div>
             </div>
+            <button type="button" onClick={downloadPdf} disabled={exportingPdf || loading || !!loadFailure || !filtered.length} title={l.pdfHint} className="ml-auto inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 text-sm font-black text-[#ff5a00] disabled:cursor-not-allowed disabled:opacity-50">
+              {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}{exportingPdf ? l.exportingPdf : l.downloadPdf}
+            </button>
           </div>
 
           {pdfFailed && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{l.pdfFailed}</div>}
@@ -242,12 +245,7 @@ export default function BazaarIngredients() {
           <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
             <div className="flex flex-col gap-3 border-b border-[#E5E7EB] p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative w-full sm:max-w-sm"><Search size={16} className="absolute left-3 top-3.5 text-[#9CA3AF]" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={l.search} className={`${INPUT} pl-9`} /></div>
-              <div className="flex flex-wrap items-center gap-3">
-                <button type="button" onClick={downloadPdf} disabled={exportingPdf || loading || !!loadFailure || !filtered.length} title={l.pdfHint} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 text-sm font-black text-[#ff5a00] disabled:cursor-not-allowed disabled:opacity-50">
-                  {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}{exportingPdf ? l.exportingPdf : l.downloadPdf}
-                </button>
-                <div className="flex rounded-xl bg-[#F3F4F6] p-1">{['active', 'archived', 'all'].map(key => <button key={key} type="button" onClick={() => setStatus(key)} className={`rounded-lg px-3 py-2 text-xs font-black ${status === key ? 'bg-white text-[#ff5a00] shadow-sm' : 'text-[#6B7280]'}`}>{l[key]}</button>)}</div>
-              </div>
+              <div className="flex rounded-xl bg-[#F3F4F6] p-1">{['active', 'archived', 'all'].map(key => <button key={key} type="button" onClick={() => setStatus(key)} className={`rounded-lg px-3 py-2 text-xs font-black ${status === key ? 'bg-white text-[#ff5a00] shadow-sm' : 'text-[#6B7280]'}`}>{l[key]}</button>)}</div>
             </div>
             {loading ? <OperationalLoading title={l.title} description="" /> : displayedError && ingredients.length === 0 ? <OperationalError title={l.loadFailed} description={displayedError} actionLabel={l.retry} onAction={loadIngredients} /> : filtered.length === 0 ? <p className="p-10 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</p> : (
               <div className="divide-y divide-[#F3F4F6]">{filtered.map(ingredient => (
