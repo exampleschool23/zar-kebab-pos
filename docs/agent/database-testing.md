@@ -3,7 +3,7 @@
 ## Entry points
 
 - Database/health: `src/lib/db.js`, `src/lib/dbHealth.js`
-- Migration runner and health commands: `supabase/migrate.js`, `scripts/check-db-health.js`
+- Migration/health: `supabase/migrate.js`, `scripts/check-db-health.js`
 - SQL migrations: `supabase/`
 - Navigator: `mcp/`, `tests/repoNavigatorMcp.test.js`, `scripts/benchmark-repo-nav.js`
 - Source guards: `tests/sourceGuards.*.test.js`
@@ -12,10 +12,10 @@
 
 ## Database workflow
 
-- Use full filenames in order; legacy duplicate prefixes `073`, `108`, `157` stay distinct. New duplicates fail.
+- Use full filenames; legacy duplicate prefixes `073`, `108`, `157` stay distinct. New duplicates fail.
 - `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. Never bulk replay/baseline legacy history. Writes and receipts are atomic, matching receipts skip, changed checksums fail. Reconcile lost responses.
 - Tests: `tests/migrationTools.test.js`; helpers: `scripts/migrationTools.js`. Health checks definitions, triggers and cron.
-- For loading/schema/RPC errors, first run `npm run db:health`.
+- For schema/RPC errors, run `npm run db:health`.
 - Migration families:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`
@@ -32,7 +32,7 @@
   - Tashkent-calendar expense backdate enforcement: `166`
   - salary/KPI accrual, notifications, Tech Card catalog access, and Team queue repair: `169`–`172`
   - paid-order correction feature access: `173`
-  - Investor alerts for order deletes and payment corrections, including the shared-trigger row-type repair: `175`–`176`
+  - Investor alerts for order deletes and payment corrections, including trigger repair: `175`–`176`
   - compact all-time Accounting remainder: `177`
   - employee lifecycle Investor notification queue: `178`
   - Game Club order type, off-premise permission and service checks: `179`
@@ -53,7 +53,7 @@
 
 ## Tests
 
-Use focused feature tests.
+Use focused tests.
 
 Validate:
 
@@ -86,7 +86,7 @@ Guards protect:
 
 - Migration `179_game_club_orders.sql` must precede the Game Club frontend release. It extends order/item constraints and current permission/settlement functions without changing historical rows. Never require the reopening function retired by `090`. Focused coverage: `tests/gameClubOrders.test.js`.
 
-- Optional isolated SQL check: `scripts/check-game-club-migration.mjs` accepts a PGlite module path and tests migration `180` without production access.
+- Isolated SQL: `scripts/check-game-club-migration.mjs` tests `180` with a PGlite module path.
 
 - Migration `184` requires deletion reasons and snapshots them for Investor alerts. Apply before frontend deployment.
 
@@ -102,3 +102,5 @@ Guards protect:
 - `197`/`198`: paid-order notices and daily KPI; deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.
 
 - `200`: repair KPI creator-label drift; preserve actor checks/history. Tests: `tests/employeeOpenedOrderKpi.test.js`.
+
+- `201`: audited, authorized, idempotent paid-payment splitting. Apply before UI. Tests: `tests/paidPaymentSplit.test.js`.

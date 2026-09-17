@@ -192,7 +192,7 @@ test('new cashier payments use cash or terminal while historical card reporting 
   const reports = readSource('src/pages/Reports.jsx')
   const expenses = readSource('src/lib/expenses.js')
   const payMethodsBlock = cashier.slice(cashier.indexOf('const PAY_METHODS = ['), cashier.indexOf('function payLabel'))
-  const correctionStart = reports.indexOf('{paymentMethodOrderId === order.id ? (')
+  const correctionStart = reports.indexOf('{canChangePaymentMethod && (')
   const correctionEnd = reports.indexOf('{canDeleteOrder &&', correctionStart)
   const correctionBlock = reports.slice(correctionStart, correctionEnd)
 

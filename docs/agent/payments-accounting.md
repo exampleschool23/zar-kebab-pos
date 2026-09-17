@@ -1,12 +1,10 @@
 # Payments, Service, Accounting, Expenses, and Daily Bazaar
 
-Cashier, Accounting, expenses, and Daily Bazaar.
-
 ## Entry points
 
 - UI: `src/pages/CashierBill.jsx`, `src/pages/Receipt.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`, `src/pages/MonthlyEstimate.jsx`, `src/pages/DailyBazaar.jsx`
 - Shared logic: `src/lib/analytics.js`, `src/lib/cashierCheckout.js`, `src/lib/billHandoff.js`, `src/lib/accounting.js`, `src/lib/accountingSummary.js`, `src/lib/expenses.js`, `src/lib/monthlyEstimate.js`, `src/lib/bazaar.js`
-- Database boundaries: `src/lib/db.js`, migrations `083`, `090`, `097`, `109`, and `135`
+- Database: `src/lib/db.js`; migrations `083`, `090`, `097`, `109`, `135`, `201`
 - Focused tests: `tests/orderPayment.test.js`, `tests/atomicPaymentSettlement.test.js`, `tests/cashierCheckout.test.js`, `tests/accountingPages.test.js`, `tests/monthlyEstimate.test.js`, `tests/bazaar.test.js`, `tests/sourceGuards.payments-reporting.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
 
 ## Payment and service math
@@ -20,10 +18,10 @@ Cashier, Accounting, expenses, and Daily Bazaar.
 
 ## Split payments and corrections
 
-- Completed split payment rows retain fixed amounts and have independent method selectors.
+- Payments have separate method selectors; `201` adds “Add second payment” in Reports.
 - Delete completed orders access permits atomic non-loyalty tender corrections.
 - Loyalty rows are visible but immutable without a separate wallet reversal workflow.
-- Corrections never change amounts, items, totals, paid state/time, loyalty data, service snapshots, or stock deductions.
+- Method corrections keep amounts fixed. Splits preserve the original sum, other payments, items, totals, paid state/time, loyalty, service and stock. Receipts audit splits and reconcile retries. Tests: `tests/paidPaymentSplit.test.js`.
 - Order deletes require a reason popup; migration `184` snapshots reasons for Investor alerts. Payment corrections also notify Investor.
 
 ## Receipt printing

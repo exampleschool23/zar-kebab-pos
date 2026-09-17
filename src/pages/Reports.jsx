@@ -26,6 +26,8 @@ import {
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import AppShell from '../components/AppShell'
 import DateRangePicker from '../components/DateRangePicker'
+import PaidPaymentSplitEditor from '../components/PaidPaymentSplitEditor'
+import { applyPaymentSplit } from '../lib/paidPaymentSplit'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import {
@@ -1348,12 +1350,14 @@ function WaiterPerformanceTab({ orders, lang }) {
 // TAB 6 — ORDER HISTORY
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateSettings, canDeleteOrder, onDeleteOrder, deletingOrderId, confirmDeleteOrderId, onCancelDeleteOrder, canChangePaymentMethod, paymentMethodOrderId, paymentMethodDraft, onStartPaymentMethodChange, onPaymentMethodDraftChange, onSavePaymentMethod, onCancelPaymentMethod, savingPaymentOrderId }) {
+function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateSettings, canDeleteOrder, onDeleteOrder, deletingOrderId, confirmDeleteOrderId, onCancelDeleteOrder, canChangePaymentMethod, paymentMethodOrderId, paymentMethodDraft, onStartPaymentMethodChange, onPaymentMethodDraftChange, onSavePaymentMethod, onCancelPaymentMethod, savingPaymentOrderId, onPaymentSplitSaved, onPaymentSplitSaving }) {
   const [fetchedItems, setFetchedItems] = useState(null)
+  const [splitPayment, setSplitPayment] = useState(null)
 
   useEffect(() => {
     if (!order) return
     setFetchedItems(null)
+    setSplitPayment(null)
     const ids = order._mergedIds?.length ? order._mergedIds : [order.id]
     supabase
       .from('order_items')
@@ -1502,7 +1506,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateS
       </div>
 
       {/* Footer actions */}
-      <div className="flex-shrink-0 px-5 py-4 border-t border-[#E5E7EB] bg-white grid grid-cols-2 gap-2">
+      <div className="max-h-[65dvh] overflow-y-auto flex-shrink-0 px-5 py-4 border-t border-[#E5E7EB] bg-white grid grid-cols-2 gap-2">
         <button
           onClick={() => navigate(`/receipt/${order.id}`)}
           className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-[#E5E7EB] text-[12px] font-bold text-[#6B7280] hover:border-[#ff5a00] hover:text-[#ff5a00] hover:bg-orange-50 transition-colors"
@@ -1519,7 +1523,15 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateS
         </button>
         {canChangePaymentMethod && (
           <div className="col-span-2 grid gap-2">
-            {paymentMethodOrderId === order.id ? (
+            {paymentMethodOrderId === order.id && splitPayment ? (
+              <PaidPaymentSplitEditor
+                key={splitPayment.id}
+                orderId={order.id} payment={splitPayment} lang={lang}
+                onSaved={result => { setSplitPayment(null); onPaymentSplitSaved(result) }}
+                onCancel={() => setSplitPayment(null)}
+                onSavingChange={onPaymentSplitSaving}
+              />
+            ) : paymentMethodOrderId === order.id ? (
               <div className="grid gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3">
                 <p className="text-[11px] font-semibold leading-relaxed text-orange-800">
                   {lang === 'uz'
@@ -1537,6 +1549,16 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateS
                           : `${lang === 'uz' ? "To‘lov" : lang === 'ru' ? 'Платёж' : 'Payment'} ${index + 1}`}
                       </p>
                       <p className="text-[11px] text-[#6B7280]">{formatCurrency(row.amount)}</p>
+                      {row.method !== 'loyalty_card' && Number(row.amount) >= 2
+                        && ((row.id && row.id !== 'legacy') || !(order._mergedIds?.length > 1)) && (
+                        <button
+                          onClick={() => setSplitPayment(row)}
+                          disabled={savingPaymentOrderId === order.id}
+                          className="mt-1 text-left text-xs font-bold text-[#ff5a00] hover:underline disabled:opacity-60"
+                        >
+                          + {lang === 'uz' ? 'Ikkinchi to‘lovni qo‘shish' : lang === 'ru' ? 'Добавить второй платёж' : 'Add second payment'}
+                        </button>
+                      )}
                     </div>
                     {row.method === 'loyalty_card' ? (
                       <div className="flex justify-end"><PayBadge method="loyalty_card" lang={lang} /></div>
@@ -2374,6 +2396,12 @@ export default function Reports() {
                 onCancelDeleteOrder={() => setConfirmDeleteOrderId('')}
                 canChangePaymentMethod={canChangePaymentMethod}
                 paymentMethodOrderId={paymentMethodOrderId}
+                onPaymentSplitSaved={result => {
+                  setHistoryOrders(current => current.map(row => applyPaymentSplit(row, result)))
+                  setSelectedOrder(current => applyPaymentSplit(current, result))
+                  setPaymentMethodOrderId('')
+                }}
+                onPaymentSplitSaving={saving => setSavingPaymentOrderId(saving ? selectedOrder.id : '')}
                 paymentMethodDraft={paymentMethodDraft}
                 onStartPaymentMethodChange={startPaymentMethodChange}
                 onPaymentMethodDraftChange={changePaymentMethodDraft}

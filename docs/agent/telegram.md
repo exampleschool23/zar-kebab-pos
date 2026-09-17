@@ -59,7 +59,7 @@
 - Employee lifecycle queues immutable Russian Investor events: employee/date/actor.
 - Ingredient changes (`189`) snapshot before/after values and actor. Unchanged saves and imports stay silent. `ingredient-events` sends to `salary_events`; unknown sends stay held.
 - New cash expenses/Bazaar purchases notify Investor via legacy `salary_events`.
-- Order deletes require a reason popup; migration `184` saves it in Investor alerts. Alerts snapshot order, total, actor, and tenders. Payment corrections also notify Investor.
+- Order deletes require a reason (`184`); Investor alerts snapshot order, total, actor and tenders. Corrections and splits (`201`) notify Investor once with before/after allocations.
 - Cash-expense alerts are text. Daily Bazaar sends one localized PNG and caption; never duplicate it with a text receipt.
 - Investor album: yesterday’s financial/payroll, Bazaar from two days ago, plus all live unpaid/non-cancelled orders (place/id/time/status/total/items). Russian labels and catalog names, saved-name fallback. Renderer also filters paid/cancelled. Tech Card consumption is separate.
 - Bazaar PNGs group numbered items by saved Russian category with paid/normal prices and signed variance (red above, green below), plus total variance. Missing normal prices stay unset; rows never truncate.

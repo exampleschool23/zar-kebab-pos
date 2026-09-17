@@ -19,7 +19,7 @@ Reporting guide.
 
 ## Historical financial invariants
 
-- Saved selling price, real-cost snapshot, service-rate snapshot, payment rows, category snapshot, and paid state are immutable reporting inputs.
+- Saved selling price, real-cost snapshot, service-rate snapshot, category snapshot, and paid state are immutable reporting inputs. Payment rows are saved inputs; the authorized migration `201` split correction preserves their combined total and audits before/after allocations. Reports use its confirmed rows, including merged sessions.
 - Profit is paid revenue minus non-cancelled sold-item cost through `src/lib/profit.js`.
 - Never fall back to a product's current cost for an old order item with missing cost coverage; show unavailable until the one-time migration is applied.
 - Product/category archival retains historical lookup context.

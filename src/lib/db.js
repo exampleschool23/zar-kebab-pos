@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { withWriteTimeout } from './writeTimeout.js'
 import {
   getOrderPaymentFields,
   normalizeServiceRatePct,
@@ -827,6 +828,17 @@ export function subscribeToRealtime(dispatch, options = {}) {
 }
 
 // ── Writers ───────────────────────────────────────────────────────────────────
+
+// This RPC reconciles its durable request receipt before retrying a split.
+export async function splitCompletedOrderPayment(request, dbClient = supabase) {
+  const { data, error } = await withWriteTimeout(
+    signal => withAbortSignal(dbClient.rpc('split_paid_order_payment', request), signal),
+    'SPLIT_PAID_ORDER_PAYMENT'
+  )
+  if (error) throw error
+  void notifyTelegramInvestorOrderChange([data.orderId])
+  return data
+}
 
 export async function writeToSupabase(action, state, options = {}) {
   switch (action.type) {
