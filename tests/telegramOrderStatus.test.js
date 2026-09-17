@@ -172,7 +172,8 @@ test('completed order group message escapes dynamic Telegram HTML fields', () =>
   assert.match(message, /Официант: Jasurbek &amp; Team/)
   assert.doesNotMatch(message, /Закрыл:/)
   assert.match(message, /Дата: 9 июля \| 00:09/)
-  assert.match(message, /Тип меню: 🧳 Турист/)
+  assert.equal(message.split('\n')[0], '🥡 Тип: Заказ с собой 🧳 ⚡')
+  assert.doesNotMatch(message, /Тип меню:/)
   assert.doesNotMatch(message, /Итого: 163 300 UZS/)
   assert.equal((message.match(/🥡 Тип: Заказ с собой/g) || []).length, 1)
   assert.match(message, /Шашлык &lt;говяжий&gt;/)
@@ -221,7 +222,8 @@ test('completed dine-in group message starts with a dine-in icon and table', () 
   assert.match(message, /Официант: Jasurbek/)
   assert.doesNotMatch(message, /Официант: Ali/)
   assert.doesNotMatch(message, /Тип: В зале/)
-  assert.match(message, /Тип меню: Обычное/)
+  assert.equal(message.split('\n')[0], '🍽️ Стол: Terassa stol 1 🍴')
+  assert.doesNotMatch(message, /Тип меню:/)
 })
 
 test('completed delivery group message starts with a delivery icon and type', () => {
@@ -255,38 +257,24 @@ test('completed group message shows split payment methods with amounts', () => {
   assert.match(message, /Оплата: Наличные 60 000 UZS, Карта 40 000 UZS/)
 })
 
-test('completed group message adds turbo icons to the menu type line including service and caps at six', () => {
-  const expectedIconCounts = [
-    [99_999, 0],
-    [100_000, 1],
-    [199_999, 1],
-    [200_000, 2],
-    [399_999, 3],
-    [400_000, 4],
-    [599_999, 5],
-    [600_000, 6],
-    [773_950, 6],
-  ]
+test('completed headers show menu icons and turbo badges including service capped at six', () => {
+  for (const [total, count] of [[99_999, 0], [100_000, 1], [199_999, 1], [200_000, 2], [386_400, 3], [400_000, 4], [599_999, 5], [600_000, 6], [773_950, 6]]) {
+    for (const [priceMode, icon] of [['regular', '🍴'], ['tourist', '🧳']]) {
+      const subtotal = Math.floor(total / 1.15)
+      const message = buildCompletedOrderGroupMessage({
+        table_name: 'Stol 7',
+        order_type: 'dine_in',
+        price_mode: priceMode,
+        subtotal,
+        service_fee: total - subtotal,
+        total,
+        payment_status: 'paid',
+      })
 
-  for (const [grossTotal, expectedIconCount] of expectedIconCounts) {
-    const subtotal = Math.floor(grossTotal / 1.15)
-    const serviceFee = grossTotal - subtotal
-    const message = buildCompletedOrderGroupMessage({
-      table_name: 'Stol 8',
-      order_type: 'dine_in',
-      subtotal,
-      service_fee: serviceFee,
-      service_rate_pct: 15,
-      total: grossTotal,
-      payment_status: 'paid',
-      payments: [{ method: 'terminal', amount: grossTotal }],
-    })
-    const priceModeLine = message.split('\n').find(line => line.startsWith('Тип меню:')) || ''
-    const turboBadge = priceModeLine.match(/(⚡+)$/)?.[1] || ''
-
-    assert.equal(turboBadge, '⚡'.repeat(expectedIconCount), `unexpected turbo badge for ${grossTotal} UZS`)
-    assert.equal(message.split('\n').find(line => line.startsWith('Сумма заказа:'))?.includes('⚡'), false)
-    assert.equal(message.split('\n').some(line => /^⚡+$/.test(line)), false)
+      assert.equal(message.split('\n')[0], `🍽️ Стол: Stol 7 ${icon}${count ? ` ${'⚡'.repeat(count)}` : ''}`)
+      assert.doesNotMatch(message, /Тип меню:|🏠/)
+      assert.doesNotMatch(message.split('\n').slice(1).join('\n'), /⚡/)
+    }
   }
 })
 

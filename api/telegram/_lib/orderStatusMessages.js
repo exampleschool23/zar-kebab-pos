@@ -138,9 +138,9 @@ function normalizePriceMode(value) {
   return value === PRICE_MODE_TOURIST ? PRICE_MODE_TOURIST : 'regular'
 }
 
-function formatPriceModeLine(order) {
+function priceModeIcon(order) {
   const mode = normalizePriceMode(order?.price_mode)
-  return mode === PRICE_MODE_TOURIST ? 'Тип меню: 🧳 Турист' : 'Тип меню: Обычное'
+  return mode === PRICE_MODE_TOURIST ? '🧳' : '🍴'
 }
 
 function isPaidOrder(order) {
@@ -290,13 +290,13 @@ export function buildCompletedOrderGroupMessage(order) {
   const turboBadge = turboIconCount > 0 ? ` ${'⚡'.repeat(turboIconCount)}` : ''
   const closedAt = formatTelegramDateTime(order?.paid_at || order?.updated_at || order?.created_at)
   const typeIcon = orderTypeIcon(order)
+  const header = isOffPremiseOrder(order)
+    ? `${typeIcon} Тип: ${escapeTelegramHtml(orderTypeLabel(inferOrderType(order), 'ru'))}`
+    : `${typeIcon} Стол: ${escapeTelegramHtml(order?.table_name || '-')}`
   const lines = [
-    isOffPremiseOrder(order)
-      ? `${typeIcon} Тип: ${escapeTelegramHtml(orderTypeLabel(inferOrderType(order), 'ru'))}`
-      : `${typeIcon} Стол: ${escapeTelegramHtml(order?.table_name || '-')}`,
+    `${header} ${priceModeIcon(order)}${turboBadge}`,
     `Дата: ${escapeTelegramHtml(closedAt)}`,
     `Официант: ${escapeTelegramHtml(String(order?.waiter_name || '').trim() || 'Не указан')}`,
-    `${escapeTelegramHtml(formatPriceModeLine(order))}${turboBadge}`,
   ]
 
   if (items.length > 0) lines.push('', `<pre>${escapeTelegramHtml(buildItemRows(items))}</pre>`)
