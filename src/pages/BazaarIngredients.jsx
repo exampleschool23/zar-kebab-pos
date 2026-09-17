@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Archive, Edit3, Loader2, PackagePlus, Plus, RotateCcw, Save, Search, X } from 'lucide-react'
+import { Archive, Download, Edit3, Loader2, PackagePlus, Plus, RotateCcw, Save, Search, X } from 'lucide-react'
 import IngredientNavigation from '../components/IngredientNavigation'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
@@ -17,12 +17,15 @@ const INPUT = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text
 
 const COPY = {
   en: {
+    downloadPdf: 'Download PDF', exportingPdf: 'Preparing PDF…', pdfFailed: 'Could not create the PDF. Please try again.', pdfHint: 'Export the current filtered list', status: 'Status',
     title: 'Ingredients', sub: 'Keep one canonical name and normal unit price for every ingredient.', back: 'Daily Bazaar', add: 'Add ingredient', edit: 'Edit ingredient', name: 'Ingredient name', nameHint: 'You can change the name. Past purchases keep their original names.', category: 'Category', unit: 'Purchase unit', normalPrice: 'Normal price per unit', save: 'Save ingredient', saving: 'Saving…', cancel: 'Cancel', search: 'Search ingredients…', active: 'Active', archived: 'Archived', all: 'All', archive: 'Archive', restore: 'Restore', empty: 'No ingredients found.', loadFailed: 'Could not load ingredients.', saveFailed: 'Could not save the ingredient.', statusFailed: 'Could not update the ingredient status.', connectionFailed: 'Connection was interrupted. Please try again; a completed save will not be duplicated.', saved: 'Ingredient saved.', statusUpdated: 'Ingredient status updated.', retry: 'Try again', readOnly: 'Your access is read-only.', required: 'Enter a name and a normal price greater than zero.', migrationMissing: 'Apply the latest Bazaar migrations to manage ingredients.'
   },
   ru: {
+    downloadPdf: 'Скачать PDF', exportingPdf: 'Подготовка PDF…', pdfFailed: 'Не удалось создать PDF. Повторите попытку.', pdfHint: 'Экспорт текущего списка с учётом фильтров', status: 'Статус',
     title: 'Ингредиенты', sub: 'Единое название и обычная цена за единицу для каждого ингредиента.', back: 'Ежедневный базар', add: 'Добавить ингредиент', edit: 'Изменить ингредиент', name: 'Название ингредиента', nameHint: 'Название можно изменить. В прошлых закупках сохранится прежнее название.', category: 'Категория', unit: 'Единица закупки', normalPrice: 'Обычная цена за единицу', save: 'Сохранить', saving: 'Сохранение…', cancel: 'Отмена', search: 'Поиск ингредиентов…', active: 'Активные', archived: 'Архивные', all: 'Все', archive: 'В архив', restore: 'Восстановить', empty: 'Ингредиенты не найдены.', loadFailed: 'Не удалось загрузить ингредиенты.', saveFailed: 'Не удалось сохранить ингредиент.', statusFailed: 'Не удалось изменить статус ингредиента.', connectionFailed: 'Соединение прервалось. Повторите попытку — уже выполненное сохранение не продублируется.', saved: 'Ингредиент сохранён.', statusUpdated: 'Статус ингредиента изменён.', retry: 'Повторить', readOnly: 'У вас доступ только для чтения.', required: 'Введите название и обычную цену больше нуля.', migrationMissing: 'Примените последние миграции базара для управления ингредиентами.'
   },
   uz: {
+    downloadPdf: 'PDF yuklab olish', exportingPdf: 'PDF tayyorlanmoqda…', pdfFailed: 'PDF yaratilmadi. Qayta urinib ko‘ring.', pdfHint: 'Filtrlangan ro‘yxatni yuklab olish', status: 'Holat',
     title: 'Masalliqlar', sub: 'Har bir masalliq uchun yagona nom va odatiy birlik narxini saqlang.', back: 'Kunlik bozor', add: 'Masalliq qo‘shish', edit: 'Masalliqni tahrirlash', name: 'Masalliq nomi', nameHint: 'Nomni o‘zgartirish mumkin. Oldingi xaridlarda eski nom saqlanadi.', category: 'Kategoriya', unit: 'Xarid birligi', normalPrice: 'Birlik uchun odatiy narx', save: 'Saqlash', saving: 'Saqlanmoqda…', cancel: 'Bekor qilish', search: 'Masalliq qidirish…', active: 'Faol', archived: 'Arxiv', all: 'Barchasi', archive: 'Arxivlash', restore: 'Tiklash', empty: 'Masalliq topilmadi.', loadFailed: 'Masalliqlarni yuklab bo‘lmadi.', saveFailed: 'Masalliqni saqlab bo‘lmadi.', statusFailed: 'Masalliq holatini o‘zgartirib bo‘lmadi.', connectionFailed: 'Aloqa uzildi. Qayta urinib ko‘ring — saqlangan yozuv takrorlanmaydi.', saved: 'Masalliq saqlandi.', statusUpdated: 'Masalliq holati yangilandi.', retry: 'Qayta urinish', readOnly: 'Sizda faqat ko‘rish huquqi bor.', required: 'Nom va noldan katta odatiy narx kiriting.', migrationMissing: 'Masalliqlarni boshqarish uchun oxirgi bozor migratsiyalarini qo‘llang.'
   },
 }
@@ -56,6 +59,8 @@ export default function BazaarIngredients() {
   const [error, setError] = useState('')
   const [loadFailure, setLoadFailure] = useState(null)
   const [notice, setNotice] = useState('')
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [pdfFailed, setPdfFailed] = useState(false)
 
   const errorMessage = useCallback((requestError, fallback) => {
     if (isMissingMigration(requestError)) return l.migrationMissing
@@ -99,6 +104,21 @@ export default function BazaarIngredients() {
       return !normalizedQuery || normalizeBazaarProductKey(item.product_name).includes(normalizedQuery)
     })
   }, [ingredients, query, status])
+
+  async function downloadPdf() {
+    if (exportingPdf || loading || loadFailure || !filtered.length) return
+    setExportingPdf(true)
+    setPdfFailed(false)
+    try {
+      const { createIngredientsPdf } = await import('../lib/ingredientsPdf')
+      const doc = await createIngredientsPdf(filtered, l, lang, { status: l[status], query })
+      await doc.save('zar-kebab-ingredients.pdf', { returnPromise: true })
+    } catch {
+      setPdfFailed(true)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
 
   function editIngredient(ingredient) {
     setForm({ ...ingredient, normal_unit_price: String(ingredient.normal_unit_price || '') })
@@ -199,6 +219,7 @@ export default function BazaarIngredients() {
             </div>
           </div>
 
+          {pdfFailed && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{l.pdfFailed}</div>}
           {displayedError && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{displayedError}</div>}
           {notice && !error && <div role="status" className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-bold text-green-700">{notice}</div>}
 
@@ -221,7 +242,12 @@ export default function BazaarIngredients() {
           <section className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
             <div className="flex flex-col gap-3 border-b border-[#E5E7EB] p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative w-full sm:max-w-sm"><Search size={16} className="absolute left-3 top-3.5 text-[#9CA3AF]" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={l.search} className={`${INPUT} pl-9`} /></div>
-              <div className="flex rounded-xl bg-[#F3F4F6] p-1">{['active', 'archived', 'all'].map(key => <button key={key} type="button" onClick={() => setStatus(key)} className={`rounded-lg px-3 py-2 text-xs font-black ${status === key ? 'bg-white text-[#ff5a00] shadow-sm' : 'text-[#6B7280]'}`}>{l[key]}</button>)}</div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="button" onClick={downloadPdf} disabled={exportingPdf || loading || !!loadFailure || !filtered.length} title={l.pdfHint} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 text-sm font-black text-[#ff5a00] disabled:cursor-not-allowed disabled:opacity-50">
+                  {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}{exportingPdf ? l.exportingPdf : l.downloadPdf}
+                </button>
+                <div className="flex rounded-xl bg-[#F3F4F6] p-1">{['active', 'archived', 'all'].map(key => <button key={key} type="button" onClick={() => setStatus(key)} className={`rounded-lg px-3 py-2 text-xs font-black ${status === key ? 'bg-white text-[#ff5a00] shadow-sm' : 'text-[#6B7280]'}`}>{l[key]}</button>)}</div>
+              </div>
             </div>
             {loading ? <OperationalLoading title={l.title} description="" /> : displayedError && ingredients.length === 0 ? <OperationalError title={l.loadFailed} description={displayedError} actionLabel={l.retry} onAction={loadIngredients} /> : filtered.length === 0 ? <p className="p-10 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</p> : (
               <div className="divide-y divide-[#F3F4F6]">{filtered.map(ingredient => (
