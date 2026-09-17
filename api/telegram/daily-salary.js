@@ -211,7 +211,7 @@ async function notifyDailySalaryCronFailure(supabase, notificationDate, error) {
     if (supabase && notificationDate) {
       const now = new Date().toISOString()
       const detail = String(error?.message || error || 'Unknown cron failure').slice(0, 700)
-      const errorMessage = `${CRON_FAILURE_ALERT_MARKER} ${detail}`
+      const errorMessage = `${CRON_FAILURE_ALERT_MARKER} Telegram message ${telegramMessageId}; chat ${target.chatId}; ${detail}`
       const existing = await supabase
         .from('daily_payroll_group_notification_deliveries')
         .select('business_date, status')
@@ -332,6 +332,26 @@ async function verifyDailySalaryCronDelivery(supabase, businessDate) {
     return { status: 'healthy' }
   }
   if (dailySalaryRunCanStillBeActive(delivery)) return { status: 'in_progress' }
+  // Recover only known failures/unstarted reports. A pending send can have an
+  // unknown Telegram outcome and must not be replayed by the watchdog.
+  if (!delivery || ['failed', 'skipped'].includes(delivery.status)) {
+    try {
+      await finalizeEmployeeMealDate(supabase, businessDate)
+      const kpiResults = await finalizeDailyKpiDate(supabase, businessDate)
+      await sendDailyInvestorReportAlbum(supabase, businessDate, kpiResults)
+      const recovered = await supabase
+        .from('daily_payroll_group_notification_deliveries')
+        .select('status, telegram_message_id')
+        .eq('business_date', businessDate)
+        .maybeSingle()
+      if (recovered.error) throw recovered.error
+      if (recovered.data?.status === 'sent' && recovered.data?.telegram_message_id) {
+        return { status: 'recovered' }
+      }
+    } catch (recoveryError) {
+      console.error('[telegram/daily-salary] watchdog report recovery failed:', recoveryError)
+    }
+  }
   if (delivery?.error_message?.includes(CRON_FAILURE_ALERT_MARKER)) {
     return { status: 'alert_already_sent' }
   }

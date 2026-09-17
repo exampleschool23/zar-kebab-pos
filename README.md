@@ -160,8 +160,10 @@ boundary for manual retries and overlapping deployments.
 
 The existing `08:00 Tashkent` unavailable-products cron also acts as the
 independent daily-salary watchdog. It runs after the primary Hobby cron window,
-verifies that the completed Tashkent date has a sent aggregate report, and
-sends one failure alert to the ZarKebab Investor group for a missing, failed,
+verifies that the completed Tashkent date has a sent aggregate report. It retries
+unstarted, failed, or skipped Investor albums after meal/KPI finalization, even
+if an earlier failure alert exists. It does not replay pending sends with uncertain
+outcomes. If recovery does not complete, it sends one failure alert to the ZarKebab Investor group for a missing, failed,
 or stale run. The report remains retryable. Authorized primary runs also send
 an immediate failure alert when KPI finalization or report delivery returns an
 error. This remains within the Vercel Hobby cron limit while Supabase owns the
