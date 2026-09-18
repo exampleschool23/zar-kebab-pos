@@ -61,10 +61,9 @@
 - New cash expenses/Bazaar purchases notify Investor via legacy `salary_events`.
 - Order deletes require a reason (`184`); Investor alerts snapshot order, total, actor and tenders. Corrections and splits (`201`) notify Investor once with before/after allocations.
 - Cash-expense alerts are text. Daily Bazaar sends one localized PNG and caption; never duplicate it with a text receipt.
-- Investor album: yesterday’s financial/payroll, Bazaar from two days ago, plus all live unpaid/non-cancelled orders (place/id/time/status/total/items). Russian labels and catalog names, saved-name fallback. Renderer also filters paid/cancelled. Tech Card consumption is separate.
+- Investor daily album: only yesterday’s financial/payroll and live unpaid/non-cancelled orders (place/id/time/status/total/items). Russian labels/catalog names, saved-name fallback; renderer filters paid/cancelled. No daily Bazaar totals or Tech Card images, including retries/manual sends. Keep historical ledgers.
 - Bazaar PNGs group numbered items by saved Russian category with paid/normal prices and signed variance (red above, green below), plus total variance. Missing normal prices stay unset; rows never truncate.
-- Financial/Bazaar are image-only: renderer failures remain retryable, no text fallback. Partial retries send only missing PNGs.
-- Ingredient images use immutable paid-sale recipe snapshots and count missing coverage.
+- Investor reports: image-only, retryable render failures, no text fallback. Financial ledger deduplicates the two-image album.
 - Album ledgers mark sent only after each photo’s Telegram message id.
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows never announce new cash expenses.

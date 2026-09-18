@@ -451,14 +451,13 @@ test('one private daily summary adds automatic KPI bonus to accumulated salary d
   assert.equal((message.match(/Daily salary summary/g) || []).length, 1)
 })
 
-test('daily cron groups the payroll and Bazaar images in one duplicate-safe Investor album', () => {
+test('daily cron groups the payroll and unclosed-order images in one duplicate-safe Investor album', () => {
   assert.match(dailyCron, /sendDailyInvestorReportAlbum/)
-  assert.match(dailyCron, /const bazaarDate = addSalaryDateDays\(businessDate, -1\)/)
   assert.match(dailyCron, /loadInvestorGroupTarget/)
   assert.doesNotMatch(dailyCron, /^import[\s\S]*?from '.\/_lib\/payrollReportImage\.js'/m)
   assert.match(dailyCron, /await import\('\.\/_lib\/payrollReportImage\.js'\)/)
   assert.match(dailyCron, /buildDailyPayrollGroupReportPng\(summary, businessDate\)/)
-  assert.match(dailyCron, /buildDailyBazaarReportPng\(purchases, bazaarDate\)/)
+  assert.doesNotMatch(dailyCron, /buildDailyBazaarReportPng/)
   assert.match(dailyCron, /sendTelegramMediaGroup\(target\.chatId, photos\)/)
   assert.match(dailyCron, /getTelegramMediaGroupMessageIds\(response, photos\.length\)/)
   assert.doesNotMatch(dailyCron, /buildDailyPayrollGroupMessage|sending text fallback/)

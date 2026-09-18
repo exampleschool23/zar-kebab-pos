@@ -124,13 +124,13 @@ test('order item ingredient snapshots are variant-aware immutable and never back
   assert.doesNotMatch(migration, /update public\.order_items|delete from public\.order_items/)
 })
 
-test('ingredient report has a duplicate-safe Investor delivery ledger', () => {
+test('legacy ingredient ledger is preserved but daily Investor ingredient sends are disabled', () => {
   const migration = readFileSync(new URL('../supabase/165_daily_ingredient_consumption_deliveries.sql', import.meta.url), 'utf8')
   const cron = readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
   assert.match(migration, /daily_ingredient_consumption_deliveries/)
   assert.match(migration, /Historical delivery skipped during migration/)
-  assert.match(cron, /sendDailyIngredientConsumptionNotification/)
-  assert.match(cron, /order_item_tech_card_ingredient_snapshots/)
-  assert.match(cron, /buildDailyIngredientConsumptionReportPng/)
+  assert.doesNotMatch(cron, /sendDailyIngredientConsumptionNotification/)
+  assert.doesNotMatch(cron, /order_item_tech_card_ingredient_snapshots/)
+  assert.doesNotMatch(cron, /buildDailyIngredientConsumptionReportPng/)
   assert.match(cron, /sendTelegramPhoto/)
 })
