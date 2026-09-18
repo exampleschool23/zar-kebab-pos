@@ -65,7 +65,7 @@ test('salary setup keeps KPI content inside the mobile viewport', () => {
   )
 
   assert.match(settingsSection, /grid w-full min-w-0 grid-cols-1 items-stretch gap-4/)
-  assert.match(settingsSection, /h-full w-full min-w-0 max-w-full overflow-hidden rounded-2xl/)
+  assert.match(settingsSection, /h-full w-full min-w-0 max-w-full rounded-2xl/)
   assert.match(salaries, /embedded \? 'min-w-0 max-w-full'/)
   assert.match(salaries, /grid min-w-0 grid-cols-\[minmax\(0,1fr\)\] gap-4 sm:grid-cols-2/)
   assert.match(salaries, /absolute left-0 top-1 h-4 w-4/)
@@ -79,7 +79,7 @@ test('salary KPI setup contains intrinsic widths on mobile', () => {
 
   assert.match(salaries, /const FIELD = '[^']*min-w-0 max-w-full/)
   assert.match(kpiSection, /grid min-w-0 grid-cols-\[minmax\(0,1fr\)\]/)
-  assert.match(kpiSection, /min-w-0 break-words rounded-xl border border-violet-200/)
+  assert.match(kpiSection, /min-w-0 break-words text-xs leading-relaxed/)
   assert.match(kpiSection, /mt-1 break-words text-sm font-black/)
 })
 
@@ -128,4 +128,13 @@ test('KPI configuration saves the basis and requires an account only for own ord
   assert.match(salaries, /existingRule.sales_basis !== kpiForm.sales_basis/)
   assert.match(salaries, /existingRule.order_opener_profile_id \|\| null/)
   assert.match(employees, /formatKpiSalesBasis\(rule.sales_basis, lang\)/)
+})
+
+test('KPI account remains visible but disabled for restaurant sales without a narrow card override', () => {
+  const section = salaries.slice(salaries.indexOf('function DailyKpiSection('))
+  assert.doesNotMatch(salaries, /maxWidth: salarySetupMode/)
+  assert.doesNotMatch(section, /\{form.sales_basis === 'employee_opened_orders' && \(/)
+  assert.match(section, /disabled=\{!selectedKpiProfile[^}]*form.sales_basis === 'restaurant'/)
+  assert.match(section, /selectedKpiProfile && form.is_enabled && form.sales_basis === 'employee_opened_orders'/)
+  assert.match(section, /form.sales_basis === 'restaurant' \? labels.kpiAccountNotNeeded : labels.kpiAccountHelp/)
 })

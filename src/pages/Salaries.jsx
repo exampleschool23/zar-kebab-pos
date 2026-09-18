@@ -233,6 +233,7 @@ export default function Salaries() {
       kpiHour: 'Soat',
       kpiMinute: 'Daqiqa',
       kpiTimeDone: 'Tayyor',
+      kpiCalculationHelp: 'KPI qanday hisoblanadi?',
       kpiStartHelp: 'Faqat shu vaqtdan boshlab yarim tungacha to‘langan buyurtmalar hisoblanadi. 00:00 — butun kun.',
       kpiStartRequired: 'KPI boshlanish vaqtini kiriting.',
       kpiHelp: "Har bir xodim uchun o‘z buyurtmalari yoki zaldagi barcha savdolardan KPI belgilang.",
@@ -394,6 +395,7 @@ export default function Salaries() {
       kpiHour: 'Часы',
       kpiMinute: 'Минуты',
       kpiTimeDone: 'Готово',
+      kpiCalculationHelp: 'Как рассчитывается KPI?',
       kpiStartHelp: 'Учитываются заказы, оплаченные с этого времени до полуночи. 00:00 — весь день.',
       kpiStartRequired: 'Укажите время начала KPI.',
       kpiHelp: "Для каждого сотрудника выберите KPI от своих заказов или всех продаж в зале.",
@@ -555,6 +557,7 @@ export default function Salaries() {
       kpiHour: 'Hour',
       kpiMinute: 'Minute',
       kpiTimeDone: 'Done',
+      kpiCalculationHelp: 'How is KPI calculated?',
       kpiStartHelp: 'Counts orders paid from this time until midnight. 00:00 includes the full day.',
       kpiStartRequired: 'Enter a KPI start time.',
       kpiHelp: "Choose KPI from an employee’s own orders or all dine-in sales.",
@@ -1826,7 +1829,7 @@ export default function Salaries() {
               description={l.salarySettingsHelp}
             />
             <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-4">
-              <div className="h-full w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+              <div className={`h-full w-full min-w-0 max-w-full rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5 ${salarySetupMode === 'kpi' ? 'overflow-visible' : 'overflow-hidden'}`}>
                 <CardHeading
                   icon={salarySetupMode === 'kpi' ? Percent : salarySetupMode === 'change' ? Save : Plus}
                   title={salarySetupMode === 'kpi' ? l.kpiRuleTitle : salarySetupMode === 'change' ? l.changeSalary : l.add}
@@ -2258,17 +2261,35 @@ function DailyKpiSection({
     <>
       <div className={embedded ? 'min-w-0 max-w-full' : 'h-full min-w-0 max-w-full rounded-2xl border border-violet-100 bg-white p-4 shadow-sm sm:p-5'}>
           {!embedded && <CardHeading icon={Percent} title={labels.kpiRuleTitle} description={labels.kpiRuleHelp} tone="violet" />}
-          <div className="mb-4 min-w-0 break-words rounded-xl border border-violet-200 bg-violet-50/70 px-3 py-2.5 text-xs font-semibold leading-relaxed text-violet-900">
-            <p>{labels.kpiBaseStatement}</p>
-            <p className="mt-1.5 font-black">{labels.kpiAccruesToSalary}</p>
-          </div>
+
           {rulesError && (
             <p role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
               {rulesError}
             </p>
           )}
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
-            <div className="min-w-0 sm:col-span-2">
+          <div className="min-w-0 space-y-5">
+            <div className="flex items-center justify-between gap-4 border-b border-gray-100 pb-3">
+              <p className="min-w-0 text-xs leading-relaxed text-gray-500">{labels.kpiHelp}</p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_enabled}
+              onClick={() => onFormChange(current => ({ ...current, is_enabled: !current.is_enabled }))}
+              disabled={!canManage || loading || rulesLoading}
+              className={`inline-flex h-10 shrink-0 items-center justify-between gap-3 rounded-lg border px-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                form.is_enabled
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-gray-200 bg-gray-100 text-gray-600'
+              }`}
+            >
+              <span>{form.is_enabled ? labels.kpiEnabled : labels.kpiDisabled}</span>
+              <span className={`relative h-6 w-11 rounded-full transition-colors ${form.is_enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden="true">
+                <span className={`absolute left-0 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.is_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+              </span>
+            </button>
+            </div>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
+            <div className="min-w-0">
               <Field label={labels.employee}>
                 <select
                   value={form.salary_profile_id}
@@ -2283,6 +2304,66 @@ function DailyKpiSection({
                 </select>
               </Field>
             </div>
+            <div className="min-w-0">
+              <Field label={labels.kpiAccount}>
+                <select value={form.order_opener_profile_id} className={FIELD}
+                  aria-label={labels.kpiAccount}
+                  disabled={!selectedKpiProfile || !canManage || loading || rulesLoading || form.sales_basis === 'restaurant' || accountsError}
+                  onChange={event => onFormChange(current => ({ ...current, order_opener_profile_id: event.target.value }))}>
+                  <option value="">{labels.kpiSelectAccount}</option>
+                  {form.order_opener_profile_id && !kpiAccounts.some(account => account.id === form.order_opener_profile_id) && (
+                    <option value={form.order_opener_profile_id} disabled>{labels.kpiAccountUnavailable}</option>
+                  )}
+                  {kpiAccounts.map(account => (
+                    <option key={account.id} value={account.id}>{account.full_name || account.email}{account.full_name && account.email ? ` (${account.email})` : ''}</option>
+                  ))}
+                </select>
+              </Field>
+              <p className="mt-2 text-xs text-gray-600">{form.sales_basis === 'restaurant' ? labels.kpiAccountNotNeeded : labels.kpiAccountHelp}</p>
+              {selectedKpiProfile && form.is_enabled && form.sales_basis === 'employee_opened_orders' && (
+                accountsError ? <p role="alert" className="mt-2 text-xs font-bold text-amber-700">
+                  {labels.kpiAccountsFailed} <button type="button" onClick={onReloadAccounts} disabled={loading} className="underline">{labels.kpiAccountsRetry}</button>
+                </p> : !kpiAccounts.length ? <p className="mt-2 text-xs font-bold text-amber-700">{labels.kpiAccountsEmpty}</p>
+                  : null
+              )}
+            </div>
+            </div>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_6rem] items-start gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+            <div className="min-w-0">
+              <Field label={labels.kpiBasis}>
+                <select value={form.sales_basis} className={FIELD}
+                  disabled={!canManage || loading || rulesLoading}
+                  onChange={event => onFormChange(current => ({ ...current, sales_basis: event.target.value }))}>
+                  <option value="employee_opened_orders">{labels.kpiOwnOrders}</option>
+                  <option value="restaurant">{labels.kpiAllDineIn}</option>
+                </select>
+              </Field>
+            </div>
+            <div className="min-w-0">
+              <Field label={labels.kpiRate}>
+                <div className="relative min-w-0">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={form.rate_percentage}
+                    onChange={event => {
+                      const value = event.target.value.replace(',', '.').replace(/[^\d.]/g, '')
+                      if (/^\d{0,3}(?:\.\d{0,2})?$/.test(value)) {
+                        onFormChange(current => ({ ...current, rate_percentage: value }))
+                      }
+                    }}
+                    placeholder="1"
+                    className={`${FIELD} pr-10`}
+                    disabled={!canManage || loading || rulesLoading}
+                    aria-describedby="daily-kpi-rate-preview"
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-black text-violet-600">%</span>
+                </div>
+              </Field>
+            </div>
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 sm:p-4">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
             <Field label={labels.effectiveDate}>
               <DateInput
                 value={form.effective_from}
@@ -2297,96 +2378,19 @@ function DailyKpiSection({
                 hourLabel={labels.kpiHour} minuteLabel={labels.kpiMinute} doneLabel={labels.kpiTimeDone}
                 className={FIELD} disabled={!canManage || loading || rulesLoading}
                 onChange={value => onFormChange(current => ({ ...current, start_time: value }))} />
-              <p className="mt-2 text-xs text-gray-600">{labels.kpiStartHelp}</p>
             </div>
-            <div className="min-w-0 sm:col-span-2">
-              <Field label={labels.kpiBasis}>
-                <select value={form.sales_basis} className={FIELD}
-                  disabled={!canManage || loading || rulesLoading}
-                  onChange={event => onFormChange(current => ({ ...current, sales_basis: event.target.value }))}>
-                  <option value="employee_opened_orders">{labels.kpiOwnOrders}</option>
-                  <option value="restaurant">{labels.kpiAllDineIn}</option>
-                </select>
-              </Field>
-            </div>
-            <div className="min-w-0 sm:col-span-2">
-              <Field label={labels.kpiAccount}>
-                <select value={form.order_opener_profile_id} className={FIELD}
-                  aria-label={labels.kpiAccount}
-                  disabled={!canManage || loading || rulesLoading || form.sales_basis === 'restaurant' || accountsError}
-                  onChange={event => onFormChange(current => ({ ...current, order_opener_profile_id: event.target.value }))}>
-                  <option value="">{labels.kpiSelectAccount}</option>
-                  {form.order_opener_profile_id && !kpiAccounts.some(account => account.id === form.order_opener_profile_id) && (
-                    <option value={form.order_opener_profile_id} disabled>{labels.kpiAccountUnavailable}</option>
-                  )}
-                  {kpiAccounts.map(account => (
-                    <option key={account.id} value={account.id}>{account.full_name || account.email}{account.full_name && account.email ? ` (${account.email})` : ''}</option>
-                  ))}
-                </select>
-              </Field>
-              <p className="mt-2 text-xs text-gray-600">{form.sales_basis === 'restaurant' ? labels.kpiAccountNotNeeded : labels.kpiAccountHelp}</p>
-              {form.sales_basis === 'employee_opened_orders' && (
-                accountsError ? <p role="alert" className="mt-2 text-xs font-bold text-amber-700">
-                  {labels.kpiAccountsFailed} <button type="button" onClick={onReloadAccounts} disabled={loading} className="underline">{labels.kpiAccountsRetry}</button>
-                </p> : !kpiAccounts.length ? <p className="mt-2 text-xs font-bold text-amber-700">{labels.kpiAccountsEmpty}</p>
-                  : !form.order_opener_profile_id && <p className="mt-2 text-xs font-bold text-amber-700">{labels.kpiAccountRequired}</p>
-              )}
-            </div>
-            <Field label={labels.kpiRate}>
-              <div className="relative min-w-0">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={form.rate_percentage}
-                  onChange={event => {
-                    const value = event.target.value.replace(',', '.').replace(/[^\d.]/g, '')
-                    if (/^\d{0,3}(?:\.\d{0,2})?$/.test(value)) {
-                      onFormChange(current => ({ ...current, rate_percentage: value }))
-                    }
-                  }}
-                  placeholder="1"
-                  className={`${FIELD} pr-10`}
-                  disabled={!canManage || loading || rulesLoading}
-                  aria-describedby="daily-kpi-rate-preview"
-                />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-black text-violet-600">%</span>
               </div>
-            </Field>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.is_enabled}
-              onClick={() => onFormChange(current => ({ ...current, is_enabled: !current.is_enabled }))}
-              disabled={!canManage || loading || rulesLoading}
-              className={`flex h-11 items-center justify-between rounded-xl border px-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2 ${
-                form.is_enabled
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border-gray-200 bg-gray-100 text-gray-600'
-              }`}
-            >
-              <span>{form.is_enabled ? labels.kpiEnabled : labels.kpiDisabled}</span>
-              <span className={`relative h-6 w-11 rounded-full transition-colors ${form.is_enabled ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden="true">
-                <span className={`absolute left-0 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${form.is_enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-              </span>
-            </button>
-            <div id="daily-kpi-rate-preview" className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 sm:col-span-2">
-              <p className="text-[10px] font-black uppercase tracking-wide text-violet-600">{labels.kpiPreview}</p>
+              <p className="mt-3 text-xs leading-relaxed text-gray-500">{labels.kpiStartHelp}</p>
+            </div>
+            <div className="flex flex-col gap-4 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div id="daily-kpi-rate-preview" className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wide text-gray-500">{labels.kpiPreview}</p>
               <p className="mt-1 break-words text-sm font-black leading-relaxed text-[#1F2937]">
                 {formatCurrency(KPI_PREVIEW_BASE_AMOUNT)} × {previewRateBps > 0 ? formatKpiRatePercent(previewRateBps, lang) : '—'} = {previewRateBps > 0 ? formatCurrency(previewBonus) : '—'}
               </p>
             </div>
-            <div className={`grid min-w-0 grid-cols-1 gap-3 sm:col-span-2 ${canRemoveSelectedRule ? 'sm:grid-cols-2' : ''}`}>
-              {canRemoveSelectedRule && (
-                <button
-                  type="button"
-                  onClick={() => onRequestRemoveRule(selectedKpiProfile, selectedRule, form.effective_from)}
-                  disabled={Boolean(removingRuleId) || saving}
-                  className="inline-flex h-11 touch-manipulation items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-black text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {removingRuleId === selectedRule.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                  {labels.kpiRemove}
-                </button>
-              )}
+            <div className="shrink-0 [&>button]:w-full sm:[&>button]:w-auto">
+
               <button
                 type="button"
                 onClick={onSave}
@@ -2396,8 +2400,24 @@ function DailyKpiSection({
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}
                 {labels.kpiSave}
               </button>
-            </div>
+            </div>            </div>
+              {canRemoveSelectedRule && (
+                <button
+                  type="button"
+                  onClick={() => onRequestRemoveRule(selectedKpiProfile, selectedRule, form.effective_from)}
+                  disabled={Boolean(removingRuleId) || saving}
+                  className="inline-flex min-h-10 touch-manipulation items-center gap-2 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                >
+                  {removingRuleId === selectedRule.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  {labels.kpiRemove}
+                </button>
+              )}
           </div>
+          <details className="mt-4 min-w-0 break-words text-xs leading-relaxed text-gray-500">
+            <summary className="cursor-pointer">{labels.kpiCalculationHelp}</summary>
+            <p className="mt-2">{labels.kpiBaseStatement}</p>
+            <p className="mt-1.5 font-black">{labels.kpiAccruesToSalary}</p>
+          </details>
       </div>
 
       {ruleToRemove && (
