@@ -26,8 +26,8 @@
 
 ## Receipt printing
 
-- Auto-print handoff opens the cashier bill with a one-time print request. An in-page receipt opens browser printing without a new tab/window.
-- Manual printing refreshes the bill and uses the same receipt dialog.
+- Auto-print uses a one-time cashier request and in-page receipt, without new tabs. Manual printing refreshes the bill.
+- Translate stored bill/receipt errors at render time; language changes never refetch bills.
 
 ## Accounting loading and presentation
 

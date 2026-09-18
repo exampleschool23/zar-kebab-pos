@@ -7,7 +7,7 @@ import { getOrderPaymentSummary } from '../lib/analytics'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { ORDER_TYPE_LABELS, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { DEFAULT_PRICE_MODE, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
-import { isWriteTimeoutError } from '../lib/writeTimeout'
+import { formatWriteError } from '../lib/writeErrorMessage'
 import { isMenuItemOrderable } from '../lib/menuItems'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { getManualOrderNotes, getOrderItemOptionLines } from './MenuProductCards'
@@ -25,18 +25,6 @@ const ORDER_TYPES = [
   { key: 'delivery', ...ORDER_TYPE_LABELS.delivery },
   { key: 'game_club', ...ORDER_TYPE_LABELS.game_club },
 ]
-
-function submitErrorMessage(lang, error) {
-  if (isWriteTimeoutError(error)) {
-    if (lang === 'uz') return 'Saqlash juda uzoq davom etdi. Ulanishni tekshirib, qayta urinib ko‘ring.'
-    if (lang === 'ru') return 'Сохранение заняло слишком много времени. Проверьте подключение и попробуйте снова.'
-    return 'Saving took too long. Check the connection and try again.'
-  }
-
-  if (lang === 'uz') return 'Buyurtmani yuborib bo‘lmadi.'
-  if (lang === 'ru') return 'Не удалось отправить заказ.'
-  return 'Could not submit the order.'
-}
 
 // ── Cart item row ──────────────────────────────────────────────────────────────
 function getCartItemKey(item) {
@@ -265,7 +253,7 @@ export default function CartPanel({
       if (result?.error) {
         setMessage({
           tone: 'error',
-          text: submitErrorMessage(lang, result.error),
+          error: result.error,
         })
         return
       }
@@ -426,7 +414,7 @@ export default function CartPanel({
               ? 'bg-red-50 text-red-700 border border-red-100'
               : 'bg-green-50 text-green-700 border border-green-100'
           }`}>
-            {message.text}
+            {message.error ? formatWriteError(message.error, lang, 'SEND_TO_KITCHEN') : message.text}
           </div>
         )}
 

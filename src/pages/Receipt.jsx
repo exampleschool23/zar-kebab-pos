@@ -704,7 +704,7 @@ export default function Receipt() {
     return (
       <OperationalError
         title={lang === 'ru' ? 'Не удалось загрузить чек' : lang === 'uz' ? 'Chekni yuklab bo‘lmadi' : 'Could not load receipt'}
-        description={lookupState.error}
+        description={lang === 'ru' ? 'Проверьте соединение и повторите загрузку чека. Не отправляйте заказ повторно.' : lang === 'uz' ? 'Ulanishni tekshiring va chekni qayta yuklang. Buyurtmani qayta yubormang.' : 'Check the connection and retry loading the receipt. Do not resubmit the order.'}
         actionLabel={lang === 'ru' ? 'Повторить' : lang === 'uz' ? 'Qayta urinish' : 'Retry'}
         onAction={() => setLookupVersion(version => version + 1)}
       />

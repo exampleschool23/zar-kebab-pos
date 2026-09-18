@@ -78,10 +78,10 @@ function cashierRefreshErrorMessage(error, lang) {
       lang === 'ru' ? 'Проверка счёта заняла слишком много времени. Проверьте соединение и попробуйте снова.' :
         'Checking the bill took too long. Check the connection and try again.'
   }
-  return error?.message || (
-    lang === 'uz' ? 'Hisobni yangilab bo‘lmadi.' :
-      lang === 'ru' ? 'Не удалось обновить счёт.' :
-        'Could not refresh the bill.'
+  return (
+    lang === 'uz' ? 'Hisobni yangilab bo‘lmadi. Ulanishni tekshiring va qayta urinib ko‘ring.' :
+      lang === 'ru' ? 'Не удалось обновить счёт. Проверьте соединение и попробуйте снова.' :
+        'Could not refresh the bill. Check the connection and try again.'
   )
 }
 
@@ -283,7 +283,7 @@ export default function CashierBill() {
       try {
         await refreshCurrentBill()
       } catch (error) {
-        if (active) setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
+        if (active) setPaymentRefreshMessage({ error })
       } finally {
         if (active) setRefreshingBill(false)
       }
@@ -300,7 +300,7 @@ export default function CashierBill() {
       active = false
       window.removeEventListener('pageshow', handlePageShow)
     }
-  }, [refreshCurrentBill, lang])
+  }, [refreshCurrentBill])
 
   useEffect(() => {
     setSplitPayments(prev => {
@@ -518,7 +518,7 @@ export default function CashierBill() {
       if (result?.error) return
       navigate('/cashier/tables')
     } catch (error) {
-      setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
+      setPaymentRefreshMessage({ error })
     } finally {
       setProcessingPayment(false)
     }
@@ -546,7 +546,7 @@ export default function CashierBill() {
         key: Date.now(),
       })
     } catch (error) {
-      setPaymentRefreshMessage(cashierRefreshErrorMessage(error, lang))
+      setPaymentRefreshMessage({ error })
     } finally {
       setPrintingBill(false)
     }
@@ -1456,7 +1456,7 @@ export default function CashierBill() {
                 )}
                 {paymentRefreshMessage && (
                   <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
-                    {paymentRefreshMessage}
+                    {paymentRefreshMessage.error ? cashierRefreshErrorMessage(paymentRefreshMessage.error, lang) : paymentRefreshMessage}
                   </p>
                 )}
                 <button
@@ -1519,7 +1519,7 @@ export default function CashierBill() {
           )}
           {paymentRefreshMessage && (
             <p role="alert" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
-              {paymentRefreshMessage}
+              {paymentRefreshMessage.error ? cashierRefreshErrorMessage(paymentRefreshMessage.error, lang) : paymentRefreshMessage}
             </p>
           )}
         </div>

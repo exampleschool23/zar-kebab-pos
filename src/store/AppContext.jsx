@@ -11,6 +11,7 @@ import { tablesReducer } from './tablesReducer'
 import { isOffPremiseOrderType } from '../lib/orderTypes'
 import { DEFAULT_PRICE_MODE, normalizePriceMode, withPriceModeFields } from '../lib/priceModes'
 import { isWriteTimeoutError, withWriteTimeout } from '../lib/writeTimeout'
+import { getKitchenBillBlockError } from '../lib/billHandoff'
 import { formatWriteError } from '../lib/writeErrorMessage'
 import { useAuth } from '../contexts/AuthContext'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
@@ -341,6 +342,11 @@ export function AppProvider({ children }) {
         const activeOrder = stateRef.current.orders.find(o =>
           o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
         )
+        const billError = !isOffPremise && getKitchenBillBlockError(activeOrder, stateRef.current.user)
+        if (billError) {
+          dispatch({ type: 'SET_CONNECTION_NOTICE', payload: { tone: 'error', error: billError, actionType: action.type } })
+          return Promise.resolve({ error: billError, action })
+        }
         const priceMode = normalizePriceMode(action.payload?.priceMode || activeOrder?.price_mode || DEFAULT_PRICE_MODE)
         const activeOrderMatchesPriceMode = !activeOrder || normalizePriceMode(activeOrder.price_mode) === priceMode
         const serviceRatePct = isOffPremise
@@ -444,7 +450,8 @@ export function AppProvider({ children }) {
             type: 'SET_CONNECTION_NOTICE',
             payload: {
               tone: 'error',
-              message: formatWriteError(err, stateRef.current.lang, action.type),
+              error: err,
+              actionType: action.type,
             },
           })
           return { error: err, action: enriched }
@@ -463,7 +470,8 @@ export function AppProvider({ children }) {
           type: 'SET_CONNECTION_NOTICE',
           payload: {
             tone: 'error',
-            message: formatWriteError(err, stateRef.current.lang, action.type),
+            error: err,
+            actionType: action.type,
           },
         })
         return { error: err, action: enriched }
@@ -660,7 +668,9 @@ export function AppProvider({ children }) {
               ? 'bg-emerald-600 text-white'
               : 'bg-[#1F2937] text-white'
         }`}>
-          {state.connectionNotice.message}
+          {state.connectionNotice.error
+            ? formatWriteError(state.connectionNotice.error, state.lang, state.connectionNotice.actionType)
+            : state.connectionNotice.message}
         </div>
       )}
       {children}

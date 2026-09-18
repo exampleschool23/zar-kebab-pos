@@ -1218,7 +1218,7 @@ export default function WaiterOrder() {
         _cart: reviewedCart,
       })
       if (submitResult?.error) {
-        setGuestModeError(formatWriteError(submitResult.error, staffLang, 'SEND_TO_KITCHEN'))
+        setGuestModeError({ writeError: submitResult.error })
         return
       }
       exitGuestModeToTables()
@@ -1297,7 +1297,7 @@ export default function WaiterOrder() {
             lang={staffLang}
             pinLength={getGuestModePinLength(guestModeSession)}
             busy={guestModeBusy}
-            error={guestModeError}
+            error={guestModeError?.writeError ? formatWriteError(guestModeError.writeError, staffLang, 'SEND_TO_KITCHEN') : guestModeError}
             lockSeconds={guestModePinLockSeconds(guestModeSession, guestUnlockClock)}
             onInput={() => setGuestModeError('')}
             onCancel={() => { if (!guestModeBusy) { setGuestUnlockOpen(false); setGuestModeError('') } }}
@@ -1338,7 +1338,7 @@ export default function WaiterOrder() {
             lang={staffLang}
             pinLength={getGuestModePinLength(guestModeSession)}
             busy={guestModeBusy}
-            error={guestModeError}
+            error={guestModeError?.writeError ? formatWriteError(guestModeError.writeError, staffLang, 'SEND_TO_KITCHEN') : guestModeError}
             lockSeconds={guestModePinLockSeconds(guestModeSession, guestUnlockClock)}
             onInput={() => setGuestModeError('')}
             onCancel={() => { if (!guestModeBusy) { setGuestUnlockOpen(false); setGuestModeError('') } }}
@@ -1724,7 +1724,7 @@ export default function WaiterOrder() {
           lang={staffLang}
           pinLength={getGuestModePinLength(guestModeSession)}
           busy={guestModeBusy}
-          error={guestModeError}
+          error={guestModeError?.writeError ? formatWriteError(guestModeError.writeError, staffLang, 'SEND_TO_KITCHEN') : guestModeError}
           lockSeconds={guestModePinLockSeconds(guestModeSession, guestUnlockClock)}
           onInput={() => setGuestModeError('')}
           onCancel={() => { if (!guestModeBusy) { setGuestUnlockOpen(false); setGuestModeError('') } }}

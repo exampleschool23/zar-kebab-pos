@@ -42,6 +42,9 @@ Read this guide for waiter tables, table entry, carts, price modes, reservations
 - Durable round receipts survive later payment, cancellation, or row deletion and are the idempotency boundary. A retry must never resurrect an old round.
 - The database must reject late inserts into paid orders and stale archived/unavailable products.
 
+- Fresh waiter submissions to an order already marked `needs_bill` require cashier recall first; retain the cart and explain the required action. Cashier-authorized users remain allowed. Never block reconciliation of an uncertain existing round on this preflight. Coverage: `tests/billHandoff.test.js`.
+- Shared write and cart submission errors use `src/lib/writeErrorMessage.js` for actionable Uzbek/Russian/English messages at render time; raw diagnostics stay in console logs. Coverage: `tests/writeErrorMessage.test.js`.
+
 ## Kitchen checks and printing
 
 - Requested rounds must match exactly; never substitute an older local round while the requested one loads.
