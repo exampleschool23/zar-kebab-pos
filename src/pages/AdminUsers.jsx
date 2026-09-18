@@ -285,7 +285,7 @@ export default function AdminUsers() {
     setNotice(null)
     const { error } = await deleteProfile(user.id)
     if (error) {
-      setNotice({ tone: 'error', message: error.message || l.deleteError })
+      setNotice({ tone: 'error', message: error.message || l.deleteError, userId: user.id })
       setDeleting(null)
       return
     }
@@ -678,6 +678,11 @@ export default function AdminUsers() {
                     {canDelete && isConfirmingDelete && (
                       <p className="xl:col-start-4 text-xs font-medium leading-snug text-red-500">
                         {l.deleteHint}
+                      </p>
+                    )}
+                    {notice?.tone === 'error' && notice.userId === user.id && (
+                      <p role="alert" className="xl:col-span-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+                        {notice.message}
                       </p>
                     )}
                     {canEditAccess && !isMe && isAccessExpanded && (

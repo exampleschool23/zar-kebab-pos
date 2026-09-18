@@ -54,3 +54,5 @@ Critical invariants:
 - Ingredients catalog/add stays at `/admin/ingredients`; `/admin/ingredients/usage` lazy-loads Purchases & usage. Both require `ingredients`. Only the usage page mounts the movement loader; adding ingredients never requests purchases/usage.
 
 - Language switching is presentation-only: preserve loaded data, forms, filters, and mounted pages. Data effects/callbacks must not depend on `lang`, translated labels, or translation callbacks unless the server response itself is language-specific. Store loader errors as codes/raw errors and localize during render. Ingredients regression coverage lives in `tests/ingredientsFeature.test.js`.
+
+- Migration `204` removes the live-profile foreign key from `accounting_record_audit.changed_by`: actor UUIDs and names remain immutable historical snapshots after account deletion. The audit mutation guard remains strict. Team deletion errors also appear on the affected row. Tests: `tests/accountDeletionAudit.test.js`.

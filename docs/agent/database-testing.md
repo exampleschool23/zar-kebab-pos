@@ -12,7 +12,7 @@
 
 ## Database workflow
 
-- Use full filenames; legacy duplicate prefixes `073`, `108`, `157` stay distinct. New duplicates fail.
+- Use full filenames; legacy duplicates `073`, `108`, `157` stay distinct. New duplicates fail.
 - `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. Never bulk replay/baseline legacy history. Writes and receipts are atomic, matching receipts skip, changed checksums fail. Reconcile lost responses.
 - For schema/RPC errors, run `npm run db:health`.
 - Migration families:
@@ -42,7 +42,7 @@
 
 ## Database invariants
 
-- Report reads retry network/502/503/504 errors: 3 attempts, 15s each, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write/send retries. Tests: `tests/reportReadFetch.test.js`.
+- Report reads retry network/502/503/504 errors: 3 attempts, 15s each, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write retries. Tests: `tests/reportReadFetch.test.js`.
 
 - Use atomic RPCs for multi-table writes such as kitchen submission, menu item + protected cost, Tech Cards, Daily Bazaar, and payment corrections.
 - Pair frontend access checks with RLS/RPC enforcement.
@@ -52,7 +52,7 @@
 
 ## Tests
 
-Use focused tests.
+
 
 Validate:
 
@@ -61,7 +61,7 @@ npm test
 npm run build
 ```
 
-Docs/map checks: `npm run docs:check` and `npm run mcp:benchmark`.
+Docs/map: `npm run docs:check` and `npm run mcp:benchmark`.
 
 ## Source-guard policy
 
@@ -104,3 +104,5 @@ Guards protect:
 - `202`: current-day-only order deletion for all roles and private KPI cleanup; apply before sender/UI. Tests: `tests/orderDeletion.test.js`.
 
 - `203`: KPI start time; apply before sender/UI. Tests: `tests/timeBasedKpi.test.js`.
+
+- `204`: preserve audit actors on account deletion. Tests: `tests/accountDeletionAudit.test.js`.

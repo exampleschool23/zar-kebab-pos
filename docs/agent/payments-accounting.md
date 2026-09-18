@@ -3,9 +3,9 @@
 ## Entry points
 
 - UI: `src/pages/CashierBill.jsx`, `src/pages/Receipt.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`, `src/pages/MonthlyEstimate.jsx`, `src/pages/DailyBazaar.jsx`
-- Shared logic: `src/lib/analytics.js`, `src/lib/cashierCheckout.js`, `src/lib/billHandoff.js`, `src/lib/accounting.js`, `src/lib/accountingSummary.js`, `src/lib/expenses.js`, `src/lib/monthlyEstimate.js`, `src/lib/bazaar.js`
+- Helpers: `src/lib/analytics.js`, `src/lib/cashierCheckout.js`, `src/lib/billHandoff.js`, `src/lib/accounting.js`, `src/lib/accountingSummary.js`, `src/lib/expenses.js`, `src/lib/monthlyEstimate.js`, `src/lib/bazaar.js`
 - Database: `src/lib/db.js`; migrations `083`, `090`, `097`, `109`, `135`, `201`
-- Focused tests: `tests/orderPayment.test.js`, `tests/atomicPaymentSettlement.test.js`, `tests/cashierCheckout.test.js`, `tests/accountingPages.test.js`, `tests/monthlyEstimate.test.js`, `tests/bazaar.test.js`, `tests/sourceGuards.payments-reporting.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
+- Tests: `tests/orderPayment.test.js`, `tests/atomicPaymentSettlement.test.js`, `tests/cashierCheckout.test.js`, `tests/accountingPages.test.js`, `tests/monthlyEstimate.test.js`, `tests/bazaar.test.js`, `tests/sourceGuards.payments-reporting.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
 
 ## Payment and service math
 
@@ -69,8 +69,10 @@ Migrations `097`, `160`–`163`, `182`.
 - Editing a durable line reuses its saved normal-price snapshot even when the current ingredient catalog price has changed.
 - Catalog deletion is archival. Existing purchase lines keep their historical name, category, unit, and exact paid amount snapshots.
 - Ingredient writes reconcile before retry and update locally.
-- Keep ISO dates internally and use shared date-format helpers for display.
-- The server calculates totals. Create retries reuse a request UUID.
+- Keep ISO dates; display with shared date helpers.
+- Server calculates totals. Create retries reuse a request UUID.
 - Save/edit/delete atomically maintains exactly one linked `expenses` row with `products_bazaar`; do not ask for duplicate Accounting entry.
 - Normalize compatible units only (g→kg, ml→l); never combine counts with weights/volumes.
 - Bazaar history loads only on `/admin/bazaar`, never during POS hydration.
+
+- `204`: audit actor FK removed; history unchanged.
