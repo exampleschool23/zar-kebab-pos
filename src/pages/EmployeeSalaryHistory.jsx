@@ -23,7 +23,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate, formatMonthYear, formatTime } from '../lib/dateFormat'
-import { formatKpiRatePercent } from '../lib/dailyKpi'
+import { formatKpiRatePercent, formatKpiStartTime } from '../lib/dailyKpi'
 import { loadSalaryRows } from '../lib/salaryData'
 import {
   expensePaymentMethodLabel,
@@ -297,7 +297,7 @@ export default function EmployeeSalaryHistory() {
         loadSalaryRows(() => supabase.from('employee_salary_fines').select('*').eq('salary_profile_id', employeeId)),
         loadSalaryRows(() => supabase.from('employee_salary_absences').select('*').eq('salary_profile_id', employeeId)),
         loadSalaryRows(() => supabase.from('employee_daily_kpi_results')
-          .select('id, business_date, salary_profile_id, sales_base_amount, rate_bps, bonus_amount, bonus_id, status')
+          .select('id, business_date, salary_profile_id, sales_base_amount, rate_bps, bonus_amount, bonus_id, status, start_time_snapshot')
           .eq('salary_profile_id', employeeId)),
       ])
       const loadError = employeeRes.error || rateRes.error || paymentRes.error || bonusRes.error || absenceRes.error
@@ -915,6 +915,7 @@ function HistoryEntryCard({ entry, lang, labels, canDelete, confirming, saving, 
           {detail && <p className="mt-1.5 break-words text-xs font-semibold leading-relaxed text-[#6B7280]">{detail}</p>}
           {entry.automaticKpi && entry.kpiResult && (
             <p className="mt-1.5 break-words rounded-lg border border-violet-100 bg-white/80 px-2.5 py-2 text-[11px] font-bold leading-relaxed text-violet-700">
+              {entry.kpiResult.start_time_snapshot != null && <span className="block">{formatKpiStartTime(entry.kpiResult.start_time_snapshot, lang)}</span>}
               {labels.kpiFormula}: {formatCurrency(entry.kpiResult.baseAmountUzs)} × {formatKpiRatePercent(entry.kpiResult.rateBps, lang)} = {formatCurrency(entry.kpiResult.bonusAmountUzs)}
             </p>
           )}

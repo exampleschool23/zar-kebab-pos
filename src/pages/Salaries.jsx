@@ -1,3 +1,4 @@
+import TimePicker24 from '../components/TimePicker24'
 import { EMPLOYEE_JOB_FUNCTIONS, employeeJobFunctionLabel } from '../lib/employeeJobFunctions'
 import React, { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, BadgeMinus, CalendarX2, ChevronLeft, ChevronRight, Copy, Loader2, Percent, Plus, Save, Send, Trash2, Users, WalletCards } from 'lucide-react'
@@ -15,6 +16,8 @@ import {
   formatKpiRateInput,
   formatKpiRatePercent,
   formatKpiSalesBasis,
+  normalizeKpiStartTime,
+  formatKpiStartTime,
   getEffectiveKpiRule,
   getActiveKpiAccounts,
   getKpiRuleEditDate,
@@ -226,6 +229,12 @@ export default function Salaries() {
       migration: 'Maosh jadvallari yangilanmagan. 054–063, 099 va 169 maosh migratsiyalarini ishga tushiring.',
       readOnly: 'Bu sahifa faqat egasi uchun.',
       kpiTitle: 'Kunlik KPI bonuslari',
+      kpiStartTime: 'KPI boshlanish vaqti (Toshkent)',
+      kpiHour: 'Soat',
+      kpiMinute: 'Daqiqa',
+      kpiTimeDone: 'Tayyor',
+      kpiStartHelp: 'Faqat shu vaqtdan boshlab yarim tungacha to‘langan buyurtmalar hisoblanadi. 00:00 — butun kun.',
+      kpiStartRequired: 'KPI boshlanish vaqtini kiriting.',
       kpiHelp: "Har bir xodim uchun o‘z buyurtmalari yoki zaldagi barcha savdolardan KPI belgilang.",
       kpiBasis: "Hisoblash asosi",
       kpiOwnOrders: "O‘zi ochgan buyurtmalar",
@@ -261,7 +270,7 @@ export default function Salaries() {
       kpiPreview: 'Hisoblash namunasi',
       kpiBaseStatement: "Hisoblash asosi: tanlangan buyurtmalardagi taom va ichimliklar summasi hamda xizmat haqi. Faqat zalda xizmat ko‘rsatilgan, shu kuni to‘langan buyurtmalar hisobga olinadi. Xostes va menejer uchun zaldagi barcha savdolarni tanlash mumkin. 16.09.2026 dan oldingi hisoblar o‘zgarmaydi.",
       kpiAccruesToSalary: 'Natija Bonus sifatida maosh balansiga qo‘shiladi va keyingi maosh to‘lovi bilan yopiladi. Xodim uni kunlik xabarda, Maosh guruhi umumiy hisobotda ko‘radi; ZarKebab Team alohida xabardor qilinadi.',
-      kpiMigration: 'Kunlik KPI va guruh xabarlari uchun 129, 169 va 170, 196-migratsiyalarni ishga tushiring.',
+      kpiMigration: 'Kunlik KPI va guruh xabarlari uchun 129, 169 va 170, 196, 203-migratsiyalarni ishga tushiring.',
       kpiLoadFailed: 'KPI ma’lumotlarini yuklab bo‘lmadi.',
       telegramTitle: 'Telegram xabarnomalari',
       telegramHelp: 'Xodimga 30 daqiqada muddati tugaydigan shaxsiy ulanish havolasini yuboring.',
@@ -381,6 +390,12 @@ export default function Salaries() {
       migration: 'Таблицы зарплат не обновлены. Запустите миграции зарплат 054–063, 099 и 169.',
       readOnly: 'Эта страница доступна только владельцу.',
       kpiTitle: 'Ежедневные KPI-бонусы',
+      kpiStartTime: 'Начало KPI (Ташкент)',
+      kpiHour: 'Часы',
+      kpiMinute: 'Минуты',
+      kpiTimeDone: 'Готово',
+      kpiStartHelp: 'Учитываются заказы, оплаченные с этого времени до полуночи. 00:00 — весь день.',
+      kpiStartRequired: 'Укажите время начала KPI.',
       kpiHelp: "Для каждого сотрудника выберите KPI от своих заказов или всех продаж в зале.",
       kpiBasis: "База расчёта",
       kpiOwnOrders: "Свои открытые заказы",
@@ -416,7 +431,7 @@ export default function Salaries() {
       kpiPreview: 'Пример расчёта',
       kpiBaseStatement: "База расчёта — сумма блюд и напитков плюс плата за обслуживание. Учитываются только заказы в зале, оплаченные за выбранный день. Для хостес и менеджера можно выбрать все продажи в зале. Расчёты до 16.09.2026 не меняются.",
       kpiAccruesToSalary: 'Результат начисляется в баланс зарплаты как бонус и погашается следующей выплатой. Сотрудник видит его в ежедневном сообщении, группа зарплат — в общем отчёте; ZarKebab Team получает отдельное уведомление.',
-      kpiMigration: 'Запустите миграции 129, 169 и 170, 196 для ежедневных KPI и групповых уведомлений.',
+      kpiMigration: 'Запустите миграции 129, 169 и 170, 196, 203 для ежедневных KPI и групповых уведомлений.',
       kpiLoadFailed: 'Не удалось загрузить данные KPI.',
       telegramTitle: 'Telegram-уведомления',
       telegramHelp: 'Отправьте сотруднику личную ссылку, которая действует 30 минут.',
@@ -536,6 +551,12 @@ export default function Salaries() {
       migration: 'Salary tables are not up to date. Run salary migrations 054–063, 099, and 169.',
       readOnly: 'Only the owner can manage this page.',
       kpiTitle: 'Daily KPI bonuses',
+      kpiStartTime: 'KPI start time (Tashkent)',
+      kpiHour: 'Hour',
+      kpiMinute: 'Minute',
+      kpiTimeDone: 'Done',
+      kpiStartHelp: 'Counts orders paid from this time until midnight. 00:00 includes the full day.',
+      kpiStartRequired: 'Enter a KPI start time.',
       kpiHelp: "Choose KPI from an employee’s own orders or all dine-in sales.",
       kpiBasis: "Calculation basis",
       kpiOwnOrders: "Own opened orders",
@@ -571,7 +592,7 @@ export default function Salaries() {
       kpiPreview: 'Calculation example',
       kpiBaseStatement: "Base: paid subtotal + service for the selected orders, counted on the payment date. Choose all dine-in for hostesses and managers. Calculations before 16 Sep 2026 stay unchanged.",
       kpiAccruesToSalary: 'The result is added to salary balance as a bonus and settled by the next salary payment. The employee sees it in the daily message, Salary group in the aggregate report; ZarKebab Team is notified separately.',
-      kpiMigration: 'Run migrations 129, 169, and 170, 196 for daily KPI and group notifications.',
+      kpiMigration: 'Run migrations 129, 169, and 170, 196, 203 for daily KPI and group notifications.',
       kpiLoadFailed: 'Could not load KPI data.',
       telegramTitle: 'Telegram notifications',
       telegramHelp: 'Send the employee a private link that expires after 30 minutes.',
@@ -664,6 +685,7 @@ export default function Salaries() {
     rate_percentage: '1',
     sales_basis: 'employee_opened_orders',
     order_opener_profile_id: '',
+    start_time: '00:00',
     is_enabled: true,
   })
 
@@ -702,7 +724,7 @@ export default function Salaries() {
           .order('attempted_at', { ascending: false })
           .limit(100),
         supabase.from('employee_kpi_rule_change_events')
-          .select('id, salary_profile_id, employee_name_snapshot, change_kind, effective_from, previous_rate_bps, previous_is_enabled, new_rate_bps, new_is_enabled, previous_sales_basis, new_sales_basis, created_at')
+          .select('id, salary_profile_id, employee_name_snapshot, change_kind, effective_from, previous_rate_bps, previous_is_enabled, new_rate_bps, new_is_enabled, previous_sales_basis, new_sales_basis, previous_start_time, new_start_time, created_at')
           .order('created_at', { ascending: false })
           .limit(100),
       ])
@@ -941,6 +963,8 @@ export default function Salaries() {
         newKpiEnabled: event?.new_is_enabled ?? null,
         previousKpiBasis: event?.previous_sales_basis,
         newKpiBasis: event?.new_sales_basis,
+        previousKpiStartTime: event?.previous_start_time,
+        newKpiStartTime: event?.new_start_time,
         sortAt: [delivery.attempted_at, delivery.employee_attempted_at, delivery.team_attempted_at]
           .filter(Boolean)
           .sort()
@@ -1070,6 +1094,7 @@ export default function Salaries() {
       rate_percentage: currentRule ? formatKpiRateInput(currentRule.rate_bps) : '1',
       sales_basis: currentRule?.sales_basis || 'employee_opened_orders',
       order_opener_profile_id: currentRule?.order_opener_profile_id || activeSalaryProfiles.find(item => item.id === salaryProfileId)?.profile_id || '',
+      start_time: normalizeKpiStartTime(currentRule?.start_time),
       is_enabled: currentRule?.is_enabled !== false,
     })
   }
@@ -1082,12 +1107,18 @@ export default function Salaries() {
       setKpiRulesError(l.kpiAccountRequired)
       return
     }
+    const startTime = normalizeKpiStartTime(kpiForm.start_time)
+    if (!startTime) {
+      setKpiRulesError(l.kpiStartRequired)
+      return
+    }
     const openerId = kpiForm.sales_basis === 'employee_opened_orders' ? kpiForm.order_opener_profile_id || null : null
     const existingRule = kpiRules.find(rule => (
       rule.salary_profile_id === salaryProfile.id
       && String(rule.effective_from || '').slice(0, 10) === kpiForm.effective_from
     ))
     const configurationChanged = !existingRule
+      || normalizeKpiStartTime(existingRule.start_time) !== startTime
       || existingRule.sales_basis !== kpiForm.sales_basis
       || (existingRule.order_opener_profile_id || null) !== openerId
       || Number(existingRule.rate_bps) !== rateBps
@@ -1105,6 +1136,7 @@ export default function Salaries() {
         rate_bps: rateBps,
         sales_basis: kpiForm.sales_basis,
         order_opener_profile_id: openerId,
+        start_time: startTime,
         is_enabled: Boolean(kpiForm.is_enabled),
         created_by: profile?.id || null,
         created_by_name: profile?.full_name || profile?.email || state.user?.name || '',
@@ -1197,6 +1229,7 @@ export default function Salaries() {
       rate_percentage: '1',
       sales_basis: 'employee_opened_orders',
       order_opener_profile_id: '',
+      start_time: '00:00',
       is_enabled: true,
     })
     setMessage(removalResult.action === 'disabled' ? l.kpiStopped : l.kpiRemoved)
@@ -2027,13 +2060,13 @@ export default function Salaries() {
                           {pagedTelegramDeliveryRows.map(delivery => {
                             const retryKey = `telegram-retry-${delivery.eventType}-${delivery.eventId}`
                             const typeStyle = telegramDeliveryTypeStyles[delivery.eventType] || telegramDeliveryTypeStyles.payment
-                            const kpiValue = (rateBps, enabled, basis) => (
-                              enabled === false ? l.kpiDisabled : `${formatKpiRatePercent(rateBps, lang)}${basis ? ` · ${formatKpiSalesBasis(basis, lang)}` : ''}`
+                            const kpiValue = (rateBps, enabled, basis, startTime) => (
+                              enabled === false ? l.kpiDisabled : `${formatKpiRatePercent(rateBps, lang)}${basis ? ` · ${formatKpiSalesBasis(basis, lang)}` : ''}${startTime != null ? ` · ${formatKpiStartTime(startTime, lang)}` : ''}`
                             )
                             const deliveryValue = delivery.eventType === 'kpi_rule'
                               ? delivery.previousKpiRateBps == null
-                                ? kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled, delivery.newKpiBasis)
-                                : `${kpiValue(delivery.previousKpiRateBps, delivery.previousKpiEnabled, delivery.previousKpiBasis)} → ${kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled, delivery.newKpiBasis)}`
+                                ? kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled, delivery.newKpiBasis, delivery.newKpiStartTime)
+                                : `${kpiValue(delivery.previousKpiRateBps, delivery.previousKpiEnabled, delivery.previousKpiBasis, delivery.previousKpiStartTime)} → ${kpiValue(delivery.newKpiRateBps, delivery.newKpiEnabled, delivery.newKpiBasis, delivery.newKpiStartTime)}`
                               : delivery.eventType === 'rate'
                                 ? `${formatCurrency(delivery.amount)} · ${salaryRateUnitLabel(delivery.eventUnit, lang)}`
                                 : delivery.eventType === 'absence'
@@ -2259,6 +2292,13 @@ function DailyKpiSection({
                 disabled={!canManage || loading || rulesLoading}
               />
             </Field>
+            <div className="min-w-0">
+              <TimePicker24 value={form.start_time} label={labels.kpiStartTime}
+                hourLabel={labels.kpiHour} minuteLabel={labels.kpiMinute} doneLabel={labels.kpiTimeDone}
+                className={FIELD} disabled={!canManage || loading || rulesLoading}
+                onChange={value => onFormChange(current => ({ ...current, start_time: value }))} />
+              <p className="mt-2 text-xs text-gray-600">{labels.kpiStartHelp}</p>
+            </div>
             <div className="min-w-0 sm:col-span-2">
               <Field label={labels.kpiBasis}>
                 <select value={form.sales_basis} className={FIELD}
@@ -2350,7 +2390,7 @@ function DailyKpiSection({
               <button
                 type="button"
                 onClick={onSave}
-                disabled={!canManage || loading || rulesLoading || !selectedKpiProfile || !form.effective_from || previewRateBps <= 0 || (form.is_enabled && form.sales_basis === 'employee_opened_orders' && !kpiAccounts.some(account => account.id === form.order_opener_profile_id)) || saving}
+                disabled={!canManage || loading || rulesLoading || !selectedKpiProfile || !form.effective_from || previewRateBps <= 0 || !normalizeKpiStartTime(form.start_time) || (form.is_enabled && form.sales_basis === 'employee_opened_orders' && !kpiAccounts.some(account => account.id === form.order_opener_profile_id)) || saving}
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}

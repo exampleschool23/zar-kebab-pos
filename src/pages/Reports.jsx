@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
+import { useOrderDeletionDate } from '../store/useOrderDeletionDate'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { getCategoryName } from '../lib/i18n'
@@ -55,7 +56,7 @@ import {
 } from '../lib/expenses'
 import { formatLongDate, formatLongDateTime } from '../lib/dateFormat'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
-import { canChangeCompletedOrderPaymentMethod, canDeletePaidOrders, canViewPage } from '../lib/permissions'
+import { canChangeCompletedOrderPaymentMethod, canDeleteOrderToday, canViewPage } from '../lib/permissions'
 import { collectPagedRows, loadOrdersForRange, mergeOrderHistory } from '../lib/orderHistory'
 import { getAccountingQuickRange } from '../lib/accounting'
 
@@ -1824,7 +1825,8 @@ export default function Reports() {
   const { loaded, loadError } = useAppDataStatus()
   const navigate     = useNavigate()
   const lang         = state.lang
-  const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
+  const deletionDate = useOrderDeletionDate()
+  const canDeleteOrder = candidate => canDeleteOrderToday(profile || { role: state.user?.role }, candidate, deletionDate)
   const canChangePaymentMethod = canChangeCompletedOrderPaymentMethod(profile || { role: state.user?.role })
   const canViewExpenses = canViewPage(profile || { role: state.user?.role }, 'expenses')
 
@@ -2048,7 +2050,7 @@ export default function Reports() {
   }
 
   async function deleteOrder(order) {
-    if (!canDeleteOrder || !order?.id || deletingOrderId) return
+    if (!canDeleteOrderToday(profile || { role: state.user?.role }, order) || !order?.id || deletingOrderId) return
     setDeletingOrderId(order.id)
     try {
       const result = await dispatch({ type: 'DELETE_ORDER', payload: { orderId: order.id } })
@@ -2389,7 +2391,7 @@ export default function Reports() {
                 navigate={navigate}
                 lang={lang}
                 serviceRateSettings={state.settings}
-                canDeleteOrder={canDeleteOrder}
+                canDeleteOrder={canDeleteOrder(selectedOrder)}
                 onDeleteOrder={deleteOrder}
                 deletingOrderId={deletingOrderId}
                 confirmDeleteOrderId={confirmDeleteOrderId}

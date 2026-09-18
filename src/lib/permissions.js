@@ -1,5 +1,6 @@
 // Centralised role permission helpers.
 // All sidebar visibility and route protection should reference these — never hardcode role arrays elsewhere.
+import { formatDateOnly } from './dateFormat.js'
 
 export const PAGE_ACCESS = {
   publicMenu: ['guest', 'owner', 'admin', 'viewer'],
@@ -182,6 +183,12 @@ export function canManageFeatureAccess(profileOrRole) {
 
 export function canDeletePaidOrders(profileOrRole) {
   return canEditFeature(profileOrRole, 'delete_paid_orders')
+}
+
+// Match the database's Tashkent business-date boundary; no owner exception.
+export function canDeleteOrderToday(profileOrRole, order, now = new Date()) {
+  const date = formatDateOnly(order?.paid_at ?? order?.created_at)
+  return Boolean(order?.id && date && date === formatDateOnly(now) && canDeletePaidOrders(profileOrRole))
 }
 
 export function canChangeCompletedOrderPaymentMethod(profileOrRole) {

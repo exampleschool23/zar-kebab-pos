@@ -240,4 +240,37 @@ test('employee opened-order KPI executes the production finalizer in PostgreSQL'
     await assert.rejects(db.query(`update employee_kpi_rules set sales_basis='restaurant' where id=$1`,[results.get(id(1)).rule_id]),/finalized day/)
     assert.deepEqual(byEmployee(await finalize('2026-09-19')),results)
   })
+
+  await t.test('same-day deletion reduces own and restaurant awards; finalized orders cannot be deleted', async () => {
+    await db.exec(`
+      create schema vault; create schema extensions; create schema net; create schema cron;
+      create table vault.decrypted_secrets(name text,decrypted_secret text,created_at timestamptz);
+      create table cron.job(jobid bigint,jobname text);
+      create function cron.schedule(text,text,text) returns bigint language sql as $$select 1::bigint$$;
+      create function cron.unschedule(bigint) returns boolean language sql as $$select true$$;
+      create table employee_salary_telegram_links(salary_profile_id uuid,chat_id text,notifications_enabled boolean);
+      create or replace function pg_catalog.clock_timestamp() returns timestamptz language sql as
+        $$select current_setting('test.deletion_clock')::timestamptz$$;
+      select set_config('test.deletion_clock','2026-09-20T12:00:00Z',false);
+      alter table orders add column order_number integer, add column total integer;
+    `)
+    await db.exec(sql('197_employee_order_kpi_notifications.sql'))
+    await db.exec(sql('198_employee_order_kpi_running_total.sql'))
+    await db.exec(sql('202_current_day_order_deletion.sql'))
+    await order('delete-today',1,1000000,'2026-09-20')
+    await order('keep-today',1,2000000,'2026-09-20',{service_fee:100000})
+    await order('other-today',2,500000,'2026-09-20')
+    await db.query("delete from orders where id='delete-today'")
+    await db.exec(`create or replace function pg_catalog.now() returns timestamptz language sql stable
+      as $$select '2026-09-21T12:00:00Z'::timestamptz$$;
+      select set_config('test.deletion_clock','2026-09-21T12:00:00Z',false)`)
+    const results = await finalize('2026-09-20')
+    assert.equal(byEmployee(results).get(id(1)).bonus_amount,21000)
+    assert.equal(byEmployee(results).get(id(4)).bonus_amount,26000)
+    const bonuses = (await db.query("select * from employee_salary_bonuses where bonus_date='2026-09-20' order by id")).rows
+    await assert.rejects(db.query("delete from orders where id='keep-today'"), /Only orders from today/)
+    assert.deepEqual(await finalize('2026-09-20'),results)
+    assert.deepEqual((await db.query("select * from employee_salary_bonuses where bonus_date='2026-09-20' order by id")).rows,bonuses)
+  })
+
 })

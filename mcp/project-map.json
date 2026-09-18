@@ -20,6 +20,18 @@
   ],
   "tasks": [
     {
+      "name": "employee KPI workday start time",
+      "aliases": ["time based KPI", "hostess manager KPI from 14:00", "KPI paid after shift begins"],
+      "path": "supabase/203_kpi_workday_start_time.sql",
+      "symbol": "employee_kpi_sales_base"
+    },
+    {
+      "name": "current day order deletion and employee KPI cleanup",
+      "aliases": ["historical order deletion blocked", "owner cannot delete previous orders", "delete employee KPI message"],
+      "path": "supabase/202_current_day_order_deletion.sql",
+      "symbol": "guard_current_day_order_deletion"
+    },
+    {
       "name": "public menu corporate sets before deals",
       "aliases": ["catering category priority", "public menu section order"],
       "path": "src/pages/PublicMenu.jsx",

@@ -36,7 +36,7 @@ Reporting guide.
 
 ## Dashboard presentation
 
-- Recent Orders and receipt/delete controls live in Reports, not Dashboard.
+- Recent Orders and receipt/delete controls live in Reports. `202` allows deletion only for today's Tashkent payment date (creation fallback), even for owners; older delete controls are hidden. Coverage: `tests/orderDeletion.test.js`.
 - Sales by Category shows every category represented by sold items in the selected period.
 - Product Contribution ranks ten products by revenue and shows quantity, revenue share, immutable-cost profit, and margin. Missing cost snapshots show unavailable profit. It reuses selected-period orders.
 - Never fabricate unsold products or empty categories. Monthly Busy Hours uses migrations `192`–`193` to return 12 two-hour buckets for the current Tashkent month. It attributes paid demand to `created_at`, scans one indexed month, returns no order details, and highlights tied peaks.

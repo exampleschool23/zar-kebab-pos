@@ -22,7 +22,7 @@
 - Delete completed orders access permits atomic non-loyalty tender corrections.
 - Loyalty rows are visible but immutable without a separate wallet reversal workflow.
 - Method corrections keep amounts fixed. Splits preserve the original sum, other payments, items, totals, paid state/time, loyalty, service and stock. Receipts audit splits and reconcile retries. Tests: `tests/paidPaymentSplit.test.js`.
-- Order deletes require a reason popup; migration `184` snapshots reasons for Investor alerts. Payment corrections also notify Investor.
+- Order deletes require a reason (`184`) and today's Tashkent `paid_at`/`created_at` date (`202`), even for owners. Reports/cashier hide older delete controls. Payment corrections still notify Investor.
 
 ## Receipt printing
 
@@ -52,7 +52,6 @@
 
 - New cash expenses queue one immutable Investor delivery: manual text or a Bazaar PNG receipt and caption.
 - Edits/deletes do not announce again. Do not project salary, bonus, employee meal, or calculated rows into this flow.
-- See `docs/agent/telegram.md` for targets, message contents, and retry rules.
 
 ## Daily Bazaar
 

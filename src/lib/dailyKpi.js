@@ -1,5 +1,18 @@
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
+// PostgreSQL returns HH:MM:SS; the setting is deliberately minute precision.
+export function normalizeKpiStartTime(value = '00:00') {
+  const time = String(value ?? '00:00')
+  return /^([01]\d|2[0-3]):[0-5]\d(?::00)?$/.test(time) ? time.slice(0, 5) : ''
+}
+
+export function formatKpiStartTime(value, lang = 'en') {
+  const time = normalizeKpiStartTime(value)
+  if (!time) return ''
+  const labels = { en: `From ${time} (Tashkent)`, ru: `С ${time} (Ташкент)`, uz: `${time} dan (Toshkent)` }
+  return labels[lang] || labels.en
+}
+
 function normalizeWholeAmount(value) {
   const amount = Number(value)
   return Number.isFinite(amount) ? Math.max(0, Math.round(amount)) : 0
@@ -95,6 +108,7 @@ export async function removeKpiRulePreservingHistory({
         salary_profile_id: rule.salary_profile_id,
         effective_from: normalizedEffectiveFrom,
         rate_bps: rule.rate_bps,
+        ...(rule.start_time != null ? { start_time: rule.start_time } : {}),
         ...(rule.sales_basis ? { sales_basis: rule.sales_basis, order_opener_profile_id: rule.order_opener_profile_id || null } : {}),
         is_enabled: false,
         created_by: createdBy,

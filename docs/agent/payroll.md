@@ -1,15 +1,13 @@
 # Employees, Payroll, KPI, Absence, and Employee Meals
 
-Cards: salary/name; inactive: end date.
-
 - Migration 194 adds nullable job_function. New employees require a job; it grants no permissions.
 
 ## Entry points
 
 - UI: `src/pages/Salaries.jsx`, `src/pages/Employees.jsx`, `src/pages/EmployeeSalaryHistory.jsx`
 - Shared logic: `src/lib/salaryTransactions.js`, `src/lib/salaryHistory.js`, `src/lib/dailyKpi.js`, `src/lib/teamProfiles.js`, `src/lib/expenses.js`
-- Notifications and scheduled finalization: `api/telegram/employee-notification.js`, `api/telegram/daily-salary.js`
-- Schema: migrations `099`, `107`–`119`, `124`–`129`, `136`, `141`, `148`, and `169`–`170`, `172`
+- Finalization: `api/telegram/employee-notification.js`, `api/telegram/daily-salary.js`
+- Schema: migrations `129`, `169`–`172`, `195`–`203`.
 - Tests: `tests/salaryTransactions.test.js`, `tests/salaryHistory.test.js`, `tests/dailyKpi.test.js`, `tests/dailyKpiUi.test.js`, `tests/dailyKpiBonuses.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/telegramSalaryMessages.test.js`
 
 ## Salary ledger
@@ -34,15 +32,15 @@ Cards: salary/name; inactive: end date.
 
 ## Daily KPI bonus
 
-- `195`/`196`: from `2026-09-16`, effective rules choose `sales_basis`: `employee_opened_orders` (default) or `restaurant`. Base is paid dine-in subtotal + service, by Tashkent payment date; ignore loyalty. Own orders match `order_opener_profile_id`, falling back to payroll `profile_id`. Require an account when saving enabled own-order rules; restaurant KPI needs none.
-- Earlier catch-up/run totals stay restaurant-wide; finalized dates replay unchanged. Results/bonus metadata freeze amounts/basis. SQL + image coverage: `tests/employeeOpenedOrderKpi.test.js`.
+- `195`/`196`: from `2026-09-16`, rules choose own opened orders or all restaurant dine-in sales. Base is paid subtotal + service by Tashkent payment date, ignoring loyalty. Own rules require `order_opener_profile_id` or payroll `profile_id`; restaurant rules need no account. Earlier catch-up uses all sales.
+- `203`: effective-dated `start_time` (default `00:00`) counts payments from that minute through midnight in Tashkent, for both bases. Finalizer/estimates share `employee_kpi_sales_base`. Results/bonuses and change events freeze time. Tests: `tests/timeBasedKpi.test.js`, `tests/employeeOpenedOrderKpi.test.js`.
 - Skip absences and dates outside employment boundaries.
-- Runs/results are immutable and duplicate-safe. Only service-role finalization creates `daily_kpi` bonuses. `200`: creator-label repair.
+- Runs/results are immutable; only service-role finalization creates `daily_kpi` bonuses (`200`: creator repair). `202` forbids deleting previous-day orders for everyone; today's deletions reduce own/restaurant bases before finalization.
 - Bonuses accrue into salary. Formula/settlement are immutable; payments record cash expense.
 - Deleting a generated bonus marks its result voided; retries never recreate it.
 - Only owners remove KPI rules. The selected effective date is the boundary: preserve earlier rules/data and insert a disabled successor. Physically delete only unused rules whose effective date equals the boundary. Never offer disabled successors for removal: that would reactivate the older rule.
 - Employee cards show today’s rule. KPI account dropdown lists active POS profiles, saves the opener on the rule, and reports retryable load failures.
-- KPI rate/status/basis/account changes snapshot before/after values and queue Salary delivery; no-op saves stay silent. No historical backfill.
+- KPI rate/status/basis/account/time changes snapshot before/after values and queue Salary delivery; no-op saves stay silent. No historical backfill.
 - Salary History separates monthly manual Bonuses from KPI bonuses. Salary + bonuses includes salary and both bonus types once each.
 - Effective dates cannot enter already finalized periods. Recovery scans missing older dates in bounded batches.
 
@@ -53,7 +51,7 @@ Cards: salary/name; inactive: end date.
 - Private PNG calendars show month-to-date salary, KPI, bonuses, fines and absences; totals are before payments, not salary balance. Separate private and Salary-group KPI event rows are skipped; Team KPI uses one image per day (migration `181`).
 - Cron repairs missing KPI delivery rows before Team delivery; `172` restores the queue trigger.
 - A failed KPI finalization defers the daily salary summary.
-- See `docs/agent/telegram.md` for language, audience privacy, destination, and delivery-state rules.
+- Delivery rules: `docs/agent/telegram.md`.
 
 ## Employee meal expense
 

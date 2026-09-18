@@ -6,6 +6,7 @@ import {
   Monitor, MoreHorizontal, Plus, Minus, Trash2, ClipboardPaste, X,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { useOrderDeletionDate } from '../store/useOrderDeletionDate'
 import { useAuth } from '../contexts/AuthContext'
 import { getItemName, t, tf } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
@@ -32,7 +33,7 @@ import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem } from '../
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { canDeletePaidOrders, canEditFeature } from '../lib/permissions'
+import { canDeleteOrderToday, canEditFeature } from '../lib/permissions'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 import { formatElapsedSince } from '../lib/dateFormat'
@@ -94,7 +95,8 @@ export default function CashierBill() {
   const { profile } = useAuth()
   const { loaded, loadError } = useAppDataStatus()
   const lang = state.lang
-  const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
+  const deletionDate = useOrderDeletionDate()
+  const canDeleteOrder = candidate => canDeleteOrderToday(profile || { role: state.user?.role }, candidate, deletionDate)
   const canEditCashier = canEditFeature(profile || { role: state.user?.role }, 'cashier')
 
   const [payMethod,  setPayMethod]  = useState('cash')
@@ -553,7 +555,7 @@ export default function CashierBill() {
   }
 
   async function handleDeleteOrder() {
-    if (!canDeleteOrder || !order?.id || isDeletingOrder) return
+    if (!canDeleteOrderToday(profile || { role: state.user?.role }, order) || !order?.id || isDeletingOrder) return
     setDeletingOrder(true)
     try {
       const result = await dispatch({
@@ -1468,7 +1470,7 @@ export default function CashierBill() {
                   {isPrintingBill ? lbl.printingBill : lbl.printReceipt}
                 </button>
 
-                {canDeleteOrder && (
+                {canDeleteOrder(order) && (
                   <div className="grid gap-2">
                     <button
                       onClick={handleDeleteOrder}

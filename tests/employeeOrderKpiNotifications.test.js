@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
-import { buildEmployeeOrderKpiMessage, deliverEmployeeOrderKpiNotification } from '../api/telegram/_lib/employeeOrderKpiNotifications.js'
+import { buildEmployeeOrderKpiMessage, deliverEmployeeOrderKpiNotification, retractDeletedEmployeeOrderKpiNotifications, drainEmployeeOrderKpiNotifications } from '../api/telegram/_lib/employeeOrderKpiNotifications.js'
 
 test('compact private message escapes order numbers and distinguishes an estimate', () => {
   const text = buildEmployeeOrderKpiMessage({order_number:'<12>',total:345000,rate_bps:300,cut:10350,daily_cut:25220})
@@ -68,9 +68,15 @@ test('production payment trigger snapshots only new paid orders and eligible lin
   assert.equal((await db.query('select * from employee_order_kpi_notifications')).rows.length,5)
 })
 
-function ledger() {
-  let row={id:'one',status:'queued',chat_id:'private',snapshot:{order_number:1,total:100,rate_bps:300,cut:3}}
-  return {get row(){return row},from(){let patch,filters=[]; const q={update(p){patch=p;return q},eq(k,v){filters.push([k,v]);return q},select(){return q},async maybeSingle(){if(!filters.every(([k,v])=>row[k]===v))return {data:null};row={...row,...patch};return {data:{...row}}},then(resolve,reject){return q.maybeSingle().then(resolve,reject)}};return q}}
+function ledger(initial = {}) {
+  let row={id:'one',status:'queued',delete_requested:false,deleted_at:null,chat_id:'private',snapshot:{order_number:1,total:100,rate_bps:300,cut:3},...initial}
+  return {get row(){return row},from(){let patch,filters=[]; const matching=()=>filters.every(f=>f(row)); const q={
+    update(p){patch=p;return q},eq(k,v){filters.push(r=>r[k]===v);return q},
+    is(k,v){filters.push(r=>(r[k]??null)===v);return q},not(k){filters.push(r=>r[k]!=null);return q},
+    select(){return q},order(){return q},limit(){return q},
+    async maybeSingle(){if(!matching())return {data:null};row={...row,...patch};return {data:{...row}}},
+    then(resolve,reject){return q.maybeSingle().then(result=>({...result,data:result.data?[result.data]:[]})).then(resolve,reject)}
+  };return q}}
 }
 test('concurrent send claims once; uncertain sends stay held',async()=>{
   const db=ledger();let sends=0; const row={...db.row}
@@ -80,5 +86,77 @@ test('concurrent send claims once; uncertain sends stay held',async()=>{
   const failed=ledger(); await deliverEmployeeOrderKpiNotification(failed,{...failed.row},async()=>{throw new Error('timeout')})
   assert.equal(failed.row.status,'processing')
   assert.equal((await deliverEmployeeOrderKpiNotification(failed,{...failed.row},send)).status,'duplicate')
+  assert.equal(sends,1)
+})
+
+
+test('a stale queued notice cannot be claimed after order deletion', async () => {
+  const db = ledger()
+  const stale = { ...db.row }
+  Object.assign(db.row, { delete_requested: true, status: 'cancelled' })
+  let sends = 0
+  const result = await deliverEmployeeOrderKpiNotification(db, stale, async () => { sends++ })
+  assert.equal(result.status, 'duplicate')
+  assert.equal(sends, 0)
+  assert.equal((await drainEmployeeOrderKpiNotifications(db)).sent, 0)
+})
+
+test('deletion during Telegram send retracts the late receipt once without resending', async () => {
+  const db = ledger()
+  let sends = 0, deletes = 0
+  const result = await deliverEmployeeOrderKpiNotification(db, { ...db.row }, async () => {
+    sends++
+    db.row.delete_requested = true
+    return { result: { message_id: 123 } }
+  }, async (chat, message) => {
+    assert.equal(chat, 'private'); assert.equal(message, 123); deletes++
+  })
+  assert.equal(result.status, 'sent')
+  assert.ok(db.row.deleted_at)
+  await retractDeletedEmployeeOrderKpiNotifications(db, undefined, async () => { deletes++ })
+  assert.equal(sends, 1)
+  assert.equal(deletes, 1)
+})
+
+test('cleanup retries Telegram errors and accepts already missing messages', async () => {
+  const db = ledger({status:'sent',delete_requested:true,telegram_message_id:123})
+  const failure = await retractDeletedEmployeeOrderKpiNotifications(db, undefined, async () => { throw new Error('not enough rights') })
+  assert.equal(failure.ok, false)
+  assert.equal(db.row.deleted_at, null)
+  assert.match(db.row.cleanup_error, /rights/)
+  const success = await retractDeletedEmployeeOrderKpiNotifications(db, undefined, async () => { throw new Error('Bad Request: message to delete not found') })
+  assert.equal(success.ok, true)
+  assert.ok(db.row.deleted_at)
+  assert.equal(db.row.cleanup_error, '')
+})
+
+test('unknown sends remain held on deletion; cleanup does not invent message identities', async () => {
+  const db = ledger()
+  await deliverEmployeeOrderKpiNotification(db, {...db.row}, async () => {
+    db.row.delete_requested = true
+    throw new Error('timeout')
+  })
+  let deletes = 0
+  await retractDeletedEmployeeOrderKpiNotifications(db, undefined, async () => { deletes++ })
+  assert.equal(db.row.status, 'processing')
+  assert.equal(db.row.telegram_message_id, undefined)
+  assert.equal(deletes, 0)
+})
+
+test('failed immediate cleanup preserves the sent receipt and retries only deletion', async () => {
+  const db = ledger()
+  let sends = 0
+  const result = await deliverEmployeeOrderKpiNotification(db, {...db.row}, async () => {
+    sends++
+    db.row.delete_requested = true
+    return {result:{message_id:123}}
+  }, async () => { throw new Error('Telegram temporarily unavailable') })
+  assert.deepEqual(result, {status:'sent',cleanupPending:true})
+  assert.equal(db.row.telegram_message_id,123)
+  assert.equal(db.row.status,'sent')
+  assert.equal(db.row.deleted_at,null)
+  await deliverEmployeeOrderKpiNotification(db,{...db.row},async () => { sends++ })
+  await retractDeletedEmployeeOrderKpiNotifications(db,undefined,async () => {})
+  assert.ok(db.row.deleted_at)
   assert.equal(sends,1)
 })

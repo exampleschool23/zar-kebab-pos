@@ -14,7 +14,6 @@
 
 - Use full filenames; legacy duplicate prefixes `073`, `108`, `157` stay distinct. New duplicates fail.
 - `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. Never bulk replay/baseline legacy history. Writes and receipts are atomic, matching receipts skip, changed checksums fail. Reconcile lost responses.
-- Tests: `tests/migrationTools.test.js`; helpers: `scripts/migrationTools.js`. Health checks definitions, triggers and cron.
 - For schema/RPC errors, run `npm run db:health`.
 - Migration families:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
@@ -99,8 +98,9 @@ Guards protect:
 
 - `195`/`196`: own/all dine-in KPI from `2026-09-16`; apply before UI. History preserved. SQL: `tests/employeeOpenedOrderKpi.test.js` (PGlite).
 
-- `197`/`198`: paid-order notices and daily KPI; deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.
-
 - `200`: repair KPI creator-label drift; preserve actor checks/history. Tests: `tests/employeeOpenedOrderKpi.test.js`.
 
-- `201`: audited, authorized, idempotent paid-payment splitting. Apply before UI. Tests: `tests/paidPaymentSplit.test.js`.
+- `201`: audited paid-payment splitting; apply before UI. Tests: `tests/paidPaymentSplit.test.js`.
+- `202`: current-day-only order deletion for all roles and private KPI cleanup; apply before sender/UI. Tests: `tests/orderDeletion.test.js`.
+
+- `203`: KPI start time; apply before sender/UI. Tests: `tests/timeBasedKpi.test.js`.

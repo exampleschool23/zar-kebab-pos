@@ -17,7 +17,7 @@
 - Saved salary events/rate changes get `not_attempted` tracking; initial setup does not.
 - Per-destination states: pending, sent, failed, skipped, confirmed.
 - Mark sent only with a Telegram message id.
-- Employee/Salary/Team/Investor sends are independent and duplicate-safe.
+- Destination sends are independent and duplicate-safe.
 - Salaries: status, five rows/page, unsent retries.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
 - Owner history deletion retracts tracked private/Salary/Team messages first. Payments snapshot chat ID. Missing messages count as retracted; other failures preserve the event.
@@ -32,11 +32,11 @@
 
 ## Team salary events
 
+- No historical broadcasts.
+
 - Manual bonus, fine, and absence notify Team; salary payments and rate changes have terminal skipped Team status.
 - Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
 - Bonuses omit payment method. Private manual bonuses/fines use Russian long dates.
-- Use shared localized long-date formatting. Empty notes are omitted; Team copy stays compact.
-- No historical broadcasts.
 
 ## Automatic daily payroll privacy and language
 
@@ -46,7 +46,7 @@
 - `180`: Game Club rounds send Team RU date, actor, menu, items, total. Snapshots paid daily income at send: Tashkent paid_at (created_at fallback), saved totals; read errors stay queued. Cron retries; unknown sends held. No costs/tenders.
 - Daily/MTD cafe income uses immutable `orders.total`. Cash/terminal uses payment rows; QR maps to terminal, while card/loyalty stay distinct.
 - Daily soliq is 4% of paid cafe revenue, included in expenses and deducted from net profit.
-- Team KPI: one Russian PNG per finalized date with all employee awards, total, date, system author. Migration `181` claims dates; unknown sends stay held. No text fallback or sales/rate/balance data. Deleting an award edits only its row in the shared image.
+- Team KPI: one Russian PNG per finalized date with all employee awards, total, date, system author. Migration `181` claims dates; unknown sends stay held. No text fallback or sales/rate/balance data. Award deletion edits its image row.
 
 ## Menu availability
 
@@ -77,6 +77,6 @@
 
 - Deploy after `185`. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages stay. Telegram permits deletion within 48h. Test: `tests/orderStatusDelivery.test.js`.
 
-- `197`/`198`: paid orders privately notify the opener with total, order cut and running daily KPI (effective own/all dine-in base, rounded once). No accrual/backfill. Claims hold uncertain sends; minute retries: `task=employee-order-kpi`. Deploy sender first. Tests: `tests/employeeOrderKpiNotifications.test.js`.
+- `197`/`198`: private paid-order estimates snapshot order/daily KPI. `203` filters order/daily cuts by Tashkent start time; Salary events snapshot before/after times. `202` cancels deleted-order queued notices and retracts sent notices, including orphans. Minute `employee-order-kpi` cron retries cleanup; uncertain sends stay held. Apply migrations before sender/UI. Other notices retain historical estimates. Tests: `tests/timeBasedKpi.test.js`.
 
 - Morning watchdog retries unstarted/failed/skipped Investor albums after meal/KPI finalization, including alerted failures. Recovery requires a saved report message ID; never replay sent/pending reports. Alert markers save message ID/chat/error only after confirmed sends. Tests: `tests/dailySalaryWatchdog.test.js`.

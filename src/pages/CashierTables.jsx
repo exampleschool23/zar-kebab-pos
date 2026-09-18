@@ -7,6 +7,7 @@ import {
   BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
+import { useOrderDeletionDate } from '../store/useOrderDeletionDate'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
 import {
@@ -28,7 +29,7 @@ import { inferOrderType, isDeliveryOrderType, isOffPremiseOrderType, orderTypeLa
 import { getItemName } from '../lib/i18n'
 import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem } from '../lib/menuItems'
 import { formatDateTime, formatElapsedSince, formatTime, parseInstantDate } from '../lib/dateFormat'
-import { canDeletePaidOrders, canEditFeature, canMoveBackToTable } from '../lib/permissions'
+import { canDeleteOrderToday, canEditFeature, canMoveBackToTable } from '../lib/permissions'
 import { getOrderItemOptionLines } from '../components/MenuProductCards'
 import { useAppDataStatus } from '../store/appHooks'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
@@ -686,7 +687,8 @@ export default function CashierTables() {
   const [deleteErrorByOrderId, setDeleteErrorByOrderId] = useState({})
   const [quickAddBusyKey, setQuickAddBusyKey] = useState('')
   const [quickAddErrorByOrderId, setQuickAddErrorByOrderId] = useState({})
-  const canDeleteOrder = canDeletePaidOrders(profile || { role: state.user?.role })
+  const deletionDate = useOrderDeletionDate()
+  const canDeleteOrder = candidate => canDeleteOrderToday(profile || { role: state.user?.role }, candidate, deletionDate)
   const canEditCashier = canEditFeature(profile || { role: state.user?.role }, 'cashier')
   const canRecallTable = canMoveBackToTable(profile || { role: state.user?.role })
 
@@ -873,7 +875,7 @@ export default function CashierTables() {
   }
 
   async function handleDeleteOrder(order) {
-    if (!canDeleteOrder || !order?.id || deletingOrderId) return
+    if (!canDeleteOrderToday(profile || { role: state.user?.role }, order) || !order?.id || deletingOrderId) return
     setDeleteErrorByOrderId(errors => ({ ...errors, [order.id]: '' }))
 
     setDeletingOrderId(order.id)
@@ -1139,7 +1141,7 @@ export default function CashierTables() {
                     quickAddBusyKey={quickAddBusyKey}
                     quickAddError={quickAddErrorByOrderId[order.id]}
                     canEdit={canEditCashier}
-                    canDelete={canDeleteOrder}
+                    canDelete={canDeleteOrder(order)}
                     onRecall={canEditCashier && canRecallTable ? handleRecallTable : null}
                     onDelete={handleDeleteOrder}
                     confirmDelete={confirmDeleteOrderId === order.id}

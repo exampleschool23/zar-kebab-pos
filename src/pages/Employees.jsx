@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { canEditFeature, normalizeRole } from '../lib/permissions'
 import { compareSalaryAbsencesNewestFirst } from '../lib/salaryTransactions'
 import { loadSalaryRows } from '../lib/salaryData'
-import { formatKpiRatePercent, formatKpiSalesBasis, getEffectiveKpiRule } from '../lib/dailyKpi'
+import { formatKpiRatePercent, formatKpiSalesBasis, formatKpiStartTime, getEffectiveKpiRule } from '../lib/dailyKpi'
 import { notifyTelegramAbsenceUndo, notifyTelegramEmployeeLifecycle } from '../lib/telegramNotifications'
 import {
   getDailySalaryAmount,
@@ -233,7 +233,7 @@ export default function Employees() {
       loadSalaryRows(() => supabase.from('employee_salary_fines').select('*')),
       loadSalaryRows(() => supabase.from('employee_salary_absences').select('*')),
       supabase.from('employee_kpi_rules')
-        .select('id, salary_profile_id, effective_from, rate_bps, is_enabled, sales_basis, created_at, updated_at')
+        .select('id, salary_profile_id, effective_from, rate_bps, is_enabled, sales_basis, start_time, created_at, updated_at')
         .lte('effective_from', today)
         .order('effective_from', { ascending: false })
         .order('updated_at', { ascending: false }),
@@ -721,6 +721,7 @@ function EmployeeKpiRow({
           <span className={`font-black ${enabled ? 'text-violet-600' : 'text-[#6B7280]'}`}>
             {formatKpiRatePercent(rule.rate_bps, lang)}
             <span className="block text-[10px] font-semibold">{formatKpiSalesBasis(rule.sales_basis, lang)}</span>
+            <span className="block text-[10px] font-semibold">{formatKpiStartTime(rule.start_time, lang)}</span>
           </span>
         )}
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
