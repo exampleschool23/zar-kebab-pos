@@ -9,7 +9,8 @@ export function groupTeamProfiles(profiles, search = '', statusFilter = 'all') {
   })
 
   return {
-    members: filtered.filter(profile => profile.status !== 'pending'),
+    members: filtered.filter(profile => profile.status !== 'pending')
+      .sort((a, b) => Number(a.status === 'disabled') - Number(b.status === 'disabled')),
     pendingRequests: filtered.filter(profile => profile.status === 'pending'),
   }
 }
