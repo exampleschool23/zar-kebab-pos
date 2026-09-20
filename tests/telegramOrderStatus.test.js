@@ -309,11 +309,16 @@ test('completed group message shows saved cashback only when earned', () => {
     order_type: 'delivery', subtotal: 120000, total: 120000,
     payments: [{ method: 'cash', amount: 120000 }],
     cashback_earned: 36000,
+    loyalty_transactions: [{ customer_name_at_transaction: 'Ali & <Bob>' }],
   }
   const message = buildCompletedOrderGroupMessage(order)
-  assert.match(message, /Оплата: Наличные 120 000 UZS\nНачислен кешбэк: \+ 36 000 UZS/)
+  assert.match(message, /Оплата: Наличные 120 000 UZS\n💳 Ali &amp; &lt;Bob&gt; · кешбэк \+ 36 000 UZS/)
+  assert.match(
+    buildCompletedOrderGroupMessage({ ...order, loyalty_transactions: [] }),
+    /💳 Карта лояльности · кешбэк \+ 36 000 UZS/,
+  )
   for (const cashback_earned of [0, null, undefined]) {
-    assert.doesNotMatch(buildCompletedOrderGroupMessage({ ...order, cashback_earned }), /Начислен кешбэк/)
+    assert.doesNotMatch(buildCompletedOrderGroupMessage({ ...order, cashback_earned }), /кешбэк/)
   }
 })
 
@@ -341,7 +346,7 @@ test('merged completed rounds aggregate loyalty without changing payment amounts
 
   assert.equal(order.loyalty_used_amount, 15000)
   assert.equal(order.cashback_earned, 1500)
-  assert.match(buildCompletedOrderGroupMessage(order), /Начислен кешбэк: \+ 1 500 UZS/)
+  assert.match(buildCompletedOrderGroupMessage(order), /💳 Card Owner · кешбэк \+ 1 500 UZS/)
   assert.equal(order.loyalty_customer_name, 'Card Owner')
   assert.deepEqual(order.payments, [{ method: 'cash', amount: 35000 }])
 })

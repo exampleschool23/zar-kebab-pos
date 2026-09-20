@@ -312,7 +312,8 @@ export function buildCompletedOrderGroupMessage(order) {
   lines.push(`Оплата: ${escapeTelegramHtml(formatPaymentLine(order))}`)
   const cashbackEarned = getOrderPaymentSummary(order).cashbackEarned
   if (cashbackEarned > 0) {
-    lines.push(`Начислен кешбэк: + ${escapeTelegramHtml(formatMoney(cashbackEarned))}`)
+    const cardOwner = loyaltyOwnerNames.join(', ') || 'Карта лояльности'
+    lines.push(`💳 ${escapeTelegramHtml(cardOwner)} · кешбэк + ${escapeTelegramHtml(formatMoney(cashbackEarned))}`)
   }
   if (order?.orderNetProfit != null && Number.isFinite(Number(order.orderNetProfit))) {
     const margin = order?.orderProfitMarginPct != null && Number.isFinite(Number(order.orderProfitMarginPct))

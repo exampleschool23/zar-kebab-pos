@@ -20,7 +20,7 @@
 - Destination sends are independent and duplicate-safe.
 - Salaries: status, five rows/page, unsent retries.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
-- Owner history deletion retracts tracked private/Salary/Team messages first. Payments snapshot chat ID. Missing messages count as retracted; other failures preserve the event.
+- Owner history deletion retracts tracked private/Salary/Team messages first. Payments snapshot chat ID. Missing messages are retracted; other failures preserve the event.
 
 ## Salary destinations
 
@@ -32,7 +32,7 @@
 
 ## Team salary events
 
-- No historical broadcasts.
+- No past broadcasts.
 
 - Manual bonus, fine, and absence notify Team; salary payments and rate changes have terminal skipped Team status.
 - Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
@@ -72,7 +72,7 @@
 
 - `Официант`: saved `waiter_name`, merged across rounds; missing: `Не указан`, never the closer.
 
-- Status: saved `cashback_earned`, summed across rounds; omit zero. Test: `tests/telegramOrderStatus.test.js`.
+- Sum `cashback_earned`; omit zero. After payment: `💳 [owner] · кешбэк + [amount] UZS`; escaped snapshot names or `Карта лояльности`. Test: `tests/telegramOrderStatus.test.js`.
 
 - Deploy after `185`. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages stay. Telegram permits deletion within 48h. Test: `tests/orderStatusDelivery.test.js`.
 
