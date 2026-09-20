@@ -1,4 +1,5 @@
 import { formatTime } from './dateFormat.js'
+import { getGroupedOrderItems } from './analytics.js'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from './menuSaleUnits.js'
 
 const CANCELLED_STATUS = 'cancelled'
@@ -132,7 +133,7 @@ export function buildKitchenCheckHtml({ group, lang = 'en', restaurantName = 'Za
   const tableName = formatKitchenTableName(group?.tableName)
   const waiterName = group?.waiterName || '-'
 
-  const rows = (group?.items || []).map(item => `
+  const rows = getGroupedOrderItems(group?.items || []).map(item => `
     <div class="item">
       ${escapeHtml(formatMenuQuantity(item.quantity, item))}${isMenuItemSoldByWeight(item) ? ' ·' : ' ×'} ${escapeHtml(kitchenItemName(item))}
       ${item.notes ? `<div class="notes">${escapeHtml(item.notes)}</div>` : ''}

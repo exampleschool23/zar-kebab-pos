@@ -600,7 +600,7 @@ export function getGroupedOrderItems(items, resolveName) {
 
     const productId = getOrderItemProductId(item)
     const key = productId != null
-      ? `${productId}::${getOrderItemOptionsKey(item)}`
+      ? `${productId}::${getOrderItemOptionsKey(item)}::${getOrderItemUnitPrice(item)}::${item.sale_unit || item.saleUnit || ''}`
       : `row::${item.id || index}`
     const existing = grouped.get(key)
 

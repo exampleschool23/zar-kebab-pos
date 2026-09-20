@@ -111,9 +111,9 @@ test('cook check renders the compact Russian kitchen slip format', () => {
     waiter_name: 'Jasurbek',
     created_at: '2026-06-10T04:34:00.000Z',
     items: [
-      item({ id: 'a', order_id: 'order-173', name: 'Куриные крылышки', quantity: 1 }),
-      item({ id: 'b', order_id: 'order-173', name: 'Шашлык из говядины', quantity: 1 }),
-      item({ id: 'c', order_id: 'order-173', name: 'Молотый шашлык', quantity: 1 }),
+      item({ id: 'a', menu_item_id: 'wings', order_id: 'order-173', name: 'Куриные крылышки', quantity: 1 }),
+      item({ id: 'b', menu_item_id: 'beef', order_id: 'order-173', name: 'Шашлык из говядины', quantity: 1 }),
+      item({ id: 'c', menu_item_id: 'ground', order_id: 'order-173', name: 'Молотый шашлык', quantity: 1 }),
     ],
   })
   const html = buildKitchenCheckHtml({ group, lang: 'ru', restaurantName: 'Zar Kebab' })

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Loader2, Printer } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { getItemName } from '../lib/i18n'
+import { getGroupedOrderItems } from '../lib/analytics'
 import { formatTime } from '../lib/dateFormat'
 import {
   formatKitchenOrderNumber,
@@ -152,7 +153,7 @@ function KitchenCheckPaper({ group }) {
       <div aria-hidden="true" style={{ margin: '7px 0', borderTop: '2px solid #000' }} />
 
       <div style={{ display: 'grid', gap: '6px' }}>
-        {(group?.items || []).map(item => (
+        {getGroupedOrderItems(group?.items || []).map(item => (
           <div
             key={item.id || `${item.menu_item_id}-${item.name}`}
             style={{ display: 'grid', gridTemplateColumns: 'max-content minmax(0, 1fr)', columnGap: '7px', fontSize: '15px', fontWeight: 900 }}

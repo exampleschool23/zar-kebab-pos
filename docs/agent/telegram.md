@@ -16,9 +16,9 @@
 
 - Saved salary events/rate changes get `not_attempted` tracking; initial setup does not.
 - Per-destination states: pending, sent, failed, skipped, confirmed.
-- Mark sent only with a Telegram message id.
-- Destination sends are independent and duplicate-safe.
-- Salaries: status, five rows/page, unsent retries.
+- Sent requires a Telegram message id.
+- Destinations send independently, duplicate-safe.
+- Salaries: status, 5 rows/page, unsent retries.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
 - Owner history deletion retracts tracked private/Salary/Team messages first. Payments snapshot chat ID. Missing messages are retracted; other failures preserve the event.
 
@@ -32,7 +32,7 @@
 
 ## Team salary events
 
-- No past broadcasts.
+- No backfill.
 
 - Manual bonus, fine, and absence notify Team; salary payments and rate changes have terminal skipped Team status.
 - Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
@@ -63,14 +63,16 @@
 - Cash-expense alerts are text. Daily Bazaar sends one localized PNG and caption; never duplicate it with a text receipt.
 - Investor daily album: only yesterday’s financial/payroll and live unpaid/non-cancelled orders (place/id/time/status/total/items). Russian labels/catalog names, saved-name fallback; renderer filters paid/cancelled. No daily Bazaar totals or Tech Card images, including retries/manual sends. Keep historical ledgers.
 - Bazaar PNGs group numbered items by saved Russian category with paid/normal prices and signed variance (red above, green below), plus total variance. Missing normal prices stay unset; rows never truncate.
-- Investor reports: image-only, retryable render failures, no text fallback. Financial ledger deduplicates the two-image album.
+- Investor: image-only, retryable render errors, no text fallback; ledger deduplicates the two-image album.
 - Album ledgers mark sent only after each photo’s Telegram message id.
 - Employee meal daily aggregate also goes to Investor and shows the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows never announce new cash expenses.
 
 ## Status messages
 
-- `Официант`: saved `waiter_name`, merged across rounds; missing: `Не указан`, never the closer.
+- Group identical product/options/notes/price/unit rows (as receipts).
+
+- `Официант`: saved `waiter_name` across rounds; fallback `Не указан`, never closer.
 
 - Sum `cashback_earned`; omit zero. After payment: `💳 [owner] · кешбэк + [amount] UZS`; escaped snapshot names or `Карта лояльности`. Test: `tests/telegramOrderStatus.test.js`.
 
@@ -78,4 +80,4 @@
 
 - `197`/`198`: private paid-order estimates snapshot order/daily KPI. `203` filters order/daily cuts by Tashkent start time; Salary events snapshot before/after times. `202` cancels deleted-order queued notices and retracts sent notices, including orphans. Minute `employee-order-kpi` cron retries cleanup; uncertain sends stay held. Apply migrations before sender/UI. Other notices retain historical estimates. Tests: `tests/timeBasedKpi.test.js`.
 
-- Morning watchdog retries unstarted/failed/skipped Investor albums after meal/KPI finalization, including alerted failures. Recovery requires a saved report message ID; never replay sent/pending reports. Alert markers save message ID/chat/error only after confirmed sends. Tests: `tests/dailySalaryWatchdog.test.js`.
+- Morning watchdog retries unstarted/failed/skipped Investor albums after meal/KPI finalization, including alerted failures. Recovery needs a saved message ID; never replay sent/pending reports. Save alert ID/chat/error only after confirmed send. Tests: `tests/dailySalaryWatchdog.test.js`.

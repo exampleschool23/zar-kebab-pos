@@ -47,6 +47,8 @@ Read this guide for waiter tables, table entry, carts, price modes, reservations
 
 ## Kitchen checks and printing
 
+- Printed kitchen checks combine identical product/options/notes/price/unit rows within the selected round only, using `getGroupedOrderItems` in both print renderers. Coverage: `tests/orderItemPresentation.test.js`.
+
 - Requested rounds must match exactly; never substitute an older local round while the requested one loads.
 - Refresh a missing round directly before printing and auto-print each round only once.
 - Failed print/submission retries retain the same round and item ids.

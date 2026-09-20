@@ -18,16 +18,18 @@
 
 ## Split payments and corrections
 
-- Payments have separate method selectors; `201` adds “Add second payment” in Reports.
+- `201`: separate payment selectors; “Add second payment” in Reports.
 - Delete completed orders access permits atomic non-loyalty tender corrections.
 - Loyalty rows are visible but immutable without a separate wallet reversal workflow.
-- Method corrections keep amounts fixed. Splits preserve the original sum, other payments, items, totals, paid state/time, loyalty, service and stock. Receipts audit splits and reconcile retries. Tests: `tests/paidPaymentSplit.test.js`.
+- Method corrections keep amounts fixed. Splits preserve the original sum, other payments, items, totals, paid state/time, loyalty, service and stock. Receipts audit/reconcile splits. Tests: `tests/paidPaymentSplit.test.js`.
 - Order deletes require a reason (`184`) and today's Tashkent `paid_at`/`created_at` date (`202`), even for owners. Reports/cashier hide older delete controls. Payment corrections still notify Investor.
 
 ## Receipt printing
 
-- Auto-print uses a one-time cashier request and in-page receipt, without new tabs. Manual printing refreshes the bill.
-- Translate stored bill/receipt errors at render time; language changes never refetch bills.
+- Grouping: Telegram guide; `tests/orderItemPresentation.test.js`.
+
+- Auto-print: one-time cashier request, in-page receipt, no new tabs. Manual print refreshes the bill.
+- Translate bill errors at render; language never refetches bills.
 
 ## Accounting loading and presentation
 

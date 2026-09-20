@@ -1,6 +1,6 @@
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../../../src/lib/orderTypes.js'
 import { formatLongDateTime } from '../../../src/lib/dateFormat.js'
-import { getOrderPaymentSummary } from '../../../src/lib/analytics.js'
+import { getGroupedOrderItems, getOrderPaymentSummary } from '../../../src/lib/analytics.js'
 import { escapeTelegramHtml, TELEGRAM_STATUS_MESSAGES } from './telegram.js'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../../../src/lib/menuSaleUnits.js'
 
@@ -234,7 +234,7 @@ export function buildItemRows(items) {
     `${'Позиция'.padEnd(22)} ${'Кол'.padStart(3)} ${'Сумма'.padStart(10)}`,
   ]
 
-  for (const item of items) {
+  for (const item of getGroupedOrderItems(items)) {
     const name = truncateText(item?.telegram_display_name || getRussianOrderItemDisplayName(item), 22)
     const quantity = Math.max(0, Number(item?.quantity) || 0)
     const quantityText = isMenuItemSoldByWeight(item)
