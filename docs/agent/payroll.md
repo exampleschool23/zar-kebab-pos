@@ -44,11 +44,11 @@
 - Salary History separates monthly manual Bonuses from KPI bonuses. Salary + bonuses includes salary and both bonus types once each.
 - Effective dates cannot enter already finalized periods. Recovery scans missing older dates in bounded batches.
 
-## Daily salary notifications
+## Daily notifications
 
 - Private and Salary-group salary-rate change messages include the KPI percentage or disabled/not-configured status effective on the salary change date.
 - KPI rule additions and changes notify only the dedicated Salary group, with employee, previous/new KPI, effective date, and actor. Employee and Team destinations stay terminally skipped.
-- Private PNG calendars show month-to-date salary, KPI, bonuses, fines and absences; totals are before payments, not salary balance. Separate private and Salary-group KPI event rows are skipped; Team KPI uses one image per day (migration `181`).
+- Private PNG calendars show MTD salary, KPI, bonuses, fines and absences before payments. Dated `getSalaryBalance()` shows remaining pay and all-time payments; negative = advance. Private/Salary-group KPI events are skipped; Team gets one daily image (`181`).
 - Cron repairs missing KPI delivery rows before Team delivery; `172` restores the queue trigger.
 - A failed KPI finalization defers the daily salary summary.
 - Delivery rules: `docs/agent/telegram.md`.

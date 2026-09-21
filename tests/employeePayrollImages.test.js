@@ -39,8 +39,8 @@ test('calendar totals reconcile daily rates, absence, fines and both bonus settl
  assert.equal(report.days[3].absence, true)
  assert.equal(report.days[0].first, true)
  const svg = buildEmployeePayrollImageSvg(data, '2026-09-03', '2026-08-31')
- assert.match(svg, /Штраф −30 000/)
- assert.doesNotMatch(svg, /999 999|900 000/)
+ assert.match(svg, /Штраф -30 000/)
+ assert.doesNotMatch(svg, /900 000/)
  assert.equal(buildEmployeePayrollCalendar(data, '2026-09-03').start, '2026-09-01')
 })
 test('calendar handles six-week months, archive boundaries and XML in names', async () => {
@@ -57,3 +57,20 @@ test('calendar handles six-week months, archive boundaries and XML in names', as
  assert.throws(() => buildEmployeePayrollCalendar(data, '2026-02-30'), /Invalid/)
  assert.throws(() => buildEmployeePayrollCalendar(data, '2026-12-31', '2026-01-01'), /62 days/)
 })
+
+ test('private remaining balance includes prior months and payments but excludes paid legacy bonuses and future events', () => {
+ const data = { ...profile, joined_at: '2026-08-31', rates: [{ effective_from: '2026-08-31', amount: 100000, rate_unit: 'daily' }], bonuses: [
+ { bonus_date: '2026-09-01', amount: 5000, accrues_to_salary: false },
+ { bonus_date: '2026-09-01', amount: 20000, accrues_to_salary: true },
+ { bonus_date: '2026-09-02', amount: 900000, accrues_to_salary: true }
+ ], payments: [{ paid_date: '2026-08-31', amount: 40000 }, { paid_date: '2026-09-01', amount: 30000 }, { paid_date: '2026-09-02', amount: 800000 }], fines: [{ fine_date: '2026-09-01', amount: 10000 }] }
+ const report = buildEmployeePayrollCalendar(data, '2026-09-01')
+ assert.equal(report.totals.net, 115000)
+ assert.equal(report.paid, 70000)
+ assert.equal(report.balance, 140000)
+ const svg = buildEmployeePayrollImageSvg(data, '2026-09-01')
+ assert.match(svg, /Остаток к выплате на 1 сентября 2026: 140 000 сум/)
+ assert.match(svg, /Выплачено за всё время.*70 000 сум/)
+ const advance = buildEmployeePayrollImageSvg({ ...data, payments: [{ paid_date: '2026-09-01', amount: 300000 }] }, '2026-09-01')
+ assert.match(advance, /Аванс \/ переплата.*90 000 сум/)
+ })

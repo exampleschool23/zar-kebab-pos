@@ -38,9 +38,9 @@
 - Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
 - Bonuses omit payment method. Private manual bonuses/fines use Russian long dates.
 
-## Automatic daily payroll privacy and language
+## Daily payroll privacy
 
-- Private Russian PNG calendars show month-to-date salary, KPI, bonuses, fines and absences through the completed day, starting no earlier than joining. Totals are before payments, not balance. Custom ranges allow up to 62 days.
+- Private RU PNG calendars show MTD salary, KPI, bonuses, fines and absences from joining through the completed day, before payments. Dated `getSalaryBalance()` shows remaining pay and all-time payments; negative = advance. Custom ranges: ≤62 days.
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
 - Game Club paid revenue has its own text/PNG bucket, excluded from other buckets.
 - `180`: Game Club rounds send Team RU date, actor, menu, items, total. Snapshots paid daily income at send: Tashkent paid_at (created_at fallback), saved totals; read errors stay queued. Cron retries; unknown sends held. No costs/tenders.

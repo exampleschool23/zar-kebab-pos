@@ -1,4 +1,4 @@
-import { getSalaryAccruedAmount, getSalaryAbsenceForDate, normalizeExpenseAmount } from '../../../src/lib/expenses.js'
+import { getSalaryAccruedAmount, getSalaryAbsenceForDate, getSalaryBalance, getSalaryPaidAmount, normalizeExpenseAmount } from '../../../src/lib/expenses.js'
 import { addSalaryDateDays, formatSalaryNotificationAmount } from './salaryMessages.js'
 import { formatLongDate } from '../../../src/lib/dateFormat.js'
 
@@ -32,7 +32,7 @@ export function buildEmployeePayrollCalendar(profile, date, startDate = `${date.
   }
   const totals = days.reduce((sum, day) => ({ salary: sum.salary + day.salary, kpi: sum.kpi + day.kpi, manual: sum.manual + day.manual, fine: sum.fine + day.fine, paidDays: sum.paidDays + Number(day.salary > 0) }), { salary: 0, kpi: 0, manual: 0, fine: 0, paidDays: 0 })
   totals.net = totals.salary + totals.kpi + totals.manual - totals.fine
-  return { start, end: date, days, totals }
+  return { start, end: date, days, totals, balance: getSalaryBalance(profile, date), paid: getSalaryPaidAmount(profile, date) }
 }
 
 export function buildEmployeePayrollCalendarSvg(profile, date, startDate) {
@@ -42,7 +42,7 @@ export function buildEmployeePayrollCalendarSvg(profile, date, startDate) {
   const offset = (new Date(`${report.start}T12:00:00Z`).getUTCDay() + 6) % 7
   const weekCount = Math.ceil((offset + report.days.length) / 7)
   const bottom = top + headerHeight + weekCount * rowHeight
-  const height = bottom + 150
+  const height = bottom + 290
   const text = (x, y, value, size = 24, color = colors.ink, extra = '') => `<text x="${x}" y="${y}" font-size="${size}" fill="${color}" ${extra}>${escape(value)}</text>`
   const name = profile?.employee_name || profile?.profile?.full_name || 'Сотрудник'
   const nameSize = Math.min(76, 1400 / Math.max([...name].length, 1))
@@ -58,13 +58,13 @@ export function buildEmployeePayrollCalendarSvg(profile, date, startDate) {
       if (!day.employed) lines.push(['Вне периода работы', colors.muted])
       lines.push([`Зарплата ${number(day.salary)}`, colors.salary])
       lines.push([`KPI ${day.kpi ? number(day.kpi) : '—'}`, colors.kpi])
-      if (day.fine) lines.push([`Штраф −${number(day.fine)}`, colors.fine])
+      if (day.fine) lines.push([`Штраф -${number(day.fine)}`, colors.fine])
       if (day.manual) lines.push([`Бонус +${number(day.manual)}`, colors.manual])
       if (day.last) lines.push(['Конец работы', colors.ink])
     }
     return `<g><rect x="${x}" y="${y}" width="${cellWidth}" height="${rowHeight}" fill="${day?.absence ? '#fee2e2' : day ? '#fffdf8' : '#f4f2ec'}" stroke="#aeb3b6"/>${text(x + 16, y + 34, shortDate(cellDate), 27, day ? colors.ink : colors.muted, 'font-weight="700"')}${lines.map(([label, color], i) => text(x + 16, y + 65 + i * 25, label, 20, color, 'font-weight="600"')).join('')}</g>`
   }).join('')
-  const cards = [ ['ЗАРПЛАТА', totals.salary, colors.salary, '#f1f7ef'], ['KPI-БОНУСЫ', totals.kpi, colors.kpi, '#f0f4fa'], ['ШТРАФЫ', totals.fine ? `−${number(totals.fine)}` : '0', colors.fine, '#fcf1ec'] ]
+  const cards = [ ['ЗАРПЛАТА', totals.salary, colors.salary, '#f1f7ef'], ['KPI-БОНУСЫ', totals.kpi, colors.kpi, '#f0f4fa'], ['ШТРАФЫ', totals.fine ? `-${number(totals.fine)}` : '0', colors.fine, '#fcf1ec'] ]
   const rates = [...new Set(report.days.filter(day => day.salary > 0).map(day => day.salary))]
   const salaryFooter = rates.length === 1 ? `${totals.paidDays} дн. × ${number(rates[0])} сум` : `Дней с начислением: ${totals.paidDays}`
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#faf8f0"/><g font-family="Noto Sans">
@@ -80,5 +80,8 @@ export function buildEmployeePayrollCalendarSvg(profile, date, startDate) {
   ${text(margin, bottom + 66, salaryFooter, 25, colors.ink, 'font-weight="700"')}
   ${text(600, bottom + 63, `Начислено за вычетом штрафов: ${number(totals.net)} сум`, 27, colors.ink, 'font-weight="700"')}
   ${text(600, bottom + 102, 'До вычета выплат · Не является остатком к оплате', 23)}
+  ${text(margin, bottom + 157, `Выплачено за всё время по ${shortDate(date)}: ${number(report.paid)} сум`, 25)}
+  ${text(margin, bottom + 205, `${report.balance < 0 ? 'Аванс / переплата' : 'Остаток к выплате'} на ${formatLongDate(date, 'ru', date)}: ${number(Math.abs(report.balance))} сум`, 30, colors.salary, 'font-weight="700"')}
+  ${text(margin, bottom + 248, 'С учётом всей истории начислений, выплат и штрафов, включая прошлые месяцы', 23)}
   </g></svg>`
 }
