@@ -1210,9 +1210,9 @@ export default function CashierBill() {
                   <input
                     type="text"
                     inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={loyaltyRedeemAmount}
-                    onChange={e => updateLoyaltyRedeem(e.target.value)}
+                    pattern="[0-9 ]*"
+                    value={formatMoneyInput(loyaltyRedeemAmount)}
+                    onChange={e => updateLoyaltyRedeem(normalizeMoneyInput(e.target.value))}
                     placeholder={lbl.useLoyalty}
                     className={`w-full border-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-[#1F2937] focus:outline-none transition-all ${
                       loyaltyValidation.ok ? 'border-[#E5E7EB] focus:border-[#ff5a00]' : 'border-red-300 focus:border-red-500'
@@ -1349,7 +1349,7 @@ export default function CashierBill() {
                             <input
                               type="text"
                               inputMode="numeric"
-                              pattern="[0-9]*"
+                              pattern="[0-9 ]*"
                               value={formatMoneyInput(row.amount)}
                               onChange={e => updatePayment(row.id, { amount: normalizeMoneyInput(e.target.value) })}
                               onFocus={() => {

@@ -5,7 +5,25 @@ import {
   formatMoneyInput,
   normalizeMoneyInput,
   numberFromMoneyInput,
+  formatSignedMoneyInput,
+  normalizeSignedMoneyInput,
 } from '../src/lib/moneyInput.js'
+
+test('balance corrections retain signs through formatting, editing, and numeric saving', () => {
+  for (const [input, normalized, formatted] of [
+    ['-60,000', '-60000', '-60 000'],
+    ['+0060000', '+60000', '+60 000'],
+    ['60\u00a0000', '60000', '60 000'],
+    ['-', '-', '-'],
+    ['+', '+', '+'],
+    ['', '', ''],
+  ]) {
+    assert.equal(normalizeSignedMoneyInput(input), normalized)
+    assert.equal(formatSignedMoneyInput(input), formatted)
+    assert.equal(normalizeSignedMoneyInput(formatted), normalized)
+  }
+  assert.equal(Number(normalizeSignedMoneyInput('-60 000')), -60000)
+})
 
 test('money input normalizes typed and pasted price text to digits', () => {
   assert.equal(normalizeMoneyInput('10 000'), '10000')

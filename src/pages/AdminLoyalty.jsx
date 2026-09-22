@@ -3,6 +3,7 @@ import { Search, BadgeDollarSign, Plus, RefreshCw, ChevronLeft, ChevronRight, Ar
 import AppShell from '../components/AppShell'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/formatCurrency'
+import { formatSignedMoneyInput, normalizeSignedMoneyInput } from '../lib/moneyInput'
 import {
   CASHBACK_TYPES,
   DEFAULT_CASHBACK_TYPE,
@@ -801,7 +802,7 @@ export default function AdminLoyalty() {
                     {canRemoveCard && <p className="mb-3 text-xs font-semibold text-red-500">{l.removeCardHelp}</p>}
                     <p className="mb-3 text-xs font-semibold text-[#9CA3AF]">{canAdjust ? l.adjustmentHelper : l.ownerAdjustOnly}</p>
                     <div className="grid gap-2">
-                      <input type="number" value={adjustment.amount} disabled={!canAdjust} onChange={e => setAdjustment({ ...adjustment, amount: e.target.value })} placeholder={l.amountPlaceholder} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50" />
+                      <input type="text" value={formatSignedMoneyInput(adjustment.amount)} disabled={!canAdjust} onChange={e => setAdjustment({ ...adjustment, amount: normalizeSignedMoneyInput(e.target.value) })} placeholder={l.amountPlaceholder} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50" />
                       <input value={adjustment.reason} disabled={!canAdjust} onChange={e => setAdjustment({ ...adjustment, reason: e.target.value })} placeholder={l.reason} className="rounded-xl border border-[#E5E7EB] px-3 py-2 text-sm font-semibold disabled:bg-gray-50" />
                       <button onClick={adjustBalance} disabled={!canAdjust} className="rounded-xl bg-[#0f3b2e] px-4 py-2.5 text-sm font-black text-white disabled:bg-gray-200 disabled:text-[#9CA3AF]">{l.apply}</button>
                     </div>

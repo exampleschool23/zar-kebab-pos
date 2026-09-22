@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { formatCurrency } from '../lib/formatCurrency'
+import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import { getPaymentSplitAmounts } from '../lib/paidPaymentSplit'
 import { splitCompletedOrderPayment } from '../lib/db'
 
@@ -54,8 +55,8 @@ export default function PaidPaymentSplitEditor({ orderId, payment, lang, onSaved
           <label className="min-w-0 text-xs text-gray-600">
             {l.amount}
             <input aria-label={`${title}: ${l.amount}`} type="text" inputMode="numeric"
-              value={index === 0 ? first : split.secondAmount ?? ''} readOnly={index === 1}
-              onChange={event => setFirst(event.target.value)}
+              value={formatMoneyInput(index === 0 ? first : split.secondAmount ?? '')} readOnly={index === 1}
+              onChange={event => setFirst(normalizeMoneyInput(event.target.value))}
               className="mt-1 h-10 w-full min-w-0 rounded-xl border border-orange-200 bg-white px-2 text-sm font-bold text-gray-900 read-only:bg-gray-100" />
           </label>
           <label className="min-w-0 text-xs text-gray-600">
