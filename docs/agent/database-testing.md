@@ -5,7 +5,7 @@
 - Database/health: `src/lib/db.js`, `src/lib/dbHealth.js`
 - Migration/health: `supabase/migrate.js`, `scripts/check-db-health.js`
 - SQL migrations: `supabase/`
-- Navigator: `mcp/`, `tests/repoNavigatorMcp.test.js`, `scripts/benchmark-repo-nav.js`
+- Navigator: `mcp/`, `tests/repoNavigatorMcp.test.js`
 - Source guards: `tests/sourceGuards.*.test.js`
 
 - 194: nullable employee job function; apply before the new employee dropdown.
@@ -13,9 +13,9 @@
 ## Database workflow
 
 - Use full filenames; legacy duplicates `073`, `108`, `157` stay distinct. New duplicates fail.
-- `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. Never bulk replay/baseline legacy history. Writes and receipts are atomic, matching receipts skip, changed checksums fail. Reconcile lost responses.
+- `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. No bulk legacy replay/baseline. Atomic writes/receipts; matching checksums skip, changed checksums fail. Reconcile lost responses.
 - For schema/RPC errors, run `npm run db:health`.
-- Migration families:
+- Migrations:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`
   - Bazaar, costs, fines, media, stock: `097`–`106`
@@ -34,10 +34,10 @@
   - Investor alerts for order deletes and payment corrections, including trigger repair: `175`–`176`
   - compact all-time Accounting remainder: `177`
   - employee lifecycle Investor notification queue: `178`
-  - Game Club order type, off-premise permission and service checks: `179`
-  - Game Club immutable per-round Team queue and cron: `180`
+  - Game Club type, permission and service checks: `179`
+  - Game Club per-round Team queue/cron: `180`
   - Daily Team KPI image claims and legacy-delivery suppression: `181`
-- Tech Card cost-sync batching and convergence: `183` (apply to enable faster saves). Coverage: `tests/techCardCostSyncMigration.test.js`; isolated PostgreSQL benchmark: `scripts/check-tech-card-cost-sync.mjs` (pass a PGlite module path).
+- Tech Card cost-sync batching and convergence: `183` (apply to enable faster saves). Tests: `tests/techCardCostSyncMigration.test.js`; SQL: `scripts/check-tech-card-cost-sync.mjs` (pass a PGlite module path).
 - Ingredient name editing with stable catalog keys and unchanged purchase snapshots: `182`.
 
 ## Database invariants
@@ -51,8 +51,6 @@
 - Archive referenced catalog records instead of physically deleting them.
 
 ## Tests
-
-
 
 Validate:
 
@@ -77,13 +75,13 @@ Guards protect:
 - correct component ownership for menu upload errors;
 - no debugging `console.log()`, blocking `alert()`, or native operational confirmation dialogs in `src`.
 
-## Browser/build verification
+## Browser/build
 
 - Authenticate protected routes.
 - Vite large-chunk warnings are non-fatal.
 - Keep unrelated edits; report unrun checks.
 
-- Migration `179_game_club_orders.sql` must precede the Game Club frontend release. It extends order/item constraints and current permission/settlement functions without changing historical rows. Never require the reopening function retired by `090`. Focused coverage: `tests/gameClubOrders.test.js`.
+- Migration `179_game_club_orders.sql` must precede the Game Club frontend release. Extends constraints and permission/settlement functions; preserves history. Never require the reopening function retired by `090`. Tests: `tests/gameClubOrders.test.js`.
 
 - Isolated SQL: `scripts/check-game-club-migration.mjs` tests `180` with a PGlite module path.
 
@@ -106,3 +104,5 @@ Guards protect:
 - `203`: KPI start time; apply before sender/UI. Tests: `tests/timeBasedKpi.test.js`.
 
 - `204`: preserve audit actors on account deletion. Tests: `tests/accountDeletionAudit.test.js`.
+
+- `205`: Take Away/Delivery/Game Club category schedule settings; apply before UI. Seeds Business lunch for Game Club. Tests: `tests/gameClubCategorySchedule.test.js`.

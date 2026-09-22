@@ -55,8 +55,50 @@ export function writeErrorReason(error) {
   return 'unknown'
 }
 
+const CATEGORY_COPY = {
+  en: {
+    prefix: 'Could not save category',
+    session: 'Your session has expired. Sign in again and check the saved category settings before retrying.',
+    unknown: 'The category settings could not be saved. Your edits are still here. Reload the category to check what was saved before retrying.',
+    staff: 'One of the selected accounts is no longer an active staff member. Reload the category and select active staff again.',
+    roster: 'The staff list has not loaded. Wait for it to finish, or reopen the category if loading failed. Your selection has not been saved.',
+    schema: 'The database needs an update before these category settings can be saved. Ask the administrator to apply the pending menu database update.',
+    partial: 'Category details may already be saved; selected-user access was not confirmed. Reopen the category to check before retrying.',
+  },
+  ru: {
+    prefix: 'Не удалось сохранить категорию',
+    session: 'Сеанс истёк. Войдите снова и проверьте сохранённые настройки категории перед повторной попыткой.',
+    unknown: 'Не удалось сохранить настройки категории. Ваши изменения сохранены в форме. Откройте категорию заново и проверьте сохранённые данные перед повторной попыткой.',
+    staff: 'Одна из выбранных учётных записей больше не является активным сотрудником. Откройте категорию заново и выберите действующих сотрудников.',
+    roster: 'Список сотрудников ещё не загружен. Дождитесь загрузки или откройте категорию заново при ошибке. Выбор не сохранён.',
+    schema: 'Для сохранения этих настроек категории нужно обновить базу данных. Попросите администратора применить ожидающее обновление базы меню.',
+    partial: 'Данные категории могли сохраниться; доступ выбранных сотрудников не подтверждён. Проверьте категорию перед повторной попыткой.',
+  },
+  uz: {
+    prefix: 'Kategoriyani saqlab bo‘lmadi',
+    session: 'Seans tugadi. Qayta kiring va qayta urinishdan oldin kategoriya sozlamalarini tekshiring.',
+    unknown: 'Kategoriya sozlamalari saqlanmadi. O‘zgarishlaringiz shaklda turibdi. Qayta urinishdan oldin kategoriyani qayta ochib, saqlangan holatini tekshiring.',
+    staff: 'Tanlangan hisoblardan biri endi faol xodim emas. Kategoriyani qayta oching va faol xodimlarni tanlang.',
+    roster: 'Xodimlar ro‘yxati hali yuklanmagan. Yuklanishini kuting yoki xato bo‘lsa kategoriyani qayta oching. Tanlov saqlanmadi.',
+    schema: 'Bu kategoriya sozlamalarini saqlash uchun ma’lumotlar bazasini yangilash kerak. Administratordan menyu bazasining kutilayotgan yangilanishini qo‘llashni so‘rang.',
+    partial: 'Kategoriya ma’lumotlari saqlangan bo‘lishi mumkin; tanlangan xodimlar ruxsati tasdiqlanmadi. Qayta urinishdan oldin kategoriyani tekshiring.',
+  },
+}
+
 export function formatWriteError(error, lang = 'en', actionType = '') {
   const copy = COPY[lang] || COPY.en
+  if (actionType === 'ADD_CATEGORY' || actionType === 'UPDATE_CATEGORY') {
+    const category = CATEGORY_COPY[lang] || CATEGORY_COPY.en
+    const message = String(error?.message || '')
+    const reason = writeErrorReason(error)
+    const detail = error?.code === 'POS_CATEGORY_STAFF_NOT_LOADED' ? category.roster
+      : /Category schedule overrides require staff profiles/i.test(message) ? category.staff
+      : ['PGRST204', 'PGRST202', '42P01', '42703', '42883'].includes(error?.code) ? category.schema
+      : reason === 'unknown' ? category.unknown
+      : reason === 'session' ? category.session
+      : copy[reason]
+    return `${category.prefix}: ${detail}${error?.categoryDetailsSaved ? ` ${category.partial}` : ''}`
+  }
   const prefix = actionType === 'MARK_ORDER_PAID' ? copy.payment : actionType === 'SEND_TO_KITCHEN' ? copy.kitchen : copy.save
   return `${prefix}: ${copy[writeErrorReason(error)]}`
 }

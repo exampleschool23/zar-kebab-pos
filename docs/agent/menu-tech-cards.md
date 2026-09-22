@@ -1,4 +1,4 @@
-# Menu, Inventory, Media, Costs, and Tech Cards
+# Menu, Inventory, and Tech Cards
 
 ## Entry points
 
@@ -7,23 +7,23 @@
 - Database: `src/lib/db.js`, migrations `139`, `149`–`151`, and `154`–`156`
 - Focused tests: `tests/menuItems.test.js`, `tests/menuArchiveSafety.test.js`, `tests/menuStock.test.js`, `tests/menuMedia.test.js`, `tests/techCards.test.js`, `tests/techCardsFeature.test.js`, `tests/sourceGuards.menu.test.js`, `tests/sourceGuards.public-menu.test.js`
 
-## Visibility and availability
+## Visibility
 
 - Public order: Corporate Sets (`c1789462941735`), Deals, other categories. Its card follows All. Visibility rules apply.
 
-- `menu_items.available` affects waiter orderability only. Public and Telegram menus still show active unavailable meals.
-- `public_hidden` is independent and owner-controlled. Non-owner saves preserve the stored value; new non-owner products default to public visibility.
-- Manage Menu writers may create unavailable products and change availability. The database enforces both access rules.
+- `menu_items.available` affects waiter orderability only. Public/Telegram still show active unavailable meals.
+- `public_hidden` is owner-controlled. Non-owner saves preserve it; new products default visible.
+- Manage Menu may create unavailable products and change availability; database enforced.
 - `cashier_only`, schedules, category visibility, option visibility, and `deleted_at` are separate controls.
 - `deleted_at` is the archive boundary. Archived products/categories never reappear because of availability behavior.
-- Product/category archival is owner-only and still requires Manage Menu access; admins retain ordinary menu editing.
+- Archival requires owner + Manage Menu; admins retain ordinary editing.
 - `stock_count` is shelf inventory and never determines menu visibility or orderability.
 
-## Product creation, cost, and history
+## Product costs and history
 
 - Normal/cashier-quick products require positive protected parent cost.
-- Create a product and its cost atomically through the current media-aware creation RPC. Do not directly insert a public product first.
-- Protected current costs live in `menu_item_costs`; variant costs live in `variant_costs`. Public option data contains names and selling prices only.
+- Create a product and its cost atomically through the current media-aware creation RPC. Never insert the public product first.
+- Protected current costs live in `menu_item_costs`; variant costs live in `variant_costs`. Public options contain names and selling prices only.
 - `order_items.cost_price` is a sale-time database snapshot. Runtime reporting must never fall back to today's menu cost for missing historical coverage.
 - Later price/cost edits affect future order items only. Never rewrite paid revenue, profit, reports, or saved order-item costs.
 - Owner deletion is archival; physical catalog deletion is rejected to preserve reports.
@@ -31,7 +31,7 @@
 
 ## Availability notifications
 
-- Authenticated availability changes, product creation, and archival queue immutable Russian Team events with product/staff snapshots.
+- Availability changes, creation, and archival queue immutable Russian Team events with product/staff snapshots.
 - Ordinary edits/restoration send nothing; archival does not change `available`. Product saves and quick toggles share the database event.
 - The daily 08:00 Tashkent snapshot lists unavailable active products by Russian category or confirms all are available. See `telegram.md`.
 
@@ -46,9 +46,9 @@
 
 - `media_urls[0]` is the cover and stays synchronized with `image_url`.
 - Gallery supports images, GIF, MP4, WebM. Cards/Telegram use the cover; customer/waiter details show the gallery.
-- Delete removed existing R2 media only after a successful product save. Clean up new temporary uploads on cancel or removal before save.
+- Delete old R2 media after save; clean temporary uploads on cancel/removal.
 - Upload error rendering belongs inside `ImageUploadField`; `SortableItemCard` must not access that state.
-- Trim localized names/descriptions at editor, write, display, and database boundaries while preserving internal spaces and description line breaks.
+- Trim localized text at editor/write/display/database boundaries; preserve internal spaces and description line breaks.
 - `estimated_prep_minutes` is a localized current-catalog expectation from 1–180 minutes (default 15), not a historical order promise.
 - Mobile product archive is owner-only and uses a retryable in-app dialog.
 
@@ -70,6 +70,10 @@
 - New orders freeze direct and nested ingredient quantities, units, and prices in service-only `order_item_tech_card_ingredient_snapshots`. Daily consumption uses paid, non-cancelled quantities; never expose or backfill these snapshots.
 - Allow repeated parents only for distinct variants.
 
-- Migration `186`: `/admin/ingredients` has Team access and movement totals; see the reporting guide. Future ingredient snapshots include canonical keys when unambiguous.
+- Migration `186`: `/admin/ingredients` has Team access and movement totals; see the reporting guide. New ingredient snapshots use unambiguous canonical keys.
 
 - PDF export (saved recipes, batch quantities): `src/components/TechCardPdfDownload.jsx`; `tests/techCardPdfData.test.js`.
+
+- `205`: Take Away/Delivery/Game Club schedule overrides (`always_visible_*`); seeds Game Club lunch. Other visibility rules remain. Tests: `tests/gameClubCategorySchedule.test.js`.
+
+- Prune stale selections only after staff loads; translate errors at render. Test: `tests/categoryScheduleAccess.test.js`.

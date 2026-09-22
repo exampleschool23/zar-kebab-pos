@@ -871,13 +871,13 @@ export default function WaiterOrder() {
       .filter(category => {
         const visibleForAudience = isGuestTabletMode
           ? isCustomerMenuCategory(category, visibilityNow)
-          : isWaiterMenuCategory(category, visibilityNow, staffUserId)
+          : isWaiterMenuCategory(category, visibilityNow, staffUserId, orderType)
         return visibleForAudience && (
           priceMode !== PRICE_MODE_TOURIST || !isTouristHiddenMenuCategory(category)
         )
       })
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
-    [state.categories, isGuestTabletMode, visibilityNow, staffUserId, priceMode]
+    [state.categories, isGuestTabletMode, visibilityNow, staffUserId, priceMode, orderType]
   )
 
   const visibleCategoryIds = useMemo(

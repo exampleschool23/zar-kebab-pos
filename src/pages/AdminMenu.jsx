@@ -1,3 +1,6 @@
+import { eligibleCategoryProfileIds } from '../lib/categoryScheduleAccess'
+import { formatWriteError } from '../lib/writeErrorMessage'
+import { orderTypeLabel } from '../lib/orderTypes'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -1236,6 +1239,9 @@ const blankCat = {
   tourist_hidden: false,
   visible_from_time: '',
   visible_until_time: '',
+  always_visible_take_away: false,
+  always_visible_delivery: false,
+  always_visible_game_club: false,
   always_visible_profile_ids: [],
 }
 
@@ -1257,6 +1263,9 @@ function getCategoryFormFingerprint(value = {}) {
     tourist_hidden: !!value.tourist_hidden,
     visible_from_time: nullableMenuTime(value.visible_from_time),
     visible_until_time: nullableMenuTime(value.visible_until_time),
+    always_visible_take_away: !!value.always_visible_take_away,
+    always_visible_delivery: !!value.always_visible_delivery,
+    always_visible_game_club: !!value.always_visible_game_club,
     always_visible_profile_ids: normalizeCategoryAlwaysVisibleProfileIds(value.always_visible_profile_ids),
   })
 }
@@ -1681,6 +1690,7 @@ export default function AdminMenu() {
   const [originalCatFormFingerprint, setOriginalCatFormFingerprint] = useState('')
   const [menuNotice, setMenuNotice] = useState(null)
   const [categoryOverrideProfiles, setCategoryOverrideProfiles] = useState([])
+  const [categoryOverrideProfilesReady, setCategoryOverrideProfilesReady] = useState(false)
   const [categoryOverrideProfilesLoading, setCategoryOverrideProfilesLoading] = useState(false)
   const [categoryOverrideProfilesError, setCategoryOverrideProfilesError] = useState('')
   const uploadedItemImageUrlsRef = useRef(new Set())
@@ -1727,6 +1737,7 @@ export default function AdminMenu() {
     if (!isCategoryEditorPage || !isOwner) return undefined
     let active = true
     setCategoryOverrideProfilesLoading(true)
+    setCategoryOverrideProfilesReady(false)
     setCategoryOverrideProfilesError('')
     supabase
       .from('profiles')
@@ -1741,6 +1752,7 @@ export default function AdminMenu() {
           setCategoryOverrideProfilesError(error.message || 'Could not load users')
         } else {
           setCategoryOverrideProfiles(data || [])
+          setCategoryOverrideProfilesReady(true)
         }
         setCategoryOverrideProfilesLoading(false)
       })
@@ -2170,6 +2182,10 @@ export default function AdminMenu() {
   async function saveCat() {
     if (savingCatForm || !canEditMenu || !isCatFormDirty) return
     if (!trimMenuItemTextValue(catForm.name_uz)) return
+    if (isOwner && !categoryOverrideProfilesReady) {
+      setMenuNotice({ tone: 'error', error: { code: 'POS_CATEGORY_STAFF_NOT_LOADED' }, actionType: 'UPDATE_CATEGORY' })
+      return
+    }
     setSavingCatForm(true)
     setMenuNotice(null)
     try {
@@ -2191,12 +2207,12 @@ export default function AdminMenu() {
           visible_from_time: nullableMenuTime(catForm.visible_from_time),
           visible_until_time: nullableMenuTime(catForm.visible_until_time),
           ...(isOwner ? {
-            always_visible_profile_ids: normalizeCategoryAlwaysVisibleProfileIds(catForm.always_visible_profile_ids),
+            always_visible_profile_ids: eligibleCategoryProfileIds(catForm.always_visible_profile_ids, categoryOverrideProfiles),
           } : {}),
         },
       })
       if (result?.error) {
-        setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
+        setMenuNotice({ tone: 'error', error: result.error, actionType: 'UPDATE_CATEGORY' })
         return
       }
       await cleanupTrackedUploads(uploadedCatImageUrlsRef, [catForm.image_url])
@@ -2359,7 +2375,7 @@ export default function AdminMenu() {
           <div className="mx-auto w-full max-w-[1080px] px-4 py-5">
             {menuNotice && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                {menuNotice.message}
+                {menuNotice.error ? formatWriteError(menuNotice.error, lang, menuNotice.actionType) : menuNotice.message}
               </div>
             )}
             {!catModal ? (
@@ -2465,6 +2481,26 @@ export default function AdminMenu() {
                         <Field label={scheduleLabels.until} type="time" value={catForm.visible_until_time || ''} onChange={setCF('visible_until_time')} />
                       </div>
                       <p className="mt-2 text-[11px] font-semibold text-gray-400">{scheduleLabels.hint}</p>
+                      <fieldset className="mt-3">
+                        <legend className="text-sm font-semibold text-gray-700">
+                          {lang === 'uz' ? 'Ushbu buyurtmalar uchun vaqtdan tashqari ham ko‘rsatish' : lang === 'ru' ? 'Показывать вне расписания для заказов' : 'Always show outside schedule for'}
+                        </legend>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+                          {['take_away', 'delivery', 'game_club'].map(orderType => {
+                            const field = `always_visible_${orderType}`
+                            return (
+                              <label key={orderType} className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                <input type="checkbox" checked={!!catForm[field]}
+                                  onChange={event => {
+                                    const checked = event.target.checked
+                                    setCatForm(current => ({ ...current, [field]: checked }))
+                                  }} />
+                                {orderTypeLabel(orderType, lang)}
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </fieldset>
                     </div>
 
                     {isOwner && <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3">
@@ -2478,7 +2514,7 @@ export default function AdminMenu() {
                               {lang === 'uz' ? 'Vaqtdan tashqari ko‘rsatish' : lang === 'ru' ? 'Показывать вне расписания' : 'Visible outside schedule'}
                             </p>
                             <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-blue-700">
-                              {normalizeCategoryAlwaysVisibleProfileIds(catForm.always_visible_profile_ids).length}
+                              {(categoryOverrideProfilesReady ? eligibleCategoryProfileIds(catForm.always_visible_profile_ids, categoryOverrideProfiles) : normalizeCategoryAlwaysVisibleProfileIds(catForm.always_visible_profile_ids)).length}
                             </span>
                           </div>
                           <p className="mt-1 text-[11px] font-semibold leading-relaxed text-gray-500">
@@ -2687,7 +2723,7 @@ export default function AdminMenu() {
           <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
             {menuNotice && (
               <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                {menuNotice.message}
+                {menuNotice.error ? formatWriteError(menuNotice.error, lang, menuNotice.actionType) : menuNotice.message}
               </div>
             )}
             {!itemModal ? (
@@ -2877,7 +2913,7 @@ export default function AdminMenu() {
         <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
           {menuNotice && (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-              {menuNotice.message}
+              {menuNotice.error ? formatWriteError(menuNotice.error, lang, menuNotice.actionType) : menuNotice.message}
             </div>
           )}
 
@@ -3509,7 +3545,7 @@ export default function AdminMenu() {
           <div className="space-y-3">
             {menuNotice && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-                {menuNotice.message}
+                {menuNotice.error ? formatWriteError(menuNotice.error, lang, menuNotice.actionType) : menuNotice.message}
               </div>
             )}
             <div>

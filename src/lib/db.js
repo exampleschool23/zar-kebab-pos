@@ -1689,6 +1689,7 @@ export async function writeToSupabase(action, state, options = {}) {
           p_category_id: categoryFields.id,
           p_profile_ids: profileIds,
         })
+        if (overrideError) overrideError.categoryDetailsSaved = true
         if (overrideError) throw overrideError
       }
       break
@@ -1704,6 +1705,7 @@ export async function writeToSupabase(action, state, options = {}) {
           p_category_id: id,
           p_profile_ids: profileIds,
         })
+        if (overrideError) overrideError.categoryDetailsSaved = true
         if (overrideError) throw overrideError
       }
       break

@@ -63,3 +63,5 @@ Read this guide for waiter tables, table entry, carts, price modes, reservations
 - Game Club uses `/waiter/take-away?orderType=game_club`, a distinct off-premise channel with `GC` order numbers, no table, zero service, and the existing off-premise permission. Regression coverage: `tests/gameClubOrders.test.js`.
 
 - Migration `180` queues each new Game Club round at commit, with only that round’s items and the actual submitting actor. Team delivery runs independently of the browser.
+
+- Staff category schedules can be bypassed per order type via `always_visible_take_away`, `always_visible_delivery`, and `always_visible_game_club`. Manage Menu exposes independent schedule checkboxes. Migration `205_game_club_category_schedule.sql` seeds Business lunch for Game Club only. Guest/public menus, item schedules, hidden/archive flags, and unavailable meals retain their rules. Tests: `tests/gameClubCategorySchedule.test.js`.

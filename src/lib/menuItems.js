@@ -102,12 +102,15 @@ export function isCustomerMenuCategory(category, date = new Date()) {
     isWithinMenuTimeWindow(category, date)
 }
 
-export function isWaiterMenuCategory(category, date = new Date(), profileId = '') {
+export function isWaiterMenuCategory(category, date = new Date(), profileId = '', orderType = '') {
   return isActiveMenuCategory(category) &&
     !isWaiterHiddenMenuCategory(category) &&
     (
       isWithinMenuTimeWindow(category, date) ||
-      hasMenuCategoryScheduleOverride(category, profileId)
+      hasMenuCategoryScheduleOverride(category, profileId) ||
+      (orderType === 'game_club' && category.always_visible_game_club === true) ||
+      (orderType === 'take_away' && category.always_visible_take_away === true) ||
+      (orderType === 'delivery' && category.always_visible_delivery === true)
     )
 }
 
