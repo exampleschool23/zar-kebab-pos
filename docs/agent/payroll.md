@@ -1,6 +1,6 @@
 # Employees, Payroll, KPI, Absence, and Employee Meals
 
-- Migration 194 adds nullable job_function. New employees require a job; it grants no permissions.
+- `194`/`206`: display-only job_function; required on creation, owner-editable. EN/RU/UZ labels; no permissions/payroll effects. Test: `tests/employeeJobFunctions.test.js`.
 
 ## Entry points
 
@@ -12,11 +12,11 @@
 
 ## Salary ledger
 
-- Keep payment, bonus, fine, absence, and salary-rate changes as distinct operation types.
+- Keep payment, bonus, fine, absence, and rate changes distinct.
 - `getSalaryBalance()` is the signed ledger: base salary plus accruing manual/KPI bonuses, minus payments and fines. An excess payment/fine becomes a negative carry-forward balance.
 - `getSalaryDue()` is the nonnegative liability for one employee. `getTotalSalaryDue()` sums per-employee liabilities so one advance never hides another employee's due.
-- Allow a positive manual salary payment even when current balance is zero or negative.
-- Combined history sorts by effective date, then `created_at` newest-first for the same date.
+- Allow positive manual payments even with zero/negative balance.
+- History sorts by effective date, then `created_at` newest-first.
 - Page payroll ledgers via `src/lib/salaryData.js`; include accrued bonuses and remove deleted bonuses from balance state. Coverage: `tests/salaryBalanceConsistency.test.js`.
 
 ## Fines, bonuses, and absence

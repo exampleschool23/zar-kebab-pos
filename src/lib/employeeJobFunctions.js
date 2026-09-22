@@ -1,4 +1,7 @@
 export const EMPLOYEE_JOB_FUNCTIONS = [
+  { value: 'director', en: 'Director', ru: 'Директор', uz: 'Direktor' },
+  { value: 'smm_manager', en: 'SMM manager', ru: 'SMM-менеджер', uz: 'SMM menejer' },
+  { value: 'runner', en: 'Runner', ru: 'Раннер', uz: 'Ranner' },
   { value: 'waiter', en: 'Waiter', ru: 'Официант', uz: 'Ofitsiant' },
   { value: 'manager', en: 'Manager', ru: 'Менеджер', uz: 'Menejer' },
   { value: 'cook', en: 'Cook', ru: 'Повар', uz: 'Oshpaz' },

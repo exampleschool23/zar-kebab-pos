@@ -333,7 +333,7 @@ test('expenses page is feature-gated, persisted, and included in owner reports n
   assert.match(employees, /onClick=\{\(\) => startNameEdit\(employee\)\}/)
   assert.match(functionBody(employees, 'startNameEdit'), /if \(!canEditName \|\| !employee\?\.id\) return/)
   assert.match(functionBody(employees, 'saveEmployeeName'), /if \(!canEditName \|\| !employee\?\.id/)
-  assert.match(functionBody(employees, 'saveEmployeeName'), /\.update\(\{ employee_name: nextName \}\)/)
+  assert.match(functionBody(employees, 'saveEmployeeName'), /\.update\(\{ employee_name: nextName, job_function: editingJobFunction \|\| null \}\)/)
   assert.match(functionBody(employees, 'saveEmployeeName'), /\.eq\('id', employee\.id\)/)
   assert.match(employeeHistory, /const isOwner = normalizeRole\(profile\?\.role \|\| state\.user\?\.role\) === 'owner'/)
   assert.match(employeeHistory, /const canDeleteHistory = canManage && isOwner/)

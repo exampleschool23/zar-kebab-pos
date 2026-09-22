@@ -8,12 +8,12 @@
 - Navigator: `mcp/`, `tests/repoNavigatorMcp.test.js`
 - Source guards: `tests/sourceGuards.*.test.js`
 
-- 194: nullable employee job function; apply before the new employee dropdown.
+- `194`/`206`: nullable display-only employee roles. Apply 206 before new roles. Tests: `tests/employeeJobFunctions.test.js`.
 
 ## Database workflow
 
-- Use full filenames; legacy duplicates `073`, `108`, `157` stay distinct. New duplicates fail.
-- `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. No bulk legacy replay/baseline. Atomic writes/receipts; matching checksums skip, changed checksums fail. Reconcile lost responses.
+- Use full filenames; legacy duplicates `073`, `108`, `157` stay distinct. No new duplicates.
+- `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. No bulk legacy replay. Atomic receipts: matching checksums skip, changed checksums fail. Reconcile lost responses.
 - For schema/RPC errors, run `npm run db:health`.
 - Migrations:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
@@ -75,9 +75,9 @@ Guards protect:
 - correct component ownership for menu upload errors;
 - no debugging `console.log()`, blocking `alert()`, or native operational confirmation dialogs in `src`.
 
-## Browser/build
+## Build
 
-- Authenticate protected routes.
+- Authenticate routes.
 - Vite large-chunk warnings are non-fatal.
 - Keep unrelated edits; report unrun checks.
 

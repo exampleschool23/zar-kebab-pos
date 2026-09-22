@@ -1,4 +1,4 @@
-import { employeeJobFunctionLabel } from '../lib/employeeJobFunctions'
+import { EMPLOYEE_JOB_FUNCTIONS, employeeJobFunctionLabel } from '../lib/employeeJobFunctions'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CalendarCheck2, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Percent, Power, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -102,7 +102,9 @@ export default function Employees() {
       fineLabel: 'Jarima',
       absenceHistory: 'Kelmagan kunlar',
       absentLabel: 'Kelmagan',
-      editName: 'Ismni o‘zgartirish',
+      editName: 'Xodimni tahrirlash',
+      jobFunction: 'Lavozim',
+      noJobFunction: 'Lavozim belgilanmagan',
       employeeName: 'Xodim ismi',
       saveName: 'Saqlash',
       cancel: 'Bekor qilish',
@@ -148,7 +150,9 @@ export default function Employees() {
       fineLabel: 'Штраф',
       absenceHistory: 'Дни отсутствия',
       absentLabel: 'Отсутствовал',
-      editName: 'Изменить имя',
+      editName: 'Редактировать сотрудника',
+      jobFunction: 'Должность',
+      noJobFunction: 'Должность не указана',
       employeeName: 'Имя сотрудника',
       saveName: 'Сохранить',
       cancel: 'Отмена',
@@ -194,7 +198,9 @@ export default function Employees() {
       fineLabel: 'Fine',
       absenceHistory: 'Absent dates',
       absentLabel: 'Absent',
-      editName: 'Edit name',
+      editName: 'Edit employee',
+      jobFunction: 'Role',
+      noJobFunction: 'Role not assigned',
       employeeName: 'Employee name',
       saveName: 'Save',
       cancel: 'Cancel',
@@ -219,6 +225,7 @@ export default function Employees() {
   const [inactiveExpanded, setInactiveExpanded] = useState(false)
   const [editingNameId, setEditingNameId] = useState(null)
   const [editingName, setEditingName] = useState('')
+  const [editingJobFunction, setEditingJobFunction] = useState('')
   const [error, setError] = useState('')
 
   async function loadEmployees() {
@@ -388,6 +395,7 @@ export default function Employees() {
     if (!canEditName || !employee?.id) return
     setEditingNameId(employee.id)
     setEditingName(employeeName(employee))
+    setEditingJobFunction(employee.job_function || '')
     setConfirmActionKey('')
     setError('')
   }
@@ -395,6 +403,7 @@ export default function Employees() {
   function cancelNameEdit() {
     setEditingNameId(null)
     setEditingName('')
+    setEditingJobFunction('')
   }
 
   async function saveEmployeeName(employee) {
@@ -410,7 +419,7 @@ export default function Employees() {
     setError('')
     const { error: updateError } = await supabase
       .from('employee_salary_profiles')
-      .update({ employee_name: nextName })
+      .update({ employee_name: nextName, job_function: editingJobFunction || null })
       .eq('id', employee.id)
     setSaving('')
     if (updateError) {
@@ -562,7 +571,24 @@ export default function Employees() {
                               )}
                             </div>
                           )}
-                          <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{employeeJobFunctionLabel(employee.job_function, lang) || employee.profile?.role || l.status}</p>
+                          {editingEmployeeName ? (
+                            <label className="mt-2 block text-xs font-bold text-[#6B7280]">
+                              {l.jobFunction}
+                              <select
+                                value={editingJobFunction}
+                                onChange={event => setEditingJobFunction(event.target.value)}
+                                disabled={saving === nameSavingKey}
+                                className="mt-1 h-9 w-full rounded-lg border border-orange-300 bg-white px-2 text-sm text-[#1F2937]"
+                              >
+                                <option value="">{l.noJobFunction}</option>
+                                {EMPLOYEE_JOB_FUNCTIONS.map(job => (
+                                  <option key={job.value} value={job.value}>{employeeJobFunctionLabel(job.value, lang)}</option>
+                                ))}
+                              </select>
+                            </label>
+                          ) : (
+                            <p className="mt-1 text-xs font-bold text-[#9CA3AF]">{employeeJobFunctionLabel(employee.job_function, lang) || l.noJobFunction}</p>
+                          )}
                         </div>
                       </div>
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-black ${
