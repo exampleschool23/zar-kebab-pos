@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import AppShell from '../components/AppShell'
+import SalaryRateHistory from '../components/SalaryRateHistory'
 import { OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -507,7 +508,7 @@ export default function EmployeeSalaryHistory() {
   return (
     <AppShell title={l.title}>
       <div className="min-h-full bg-[#FAF7F0]">
-        <div className="mx-auto max-w-[1280px] px-4 py-5 sm:px-5 sm:py-6">
+        <div className="mx-auto max-w-[1600px] px-4 py-5 sm:px-5 sm:py-6">
           <header className="mb-5">
             <button
               type="button"
@@ -571,7 +572,7 @@ export default function EmployeeSalaryHistory() {
             <SummaryCard icon={CalendarX2} label={l.absenceTotal} value={monthSummary.absenceCount} tone="violet" />
           </section>
 
-          <div className="grid grid-cols-1 items-start gap-5">
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
             <section className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5" aria-labelledby="salary-history-calendar-heading">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
@@ -674,7 +675,9 @@ export default function EmployeeSalaryHistory() {
               </div>
             </section>
 
-            <section className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5" aria-labelledby="salary-history-activity-heading">
+            <SalaryRateHistory employeeId={employeeId} rates={employee.rates} lang={lang} />
+
+            <section className="xl:col-span-2 min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5" aria-labelledby="salary-history-activity-heading">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 id="salary-history-activity-heading" className="text-base font-black text-[#1F2937]">

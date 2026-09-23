@@ -33,6 +33,8 @@ import {
   convertSalaryAmountToDaily,
   expensePaymentMethodLabel,
   getSalaryAbsenceDates,
+  getExpenseEntryMinDate,
+  isExpenseEntryDateAllowed,
   getSalaryBalance,
   getSalaryDue,
   getTotalSalaryDue,
@@ -139,6 +141,7 @@ export default function Salaries() {
   const canManage = canEditFeature(profile || { role }, 'expenses')
   const canRemoveKpiRules = role === 'owner'
   const today = todayExpenseDate()
+  const minimumSalaryDate = getExpenseEntryMinDate(today)
 
   const L = {
     uz: {
@@ -154,6 +157,7 @@ export default function Salaries() {
       employeeName: 'Xodim ismi',
       joined: 'Ishga kirgan sana',
       effectiveDate: 'Qachondan',
+      salaryDateLimit: 'Ish haqi sanasi bugundan uch kundan ortiq oldin bo‘lishi mumkin emas.',
       salaryAmount: 'Maosh summasi',
       salaryUnit: 'Maosh turi',
       method: 'To‘lov turi',
@@ -316,6 +320,7 @@ export default function Salaries() {
       employeeName: 'Имя сотрудника',
       joined: 'Дата выхода',
       effectiveDate: 'Действует с',
+      salaryDateLimit: 'Дата зарплаты не может быть раньше, чем три дня назад.',
       salaryAmount: 'Сумма зарплаты',
       salaryUnit: 'Тип зарплаты',
       method: 'Способ оплаты',
@@ -478,6 +483,7 @@ export default function Salaries() {
       employeeName: 'Employee name',
       joined: 'Joining date',
       effectiveDate: 'Effective date',
+      salaryDateLimit: 'Salary dates cannot be more than three days before today.',
       salaryAmount: 'Salary amount',
       salaryUnit: 'Salary type',
       method: 'Payment method',
@@ -1251,6 +1257,10 @@ export default function Salaries() {
     setMessage('')
     const employeeName = String(form.employee_name || '').trim()
     const amount = normalizeExpenseAmount(form.salary_amount)
+    if (!isExpenseEntryDateAllowed(form.joined_at)) {
+      setError(l.salaryDateLimit)
+      return
+    }
     if (!employeeName || !EMPLOYEE_JOB_FUNCTIONS.some(item => item.value === form.job_function) || !form.joined_at || amount <= 0) return
     setSaving('create')
     const { data: salaryProfile, error: profileError } = await supabase
@@ -1298,7 +1308,11 @@ export default function Salaries() {
     if (!selectedProfile) return
     const isInitialRate = (selectedProfile.rates || []).length === 0
     const amount = normalizeExpenseAmount(changeForm.salary_amount)
-    const effectiveFrom = changeForm.effective_from || today
+    const effectiveFrom = changeForm.effective_from
+    if (!isExpenseEntryDateAllowed(effectiveFrom)) {
+      setError(l.salaryDateLimit)
+      return
+    }
     if (!canManage || amount <= 0) return
     setError('')
     setMessage('')
@@ -1893,8 +1907,8 @@ export default function Salaries() {
                       ))}
                     </select>
                   </Field>
-                  <Field label={l.effectiveDate}>
-                    <DateInput value={form.joined_at} lang={lang} onChange={value => setForm(current => ({ ...current, joined_at: value }))} disabled={!canManage || loading} />
+                  <Field label={l.effectiveDate} hint={l.salaryDateLimit}>
+                    <DateInput min={minimumSalaryDate} value={form.joined_at} lang={lang} onChange={value => setForm(current => ({ ...current, joined_at: value }))} disabled={!canManage || loading} />
                   </Field>
                   <Field label={l.salaryAmount}>
                     <input type="text" inputMode="numeric" value={formatAmountInput(form.salary_amount)} onChange={event => setForm(current => ({ ...current, salary_amount: parseAmountInput(event.target.value) }))} placeholder="0 UZS" className={FIELD} disabled={!canManage || loading} />
@@ -1957,7 +1971,7 @@ export default function Salaries() {
                           setChangeForm(current => ({
                             ...current,
                             salary_profile_id: event.target.value,
-                            effective_from: selectedProfile?.joined_at || current.effective_from,
+                            effective_from: today,
                             salary_unit: selectedProfile?.rates?.[0]?.rate_unit || current.salary_unit,
                           }))
                         }}
@@ -1971,8 +1985,8 @@ export default function Salaries() {
                       </select>
                     </Field>
                   </div>
-                  <Field label={l.effectiveDate}>
-                    <DateInput value={changeForm.effective_from} lang={lang} onChange={value => setChangeForm(current => ({ ...current, effective_from: value }))} disabled={!canManage || loading} />
+                  <Field label={l.effectiveDate} hint={l.salaryDateLimit}>
+                    <DateInput min={minimumSalaryDate} value={changeForm.effective_from} lang={lang} onChange={value => setChangeForm(current => ({ ...current, effective_from: value }))} disabled={!canManage || loading} />
                   </Field>
                   <Field label={l.salaryAmount}>
                     <input
@@ -1993,7 +2007,7 @@ export default function Salaries() {
                   <button
                     type="button"
                     onClick={() => addRate()}
-                    disabled={!canManage || loading || !changeForm.salary_profile_id || normalizeExpenseAmount(changeForm.salary_amount) <= 0 || saving === 'rate-create'}
+                    disabled={!canManage || loading || !changeForm.salary_profile_id || !isExpenseEntryDateAllowed(changeForm.effective_from, today) || normalizeExpenseAmount(changeForm.salary_amount) <= 0 || saving === 'rate-create'}
                     className="inline-flex h-11 self-end items-center justify-center gap-2 rounded-xl bg-[#1F2937] px-4 text-sm font-black text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none"
                   >
                     {saving === 'rate-create' ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} />}{l.save}

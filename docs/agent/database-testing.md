@@ -12,9 +12,9 @@
 
 ## Database workflow
 
-- Use full filenames; legacy duplicates `073`, `108`, `157` stay distinct. No new duplicates.
-- `199`: protected checksum receipts and service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; README documents setup. No bulk legacy replay. Atomic receipts: matching checksums skip, changed checksums fail. Reconcile lost responses.
-- For schema/RPC errors, run `npm run db:health`.
+- Use full filenames; legacy duplicates `073`, `108`, `157` stay distinct. No duplicates.
+- `199`: checksum receipts; service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; Setup: README. No bulk legacy replay. Atomic receipts: matching checksums skip, changed checksums fail. Reconcile lost responses.
+- Schema/RPC errors: `npm run db:health`.
 - Migrations:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`
@@ -50,24 +50,20 @@
 - Retries of externally uncertain writes reuse request/round ids and reconcile durable receipts before issuing another mutation.
 - Archive referenced catalog records instead of physically deleting them.
 
-## Tests
-
-Validate:
+## Validation
 
 ```bash
 npm test
 npm run build
 ```
 
-Docs/map: `npm run docs:check` and `npm run mcp:benchmark`.
+`npm run docs:check`; `npm run mcp:benchmark`.
 
-## Source-guard policy
+## Source guards
 
-Guards protect:
-
-- stable `ProfileSync`, `dbDispatch`, and unique realtime channels;
-- parent-owned kitchen sending state and snapshot-only cart removal;
-- exact, idempotent kitchen rounds and paid/unavailable-order rejection;
+- `ProfileSync`, `dbDispatch`, unique realtime channels;
+- Parent-owned kitchen sending; snapshot-only cart removal;
+- Idempotent kitchen rounds; reject paid/unavailable orders;
 - operational loading boundaries and waiter-table refresh;
 - disabled/reserved table behavior and history-safe table management;
 - variant-specific cart rows, table price-mode entry, and submitted-round display;
@@ -79,13 +75,13 @@ Guards protect:
 
 - Authenticate routes.
 - Vite large-chunk warnings are non-fatal.
-- Keep unrelated edits; report unrun checks.
+- Preserve unrelated edits.
 
 - Migration `179_game_club_orders.sql` must precede the Game Club frontend release. Extends constraints and permission/settlement functions; preserves history. Never require the reopening function retired by `090`. Tests: `tests/gameClubOrders.test.js`.
 
 - Isolated SQL: `scripts/check-game-club-migration.mjs` tests `180` with a PGlite module path.
 
-- Migration `184` requires deletion reasons and snapshots them for Investor alerts. Apply before frontend deployment.
+- Migration `184` requires deletion reasons and snapshots them for Investor alerts. Apply before UI.
 
 - `185`: independent status-message tracking and minute cleanup retries. Apply before the Telegram sender. Tests: `tests/orderStatusDelivery.test.js`.
 
@@ -99,10 +95,12 @@ Guards protect:
 - `200`: repair KPI creator-label drift; preserve actor checks/history. Tests: `tests/employeeOpenedOrderKpi.test.js`.
 
 - `201`: audited paid-payment splitting; apply before UI. Tests: `tests/paidPaymentSplit.test.js`.
-- `202`: current-day-only order deletion for all roles and private KPI cleanup; apply before sender/UI. Tests: `tests/orderDeletion.test.js`.
+- `202`: current-day-only order deletion and private KPI cleanup; apply before sender/UI. Tests: `tests/orderDeletion.test.js`.
 
 - `203`: KPI start time; apply before sender/UI. Tests: `tests/timeBasedKpi.test.js`.
 
 - `204`: preserve audit actors on account deletion. Tests: `tests/accountDeletionAudit.test.js`.
 
 - `205`: Take Away/Delivery/Game Club category schedule settings; apply before UI. Seeds Business lunch for Game Club. Tests: `tests/gameClubCategorySchedule.test.js`.
+
+- `207`: salary rate date guard. `208`: rate audit snapshots. Apply before UI; tests: `tests/salaryRateDateWindow.test.js`, `tests/salaryRateHistory.test.js`.

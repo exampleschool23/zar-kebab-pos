@@ -10,25 +10,29 @@
 - Schema: migrations `129`, `169`–`172`, `195`–`203`.
 - Tests: `tests/salaryTransactions.test.js`, `tests/salaryHistory.test.js`, `tests/dailyKpi.test.js`, `tests/dailyKpiUi.test.js`, `tests/dailyKpiBonuses.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/telegramSalaryMessages.test.js`
 
+- `207`: salary rates allow dates ≥ Tashkent today − 3 days; older rates cannot be updated. Includes initial rates. Test: `tests/salaryRateDateWindow.test.js`.
+
+- `208`: rate insert/update/delete audit snapshots. Right-side history shows recorded time, author, rate/unit and effective date; pre-audit rows are labeled. Test: `tests/salaryRateHistory.test.js`.
+
 ## Salary ledger
 
-- Keep payment, bonus, fine, absence, and rate changes distinct.
+- Separate payments, bonuses, fines, absences, and rates.
 - `getSalaryBalance()` is the signed ledger: base salary plus accruing manual/KPI bonuses, minus payments and fines. An excess payment/fine becomes a negative carry-forward balance.
 - `getSalaryDue()` is the nonnegative liability for one employee. `getTotalSalaryDue()` sums per-employee liabilities so one advance never hides another employee's due.
 - Allow positive manual payments even with zero/negative balance.
-- History sorts by effective date, then `created_at` newest-first.
+- History sorts by effective date, then newest `created_at`.
 - Page payroll ledgers via `src/lib/salaryData.js`; include accrued bonuses and remove deleted bonuses from balance state. Coverage: `tests/salaryBalanceConsistency.test.js`.
 
 ## Fines, bonuses, and absence
 
 - A fine requires employee, date, positive amount, and non-empty reason. It reduces payroll liability but never becomes an Accounting cash expense.
 - Bonuses created after migration `169` accrue into salary liability and become cash expense only through a later salary payment. Legacy bonuses remain immutable immediately-paid expenses.
-- Every salary mutation is protected by Accounting write access and immutable audit coverage.
+- Salary writes require Accounting access and immutable audits.
 - Today's absence can be undone only for an active employee with an exact row for the current Tashkent date.
 - Undo absence requires confirmation and an exact delete guarded by absence id, salary profile id, and date. Zero affected rows is an error.
-- Salary-history deletion retracts each directly tracked employee, Salary-group, and Team Telegram message before deleting the source row. If Telegram refuses a retraction, keep the source row so the operator can retry; deleted bonus/fine/absence/rate events then remove their polymorphic delivery records so they cannot remain retryable.
+- History deletion retracts tracked employee/Salary/Team Telegram messages first. Failed retraction keeps the source for retry. Deleted bonus/fine/absence/rate events remove delivery records to prevent retries.
 - Deactivation/reactivation work boundaries are inclusive; only intervening dates become absences. Archived `deleted_at` is exclusive after the last working date.
-- Employee creation, activation, and deactivation queue immutable Russian Investor lifecycle notifications at the database boundary. Both Salaries and Employees request the same retry-safe delivery after a successful workflow.
+- Employee creation/activation/deactivation queue immutable Russian Investor events in the database. Salaries and Employees request retry-safe delivery on success.
 
 ## Daily KPI bonus
 
@@ -38,15 +42,15 @@
 - Runs/results are immutable; only service-role finalization creates `daily_kpi` bonuses (`200`: creator repair). `202` forbids deleting previous-day orders for everyone; today's deletions reduce own/restaurant bases before finalization.
 - Bonuses accrue into salary. Formula/settlement are immutable; payments record cash expense.
 - Deleting a generated bonus marks its result voided; retries never recreate it.
-- Only owners remove KPI rules. The selected effective date is the boundary: preserve earlier rules/data and insert a disabled successor. Physically delete only unused rules whose effective date equals the boundary. Never offer disabled successors for removal: that would reactivate the older rule.
-- Employee cards show today’s rule. KPI account dropdown lists active POS profiles, saves the opener on the rule, and reports retryable load failures.
+- Only owners remove KPI rules. Preserve rules/data before the effective date; insert a disabled successor. Delete only unused rules effective at that boundary. Never offer disabled successors for removal: that would reactivate the older rule.
+- Cards show today’s rule. KPI dropdown lists active POS profiles, saves the opener, and shows retryable load errors.
 - KPI rate/status/basis/account/time changes snapshot before/after values and queue Salary delivery; no-op saves stay silent. No historical backfill.
 - Salary History separates monthly manual Bonuses from KPI bonuses. Salary + bonuses includes salary and both bonus types once each.
 - Effective dates cannot enter already finalized periods. Recovery scans missing older dates in bounded batches.
 
 ## Daily notifications
 
-- Private and Salary-group salary-rate change messages include the KPI percentage or disabled/not-configured status effective on the salary change date.
+- Private/Salary rate messages include KPI percentage or disabled/unconfigured status effective on the change date.
 - KPI rule additions and changes notify only the dedicated Salary group, with employee, previous/new KPI, effective date, and actor. Employee and Team destinations stay terminally skipped.
 - Private PNG calendars show MTD salary, KPI, bonuses, fines and absences before payments. Dated `getSalaryBalance()` shows remaining pay and all-time payments; negative = advance. Private/Salary-group KPI events are skipped; Team gets one daily image (`181`).
 - Cron repairs missing KPI delivery rows before Team delivery; `172` restores the queue trigger.
@@ -58,6 +62,6 @@
 - `average_daily_employee_meal_uzs` is per present employee per day, not one restaurant total.
 - `employee_daily_meal_expenses` freezes completed-day rate, present count, and total. Reporting uses the snapshot, never today's setting.
 - Absences and employment boundaries determine attendance; exclude future dates.
-- The cron repairs missing meal dates independently from KPI rules in bounded batches.
-- Calculated meal rows reduce report remainder but have no payment method and do not mutate the cash expense ledger.
+- Cron repairs meal dates independently in bounded batches.
+- Meal rows reduce report remainder without a payment method or cash ledger mutation.
 - Historical backfill is a one-time migration snapshot and is not recalculated after setting changes.
