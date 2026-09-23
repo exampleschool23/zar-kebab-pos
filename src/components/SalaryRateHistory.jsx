@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { loadSalaryRows } from '../lib/salaryData'
 import { buildSalaryRateHistory } from '../lib/salaryRateHistory'
 import { formatCurrency } from '../lib/formatCurrency'
-import { formatLongDateTime, formatLongDate } from '../lib/dateFormat'
+import { formatLongDate, formatTime } from '../lib/dateFormat'
 
 const LABELS = {
   en: { title: 'Salary changes', insert: 'Rate added', update: 'Rate changed', delete: 'Rate deleted', effective: 'Effective from', daily: 'day', monthly: 'month', before: 'Before', after: 'After', unknown: 'Author unavailable', legacy: 'Saved rate · earlier edits were not audited', empty: 'No salary rate changes.', error: 'Could not load the complete change history.', retry: 'Retry', more: 'Show more', loading: 'Loading changes…' },
@@ -72,7 +72,7 @@ export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, 
               <div className="min-w-0 flex-1">
                 <p className={`text-xs font-bold ${entry.deleted ? 'line-through' : ''}`}>{l[entry.action]}</p>
                 <p className={`mt-0.5 break-words text-[11px] leading-snug ${entry.deleted ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {formatLongDateTime(entry.recordedAt, lang, '—')} · {entry.actor || l.unknown}
+                  <time dateTime={entry.recordedAt || undefined}>{formatLongDate(entry.recordedAt, lang, '—')}{formatTime(entry.recordedAt) && `, ${formatTime(entry.recordedAt)}`}</time> · {entry.actor || l.unknown}
                 </p>
                 {snapshot(entry.before, entry.after ? l.before : '', entry.deleted)}
                 {snapshot(entry.after, entry.before ? l.after : '', entry.deleted)}
