@@ -118,8 +118,8 @@ test('browser accepts rate cleanup and backend and both deletion entry points en
   const client = readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
   const start = client.indexOf('export function retractTelegramSalaryEvent')
   const end = client.indexOf('\nexport ', start + 10)
-  const retract = new Function('postAuthenticatedTelegramNotification', `${client.slice(start, end).replace('export ', '')}; return retractTelegramSalaryEvent`)(async payload => payload)
-  assert.deepEqual(await retract('rate', 'rate-id'), { type: 'retract_salary_event', eventType: 'rate', eventId: 'rate-id' })
+  const retract = new Function('postAuthenticatedTelegramNotification', `${client.slice(start, end).replace('export ', '')}; return retractTelegramSalaryEvent`)(async payload => ({ ok: true, ...payload }))
+  assert.deepEqual(await retract('rate', 'rate-id'), { ok: true, type: 'retract_salary_event', eventType: 'rate', eventId: 'rate-id' })
   const page = readFileSync(new URL('../src/pages/EmployeeSalaryHistory.jsx', import.meta.url), 'utf8')
   const salaries = readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
   assert.match(page, /canDeleteHistory = canManage && isOwner/)
@@ -178,4 +178,42 @@ test('Telegram cancellation edits the original message with strikethrough and cl
     if (originalToken == null) delete process.env.TELEGRAM_BOT_TOKEN
     else process.env.TELEGRAM_BOT_TOKEN = originalToken
   }
+})
+
+
+test('salary cleanup timeout releases a hanging request and invalid responses never allow deletion', async () => {
+  const client = readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
+  const start = client.indexOf('export function retractTelegramSalaryEvent')
+  const end = client.indexOf('\nexport ', start + 10)
+  const body = `${client.slice(start, end).replace('export ', '')}; return retractTelegramSalaryEvent`
+  let expire, signal, cleared = false
+  const retract = new Function('postAuthenticatedTelegramNotification', 'setTimeout', 'clearTimeout', body)(
+    (_, options) => { signal = options.signal; return new Promise(() => {}) },
+    callback => { expire = callback; return 1 },
+    () => { cleared = true },
+  )
+  const pending = retract('rate', 'rate-id')
+  expire()
+  await assert.rejects(pending, /timed out.*record was kept/)
+  assert.equal(signal.aborted, true)
+  assert.equal(cleared, true)
+  const invalid = new Function('postAuthenticatedTelegramNotification', body)(async () => ({}))
+  await assert.rejects(invalid('rate', 'rate-id'), /invalid response/)
+})
+
+test('a session that resolves after cleanup timeout cannot send a late Telegram request', async () => {
+  const source = readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
+  const start = source.indexOf('async function postAuthenticatedTelegramNotification')
+  const end = source.indexOf('\nexport ', start)
+  let resolveSession, requests = 0
+  const post = new Function('supabase', 'fetch', `${source.slice(start, end)}; return postAuthenticatedTelegramNotification`)(
+    { auth: { getSession: () => new Promise(resolve => { resolveSession = resolve }) } },
+    () => { requests += 1 },
+  )
+  const controller = new AbortController()
+  const pending = post({}, { signal: controller.signal })
+  controller.abort(new Error('cleanup timed out'))
+  resolveSession({ data: { session: { access_token: 'test' } }, error: null })
+  await assert.rejects(pending, /timed out/)
+  assert.equal(requests, 0)
 })

@@ -410,8 +410,11 @@ export default function EmployeeSalaryHistory() {
   }
 
   async function deleteHistoryEntry(entry) {
-    if (!canDeleteHistory || !entry?.id || saving) return
-    if (entry.entryType === 'rate' && !employee?.rates.some(rate => rate.id === entry.id)) return
+    if (saving) return
+    if (!canDeleteHistory || !entry?.id || (entry.entryType === 'rate' && !employee?.rates.some(rate => rate.id === entry.id))) {
+      setError(l.deleteFailed)
+      return
+    }
     const table = HISTORY_TABLE_BY_TYPE[entry.entryType]
     if (!table) return
     const key = `${entry.entryType}-history-delete-${entry.id}`
@@ -569,8 +572,9 @@ export default function EmployeeSalaryHistory() {
           </header>
 
           {error && employee && (
-            <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
-              {error}
+            <div role="alert" aria-live="assertive" className="fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[100] mx-auto flex max-w-xl items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 shadow-lg">
+              <p className="min-w-0 flex-1 break-words">{error}</p>
+              <button type="button" onClick={() => setError('')} aria-label={l.cancel} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-red-100"><X size={18} /></button>
             </div>
           )}
 

@@ -2,14 +2,16 @@ import { supabase } from './supabase.js'
 
 const NOTIFIABLE_STATUSES = new Set(['accepted', 'preparing', 'ready', 'completed', 'cancelled', 'served'])
 
-async function postAuthenticatedTelegramNotification(body) {
+async function postAuthenticatedTelegramNotification(body, { signal } = {}) {
   const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  if (signal?.aborted) throw signal.reason || new Error('Request cancelled')
   if (sessionError) throw sessionError
   if (!session?.access_token) throw new Error('Authentication required')
 
   const response = await fetch('/api/telegram/employee-notification', {
     method: 'POST',
     keepalive: true,
+    signal,
     headers: {
       Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
@@ -124,11 +126,26 @@ export function retractTelegramSalaryEvent(eventType, eventId) {
   if (!eventId || !['payment', 'bonus', 'fine', 'absence', 'rate'].includes(eventType)) {
     return Promise.reject(new Error('Unsupported salary event'))
   }
-  return postAuthenticatedTelegramNotification({
-    type: 'retract_salary_event',
-    eventType,
-    eventId,
+  const controller = new AbortController()
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error('Telegram cleanup timed out. The salary record was kept. Please retry.')
+      controller.abort(error)
+      reject(error)
+    }, 30_000)
   })
+  return Promise.race([
+    postAuthenticatedTelegramNotification({
+      type: 'retract_salary_event',
+      eventType,
+      eventId,
+    }, { signal: controller.signal }).then(result => {
+      if (result?.ok !== true) throw new Error(result?.error || 'Telegram cleanup returned an invalid response. The salary record was kept.')
+      return result
+    }),
+    timeout,
+  ]).finally(() => clearTimeout(timer))
 }
 
 export async function notifyTelegramInvestorExpense(expenseId) {
