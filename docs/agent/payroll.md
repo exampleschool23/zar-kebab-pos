@@ -12,7 +12,9 @@
 
 - `207`: salary rates allow dates ≥ Tashkent today − 3 days; older rates cannot be updated. Includes initial rates. Test: `tests/salaryRateDateWindow.test.js`.
 
-- `208`: rate insert/update/delete audit snapshots. Right-side history shows recorded time, author, rate/unit and effective date; pre-audit rows are labeled. Test: `tests/salaryRateHistory.test.js`.
+- Change salary uses Tashkent today.
+
+- `208`: rate insert/update/delete audit snapshots. Separate history shows time, author and snapshots. `209`: owner-only rate deletion; refresh balances/history, keep audits. Test: `tests/salaryRateHistory.test.js`.
 
 ## Salary ledger
 

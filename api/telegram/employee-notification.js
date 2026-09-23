@@ -67,6 +67,7 @@ const GROUP_EVENT_CONFIG = {
 }
 
 const RETRACTABLE_SALARY_EVENT_TABLES = {
+  rate: 'employee_salary_rates',
   payment: 'employee_salary_payments',
   bonus: 'employee_salary_bonuses',
   fine: 'employee_salary_fines',

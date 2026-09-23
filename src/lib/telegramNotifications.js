@@ -121,7 +121,7 @@ export function notifyTelegramKpiRuleChange(changeEventId) {
 }
 
 export function retractTelegramSalaryEvent(eventType, eventId) {
-  if (!eventId || !['payment', 'bonus', 'fine', 'absence'].includes(eventType)) {
+  if (!eventId || !['payment', 'bonus', 'fine', 'absence', 'rate'].includes(eventType)) {
     return Promise.reject(new Error('Unsupported salary event'))
   }
   return postAuthenticatedTelegramNotification({

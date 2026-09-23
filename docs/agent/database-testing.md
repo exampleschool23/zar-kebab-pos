@@ -103,4 +103,4 @@ npm run build
 
 - `205`: Take Away/Delivery/Game Club category schedule settings; apply before UI. Seeds Business lunch for Game Club. Tests: `tests/gameClubCategorySchedule.test.js`.
 
-- `207`: salary rate date guard. `208`: rate audit snapshots. Apply before UI; tests: `tests/salaryRateDateWindow.test.js`, `tests/salaryRateHistory.test.js`.
+- `207`–`209`: rate date guard, audits, owner-only DELETE. Apply before UI. Tests: `tests/salaryRateDateWindow.test.js`, `tests/salaryRateHistory.test.js`.

@@ -20,7 +20,7 @@
 - Destinations send independently, duplicate-safe.
 - Salaries: status, 5 rows/page, unsent retries.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
-- Owner history deletion retracts tracked private/Salary/Team messages first. Payments snapshot chat ID. Missing messages are retracted; other failures preserve the event.
+- Owner deletions retract tracked private/Salary (Investor)/Team messages first. Payments snapshot chat ID. Missing messages are retracted; other failures preserve the event.
 
 ## Salary destinations
 

@@ -11,7 +11,7 @@ const LABELS = {
   uz: { title: 'Maosh o‘zgarishlari', help: 'Barcha sanalar · yangilari avval · Toshkent vaqti', insert: 'Stavka qo‘shildi', update: 'Stavka o‘zgartirildi', delete: 'Stavka o‘chirildi', effective: 'Amal qilish sanasi', daily: 'kun', monthly: 'oy', before: 'Oldin', after: 'Keyin', unknown: 'Muallif noma’lum', legacy: 'Saqlangan stavka · oldingi tahrirlar kuzatilmagan', empty: 'Maosh stavkasi o‘zgarishlari yo‘q.', error: 'To‘liq o‘zgarishlar tarixini yuklab bo‘lmadi.', retry: 'Qayta urinish', more: 'Yana ko‘rsatish', loading: 'O‘zgarishlar yuklanmoqda…' },
 }
 
-export default function SalaryRateHistory({ employeeId, rates, lang }) {
+export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, onDelete, onCancelDelete, confirmActionKey, saving, actionLabels }) {
   const l = LABELS[lang] || LABELS.en
   const [entries, setEntries] = useState([])
   const [failed, setFailed] = useState(false)
@@ -70,6 +70,15 @@ export default function SalaryRateHistory({ employeeId, rates, lang }) {
           <p className="mt-1 break-words text-xs text-slate-600">{entry.actor || l.unknown}</p>
           {snapshot(entry.before, l.before)}
           {snapshot(entry.after, entry.before ? l.after : '')}
+          {canDelete && entry.canDelete && <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" disabled={Boolean(saving)}
+              onClick={() => onDelete({ id: entry.rateId, entryType: 'rate' })}
+              className="min-h-10 rounded-lg bg-red-50 px-3 text-xs font-bold text-red-700 disabled:opacity-50">
+              {confirmActionKey === `rate-history-delete-${entry.rateId}` ? actionLabels.confirm : actionLabels.delete}
+            </button>
+            {confirmActionKey === `rate-history-delete-${entry.rateId}` && <button type="button" disabled={Boolean(saving)} onClick={onCancelDelete}
+              className="min-h-10 rounded-lg border px-3 text-xs font-bold text-slate-600">{actionLabels.cancel}</button>}
+          </div>}
           {!entry.audited && <p className="mt-2 text-[11px] text-slate-400">{l.legacy}</p>}
         </li>)}
       </ol>

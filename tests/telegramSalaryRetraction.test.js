@@ -33,7 +33,7 @@ test('salary-history deletion retracts Telegram messages before deleting its sou
     'utf8'
   )
   const retractCall = historyPage.indexOf('await retractTelegramSalaryEvent(entry.entryType, entry.id)')
-  const sourceDelete = historyPage.indexOf(".from(table)\n      .delete()")
+  const sourceDelete = historyPage.search(/\.from\(table\)\s*\.delete\(\)/)
 
   assert.ok(retractCall >= 0)
   assert.ok(sourceDelete > retractCall)
@@ -70,4 +70,59 @@ test('payment delivery snapshots the exact employee chat used by the sent messag
   assert.match(dbHealth, /employee_chat_id/)
   assert.match(dbHealth, /157_salary_payment_employee_chat_tracking/)
   assert.match(cliHealth, /employee_chat_id/)
+})
+
+function salaryRetractionWith(deleteTelegramMessage) {
+  const source = readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
+  const tables = source.slice(source.indexOf('const RETRACTABLE_SALARY_EVENT_TABLES'), source.indexOf('\nfunction isMissingKpiBonusSourceColumns'))
+  const helpers = source.slice(source.indexOf('function telegramMessageWasAlreadyDeleted'), source.indexOf('\nasync function', source.indexOf('async function retractSalaryEventMessages') + 10))
+  return new Function('deleteTelegramMessage', `${tables}\n${helpers}\nreturn retractSalaryEventMessages`)(deleteTelegramMessage)
+}
+
+function rateRetractionDb(delivery) {
+  return { from(table) {
+    const query = {
+      select() { return this }, eq() { return this },
+      async maybeSingle() { return { data: table === 'employee_salary_rates' ? { id: 'rate', salary_profile_id: 'employee' } : delivery, error: null } },
+    }
+    return query
+  } }
+}
+
+test('rate retraction deletes private, Investor and any recorded Team message using original chat IDs', async () => {
+  const calls = []
+  const retract = salaryRetractionWith(async (chat, message) => { calls.push([chat, message]) })
+  const result = await retract(rateRetractionDb({
+    employee_chat_id: 'employee-original', employee_telegram_message_id: '11',
+    telegram_chat_id: 'investor-original', telegram_message_id: '22',
+    team_chat_id: 'team-original', team_telegram_message_id: '33',
+  }), 'rate', 'rate')
+  assert.equal(result.ok, true)
+  assert.deepEqual(calls, [['employee-original', '11'], ['investor-original', '22'], ['team-original', '33']])
+})
+
+test('rate retraction attempts every destination and reports partial failure for safe retry', async () => {
+  const calls = []
+  const retract = salaryRetractionWith(async (chat) => {
+    calls.push(chat)
+    if (chat === 'investor') throw new Error('Telegram delete denied')
+  })
+  await assert.rejects(retract(rateRetractionDb({
+    employee_chat_id: 'employee', employee_telegram_message_id: '11',
+    telegram_chat_id: 'investor', telegram_message_id: '22',
+  }), 'rate', 'rate'), /salary_group.*Telegram delete denied/)
+  assert.deepEqual(calls, ['employee', 'investor'])
+})
+
+test('browser accepts rate cleanup and backend and both deletion entry points enforce ownership', async () => {
+  const client = readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')
+  const start = client.indexOf('export function retractTelegramSalaryEvent')
+  const end = client.indexOf('\nexport ', start + 10)
+  const retract = new Function('postAuthenticatedTelegramNotification', `${client.slice(start, end).replace('export ', '')}; return retractTelegramSalaryEvent`)(async payload => payload)
+  assert.deepEqual(await retract('rate', 'rate-id'), { type: 'retract_salary_event', eventType: 'rate', eventId: 'rate-id' })
+  const page = readFileSync(new URL('../src/pages/EmployeeSalaryHistory.jsx', import.meta.url), 'utf8')
+  const salaries = readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
+  assert.match(page, /canDeleteHistory = canManage && isOwner/)
+  assert.match(salaries, /async function deleteRate\(rate\)\s*{\s*if \(!canManage \|\| role !== 'owner'/)
+  assert.ok(salaries.indexOf("await retractTelegramSalaryEvent('rate', rate.id)") < salaries.indexOf("const { data: deleted, error: deleteError } = await supabase.from('employee_salary_rates')"))
 })

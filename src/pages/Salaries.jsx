@@ -49,6 +49,7 @@ import {
   notifyTelegramEmployeeLifecycle,
   notifyTelegramEmployeePayment,
   notifyTelegramEmployeeRate,
+  retractTelegramSalaryEvent,
   notifyTelegramKpiRuleChange,
 } from '../lib/telegramNotifications'
 
@@ -1456,21 +1457,27 @@ export default function Salaries() {
   }
 
   async function deleteRate(rate) {
-    if (!canManage || !rate?.id) return
+    if (!canManage || role !== 'owner' || !rate?.id || saving) return
     const key = `rate-delete-${rate.id}`
     if (confirmActionKey !== key) {
       setConfirmActionKey(key)
       return
     }
     setSaving(key)
-    const { error: deleteError } = await supabase.from('employee_salary_rates').delete().eq('id', rate.id)
-    setSaving('')
-    setConfirmActionKey('')
-    if (deleteError) {
+    setError('')
+    try {
+      await retractTelegramSalaryEvent('rate', rate.id)
+      const { data: deleted, error: deleteError } = await supabase.from('employee_salary_rates').delete()
+        .eq('id', rate.id).eq('salary_profile_id', rate.salary_profile_id).select('id')
+      if (deleteError) throw deleteError
+      if (!deleted?.length) throw new Error('Salary rate was not deleted')
+      await loadData()
+    } catch (deleteError) {
       setError(deleteError.message)
-      return
+    } finally {
+      setSaving('')
+      setConfirmActionKey('')
     }
-    await loadData()
   }
 
   async function toggleSalaryProfileActive(salaryProfile) {
@@ -1861,7 +1868,12 @@ export default function Salaries() {
                       <button
                         key={item.key}
                         type="button"
-                        onClick={() => setSalarySetupMode(item.key)}
+                        onClick={() => {
+                          if (item.key === 'change' && salarySetupMode !== 'change') {
+                            setChangeForm(current => ({ ...current, effective_from: todayExpenseDate() }))
+                          }
+                          setSalarySetupMode(item.key)
+                        }}
                         disabled={loading}
                         aria-pressed={active}
                         className={`flex min-h-11 min-w-0 items-center justify-center break-words rounded-xl border px-3 py-2 text-center text-xs font-black leading-tight transition-colors sm:text-sm ${

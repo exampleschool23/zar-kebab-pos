@@ -60,3 +60,36 @@ test('salary rate audit migration captures inserts, changes and deletes in immut
   await db.exec("insert into expenses values ('expense')")
   assert.equal((await db.query("select count(*)::int n from accounting_record_audit where entity_type='expense'")).rows[0].n, 1)
 })
+
+
+test('only the newest action of an existing rate can be deleted, never an audit or removed rate', () => {
+  const rows = buildSalaryRateHistory([{ id: 'live' }, { id: 'legacy' }], [
+    { id: 1, entity_id: 'live', action: 'insert', changed_at: '2026-09-21T00:00:00Z' },
+    { id: 2, entity_id: 'live', action: 'update', changed_at: '2026-09-22T00:00:00Z' },
+    { id: 3, entity_id: 'gone', action: 'delete', changed_at: '2026-09-23T00:00:00Z' },
+  ])
+  assert.deepEqual(rows.filter(row => row.canDelete).map(row => [row.id, row.rateId]), [['audit-2', 'live'], ['rate-legacy', 'legacy']])
+})
+
+test('database permits only owners to delete rates even with a broad legacy write policy', async t => {
+  const db = new PGlite(); t.after(() => db.close())
+  await db.exec(`
+    create role authenticated;
+    create function public.current_staff_role() returns text language sql as $$select current_setting('test.staff_role')$$;
+    create table public.employee_salary_rates(id int primary key, amount int);
+    alter table public.employee_salary_rates enable row level security;
+    grant select, insert, update, delete on public.employee_salary_rates to authenticated;
+    create policy legacy_write on public.employee_salary_rates for all to authenticated using (true) with check (true);
+    insert into public.employee_salary_rates values (1, 100);
+  `)
+  await db.exec(readFileSync(new URL('../supabase/209_owner_only_salary_rate_deletion.sql', import.meta.url), 'utf8'))
+  await db.exec('set role authenticated')
+  for (const role of ['admin', 'manager', 'cashier', 'waiter', 'kitchen']) {
+    await db.query("select set_config('test.staff_role', $1, false)", [role])
+    assert.equal((await db.query('delete from employee_salary_rates where id=1 returning id')).rows.length, 0, role)
+  }
+  await db.exec('update employee_salary_rates set amount=200 where id=1')
+  assert.equal((await db.query('select amount from employee_salary_rates')).rows[0].amount, 200)
+  await db.query("select set_config('test.staff_role', 'owner', false)")
+  assert.equal((await db.query('delete from employee_salary_rates where id=1 returning id')).rows.length, 1)
+})

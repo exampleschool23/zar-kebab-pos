@@ -47,6 +47,7 @@ import {
 
 const PAGE_SIZE = 10
 const HISTORY_TABLE_BY_TYPE = {
+  rate: 'employee_salary_rates',
   payment: 'employee_salary_payments',
   bonus: 'employee_salary_bonuses',
   fine: 'employee_salary_fines',
@@ -409,7 +410,8 @@ export default function EmployeeSalaryHistory() {
   }
 
   async function deleteHistoryEntry(entry) {
-    if (!canDeleteHistory || !entry?.id) return
+    if (!canDeleteHistory || !entry?.id || saving) return
+    if (entry.entryType === 'rate' && !employee?.rates.some(rate => rate.id === entry.id)) return
     const table = HISTORY_TABLE_BY_TYPE[entry.entryType]
     if (!table) return
     const key = `${entry.entryType}-history-delete-${entry.id}`
@@ -428,16 +430,25 @@ export default function EmployeeSalaryHistory() {
       setError(`${l.telegramDeleteFailed} ${telegramError?.message || ''}`.trim())
       return
     }
-    const { error: deleteError } = await supabase
-      .from(table)
-      .delete()
-      .eq('id', entry.id)
-      .eq('salary_profile_id', employeeId)
-    setSaving('')
-    setConfirmActionKey('')
-    if (deleteError) {
+    try {
+      const { data: deleted, error: deleteError } = await supabase
+        .from(table)
+        .delete()
+        .eq('id', entry.id)
+        .eq('salary_profile_id', employeeId)
+        .select('id')
+      if (deleteError) throw deleteError
+      if (!deleted?.length) throw new Error(l.deleteFailed)
+      if (entry.entryType === 'rate') {
+        await loadHistory({ showLoader: false })
+        return
+      }
+    } catch (deleteError) {
       setError(deleteError.message || l.deleteFailed)
       return
+    } finally {
+      setSaving('')
+      setConfirmActionKey('')
     }
     setEntries(current => current.filter(item => !(
       item.id === entry.id && item.entryType === entry.entryType
@@ -675,7 +686,10 @@ export default function EmployeeSalaryHistory() {
               </div>
             </section>
 
-            <SalaryRateHistory employeeId={employeeId} rates={employee.rates} lang={lang} />
+            <SalaryRateHistory employeeId={employeeId} rates={employee.rates} lang={lang}
+              canDelete={canDeleteHistory} onDelete={deleteHistoryEntry}
+              onCancelDelete={() => setConfirmActionKey('')}
+              confirmActionKey={confirmActionKey} saving={saving} actionLabels={l} />
 
             <section className="xl:col-span-2 min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5" aria-labelledby="salary-history-activity-heading">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

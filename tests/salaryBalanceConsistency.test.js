@@ -167,7 +167,7 @@ test('deleting a bonus immediately removes it from salary balance after successf
   const entry = { id: employee.bonuses[0].id, entryType: 'bonus' }
   let retracted = false
   const deleteEntry = pageFunction('EmployeeSalaryHistory', 'deleteHistoryEntry', {
-    canDeleteHistory: true, HISTORY_TABLE_BY_TYPE: { bonus: 'employee_salary_bonuses' },
+    saving: '', canDeleteHistory: true, HISTORY_TABLE_BY_TYPE: { bonus: 'employee_salary_bonuses' },
     confirmActionKey: `bonus-history-delete-${entry.id}`, employeeId, l: {},
     supabase: mockDb(fixture()), setSaving() {}, setError(value) { assert.equal(value, '') },
     setConfirmActionKey() {}, setEntries() {},
@@ -176,4 +176,42 @@ test('deleting a bonus immediately removes it from salary balance after successf
   })
   await deleteEntry(entry)
   assert.equal(getSalaryBalance(employee, today), 854_717 - 67_824)
+})
+
+
+test('rate deletion confirms, retracts Telegram first, checks the exact row and refreshes history', async () => {
+  const entry = { id: 'rate', entryType: 'rate' }
+  for (const scenario of ['confirm', 'success', 'telegram-error', 'database-error', 'missing', 'busy']) {
+    const calls = []
+    let refreshed = false
+    let error = ''
+    const query = {
+      delete() { calls.push('delete'); return this },
+      eq(key, value) { calls.push([key, value]); return this },
+      select() { return Promise.resolve({ data: scenario === 'missing' ? [] : [{ id: 'rate' }], error: scenario === 'database-error' ? new Error('denied') : null }) },
+    }
+    const remove = pageFunction('EmployeeSalaryHistory', 'deleteHistoryEntry', {
+      canDeleteHistory: true, saving: scenario === 'busy' ? 'pending' : '',
+      employee: { rates: [{ id: 'rate' }] }, employeeId,
+      HISTORY_TABLE_BY_TYPE: { rate: 'employee_salary_rates' },
+      confirmActionKey: scenario === 'confirm' ? '' : 'rate-history-delete-rate',
+      setConfirmActionKey(value) { calls.push(['confirm', value]) }, setSaving() {},
+      setError(value) { error = value }, l: { deleteFailed: 'not deleted', telegramDeleteFailed: 'retraction failed' },
+      retractTelegramSalaryEvent: async (type, id) => {
+        calls.push(['retract', type, id])
+        if (scenario === 'telegram-error') throw new Error('offline')
+      },
+      supabase: { from(table) { calls.push(table); return query } },
+      loadHistory: async options => { assert.equal(options.showLoader, false); refreshed = true },
+    })
+    await remove(entry)
+    assert.equal(refreshed, scenario === 'success')
+    if (scenario === 'confirm') assert.deepEqual(calls, [['confirm', 'rate-history-delete-rate']])
+    if (scenario === 'busy') assert.deepEqual(calls, [])
+    if (scenario === 'success') {
+      assert.deepEqual(calls.slice(0, 5), [['retract', 'rate', 'rate'], 'employee_salary_rates', 'delete', ['id', 'rate'], ['salary_profile_id', employeeId]])
+    }
+    if (scenario === 'telegram-error') assert.ok(!calls.includes('delete'))
+    if (['telegram-error', 'database-error', 'missing'].includes(scenario)) assert.ok(error)
+  }
 })
