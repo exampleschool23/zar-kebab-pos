@@ -93,3 +93,16 @@ test('database permits only owners to delete rates even with a broad legacy writ
   await db.query("select set_config('test.staff_role', 'owner', false)")
   assert.equal((await db.query('delete from employee_salary_rates where id=1 returning id')).rows.length, 1)
 })
+
+
+test('all audit entries for a deleted rate are marked deleted without affecting active rates', () => {
+  const rows = buildSalaryRateHistory([{ id: 'active' }], [
+    { id: 1, entity_id: 'gone', action: 'insert', changed_at: '2026-09-21T00:00:00Z' },
+    { id: 2, entity_id: 'gone', action: 'update', changed_at: '2026-09-22T00:00:00Z' },
+    { id: 3, entity_id: 'gone', action: 'delete', changed_at: '2026-09-23T00:00:00Z' },
+    { id: 4, entity_id: 'unknown', action: 'insert', changed_at: '2026-09-20T00:00:00Z' },
+  ])
+  assert.ok(rows.filter(row => row.rateId === 'gone').every(row => row.deleted && !row.canDelete))
+  assert.equal(rows.find(row => row.rateId === 'active').deleted, false)
+  assert.equal(rows.find(row => row.rateId === 'unknown').deleted, false)
+})

@@ -27,10 +27,11 @@ export function buildSalaryRateHistory(rates = [], audits = [], actors = []) {
   }
   const sorted = entries.sort((a, b) => (Date.parse(b.recordedAt) || 0) - (Date.parse(a.recordedAt) || 0) || b.id.localeCompare(a.id))
   const existingIds = new Set(rates.map(rate => rate.id))
+  const deletedIds = new Set(audits.filter(row => row.action === 'delete').map(row => row.entity_id))
   const seen = new Set()
   return sorted.map(entry => {
     const canDelete = existingIds.has(entry.rateId) && !seen.has(entry.rateId) && entry.action !== 'delete'
     seen.add(entry.rateId)
-    return { ...entry, canDelete }
+    return { ...entry, canDelete, deleted: deletedIds.has(entry.rateId) && !existingIds.has(entry.rateId) }
   })
 }
