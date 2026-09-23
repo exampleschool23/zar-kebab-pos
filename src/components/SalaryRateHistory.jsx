@@ -7,9 +7,9 @@ import { formatCurrency } from '../lib/formatCurrency'
 import { formatLongDate, formatTime } from '../lib/dateFormat'
 
 const LABELS = {
-  en: { title: 'Salary changes', insert: 'Rate added', update: 'Rate changed', delete: 'Rate deleted', effective: 'Effective from', daily: 'day', monthly: 'month', before: 'Before', after: 'After', unknown: 'Author unavailable', legacy: 'Saved rate · earlier edits were not audited', empty: 'No salary rate changes.', error: 'Could not load the complete change history.', retry: 'Retry', more: 'Show more', loading: 'Loading changes…' },
-  ru: { title: 'Изменения зарплаты', insert: 'Ставка добавлена', update: 'Ставка изменена', delete: 'Ставка удалена', effective: 'Действует с', daily: 'день', monthly: 'месяц', before: 'До', after: 'После', unknown: 'Автор неизвестен', legacy: 'Сохранённая ставка · прежние правки не отслеживались', empty: 'Изменений ставки нет.', error: 'Не удалось загрузить полную историю изменений.', retry: 'Повторить', more: 'Показать ещё', loading: 'Загрузка изменений…' },
-  uz: { title: 'Maosh o‘zgarishlari', insert: 'Stavka qo‘shildi', update: 'Stavka o‘zgartirildi', delete: 'Stavka o‘chirildi', effective: 'Amal qilish sanasi', daily: 'kun', monthly: 'oy', before: 'Oldin', after: 'Keyin', unknown: 'Muallif noma’lum', legacy: 'Saqlangan stavka · oldingi tahrirlar kuzatilmagan', empty: 'Maosh stavkasi o‘zgarishlari yo‘q.', error: 'To‘liq o‘zgarishlar tarixini yuklab bo‘lmadi.', retry: 'Qayta urinish', more: 'Yana ko‘rsatish', loading: 'O‘zgarishlar yuklanmoqda…' },
+  en: { title: 'Salary changes', addedBy: 'Added by', changedBy: 'Changed by', deletedBy: 'Deleted by', insert: 'Rate added', update: 'Rate changed', delete: 'Rate deleted', effective: 'Effective from', daily: 'day', monthly: 'month', before: 'Before', after: 'After', unknown: 'Author unavailable', legacy: 'Saved rate · earlier edits were not audited', empty: 'No salary rate changes.', error: 'Could not load the complete change history.', retry: 'Retry', more: 'Show more', loading: 'Loading changes…' },
+  ru: { title: 'Изменения зарплаты', addedBy: 'Добавил(а)', changedBy: 'Изменил(а)', deletedBy: 'Удалил(а)', insert: 'Ставка добавлена', update: 'Ставка изменена', delete: 'Ставка удалена', effective: 'Действует с', daily: 'день', monthly: 'месяц', before: 'До', after: 'После', unknown: 'Автор неизвестен', legacy: 'Сохранённая ставка · прежние правки не отслеживались', empty: 'Изменений ставки нет.', error: 'Не удалось загрузить полную историю изменений.', retry: 'Повторить', more: 'Показать ещё', loading: 'Загрузка изменений…' },
+  uz: { title: 'Maosh o‘zgarishlari', addedBy: 'Qo‘shgan', changedBy: 'O‘zgartirgan', deletedBy: 'O‘chirgan', insert: 'Stavka qo‘shildi', update: 'Stavka o‘zgartirildi', delete: 'Stavka o‘chirildi', effective: 'Amal qilish sanasi', daily: 'kun', monthly: 'oy', before: 'Oldin', after: 'Keyin', unknown: 'Muallif noma’lum', legacy: 'Saqlangan stavka · oldingi tahrirlar kuzatilmagan', empty: 'Maosh stavkasi o‘zgarishlari yo‘q.', error: 'To‘liq o‘zgarishlar tarixini yuklab bo‘lmadi.', retry: 'Qayta urinish', more: 'Yana ko‘rsatish', loading: 'O‘zgarishlar yuklanmoqda…' },
 }
 
 export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, onDelete, onCancelDelete, confirmActionKey, saving, actionLabels, actionError }) {
@@ -31,7 +31,10 @@ export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, 
           .select('id,entity_id,action,old_record,new_record,changed_by,changed_by_name,changed_at')
           .eq('entity_type', 'salary_rate')
           .or(`old_record->>salary_profile_id.eq.${employeeId},new_record->>salary_profile_id.eq.${employeeId}`))
-        const actorIds = [...new Set(rates.map(rate => rate.created_by).filter(Boolean))]
+        const actorIds = [...new Set([
+          ...rates.map(rate => rate.created_by),
+          ...(audit.data || []).flatMap(row => [row.changed_by, row.old_record?.created_by, row.new_record?.created_by]),
+        ].filter(Boolean))]
         const actors = actorIds.length
           ? await loadSalaryRows(() => supabase.from('profiles').select('id,full_name').in('id', actorIds))
           : { data: [], error: null }
@@ -72,8 +75,15 @@ export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, 
               <div className="min-w-0 flex-1">
                 <p className={`text-xs font-bold ${entry.deleted ? 'line-through' : ''}`}>{l[entry.action]}</p>
                 <p className={`mt-0.5 break-words text-[11px] leading-snug ${entry.deleted ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <time dateTime={entry.recordedAt || undefined}>{formatLongDate(entry.recordedAt, lang, '—')}{formatTime(entry.recordedAt) && `, ${formatTime(entry.recordedAt)}`}</time> · {entry.actor || l.unknown}
+                  <time dateTime={entry.recordedAt || undefined}>{formatLongDate(entry.recordedAt, lang, '—')}{formatTime(entry.recordedAt) && `, ${formatTime(entry.recordedAt)}`}</time>
                 </p>
+                <p className="mt-0.5 break-words text-[11px] leading-snug text-slate-600">
+                  {entry.action === 'delete' ? l.deletedBy : entry.action === 'update' ? l.changedBy : l.addedBy}: {entry.actor || l.unknown}
+                </p>
+                {entry.action !== 'insert' && <p className="mt-0.5 break-words text-[11px] leading-snug text-slate-600">
+                  {l.addedBy}: {entry.addedBy || l.unknown}
+                  {entry.addedAt && <> · <time dateTime={entry.addedAt}>{formatLongDate(entry.addedAt, lang, '—')}, {formatTime(entry.addedAt)}</time></>}
+                </p>}
                 {snapshot(entry.before, entry.after ? l.before : '', entry.deleted)}
                 {snapshot(entry.after, entry.before ? l.after : '', entry.deleted)}
               </div>

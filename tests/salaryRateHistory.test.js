@@ -106,3 +106,33 @@ test('all audit entries for a deleted rate are marked deleted without affecting 
   assert.equal(rows.find(row => row.rateId === 'active').deleted, false)
   assert.equal(rows.find(row => row.rateId === 'unknown').deleted, false)
 })
+
+
+test('deleted legacy rates retain both creator and deletion actor with separate timestamps', () => {
+  const [entry] = buildSalaryRateHistory([], [{
+    id: 'delete', entity_id: 'rate', action: 'delete', changed_at: '2026-09-23T16:43:00Z',
+    changed_by_name: 'Deleting owner', changed_by: 'owner',
+    old_record: { created_by: 'creator', created_at: '2026-09-21T09:30:00Z' },
+  }], [{ id: 'creator', full_name: 'Original creator' }])
+  assert.equal(entry.actor, 'Deleting owner')
+  assert.equal(entry.addedBy, 'Original creator')
+  assert.equal(entry.addedAt, '2026-09-21T09:30:00Z')
+  assert.equal(entry.recordedAt, '2026-09-23T16:43:00Z')
+})
+
+test('insert audit preserves original author despite profile renames and later edits', () => {
+  const rows = buildSalaryRateHistory([], [
+    { id: 3, entity_id: 'rate', action: 'delete', changed_at: '2026-09-23T00:00:00Z', changed_by_name: 'Owner', old_record: { created_by: 'editor' } },
+    { id: 1, entity_id: 'rate', action: 'insert', changed_at: '2026-09-21T00:00:00Z', changed_by: 'creator', changed_by_name: 'Creator at creation', new_record: { created_by: 'creator' } },
+    { id: 2, entity_id: 'rate', action: 'update', changed_at: '2026-09-22T00:00:00Z', changed_by_name: 'Editor', old_record: { created_by: 'creator' }, new_record: { created_by: 'editor' } },
+  ], [{ id: 'creator', full_name: 'Renamed creator' }])
+  assert.ok(rows.every(row => row.addedBy === 'Creator at creation'))
+  assert.equal(rows[0].actor, 'Owner')
+  assert.equal(rows[1].actor, 'Editor')
+})
+
+test('missing historical creator is never attributed to the deleting owner', () => {
+  const [entry] = buildSalaryRateHistory([], [{ id: 1, entity_id: 'rate', action: 'delete', changed_by_name: 'Owner', old_record: { created_by: 'missing' } }])
+  assert.equal(entry.addedBy, '')
+  assert.equal(entry.actor, 'Owner')
+})

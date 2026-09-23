@@ -10,11 +10,11 @@
 - Schema: migrations `129`, `169`–`172`, `195`–`203`.
 - Tests: `tests/salaryTransactions.test.js`, `tests/salaryHistory.test.js`, `tests/dailyKpi.test.js`, `tests/dailyKpiUi.test.js`, `tests/dailyKpiBonuses.test.js`, `tests/dailySalaryWatchdog.test.js`, `tests/telegramSalaryMessages.test.js`
 
-- `207`: salary rates allow dates ≥ Tashkent today − 3 days; older rates cannot be updated. Includes initial rates. Test: `tests/salaryRateDateWindow.test.js`.
+- `207`: salary rates allow dates ≥ Tashkent today − 3 days; older rates cannot be updated. Includes initial. Test: `tests/salaryRateDateWindow.test.js`.
 
-- Change salary uses Tashkent today.
+- Salary date: Tashkent today.
 
-- `208`: rate insert/update/delete audit snapshots. Separate history shows time, author and snapshots. `209`: owner-only rate deletion; refresh balances/history, keep audits. Test: `tests/salaryRateHistory.test.js`.
+- `208`: rate insert/update/delete audit snapshots. History labels creator/deleter; insert audits precede live names. `209`: owner-only rate deletion; refresh balances/history, keep audits. Test: `tests/salaryRateHistory.test.js`.
 
 ## Salary ledger
 
