@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Loader2, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { loadSalaryRows } from '../lib/salaryData'
 import { buildSalaryRateHistory } from '../lib/salaryRateHistory'
@@ -12,7 +12,7 @@ const LABELS = {
   uz: { title: 'Maosh o‘zgarishlari', help: 'Barcha sanalar · yangilari avval · Toshkent vaqti', insert: 'Stavka qo‘shildi', update: 'Stavka o‘zgartirildi', delete: 'Stavka o‘chirildi', effective: 'Amal qilish sanasi', daily: 'kun', monthly: 'oy', before: 'Oldin', after: 'Keyin', unknown: 'Muallif noma’lum', legacy: 'Saqlangan stavka · oldingi tahrirlar kuzatilmagan', empty: 'Maosh stavkasi o‘zgarishlari yo‘q.', error: 'To‘liq o‘zgarishlar tarixini yuklab bo‘lmadi.', retry: 'Qayta urinish', more: 'Yana ko‘rsatish', loading: 'O‘zgarishlar yuklanmoqda…' },
 }
 
-export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, onDelete, onCancelDelete, confirmActionKey, saving, actionLabels }) {
+export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, onDelete, onCancelDelete, confirmActionKey, saving, actionLabels, actionError }) {
   const l = LABELS[lang] || LABELS.en
   const [entries, setEntries] = useState([])
   const [failed, setFailed] = useState(false)
@@ -60,11 +60,13 @@ export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, 
   return <aside aria-labelledby="salary-rate-history-heading" className="min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
     <h2 id="salary-rate-history-heading" className="text-base font-black text-[#1F2937]">{l.title}</h2>
     <p className="mt-1 text-xs text-slate-500">{l.help}</p>
+    {actionError && <div role="alert" className="mt-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">{actionError}</div>}
     {failed && <div role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{l.error} <button type="button" onClick={() => setRetry(value => value + 1)} className="font-bold underline">{l.retry}</button></div>}
     {loading ? <p role="status" className="mt-4 text-sm text-slate-500">{l.loading}</p> : <>
       {!entries.length && !failed && <p className="mt-4 text-sm text-slate-500">{l.empty}</p>}
       <ol className="mt-3 divide-y divide-slate-100">
         {entries.slice(0, limit).map(entry => {
+          const deleting = saving === `rate-history-delete-${entry.rateId}`
           const confirming = confirmActionKey === `rate-history-delete-${entry.rateId}`
           return <li key={entry.id} className={`py-2 first:pt-0 last:pb-0 ${entry.deleted ? 'text-slate-400' : 'text-slate-800'}`}>
             <div className="flex items-start justify-between gap-2">
@@ -82,7 +84,7 @@ export default function SalaryRateHistory({ employeeId, rates, lang, canDelete, 
                   title={confirming ? actionLabels.confirm : actionLabels.delete}
                   onClick={() => onDelete({ id: entry.rateId, entryType: 'rate' })}
                   className="flex min-h-10 min-w-10 items-center justify-center rounded-lg px-2 text-xs font-bold text-red-600 hover:bg-red-50 disabled:opacity-50">
-                  {confirming ? actionLabels.confirm : <Trash2 size={15} aria-hidden="true" />}
+                  {deleting ? <Loader2 size={15} className="animate-spin" aria-label={l.loading} /> : confirming ? actionLabels.confirm : <Trash2 size={15} aria-hidden="true" />}
                 </button>
                 {confirming && <button type="button" disabled={Boolean(saving)} onClick={onCancelDelete}
                   className="min-h-10 rounded-lg border px-2 text-xs font-bold text-slate-600">{actionLabels.cancel}</button>}

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { deleteTelegramMessage } from '../api/telegram/_lib/telegram.js'
+import { deleteTelegramMessage, editTelegramMessage } from '../api/telegram/_lib/telegram.js'
 
 test('Telegram salary retraction calls deleteMessage with the tracked destination', async () => {
   const originalFetch = globalThis.fetch
@@ -72,11 +72,11 @@ test('payment delivery snapshots the exact employee chat used by the sent messag
   assert.match(cliHealth, /employee_chat_id/)
 })
 
-function salaryRetractionWith(deleteTelegramMessage) {
+function salaryRetractionWith(deleteTelegramMessage, editTelegramMessage = async () => { throw new Error('Unexpected edit') }) {
   const source = readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
   const tables = source.slice(source.indexOf('const RETRACTABLE_SALARY_EVENT_TABLES'), source.indexOf('\nfunction isMissingKpiBonusSourceColumns'))
   const helpers = source.slice(source.indexOf('function telegramMessageWasAlreadyDeleted'), source.indexOf('\nasync function', source.indexOf('async function retractSalaryEventMessages') + 10))
-  return new Function('deleteTelegramMessage', `${tables}\n${helpers}\nreturn retractSalaryEventMessages`)(deleteTelegramMessage)
+  return new Function('deleteTelegramMessage', 'editTelegramMessage', `${tables}\n${helpers}\nreturn retractSalaryEventMessages`)(deleteTelegramMessage, editTelegramMessage)
 }
 
 function rateRetractionDb(delivery) {
@@ -125,4 +125,57 @@ test('browser accepts rate cleanup and backend and both deletion entry points en
   assert.match(page, /canDeleteHistory = canManage && isOwner/)
   assert.match(salaries, /async function deleteRate\(rate\)\s*{\s*if \(!canManage \|\| role !== 'owner'/)
   assert.ok(salaries.indexOf("await retractTelegramSalaryEvent('rate', rate.id)") < salaries.indexOf("const { data: deleted, error: deleteError } = await supabase.from('employee_salary_rates')"))
+})
+
+
+test('old rate messages are marked cancelled at every saved destination before deletion can continue', async () => {
+  const edits = []
+  const retract = salaryRetractionWith(async () => { throw new Error("Bad Request: message can't be deleted") }, async (...args) => { edits.push(args) })
+  const result = await retract(rateRetractionDb({
+    employee_chat_id: 'employee', employee_telegram_message_id: '11',
+    telegram_chat_id: 'investor', telegram_message_id: '22',
+  }), 'rate', 'rate')
+  assert.deepEqual(result.retracted.map(row => row.status), ['cancelled', 'cancelled'])
+  assert.deepEqual(edits.map(args => args.slice(0, 2)), [['employee', '11'], ['investor', '22']])
+  assert.ok(edits.every(args => /Salary change cancelled/.test(args[2]) && /<s>/.test(args[2])))
+})
+
+test('cancellation retries accept unchanged text but still block when Telegram cannot edit', async () => {
+  const delivery = { telegram_chat_id: 'investor', telegram_message_id: '22' }
+  for (const message of ['Bad Request: message is not modified', 'Forbidden: bot was kicked']) {
+    const retract = salaryRetractionWith(async () => { throw new Error("message can't be deleted") }, async () => { throw new Error(message) })
+    if (message.includes('not modified')) {
+      assert.equal((await retract(rateRetractionDb(delivery), 'rate', 'rate')).retracted[0].status, 'cancelled')
+    } else {
+      await assert.rejects(retract(rateRetractionDb(delivery), 'rate', 'rate'), /bot was kicked/)
+    }
+  }
+})
+
+test('transport errors never trigger cancellation edits', async () => {
+  let edits = 0
+  const retract = salaryRetractionWith(async () => { throw new Error('fetch failed') }, async () => { edits += 1 })
+  await assert.rejects(retract(rateRetractionDb({ telegram_chat_id: 'investor', telegram_message_id: '22' }), 'rate', 'rate'), /fetch failed/)
+  assert.equal(edits, 0)
+})
+
+
+test('Telegram cancellation edits the original message with strikethrough and clears buttons', async () => {
+  const originalFetch = globalThis.fetch
+  const originalToken = process.env.TELEGRAM_BOT_TOKEN
+  process.env.TELEGRAM_BOT_TOKEN = 'test-token'
+  let request
+  globalThis.fetch = async (url, options) => {
+    request = { url, body: JSON.parse(options.body) }
+    return { ok: true, json: async () => ({ ok: true, result: true }) }
+  }
+  try {
+    await editTelegramMessage('-100123', '607', '<s>Salary change cancelled</s>')
+    assert.match(request.url, /\/editMessageText$/)
+    assert.deepEqual(request.body, { chat_id: '-100123', message_id: 607, text: '<s>Salary change cancelled</s>', parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } })
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalToken == null) delete process.env.TELEGRAM_BOT_TOKEN
+    else process.env.TELEGRAM_BOT_TOKEN = originalToken
+  }
 })

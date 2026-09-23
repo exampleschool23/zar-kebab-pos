@@ -14,13 +14,13 @@
 
 ## Delivery records and retries
 
-- Saved salary events/rate changes get `not_attempted` tracking; initial setup does not.
+- Saved salary events get `not_attempted` tracking; initial setup does not.
 - Per-destination states: pending, sent, failed, skipped, confirmed.
 - Sent requires a Telegram message id.
 - Destinations send independently, duplicate-safe.
-- Salaries: status, 5 rows/page, unsent retries.
+- Salaries: 5 rows/page, unsent retries.
 - Reuse `api/telegram/employee-notification.js` for salary operation types to stay within deployment function limits.
-- Owner deletions retract tracked private/Salary (Investor)/Team messages first. Payments snapshot chat ID. Missing messages are retracted; other failures preserve the event.
+- Owner deletions retract tracked private/Salary (Investor)/Team messages first. Missing messages succeed. Undeletable rate notices are edited to cancelled; other failures block deletion.
 
 ## Salary destinations
 

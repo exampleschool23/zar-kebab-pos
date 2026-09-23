@@ -149,6 +149,19 @@ export async function deleteTelegramMessage(chatId, messageId) {
   })
 }
 
+export async function editTelegramMessage(chatId, messageId, text) {
+  if (!chatId || !Number.isSafeInteger(Number(messageId)) || Number(messageId) <= 0 || !text) {
+    throw new Error('Telegram chat id, message id and text are required')
+  }
+  return callTelegramApi('editMessageText', {
+    chat_id: String(chatId),
+    message_id: Number(messageId),
+    text,
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [] },
+  })
+}
+
 export async function sendTelegramPhoto(chatId, photo, {
   caption = '',
   filename = 'report.png',

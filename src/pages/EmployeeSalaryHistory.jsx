@@ -689,7 +689,7 @@ export default function EmployeeSalaryHistory() {
             <SalaryRateHistory employeeId={employeeId} rates={employee.rates} lang={lang}
               canDelete={canDeleteHistory} onDelete={deleteHistoryEntry}
               onCancelDelete={() => setConfirmActionKey('')}
-              confirmActionKey={confirmActionKey} saving={saving} actionLabels={l} />
+              confirmActionKey={confirmActionKey} saving={saving} actionLabels={l} actionError={error} />
 
             <section className="xl:col-span-2 min-w-0 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5" aria-labelledby="salary-history-activity-heading">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
