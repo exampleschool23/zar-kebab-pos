@@ -50,7 +50,7 @@
 - Upload error rendering belongs inside `ImageUploadField`; `SortableItemCard` must not access that state.
 - Trim localized text at editor/write/display/database boundaries; preserve internal spaces and description line breaks.
 - `estimated_prep_minutes` is a localized current-catalog expectation from 1–180 minutes (default 15), not a historical order promise.
-- Mobile product archive is owner-only and uses a retryable in-app dialog.
+- Owner-only Archive buttons use a retryable in-app dialog.
 
 ## Tech Cards
 

@@ -39,7 +39,7 @@ import {
   BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck, Pencil, Globe2, UserRound,
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
-import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
+import { ALL_DISHES_KEY, getDishSalesAnalysis, getDishRevenueReconciliation } from '../lib/dishSales'
 import { ORDER_TYPE_KEYS, ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import {
@@ -537,6 +537,7 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
   const [pickerSearch, setPickerSearch] = useState('')
   const [activeSectionKey, setActiveSectionKey] = useState('')
   const pickerRef = useRef(null)
+  const reconciliation = useMemo(() => getDishRevenueReconciliation(orders), [orders])
 
   const analysis = useMemo(() => (
     getDishSalesAnalysis({ orders, menuItems, selectedDishKey })
@@ -615,7 +616,7 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
     menuItems:  { uz: 'menyu taomi',      ru: 'позиций меню',    en: 'menu items' },
     sold:       { uz: 'Sotildi',          ru: 'Продано',         en: 'Sold' },
     orders:     { uz: 'Buyurtmalar',      ru: 'Заказов',         en: 'Orders' },
-    revenue:    { uz: 'Daromad',          ru: 'Выручка',         en: 'Revenue' },
+    revenue:    { uz: 'Taomlar summasi',   ru: 'Сумма блюд',      en: 'Item sales' },
     lastSale:   { uz: 'Oxirgi sotuv',     ru: 'Последняя продажа', en: 'Last sale' },
     avgOrder:   { uz: "O'rtacha",         ru: 'В среднем',       en: 'Avg per order' },
     noSales:    { uz: 'Sotuv yo‘q',       ru: 'Нет продаж',      en: 'No sales' },
@@ -797,6 +798,22 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
           value={analysis.totals.lastSoldAt ? formatLongDateTime(analysis.totals.lastSoldAt, lang) : '—'}
         />
       </div>
+
+      {selectedDishKey === ALL_DISHES_KEY && (
+        <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 text-sm space-y-3">
+          <p className="font-black">{lang === 'ru' ? 'От суммы блюд к поступлениям' : lang === 'uz' ? 'Taomlar summasidan tushumgacha' : 'From item sales to collected income'}</p>
+          <SummaryRow label={lang === 'ru' ? 'Блюда до обслуживания и лояльности' : lang === 'uz' ? 'Xizmat va loyallikdan oldingi taomlar' : 'Items before service and loyalty'} value={formatCurrency(reconciliation.items)} />
+          <SummaryRow label={lang === 'ru' ? '+ Сохранённое обслуживание' : lang === 'uz' ? '+ Saqlangan xizmat haqi' : '+ Saved service charges'} value={formatCurrency(reconciliation.service)} />
+          <SummaryRow label={lang === 'ru' ? '− Сохранённая лояльность / скидки' : lang === 'uz' ? '− Saqlangan loyallik / chegirmalar' : '− Saved loyalty / discounts'} value={formatCurrency(reconciliation.loyalty)} />
+          {(reconciliation.difference !== 0 || reconciliation.missingSnapshots > 0) && (
+            <div className="rounded-xl bg-amber-50 p-3 text-amber-800">
+              <SummaryRow label={lang === 'ru' ? 'Необъяснённая разница — нужна проверка' : lang === 'uz' ? 'Izohlanmagan farq — tekshirish kerak' : 'Unexplained difference — review needed'} value={formatCurrency(reconciliation.difference)} />
+              {reconciliation.missingSnapshots > 0 && <p className="mt-2 text-xs">{lang === 'ru' ? 'Заказы с неполными сохранёнными данными' : lang === 'uz' ? 'Saqlangan maʼlumotlari to‘liq bo‘lmagan buyurtmalar' : 'Orders with incomplete saved fields'}: {reconciliation.missingSnapshots}</p>}
+            </div>
+          )}
+          <SummaryRow label={lang === 'ru' ? '= Получено по заказам' : lang === 'uz' ? '= Buyurtmalar bo‘yicha tushum' : '= Collected order income'} value={formatCurrency(reconciliation.collected)} bold />
+        </div>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
@@ -1849,6 +1866,7 @@ export default function Reports() {
   const [expenseBreakdownOpen, setExpenseBreakdownOpen] = useState(false)
   const [historyOrders, setHistoryOrders] = useState([])
   const [ordersError, setOrdersError] = useState('')
+  const [loadedHistoryRange, setLoadedHistoryRange] = useState('')
 
   // ── Lookups ────────────────────────────────────────────────────────────────
 
@@ -1952,9 +1970,13 @@ export default function Reports() {
   useEffect(() => {
     let cancelled = false
     setOrdersError('')
+    setLoadedHistoryRange('')
     loadOrdersForRange(dateFrom, dateTo)
       .then(rows => {
-        if (!cancelled) setHistoryOrders(rows)
+        if (!cancelled) {
+          setHistoryOrders(rows)
+          setLoadedHistoryRange(`${dateFrom}:${dateTo}`)
+        }
       })
       .catch(error => {
         if (cancelled) return
@@ -2140,9 +2162,9 @@ export default function Reports() {
   const showDrawer = !!selectedOrder
 
   const L = {
-    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', employeeMeals: 'Xodimlar ovqati', employeeMealsSub: 'Davomat bo‘yicha hisoblangan', netIncome: 'Qolgan pul', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', previousMonth: 'O‘tgan oy', previousWeek: 'O‘tgan hafta', previousCurrentWeek: 'O‘tgan va joriy hafta', currentWeek: 'Joriy hafta', currentNextWeek: 'Joriy va keyingi hafta', nextWeek: 'Keyingi hafta', nextMonth: 'Keyingi oy', presets: 'Tayyor davrlar', applyRange: 'Davrni qo‘llash', cancel: 'Bekor qilish', selectDateRange: 'Sana oralig‘ini tanlash', weekdays: ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Ya'], from: 'Dan', to: 'Gacha', closeout: 'Kunlik yopish', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Jami qolgan', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq', tapForDetails: 'Xarajatlarni ko‘rish', expenseDetails: 'Xarajatlar tafsiloti', periodExpenses: 'Davr xarajatlari', entries: 'ta yozuv', noExpenses: 'Bu davrda xarajatlar yo‘q', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi', close: 'Yopish' },
-    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', employeeMeals: 'Питание сотрудников', employeeMealsSub: 'Рассчитано по посещаемости', netIncome: 'Остаток',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', previousMonth: 'Прошлый месяц', previousWeek: 'Прошлая неделя', previousCurrentWeek: 'Прошлая и текущая неделя', currentWeek: 'Текущая неделя', currentNextWeek: 'Текущая и следующая неделя', nextWeek: 'Следующая неделя', nextMonth: 'Следующий месяц', presets: 'Готовые периоды', applyRange: 'Применить период', cancel: 'Отмена', selectDateRange: 'Выбрать период', weekdays: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], from: 'С', to: 'По', closeout: 'Закрытие дня', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'Итого осталось', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение', tapForDetails: 'Показать расходы', expenseDetails: 'Детализация расходов', periodExpenses: 'Расходы за период', entries: 'записей', noExpenses: 'За этот период расходов нет', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате', close: 'Закрыть' },
-    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', employeeMeals: 'Employees meal', employeeMealsSub: 'Calculated from attendance', netIncome: 'Left', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', previousMonth: 'Previous month', previousWeek: 'Previous week', previousCurrentWeek: 'Previous & current week', currentWeek: 'Current week', currentNextWeek: 'Current & next week', nextWeek: 'Next week', nextMonth: 'Next month', presets: 'Presets', applyRange: 'Apply range', cancel: 'Cancel', selectDateRange: 'Select date range', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], from: 'From', to: 'To', closeout: 'Daily closeout', leftAfterExpenses: 'Left after expenses', totalLeft: 'Total left', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance', tapForDetails: 'View expenses', expenseDetails: 'Expense breakdown', periodExpenses: 'Expenses for the period', entries: 'entries', noExpenses: 'No expenses were recorded for this period', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus', close: 'Close' },
+    uz: { title: 'Hisobotlar', sub: 'Savdo ko\'rsatkichlari va tahlil', totalRev: 'Daromad', loyaltyIncome: 'Loyallik daromadi', numOrders: 'Buyurtmalar', avgOrder: 'O\'rtacha buyurtma', expenses: 'Xarajatlar', employeeMeals: 'Xodimlar ovqati', employeeMealsSub: 'Davomat bo‘yicha hisoblangan', netIncome: 'Barcha xarajatlardan keyin', allTables: 'Barcha stollar', allWaiters: 'Barcha ofitsiantlar', export: 'Eksport', today: 'Bugun', yesterday: 'Kecha', week: '7 kun', month: 'Oy', previousMonth: 'O‘tgan oy', previousWeek: 'O‘tgan hafta', previousCurrentWeek: 'O‘tgan va joriy hafta', currentWeek: 'Joriy hafta', currentNextWeek: 'Joriy va keyingi hafta', nextWeek: 'Keyingi hafta', nextMonth: 'Keyingi oy', presets: 'Tayyor davrlar', applyRange: 'Davrni qo‘llash', cancel: 'Bekor qilish', selectDateRange: 'Sana oralig‘ini tanlash', weekdays: ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Ya'], from: 'Dan', to: 'Gacha', closeout: 'Davr tushumlari', leftAfterExpenses: 'Xarajatlardan keyin qolgan', totalLeft: 'Xarajatlar va ovqatdan keyin', cash: 'Naqd', card: 'Karta', terminal: 'Terminal', cashbackIssued: 'Cashback berildi', cancelled: 'Bekor qilingan', variance: 'Farq', tapForDetails: 'Xarajatlarni ko‘rish', expenseDetails: 'Xarajatlar tafsiloti', periodExpenses: 'Davr xarajatlari', entries: 'ta yozuv', noExpenses: 'Bu davrda xarajatlar yo‘q', salaryPayment: 'Maosh to‘lovi', salaryBonus: 'Maosh bonusi', close: 'Yopish' },
+    ru: { title: 'Отчёты',     sub: 'Обзор продаж и аналитика',         totalRev: 'Доход', loyaltyIncome: 'Доход по лояльности', numOrders: 'Заказов',     avgOrder: 'Средний чек',      expenses: 'Расходы', employeeMeals: 'Питание сотрудников', employeeMealsSub: 'Рассчитано по посещаемости', netIncome: 'После всех расходов',   allTables: 'Все столы',         allWaiters: 'Все официанты',       export: 'Экспорт', today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', previousMonth: 'Прошлый месяц', previousWeek: 'Прошлая неделя', previousCurrentWeek: 'Прошлая и текущая неделя', currentWeek: 'Текущая неделя', currentNextWeek: 'Текущая и следующая неделя', nextWeek: 'Следующая неделя', nextMonth: 'Следующий месяц', presets: 'Готовые периоды', applyRange: 'Применить период', cancel: 'Отмена', selectDateRange: 'Выбрать период', weekdays: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], from: 'С', to: 'По', closeout: 'Поступления за период', leftAfterExpenses: 'Остаток после расходов', totalLeft: 'После расходов и питания', cash: 'Наличные', card: 'Карта', terminal: 'Терминал', cashbackIssued: 'Кешбэк выдан', cancelled: 'Отменено', variance: 'Расхождение', tapForDetails: 'Показать расходы', expenseDetails: 'Детализация расходов', periodExpenses: 'Расходы за период', entries: 'записей', noExpenses: 'За этот период расходов нет', salaryPayment: 'Выплата зарплаты', salaryBonus: 'Бонус к зарплате', close: 'Закрыть' },
+    en: { title: 'Reports',    sub: 'Sales overview and analytics',      totalRev: 'Income', loyaltyIncome: 'Loyalty income', numOrders: 'Orders',      avgOrder: 'Avg Order Value',  expenses: 'Expenses', employeeMeals: 'Employees meal', employeeMealsSub: 'Calculated from attendance', netIncome: 'After all expenses', allTables: 'All Tables',        allWaiters: 'All Waiters',         export: 'Export',  today: 'Today', yesterday: 'Yesterday', week: '7 Days', month: 'Month', previousMonth: 'Previous month', previousWeek: 'Previous week', previousCurrentWeek: 'Previous & current week', currentWeek: 'Current week', currentNextWeek: 'Current & next week', nextWeek: 'Next week', nextMonth: 'Next month', presets: 'Presets', applyRange: 'Apply range', cancel: 'Cancel', selectDateRange: 'Select date range', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], from: 'From', to: 'To', closeout: 'Period receipts', leftAfterExpenses: 'Left after expenses', totalLeft: 'After expenses and meals', cash: 'Cash', card: 'Card', terminal: 'Terminal', cashbackIssued: 'Cashback issued', cancelled: 'Cancelled', variance: 'Variance', tapForDetails: 'View expenses', expenseDetails: 'Expense breakdown', periodExpenses: 'Expenses for the period', entries: 'entries', noExpenses: 'No expenses were recorded for this period', salaryPayment: 'Salary payment', salaryBonus: 'Salary bonus', close: 'Close' },
   }
   const l = L[lang] || L.en
 
@@ -2279,7 +2301,7 @@ export default function Reports() {
                 <SummaryRow label={l.loyaltyIncome} value={formatCurrency(closeout.loyaltyIncome)} />
                 <SummaryRow label={l.cashbackIssued} value={formatCurrency(closeout.cashbackIssued)} />
                 <SummaryRow label={l.cancelled} value={closeout.cancelledCount} />
-                <SummaryRow label={l.variance} value={formatCurrency(closeout.variance)} />
+                <SummaryRow label={l.variance} value={closeout.variance == null ? (lang === 'ru' ? 'Не измерено' : lang === 'uz' ? 'O‘lchanmagan' : 'Not measured') : formatCurrency(closeout.variance)} />
               </div>
             </div>
 
@@ -2317,6 +2339,7 @@ export default function Reports() {
                   <SummaryRow label={l.employeeMeals} value={formatCurrency(employeeMealTotal)} />
                   <SummaryRow label={l.expenses} value={formatCurrency(expenseSummary.total)} />
                   <SummaryRow label={l.totalLeft} value={formatCurrency(cashflowLeft)} />
+                  <p className="text-xs text-[#6B7280] sm:col-span-2 lg:col-span-4">{lang === 'ru' ? 'Движение за выбранный период, без начального остатка. Питание сотрудников уже включено в расходы как расчётная стоимость, без списания с наличных, карты или терминала.' : lang === 'uz' ? 'Tanlangan davr harakati, boshlang‘ich qoldiqsiz. Xodimlar ovqati hisoblangan xarajatga kiritilgan, naqd, karta yoki terminaldan yechilmagan.' : 'Movement for this period, excluding opening balances. Employee meals are already included in expenses as a calculated cost, with no cash, card or terminal deduction.'}</p>
                 </div>
               </div>
             )}
@@ -2342,7 +2365,11 @@ export default function Reports() {
               <BestSellingTab orders={filteredForAnalytics} menuItemMap={menuItemMap} categories={state.categories} lang={lang} />
             )}
             {activeTab === 'dish_sales'         && (
-              <DishSalesTab orders={filteredForAnalytics} menuItems={state.menuItems} categories={state.categories} lang={lang} />
+              ordersError ? (
+                <CompactEmpty label={lang === 'ru' ? 'История продаж не загружена. Обновите страницу, чтобы повторить.' : lang === 'uz' ? 'Sotuv tarixi yuklanmadi. Qayta urinish uchun sahifani yangilang.' : 'Sales history could not load. Refresh the page to retry.'} />
+              ) : loadedHistoryRange !== `${dateFrom}:${dateTo}` ? (
+                <CompactEmpty label={lang === 'ru' ? 'Загрузка продаж за выбранный период…' : lang === 'uz' ? 'Tanlangan davr sotuvlari yuklanmoqda…' : 'Loading sales for the selected period…'} />
+              ) : <DishSalesTab orders={filteredForAnalytics} menuItems={state.menuItems} categories={state.categories} lang={lang} />
             )}
             {activeTab === 'by_category'        && (
               <ByCategoryTab  orders={filteredForAnalytics} categories={state.categories} menuItemMap={menuItemMap} lang={lang} />

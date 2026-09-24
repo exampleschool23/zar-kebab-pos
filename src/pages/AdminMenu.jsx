@@ -30,7 +30,7 @@ import {
   isPublicHiddenMenuItem,
 } from '../lib/menuItems'
 import {
-  Plus, Edit2, Trash2, X, UtensilsCrossed,
+  Plus, Edit2, Trash2, Archive, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
   ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock, Users, Clock3, ClipboardList,
 } from 'lucide-react'
@@ -977,10 +977,11 @@ function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, ca
                 onPointerDown={event => event.stopPropagation()}
                 onClick={() => onDelete(item)}
                 disabled={visibilityPending}
-                aria-label={lang === 'uz' ? 'Mahsulotni o‘chirish' : lang === 'ru' ? 'Удалить товар' : 'Delete item'}
-                className="touch-manipulation flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-300 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={lang === 'uz' ? 'Mahsulotni arxivlash' : lang === 'ru' ? 'Архивировать товар' : 'Archive item'}
+                className="touch-manipulation flex h-11 items-center justify-center gap-1.5 px-3 rounded-xl border border-amber-200 text-amber-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Trash2 size={12} />
+                <Archive size={14} />
+                {lang === 'uz' ? 'Arxiv' : lang === 'ru' ? 'В архив' : 'Archive'}
               </button>
             )}
           </div>
@@ -1079,10 +1080,11 @@ function SortableItemRow({ item, lang, onEdit, onDelete, onToggleVisibility, cat
               onPointerDown={event => event.stopPropagation()}
               onClick={() => onDelete(item)}
               disabled={visibilityPending}
-              aria-label={lang === 'uz' ? 'Mahsulotni o‘chirish' : lang === 'ru' ? 'Удалить товар' : 'Delete item'}
-              className="touch-manipulation flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 text-gray-300 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={lang === 'uz' ? 'Mahsulotni arxivlash' : lang === 'ru' ? 'Архивировать товар' : 'Archive item'}
+              className="touch-manipulation flex h-11 items-center justify-center gap-1.5 px-3 rounded-xl border border-amber-200 text-amber-700 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Trash2 size={14} />
+              <Archive size={14} />
+              {lang === 'uz' ? 'Arxiv' : lang === 'ru' ? 'В архив' : 'Archive'}
             </button>
           )}
         </div>
@@ -3491,10 +3493,10 @@ export default function AdminMenu() {
             className="relative max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-[24px] border border-white/70 bg-white p-5 shadow-2xl"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
-              <Trash2 size={22} />
+              <Archive size={22} />
             </div>
             <h2 id="delete-menu-item-title" className="mt-4 text-xl font-black text-[#1F2937]">
-              {lang === 'uz' ? 'Mahsulotni o‘chirasizmi?' : lang === 'ru' ? 'Удалить товар?' : 'Delete item?'}
+              {lang === 'uz' ? 'Mahsulotni arxivlaysizmi?' : lang === 'ru' ? 'Архивировать товар?' : 'Archive item?'}
             </h2>
             <p className="mt-2 break-words text-sm font-semibold leading-6 text-[#6B7280]">
               {getItemName(deleteItemCandidate, lang)}
@@ -3529,10 +3531,10 @@ export default function AdminMenu() {
               >
                 {savingItemId === deleteItemCandidate.id
                   ? <Loader2 size={16} className="animate-spin" />
-                  : <Trash2 size={16} />}
+                  : <Archive size={16} />}
                 {savingItemId === deleteItemCandidate.id
-                  ? (lang === 'uz' ? 'O‘chirilmoqda…' : lang === 'ru' ? 'Удаление…' : 'Deleting…')
-                  : (lang === 'uz' ? 'O‘chirish' : lang === 'ru' ? 'Удалить' : 'Delete')}
+                  ? (lang === 'uz' ? 'Arxivlanmoqda…' : lang === 'ru' ? 'Архивирование…' : 'Archiving…')
+                  : (lang === 'uz' ? 'Arxivlash' : lang === 'ru' ? 'В архив' : 'Archive')}
               </button>
             </div>
           </div>

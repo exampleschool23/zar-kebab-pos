@@ -1,5 +1,8 @@
+import { isActiveMenuItem } from './menuItems.js'
 import {
   getOrderDate,
+  getOrderRevenueTotal,
+  isPaidOrder,
   getOrderItemCategoryId,
   getOrderItemProductId,
   getOrderItems,
@@ -66,7 +69,7 @@ function createDishRowFromMenuItem(item, key) {
     category_id: item?.category_id || null,
     image_url: item?.image_url || '',
     available: item?.available !== false,
-    currentMenuItem: true,
+    currentMenuItem: isActiveMenuItem(item),
     quantity: 0,
     revenue: 0,
     orders: 0,
@@ -235,4 +238,24 @@ export function getDishSalesAnalysis({ orders = [], menuItems = [], selectedDish
     hourly,
     sales: filteredSales.sort((a, b) => compareInstant(b.orderDate, a.orderDate)),
   }
+}
+
+// Reconcile frozen order fields without estimating old service or changing history.
+export function getDishRevenueReconciliation(orders = []) {
+  const paid = orders.filter(isPaidOrder)
+  const items = getDishSalesAnalysis({ orders: paid }).totals.revenue
+  let service = 0
+  let loyalty = 0
+  let collected = 0
+  let missingSnapshots = 0
+  for (const order of paid) {
+    const savedService = order.service_fee
+    const savedLoyalty = order.loyalty_used_amount ?? order.loyalty_redeem_amount ?? order.loyalty_discount_amount
+    if (savedService == null || savedLoyalty == null) missingSnapshots += 1
+    service += Number(savedService) || 0
+    loyalty += Number(savedLoyalty) || 0
+    collected += getOrderRevenueTotal(order)
+  }
+  return { items, service, loyalty, collected, missingSnapshots,
+    difference: collected - (items + service - loyalty) }
 }

@@ -119,3 +119,30 @@ test('dish sales analysis keeps deleted menu item sales by item name', () => {
   assert.equal(legacy.quantity, 4)
   assert.equal(legacy.revenue, 72000)
 })
+
+
+test('archived products retain sales and names but are excluded from current low sellers', () => {
+  const archived = { ...menuItems[0], deleted_at: '2026-09-24T00:00:00Z' }
+  const analysis = getDishSalesAnalysis({
+    menuItems: [archived, menuItems[1]],
+    orders: [order({ id: 'history', paidAt: '2026-09-01T10:00:00Z', items: [item({ quantity: 2 })] })],
+  })
+  const dish = analysis.dishes.find(row => row.menuItemId === 'kebab')
+  assert.equal(dish.currentMenuItem, false)
+  assert.equal(dish.name, 'Kebab')
+  assert.equal(dish.quantity, 2)
+  assert.equal(dish.revenue, 50000)
+  assert.deepEqual(analysis.dishes.filter(row => row.currentMenuItem).map(row => row.menuItemId), ['lagman'])
+})
+
+test('reconciliation uses saved service and loyalty and exposes unexplained differences', async () => {
+  const { getDishRevenueReconciliation } = await import('../src/lib/dishSales.js')
+  const paid = { ...order({ id: 'paid', items: [item({ price: 100000 })] }), total: 110000, service_fee: 20000, loyalty_used_amount: 10000 }
+  assert.deepEqual(getDishRevenueReconciliation([paid]), { items: 100000, service: 20000, loyalty: 10000, collected: 110000, missingSnapshots: 0, difference: 0 })
+  assert.equal(getDishRevenueReconciliation([{ ...paid, total: 111000 }]).difference, 1000)
+  const incomplete = getDishRevenueReconciliation([{ ...paid, service_fee: null }])
+  assert.equal(incomplete.missingSnapshots, 1)
+  assert.equal(incomplete.service, 0)
+  assert.equal(incomplete.difference, 20000)
+  assert.equal(getDishRevenueReconciliation([{ ...paid, status: 'cancelled' }]).collected, 0)
+})

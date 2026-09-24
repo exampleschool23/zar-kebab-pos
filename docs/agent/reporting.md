@@ -1,7 +1,5 @@
 # Reporting
 
-Reporting guide.
-
 ## Entry points
 
 - UI: `src/pages/AdminDashboard.jsx`, `src/pages/Reports.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`
@@ -13,16 +11,16 @@ Reporting guide.
 
 - Initial POS hydration contains active orders plus today's paid operational subset only. It is never a source for historical reports or Accounting ranges.
 - Dashboard, Reports, Accounting, Monthly Estimate, and receipts use explicit bounded loaders.
-- Older report receipts load their order/session directly by id.
-- Monthly estimates query only the earliest order date needed for the business-activity boundary.
-- Never load full paid-order history to populate overview summary cards when an aggregate RPC exists.
+- Old receipts load by order/session id.
+- Monthly estimates query only the earliest needed order date.
+- Use aggregate RPCs for overview cards.
 
 ## Historical financial invariants
 
 - Saved selling price, real-cost snapshot, service-rate snapshot, category snapshot, and paid state are immutable reporting inputs. Payment rows are saved inputs; the authorized migration `201` split correction preserves their combined total and audits before/after allocations. Reports use its confirmed rows, including merged sessions.
-- Profit is paid revenue minus non-cancelled sold-item cost through `src/lib/profit.js`.
-- Never fall back to a product's current cost for an old order item with missing cost coverage; show unavailable until the one-time migration is applied.
-- Product/category archival retains historical lookup context.
+- Profit: paid revenue minus non-cancelled costs (`src/lib/profit.js`).
+- Missing historical cost: show unavailable until backfilled; never use current cost.
+- Archival retains historical lookup context.
 - Reports display the saved Regular/Tourist `orders.price_mode` in desktop, mobile, and details.
 
 ## Category and daily snapshots
@@ -38,15 +36,15 @@ Reporting guide.
 
 - Recent Orders and receipt/delete controls live in Reports. `202` allows deletion only for today's Tashkent payment date (creation fallback), even for owners; older delete controls are hidden. Coverage: `tests/orderDeletion.test.js`.
 - Sales by Category shows every category represented by sold items in the selected period.
-- Product Contribution ranks ten products by revenue and shows quantity, revenue share, immutable-cost profit, and margin. Missing cost snapshots show unavailable profit. It reuses selected-period orders.
-- Never fabricate unsold products or empty categories. Monthly Busy Hours uses migrations `192`–`193` to return 12 two-hour buckets for the current Tashkent month. It attributes paid demand to `created_at`, scans one indexed month, returns no order details, and highlights tied peaks.
-- Average Daily Income by Month always shows the latest 12 calendar-month positions, suppresses numeric zero labels, and overlays the `business_settings.average_daily_break_even_income_uzs` target as a red dotted horizontal line. Completed actual months come only from immutable `dashboard_monthly_income_snapshots`; the current month aggregates only completed Tashkent days live from orders.
-- Migration `157` performs the one-time completed-history backfill. Its duplicate-safe daily cron finalizes the previous Tashkent month, so normal Dashboard reads never rescan completed order history for this chart.
+- Product Contribution ranks ten products by revenue: quantity, share, snapshot profit, margin. Missing cost snapshots show unavailable profit. It reuses selected-period orders.
+- Do not invent products/categories. Monthly Busy Hours uses migrations `192`–`193` to return 12 two-hour buckets for the current Tashkent month. It attributes paid demand to `created_at`, scans one indexed month, returns no order details, and highlights tied peaks.
+- Monthly Income shows 12 months, hides zero labels, and plots `business_settings.average_daily_break_even_income_uzs` as a red dotted line. Past months use immutable `dashboard_monthly_income_snapshots`; this month uses completed Tashkent days.
+- `157` backfills completed history; duplicate-safe daily cron finalizes last month. Dashboard never rescans completed months.
 - Monthly averages use total paid cafe income divided by all calendar days. The current month excludes today and divides by completed days through yesterday; day one safely returns zero.
 
 ## Accounting/report separation
 
-- Keep overview aggregates lightweight; order details belong in reports and receipts.
+- Keep overview aggregates small; details belong in reports/receipts.
 - Selected-month forecast uses that month's actual/expected operating costs only, not prior-period arrears.
 - Fines are payroll deductions, never cash expenses. Employee meal snapshots are calculated operating costs without payment methods.
 
@@ -57,3 +55,7 @@ Reporting guide.
 - Migrations `187`–`188` add categories and restrict movement to explicitly added (`is_catalog_managed`) ingredients, including archived ones with history. Category/search filters and name/quantity/movement/purchase-amount sorting operate locally without refetching.
 
 - Ten-day income (`190`–`191`) shows the latest 20 periods (1–10, 11–20, 21–end) through a selected month. It scans at most eight indexed months, excludes today/future periods, caches results, hides empty months, starts choices at the earliest order month, and uses stable month colors. Zero periods in active months remain. Tests: `tests/weeklyIncome.test.js`.
+
+- Dish sales requires loaded selected-range history; loading/errors cannot show zero sales. Low sellers ranks 15 active products, including unsold ones. Archives keep history but leave this ranking.
+
+- Dish reconciliation uses saved service/loyalty and item prices; expose missing snapshots and residual differences. Period remainder includes calculated meals, excludes opening balances. Closeout variance is unknown without counted balances; CSV says Not measured. Tests: `tests/closeout.test.js`.

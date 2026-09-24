@@ -70,7 +70,8 @@ export function getDailyCloseout(
       matchesCloseoutRange(order.updated_at || order.created_at) &&
       matchesSelectedScope(order)
     )).length,
-    variance: 0,
+    // No counted cash/bank balance is captured, so an actual variance is unknown.
+    variance: null,
     notes: '',
   }
 }
@@ -91,7 +92,7 @@ export function closeoutToCsv(closeout) {
     ['Loyalty income', closeout.loyaltyIncome ?? closeout.loyaltyUsed],
     ['Cashback issued', closeout.cashbackIssued],
     ['Cancelled orders', closeout.cancelledCount],
-    ['Variance', closeout.variance],
+    ['Variance (counted balance required)', closeout.variance ?? 'Not measured'],
     ['Notes', closeout.notes],
   ]
   return rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n')

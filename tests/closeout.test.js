@@ -142,3 +142,9 @@ test('closeout applies selected table and waiter filters to payments and cancell
   assert.equal(closeout.totals.terminal, 0)
   assert.equal(closeout.cancelledCount, 2)
 })
+
+test('closeout does not claim a measured zero variance without counted balances', () => {
+  const result = getDailyCloseout([], '2026-09-24')
+  assert.equal(result.variance, null)
+  assert.match(closeoutToCsv(result), /Not measured/)
+})
