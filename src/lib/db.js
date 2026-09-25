@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { loadActiveOrderWaiterNames } from './activeOrderWaiters.js'
 import { withWriteTimeout } from './writeTimeout.js'
 import {
   getOrderPaymentFields,
@@ -581,7 +582,7 @@ async function loadCurrentOrderState() {
     loadActiveOrders(),
     loadPaidOrdersForRange(today, today),
   ])
-  return mergeOperationalOrders(activeOrders, paidTodayOrders)
+  return mergeOperationalOrders(await loadActiveOrderWaiterNames(activeOrders, supabase), paidTodayOrders)
 }
 
 export async function loadOrders() {
@@ -794,6 +795,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
   const channel = dbClient
     .channel(`pos-realtime-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleReloadOrders)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'order_payments' }, scheduleReloadOrders)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, scheduleReloadMenu)

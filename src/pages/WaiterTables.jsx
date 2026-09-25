@@ -1,3 +1,4 @@
+import { getActiveWaiterNames } from '../lib/activeOrderWaiters'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../store/AppContext'
@@ -281,6 +282,7 @@ function getPreparationCounts(tableId, orders) {
   )
   const orderTimes = active.map(o => o.created_at).filter(Boolean)
   return {
+    waiterNames: getActiveWaiterNames(active),
     newCount: items.filter(i => (i.status || 'new') === 'new').length,
     preparingCount: items.filter(i => i.status === 'preparing').length,
     readyCount: items.filter(i => i.status === 'ready').length,
@@ -378,18 +380,28 @@ function TableCard({ table, zones, status, counts, lang, canEdit, onClick, onAct
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${zone.dot}`} aria-hidden="true" />
             <span className="truncate">{zoneName}</span>
           </span>
-          {elapsed && status !== 'available' && (
-            <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-gray-400">
-              <Clock size={11} />
-              {elapsed}
-            </p>
-          )}
         </div>
         <span className={`flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${cfg.badge}`}>
           <StatusIcon size={10} />
           {statusLabel(lang, status)}
         </span>
       </div>
+
+      {(counts?.waiterNames?.length > 0 || (elapsed && status !== 'available')) && (
+        <div className="mb-2 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          {counts?.waiterNames?.length > 0 && (
+            <p className="min-w-0 break-words text-xs font-semibold text-gray-600">
+              {lang === 'ru' ? 'Официант' : lang === 'uz' ? 'Ofitsiant' : 'Waiter'}: {counts.waiterNames.join(', ')}
+            </p>
+          )}
+          {elapsed && status !== 'available' && (
+            <p className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-gray-400">
+              <Clock size={11} className="shrink-0" />
+              {elapsed}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* State-specific content */}
       {status === 'available' && (

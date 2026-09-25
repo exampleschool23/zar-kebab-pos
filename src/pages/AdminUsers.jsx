@@ -161,7 +161,7 @@ const L = {
 
 export default function AdminUsers() {
   const { profile: myProfile } = useAuth()
-  const { state } = useApp()
+  const { state, refreshPOSData } = useApp()
   const lang   = state.lang
   const l      = L[lang] || L.en
   const myRole = (myProfile?.role || 'guest').toLowerCase()
@@ -277,6 +277,7 @@ export default function AdminUsers() {
     setSaving(null)
     cancelNameEdit()
     setNotice({ tone: 'success', message: l.nameSaved })
+    refreshPOSData().catch(error => console.warn('[team] waiter name refresh failed:', error))
   }
 
   async function handleDelete(user) {

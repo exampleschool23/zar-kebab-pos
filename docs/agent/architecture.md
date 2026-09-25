@@ -58,3 +58,5 @@ Critical invariants:
 - Migration `204` removes the live-profile foreign key from `accounting_record_audit.changed_by`: actor UUIDs and names remain immutable historical snapshots after account deletion. The audit mutation guard remains strict. Team deletion errors also appear on the affected row. Tests: `tests/accountDeletionAudit.test.js`.
 
 - `210`: salary-covered checkout uses Delete completed orders write access. The permission-checked balance endpoint returns IDs/names and signed salary balances only; full payroll ledgers stay server-side. The salary dialog preserves its bill while realtime closes the order and stores the pending request identity across retries/reloads.
+
+- Active-order waiter labels resolve only profile IDs and full names via `src/lib/activeOrderWaiters.js`. Migration `211_profile_name_realtime.sql` enables profile rename events to refresh operational orders across devices; Team name saves also refresh local POS state. Paid orders retain saved names.

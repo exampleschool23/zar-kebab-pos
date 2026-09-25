@@ -20,6 +20,12 @@
   ],
   "tasks": [
     {
+      "name": "active order waiter names and table ownership labels",
+      "aliases": ["renamed waiter still shows old name", "waiter name on table card"],
+      "path": "src/lib/activeOrderWaiters.js",
+      "symbol": "loadActiveOrderWaiterNames"
+    },
+    {
       "name": "account deletion with immutable audit history",
       "aliases": ["delete user database error", "Team confirm deletion fails"],
       "path": "supabase/204_preserve_audit_actor_on_account_deletion.sql",

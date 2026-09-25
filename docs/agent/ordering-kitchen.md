@@ -56,6 +56,8 @@ Read this guide for waiter tables, table entry, carts, price modes, reservations
 
 ## Tables
 
+- Occupied cards show distinct active-order waiter names, resolved by `opened_by` with saved-name fallback. Paid history stays unchanged. Tests: `tests/activeOrderWaiters.test.js`.
+
 - Disabled tables remain available to reports/history but are hidden from waiter ordering.
 - Table edit/delete controls belong to `/admin/tables`, not the waiter grid.
 - Never hard-delete a table with active orders or historical references; verify history on demand before archival/deletion decisions.

@@ -12,7 +12,7 @@
 
 ## Workflow
 
-- Use full filenames; legacy duplicates `073`, `108`, `157` stay distinct. No duplicates.
+- Use full filenames; keep legacy `073`, `108`, `157` duplicates distinct.
 - `199`: checksum receipts; service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; Setup: README. No bulk legacy replay. Atomic receipts: matching checksums skip, changed checksums fail. Reconcile lost responses.
 - Schema/RPC errors: `npm run db:health`.
 - Migrations:
@@ -45,9 +45,9 @@
 - Report reads retry network/502/503/504 errors: 3 attempts, 15s each, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write retries. Tests: `tests/reportReadFetch.test.js`.
 
 - Use atomic RPCs for multi-table writes such as kitchen submission, menu item + protected cost, Tech Cards, Daily Bazaar, and payment corrections.
-- Pair frontend access checks with RLS/RPC enforcement.
-- Preserve immutable historical order, cost, category, payroll-calculation, notification, and audit snapshots.
-- Retries of externally uncertain writes reuse request/round ids and reconcile durable receipts before issuing another mutation.
+- Pair UI access checks with RLS/RPC enforcement.
+- Preserve order, cost, category, payroll, notification, and audit snapshots.
+- Uncertain writes reuse request/round IDs; reconcile receipts before retrying.
 - Archive referenced catalog records instead of physically deleting them.
 
 ## Checks
@@ -106,3 +106,5 @@ npm run build
 - `207`–`209`: rate date guard, audits, owner-only DELETE. Apply before UI. Tests: `tests/salaryRateDateWindow.test.js`, `tests/salaryRateHistory.test.js`.
 
 - `210`: see [salary orders](salary-orders.md).
+
+- `211`: profile name realtime; history unchanged. Tests: `tests/activeOrderWaiters.test.js`.
