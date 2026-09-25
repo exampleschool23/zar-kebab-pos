@@ -1714,9 +1714,9 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
         <EmptyState label={lang === 'uz' ? 'Buyurtmalar topilmadi' : lang === 'ru' ? 'Заказы не найдены' : 'No orders found'} lang={lang} />
       ) : (
         <div className="w-full overflow-x-auto rounded-2xl border border-[#E5E7EB] shadow-sm">
-        <div className="bg-white rounded-2xl overflow-hidden min-w-[1320px]">
+        <div className="bg-white rounded-2xl overflow-hidden lg:min-w-[1340px]">
           {/* Desktop header */}
-          <div className="hidden lg:grid grid-cols-[80px_90px_90px_120px_120px_145px_90px_140px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
+          <div className="hidden lg:grid grid-cols-[80px_90px_90px_120px_120px_minmax(145px,1fr)_90px_140px_60px_60px_110px_100px] gap-2 px-4 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
             <span>{lang === 'uz' ? 'Buyurtma' : lang === 'ru' ? 'Заказ' : 'Order ID'}</span>
             <span>{lang === 'uz' ? 'Stol' : lang === 'ru' ? 'Стол' : 'Table'}</span>
             <span>{lang === 'uz' ? 'Mijoz' : lang === 'ru' ? 'Клиент' : 'Customer'}</span>
@@ -1728,7 +1728,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
             <span className="text-center">{lang === 'uz' ? 'Sodiqlik' : lang === 'ru' ? 'Лояльность' : 'Loyalty'}</span>
             <span className="text-center">{lang === 'uz' ? 'Xizmat' : lang === 'ru' ? 'Серв.' : 'Serv%'}</span>
             <span className="text-right">{lang === 'uz' ? 'Jami' : lang === 'ru' ? 'Итого' : 'Total'}</span>
-            <span className="text-center">{lang === 'uz' ? 'Amal' : lang === 'ru' ? 'Действие' : 'Action'}</span>
+            <span className="text-right">{lang === 'uz' ? 'Amal' : lang === 'ru' ? 'Действие' : 'Action'}</span>
           </div>
 
           <div className="divide-y divide-[#F9FAFB]">
@@ -1750,7 +1750,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                   className={`px-4 py-3 transition-colors cursor-pointer ${isSelected ? 'bg-orange-50/60' : 'hover:bg-gray-50/60'}`}
                 >
                   {/* Desktop row */}
-                  <div className="hidden lg:grid grid-cols-[80px_90px_90px_120px_120px_145px_90px_140px_60px_60px_110px_100px] gap-2 items-center">
+                  <div className="hidden lg:grid grid-cols-[80px_90px_90px_120px_120px_minmax(145px,1fr)_90px_140px_60px_60px_110px_100px] gap-2 items-center">
                     <span className="font-black text-[#ff5a00] text-sm flex items-center gap-1">
                       {orderNum}
                       {sessionCnt > 1 && (
@@ -1767,7 +1767,7 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
                     <span className="text-center text-sm text-[#6B7280]">{loyaltyUsed > 0 ? formatCurrency(loyaltyUsed) : '—'}</span>
                     <span className="text-center text-sm text-[#6B7280]">{servicePct}%</span>
                     <span className="text-right font-black text-sm text-[#ff5a00]">{formatCurrency(getOrderTotal(order))}</span>
-                    <div className="flex justify-center">
+                    <div className="flex justify-end">
                       <button
                         onClick={e => { e.stopPropagation(); onSelect(isSelected ? null : order) }}
                         className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-colors ${
@@ -2196,7 +2196,7 @@ export default function Reports() {
 
         {/* ── Main content ── */}
         <div className={`flex-1 min-w-0 overflow-y-auto transition-all ${showDrawer ? 'lg:mr-[380px]' : ''}`}>
-          <div className="max-w-[1200px] mx-auto px-5 py-6">
+          <div className="w-full max-w-[1400px] mx-auto px-5 py-6">
 
             {/* Heading + filters */}
             <div className="mb-6">
@@ -2344,8 +2344,8 @@ export default function Reports() {
               </div>
             )}
 
-            {/* Tab bar — scrolls horizontally when tabs don't fit */}
-            <div className="flex gap-0 border-b border-[#E5E7EB] mb-5 overflow-x-auto scrollbar-none">
+            {/* Desktop tabs wrap; smaller screens can scroll horizontally. */}
+            <div className="flex lg:flex-wrap gap-0 border-b border-[#E5E7EB] mb-5 overflow-x-auto scrollbar-none">
               {TABS.map(({ key, label, Icon }) => (
                 <button key={key} onClick={() => setActiveTab(key)}
                   className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-3 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
