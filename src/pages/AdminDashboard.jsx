@@ -1179,9 +1179,9 @@ export default function AdminDashboard() {
             <p className="py-8 text-center text-sm text-[#9CA3AF]">{l.noData}</p>
           ) : (
             <div className="overflow-x-auto pb-1">
-              <div className="min-w-[720px]">
+              <div className="min-w-[720px] pt-7">
                 <div
-                  className="relative flex h-48 items-end gap-3 border-b border-[#E5E7EB] px-2 pt-7"
+                  className="relative flex h-48 items-end gap-3 border-b border-[#E5E7EB] px-2"
                   role="list"
                   aria-label={l.monthlyAvgDailyIncome}
                 >
