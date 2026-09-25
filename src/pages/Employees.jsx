@@ -87,6 +87,7 @@ export default function Employees() {
       active: 'Faol',
       inactive: 'Nofaol',
       inactiveSection: 'Faolsizlantirilgan xodimlar',
+      inactiveSalaryDue: 'To‘lanadigan maosh',
       inactiveNewestFirst: 'Eng oxirgi faolsizlantirilgan xodim birinchi',
       joined: 'Ishga kirgan',
       ended: 'Tugagan',
@@ -147,6 +148,7 @@ export default function Employees() {
       active: 'Активен',
       inactive: 'Неактивен',
       inactiveSection: 'Деактивированные сотрудники',
+      inactiveSalaryDue: 'Зарплата к выплате',
       inactiveNewestFirst: 'Сначала недавно деактивированные',
       joined: 'Дата выхода',
       ended: 'Дата окончания',
@@ -207,6 +209,7 @@ export default function Employees() {
       active: 'Active',
       inactive: 'Inactive',
       inactiveSection: 'Deactivated employees',
+      inactiveSalaryDue: 'Salary due',
       inactiveNewestFirst: 'Most recently deactivated first',
       joined: 'Joined',
       ended: 'Ended',
@@ -366,6 +369,7 @@ export default function Employees() {
     activeEmployees.reduce((sum, item) => sum + getDailySalaryAmount(item, today), 0)
   ), [activeEmployees, today])
   const totalDue = useMemo(() => getTotalSalaryDue(employees, today), [employees, today])
+  const inactiveSalaryDue = useMemo(() => getTotalSalaryDue(inactiveEmployees, today), [inactiveEmployees, today])
 
   async function toggleEmployeeActive(employee) {
     if (!canManage || !employee?.id) return
@@ -565,8 +569,9 @@ export default function Employees() {
                           <span className="mt-0.5 block text-xs font-semibold text-[#9CA3AF]">{sortBy === 'default' ? l.inactiveNewestFirst : l[sortBy]}</span>
                         </span>
                       </span>
-                      <span className="flex flex-shrink-0 items-center gap-2">
-                        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-[#6B7280]">{inactiveEmployees.length}</span>
+                      <span className="flex min-w-0 items-center gap-2 sm:gap-4">
+                        <span className="text-right text-sm font-bold text-[#1F2937]">{l.inactiveSalaryDue}: <span className="whitespace-nowrap">{formatCurrency(inactiveSalaryDue)}</span></span>
+                        <span className="flex-shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-black text-[#6B7280]">{inactiveEmployees.length}</span>
                         {inactiveExpanded ? <ChevronUp size={18} className="text-[#6B7280]" /> : <ChevronDown size={18} className="text-[#6B7280]" />}
                       </span>
                     </button>
