@@ -66,6 +66,11 @@ The former 58 KB instruction file is preserved at `docs/agent/legacy-context.md`
 - Do not weaken a regression/source-guard test merely to make the suite pass; understand the protected behavior first.
 - Preserve unrelated user changes in a dirty worktree.
 
+## Git publishing
+
+- When the user requests a commit and push, the approved destination for this repository is `origin` (`git@github.com:exampleschool23/zar-kebab-pos.git`), including branch `main`. Do not ask for destination confirmation again while this remote remains unchanged.
+- This approval covers ordinary pushes of requested changes; it does not authorize force pushes, unrelated changes, or committing secrets.
+
 ## Validation
 
 For code changes, run the smallest relevant tests during development, then normally run:
