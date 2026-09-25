@@ -1,5 +1,6 @@
+import CalendarPicker from '../components/CalendarPicker'
 import { EMPLOYEE_JOB_FUNCTIONS, employeeJobFunctionLabel } from '../lib/employeeJobFunctions'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, CalendarCheck2, CalendarDays, CalendarX2, Check, ChevronDown, ChevronUp, History, Loader2, Pencil, Percent, Power, UserRound, Users, WalletCards, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../components/AppShell'
@@ -857,37 +858,6 @@ function EmployeeKpiRow({
   )
 }
 
-function DateInput({ value, lang, onChange, min, max }) {
-  const inputRef = useRef(null)
-
-  function openPicker(event) {
-    if (event.button && event.button !== 0) return
-    const input = inputRef.current
-    if (!input) return
-    input.focus()
-    if (typeof input.showPicker === 'function') {
-      try {
-        input.showPicker()
-      } catch {
-        // Some browsers only allow showPicker during specific user gestures.
-      }
-    }
-  }
-
-  return (
-    <div className="relative cursor-pointer" onPointerDown={openPicker}>
-      <span className="pointer-events-none absolute inset-y-0 left-3 right-10 flex items-center overflow-hidden whitespace-nowrap text-sm font-black text-[#1F2937]">
-        {formatLongDate(value, lang, value)}
-      </span>
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        min={min}
-        max={max}
-        onChange={event => onChange(event.target.value)}
-        className="w-full cursor-pointer rounded-lg border border-red-100 bg-white px-2 py-2 text-sm font-black text-transparent caret-transparent outline-none focus:border-red-300"
-      />
-    </div>
-  )
+function DateInput(props) {
+  return <CalendarPicker {...props} />
 }

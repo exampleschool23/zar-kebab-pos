@@ -1,3 +1,4 @@
+import CalendarPicker from '../components/CalendarPicker'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Banknote,
@@ -1123,7 +1124,7 @@ function BazaarEntryForm({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label={l.purchaseDate} icon={CalendarDays}>
-              <FormattedDateInput value={form.purchase_date} lang={lang} onChange={value => onUpdateForm('purchase_date', value)} min={form.id ? undefined : expenseEntryMinDate} className={`${INPUT} native-date-input cursor-pointer text-transparent caret-transparent`} />
+              <FormattedDateInput value={form.purchase_date} lang={lang} onChange={value => onUpdateForm('purchase_date', value)} min={form.id ? undefined : expenseEntryMinDate} className={`${INPUT}`} />
               {!form.id && <p className="mt-1 text-[11px] font-semibold text-[#9CA3AF]">{l.expenseDateLimit}</p>}
             </Field>
             <Field label={l.buyer} icon={UserRound} error={validationErrors.some(item => item.field === 'buyer_profile_id')}>
@@ -1618,38 +1619,6 @@ function Field({ label, icon: Icon, error = false, children }) {
   )
 }
 
-function FormattedDateInput({ value, lang, onChange, className = INPUT, min }) {
-  const inputRef = useRef(null)
-
-  function openPicker(event) {
-    if (event?.button && event.button !== 0) return
-    const input = inputRef.current
-    if (!input) return
-    input.focus()
-    if (typeof input.showPicker === 'function') {
-      try {
-        input.showPicker()
-      } catch {
-        // Focusing the native input remains a usable fallback.
-      }
-    }
-  }
-
-  const formatted = formatLongDate(value, lang, value)
-  return (
-    <div className="relative min-w-0 cursor-pointer" onPointerDown={openPicker}>
-      <span className="pointer-events-none absolute inset-y-0 left-3 right-10 z-10 flex items-center overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[#1F2937]">
-        {formatted}
-      </span>
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        min={min}
-        aria-label={formatted}
-        onChange={event => onChange(event.target.value)}
-        className={`native-date-input cursor-pointer text-transparent caret-transparent ${className}`}
-      />
-    </div>
-  )
+function FormattedDateInput(props) {
+  return <CalendarPicker className={INPUT} {...props} />
 }

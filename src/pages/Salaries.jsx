@@ -1,3 +1,4 @@
+import CalendarPicker from '../components/CalendarPicker'
 import TimePicker24 from '../components/TimePicker24'
 import { EMPLOYEE_JOB_FUNCTIONS, employeeJobFunctionLabel } from '../lib/employeeJobFunctions'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -2573,21 +2574,6 @@ function Field({ label, hint = '', hintClassName = '', children }) {
   )
 }
 
-function DateInput({ value, lang, onChange, min, max, disabled = false }) {
-  return (
-    <div className="relative">
-      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm font-semibold text-[#1F2937]">
-        {formatLongDate(value, lang, value)}
-      </span>
-      <input
-        type="date"
-        value={value}
-        min={min}
-        max={max}
-        onChange={event => onChange(event.target.value)}
-        className={`${FIELD} text-transparent caret-transparent`}
-        disabled={disabled}
-      />
-    </div>
-  )
+function DateInput(props) {
+  return <CalendarPicker className={FIELD} {...props} />
 }

@@ -1,3 +1,4 @@
+import CalendarPicker from './CalendarPicker'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { buildIncomeMonthOptions, incomeMonthColors, hideZeroIncomeMonths, loadDashboardWeeklyIncome } from '../lib/weeklyIncome'
 import { loadEarliestOrderDate } from '../lib/db'
@@ -77,10 +78,10 @@ export default function WeeklyIncomeChart({ lang, target = 0 }) {
           <p className="mt-1 text-xs text-gray-500">{l.sub}</p>
         </div>
         <label className="text-xs font-bold text-gray-600">{l.month}
-          <select disabled={firstMonth === null || startFailed} value={month} onChange={event => setMonth(event.target.value)}
-            className="ml-2 rounded-lg border border-gray-200 bg-white p-2">
-            {monthOptions.map(value => <option key={value} value={value}>{formatMonthYear(value, lang)}</option>)}
-          </select>
+          <CalendarPicker mode="month" lang={lang} label={l.month}
+            disabled={firstMonth === null || startFailed} value={month} onChange={setMonth}
+            min={monthOptions[monthOptions.length - 1]} max={monthOptions[0]}
+            className="ml-2 rounded-lg border border-gray-200 bg-white p-2" />
         </label>
       </div>
       {failed || startFailed ? <div role="alert" className="text-sm text-red-700">{l.error} <button type="button" onClick={() => setRetry(value => value + 1)} className="ml-3 rounded border px-3 py-1">{l.retry}</button></div>

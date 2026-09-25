@@ -1,3 +1,4 @@
+import CalendarPicker from '../components/CalendarPicker'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -66,7 +67,7 @@ import { notifyTelegramInvestorExpense } from '../lib/telegramNotifications'
 
 const SELECT_COLUMNS = 'id, entry_type, expense_date, category, payment_method, amount, vendor, description, created_by, created_by_name, created_at, updated_at'
 const FIELD_INPUT_CLASS = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-colors focus:border-[#ff5a00] focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500'
-const DATE_INPUT_CLASS = `${FIELD_INPUT_CLASS} text-transparent caret-transparent`
+const DATE_INPUT_CLASS = FIELD_INPUT_CLASS
 const ACCOUNTING_SECTION_GRID = 'grid items-start gap-5 lg:grid-cols-2'
 const HISTORY_SECTION_GRID = 'grid items-stretch gap-5 lg:grid-cols-2'
 
@@ -127,43 +128,8 @@ function expenseTone(expense) {
   }
 }
 
-function DateInput({ value, lang, onChange, className = DATE_INPUT_CLASS, disabled = false, min }) {
-  const inputRef = useRef(null)
-
-  function openPicker(event) {
-    if (disabled) return
-    if (event?.button && event.button !== 0) return
-    const input = inputRef.current
-    if (!input) return
-
-    input.focus()
-    if (typeof input.showPicker === 'function') {
-      try {
-        input.showPicker()
-        return
-      } catch {
-        // Fall back to focusing when showPicker is unavailable or blocked.
-      }
-    }
-  }
-
-  return (
-    <div className={`relative ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`} onPointerDown={openPicker}>
-      <span className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold text-[#1F2937]">
-        {formatLongDate(value, lang, value)}
-      </span>
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        min={min}
-        aria-label={formatLongDate(value, lang, value)}
-        onChange={event => onChange(event.target.value)}
-        className={`native-date-input cursor-pointer ${className}`}
-        disabled={disabled}
-      />
-    </div>
-  )
+function DateInput(props) {
+  return <CalendarPicker className={DATE_INPUT_CLASS} {...props} />
 }
 
 function isMissingExpensesMigration(error) {

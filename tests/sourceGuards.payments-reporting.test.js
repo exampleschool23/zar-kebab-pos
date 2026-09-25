@@ -137,20 +137,16 @@ test('QR is retired from payment, reporting, accounting, dashboard, and receipt 
   assert.doesNotMatch(closeout, /\['QR'/)
 })
 
-test('expenses use the shared Daily Bazaar range calendar while entry dates stay native', () => {
+test('expenses use shared custom calendars for ranges and entry dates', () => {
   const expenses = readSource('src/pages/Expenses.jsx')
   const rangePicker = readSource('src/components/DateRangePicker.jsx')
   const dateInput = functionBody(expenses, 'DateInput')
 
-  assert.match(dateInput, /const inputRef = useRef\(null\)/)
-  assert.match(dateInput, /onPointerDown=\{openPicker\}/)
-  assert.match(dateInput, /input\.showPicker\(\)/)
-  assert.match(dateInput, /formatLongDate\(value, lang, value\)/)
-  assert.match(dateInput, /type="date"/)
-  assert.match(dateInput, /native-date-input/)
-  assert.match(dateInput, /left-3 right-9/)
-  assert.match(dateInput, /overflow-hidden text-ellipsis whitespace-nowrap/)
-  assert.match(expenses, /const DATE_INPUT_CLASS = .*text-transparent caret-transparent/)
+  assert.match(dateInput, /<CalendarPicker className=\{DATE_INPUT_CLASS\} \{\.\.\.props\}/)
+  const picker = readSource('src/components/CalendarPicker.jsx')
+  assert.match(picker, /formatLongDate\(value, lang, value\)/)
+  assert.match(picker, /<MonthCalendar/)
+  assert.doesNotMatch(expenses, /showPicker|type="date"|text-transparent/)
   assert.match(expenses, /import DateRangePicker from '\.\.\/components\/DateRangePicker'/)
   assert.match(expenses, /<DateRangePicker[\s\S]*rangeKey=\{activeRangeKey\}[\s\S]*onPreset=\{selectQuickRange\}[\s\S]*onApply=\{setCustomRange\}/)
   assert.match(rangePicker, /role="dialog" aria-label=\{l\.selectDateRange\}/)

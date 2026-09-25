@@ -33,7 +33,7 @@
 
 ## Accounting
 
-- Do not show today-only POS orders while Accounting history loads.
+- Never show today-only POS orders as Accounting history.
 - Wait for expenses, paid-order summary/history, and salary data before ending loading.
 - KPIs use permission-checked aggregates, never full history. The all-time cash remainder excludes unpaid salary liability.
 - Detailed order rows belong to reports, receipts, and drilldowns.
@@ -60,9 +60,9 @@
 Migrations `097`, `160`–`163`, `182`.
 
 - Receipts contain product, category, quantity, unit, and exact amount.
-- Product-line controls share one height; each optional line note uses a separate multiline field.
-- Store buyer id and name snapshot. New entries use cash or card; historical terminal remains readable.
-- New purchase lines choose an active canonical ingredient from `bazaar_product_catalog`; arbitrary product names are not accepted.
+- Product-line controls share one height; notes use separate multiline fields.
+- Store buyer id and name snapshot. New entries use cash/card; preserve historical terminal.
+- New lines require active `bazaar_product_catalog` ingredients; no arbitrary names.
 - `/admin/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Migration `182` allows owner renames; saves keep catalog keys and historical snapshots.
 - Migration `186` delegates catalog writes to active owners/admins with the independent `ingredients` Team feature; viewers only read. Bazaar/Tech Card users retain catalog reads but do not inherit Ingredients access or writes.
 - Migration `161` starts the managed list empty without changing history.
@@ -71,7 +71,7 @@ Migrations `097`, `160`–`163`, `182`.
 - Editing a durable line reuses its saved normal-price snapshot even when the current ingredient catalog price has changed.
 - Catalog deletion is archival. Existing purchase lines keep their historical name, category, unit, and exact paid amount snapshots.
 - Ingredient writes reconcile before retry and update locally.
-- Keep ISO dates; display with shared date helpers.
+- Keep ISO dates.
 - Server calculates totals. Create retries reuse a request UUID.
 - Save/edit/delete atomically maintains exactly one linked `expenses` row with `products_bazaar`; do not ask for duplicate Accounting entry.
 - Normalize compatible units only (g→kg, ml→l); never combine counts with weights/volumes.
@@ -80,3 +80,5 @@ Migrations `097`, `160`–`163`, `182`.
 - `204`: audit actor FK removed; history unchanged.
 
 - `210`: see [salary orders](salary-orders.md).
+
+- Custom calendars: `src/components/CalendarPicker.jsx`; ISO values/bounds preserved. Tests: `tests/calendarPicker.test.js`.

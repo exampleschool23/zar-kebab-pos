@@ -15,7 +15,7 @@ function calendarIso(date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
 }
 
-function shiftCalendarMonth(monthKey, amount) {
+export function shiftCalendarMonth(monthKey, amount) {
   const parsed = calendarDate(`${String(monthKey || '').slice(0, 7)}-01`)
   if (!parsed) return String(monthKey || '').slice(0, 7)
   parsed.setUTCMonth(parsed.getUTCMonth() + amount)
@@ -198,7 +198,7 @@ export default function DateRangePicker({ l, lang, rangeKey, dateFrom, dateTo, t
   )
 }
 
-function MonthCalendar({
+export function MonthCalendar({
   l,
   lang,
   monthKey,
@@ -208,6 +208,8 @@ function MonthCalendar({
   onSelect,
   onPrevious,
   onNext,
+  min,
+  max,
   showPrevious = false,
   showNext = false,
   showMobileNext = false,
@@ -241,12 +243,12 @@ function MonthCalendar({
               key={day.date}
               type="button"
               role="gridcell"
-              disabled={!day.inMonth}
+              disabled={!day.inMonth || Boolean(min && day.date < min) || Boolean(max && day.date > max)}
               aria-label={formatLongDate(day.date, lang, day.date)}
               aria-current={isToday ? 'date' : undefined}
               aria-pressed={selectedEdge || inRange}
               onClick={() => onSelect(day.date)}
-              className={`flex h-9 items-center justify-center rounded-xl text-xs font-black transition-colors ${
+              className={`flex h-9 items-center justify-center rounded-xl text-xs font-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                 selectedEdge
                   ? 'bg-[#ff5a00] text-white shadow-sm shadow-orange-200'
                   : inRange

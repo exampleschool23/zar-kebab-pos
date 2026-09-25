@@ -106,12 +106,12 @@ test('Daily Bazaar entry uses active employees, cash/card entry methods, and dur
   assert.doesNotMatch(page, /receipt_reference|l\.reference|l\.receipt/)
 })
 
-test('Daily Bazaar dates display through shared formatters and the entry keeps a native date control', () => {
+test('Daily Bazaar dates display through shared formatters and the entry uses the shared custom calendar', () => {
   const page = readSource('src/pages/DailyBazaar.jsx')
   const rangePicker = readSource('src/components/DateRangePicker.jsx')
 
   assert.match(page, /function FormattedDateInput/)
-  assert.match(page, /formatLongDate\(value, lang, value\)/)
+  assert.match(readSource('src/components/CalendarPicker.jsx'), /formatLongDate\(value, lang, value\)/)
   assert.match(page, /<FormattedDateInput value=\{form\.purchase_date\}/)
   assert.match(page, /import DateRangePicker from '\.\.\/components\/DateRangePicker'/)
   assert.match(rangePicker, /formatLongDate\(dateFrom, lang, dateFrom\)/)

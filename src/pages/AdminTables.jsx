@@ -1,3 +1,4 @@
+import { DateTimePicker } from '../components/CalendarPicker'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -1176,19 +1177,19 @@ export default function AdminTables() {
                       />
                     </Field>
                     <Field label={l.reservationTime} error={errors.reserved_at}>
-                      <input
-                        type="datetime-local"
+                      <DateTimePicker
+                        lang={lang} label={l.reservationTime}
                         value={form.reserved_at}
-                        onChange={e => setForm(current => ({ ...current, reserved_at: e.target.value }))}
+                        onChange={value => setForm(current => ({ ...current, reserved_at: value }))}
                         className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
                       />
                     </Field>
                   </div>
                   <Field label={l.reservedUntil} error={errors.reserved_until}>
-                    <input
-                      type="datetime-local"
+                    <DateTimePicker
+                      lang={lang} label={l.reservedUntil}
                       value={form.reserved_until}
-                      onChange={e => setForm(current => ({ ...current, reserved_until: e.target.value }))}
+                      onChange={value => setForm(current => ({ ...current, reserved_until: value }))}
                       className="h-11 w-full rounded-xl border border-[#E5E7EB] px-3 text-sm outline-none transition-all focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/15"
                     />
                   </Field>

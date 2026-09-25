@@ -9,7 +9,7 @@
 
 ## Loader boundaries
 
-- Initial POS hydration contains active orders plus today's paid operational subset only. It is never a source for historical reports or Accounting ranges.
+- POS hydration covers active/today’s paid orders only, never historical reports or Accounting.
 - Dashboard, Reports, Accounting, Monthly Estimate, and receipts use explicit bounded loaders.
 - Old receipts load by order/session id.
 - Monthly estimates query only the earliest needed order date.
@@ -61,3 +61,5 @@
 - Dish reconciliation uses saved service/loyalty and item prices; expose missing snapshots and residual differences. Period remainder includes calculated meals, excludes opening balances. Closeout variance is unknown without counted balances; CSV says Not measured. Tests: `tests/closeout.test.js`.
 
 - `210`: see [salary orders](salary-orders.md).
+
+- Custom calendars: `src/components/CalendarPicker.jsx`; ISO values/bounds preserved. Tests: `tests/calendarPicker.test.js`.

@@ -12,16 +12,16 @@
 
 - `207`: salary rates allow dates ≥ Tashkent today − 3 days; older rates cannot be updated. Includes initial. Test: `tests/salaryRateDateWindow.test.js`.
 
-- Salary date: Tashkent today.
+- Dates: Tashkent.
 
 - `208`: rate insert/update/delete audit snapshots. History labels creator/deleter; insert audits precede live names. `209`: owner-only rate deletion; refresh balances/history, keep audits. Test: `tests/salaryRateHistory.test.js`.
 
 ## Ledger
 
-- Separate payments, bonuses, fines, absences, and rates.
-- `getSalaryBalance()` is the signed ledger: base salary plus accruing manual/KPI bonuses, minus payments and fines. An excess payment/fine becomes a negative carry-forward balance.
+- Separate payments, bonuses, fines, absences, rates.
+- `getSalaryBalance()` is the signed ledger: base salary plus accruing manual/KPI bonuses, minus payments and fines. Excess payments/fines carry forward negatively.
 - `getSalaryDue()` is the nonnegative liability for one employee. `getTotalSalaryDue()` sums per-employee liabilities so one advance never hides another employee's due.
-- Allow positive manual payments even with zero/negative balance.
+- Allow payments with zero/negative balances.
 - History sorts by effective date, then newest `created_at`.
 - Page payroll ledgers via `src/lib/salaryData.js`; include accrued bonuses and remove deleted bonuses from balance state. Coverage: `tests/salaryBalanceConsistency.test.js`.
 
@@ -29,7 +29,7 @@
 
 - A fine requires employee, date, positive amount, and non-empty reason. It reduces payroll liability but never becomes an Accounting cash expense.
 - Bonuses created after migration `169` accrue into salary liability and become cash expense only through a later salary payment. Legacy bonuses remain immutable immediately-paid expenses.
-- Salary writes require Accounting access and immutable audits.
+- Salary writes need Accounting access and audits.
 - Today's absence can be undone only for an active employee with an exact row for the current Tashkent date.
 - Undo absence requires confirmation and an exact delete guarded by absence id, salary profile id, and date. Zero affected rows is an error.
 - History deletion retracts tracked employee/Salary/Team Telegram messages first. Failed retraction keeps the source for retry. Deleted bonus/fine/absence/rate events remove delivery records to prevent retries.
@@ -52,12 +52,12 @@
 
 ## Notifications
 
-- Private/Salary rate messages include KPI percentage or disabled/unconfigured status effective on the change date.
+- Private/Salary rate messages show effective KPI percentage/status.
 - KPI rule additions and changes notify only the dedicated Salary group, with employee, previous/new KPI, effective date, and actor. Employee and Team destinations stay terminally skipped.
-- Private PNG calendars show MTD salary, KPI, bonuses, fines and absences before payments. Dated `getSalaryBalance()` shows remaining pay and all-time payments; negative = advance. Private/Salary-group KPI events are skipped; Team gets one daily image (`181`).
+- Private PNG calendars show pre-payment MTD salary, KPI, bonuses, fines and absences. Dated `getSalaryBalance()` shows remaining pay and all-time payments; negative = advance. Private/Salary-group KPI events are skipped; Team gets one daily image (`181`).
 - Cron repairs missing KPI delivery rows before Team delivery; `172` restores the queue trigger.
 - A failed KPI finalization defers the daily salary summary.
-- Delivery rules: `docs/agent/telegram.md`.
+- Delivery: `docs/agent/telegram.md`.
 
 ## Meals
 
@@ -69,3 +69,5 @@
 - Historical backfill is a one-time migration snapshot and is not recalculated after setting changes.
 
 - `210`: see [salary orders](salary-orders.md).
+
+- Custom calendars: `src/components/CalendarPicker.jsx`; ISO values/bounds preserved. Tests: `tests/calendarPicker.test.js`.
