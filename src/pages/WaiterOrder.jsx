@@ -1469,16 +1469,18 @@ export default function WaiterOrder() {
         <div className="flex-shrink-0 px-3 pt-2 pb-0 sm:px-4 sm:pt-4">
           <div className="relative rounded-2xl sm:rounded-[28px] border border-[#E5E7EB] bg-white p-2 sm:p-4 shadow-sm">
             {isGuestTabletMode ? (
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+              <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
                 <div className="flex min-w-0 items-center gap-3 xl:contents">
-                  <div className="min-w-0 flex-1 xl:max-w-[240px] xl:flex-none">
+                  <div className="min-w-0 flex-1 xl:flex-[1_0_max-content] xl:max-w-full">
                     <p className="hidden sm:block truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
-                    <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
+                    <h1 className="min-w-0 whitespace-normal break-words text-sm font-black leading-tight text-[#1F2937] sm:text-base">
+                    <span className="shrink-0">{orderTitle}</span>
                     {waiterName && (
-                      <p className="mt-1 truncate text-xs leading-snug text-[#6B7280]" title={`${waiterLabel}: ${waiterName}`}>
-                        {waiterLabel}: <span className="font-semibold text-[#374151]">{waiterName}</span>
-                      </p>
+                      <span className="ml-2 text-xs font-semibold text-[#374151]" title={`${waiterLabel}: ${waiterName}`} aria-label={`${waiterLabel}: ${waiterName}`}>
+                        <span aria-hidden="true">· </span><span className="font-normal text-[#6B7280]">{waiterLabel}: </span>{waiterName}
+                      </span>
                     )}
+                  </h1>
                   </div>
                   <div className="ml-auto xl:hidden">
                     <GuestModeUtilities
@@ -1490,7 +1492,7 @@ export default function WaiterOrder() {
                   </div>
                 </div>
                 <div className="flex min-w-0 items-center gap-3 xl:contents">
-                  {renderSearchControl('!order-none min-w-0 flex-1 xl:ml-auto')}
+                  {renderSearchControl('!order-none min-w-0 flex-1 xl:!basis-48 xl:!min-w-48 xl:ml-auto')}
                   {renderCartButton('ml-auto xl:ml-0')}
                   <div className="hidden xl:block">
                     <GuestModeUtilities
@@ -1503,7 +1505,7 @@ export default function WaiterOrder() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 sm:gap-3 sm:flex-nowrap">
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 sm:gap-3">
                 {shouldShowSidebar && (
                   <button
                     onClick={() => { if (!orderLocked) setSidebarOpen(true) }}
@@ -1521,16 +1523,18 @@ export default function WaiterOrder() {
                 >
                   <ArrowLeft size={17} />
                 </button>
-                <div className="min-w-0 max-w-[180px] flex-1 sm:max-w-[240px]">
+                <div className="min-w-0 max-w-full flex-[1_0_max-content]">
                   <p className="hidden sm:block truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
-                  <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
-                  {waiterName && (
-                    <p className="mt-1 truncate text-xs leading-snug text-[#6B7280]" title={`${waiterLabel}: ${waiterName}`}>
-                      {waiterLabel}: <span className="font-semibold text-[#374151]">{waiterName}</span>
-                    </p>
-                  )}
+                  <h1 className="min-w-0 whitespace-normal break-words text-sm font-black leading-tight text-[#1F2937] sm:text-base">
+                    <span className="shrink-0">{orderTitle}</span>
+                    {waiterName && (
+                      <span className="ml-2 text-xs font-semibold text-[#374151]" title={`${waiterLabel}: ${waiterName}`} aria-label={`${waiterLabel}: ${waiterName}`}>
+                        <span aria-hidden="true">· </span><span className="font-normal text-[#6B7280]">{waiterLabel}: </span>{waiterName}
+                      </span>
+                    )}
+                  </h1>
                 </div>
-                {renderSearchControl('!order-last !basis-full sm:!order-none sm:!basis-0')}
+                {renderSearchControl('!order-last !basis-full xl:!order-none xl:!basis-48 xl:!min-w-48')}
                 {renderCartButton('ml-auto')}
                 <button type="button"
                   aria-label={mobileMenuView === 'compact' ? (lang === 'ru' ? 'Крупные карточки' : lang === 'uz' ? 'Katta kartochkalar' : 'Large cards') : (lang === 'ru' ? 'Компактные карточки' : lang === 'uz' ? 'Ixcham kartochkalar' : 'Compact cards')}
