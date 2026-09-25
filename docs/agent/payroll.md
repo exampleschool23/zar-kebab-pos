@@ -16,7 +16,7 @@
 
 - `208`: rate insert/update/delete audit snapshots. History labels creator/deleter; insert audits precede live names. `209`: owner-only rate deletion; refresh balances/history, keep audits. Test: `tests/salaryRateHistory.test.js`.
 
-## Salary ledger
+## Ledger
 
 - Separate payments, bonuses, fines, absences, and rates.
 - `getSalaryBalance()` is the signed ledger: base salary plus accruing manual/KPI bonuses, minus payments and fines. An excess payment/fine becomes a negative carry-forward balance.
@@ -25,7 +25,7 @@
 - History sorts by effective date, then newest `created_at`.
 - Page payroll ledgers via `src/lib/salaryData.js`; include accrued bonuses and remove deleted bonuses from balance state. Coverage: `tests/salaryBalanceConsistency.test.js`.
 
-## Fines, bonuses, and absence
+## Adjustments
 
 - A fine requires employee, date, positive amount, and non-empty reason. It reduces payroll liability but never becomes an Accounting cash expense.
 - Bonuses created after migration `169` accrue into salary liability and become cash expense only through a later salary payment. Legacy bonuses remain immutable immediately-paid expenses.
@@ -36,7 +36,7 @@
 - Deactivation/reactivation work boundaries are inclusive; only intervening dates become absences. Archived `deleted_at` is exclusive after the last working date.
 - Employee creation/activation/deactivation queue immutable Russian Investor events in the database. Salaries and Employees request retry-safe delivery on success.
 
-## Daily KPI bonus
+## KPI
 
 - `195`/`196`: from `2026-09-16`, rules choose own opened orders or all restaurant dine-in sales. Base is paid subtotal + service by Tashkent payment date, ignoring loyalty. Own rules require `order_opener_profile_id` or payroll `profile_id`; restaurant rules need no account. Earlier catch-up uses all sales.
 - `203`: effective-dated `start_time` (default `00:00`) counts payments from that minute through midnight in Tashkent, for both bases. Finalizer/estimates share `employee_kpi_sales_base`. Results/bonuses and change events freeze time. Tests: `tests/timeBasedKpi.test.js`, `tests/employeeOpenedOrderKpi.test.js`.
@@ -50,7 +50,7 @@
 - Salary History separates monthly manual Bonuses from KPI bonuses. Salary + bonuses includes salary and both bonus types once each.
 - Effective dates cannot enter already finalized periods. Recovery scans missing older dates in bounded batches.
 
-## Daily notifications
+## Notifications
 
 - Private/Salary rate messages include KPI percentage or disabled/unconfigured status effective on the change date.
 - KPI rule additions and changes notify only the dedicated Salary group, with employee, previous/new KPI, effective date, and actor. Employee and Team destinations stay terminally skipped.
@@ -59,7 +59,7 @@
 - A failed KPI finalization defers the daily salary summary.
 - Delivery rules: `docs/agent/telegram.md`.
 
-## Employee meal expense
+## Meals
 
 - `average_daily_employee_meal_uzs` is per present employee per day, not one restaurant total.
 - `employee_daily_meal_expenses` freezes completed-day rate, present count, and total. Reporting uses the snapshot, never today's setting.
@@ -67,3 +67,5 @@
 - Cron repairs meal dates independently in bounded batches.
 - Meal rows reduce report remainder without a payment method or cash ledger mutation.
 - Historical backfill is a one-time migration snapshot and is not recalculated after setting changes.
+
+- `210`: see [salary orders](salary-orders.md).

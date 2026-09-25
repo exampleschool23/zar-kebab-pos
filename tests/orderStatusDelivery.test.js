@@ -4,19 +4,21 @@ import { sendTrackedOrderStatusMessage, retractDeletedOrderStatusMessages } from
 
 function database(rows = []) {
   return { rows, from() {
-    let predicates = [], patch, insert
+    let predicates = [], patch, insert, single = false, remove = false
     const q = {
-      select() { return q }, order() { return q }, limit() { return q },
+      select() { return q }, delete() { remove = true; return q }, maybeSingle() { single = true; return q }, order() { return q }, limit() { return q },
       eq(k, v) { predicates.push(r => r[k] === v); return q },
       is(k, v) { predicates.push(r => (r[k] ?? null) === v); return q },
       not(k) { predicates.push(r => r[k] != null); return q },
       overlaps(k, v) { predicates.push(r => r[k].some(id => v.includes(id))); return q },
       insert(v) { insert = v; return q }, update(v) { patch = v; return q },
       then(resolve, reject) { return Promise.resolve().then(() => {
+        if (insert && rows.some(row => row.id === insert.id)) return { error: { code: '23505' } }
         if (insert) rows.push({ delete_requested: false, ...insert })
         const selected = rows.filter(r => predicates.every(p => p(r)))
         if (patch) selected.forEach(r => Object.assign(r, patch))
-        return { data: structuredClone(selected) }
+        if (remove) selected.forEach(r => rows.splice(rows.indexOf(r), 1))
+        return { data: structuredClone(single ? selected[0] || null : selected) }
       }).then(resolve, reject) },
     }
     return q
@@ -79,4 +81,26 @@ test('unknown sends retain their reservation without inventing a message ID or r
   await retractDeletedOrderStatusMessages(db)
   assert.equal(attempts, 1)
   assert.equal(db.rows[0].message_id, undefined)
+}))
+
+test('salary status retry reuses confirmed messages and holds unknown sends', async () => telegram(async calls => {
+  const db = database()
+  await sendTrackedOrderStatusMessage(db, ['b', 'a'], '-100', 'salary order', { salarySettlement: true })
+  await sendTrackedOrderStatusMessage(db, ['a', 'b'], '-100', 'salary order', { salarySettlement: true })
+  assert.equal(calls.filter(call => call.method === 'sendMessage').length, 1)
+  global.fetch = async () => { throw new Error('connection lost') }
+  await assert.rejects(sendTrackedOrderStatusMessage(db, ['c'], '-100', 'salary order', { salarySettlement: true }), /connection lost/)
+  await assert.rejects(sendTrackedOrderStatusMessage(db, ['c'], '-100', 'salary order', { salarySettlement: true }), /pending or unknown/)
+  assert.equal(db.rows.length, 2)
+}))
+
+test('salary status retries a definite Telegram rejection without replaying successful sends', async () => telegram(async calls => {
+  const db = database()
+  const workingFetch = global.fetch
+  global.fetch = async () => ({ ok: false, json: async () => ({ ok: false, description: 'Not enough rights' }) })
+  await assert.rejects(sendTrackedOrderStatusMessage(db, ['a'], '-100', 'salary order', { salarySettlement: true }), /rights/)
+  assert.equal(db.rows.length, 0)
+  global.fetch = workingFetch
+  await sendTrackedOrderStatusMessage(db, ['a'], '-100', 'salary order', { salarySettlement: true })
+  assert.equal(calls.length, 1)
 }))

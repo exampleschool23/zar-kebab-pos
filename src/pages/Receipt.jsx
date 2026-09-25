@@ -11,6 +11,8 @@ import {
 import { getOrderItemUnitPrice, PRICE_MODE_TOURIST } from '../lib/priceModes'
 import { isCashierQuickItem } from '../lib/menuItems'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
+import { expensePaymentMethodLabel } from '../lib/expenses'
+import { getOrderPaymentBreakdown } from '../lib/analytics'
 import { formatDateTime } from '../lib/dateFormat'
 import { loadReceiptOrderGroup } from '../lib/db'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
@@ -299,7 +301,7 @@ function useTouristReceiptEnglish(priceMode, receiptKey, dispatch) {
   }, [dispatch, priceMode, receiptKey])
 }
 
-function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, labels, receiptFooter, receiptMarketing }) {
+function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateStr, items, subtotal, serviceFee, serviceRate, loyaltyAmt, cashbackEarned, total, salaryAmount = 0, salaryLabel, labels, receiptFooter, receiptMarketing }) {
   const marketingMode = normalizeReceiptMarketing(receiptMarketing)
 
   return (
@@ -396,6 +398,7 @@ function ReceiptPaper({ tableName, priceMode, waiterName, completedByName, dateS
       {/* ── Subtotals ────────────────────────────────────────────────────── */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2px' }}>
         <tbody>
+          {salaryAmount > 0 && <TotalRow label={salaryLabel} value={fmtUZS(salaryAmount)} />}
           <TotalRow label={labels.orderAmount} value={fmtUZS(subtotal)} />
           <TotalRow label={labels.servicePct(serviceRate)} value={fmtUZS(serviceFee)} />
           {loyaltyAmt > 0 && (
@@ -689,6 +692,8 @@ export default function Receipt() {
       serviceFee: quote.serviceFee,
       serviceRate: quote.serviceRatePct,
       loyaltyAmt: quote.loyaltyUsedAmount,
+      salaryAmount: allOrders.flatMap(getOrderPaymentBreakdown).filter(row => row.method === 'salary').reduce((sum, row) => sum + row.amount, 0),
+      salaryLabel: expensePaymentMethodLabel('salary', lang),
       cashbackEarned: quote.cashbackEarned,
       total: quote.total,
     }

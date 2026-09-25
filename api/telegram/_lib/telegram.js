@@ -122,7 +122,7 @@ export async function callTelegramApi(method, payload) {
 
   const body = await res.json().catch(() => ({}))
   if (!res.ok || body.ok === false) {
-    throw new Error(body.description || `Telegram ${method} failed with ${res.status}`)
+    throw Object.assign(new Error(body.description || `Telegram ${method} failed with ${res.status}`), { telegramRejected: body.ok === false })
   }
   return body
 }

@@ -140,6 +140,7 @@ const STATUS_CFG = {
 }
 
 const PAY_CFG = {
+  salary: { label: { uz: 'Maoshdan', ru: 'Из зарплаты', en: 'Salary deduction' }, cls: 'bg-blue-50 text-blue-700', Icon: Banknote, bar: '#2563EB' },
   cash:     { label: { uz: 'Naqd',      ru: 'Наличные',   en: 'Cash'     }, cls: 'bg-green-50 text-green-700',   Icon: Banknote,   bar: '#16A34A' },
   card:     { label: { uz: 'Karta',     ru: 'Карта',      en: 'Card'     }, cls: 'bg-blue-50 text-blue-700',     Icon: CreditCard, bar: '#2563EB' },
   terminal: { label: { uz: 'Terminal',  ru: 'Терминал',   en: 'Terminal' }, cls: 'bg-purple-50 text-purple-700', Icon: Monitor,    bar: '#7C3AED' },
@@ -1539,7 +1540,7 @@ function OrderDrawer({ order, menuItemMap, onClose, navigate, lang, serviceRateS
           <Printer size={14} />
           {lang === 'uz' ? 'Bosish' : lang === 'ru' ? 'Печать' : 'Print'}
         </button>
-        {canChangePaymentMethod && (
+        {canChangePaymentMethod && !getOrderPaymentBreakdown(order).some(row => row.method === 'salary') && (
           <div className="col-span-2 grid gap-2">
             {paymentMethodOrderId === order.id && splitPayment ? (
               <PaidPaymentSplitEditor
@@ -1843,7 +1844,7 @@ export default function Reports() {
   const navigate     = useNavigate()
   const lang         = state.lang
   const deletionDate = useOrderDeletionDate()
-  const canDeleteOrder = candidate => canDeleteOrderToday(profile || { role: state.user?.role }, candidate, deletionDate)
+  const canDeleteOrder = candidate => !getOrderPaymentBreakdown(candidate).some(row => row.method === 'salary') && canDeleteOrderToday(profile || { role: state.user?.role }, candidate, deletionDate)
   const canChangePaymentMethod = canChangeCompletedOrderPaymentMethod(profile || { role: state.user?.role })
   const canViewExpenses = canViewPage(profile || { role: state.user?.role }, 'expenses')
 
@@ -2298,6 +2299,7 @@ export default function Reports() {
                 <SummaryRow label={l.cash} value={formatCurrency(closeout.totals.cash)} />
                 <SummaryRow label={l.card} value={formatCurrency(closeout.totals.card)} />
                 <SummaryRow label={l.terminal} value={formatCurrency(closeout.totals.terminal)} />
+                {closeout.totals.salary > 0 && <SummaryRow label={expensePaymentMethodLabel('salary', lang)} value={formatCurrency(closeout.totals.salary)} />}
                 <SummaryRow label={l.loyaltyIncome} value={formatCurrency(closeout.loyaltyIncome)} />
                 <SummaryRow label={l.cashbackIssued} value={formatCurrency(closeout.cashbackIssued)} />
                 <SummaryRow label={l.cancelled} value={closeout.cancelledCount} />

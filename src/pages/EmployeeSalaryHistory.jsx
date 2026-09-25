@@ -411,7 +411,7 @@ export default function EmployeeSalaryHistory() {
 
   async function deleteHistoryEntry(entry) {
     if (saving) return
-    if (!canDeleteHistory || !entry?.id || (entry.entryType === 'rate' && !employee?.rates.some(rate => rate.id === entry.id))) {
+    if (!canDeleteHistory || entry?.paymentMethod === 'salary' || !entry?.id || (entry.entryType === 'rate' && !employee?.rates.some(rate => rate.id === entry.id))) {
       setError(l.deleteFailed)
       return
     }
@@ -759,7 +759,7 @@ export default function EmployeeSalaryHistory() {
                             entry={entry}
                             lang={lang}
                             labels={l}
-                            canDelete={canDeleteHistory}
+                            canDelete={canDeleteHistory && entry.paymentMethod !== 'salary'}
                             confirming={confirmActionKey === `${entry.entryType}-history-delete-${entry.id}`}
                             saving={saving === `${entry.entryType}-history-delete-${entry.id}`}
                             onDelete={() => deleteHistoryEntry(entry)}

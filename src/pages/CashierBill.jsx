@@ -26,6 +26,7 @@ import {
 } from '../lib/analytics'
 import { supabase } from '../lib/supabase'
 import { getLoyaltyCardCashbackPercent, getLoyaltyCardCashbackType } from '../lib/loyalty'
+import SalaryOrderPayment from '../components/SalaryOrderPayment'
 import CashierLoyaltyNameSearch from '../components/CashierLoyaltyNameSearch'
 import UnifiedSidebar from '../components/UnifiedSidebar'
 import StatusBadge from '../components/StatusBadge'
@@ -33,7 +34,7 @@ import { getQuickItemSortOrder, isActiveMenuItem, isCashierQuickItem } from '../
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
 import { inferOrderType, isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes'
-import { canDeleteOrderToday, canEditFeature } from '../lib/permissions'
+import { canDeleteOrderToday, canDeletePaidOrders, canEditFeature } from '../lib/permissions'
 import { getOrderItemUnitPrice, getPriceModeLabel, normalizePriceMode } from '../lib/priceModes'
 import { getManualOrderNotes, getOrderItemOptionLines } from '../components/MenuProductCards'
 import { formatElapsedSince } from '../lib/dateFormat'
@@ -86,6 +87,10 @@ function cashierRefreshErrorMessage(error, lang) {
   )
 }
 
+function hasPendingSalarySettlement(target) {
+  try { return !!sessionStorage.getItem(`salary-order:${target}`) } catch { return false }
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 export default function CashierBill() {
   const { tableId, orderId }  = useParams()
@@ -99,6 +104,8 @@ export default function CashierBill() {
   const canDeleteOrder = candidate => canDeleteOrderToday(profile || { role: state.user?.role }, candidate, deletionDate)
   const canEditCashier = canEditFeature(profile || { role: state.user?.role }, 'cashier')
 
+  const [salaryCheckoutActive, setSalaryCheckoutActive] = useState(false)
+  const salaryBill = useRef(null)
   const [payMethod,  setPayMethod]  = useState('cash')
   const [splitPayments, setSplitPayments] = useState([{ id: 'payment-1', method: 'cash', amount: '' }])
   const [activePaymentId, setActivePaymentId] = useState('payment-1')
@@ -125,7 +132,7 @@ export default function CashierBill() {
   }, [state.menuItems])
 
   // Merge all active orders for a table, or load one take-away order by id.
-  const order = useMemo(() => {
+  const currentOrder = useMemo(() => {
     const orders = state.orders.filter(o =>
       (orderId ? o.id === orderId : o.table_id === tableId) && o.payment_status !== 'paid'
     )
@@ -165,6 +172,8 @@ export default function CashierBill() {
       cashier_quote: { ...cashierQuote, serviceRatePct },
     }
   }, [state.orders, state.settings, tableId, orderId, menuItemMap])
+
+  const order = currentOrder || (salaryCheckoutActive ? salaryBill.current : null)
 
   const table = state.tables.find(t => t.id === tableId)
   const orderType = inferOrderType(order)
@@ -718,6 +727,11 @@ export default function CashierBill() {
             <p className="text-sm text-[#6B7280] mt-1 mb-5">
               {lang === 'uz' ? "Buyurtma allaqachon to'langan bo'lishi mumkin." : lang === 'ru' ? 'Возможно, заказ уже оплачен.' : 'The order may have already been paid.'}
             </p>
+            {canDeletePaidOrders(profile || { role: state.user?.role }) && hasPendingSalarySettlement(orderId || tableId) && (
+              <SalaryOrderPayment lang={lang} disabled={false} total={0} loyaltyUsed={0} cashback={0}
+                tableId={tableId} orderId={orderId} getFreshQuote={async () => ({ orderIds: [] })}
+                onOpenChange={() => {}} onDone={() => navigate('/cashier/tables')} />
+            )}
             <button
               onClick={() => navigate('/cashier/tables')}
               className="flex items-center gap-2 text-[#ff5a00] font-semibold hover:underline text-sm"
@@ -1439,6 +1453,14 @@ export default function CashierBill() {
 
               {/* Action buttons */}
               <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 space-y-2.5">
+                {canDeletePaidOrders(profile || { role: state.user?.role }) && (
+                  <SalaryOrderPayment lang={lang} disabled={isProcessingPayment || isRefreshingBill || !loyaltyReady || total <= 0}
+                    total={total} loyaltyUsed={loyaltyAmt} cashback={cashbackToBeEarned} cardNumber={loyaltyCard?.card_number}
+                    tableId={tableId} orderId={orderId}
+                    getFreshQuote={async () => getFreshCashierPaymentQuote({ orders: await refreshCurrentBill(), menuItems: state.menuItems, settings: state.settings, tableId, orderId, loyaltyUsedAmount: loyaltyAmt })}
+                    onOpenChange={open => { if (open) salaryBill.current = order; setSalaryCheckoutActive(open) }}
+                    onDone={() => { void refreshCurrentBill().catch(() => {}); navigate('/cashier/tables') }} />
+                )}
                 <button
                   onClick={handlePaid}
                   disabled={!canProcess}

@@ -86,6 +86,7 @@ export function normalizeAccountingPaidOrderSummary(summary = {}, dateFrom, date
     orderCount: normalizeSummaryAmount(summary.orderCount ?? summary.order_count),
     salesDayCount: normalizeSummaryAmount(summary.salesDayCount ?? summary.sales_day_count),
     paymentMethodIncome: {
+      salary: normalizeSummaryAmount(paymentMethodIncome?.salary),
       cash: normalizeSummaryAmount(paymentMethodIncome?.cash),
       card: normalizeSummaryAmount(paymentMethodIncome?.card),
       terminal: normalizeSummaryAmount(paymentMethodIncome?.terminal) + normalizeSummaryAmount(paymentMethodIncome?.qr),
@@ -271,7 +272,7 @@ export function filterAccountingHistoryRows(rows = [], { type = 'all', category 
 }
 
 export function getAccountingHistoryDeleteTarget(row) {
-  if (!row?.id) return null
+  if (!row?.id || row.payment_method === 'salary') return null
   if (row.is_bazaar_daily_total) return null
   if (row.is_employee_meal_estimate) return null
   if (row.is_salary_payment) {

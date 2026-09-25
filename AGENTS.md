@@ -44,6 +44,7 @@ Before editing a feature, read its guide completely. Read more than one only whe
 | Waiter tables, cart, price mode, kitchen submission/checks, reservations | `docs/agent/ordering-kitchen.md` |
 | Products, categories, availability, media, stock, costs, tech cards | `docs/agent/menu-tech-cards.md` |
 | Cashier, payments, service fees, Accounting, expenses, Daily Bazaar | `docs/agent/payments-accounting.md` |
+| Orders paid from salary, non-cash settlement, linked payroll | `docs/agent/salary-orders.md` |
 | Employees, salaries, fines, absences, advances, KPI, employee meals | `docs/agent/payroll.md` |
 | Telegram targets, messages, delivery tracking, cron notifications | `docs/agent/telegram.md` |
 | Dashboard, reports, historical snapshots, profit and date ranges | `docs/agent/reporting.md` |

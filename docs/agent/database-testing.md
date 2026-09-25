@@ -1,4 +1,4 @@
-# Database, Migrations, Tests, and Verification
+# Database, Migrations and Tests
 
 ## Entry points
 
@@ -10,7 +10,7 @@
 
 - `194`/`206`: nullable display-only employee roles. Apply 206 before new roles. Tests: `tests/employeeJobFunctions.test.js`.
 
-## Database workflow
+## Workflow
 
 - Use full filenames; legacy duplicates `073`, `108`, `157` stay distinct. No duplicates.
 - `199`: checksum receipts; service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; Setup: README. No bulk legacy replay. Atomic receipts: matching checksums skip, changed checksums fail. Reconcile lost responses.
@@ -40,7 +40,7 @@
 - Tech Card cost-sync batching and convergence: `183` (apply to enable faster saves). Tests: `tests/techCardCostSyncMigration.test.js`; SQL: `scripts/check-tech-card-cost-sync.mjs` (pass a PGlite module path).
 - Ingredient name editing with stable catalog keys and unchanged purchase snapshots: `182`.
 
-## Database invariants
+## Invariants
 
 - Report reads retry network/502/503/504 errors: 3 attempts, 15s each, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write retries. Tests: `tests/reportReadFetch.test.js`.
 
@@ -50,7 +50,7 @@
 - Retries of externally uncertain writes reuse request/round ids and reconcile durable receipts before issuing another mutation.
 - Archive referenced catalog records instead of physically deleting them.
 
-## Validation
+## Checks
 
 ```bash
 npm test
@@ -59,7 +59,7 @@ npm run build
 
 `npm run docs:check`; `npm run mcp:benchmark`.
 
-## Source guards
+## Guards
 
 - `ProfileSync`, `dbDispatch`, unique realtime channels;
 - Parent-owned kitchen sending; snapshot-only cart removal;
@@ -104,3 +104,5 @@ npm run build
 - `205`: Take Away/Delivery/Game Club category schedule settings; apply before UI. Seeds Business lunch for Game Club. Tests: `tests/gameClubCategorySchedule.test.js`.
 
 - `207`–`209`: rate date guard, audits, owner-only DELETE. Apply before UI. Tests: `tests/salaryRateDateWindow.test.js`, `tests/salaryRateHistory.test.js`.
+
+- `210`: see [salary orders](salary-orders.md).

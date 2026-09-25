@@ -1,7 +1,7 @@
 import { getOrderPaymentBreakdown, normalizePaymentMethod } from './analytics.js'
 import { normalizeExpenseAmount } from './expenses.js'
 
-export const MONTHLY_ESTIMATE_PAYMENT_METHODS = ['cash', 'card', 'terminal', 'loyalty_card']
+export const MONTHLY_ESTIMATE_PAYMENT_METHODS = ['cash', 'card', 'terminal', 'loyalty_card', 'salary']
 
 function addAmount(map, method, amount) {
   const key = normalizePaymentMethod(method)

@@ -15,7 +15,7 @@
 - Monthly estimates query only the earliest needed order date.
 - Use aggregate RPCs for overview cards.
 
-## Historical financial invariants
+## Financial history
 
 - Saved selling price, real-cost snapshot, service-rate snapshot, category snapshot, and paid state are immutable reporting inputs. Payment rows are saved inputs; the authorized migration `201` split correction preserves their combined total and audits before/after allocations. Reports use its confirmed rows, including merged sessions.
 - Profit: paid revenue minus non-cancelled costs (`src/lib/profit.js`).
@@ -23,7 +23,7 @@
 - Archival retains historical lookup context.
 - Reports display the saved Regular/Tourist `orders.price_mode` in desktop, mobile, and details.
 
-## Category and daily snapshots
+## Snapshots
 
 - `order_items.category_id_snapshot` is the sold-time category. `category_snapshot_captured` distinguishes intentional uncategorized from legacy missing coverage.
 - Category reports prefer the snapshot over the product's current category.
@@ -32,7 +32,7 @@
 - Daily ingredient consumption is theoretical Tech Card usage from paid, non-cancelled order-item quantities and service-only immutable `order_item_tech_card_ingredient_snapshots`, including nested recipe components. Weight is normalized to kg, volume to litres, and pieces remain counts; incompatible units are never combined.
 - Ingredient value uses the saved per-unit Tech Card price. Missing legacy snapshots are reported as uncovered sales rather than filled from today's recipe.
 
-## Dashboard presentation
+## Dashboard
 
 - Recent Orders and receipt/delete controls live in Reports. `202` allows deletion only for today's Tashkent payment date (creation fallback), even for owners; older delete controls are hidden. Coverage: `tests/orderDeletion.test.js`.
 - Sales by Category shows every category represented by sold items in the selected period.
@@ -42,7 +42,7 @@
 - `157` backfills completed history; duplicate-safe daily cron finalizes last month. Dashboard never rescans completed months.
 - Monthly averages use total paid cafe income divided by all calendar days. The current month excludes today and divides by completed days through yesterday; day one safely returns zero.
 
-## Accounting/report separation
+## Accounting
 
 - Keep overview aggregates small; details belong in reports/receipts.
 - Selected-month forecast uses that month's actual/expected operating costs only, not prior-period arrears.
@@ -59,3 +59,5 @@
 - Dish sales requires loaded selected-range history; loading/errors cannot show zero sales. Low sellers ranks 15 active products, including unsold ones. Archives keep history but leave this ranking.
 
 - Dish reconciliation uses saved service/loyalty and item prices; expose missing snapshots and residual differences. Period remainder includes calculated meals, excludes opening balances. Closeout variance is unknown without counted balances; CSV says Not measured. Tests: `tests/closeout.test.js`.
+
+- `210`: see [salary orders](salary-orders.md).

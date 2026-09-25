@@ -14,6 +14,7 @@ import {
   getEmployeePaymentConfirmationCopy,
 } from './_lib/paymentMessages.js'
 import { getDailySalaryNotificationSummary, getTashkentDate } from './_lib/salaryMessages.js'
+import { loadOrderSalaryBalances } from './_lib/orderSalaryBalances.js'
 import { loadSalaryProfiles } from './_lib/salaryProfileData.js'
 import { editTelegramMessage, deleteTelegramMessage, sendTelegramMessage, sendTelegramPhoto } from './_lib/telegram.js'
 import { deliverTeamDailyKpi, retractTeamDailyKpiItem } from './_lib/teamDailyKpiDelivery.js'
@@ -1086,7 +1087,7 @@ export async function notifyAutomaticKpiBonus(supabase, bonusId) {
   })
 }
 
-async function notifyPayment(supabase, user, paymentId) {
+async function notifyPayment(supabase, user, paymentId, salaryOrderOnly = false) {
   let deliveryId = null
   let employeeShouldSend = false
   let groupShouldSend = false
@@ -1099,7 +1100,7 @@ async function notifyPayment(supabase, user, paymentId) {
       .eq('id', paymentId)
       .maybeSingle()
     if (error) throw error
-    if (!payment || payment.created_by !== user.id) {
+    if (!payment || payment.created_by !== user.id || (salaryOrderOnly && payment.payment_method !== 'salary')) {
       throw Object.assign(new Error('Payment not found'), { status: 404 })
     }
 
@@ -1113,9 +1114,9 @@ async function notifyPayment(supabase, user, paymentId) {
       pendingRetryMs: PENDING_DELIVERY_RETRY_MS,
     })
     employeeShouldSend = retryTargets.employee
-    groupShouldSend = retryTargets.group
+    groupShouldSend = payment.payment_method !== 'salary' && retryTargets.group
     employeeAlreadyDelivered = ['sent', 'confirmed'].includes(existingDelivery?.status)
-    groupAlreadyDelivered = existingDelivery?.group_status === 'sent'
+    groupAlreadyDelivered = payment.payment_method === 'salary' || existingDelivery?.group_status === 'sent'
     if (!employeeShouldSend && !groupShouldSend) {
       return {
         ok: employeeAlreadyDelivered || groupAlreadyDelivered,
@@ -1308,7 +1309,7 @@ async function notifyPayment(supabase, user, paymentId) {
             employeeLink.preferred_language
           )
           const confirmation = getEmployeePaymentConfirmationCopy(employeeLink.preferred_language)
-          const response = await sendTelegramMessage(employeeLink.chat_id, text, {
+          const response = await sendTelegramMessage(employeeLink.chat_id, text, payment.payment_method === 'salary' ? {} : {
             reply_markup: {
               inline_keyboard: [[{
                 text: confirmation.button,
@@ -1396,7 +1397,7 @@ async function notifyPayment(supabase, user, paymentId) {
     if (sentUpdateError) throw sentUpdateError
 
     const employeeSent = ['sent', 'confirmed'].includes(employeeResult.status)
-    const groupSent = groupResult.status === 'sent'
+    const groupSent = payment.payment_method === 'salary' || groupResult.status === 'sent'
     return {
       ok: employeeSent || groupSent,
       allSent: employeeSent && groupSent,
@@ -1479,11 +1480,14 @@ async function retractSalaryEventMessages(supabase, eventType, eventId) {
 
   const { data: event, error: eventError } = await supabase
     .from(table)
-    .select(eventType === 'bonus' ? 'id, salary_profile_id, source_type, bonus_date' : 'id, salary_profile_id')
+    .select(eventType === 'bonus' ? 'id, salary_profile_id, source_type, bonus_date' : eventType === 'payment' ? 'id, salary_profile_id, payment_method' : 'id, salary_profile_id')
     .eq('id', eventId)
     .maybeSingle()
   if (eventError) throw eventError
   if (!event) throw Object.assign(new Error('Salary event not found'), { status: 404 })
+  if (eventType === 'payment' && event.payment_method === 'salary') {
+    throw Object.assign(new Error('Linked salary order payments cannot be deleted independently'), { status: 409 })
+  }
 
   if (eventType === 'bonus' && event.source_type === 'daily_kpi') {
     await retractTeamDailyKpiItem(supabase, event.bonus_date, eventId)
@@ -2006,7 +2010,12 @@ export default async function handler(req, res) {
                   : menuItemId
                     ? 'menu_unavailable'
                     : '')
+    if (notificationType === 'salary_order_balances') {
+      const { supabase, user } = await requireOrderChangeNotificationAccess(req)
+      return json(res, 200, await loadOrderSalaryBalances(supabase, user.id))
+    }
     const eventIds = {
+      salary_order: paymentId,
       payment: paymentId,
       fine: fineId,
       bonus: bonusId,
@@ -2025,7 +2034,7 @@ export default async function handler(req, res) {
     const isMenuArchived = notificationType === 'menu_archived'
     const isMenuEvent = isMenuUnavailable || isMenuAvailable || isMenuCreated || isMenuArchived
     const isSalaryRetraction = notificationType === 'retract_salary_event'
-    if (!isMenuEvent && !isSalaryRetraction && !['fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'kpi_rule', 'expense', 'investor_income', 'order_change', 'employee_lifecycle'].includes(notificationType)) {
+    if (!isMenuEvent && !isSalaryRetraction && !['salary_order', 'fine', 'payment', 'bonus', 'absence', 'absence_undo', 'rate', 'kpi_rule', 'expense', 'investor_income', 'order_change', 'employee_lifecycle'].includes(notificationType)) {
       return json(res, 400, { error: 'Unsupported notification type' })
     }
     if (isMenuEvent && !menuItemId) {
@@ -2040,7 +2049,7 @@ export default async function handler(req, res) {
 
     const access = isMenuEvent
       ? await requireMenuWriteAccess(req)
-      : notificationType === 'order_change'
+      : ['order_change', 'salary_order'].includes(notificationType)
         ? await requireOrderChangeNotificationAccess(req)
       : notificationType === 'expense'
         ? await requireExpenseNotificationAccess(req)
@@ -2075,6 +2084,8 @@ export default async function handler(req, res) {
       result = await notifyAbsenceUndo(supabase, user, absenceId)
     } else if (notificationType === 'employee_lifecycle') {
       result = await notifyEmployeeLifecycle(supabase, user, salaryProfileId, lifecycleEventType)
+    } else if (notificationType === 'salary_order') {
+      result = await notifyPayment(supabase, user, paymentId, true)
     } else if (notificationType === 'payment') {
       result = await notifyPayment(supabase, user, paymentId)
     } else {

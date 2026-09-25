@@ -38,8 +38,11 @@ export async function notifyTelegramOrderStatus(orderIdOrIds, status) {
         : { orderIds, status }),
     })
     if (!response.ok) throw new Error(`Telegram notification failed with ${response.status}`)
+    const result = await response.json().catch(() => ({}))
+    return { ...result, ok: result.ok === true }
   } catch (error) {
     console.warn('[telegram] order status notification failed:', error)
+    return { ok: false }
   }
 }
 
@@ -221,4 +224,13 @@ export function notifyTelegramMenuCreated(menuItemId) {
 
 export function notifyTelegramMenuArchived(menuItemId) {
   return notifyTelegramMenuEvent(menuItemId, 'menu_archived')
+}
+
+export async function notifyTelegramSalaryOrderPayment(paymentId) {
+  try { return await postAuthenticatedTelegramNotification({ type: 'salary_order', paymentId }) }
+  catch { return { ok: false } }
+}
+
+export function loadOrderSalaryEmployeeBalances(signal) {
+  return postAuthenticatedTelegramNotification({ type: 'salary_order_balances' }, { signal })
 }

@@ -29,6 +29,7 @@ export function getDailyCloseout(
     matchesSelectedScope(order)
   ))
   const totals = {
+    salary: 0,
     cash: 0,
     card: 0,
     terminal: 0,
@@ -86,6 +87,7 @@ export function closeoutToCsv(closeout) {
     ...dateRows,
     ['Paid orders', closeout.orderCount],
     ['Revenue', closeout.revenue],
+    ['Salary deduction (non-cash)', closeout.totals.salary || 0],
     ['Cash', closeout.totals.cash],
     ['Card', closeout.totals.card],
     ['Terminal', closeout.totals.terminal],

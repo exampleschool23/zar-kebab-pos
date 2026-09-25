@@ -412,14 +412,25 @@ export function getEmployeePaymentConfirmationCopy(language = 'ru') {
   }
 }
 
+function salaryPaymentCopy(payment, lang) {
+  const copy = COPY[lang]
+  if (payment?.payment_method !== 'salary') return copy
+  const labels = {
+    en: ['Order paid from salary', 'The order balance was deducted from salary. No cash was paid out.', 'Salary deducted'],
+    ru: ['Заказ оплачен из зарплаты', 'Остаток заказа списан из зарплаты. Наличные не выдавались.', 'Списано из зарплаты'],
+    uz: ['Buyurtma maoshdan to‘landi', 'Buyurtma qoldig‘i maoshdan yechildi. Naqd pul berilmadi.', 'Maoshdan yechildi'],
+  }[lang]
+  return { ...copy, title: labels[0], recorded: labels[1], amount: labels[2] }
+}
+
 export function buildSalaryPaymentGroupMessage(payment, remainingDue = 0, language = 'ru') {
   const lang = normalizeSalaryNotificationLanguage(language)
-  const copy = COPY[lang]
+  const copy = salaryPaymentCopy(payment, lang)
   const groupCopy = GROUP_COPY[lang]
   const lines = [
     `💵 <b>${copy.title}</b>`,
     '',
-    groupCopy.recorded,
+    payment?.payment_method === 'salary' ? copy.recorded : groupCopy.recorded,
     '',
     `<b>${groupCopy.employee}:</b> ${escapeTelegramHtml(payment?.employee_name || '-')}`,
     `<b>${copy.amount}:</b> ${formatSalaryNotificationAmount(payment?.amount)} UZS`,
@@ -545,7 +556,7 @@ export function buildEmployeeSalaryEventMessage(type, event, remainingDue = 0, l
 
 export function buildEmployeePaymentMessage(payment, remainingDue = 0, language = 'ru') {
   const lang = normalizeSalaryNotificationLanguage(language)
-  const copy = COPY[lang]
+  const copy = salaryPaymentCopy(payment, lang)
   const employeeName = escapeTelegramHtml(payment?.employee_name || 'сотрудник')
   const lines = [
     `💵 <b>${copy.title}</b>`,

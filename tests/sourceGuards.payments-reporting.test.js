@@ -192,7 +192,7 @@ test('new cashier payments use cash or terminal while historical card reporting 
   const reports = readSource('src/pages/Reports.jsx')
   const expenses = readSource('src/lib/expenses.js')
   const payMethodsBlock = cashier.slice(cashier.indexOf('const PAY_METHODS = ['), cashier.indexOf('function payLabel'))
-  const correctionStart = reports.indexOf('{canChangePaymentMethod && (')
+  const correctionStart = reports.indexOf('{canChangePaymentMethod && !getOrderPaymentBreakdown(order)')
   const correctionEnd = reports.indexOf('{canDeleteOrder &&', correctionStart)
   const correctionBlock = reports.slice(correctionStart, correctionEnd)
 
@@ -204,7 +204,7 @@ test('new cashier payments use cash or terminal while historical card reporting 
   assert.doesNotMatch(correctionBlock, /<option value="card">/)
   assert.match(reports, /card:\s+\{ label:/)
   assert.match(reports, /<option value="card">\{lang === 'uz' \? 'Karta'/)
-  assert.match(expenses, /ACCOUNTING_CASHFLOW_METHODS = \['cash', 'card', 'terminal', 'loyalty_card'\]/)
+  assert.match(expenses, /ACCOUNTING_CASHFLOW_METHODS = \['cash', 'card', 'terminal', 'loyalty_card', 'salary'\]/)
 })
 
 test('active cashback calculation uses card type resolver instead of hardcoded default percent', () => {

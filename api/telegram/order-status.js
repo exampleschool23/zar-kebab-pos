@@ -204,7 +204,7 @@ export default async function handler(req, res) {
       })
       for (const chatId of getCompletedOrdersChatIds()) {
         sends.push(
-          sendTrackedOrderStatusMessage(supabase, completedOrders.map(order => order.id), chatId, text)
+          sendTrackedOrderStatusMessage(supabase, completedOrders.map(order => order.id), chatId, text, { salarySettlement: completedOrders.some(order => order.payment_method === 'salary' || order.payments?.some(payment => payment.method === 'salary')) })
             .then(() => { completedGroupSentCount += 1 })
         )
       }

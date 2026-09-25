@@ -7,7 +7,7 @@
 - Database: `src/lib/db.js`; migrations `083`, `090`, `097`, `109`, `135`, `201`
 - Tests: `tests/orderPayment.test.js`, `tests/atomicPaymentSettlement.test.js`, `tests/cashierCheckout.test.js`, `tests/accountingPages.test.js`, `tests/monthlyEstimate.test.js`, `tests/bazaar.test.js`, `tests/sourceGuards.payments-reporting.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
 
-## Payment and service math
+## Payment math
 
 - Use `normalizeServiceRatePct()`, `getOrderPaymentSummary()`, and `getOrderPaymentFields()` from `src/lib/analytics.js`; do not hand-roll totals in pages.
 - Dine-in may include service. Take-away, delivery, and Game Club use zero service.
@@ -31,7 +31,7 @@
 - Auto-print: one-time cashier request, in-page receipt, no new tabs. Manual print refreshes the bill.
 - Translate bill errors at render; language never refetches bills.
 
-## Accounting loading and presentation
+## Accounting
 
 - Do not show today-only POS orders while Accounting history loads.
 - Wait for expenses, paid-order summary/history, and salary data before ending loading.
@@ -39,7 +39,7 @@
 - Detailed order rows belong to reports, receipts, and drilldowns.
 - Use four then three KPI cards on large screens; collapse payment-method balances in the left column.
 
-## Expense history and monthly estimate
+## Expenses and estimates
 
 - Expenses allow today or three prior Tashkent dates; UI/database reject older dates. Income and unchanged history are allowed.
 - Bonus display rows are projections: deletion targets `employee_salary_bonuses.source_id`, never a synthetic display id.
@@ -50,7 +50,7 @@
 - `business_settings.monthly_utilities_uzs` is the plan; only recorded `utilities` rows are monthly actuals.
 - `business_settings.average_daily_break_even_income_uzs` is the operator-entered Dashboard benchmark; it does not alter Accounting totals.
 
-## Cash-expense Telegram delivery
+## Cash Telegram
 
 - New cash expenses queue one immutable Investor delivery: manual text or a Bazaar PNG receipt and caption.
 - Edits/deletes do not announce again. Do not project salary, bonus, employee meal, or calculated rows into this flow.
@@ -78,3 +78,5 @@ Migrations `097`, `160`–`163`, `182`.
 - Bazaar history loads only on `/admin/bazaar`, never during POS hydration.
 
 - `204`: audit actor FK removed; history unchanged.
+
+- `210`: see [salary orders](salary-orders.md).

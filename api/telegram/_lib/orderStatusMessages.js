@@ -42,6 +42,7 @@ function formatPercent(value) {
 }
 
 function paymentMethodLabel(value) {
+  if (value === 'salary') return 'Из зарплаты'
   const key = String(value || '').toLowerCase()
   if (PAYMENT_METHOD_LABELS_RU[key]) return PAYMENT_METHOD_LABELS_RU[key]
   return String(value || '-')

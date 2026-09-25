@@ -12,7 +12,7 @@
 
 - Read-only.
 
-## Delivery records and retries
+## Delivery retries
 
 - Saved salary events get `not_attempted` tracking; initial setup does not.
 - States: pending, sent, failed, skipped, confirmed.
@@ -22,7 +22,7 @@
 - Salary operations use `api/telegram/employee-notification.js`. Cleanup requires `ok:true` within 30s; timeout keeps the record and shows an error.
 - Owner deletions retract tracked private/Salary (Investor)/Team messages first. Missing messages succeed. Undeletable rate notices are edited to cancelled; other failures block deletion.
 
-## Salary destinations
+## Salary targets
 
 - Salary payments: employee privately (receipt confirmation), Salary group (no confirmation).
 - Salary group target is `salary_events`; its env fallback must never use Team or completed-orders groups.
@@ -30,7 +30,7 @@
 - Rate-change messages show previous/new salary, effective date, and effective KPI status.
 - KPI changes notify Salary group from immutable rate/basis/account snapshots (`196`); no-op saves stay silent.
 
-## Team salary events
+## Team events
 
 - No backfill.
 
@@ -38,7 +38,7 @@
 - Team messages include amount, full fine/absence detail, and author, but omit salary balance. Automatic events name the system.
 - Bonuses omit payment method. Private manual bonuses/fines use Russian long dates.
 
-## Daily payroll privacy
+## Payroll privacy
 
 - Private RU PNG calendars show MTD salary, KPI, bonuses, fines and absences from joining through the completed day, before payments. Dated `getSalaryBalance()` shows remaining pay and all-time payments; negative = advance. Custom ranges: ≤62 days.
 - Salary group receives only the aggregate daily salary/KPI report, not per-employee KPI details.
@@ -54,7 +54,7 @@
 - At 08:00 Tashkent, send the duplicate-safe Russian unavailable-products snapshot and optionally reply to Google reviews; review failures do not block it.
 - Exclude archived products and archived categories; preserve exact sent snapshots.
 
-## Investor notifications
+## Investor
 
 - Employee lifecycle queues immutable Russian Investor events: employee/date/actor.
 - Ingredient changes (`189`) snapshot before/after values and actor. Unchanged saves and imports stay silent. `ingredient-events` sends to `salary_events`; unknown sends stay held.
@@ -81,3 +81,5 @@
 - `197`/`198`: private paid-order estimates snapshot order/daily KPI. `203` filters order/daily cuts by Tashkent start time; Salary events snapshot before/after times. `202` cancels deleted-order queued notices and retracts sent notices, including orphans. Minute `employee-order-kpi` cron retries cleanup; uncertain sends stay held. Apply migrations before sender/UI. Other notices retain historical estimates. Tests: `tests/timeBasedKpi.test.js`.
 
 - Morning watchdog retries unstarted/failed/skipped Investor albums after meal/KPI finalization, including alerted failures. Recovery needs a saved message ID; never replay sent/pending reports. Save alert ID/chat/error only after confirmed send. Tests: `tests/dailySalaryWatchdog.test.js`.
+
+- `210`: see [salary orders](salary-orders.md).
