@@ -1,3 +1,4 @@
+import { getActiveTableOrders } from '../lib/tableGuestEntry.js'
 import {
   allocateSplitPaymentsToOrders,
   calculateLoyaltyCashback,
@@ -99,9 +100,9 @@ export function ordersReducer(state, action) {
       if (exactOrder && isPaidOrder(exactOrder)) return state
       if (!isOffPremise && !table) return state
 
-      const activeOrder = exactOrder || state.orders.find(o =>
-        (!isOffPremise && o.table_id === tableId && o.payment_status !== 'paid')
-      )
+      const activeOrder = exactOrder || (!action._orderId && !isOffPremise
+        ? getActiveTableOrders(tableId, state.orders)[0]
+        : null)
       const existingItemIds = new Set((activeOrder?.items || []).map(item => item.id).filter(Boolean))
       const newCartItems = activeOrder
         ? cartItems.filter(item => !item.id || !existingItemIds.has(item.id))

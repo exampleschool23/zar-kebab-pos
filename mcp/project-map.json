@@ -21,7 +21,7 @@
   "tasks": [
     {
       "name": "active order waiter names and table ownership labels",
-      "aliases": ["renamed waiter still shows old name", "waiter name on table card"],
+      "aliases": ["renamed waiter still shows old name", "waiter name on table card", "ordering header creator instead of current user", "available table shows previous waiter", "empty order owner reused"],
       "path": "src/lib/activeOrderWaiters.js",
       "symbol": "loadActiveOrderWaiterNames"
     },
@@ -162,8 +162,8 @@
     {
       "name": "payments-cashier",
       "keywords": ["available salary", "salary deduction", "salary-covered order", "cashier", "bill", "payment", "service", "split", "settlement", "receipt", "auto-print", "print dialog", "loyalty", "delete paid orders", "payment correction", "Investor order change alert"],
-      "files": ["api/telegram/_lib/orderSalaryBalances.js", "docs/agent/salary-orders.md", "src/components/SalaryOrderPayment.jsx", "supabase/210_order_salary_settlement.sql", "src/pages/CashierBill.jsx", "src/pages/CashierTables.jsx", "src/pages/Receipt.jsx", "src/lib/analytics.js", "src/lib/cashierCheckout.js", "src/lib/cashierBills.js", "src/components/PaidPaymentSplitEditor.jsx", "src/lib/paidPaymentSplit.js", "supabase/201_split_completed_order_payment.sql", "src/lib/billHandoff.js", "src/lib/loyalty.js", "src/lib/db.js"],
-      "tests": ["tests/orderSalaryBalances.test.js", "tests/orderSalarySettlement.test.js", "tests/orderItemPresentation.test.js", "tests/orderPayment.test.js", "tests/cashierCheckout.test.js", "tests/cashierPaymentFixes.test.js", "tests/billHandoff.test.js", "tests/atomicPaymentSettlement.test.js", "tests/paidPaymentSplit.test.js", "tests/telegramInvestorOrderChanges.test.js", "tests/loyaltyCards.test.js", "tests/sourceGuards.payments-reporting.test.js"]
+      "files": ["supabase/212_atomic_bill_item_edits.sql", "api/telegram/_lib/orderSalaryBalances.js", "docs/agent/salary-orders.md", "src/components/SalaryOrderPayment.jsx", "supabase/210_order_salary_settlement.sql", "src/pages/CashierBill.jsx", "src/pages/CashierTables.jsx", "src/pages/Receipt.jsx", "src/lib/analytics.js", "src/lib/cashierCheckout.js", "src/lib/cashierBills.js", "src/components/PaidPaymentSplitEditor.jsx", "src/lib/paidPaymentSplit.js", "supabase/201_split_completed_order_payment.sql", "src/lib/billHandoff.js", "src/lib/loyalty.js", "src/lib/db.js"],
+      "tests": ["tests/cashierBills.test.js", "tests/orderDeletion.test.js", "tests/atomicBillItemEdits.test.js", "tests/orderSalaryBalances.test.js", "tests/orderSalarySettlement.test.js", "tests/orderItemPresentation.test.js", "tests/orderPayment.test.js", "tests/cashierCheckout.test.js", "tests/cashierPaymentFixes.test.js", "tests/billHandoff.test.js", "tests/atomicPaymentSettlement.test.js", "tests/paidPaymentSplit.test.js", "tests/telegramInvestorOrderChanges.test.js", "tests/loyaltyCards.test.js", "tests/sourceGuards.payments-reporting.test.js"]
     },
     {
       "name": "accounting-bazaar",
@@ -179,7 +179,7 @@
     },
     {
       "name": "reporting-history",
-      "keywords": ["dashboard", "report", "profit", "history", "snapshot", "date range", "closeout", "dish sales", "low sellers archived products", "dish sales history loading", "income reconciliation", "unmeasured closeout variance", "average daily income", "weekly income", "ten-day income", "last 20 bars", "hide zero-income months", "cafe opening month", "dashboard without recent orders", "busy hours", "decade income", "break-even", "ingredient consumption"],
+      "keywords": ["dashboard", "report", "Reports date range loading skeletons", "profit", "history", "snapshot", "date range", "closeout", "dish sales", "most-sold meals by quantity", "low sellers archived products", "dish sales history loading", "income reconciliation", "unmeasured closeout variance", "average daily income", "weekly income", "ten-day income", "last 20 bars", "hide zero-income months", "cafe opening month", "dashboard without recent orders", "busy hours", "decade income", "break-even", "ingredient consumption"],
       "files": ["src/pages/AdminDashboard.jsx", "src/pages/AdminSettings.jsx", "src/pages/Reports.jsx", "src/lib/dashboardAnalytics.js", "src/lib/monthlyIncome.js", "src/lib/weeklyIncome.js", "src/components/WeeklyIncomeChart.jsx", "src/components/BusyHoursCard.jsx", "src/components/ProductContributionCard.jsx", "src/lib/monthlyBusyHours.js", "supabase/192_dashboard_monthly_busy_hours.sql", "supabase/193_dashboard_busy_hours_created_at.sql", "supabase/190_dashboard_weekly_income.sql", "supabase/191_dashboard_recent_period_income.sql", "src/lib/dishSales.js", "src/lib/profit.js", "src/lib/orderHistory.js", "src/lib/accountingSummary.js", "src/lib/closeout.js", "src/lib/ingredientConsumption.js", "api/telegram/_lib/dailyOperationsReportImages.js", "supabase/157_dashboard_monthly_income_snapshots.sql", "supabase/158_business_settings_daily_break_even_income.sql", "supabase/174_dashboard_monthly_income_completed_days.sql"],
       "tests": ["tests/dashboardAnalytics.test.js", "tests/monthlyIncomeSnapshots.test.js", "tests/weeklyIncome.test.js", "tests/monthlyBusyHours.test.js", "tests/dishSales.test.js", "tests/closeout.test.js", "tests/profit.test.js", "tests/orderHistory.test.js", "tests/financialHistorySnapshots.test.js", "tests/sourceGuards.accounting-reporting.test.js"]
     },

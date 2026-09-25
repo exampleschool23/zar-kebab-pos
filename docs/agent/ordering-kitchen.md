@@ -10,7 +10,7 @@
 ## Table entry and price mode
 
 - Opening a table is a direct compact Regular/Tourist (`R`/`T`) choice followed by Enter table. Do not ask for a PIN or create a Guest session.
-- Opening a table alone never creates an order. The waiter builds a cart and sends it normally.
+- Opening a table creates no order; sending the cart does.
 - Reserved-table seating clears reservation fields before entering ordering.
 - Active non-empty orders keep their saved price mode locked. Conflicting active modes require staff review.
 - Empty shells, stale totals without items, and all-cancelled orders must not lock price mode or show an active-order notice.
@@ -26,7 +26,7 @@
 - Configured-option additions start at quantity one and increment only the matching `cart_item_key`.
 - Reject unavailable or archived products at add, increment, detail submit, kitchen submit, and the database boundary.
 - `stock_count` is inventory, not an availability flag.
-- The waiter header reports submitted quantities when an active order exists; it must not say the order is empty merely because the unsent cart is empty.
+- The header counts submitted items even when the unsent cart is empty.
 - Submitted kitchen rounds remain visible while a new cart batch is built. Derive stable `Order 1`, `Order 2`, etc. numbering from the complete chronological round list before filtering controls.
 
 ## Kitchen submission
@@ -47,14 +47,16 @@
 
 - Printed kitchen checks combine identical product/options/notes/price/unit rows within the selected round only, using `getGroupedOrderItems` in both print renderers. Coverage: `tests/orderItemPresentation.test.js`.
 
-- Requested rounds must match exactly; never substitute an older local round while the requested one loads.
+- Never substitute an older round while the requested round loads.
 - Refresh a missing round directly before printing and auto-print each round only once.
 - Failed print/submission retries retain the same round and item ids.
 - See `PRINTING.md` for receipt-printer setup.
 
 ## Tables
 
-- Occupied cards show distinct active-order waiter names, resolved by `opened_by` with saved-name fallback. Paid history stays unchanged. Tests: `tests/activeOrderWaiters.test.js`.
+- Cards use `getActiveTableOrders`; empty/stale-total shells stay available. See payments guide for atomic edits (`212`).
+
+- Active orders show their creators; available-table drafts show the signed-in user. Empty shells supply neither names nor new submission IDs. Explicit retry IDs persist. Tests: `tests/activeOrderWaiters.test.js`, `tests/operationalFlows.test.js`.
 
 - Disabled tables remain available to reports/history but are hidden from waiter ordering.
 - Table edit/delete controls belong to `/admin/tables`, not the waiter grid.

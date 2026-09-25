@@ -5,7 +5,6 @@
 - Database/health: `src/lib/db.js`, `src/lib/dbHealth.js`
 - Migration/health: `supabase/migrate.js`, `scripts/check-db-health.js`
 - SQL migrations: `supabase/`
-- Navigator: `mcp/`, `tests/repoNavigatorMcp.test.js`
 - Source guards: `tests/sourceGuards.*.test.js`
 
 - `194`/`206`: nullable display-only employee roles. Apply 206 before new roles. Tests: `tests/employeeJobFunctions.test.js`.
@@ -45,8 +44,8 @@
 - Report reads retry network/502/503/504 errors: 3 attempts, 15s each, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write retries. Tests: `tests/reportReadFetch.test.js`.
 
 - Use atomic RPCs for multi-table writes such as kitchen submission, menu item + protected cost, Tech Cards, Daily Bazaar, and payment corrections.
-- Pair UI access checks with RLS/RPC enforcement.
-- Preserve order, cost, category, payroll, notification, and audit snapshots.
+- Enforce UI permissions with RLS/RPCs.
+- Preserve order/cost/category/payroll/notification/audit snapshots.
 - Uncertain writes reuse request/round IDs; reconcile receipts before retrying.
 - Archive referenced catalog records instead of physically deleting them.
 
@@ -108,3 +107,5 @@ npm run build
 - `210`: see [salary orders](salary-orders.md).
 
 - `211`: profile name realtime; history unchanged. Tests: `tests/activeOrderWaiters.test.js`.
+
+- `212`: atomic bill edits; deploy before UI. See payments guide.

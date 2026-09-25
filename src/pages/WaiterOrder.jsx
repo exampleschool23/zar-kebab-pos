@@ -26,7 +26,7 @@ import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canEditFeature } from '../lib/permissions'
 import { rebuildGuestCartFromCatalog } from '../lib/guestCart'
 import { getActiveTableOrders } from '../lib/tableGuestEntry'
-import { getActiveWaiterNames } from '../lib/activeOrderWaiters'
+import { getTableOrderWaiterNames } from '../lib/activeOrderWaiters'
 import {
   clearGuestModeSession,
   getGuestModePinLength,
@@ -426,7 +426,7 @@ function BottomTableChips({ currentTableId, onNewOrder, disabled = false }) {
   const chips = useMemo(() => {
     const byTable = {}
     state.orders.forEach(o => {
-      if (o.payment_status === 'paid') return
+      if (!getActiveTableOrders(o.table_id, [o]).length) return
       if (!byTable[o.table_id]) {
         byTable[o.table_id] = {
           table_id:   o.table_id,
@@ -689,7 +689,7 @@ export default function WaiterOrder() {
     () => isTakeAwayFlow ? [] : getActiveTableOrders(tableId, state.orders),
     [state.orders, tableId, isTakeAwayFlow]
   )
-  const waiterName = getActiveWaiterNames(activeOrders).join(', ') || profile?.full_name?.trim()
+  const waiterName = isTakeAwayFlow ? '' : getTableOrderWaiterNames(tableId, state.orders, profile?.full_name || state.user?.name || '').join(', ')
   const waiterLabel = lang === 'uz' ? 'Ofitsiantingiz' : lang === 'ru' ? 'Ваш официант' : 'Your waiter'
 
   // Merge all billable active orders for this table. Empty shells must not

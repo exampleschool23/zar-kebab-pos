@@ -455,3 +455,17 @@ test('admin table drag reorder applies every persisted sort position', () => {
     ['t3', 2],
   ])
 })
+
+test('sending from an available table creates a new owner identity instead of reusing an empty shell', () => {
+  const old = { id: 'old-asil', table_id: 't1', status: 'needs_bill', payment_status: 'unpaid',
+    opened_by: 'asil', opened_by_name: 'Asil', waiter_name: 'Asil', items: [], subtotal: 36000, total: 41400 }
+  const initial = { ...state(), orders: [old], user: { id: 'jasurbek', name: 'Jasurbek Shomurodov' } }
+  const result = ordersReducer(initial, { type: 'SEND_TO_KITCHEN', _orderId: 'fresh',
+    _items: [{ id: 'fresh-item', price: 10000, base_price: 10000, quantity: 1 }], payload: { orderType: 'dine_in' } })
+  assert.equal(result.orders.length, 2)
+  assert.deepEqual(result.orders[0], old)
+  assert.equal(result.orders[1].id, 'fresh')
+  assert.equal(result.orders[1].opened_by, 'jasurbek')
+  assert.equal(result.orders[1].waiter_name, 'Jasurbek Shomurodov')
+  assert.equal(result.orders[1].subtotal, 10000)
+})

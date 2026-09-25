@@ -206,6 +206,11 @@ const checks = await Promise.all([
     'manage menu and tech cards access are required'
   ),
   checkRpc(
+    'update_bill_item_quantity(payload)',
+    () => supabase.rpc('update_bill_item_quantity', { payload: {} }),
+    'bill edit permission required'
+  ),
+  checkRpc(
     'settle_orders_payment(payload)',
     () => supabase.rpc('settle_orders_payment', { payload: {} }),
     'cashier write access is required'

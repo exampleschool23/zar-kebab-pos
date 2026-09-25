@@ -1,3 +1,4 @@
+import { getActiveTableOrders } from '../lib/tableGuestEntry'
 import { useOrderDeletion } from './useOrderDeletion'
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react'
 import { isRecoverableIdleError, loadOperationalTableData, loadPOSData, refreshSupabaseSession, waitForKitchenRoundSubmission, writeToSupabase, subscribeToRealtime } from '../lib/db'
@@ -339,9 +340,7 @@ export function AppProvider({ children }) {
         const orderType = normalizeOrderType(action.payload?.orderType)
         const isOffPremise = isOffPremiseOrderType(orderType)
         const submittedAt = action._submittedAt || new Date().toISOString()
-        const activeOrder = stateRef.current.orders.find(o =>
-          o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
-        )
+        const activeOrder = isOffPremise ? null : getActiveTableOrders(stateRef.current.currentTableId, stateRef.current.orders)[0]
         const billError = !isOffPremise && getKitchenBillBlockError(activeOrder, stateRef.current.user)
         if (billError) {
           dispatch({ type: 'SET_CONNECTION_NOTICE', payload: { tone: 'error', error: billError, actionType: action.type } })
@@ -366,9 +365,7 @@ export function AppProvider({ children }) {
           _kitchenRoundId: kitchenRoundId,
           _orderId: action._orderId || (isOffPremise
             ? `${orderType === 'game_club' ? 'gc' : orderType === 'delivery' ? 'dl' : 'ta'}-${Date.now()}`
-            : stateRef.current.orders.find(o =>
-              o.table_id === stateRef.current.currentTableId && o.payment_status !== 'paid'
-            )?.id || 'o' + Date.now()),
+            : activeOrder?.id || 'o' + Date.now()),
           _orderNumber: action._orderNumber || (isOffPremise
             ? makeOrderNumber(Date.now(), orderType)
             : undefined),
@@ -387,6 +384,8 @@ export function AppProvider({ children }) {
         }
         rememberPendingKitchenSubmission(enriched)
       }
+    } else if (action.type === 'UPDATE_BILL_ITEM_QTY') {
+      enriched = { ...action, _billEditRequestId: action._billEditRequestId || makeLocalId() }
     } else if (action.type === 'ADD_QUICK_ITEM_TO_ORDER') {
       enriched = {
         ...action,
@@ -465,6 +464,7 @@ export function AppProvider({ children }) {
         return { error: null, action: enriched }
       })
       .catch(err => {
+        if (enriched.type === 'UPDATE_BILL_ITEM_QTY') refreshPOSData()
         console.error('[db] write failed:', action.type, err)
         dispatch({
           type: 'SET_CONNECTION_NOTICE',

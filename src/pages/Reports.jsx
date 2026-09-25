@@ -607,6 +607,13 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
     }
   }, [dishSections, activeSectionKey])
 
+  const mostSoldMeals = useMemo(() => (
+    analysis.dishes
+      .filter(dish => dish.quantity > 0)
+      .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue || a.key.localeCompare(b.key))
+      .slice(0, 30)
+  ), [analysis.dishes])
+
   const lowSellers = useMemo(() => (
     analysis.dishes.filter(dish => dish.currentMenuItem).slice(0, 15)
   ), [analysis.dishes])
@@ -621,7 +628,7 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
     lastSale:   { uz: 'Oxirgi sotuv',     ru: 'Последняя продажа', en: 'Last sale' },
     avgOrder:   { uz: "O'rtacha",         ru: 'В среднем',       en: 'Avg per order' },
     noSales:    { uz: 'Sotuv yo‘q',       ru: 'Нет продаж',      en: 'No sales' },
-    byDay:      { uz: 'Kun bo‘yicha',     ru: 'По дням',         en: 'Sales by day' },
+    mostSold:   { uz: 'Eng ko‘p sotilgan taomlar', ru: 'Самые продаваемые блюда', en: 'Most-sold meals' },
     byHour:     { uz: 'Soat bo‘yicha',    ru: 'По часам',        en: 'Sales by hour' },
     lowSellers: { uz: 'Kam sotilganlar',  ru: 'Слабые продажи',  en: 'Low sellers' },
     saleLog:    { uz: 'Sotuv vaqtlari',   ru: 'Время продаж',    en: 'Sale times' },
@@ -640,7 +647,7 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
     ? (s.allDishes[lang] || s.allDishes.en)
     : dishDisplayName(analysis.selectedDish, lang)
   const activeSection = dishSections.find(section => section.key === activeSectionKey) || dishSections[0]
-  const maxDailyQty = Math.max(...analysis.daily.map(row => row.quantity), 1)
+  const maxMealQty = Math.max(...mostSoldMeals.map(row => row.quantity), 1)
   const maxHourlyQty = Math.max(...analysis.hourly.map(row => row.quantity), 1)
   const visibleSales = selectedDishKey === ALL_DISHES_KEY ? analysis.sales.slice(0, 18) : analysis.sales
 
@@ -819,19 +826,19 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <p className="text-sm font-black text-[#1F2937]">{s.byDay[lang] || s.byDay.en}</p>
-            <span className="text-[11px] font-bold text-[#9CA3AF]">{analysis.daily.length}</span>
+            <p className="text-sm font-black text-[#1F2937]">{s.mostSold[lang] || s.mostSold.en}</p>
+            <span className="text-[11px] font-bold text-[#9CA3AF]">{mostSoldMeals.length}</span>
           </div>
-          {analysis.daily.length === 0 ? (
+          {mostSoldMeals.length === 0 ? (
             <CompactEmpty label={s.noSales[lang] || s.noSales.en} />
           ) : (
             <div className="max-h-[340px] space-y-2 overflow-y-auto pr-1">
-              {analysis.daily.map(row => {
-                const pct = Math.round(row.quantity / maxDailyQty * 100)
+              {mostSoldMeals.map(row => {
+                const pct = Math.round(row.quantity / maxMealQty * 100)
                 return (
-                  <div key={row.date} className="flex items-center gap-3">
+                  <div key={row.key} className="flex items-center gap-3">
                     <span className="w-28 flex-shrink-0 text-right text-[12px] font-bold text-[#6B7280]">
-                      {formatLongDate(row.date, lang, row.date, { includeYear: false })}
+                      {dishDisplayName(row, lang)}
                     </span>
                     <div className="h-8 flex-1 overflow-hidden rounded-lg bg-gray-100">
                       <div
@@ -1837,6 +1844,37 @@ function OrderHistoryTab({ orders, allOrders, menuItemMap, lang, navigate, selec
 // MAIN PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
+function ReportsSkeleton({ canViewExpenses, lang }) {
+  return (
+    <div role="status" aria-busy="true" className="space-y-6">
+      <span className="sr-only">{lang === 'ru' ? 'Загрузка отчётов' : lang === 'uz' ? 'Hisobotlar yuklanmoqda' : 'Loading reports'}</span>
+      <div aria-hidden="true" className={`grid grid-cols-2 lg:grid-cols-3 ${canViewExpenses ? 'xl:grid-cols-6' : 'xl:grid-cols-3'} gap-4`}>
+        {Array.from({ length: canViewExpenses ? 6 : 3 }, (_, index) => (
+          <div key={index} className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm motion-safe:animate-pulse">
+            <div className="mb-4 h-10 w-10 rounded-xl bg-gray-100" />
+            <div className="mb-3 h-3 w-2/3 rounded bg-gray-100" />
+            <div className="h-8 w-full rounded bg-gray-200" />
+          </div>
+        ))}
+      </div>
+      <div aria-hidden="true" className="space-y-6 motion-safe:animate-pulse">
+        {Array.from({ length: canViewExpenses ? 3 : 2 }, (_, index) => (
+          <div key={index} className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+            <div className="mb-4 h-4 w-40 rounded bg-gray-200" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-12 rounded bg-gray-100" />
+              <div className="h-12 rounded bg-gray-100" />
+            </div>
+          </div>
+        ))}
+        <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 space-y-6">
+          {Array.from({ length: 5 }, (_, index) => <div key={index} className="h-10 rounded bg-gray-100" />)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Reports() {
   const { state, dispatch } = useApp()
   const { profile } = useAuth()
@@ -1868,6 +1906,12 @@ export default function Reports() {
   const [historyOrders, setHistoryOrders] = useState([])
   const [ordersError, setOrdersError] = useState('')
   const [loadedHistoryRange, setLoadedHistoryRange] = useState('')
+  const [settledHistoryRange, setSettledHistoryRange] = useState('')
+  const [settledExpenseRange, setSettledExpenseRange] = useState('')
+  const reportRange = `${dateFrom}:${dateTo}`
+  // Compare during render so applying dates hides stale results before effects run.
+  const reportsLoading = settledHistoryRange !== reportRange ||
+    (canViewExpenses && settledExpenseRange !== reportRange)
 
   // ── Lookups ────────────────────────────────────────────────────────────────
 
@@ -1972,6 +2016,7 @@ export default function Reports() {
     let cancelled = false
     setOrdersError('')
     setLoadedHistoryRange('')
+    setSettledHistoryRange('')
     loadOrdersForRange(dateFrom, dateTo)
       .then(rows => {
         if (!cancelled) {
@@ -1984,11 +2029,16 @@ export default function Reports() {
         setHistoryOrders([])
         setOrdersError(error?.message || 'Could not load complete order history')
       })
+      .finally(() => {
+        if (!cancelled) setSettledHistoryRange(`${dateFrom}:${dateTo}`)
+      })
     return () => { cancelled = true }
   }, [dateFrom, dateTo])
 
   useEffect(() => {
     let cancelled = false
+    setSettledExpenseRange('')
+    setExpensesError('')
     async function loadExpenses() {
       if (!canViewExpenses) {
         setExpenses([])
@@ -2048,6 +2098,12 @@ export default function Reports() {
       }
     }
     loadExpenses()
+      .catch(error => {
+        if (!cancelled) setExpensesError(error?.message || 'Could not load expenses')
+      })
+      .finally(() => {
+        if (!cancelled) setSettledExpenseRange(`${dateFrom}:${dateTo}`)
+      })
     return () => { cancelled = true }
   }, [dateFrom, dateTo, canViewExpenses])
 
@@ -2066,6 +2122,7 @@ export default function Reports() {
   }
 
   function exportCloseout() {
+    if (reportsLoading || ordersError) return
     const dateSuffix = closeout.dateFrom === closeout.dateTo
       ? closeout.dateTo
       : `${closeout.dateFrom}-to-${closeout.dateTo}`
@@ -2227,7 +2284,7 @@ export default function Reports() {
                     <option value="all">{l.allWaiters}</option>
                     {uniqueWaiters.map(w => <option key={w} value={w}>{w}</option>)}
                   </select>
-                  <button onClick={exportCloseout} className="flex h-11 items-center gap-1.5 px-4 bg-white border border-[#E5E7EB] rounded-xl text-sm font-semibold text-[#6B7280] hover:bg-gray-50 shadow-sm">
+                  <button onClick={exportCloseout} disabled={reportsLoading || Boolean(ordersError)} className="flex h-11 items-center gap-1.5 px-4 bg-white border border-[#E5E7EB] rounded-xl text-sm font-semibold text-[#6B7280] hover:bg-gray-50 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                     <Download size={14} />{l.export}
                   </button>
                 </div>
@@ -2245,6 +2302,10 @@ export default function Reports() {
               </div>
             )}
 
+            {reportsLoading && (
+              <ReportsSkeleton canViewExpenses={canViewExpenses} lang={lang} />
+            )}
+            <div hidden={reportsLoading || Boolean(ordersError)}>
             {/* KPI cards */}
             <div className={`grid grid-cols-2 lg:grid-cols-3 ${canViewExpenses ? 'xl:grid-cols-6' : 'xl:grid-cols-3'} gap-4 mb-6`}>
               <KpiCard icon={DollarSign}  iconCls="bg-green-50 text-green-600"   label={l.totalRev}  value={formatCurrency(kpiRevenue)} sub={`${l.loyaltyIncome}: ${formatCurrency(kpiLoyaltyIncome)}`} />
@@ -2401,6 +2462,7 @@ export default function Reports() {
               />
             )}
 
+            </div>
           </div>
         </div>
 

@@ -16,7 +16,7 @@ import { clearReservationPatch, getTodaysReservations } from '../lib/tableActivi
 import { formatDateTime, formatElapsedSince, formatTime } from '../lib/dateFormat'
 import { earliestReliableTime, getReliableOrderItemTime } from '../lib/orderTimestamps'
 import { canEditFeature, canUseOffPremiseOrders } from '../lib/permissions'
-import { getTableGuestEntryContext } from '../lib/tableGuestEntry'
+import { getActiveTableOrders, getTableGuestEntryContext } from '../lib/tableGuestEntry'
 import { getTableZoneName, getTableZoneVisual, groupTableInfosByZone } from '../lib/tableZoneColors'
 import { TableGuestEntryDialog } from '../components/GuestModeUI'
 import { completeBillHandoff } from '../lib/billHandoff'
@@ -224,12 +224,7 @@ const STATUS_CFG = {
 // ── Status derivation ─────────────────────────────────────────────────────────
 
 function getVisibleActiveOrdersForTable(tableId, orders) {
-  return orders.filter(o =>
-    o.table_id === tableId &&
-    o.payment_status !== 'paid' &&
-    o.status !== 'cancelled' &&
-    getOrderTotal(o) > 0
-  )
+  return getActiveTableOrders(tableId, orders)
 }
 
 function deriveStatus(tableId, orders) {
@@ -356,7 +351,6 @@ function TableCard({ table, zones, status, counts, lang, canEdit, onClick, onAct
   const zoneName = getTableZoneName(table)
   const cardBorder = status === 'available' ? zone.border : cfg.border
   const cardHoverBorder = status === 'available' ? zone.hoverBorder : cfg.hoverBorder
-  const StatusIcon = cfg.icon
   const elapsed = counts?.createdAt ? elapsedSince(counts.createdAt, lang) : null
   const action = actionForStatus(lang, status)
   const ActionIcon = action?.Icon
@@ -373,35 +367,27 @@ function TableCard({ table, zones, status, counts, lang, canEdit, onClick, onAct
     >
       <span className={`absolute inset-x-0 top-0 h-1 ${zone.bar}`} aria-hidden="true" />
       {/* Header */}
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-base font-black leading-none text-gray-900">{table.name}</p>
-          <span className={`mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black ${zone.badge}`}>
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${zone.dot}`} aria-hidden="true" />
-            <span className="truncate">{zoneName}</span>
-          </span>
-        </div>
-        <span className={`flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${cfg.badge}`}>
-          <StatusIcon size={10} />
-          {statusLabel(lang, status)}
-        </span>
+      <div className="mb-1.5 flex items-start justify-between gap-2">
+        <p className="min-w-0 truncate text-base font-black leading-none text-gray-900">{table.name}</p>
+        {counts?.waiterNames?.length > 0 && (
+          <p className="min-w-0 max-w-[55%] break-words text-right text-xs font-semibold leading-4 text-gray-600">
+            {lang === 'ru' ? 'Официант' : lang === 'uz' ? 'Ofitsiant' : 'Waiter'}: {counts.waiterNames.join(', ')}
+          </p>
+        )}
       </div>
 
-      {(counts?.waiterNames?.length > 0 || (elapsed && status !== 'available')) && (
-        <div className="mb-2 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          {counts?.waiterNames?.length > 0 && (
-            <p className="min-w-0 break-words text-xs font-semibold text-gray-600">
-              {lang === 'ru' ? 'Официант' : lang === 'uz' ? 'Ofitsiant' : 'Waiter'}: {counts.waiterNames.join(', ')}
-            </p>
-          )}
-          {elapsed && status !== 'available' && (
-            <p className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-gray-400">
-              <Clock size={11} className="shrink-0" />
-              {elapsed}
-            </p>
-          )}
-        </div>
-      )}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className={`inline-flex min-w-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black ${zone.badge}`}>
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${zone.dot}`} aria-hidden="true" />
+          <span className="truncate">{zoneName}</span>
+        </span>
+        {elapsed && status !== 'available' && (
+          <p className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-gray-400">
+            <Clock size={11} className="shrink-0" />
+            {elapsed}
+          </p>
+        )}
+      </div>
 
       {/* State-specific content */}
       {status === 'available' && (
@@ -483,7 +469,7 @@ function TableCard({ table, zones, status, counts, lang, canEdit, onClick, onAct
       )}
 
       {canEdit && (action || canManageActiveOrder) && (
-        <div className="mt-4 grid grid-cols-1 gap-2">
+        <div className="mt-auto grid grid-cols-1 gap-2 pt-4">
           {canManageActiveOrder && (
             <button
               type="button"

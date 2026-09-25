@@ -31,7 +31,8 @@ test('Reports and both cashier entry points hide historical delete controls and 
     const source = read(`pages/${page}.jsx`)
     assert.match(source, /const deletionDate = useOrderDeletionDate\(\)/)
     assert.match(source, /canDeleteOrderToday\(profile \|\| \{ role: state.user\?\.role \}, candidate, deletionDate\)/)
-    assert.match(source, /if \(!canDeleteOrderToday\(profile \|\| \{ role: state.user\?\.role \}, order\)/)
+    const clickTarget = page === 'CashierBill' ? 'candidate' : 'order'
+    assert.ok(source.includes(`if (!canDeleteOrderToday(profile || { role: state.user?.role }, ${clickTarget})`))
   }
   assert.match(read('pages/Reports.jsx'), /canDeleteOrder=\{canDeleteOrder\(selectedOrder\)\}/)
   assert.match(read('pages/CashierTables.jsx'), /canDelete=\{canDeleteOrder\(order\)\}/)
@@ -151,4 +152,19 @@ test('production deletion RPC and direct SQL enforce the date boundary and queue
   await db.exec("begin; select set_config('test.now','2026-09-19T19:00:00Z',true)")
   await assert.rejects(db.exec("delete from orders where id='midnight'"),/Only orders from today/)
   await db.exec('rollback')
+})
+
+
+test('cashier empty-state deletion refreshes the candidate and retains normal permission/reason flow', () => {
+  const source = readFileSync(new URL('../src/pages/CashierBill.jsx', import.meta.url), 'utf8')
+  const handler = source.slice(source.indexOf('  async function handleDeleteOrder'), source.indexOf('  function addQuickItem'))
+  assert.match(handler, /const freshOrders = await refreshCurrentBill\(\)/)
+  assert.match(handler, /getEmptyCashierOrders\(freshOrders, \{ tableId, orderId \}\)\.some\(row => row.id === candidate.id\)/)
+  assert.match(handler, /type: 'DELETE_ORDER',[\s\S]*orderId: candidate.id/)
+  assert.match(handler, /if \(result\?\.cancelled\) return/)
+  const emptyState = source.slice(source.indexOf('  // ── Empty state'), source.indexOf('  const totalItems'))
+  assert.match(emptyState, /!isRefreshingBill && !paymentRefreshMessage && emptyOrders.map/)
+  assert.match(emptyState, /canDeleteOrder\(candidate\)/)
+  assert.match(emptyState, /onClick=\{\(\) => handleDeleteOrder\(candidate\)\}/)
+  assert.match(emptyState, /formatWriteError\(deleteOrderError, lang, 'DELETE_ORDER'\)/)
 })

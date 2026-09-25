@@ -1323,67 +1323,18 @@ export async function writeToSupabase(action, state, options = {}) {
     }
 
     case 'UPDATE_BILL_ITEM_QTY': {
-      const { tableId, orderId, orderItemId, menuItemId, qty } = action.payload
-      const sourceItemIds = new Set(action.payload.sourceItemIds || [])
-      const rawQty = Number(qty) || 0
-      const nextQty = rawQty <= 0 ? 0 : normalizeMenuQuantity(rawQty, action.payload)
-      if ((!tableId && !orderId) || (!orderItemId && !menuItemId)) return
-
-      let query = supabase
-        .from('orders')
-        .select('*, items:order_items(*)')
-        .neq('payment_status', 'paid')
-      query = orderId ? query.eq('id', orderId) : query.eq('table_id', tableId)
-      const { data: orders, error: ordersError } = await query
-      if (ordersError) throw ordersError
-
-      const order = (orders || []).find(o =>
-        (o.items || []).some(row => orderItemId ? row.id === orderItemId || sourceItemIds.has(row.id) : row.menu_item_id === menuItemId)
-      )
-      if (!order) return
-
-      const matchesItem = row => orderItemId
-        ? row.id === orderItemId || sourceItemIds.has(row.id)
-        : row.menu_item_id === menuItemId
-      const target = (order.items || []).find(matchesItem)
-      if (!target) return
-      const duplicateIds = (order.items || [])
-        .filter(row => matchesItem(row) && row.id !== target.id)
-        .map(row => row.id)
-
-      if (nextQty <= 0) {
-        const idsToDelete = [target.id, ...duplicateIds]
-        const { error } = await supabase.from('order_items').delete().in('id', idsToDelete)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from('order_items').update({ quantity: nextQty }).eq('id', target.id)
-        if (error) throw error
-        if (duplicateIds.length > 0) {
-          const { error: deleteDuplicatesError } = await supabase.from('order_items').delete().in('id', duplicateIds)
-          if (deleteDuplicatesError) throw deleteDuplicatesError
-        }
-      }
-
-      const nextItems = nextQty <= 0
-        ? (order.items || []).filter(row => !matchesItem(row))
-        : (order.items || []).flatMap(row => {
-            if (!matchesItem(row)) return [row]
-            if (row.id !== target.id) return []
-            return [{ ...row, quantity: nextQty }]
-          })
-      const serviceRatePct = isOffPremiseOrderType(order.order_type) ? 0 : Number.isFinite(Number(order.service_rate_pct))
-        ? Number(order.service_rate_pct)
-        : serviceRatePctFromSettings(state.settings, order.price_mode)
-      const paymentFields = getOrderPaymentFields(
-        { order_type: order.order_type, service_rate_pct: serviceRatePct },
-        nextItems,
-        serviceRatePct
-      )
-      const { error: orderUpdateError } = await supabase
-        .from('orders')
-        .update(paymentFields)
-        .eq('id', order.id)
-      if (orderUpdateError) throw orderUpdateError
+      const { tableId, orderId, orderItemId, sourceItemIds = [], qty } = action.payload
+      const { error } = await withAbortSignal(supabase.rpc('update_bill_item_quantity', {
+        payload: {
+          request_id: action._billEditRequestId,
+          table_id: tableId || null,
+          order_id: orderId || null,
+          order_item_id: orderItemId,
+          source_item_ids: sourceItemIds,
+          quantity: Number(qty),
+        },
+      }), options.signal)
+      if (error) throw error
       break
     }
 

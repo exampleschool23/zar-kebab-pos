@@ -74,3 +74,23 @@ test('cashier hides paid or cancelled orders even with billable items', () => {
   assert.equal(isCashierVisibleBill(order({ payment_status: 'paid', items: [item()] })), false)
   assert.equal(isCashierVisibleBill(order({ status: 'cancelled', items: [item()] })), false)
 })
+
+test('empty-order recovery includes only loaded unpaid shells for the requested bill', async () => {
+  const { getEmptyCashierOrders } = await import('../src/lib/cashierBills.js')
+  const base = { id: 'empty', table_id: 't4', status: 'needs_bill', payment_status: 'unpaid', total: 41400, items: [] }
+  const rows = [base,
+    { ...base, id: 'cancelled-items', items: [{ status: 'cancelled', quantity: 1, price: 100 }] },
+    { ...base, id: 'paid', payment_status: 'paid' },
+    { ...base, id: 'paid-at', paid_at: '2026-09-25T10:00:00Z' },
+    { ...base, id: 'completed', status: 'completed' },
+    { ...base, id: 'cancelled', status: 'cancelled' },
+    { ...base, id: 'cancelled-payment', payment_status: 'cancelled' },
+    { ...base, id: 'unloaded', items: undefined },
+    { ...base, id: 'live', items: [{ quantity: 1, price: 100 }] },
+    { ...base, id: 'other', table_id: 't5' },
+  ]
+  assert.deepEqual(getEmptyCashierOrders(rows, { tableId: 't4' }).map(o => o.id), ['empty', 'cancelled-items'])
+  assert.deepEqual(getEmptyCashierOrders(rows, { orderId: 'empty' }), [base])
+  assert.deepEqual(getEmptyCashierOrders(rows), [])
+  assert.equal(isCashierVisibleBill(base), false)
+})

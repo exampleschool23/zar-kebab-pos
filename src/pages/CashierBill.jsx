@@ -1,3 +1,5 @@
+import { getEmptyCashierOrders } from '../lib/cashierBills'
+import { formatWriteError } from '../lib/writeErrorMessage'
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -123,6 +125,7 @@ export default function CashierBill() {
   const [paymentRefreshMessage, setPaymentRefreshMessage] = useState('')
   const [isDeletingOrder, setDeletingOrder] = useState(false)
   const [confirmDeleteOrder, setConfirmDeleteOrder] = useState(false)
+  const [deleteOrderError, setDeleteOrderError] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const menuItemMap = useMemo(() => {
@@ -174,6 +177,8 @@ export default function CashierBill() {
   }, [state.orders, state.settings, tableId, orderId, menuItemMap])
 
   const order = currentOrder || (salaryCheckoutActive ? salaryBill.current : null)
+
+  const emptyOrders = getEmptyCashierOrders(state.orders, { tableId, orderId })
 
   const table = state.tables.find(t => t.id === tableId)
   const orderType = inferOrderType(order)
@@ -563,16 +568,27 @@ export default function CashierBill() {
     }
   }
 
-  async function handleDeleteOrder() {
-    if (!canDeleteOrderToday(profile || { role: state.user?.role }, order) || !order?.id || isDeletingOrder) return
+  async function handleDeleteOrder(candidate = order) {
+    if (!canDeleteOrderToday(profile || { role: state.user?.role }, candidate) || !candidate?.id || isDeletingOrder) return
     setDeletingOrder(true)
+    setDeleteOrderError(null)
     try {
+      if (!order) {
+        const freshOrders = await refreshCurrentBill()
+        if (!getEmptyCashierOrders(freshOrders, { tableId, orderId }).some(row => row.id === candidate.id)) return
+      }
       const result = await dispatch({
         type: 'DELETE_ORDER',
-        payload: { orderId: order.id },
+        payload: { orderId: candidate.id },
       })
-      if (result?.error) return
+      if (result?.cancelled) return
+      if (result?.error) {
+        setDeleteOrderError(result.error)
+        return
+      }
       navigate('/cashier/tables')
+    } catch (error) {
+      setDeleteOrderError(error)
     } finally {
       setDeletingOrder(false)
     }
@@ -723,10 +739,40 @@ export default function CashierBill() {
             <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mb-4">
               <Receipt size={28} className="text-orange-300" strokeWidth={1.5} />
             </div>
-            <p className="font-black text-[#1F2937] text-base mb-1">{lbl.noOrder}</p>
+            <p className="font-black text-[#1F2937] text-base mb-1">{isRefreshingBill ? lbl.refreshingBill : emptyOrders.length > 0
+              ? (lang === 'uz' ? 'Buyurtmada mahsulot yo‘q' : lang === 'ru' ? 'В заказе нет позиций' : 'This order has no items')
+              : lbl.noOrder}</p>
             <p className="text-sm text-[#6B7280] mt-1 mb-5">
-              {lang === 'uz' ? "Buyurtma allaqachon to'langan bo'lishi mumkin." : lang === 'ru' ? 'Возможно, заказ уже оплачен.' : 'The order may have already been paid.'}
+              {!isRefreshingBill && !paymentRefreshMessage && (emptyOrders.length > 0
+                ? (lang === 'uz' ? 'To‘lanmagan bo‘sh buyurtma saqlanib qolgan. Saqlangan summa to‘lov uchun hisob emas.' : lang === 'ru' ? 'Остался пустой неоплаченный заказ. Сохранённая сумма не является счётом к оплате.' : 'An empty unpaid order remains. Its saved amount is not a bill to charge.')
+                : (lang === 'uz' ? "Buyurtma allaqachon to'langan bo'lishi mumkin." : lang === 'ru' ? 'Возможно, заказ уже оплачен.' : 'The order may have already been paid.'))}
             </p>
+            {!isRefreshingBill && !paymentRefreshMessage && emptyOrders.map(candidate => (
+              <div key={candidate.id} className="mb-4 w-full rounded-xl border border-orange-100 bg-orange-50 p-3">
+                <p className="mb-2 break-all text-xs text-gray-500">{candidate.table_name || table?.name} · {candidate.id}</p>
+                {canDeleteOrder(candidate) ? (
+                  <button type="button" disabled={isDeletingOrder} onClick={() => handleDeleteOrder(candidate)}
+                    className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
+                    {isDeletingOrder ? lbl.deletingOrder : lbl.deleteOrder}
+                  </button>
+                ) : (
+                  <p className="text-sm text-gray-600">{lang === 'uz' ? 'Bugungi buyurtmani o‘chirish uchun ruxsatli hisob kerak. Yordam uchun rahbarga murojaat qiling.' : lang === 'ru' ? 'Удаление доступно уполномоченной учётной записи только в день заказа. Обратитесь к руководителю.' : 'Deletion requires an authorized account and is available only on the order’s date. Ask a manager for help.'}</p>
+                )}
+              </div>
+            ))}
+            {deleteOrderError && <p role="alert" className="mb-4 text-sm text-red-600">{formatWriteError(deleteOrderError, lang, 'DELETE_ORDER')}</p>}
+            {paymentRefreshMessage && (
+              <div role="alert" className="mb-4 text-sm text-red-600">
+                <p>{paymentRefreshMessage.error ? cashierRefreshErrorMessage(paymentRefreshMessage.error, lang) : paymentRefreshMessage}</p>
+                <button type="button" disabled={isRefreshingBill} className="mt-2 font-bold underline"
+                  onClick={async () => {
+                    setRefreshingBill(true)
+                    setPaymentRefreshMessage('')
+                    try { await refreshCurrentBill() } catch (error) { setPaymentRefreshMessage({ error }) }
+                    finally { setRefreshingBill(false) }
+                  }}>{lang === 'uz' ? 'Qayta urinish' : lang === 'ru' ? 'Повторить' : 'Retry'}</button>
+              </div>
+            )}
             {canDeletePaidOrders(profile || { role: state.user?.role }) && hasPendingSalarySettlement(orderId || tableId) && (
               <SalaryOrderPayment lang={lang} disabled={false} total={0} loyaltyUsed={0} cashback={0}
                 tableId={tableId} orderId={orderId} getFreshQuote={async () => ({ orderIds: [] })}
@@ -1495,7 +1541,7 @@ export default function CashierBill() {
                 {canDeleteOrder(order) && (
                   <div className="grid gap-2">
                     <button
-                      onClick={handleDeleteOrder}
+                      onClick={() => handleDeleteOrder(order)}
                       disabled={isDeletingOrder}
                       className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-colors ${
                         confirmDeleteOrder

@@ -1,3 +1,5 @@
+import { getActiveTableOrders } from './tableGuestEntry.js'
+
 // Resolve operational labels only; persisted actor names remain historical snapshots.
 export async function loadActiveOrderWaiterNames(orders, dbClient) {
   const active = orders.filter(order => order.payment_status !== 'paid' && !order.paid_at && !['paid', 'completed', 'cancelled'].includes(order.status))
@@ -19,4 +21,12 @@ export async function loadActiveOrderWaiterNames(orders, dbClient) {
 
 export function getActiveWaiterNames(orders) {
   return [...new Set(orders.map(order => order.waiter_name?.trim() || order.opened_by_name?.trim()).filter(Boolean))]
+}
+
+export function getTableOrderWaiterNames(tableId, orders = [], draftWaiterName = '') {
+  if (!tableId) return []
+  const active = getActiveTableOrders(tableId, orders)
+  return active.length > 0
+    ? getActiveWaiterNames(active)
+    : [draftWaiterName.trim()].filter(Boolean)
 }

@@ -4,17 +4,21 @@
 
 - UI: `src/pages/CashierBill.jsx`, `src/pages/Receipt.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`, `src/pages/MonthlyEstimate.jsx`, `src/pages/DailyBazaar.jsx`
 - Helpers: `src/lib/analytics.js`, `src/lib/cashierCheckout.js`, `src/lib/billHandoff.js`, `src/lib/accounting.js`, `src/lib/accountingSummary.js`, `src/lib/expenses.js`, `src/lib/monthlyEstimate.js`, `src/lib/bazaar.js`
-- Database: `src/lib/db.js`; migrations `083`, `090`, `097`, `109`, `135`, `201`
+- Database: `src/lib/db.js`; migrations `083`, `090`, `097`, `109`, `135`, `201`, `212`
 - Tests: `tests/orderPayment.test.js`, `tests/atomicPaymentSettlement.test.js`, `tests/cashierCheckout.test.js`, `tests/accountingPages.test.js`, `tests/monthlyEstimate.test.js`, `tests/bazaar.test.js`, `tests/sourceGuards.payments-reporting.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
 
 ## Payment math
 
-- Use `normalizeServiceRatePct()`, `getOrderPaymentSummary()`, and `getOrderPaymentFields()` from `src/lib/analytics.js`; do not hand-roll totals in pages.
+- Use `normalizeServiceRatePct()`, `getOrderPaymentSummary()`, and `getOrderPaymentFields()`; never hand-roll page totals.
 - Dine-in may include service. Take-away, delivery, and Game Club use zero service.
 - Regular and Tourist service settings are separate; new dine-in orders snapshot the rate chosen by authoritative `price_mode`.
 - Reuse an unpaid order's saved service rate only when its saved price mode matches the submitted mode. Empty/stale Regular shells cannot leak Regular service into Tourist orders.
 - Active and paid orders keep their rate snapshot after settings change. Pending kitchen retries retain the original rate.
-- Use shared loyalty/counter-item helpers. Reports read paid `orders.total`; unpaid bills recalculate from items.
+- Use shared loyalty/counter helpers. Reports use paid `orders.total`; unpaid bills use items.
+
+## Bill item edits
+
+- Deploy `212` before UI; reload old clients. `update_bill_item_quantity` atomically locks/edits/recalculates; no legacy fallback. `_billEditRequestId` receipts prevent replay; errors refresh state. Paid items locked; waiter recall required. Empty bills save zero and free tables without other active items. Tests: `tests/atomicBillItemEdits.test.js`.
 
 ## Split payments and corrections
 
@@ -22,7 +26,7 @@
 - Delete completed orders access permits atomic non-loyalty tender corrections.
 - Loyalty rows are visible but immutable without a separate wallet reversal workflow.
 - Method corrections keep amounts fixed. Splits preserve the original sum, other payments, items, totals, paid state/time, loyalty, service and stock. Receipts audit/reconcile splits. Tests: `tests/paidPaymentSplit.test.js`.
-- Order deletes require a reason (`184`) and today's Tashkent `paid_at`/`created_at` date (`202`), even for owners. Reports/cashier hide older delete controls. Payment corrections still notify Investor.
+- Deletes require a reason (`184`) and today's Tashkent date (`202`), including owners. Empty cashier bills expose the same guarded deletion after refresh; paid/older orders remain protected. Corrections notify Investor.
 
 ## Receipt printing
 
@@ -60,18 +64,18 @@
 Migrations `097`, `160`–`163`, `182`.
 
 - Receipts contain product, category, quantity, unit, and exact amount.
-- Product-line controls share one height; notes use separate multiline fields.
-- Store buyer id and name snapshot. New entries use cash/card; preserve historical terminal.
+- Product rows share one height; notes are multiline.
+- Snapshot buyer ID/name. New entries use cash/card; preserve historical terminal.
 - New lines require active `bazaar_product_catalog` ingredients; no arbitrary names.
 - `/admin/ingredients` manages canonical names, categories, purchase units, normal unit prices, and active/archive state. Migration `182` allows owner renames; saves keep catalog keys and historical snapshots.
-- Migration `186` delegates catalog writes to active owners/admins with the independent `ingredients` Team feature; viewers only read. Bazaar/Tech Card users retain catalog reads but do not inherit Ingredients access or writes.
+- `186`: active owners/admins with `ingredients` may write; viewers read. Bazaar/Tech Card access grants catalog reads only.
 - Migration `161` starts the managed list empty without changing history.
-- Normal unit price suggests the line total, but the exact paid total remains editable and is the historical Accounting source of truth.
-- Each saved line snapshots its normal unit price, quantity-scaled normal total, and signed difference (`paid - normal`). UI and Investor Telegram show line/total differences: positive is above normal, negative below.
-- Editing a durable line reuses its saved normal-price snapshot even when the current ingredient catalog price has changed.
+- Suggested line totals remain editable; exact paid totals drive Accounting.
+- Snapshot normal unit price, quantity-scaled total and variance (`paid - normal`). UI/Investor show line/total variances: positive above normal, negative below.
+- Saved lines retain their original normal-price snapshot.
 - Catalog deletion is archival. Existing purchase lines keep their historical name, category, unit, and exact paid amount snapshots.
 - Ingredient writes reconcile before retry and update locally.
-- Keep ISO dates.
+- ISO dates.
 - Server calculates totals. Create retries reuse a request UUID.
 - Save/edit/delete atomically maintains exactly one linked `expenses` row with `products_bazaar`; do not ask for duplicate Accounting entry.
 - Normalize compatible units only (g→kg, ml→l); never combine counts with weights/volumes.
