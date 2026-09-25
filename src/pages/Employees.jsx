@@ -70,6 +70,18 @@ export default function Employees() {
   const L = {
     uz: {
       title: 'Xodimlar',
+      allRoles: 'Barcha lavozimlar',
+      sortBy: 'Saralash',
+      defaultSort: 'Odatiy tartib',
+      balanceDesc: 'Balans: yuqoridan pastga',
+      balanceAsc: 'Balans: pastdan yuqoriga',
+      salaryDesc: 'Kunlik maosh: yuqoridan pastga',
+      salaryAsc: 'Kunlik maosh: pastdan yuqoriga',
+      nameAsc: 'Ism: A–Z',
+      joinedDesc: 'Ishga kirgan: eng yangi',
+      joinedAsc: 'Ishga kirgan: eng eski',
+      noMatches: 'Bu lavozimda xodimlar topilmadi',
+      resetFilters: 'Filtrlarni tozalash',
       sub: 'Maosh tizimidagi xodimlar ro‘yxati',
       back: 'Maoshlarga qaytish',
       active: 'Faol',
@@ -118,6 +130,18 @@ export default function Employees() {
     },
     ru: {
       title: 'Сотрудники',
+      allRoles: 'Все должности',
+      sortBy: 'Сортировка',
+      defaultSort: 'По умолчанию',
+      balanceDesc: 'Баланс: по убыванию',
+      balanceAsc: 'Баланс: по возрастанию',
+      salaryDesc: 'Дневная зарплата: по убыванию',
+      salaryAsc: 'Дневная зарплата: по возрастанию',
+      nameAsc: 'Имя: А–Я',
+      joinedDesc: 'Дата выхода: сначала новые',
+      joinedAsc: 'Дата выхода: сначала старые',
+      noMatches: 'Нет сотрудников с этой должностью',
+      resetFilters: 'Сбросить фильтры',
       sub: 'Список сотрудников в зарплатной системе',
       back: 'Назад к зарплатам',
       active: 'Активен',
@@ -166,6 +190,18 @@ export default function Employees() {
     },
     en: {
       title: 'Employees',
+      allRoles: 'All roles',
+      sortBy: 'Sort by',
+      defaultSort: 'Default order',
+      balanceDesc: 'Balance: highest first',
+      balanceAsc: 'Balance: lowest first',
+      salaryDesc: 'Daily salary: highest first',
+      salaryAsc: 'Daily salary: lowest first',
+      nameAsc: 'Name: A–Z',
+      joinedDesc: 'Joined: newest first',
+      joinedAsc: 'Joined: oldest first',
+      noMatches: 'No employees match this role',
+      resetFilters: 'Reset filters',
       sub: 'Employee list from the salary system',
       back: 'Back to salaries',
       active: 'Active',
@@ -223,6 +259,8 @@ export default function Employees() {
   const [confirmActionKey, setConfirmActionKey] = useState('')
   const [deactivateDates, setDeactivateDates] = useState({})
   const [inactiveExpanded, setInactiveExpanded] = useState(false)
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('default')
   const [editingNameId, setEditingNameId] = useState(null)
   const [editingName, setEditingName] = useState('')
   const [editingJobFunction, setEditingJobFunction] = useState('')
@@ -276,13 +314,13 @@ export default function Employees() {
       .filter(employee => getSalaryAbsenceDates(employee).has(today))
       .map(employee => employee.id)
   ), [activeEmployees, today])
-  const sortedActiveEmployees = useMemo(() => (
+  const defaultActiveEmployees = useMemo(() => (
     [...activeEmployees].sort((a, b) => (
       getDailySalaryAmount(a, getSalaryActiveUntil(a, today)) - getDailySalaryAmount(b, getSalaryActiveUntil(b, today)) ||
       employeeName(a).localeCompare(employeeName(b))
     ))
   ), [activeEmployees, today])
-  const inactiveEmployees = useMemo(() => (
+  const defaultInactiveEmployees = useMemo(() => (
     employees
       .filter(item => item.is_active === false)
       .sort((a, b) => (
@@ -290,6 +328,33 @@ export default function Employees() {
         employeeName(a).localeCompare(employeeName(b))
       ))
   ), [employees])
+  const { sortedActiveEmployees, inactiveEmployees } = useMemo(() => {
+    const matches = [...defaultActiveEmployees, ...defaultInactiveEmployees].filter(employee => roleFilter === 'all' || (
+      roleFilter === 'unassigned' ? !employee.job_function : employee.job_function === roleFilter
+    ))
+    // Compute ledger values once per employee, using the same dates as the cards.
+    const values = new Map(matches.map(employee => [employee.id, {
+      balance: getSalaryBalance(employee, today),
+      salary: getDailySalaryAmount(employee, getSalaryActiveUntil(employee, today)),
+    }]))
+    const compare = (a, b) => {
+      const byName = employeeName(a).localeCompare(employeeName(b), lang)
+      switch (sortBy) {
+        case 'balanceDesc': return values.get(b.id).balance - values.get(a.id).balance || byName
+        case 'balanceAsc': return values.get(a.id).balance - values.get(b.id).balance || byName
+        case 'salaryDesc': return values.get(b.id).salary - values.get(a.id).salary || byName
+        case 'salaryAsc': return values.get(a.id).salary - values.get(b.id).salary || byName
+        case 'nameAsc': return byName
+        case 'joinedDesc': return String(b.joined_at || '').localeCompare(String(a.joined_at || '')) || byName
+        case 'joinedAsc': return String(a.joined_at || '').localeCompare(String(b.joined_at || '')) || byName
+        default: return 0
+      }
+    }
+    return {
+      sortedActiveEmployees: matches.filter(employee => employee.is_active !== false).sort(compare),
+      inactiveEmployees: matches.filter(employee => employee.is_active === false).sort(compare),
+    }
+  }, [defaultActiveEmployees, defaultInactiveEmployees, roleFilter, sortBy, today, lang])
   const employeeGridEntries = [
     ...sortedActiveEmployees.map(employee => ({ type: 'employee', employee })),
     ...(inactiveEmployees.length > 0 ? [{ type: 'inactive-toggle', id: 'inactive-toggle' }] : []),
@@ -450,12 +515,35 @@ export default function Employees() {
             </div>
           </div>
 
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-[#E5E7EB] bg-white p-4 sm:flex-row sm:items-end">
+            <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-xs font-bold text-[#6B7280]">
+              {l.jobFunction}
+              <select value={roleFilter} onChange={event => setRoleFilter(event.target.value)} className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                <option value="all">{l.allRoles}</option>
+                {EMPLOYEE_JOB_FUNCTIONS.map(job => <option key={job.value} value={job.value}>{employeeJobFunctionLabel(job.value, lang)}</option>)}
+                <option value="unassigned">{l.noJobFunction}</option>
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-xs font-bold text-[#6B7280]">
+              {l.sortBy}
+              <select value={sortBy} onChange={event => setSortBy(event.target.value)} className="w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-semibold text-[#1F2937] focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-100">
+                <option value="default">{l.defaultSort}</option>
+                {['balanceDesc', 'balanceAsc', 'salaryDesc', 'salaryAsc', 'nameAsc', 'joinedDesc', 'joinedAsc'].map(value => <option key={value} value={value}>{l[value]}</option>)}
+              </select>
+            </label>
+            {(roleFilter !== 'all' || sortBy !== 'default') && (
+              <button type="button" onClick={() => { setRoleFilter('all'); setSortBy('default') }} className="rounded-xl px-3 py-2.5 text-sm font-bold text-[#ff5a00] hover:bg-orange-50">{l.resetFilters}</button>
+            )}
+          </div>
+
           {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div>}
 
           {loading ? (
             <div className="flex justify-center py-20"><Loader2 size={30} className="animate-spin text-gray-300" /></div>
           ) : employees.length === 0 ? (
             <div className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-16 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div>
+          ) : employeeGridEntries.length === 0 ? (
+            <div role="status" className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-16 text-center text-sm font-bold text-[#9CA3AF]">{l.noMatches}</div>
           ) : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {employeeGridEntries.map(entry => {
@@ -474,7 +562,7 @@ export default function Employees() {
                         </span>
                         <span className="min-w-0">
                           <span className="block text-sm font-black text-[#1F2937]">{l.inactiveSection}</span>
-                          <span className="mt-0.5 block text-xs font-semibold text-[#9CA3AF]">{l.inactiveNewestFirst}</span>
+                          <span className="mt-0.5 block text-xs font-semibold text-[#9CA3AF]">{sortBy === 'default' ? l.inactiveNewestFirst : l[sortBy]}</span>
                         </span>
                       </span>
                       <span className="flex flex-shrink-0 items-center gap-2">
