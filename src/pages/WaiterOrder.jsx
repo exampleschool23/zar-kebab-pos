@@ -26,6 +26,7 @@ import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 import { canEditFeature } from '../lib/permissions'
 import { rebuildGuestCartFromCatalog } from '../lib/guestCart'
 import { getActiveTableOrders } from '../lib/tableGuestEntry'
+import { getActiveWaiterNames } from '../lib/activeOrderWaiters'
 import {
   clearGuestModeSession,
   getGuestModePinLength,
@@ -688,6 +689,8 @@ export default function WaiterOrder() {
     () => isTakeAwayFlow ? [] : getActiveTableOrders(tableId, state.orders),
     [state.orders, tableId, isTakeAwayFlow]
   )
+  const waiterName = getActiveWaiterNames(activeOrders).join(', ') || profile?.full_name?.trim()
+  const waiterLabel = lang === 'uz' ? 'Ofitsiantingiz' : lang === 'ru' ? 'Ваш официант' : 'Your waiter'
 
   // Merge all billable active orders for this table. Empty shells must not
   // override the R/T price mode selected while entering the table.
@@ -1366,10 +1369,8 @@ export default function WaiterOrder() {
         placeholder={lang === 'uz' ? 'Menyu qidirish...' : lang === 'ru' ? 'Поиск по меню...' : 'Search menu...'}
         searchLabel={lang === 'uz' ? 'Qidirish' : lang === 'ru' ? 'Поиск' : 'Search'}
         clearLabel={lang === 'uz' ? 'Qidiruvni tozalash' : lang === 'ru' ? 'Очистить поиск' : 'Clear search'}
-        closeLabel={lang === 'uz' ? 'Qidiruvni yopish' : lang === 'ru' ? 'Закрыть поиск' : 'Close search'}
-        alwaysOpen={isGuestTabletMode}
-        variant={isGuestTabletMode ? 'inline' : 'overlay'}
-        buttonClassName="!h-11 !w-11"
+        alwaysOpen
+        panelClassName="!h-11"
         className={className}
       />
     )
@@ -1473,6 +1474,11 @@ export default function WaiterOrder() {
                   <div className="min-w-0 flex-1 xl:max-w-[240px] xl:flex-none">
                     <p className="hidden sm:block truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
                     <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
+                    {waiterName && (
+                      <p className="mt-1 truncate text-xs leading-snug text-[#6B7280]" title={`${waiterLabel}: ${waiterName}`}>
+                        {waiterLabel}: <span className="font-semibold text-[#374151]">{waiterName}</span>
+                      </p>
+                    )}
                   </div>
                   <div className="ml-auto xl:hidden">
                     <GuestModeUtilities
@@ -1497,7 +1503,7 @@ export default function WaiterOrder() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-1 sm:gap-3 sm:flex-nowrap">
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-2 sm:gap-3 sm:flex-nowrap">
                 {shouldShowSidebar && (
                   <button
                     onClick={() => { if (!orderLocked) setSidebarOpen(true) }}
@@ -1518,8 +1524,13 @@ export default function WaiterOrder() {
                 <div className="min-w-0 max-w-[180px] flex-1 sm:max-w-[240px]">
                   <p className="hidden sm:block truncate text-[10px] font-black uppercase tracking-wide text-[#9CA3AF]">{orderContextLabel}</p>
                   <h1 className="truncate text-sm font-black leading-tight text-[#1F2937] sm:text-base">{orderTitle}</h1>
+                  {waiterName && (
+                    <p className="mt-1 truncate text-xs leading-snug text-[#6B7280]" title={`${waiterLabel}: ${waiterName}`}>
+                      {waiterLabel}: <span className="font-semibold text-[#374151]">{waiterName}</span>
+                    </p>
+                  )}
                 </div>
-                {renderSearchControl()}
+                {renderSearchControl('!order-last !basis-full sm:!order-none sm:!basis-0')}
                 {renderCartButton('ml-auto')}
                 <button type="button"
                   aria-label={mobileMenuView === 'compact' ? (lang === 'ru' ? 'Крупные карточки' : lang === 'uz' ? 'Katta kartochkalar' : 'Large cards') : (lang === 'ru' ? 'Компактные карточки' : lang === 'uz' ? 'Ixcham kartochkalar' : 'Compact cards')}
