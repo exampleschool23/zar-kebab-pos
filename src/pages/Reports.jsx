@@ -630,6 +630,7 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
     direct:     { uz: 'Alohida sotilgan', ru: 'Продано отдельно', en: 'Sold directly' },
     included:   { uz: 'Setlar tarkibida', ru: 'В составе сетов', en: 'Sold in sets' },
     sources:    { uz: 'Sotuv tarkibi', ru: 'Источники продаж', en: 'Sales breakdown' },
+    overall:    { uz: 'Jami', ru: 'Всего', en: 'Overall' },
     directRevenue: { uz: 'Alohida sotuvlar summasi', ru: 'Сумма отдельных продаж', en: 'Direct item sales' },
     setRevenue: { uz: 'Set narxiga kiritilgan', ru: 'Включено в цену сета', en: 'Included in set price' },
     mostSold:   { uz: 'Eng ko‘p sotilgan taomlar', ru: 'Самые продаваемые блюда', en: 'Most-sold meals' },
@@ -826,6 +827,12 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
             <p className="text-sm font-black text-[#1F2937]">{selectedDishKey === ALL_DISHES_KEY ? s.mostSold[lang] : s.sources[lang]}</p>
             <span className="text-[11px] font-bold text-[#9CA3AF]">{mostSoldMeals.length}</span>
           </div>
+          {selectedDishKey !== ALL_DISHES_KEY && (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-orange-50 px-4 py-3">
+              <span className="text-sm font-bold text-[#1F2937]">{s.overall[lang] || s.overall.en}</span>
+              <span className="text-xl font-black text-[#ff5a00]">{formatQuantity(analysis.totals.quantity)}</span>
+            </div>
+          )}
           {mostSoldMeals.length === 0 ? (
             <CompactEmpty label={s.noSales[lang] || s.noSales.en} />
           ) : (
