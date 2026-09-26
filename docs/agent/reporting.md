@@ -9,11 +9,8 @@
 
 ## Loader boundaries
 
-- POS hydration covers active/today’s paid orders only, never historical reports or Accounting.
-- Dashboard, Reports, Accounting, Monthly Estimate and receipts use bounded loaders.
-- Receipts load by order/session id.
-- Monthly estimates query the earliest needed date.
-- Overview cards use aggregate RPCs.
+- POS hydration covers active/today’s paid orders only.
+- Use bounded report loaders, receipt order/session IDs, earliest-needed estimate dates, and aggregate overview RPCs.
 
 ## Financial history
 
@@ -58,11 +55,11 @@
 
 - Reports: skeletons and disabled export until orders/expenses settle for applied dates. Ignore cancelled reads; language changes never refetch.
 
-- Dish Analysis ranks the top 30 sold meals by quantity for the report range, including archived sales.
+- Dish Analysis: All dishes ranks 30 direct sellers. Selection shows description, sources, hours/log, hiding global rankings. Add frozen `tech_card_component_snapshot` quantities × parent quantity; deduplicate orders. No inferred recipes/legacy contents or added set revenue. Tests: `tests/dishSales.test.js`.
 
-- Dish sales needs loaded range history; loading/errors never imply zero. Low sellers: 15 active products including unsold; archives retain history only.
+- Dish sales requires loaded history; loading/errors never mean zero. Low sellers: 15 active products, including unsold; archives retain history.
 
-- Dish reconciliation uses saved service/loyalty and item prices; expose missing snapshots and residual differences. Period remainder includes calculated meals, excludes opening balances. Closeout variance is unknown without counted balances; CSV says Not measured. Tests: `tests/closeout.test.js`.
+- Dish reconciliation helper retains saved inputs and coverage/residual checks; its UI panel is removed. Period remainder includes calculated meals, excludes opening balances. Closeout variance is unknown without counted balances; CSV says Not measured. Tests: `tests/closeout.test.js`.
 
 - `210`: see [salary orders](salary-orders.md).
 

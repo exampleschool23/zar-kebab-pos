@@ -146,3 +146,57 @@ test('reconciliation uses saved service and loyalty and exposes unexplained diff
   assert.equal(incomplete.difference, 20000)
   assert.equal(getDishRevenueReconciliation([{ ...paid, status: 'cancelled' }]).collected, 0)
 })
+
+test('selected dish includes frozen set portions, deduplicates orders and preserves revenue', () => {
+  const included = { menu_item_id: 'kebab', name_en: 'Kebab', quantity: 2 }
+  const orders = [
+    order({ id: 'both', paidAt: '2026-09-26T06:00:00Z', items: [
+      item({ quantity: 3 }),
+      item({ menu_item_id: 'set', name: 'Shashlik lovers', quantity: 2, price: 100000, tech_card_component_snapshot: [included] }),
+      item({ menu_item_id: 'set', quantity: 9, status: 'cancelled', tech_card_component_snapshot: [included] }),
+    ] }),
+    order({ id: 'set-only', paidAt: '2026-09-26T08:00:00Z', items: [
+      item({ menu_item_id: 'small-set', name: 'Small set', quantity: 3, price: 50000, tech_card_component_snapshot: [{ ...included, quantity: 0.5 }] }),
+    ] }),
+  ]
+  const analysis = getDishSalesAnalysis({ orders, menuItems, selectedDishKey: 'menu:kebab' })
+  assert.equal(analysis.totals.quantity, 8.5)
+  assert.equal(analysis.totals.directQuantity, 3)
+  assert.equal(analysis.totals.includedQuantity, 5.5)
+  assert.equal(analysis.totals.orders, 2)
+  assert.equal(analysis.totals.averagePerOrder, 4.25)
+  assert.equal(analysis.totals.revenue, 75000)
+  assert.equal(analysis.totals.lastSoldAt, '2026-09-26T08:00:00Z')
+  assert.deepEqual(analysis.hourly.map(row => [row.hour, row.quantity]), [[11, 7], [13, 1.5]])
+  assert.deepEqual(analysis.sources.map(row => [row.name, row.quantity]), [['Shashlik lovers', 4], ['Kebab', 3], ['Small set', 1.5]])
+  assert.equal(analysis.sales.filter(row => row.includedInSet).length, 2)
+  const all = getDishSalesAnalysis({ orders, menuItems })
+  assert.equal(all.totals.quantity, 8)
+  assert.equal(all.totals.revenue, 425000)
+  const set = getDishSalesAnalysis({ orders, menuItems, selectedDishKey: 'menu:set' })
+  assert.equal(set.totals.quantity, 2)
+  assert.equal(set.totals.includedQuantity, 0)
+})
+
+test('set-only archived dish uses snapshot identity and ignores invalid or missing contents', () => {
+  const orders = [order({ id: 'old', paidAt: '2026-09-26T06:00:00Z', items: [
+    item({ tech_card_component_snapshot: [
+      { menu_item_id: 'archived', name_en: 'Old samsa', quantity: 2 },
+      { menu_item_id: 'archived', quantity: 0 },
+      { menu_item_id: 'archived', quantity: -2 },
+      { menu_item_id: 'archived', quantity: 'bad' },
+    ] }),
+    item({ tech_card_component_snapshot: null }),
+    item({ tech_card_component_snapshot: {} }),
+  ] })]
+  const analysis = getDishSalesAnalysis({ orders, selectedDishKey: 'menu:archived' })
+  assert.equal(analysis.selectedDish.name, 'Old samsa')
+  assert.equal(analysis.selectedDish.currentMenuItem, false)
+  assert.equal(analysis.totals.quantity, 2)
+  assert.equal(analysis.totals.revenue, 0)
+  assert.equal(analysis.totals.orders, 1)
+  const empty = getDishSalesAnalysis({ orders, menuItems, selectedDishKey: 'menu:salad' })
+  assert.equal(empty.totals.quantity, 0)
+  assert.deepEqual(empty.sources, [])
+  assert.deepEqual(empty.hourly, [])
+})

@@ -39,7 +39,7 @@ import {
   BarChart2, Clock, Tag, Users, ListOrdered, HelpCircle, Trash2, Truck, Pencil, Globe2, UserRound,
 } from 'lucide-react'
 import { closeoutToCsv, downloadCsv, getDailyCloseout } from '../lib/closeout'
-import { ALL_DISHES_KEY, getDishSalesAnalysis, getDishRevenueReconciliation } from '../lib/dishSales'
+import { ALL_DISHES_KEY, getDishSalesAnalysis } from '../lib/dishSales'
 import { ORDER_TYPE_KEYS, ORDER_TYPE_LABELS, inferOrderType, orderTypeLabel } from '../lib/orderTypes'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import {
@@ -538,7 +538,6 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
   const [pickerSearch, setPickerSearch] = useState('')
   const [activeSectionKey, setActiveSectionKey] = useState('')
   const pickerRef = useRef(null)
-  const reconciliation = useMemo(() => getDishRevenueReconciliation(orders), [orders])
 
   const analysis = useMemo(() => (
     getDishSalesAnalysis({ orders, menuItems, selectedDishKey })
@@ -608,11 +607,11 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
   }, [dishSections, activeSectionKey])
 
   const mostSoldMeals = useMemo(() => (
-    analysis.dishes
+    selectedDishKey !== ALL_DISHES_KEY ? analysis.sources : analysis.dishes
       .filter(dish => dish.quantity > 0)
       .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue || a.key.localeCompare(b.key))
       .slice(0, 30)
-  ), [analysis.dishes])
+  ), [analysis.dishes, analysis.sources, selectedDishKey])
 
   const lowSellers = useMemo(() => (
     analysis.dishes.filter(dish => dish.currentMenuItem).slice(0, 15)
@@ -628,6 +627,11 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
     lastSale:   { uz: 'Oxirgi sotuv',     ru: 'Последняя продажа', en: 'Last sale' },
     avgOrder:   { uz: "O'rtacha",         ru: 'В среднем',       en: 'Avg per order' },
     noSales:    { uz: 'Sotuv yo‘q',       ru: 'Нет продаж',      en: 'No sales' },
+    direct:     { uz: 'Alohida sotilgan', ru: 'Продано отдельно', en: 'Sold directly' },
+    included:   { uz: 'Setlar tarkibida', ru: 'В составе сетов', en: 'Sold in sets' },
+    sources:    { uz: 'Sotuv tarkibi', ru: 'Источники продаж', en: 'Sales breakdown' },
+    directRevenue: { uz: 'Alohida sotuvlar summasi', ru: 'Сумма отдельных продаж', en: 'Direct item sales' },
+    setRevenue: { uz: 'Set narxiga kiritilgan', ru: 'Включено в цену сета', en: 'Included in set price' },
     mostSold:   { uz: 'Eng ko‘p sotilgan taomlar', ru: 'Самые продаваемые блюда', en: 'Most-sold meals' },
     byHour:     { uz: 'Soat bo‘yicha',    ru: 'По часам',        en: 'Sales by hour' },
     lowSellers: { uz: 'Kam sotilganlar',  ru: 'Слабые продажи',  en: 'Low sellers' },
@@ -664,7 +668,10 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
           <div className="min-w-0">
             <p className="text-sm font-black text-[#1F2937]">{selectedName}</p>
             <p className="text-xs font-semibold text-[#9CA3AF]">
-              {analysis.dishes.length} {s.menuItems[lang] || s.menuItems.en}
+              {analysis.selectedDish ? dishCategoryLabel(analysis.selectedDish, categories, lang) : `${analysis.dishes.length} ${s.menuItems[lang] || s.menuItems.en}`}
+            </p>
+            <p className="mt-1 whitespace-pre-line text-sm text-[#6B7280]">
+              {analysis.selectedDish?.[`description_${lang}`] || analysis.selectedDish?.description_en}
             </p>
           </div>
           <div ref={pickerRef} className="relative flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
@@ -778,13 +785,19 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
         </div>
       </div>
 
+      {analysis.selectedDish && (
+        <p className="text-xs text-[#6B7280]">
+          {lang === 'ru' ? 'Продажи в сетах учитываются по сохранённому составу при продаже. Для старых продаж без сохранённого состава эти количества недоступны.' : lang === 'uz' ? 'Setlardagi sotuvlar sotuv vaqtida saqlangan tarkib bo‘yicha hisoblanadi. Tarkibi saqlanmagan eski sotuvlar uchun bu miqdorlar mavjud emas.' : 'Set quantities use the contents saved at the time of sale. Older sales without saved set contents cannot be included.'}
+        </p>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <DishMetric
           icon={Package}
           iconCls="bg-orange-50 text-[#ff5a00]"
           label={s.sold[lang] || s.sold.en}
           value={formatQuantity(analysis.totals.quantity)}
-          sub={`${analysis.totals.saleLines} ${lang === 'uz' ? 'qator' : lang === 'ru' ? 'строк' : 'lines'}`}
+          sub={selectedDishKey === ALL_DISHES_KEY ? `${analysis.totals.saleLines} ${lang === 'uz' ? 'qator' : lang === 'ru' ? 'строк' : 'lines'}` : `${s.direct[lang]}: ${formatQuantity(analysis.totals.directQuantity)} · ${s.included[lang]}: ${formatQuantity(analysis.totals.includedQuantity)}`}
         />
         <DishMetric
           icon={ShoppingBag}
@@ -796,7 +809,7 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
         <DishMetric
           icon={DollarSign}
           iconCls="bg-green-50 text-green-600"
-          label={s.revenue[lang] || s.revenue.en}
+          label={selectedDishKey === ALL_DISHES_KEY ? s.revenue[lang] : s.directRevenue[lang]}
           value={formatCurrency(analysis.totals.revenue)}
         />
         <DishMetric
@@ -807,26 +820,10 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
         />
       </div>
 
-      {selectedDishKey === ALL_DISHES_KEY && (
-        <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 text-sm space-y-3">
-          <p className="font-black">{lang === 'ru' ? 'От суммы блюд к поступлениям' : lang === 'uz' ? 'Taomlar summasidan tushumgacha' : 'From item sales to collected income'}</p>
-          <SummaryRow label={lang === 'ru' ? 'Блюда до обслуживания и лояльности' : lang === 'uz' ? 'Xizmat va loyallikdan oldingi taomlar' : 'Items before service and loyalty'} value={formatCurrency(reconciliation.items)} />
-          <SummaryRow label={lang === 'ru' ? '+ Сохранённое обслуживание' : lang === 'uz' ? '+ Saqlangan xizmat haqi' : '+ Saved service charges'} value={formatCurrency(reconciliation.service)} />
-          <SummaryRow label={lang === 'ru' ? '− Сохранённая лояльность / скидки' : lang === 'uz' ? '− Saqlangan loyallik / chegirmalar' : '− Saved loyalty / discounts'} value={formatCurrency(reconciliation.loyalty)} />
-          {(reconciliation.difference !== 0 || reconciliation.missingSnapshots > 0) && (
-            <div className="rounded-xl bg-amber-50 p-3 text-amber-800">
-              <SummaryRow label={lang === 'ru' ? 'Необъяснённая разница — нужна проверка' : lang === 'uz' ? 'Izohlanmagan farq — tekshirish kerak' : 'Unexplained difference — review needed'} value={formatCurrency(reconciliation.difference)} />
-              {reconciliation.missingSnapshots > 0 && <p className="mt-2 text-xs">{lang === 'ru' ? 'Заказы с неполными сохранёнными данными' : lang === 'uz' ? 'Saqlangan maʼlumotlari to‘liq bo‘lmagan buyurtmalar' : 'Orders with incomplete saved fields'}: {reconciliation.missingSnapshots}</p>}
-            </div>
-          )}
-          <SummaryRow label={lang === 'ru' ? '= Получено по заказам' : lang === 'uz' ? '= Buyurtmalar bo‘yicha tushum' : '= Collected order income'} value={formatCurrency(reconciliation.collected)} bold />
-        </div>
-      )}
-
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <p className="text-sm font-black text-[#1F2937]">{s.mostSold[lang] || s.mostSold.en}</p>
+            <p className="text-sm font-black text-[#1F2937]">{selectedDishKey === ALL_DISHES_KEY ? s.mostSold[lang] : s.sources[lang]}</p>
             <span className="text-[11px] font-bold text-[#9CA3AF]">{mostSoldMeals.length}</span>
           </div>
           {mostSoldMeals.length === 0 ? (
@@ -838,7 +835,7 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
                 return (
                   <div key={row.key} className="flex items-center gap-3">
                     <span className="w-28 flex-shrink-0 text-right text-[12px] font-bold text-[#6B7280]">
-                      {dishDisplayName(row, lang)}
+                      {selectedDishKey === ALL_DISHES_KEY ? dishDisplayName(row, lang) : row.includedInSet ? `${s.included[lang]}: ${dishDisplayName(analysis.dishes.find(dish => dish.key === row.key) || row, lang)}` : s.direct[lang]}
                     </span>
                     <div className="h-8 flex-1 overflow-hidden rounded-lg bg-gray-100">
                       <div
@@ -891,8 +888,8 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
+      <div className={`grid gap-5 ${selectedDishKey === ALL_DISHES_KEY ? 'xl:grid-cols-2' : ''}`}>
+        {selectedDishKey === ALL_DISHES_KEY && <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-5 py-3.5">
             <p className="text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">{s.lowSellers[lang] || s.lowSellers.en}</p>
             <span className="text-[11px] font-black text-[#ff5a00]">{lowSellers.length}</span>
@@ -925,7 +922,7 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
               ))}
             </div>
           )}
-        </div>
+        </div>}
 
         <div className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-sm">
           <div className="flex items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-5 py-3.5">
@@ -945,10 +942,11 @@ function DishSalesTab({ orders, menuItems, categories, lang }) {
                       </p>
                       <p className="text-[11px] font-semibold text-[#9CA3AF]">{formatLongDateTime(sale.orderDate, lang, '—')}</p>
                     </div>
-                    <p className="flex-shrink-0 text-sm font-black text-[#ff5a00]">{formatCurrency(sale.revenue)}</p>
+                    <p className="flex-shrink-0 text-sm font-black text-[#ff5a00]">{sale.includedInSet ? s.setRevenue[lang] : formatCurrency(sale.revenue)}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#6B7280]">
                     <span>{s.qty[lang] || s.qty.en}: {formatQuantity(sale.quantity)}</span>
+                    {sale.includedInSet && <span>· {s.included[lang]}: {sale.sourceName}</span>}
                     <span>·</span>
                     <span>{s.order[lang] || s.order.en}: #{String(sale.orderId).slice(-4).toUpperCase()}</span>
                     {sale.waiterName && (

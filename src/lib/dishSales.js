@@ -67,6 +67,9 @@ function createDishRowFromMenuItem(item, key) {
     name_ru: cleanText(item?.name_ru),
     name_en: cleanText(item?.name_en),
     category_id: item?.category_id || null,
+    description_uz: cleanText(item?.description_uz),
+    description_ru: cleanText(item?.description_ru),
+    description_en: cleanText(item?.description_en),
     image_url: item?.image_url || '',
     available: item?.available !== false,
     currentMenuItem: isActiveMenuItem(item),
@@ -147,6 +150,7 @@ export function getDishSalesAnalysis({ orders = [], menuItems = [], selectedDish
   const dishMap = new Map()
   const orderIdsByDish = new Map()
   const sales = []
+  const includedSales = []
 
   ;(menuItems || []).forEach(item => {
     const key = getMenuDishSalesKey(item)
@@ -180,7 +184,7 @@ export function getDishSalesAnalysis({ orders = [], menuItems = [], selectedDish
       if (!dish.lastSoldAt || compareInstant(orderDate, dish.lastSoldAt) > 0) dish.lastSoldAt = orderDate || null
       addOrderId(orderIdsByDish, key, orderId)
 
-      sales.push({
+      const sale = {
         dishKey: key,
         menuItemId: dish.menuItemId,
         dishName: dish.name,
@@ -194,6 +198,28 @@ export function getDishSalesAnalysis({ orders = [], menuItems = [], selectedDish
         tableName: order?.table_name || '',
         waiterName: order?.waiter_name || order?.waiter_email || '',
         orderType: inferOrderType(order),
+        sourceKey: key,
+        sourceName: getOrderItemDishName(item),
+        includedInSet: false,
+      }
+      sales.push(sale)
+      // Only frozen, direct set contents are available; never infer old recipes.
+      const components = Array.isArray(item.tech_card_component_snapshot) ? item.tech_card_component_snapshot : []
+      components.forEach(component => {
+        const componentKey = getOrderItemDishSalesKey(component)
+        const componentQuantity = Number(component.quantity)
+        if (!componentKey || !Number.isFinite(componentQuantity) || componentQuantity <= 0) return
+        if (!dishMap.has(componentKey)) dishMap.set(componentKey, createDishRowFromOrderItem(component, componentKey))
+        includedSales.push({
+          ...sale,
+          dishKey: componentKey,
+          menuItemId: getOrderItemProductId(component),
+          dishName: getOrderItemDishName(component),
+          quantity: quantity * componentQuantity,
+          unitPrice: 0,
+          revenue: 0,
+          includedInSet: true,
+        })
       })
     })
   })
@@ -206,7 +232,7 @@ export function getDishSalesAnalysis({ orders = [], menuItems = [], selectedDish
   const dishes = Array.from(dishMap.values()).sort(sortLowSellingDishes)
   const filteredSales = selectedDishKey === ALL_DISHES_KEY
     ? sales
-    : sales.filter(entry => entry.dishKey === selectedDishKey)
+    : [...sales, ...includedSales].filter(entry => entry.dishKey === selectedDishKey)
   const selectedDish = selectedDishKey === ALL_DISHES_KEY
     ? null
     : dishes.find(dish => dish.key === selectedDishKey) || null
@@ -225,8 +251,14 @@ export function getDishSalesAnalysis({ orders = [], menuItems = [], selectedDish
   return {
     dishes,
     selectedDish,
+    sources: bucketRows(filteredSales, 'sourceKey').map(row => {
+      const sale = filteredSales.find(entry => entry.sourceKey === row.sourceKey)
+      return { ...row, key: row.sourceKey, name: sale.sourceName, includedInSet: sale.includedInSet }
+    }).sort((a, b) => b.quantity - a.quantity || a.key.localeCompare(b.key)),
     totals: {
       quantity,
+      directQuantity: filteredSales.filter(entry => !entry.includedInSet).reduce((sum, entry) => sum + entry.quantity, 0),
+      includedQuantity: filteredSales.filter(entry => entry.includedInSet).reduce((sum, entry) => sum + entry.quantity, 0),
       revenue,
       orders: selectedOrderIds.size,
       saleLines: filteredSales.length,
