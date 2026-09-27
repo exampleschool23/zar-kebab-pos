@@ -384,19 +384,10 @@ test('CashierTables groups bills by cashier urgency', () => {
   assert.match(appContext, /'RECALL_TABLE_FROM_CASHIER'/)
 })
 
-test('CashierTables shows today net profit from exact paid revenue and shared cost math', () => {
+test('CashierTables does not show income or net profit KPIs', () => {
   const source = readSource('src/pages/CashierTables.jsx')
 
-  assert.match(source, /import \{ getOrdersCostTotal, getSaleProfitSummary, hasOrdersCostCoverage \} from '\.\.\/lib\/profit'/)
-  assert.match(source, /formatCurrencyWithPercentage/)
-  assert.match(source, /hasOrdersCostCoverage\(paidTodayOrders, menuItemMap\)/)
-  assert.match(source, /todayRevenue - getOrdersCostTotal\(paidTodayOrders, menuItemMap\)/)
-  assert.match(source, /getSaleProfitSummary\(todayRevenue, todayRevenue - value\)\?\.marginPct/)
-  assert.match(source, /function formatProfitKpiValue\(summary, lang\)/)
-  assert.match(source, /formatCurrencyWithPercentage\(summary\.value, summary\.marginPct, lang\)/)
-  assert.match(source, /label=\{l\.todayNetProfit\}/)
-  assert.match(source, /value=\{formatProfitKpiValue\(todayProfitSummary, lang\)\}/)
-  assert.match(source, /2xl:grid-cols-5/)
+  assert.doesNotMatch(source, /l\.todayRevenue|l\.todayNetProfit|formatProfitKpiValue/)
   assert.doesNotMatch(source, /\.from\('menu_item_costs'\)/)
 })
 

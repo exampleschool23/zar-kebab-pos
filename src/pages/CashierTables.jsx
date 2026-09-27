@@ -4,16 +4,14 @@ import {
   Receipt, CreditCard, Menu as MenuIcon, Clock, Users, Search,
   ChevronDown, Table2, Banknote, Monitor,
   UtensilsCrossed, ArrowUpDown, X, HelpCircle, Trash2, RotateCcw, Plus,
-  BadgeDollarSign,
 } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { useOrderDeletionDate } from '../store/useOrderDeletionDate'
 import { useAuth } from '../contexts/AuthContext'
-import { formatCurrency, formatCurrencyWithPercentage } from '../lib/formatCurrency'
+import { formatCurrency } from '../lib/formatCurrency'
 import {
   getGroupedOrderItems,
   getOrderDate,
-  getOrderLoyaltyIncomeTotal,
   getOrderPaymentBreakdown,
   getOrderRevenueTotal,
   getOrderTotal,
@@ -33,7 +31,6 @@ import { canDeleteOrderToday, canEditFeature, canMoveBackToTable } from '../lib/
 import { getOrderItemOptionLines } from '../components/MenuProductCards'
 import { useAppDataStatus } from '../store/appHooks'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
-import { getOrdersCostTotal, getSaleProfitSummary, hasOrdersCostCoverage } from '../lib/profit'
 import { formatMenuQuantity, isMenuItemSoldByWeight } from '../lib/menuSaleUnits'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 
@@ -49,11 +46,6 @@ function timeLabel(iso) {
 
 function dateTimeLabel(iso) {
   return formatDateTime(iso)
-}
-
-function formatProfitKpiValue(summary, lang) {
-  if (!summary?.available) return '—'
-  return formatCurrencyWithPercentage(summary.value, summary.marginPct, lang)
 }
 
 function countLabel(count, lang) {
@@ -75,11 +67,6 @@ const L = {
     activeBills:     'Faol hisoblar',
     needsBill:       'Hisob kerak',
     paidToday:       "Bugun to'langan",
-    todayRevenue:    'Bugungi daromad',
-    loyaltyIncome:   'Loyallik daromadi',
-    todayNetProfit:  'Bugungi sof foyda',
-    netProfitSub:    'Daromad minus sotilgan mahsulot tannarxi',
-    netProfitUnavailable: 'Tannarx maʼlumoti toʻliq emas',
     payMethods:      "Bugungi to'lov usullari",
     tables:          'stol',
     waitingPay:      "To'lovni kutmoqda",
@@ -130,11 +117,6 @@ const L = {
     activeBills:     'Активные счета',
     needsBill:       'Нужен счёт',
     paidToday:       'Оплачено сегодня',
-    todayRevenue:    'Доход за день',
-    loyaltyIncome:   'Доход по лояльности',
-    todayNetProfit:  'Чистая прибыль за день',
-    netProfitSub:    'Доход минус себестоимость проданных товаров',
-    netProfitUnavailable: 'Не все данные о себестоимости доступны',
     payMethods:      'Способы оплаты сегодня',
     tables:          'столов',
     waitingPay:      'Ожидают оплаты',
@@ -184,11 +166,6 @@ const L = {
     activeBills:     'Active Bills',
     needsBill:       'Needs Bill',
     paidToday:       'Paid Today',
-    todayRevenue:    'Today Income',
-    loyaltyIncome:   'Loyalty income',
-    todayNetProfit:  'Net Profit Today',
-    netProfitSub:    'Income minus cost of sold items',
-    netProfitUnavailable: 'Some cost data is unavailable',
     payMethods:      'Payment Methods Today',
     tables:          'tables',
     waitingPay:      'Waiting for payment',
@@ -748,21 +725,6 @@ export default function CashierTables() {
   const paidTodayCount = useMemo(() => {
     return paidTodayOrders.length
   }, [paidTodayOrders])
-  const todayRevenue   = paidTodayOrders.reduce((s, o) => s + (o.cashier_total ?? getOrderRevenueTotal(o)), 0)
-  const todayLoyaltyIncome = paidTodayOrders.reduce((s, o) => s + getOrderLoyaltyIncomeTotal(o), 0)
-  const todayProfitSummary = useMemo(() => {
-    if (!hasOrdersCostCoverage(paidTodayOrders, menuItemMap)) {
-      return { value: null, marginPct: null, available: false }
-    }
-    const value = todayRevenue - getOrdersCostTotal(paidTodayOrders, menuItemMap)
-    return {
-      value,
-      marginPct: getSaleProfitSummary(todayRevenue, todayRevenue - value)?.marginPct ?? null,
-      available: true,
-    }
-  },
-    [paidTodayOrders, menuItemMap, todayRevenue]
-  )
 
   // Payment method breakdown — tracks { amount, count } per method
   const payMethodTotals = useMemo(() => {
@@ -1003,7 +965,7 @@ export default function CashierTables() {
           <div className="p-5">
 
           {/* ── KPI cards ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
             <KpiCard
               label={l.activeBills}
               value={activeBills.length}
@@ -1030,24 +992,6 @@ export default function CashierTables() {
               icon={Users}
               iconBg="bg-green-50"
               iconColor="text-[#16A34A]"
-            />
-            <KpiCard
-              label={l.todayRevenue}
-              value={formatCurrency(todayRevenue)}
-              sub={`${l.loyaltyIncome}: ${formatCurrency(todayLoyaltyIncome)}`}
-              accent="text-[#2563EB]"
-              icon={Table2}
-              iconBg="bg-blue-50"
-              iconColor="text-blue-600"
-            />
-            <KpiCard
-              label={l.todayNetProfit}
-              value={formatProfitKpiValue(todayProfitSummary, lang)}
-              sub={todayProfitSummary.available ? l.netProfitSub : l.netProfitUnavailable}
-              accent="text-[#059669]"
-              icon={BadgeDollarSign}
-              iconBg="bg-emerald-50"
-              iconColor="text-emerald-600"
             />
           </div>
 
