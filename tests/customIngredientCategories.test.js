@@ -45,9 +45,15 @@ test('custom ingredient categories keep their name as the label and list after b
   assert.equal(errors.some(error => error.field === 'category'), false)
 })
 
-test('ingredients page picks categories with the shared popover picker', () => {
+test('ingredients page adds categories in a separate panel and only picks them in the form', () => {
   const page = read('src/pages/BazaarIngredients.jsx')
-  assert.match(page, /<BazaarCategoryPicker value=\{form\.category\} ingredients=\{ingredients\}[\s\S]*?allowCreate \/>/)
+  const picker = read('src/components/BazaarCategoryPicker.jsx')
+  assert.match(page, /<form onSubmit=\{addCategory\}/)
+  assert.match(page, /supabase\.rpc\('add_bazaar_ingredient_category', \{ p_name: name \}\)/)
+  assert.match(page, /\.from\('bazaar_ingredient_categories'\)/)
+  assert.match(page, /extraCategories=\{customCategories\}/)
+  assert.doesNotMatch(picker, /customBazaarCategoryKey|allowCreate/)
+  assert.match(page, /<BazaarCategoryPicker value=\{form\.category\} ingredients=\{ingredients\}[\s\S]*?\/>/)
   assert.doesNotMatch(page, /BAZAAR_ENTRY_CATEGORIES\.map/)
 })
 
@@ -59,6 +65,11 @@ test('migration 214 accepts custom categories in constraints and both catalog RP
   const builtins = `'meat', 'poultry', 'vegetables', 'fruit', 'dairy', 'grocery', 'spices', 'beverages', 'bakery', 'packaging', 'cleaning', 'charcoal'`
 
   await db.exec(`
+    create role anon; create role authenticated;
+    create function public.current_staff_can_access(feature text) returns boolean language sql as $$ select true $$;
+    create table public.test_manager (allowed boolean);
+    insert into public.test_manager values (true);
+    create function public.current_staff_can_manage_bazaar_ingredients() returns boolean language sql as $$ select allowed from public.test_manager $$;
     create table public.bazaar_product_catalog (
       category text not null,
       constraint bazaar_product_catalog_category_check check (category in (${builtins}))
@@ -91,6 +102,15 @@ test('migration 214 accepts custom categories in constraints and both catalog RP
            public.is_valid_bazaar_category('other') as unknown
   `)
   assert.deepEqual(rows[0], { custom: 'custom:Sauces dips', builtin: 'meat', valid_custom: true, empty_custom: false, unknown: false })
+
+  const added = await db.query(`select (public.add_bazaar_ingredient_category('  Sauces   dips ')).category as category`)
+  assert.equal(added.rows[0].category, 'custom:Sauces dips')
+  const again = await db.query(`select (public.add_bazaar_ingredient_category('SAUCES DIPS')).category as category`)
+  assert.equal(again.rows[0].category, 'custom:Sauces dips')
+  assert.equal((await db.query('select count(*)::int as n from public.bazaar_ingredient_categories')).rows[0].n, 1)
+  await assert.rejects(db.query(`select public.add_bazaar_ingredient_category('   ')`), /Category name is required/)
+  await db.exec('update public.test_manager set allowed = false')
+  await assert.rejects(db.query(`select public.add_bazaar_ingredient_category('Other')`), /Only an owner/)
 
   await db.exec(`insert into public.bazaar_product_catalog (category) values ('custom:Sauces'), ('meat')`)
   await assert.rejects(db.exec(`insert into public.bazaar_purchase_items (category) values ('other')`))

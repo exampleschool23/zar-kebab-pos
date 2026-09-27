@@ -1,4 +1,6 @@
 -- Allow owners to add ingredient categories beyond the built-in list.
+-- Categories are created on their own (add_bazaar_ingredient_category) and
+-- kept in bazaar_ingredient_categories so empty categories remain selectable.
 -- Custom categories are stored inline as 'custom:<name>' (1-60 trimmed chars)
 -- so every reader, including Telegram images, can label them without a lookup.
 -- Built-in keys stay lowercase; custom names keep their original casing.
@@ -49,6 +51,64 @@ alter table public.bazaar_purchase_items
 alter table public.bazaar_purchase_items
   add constraint bazaar_purchase_items_category_check
     check (public.is_valid_bazaar_category(category));
+
+create table if not exists public.bazaar_ingredient_categories (
+  category   text primary key,
+  created_at timestamptz not null default now(),
+  constraint bazaar_ingredient_categories_custom_check
+    check (category like 'custom:%' and public.is_valid_bazaar_category(category))
+);
+create unique index if not exists bazaar_ingredient_categories_name_key
+  on public.bazaar_ingredient_categories (lower(category));
+
+alter table public.bazaar_ingredient_categories enable row level security;
+revoke all on table public.bazaar_ingredient_categories from anon, authenticated;
+grant select on table public.bazaar_ingredient_categories to authenticated;
+
+drop policy if exists bazaar_feature_read_ingredient_categories on public.bazaar_ingredient_categories;
+create policy bazaar_feature_read_ingredient_categories on public.bazaar_ingredient_categories
+for select to authenticated using (
+  public.current_staff_can_access('ingredients')
+  or public.current_staff_can_access('bazaar')
+  or public.current_staff_can_access('tech_cards')
+);
+
+-- Idempotent: a retry after a lost response returns the existing category.
+create or replace function public.add_bazaar_ingredient_category(p_name text)
+returns public.bazaar_ingredient_categories
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  category_key text := public.normalize_bazaar_category('custom:' || coalesce(p_name, ''));
+  saved public.bazaar_ingredient_categories%rowtype;
+begin
+  if not public.current_staff_can_manage_bazaar_ingredients() then
+    raise exception 'Only an owner can manage Daily Bazaar ingredients';
+  end if;
+  if not public.is_valid_bazaar_category(category_key) then
+    raise exception 'Category name is required';
+  end if;
+  select * into saved from public.bazaar_ingredient_categories
+  where lower(category) = lower(category_key);
+  if found then
+    return saved;
+  end if;
+  insert into public.bazaar_ingredient_categories (category)
+  values (category_key)
+  on conflict do nothing
+  returning * into saved;
+  if saved.category is null then
+    select * into saved from public.bazaar_ingredient_categories
+    where lower(category) = lower(category_key);
+  end if;
+  return saved;
+end;
+$$;
+
+revoke all on function public.add_bazaar_ingredient_category(text) from public, anon, authenticated;
+grant execute on function public.add_bazaar_ingredient_category(text) to authenticated;
 
 -- Patch the two RPCs in place so their other validation, audit, and expense
 -- behavior stays exactly as deployed.

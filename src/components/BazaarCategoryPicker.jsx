@@ -1,16 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Plus, Search, Tag } from 'lucide-react'
-import { BAZAAR_CUSTOM_CATEGORY_MAX_LENGTH, bazaarCategoriesFor, bazaarCategoryLabel, customBazaarCategoryKey } from '../lib/bazaar'
+import { Check, ChevronDown, Search, Tag } from 'lucide-react'
+import { bazaarCategoriesFor, bazaarCategoryLabel } from '../lib/bazaar'
 
 function pickerLabels(lang) {
   if (lang === 'uz') return {
-    search: 'Kategoriya qidirish yoki yangisini yozish', select: 'Kategoriyani tanlang', empty: 'Kategoriya topilmadi', categories: 'kategoriya', add: 'Kategoriya qo‘shish', custom: 'Qo‘shilgan',
+    search: 'Kategoriya qidirish', select: 'Kategoriyani tanlang', empty: 'Kategoriya topilmadi', categories: 'kategoriya', custom: 'Qo‘shilgan',
   }
   if (lang === 'ru') return {
-    search: 'Найдите категорию или введите новую', select: 'Выберите категорию', empty: 'Категории не найдены', categories: 'категорий', add: 'Добавить категорию', custom: 'Добавлена',
+    search: 'Поиск категории', select: 'Выберите категорию', empty: 'Категории не найдены', categories: 'категорий', custom: 'Добавлена',
   }
   return {
-    search: 'Search or type a new category', select: 'Select a category', empty: 'No categories found', categories: 'categories', add: 'Add category', custom: 'Added',
+    search: 'Search categories', select: 'Select a category', empty: 'No categories found', categories: 'categories', custom: 'Added',
   }
 }
 
@@ -21,7 +21,7 @@ export default function BazaarCategoryPicker({
   onChange,
   lang = 'en',
   disabled = false,
-  allowCreate = false,
+  extraCategories = [],
 }) {
   const l = pickerLabels(lang)
   const rootRef = useRef(null)
@@ -31,19 +31,16 @@ export default function BazaarCategoryPicker({
   const categories = useMemo(() => {
     const counts = new Map()
     for (const ingredient of ingredients) counts.set(ingredient.category, (counts.get(ingredient.category) || 0) + 1)
-    return bazaarCategoriesFor([...ingredients, value]).map(category => ({
+    return bazaarCategoriesFor([...ingredients, ...extraCategories, value]).map(category => ({
       key: category.key,
       custom: Boolean(category.custom),
       label: bazaarCategoryLabel(category.key, lang),
       count: counts.get(category.key) || 0,
     }))
-  }, [ingredients, lang, value])
+  }, [extraCategories, ingredients, lang, value])
 
-  const trimmedSearch = search.replace(/\s+/g, ' ').trim()
-  const normalizedSearch = trimmedSearch.toLocaleLowerCase()
+  const normalizedSearch = search.trim().toLocaleLowerCase()
   const visible = categories.filter(category => !normalizedSearch || category.label.toLocaleLowerCase().includes(normalizedSearch))
-  const canCreate = allowCreate && trimmedSearch !== ''
-    && !categories.some(category => category.label.toLocaleLowerCase() === normalizedSearch)
 
   useEffect(() => {
     if (!open) return undefined
@@ -71,8 +68,7 @@ export default function BazaarCategoryPicker({
   function onSearchKeyDown(event) {
     if (event.key !== 'Enter') return
     event.preventDefault()
-    if (visible.length === 1 && !canCreate) selectCategory(visible[0].key)
-    else if (canCreate) selectCategory(customBazaarCategoryKey(trimmedSearch))
+    if (visible.length === 1) selectCategory(visible[0].key)
   }
 
   return (
@@ -100,7 +96,6 @@ export default function BazaarCategoryPicker({
               <input
                 autoFocus
                 value={search}
-                maxLength={BAZAAR_CUSTOM_CATEGORY_MAX_LENGTH}
                 onChange={event => setSearch(event.target.value)}
                 onKeyDown={onSearchKeyDown}
                 placeholder={l.search}
@@ -113,19 +108,6 @@ export default function BazaarCategoryPicker({
             <div className="sticky top-0 z-10 mb-1 rounded-xl bg-white/95 px-3 py-2 backdrop-blur">
               <p className="text-[10px] font-bold text-[#C3C8D0]">{visible.length} {l.categories}</p>
             </div>
-            {canCreate && (
-              <button
-                type="button"
-                onClick={() => selectCategory(customBazaarCategoryKey(trimmedSearch))}
-                className="mb-1 flex w-full items-center gap-3 rounded-xl border border-dashed border-orange-200 bg-orange-50/60 px-3 py-2.5 text-left text-[#ff5a00] hover:bg-orange-50"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white"><Plus size={16} /></div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-black uppercase tracking-wide">{l.add}</p>
-                  <p className="truncate text-sm font-black text-[#1F2937]">{trimmedSearch}</p>
-                </div>
-              </button>
-            )}
             {visible.map(category => {
               const isSelected = category.key === value
               return (
@@ -147,7 +129,7 @@ export default function BazaarCategoryPicker({
                 </button>
               )
             })}
-            {visible.length === 0 && !canCreate && <div className="flex min-h-32 items-center justify-center px-4 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div>}
+            {visible.length === 0 && <div className="flex min-h-32 items-center justify-center px-4 text-center text-sm font-bold text-[#9CA3AF]">{l.empty}</div>}
           </div>
         </div>
       )}

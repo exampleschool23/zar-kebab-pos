@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Archive, Download, Edit3, Loader2, PackagePlus, Plus, RotateCcw, Save, Search, X } from 'lucide-react'
+import { Archive, Download, Edit3, Loader2, PackagePlus, Plus, RotateCcw, Save, Search, Tag, X } from 'lucide-react'
 import IngredientNavigation from '../components/IngredientNavigation'
 import BazaarCategoryPicker from '../components/BazaarCategoryPicker'
 import AppShell from '../components/AppShell'
@@ -11,7 +11,7 @@ import { canEditFeature } from '../lib/permissions'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import { withWriteTimeout } from '../lib/writeTimeout'
-import { BAZAAR_ENTRY_UNITS, bazaarCategoryLabel, bazaarUnitLabel, normalizeBazaarProductKey } from '../lib/bazaar'
+import { BAZAAR_CUSTOM_CATEGORY_MAX_LENGTH, BAZAAR_ENTRY_UNITS, bazaarCategoriesFor, bazaarCategoryLabel, bazaarUnitLabel, normalizeBazaarProductKey } from '../lib/bazaar'
 import { bazaarIngredientMatches, isBazaarIngredientNetworkError, runBazaarIngredientWriteWithRecovery } from '../lib/bazaarIngredientWrites'
 
 const INPUT = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-all placeholder:text-[#C3C8D0] focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]'
@@ -31,13 +31,19 @@ const COPY = {
   },
 }
 
+const CATEGORY_COPY = {
+  en: { addCategory: 'Add category', newCategory: 'New category name', categoryHint: 'The category becomes available in the ingredient form.', addCategoryButton: 'Add', categoryAdded: 'Category added.', categoryExists: 'This category already exists.', categoryFailed: 'Could not add the category.', categoryRequired: 'Enter a category name.', allCategories: 'Categories' },
+  ru: { addCategory: 'Добавить категорию', newCategory: 'Название новой категории', categoryHint: 'Категория появится в форме ингредиента.', addCategoryButton: 'Добавить', categoryAdded: 'Категория добавлена.', categoryExists: 'Такая категория уже есть.', categoryFailed: 'Не удалось добавить категорию.', categoryRequired: 'Введите название категории.', allCategories: 'Категории' },
+  uz: { addCategory: 'Kategoriya qo‘shish', newCategory: 'Yangi kategoriya nomi', categoryHint: 'Kategoriya masalliq formasida paydo bo‘ladi.', addCategoryButton: 'Qo‘shish', categoryAdded: 'Kategoriya qo‘shildi.', categoryExists: 'Bu kategoriya allaqachon mavjud.', categoryFailed: 'Kategoriyani qo‘shib bo‘lmadi.', categoryRequired: 'Kategoriya nomini kiriting.', allCategories: 'Kategoriyalar' },
+}
+
 function emptyIngredient() {
   return { product_key: '', product_name: '', category: 'vegetables', unit: 'kg', normal_unit_price: '' }
 }
 
 function isMissingMigration(error) {
   const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
-  return text.includes('normal_unit_price') || text.includes('is_catalog_managed') || text.includes('save_bazaar_ingredient') || text.includes('set_bazaar_ingredient_active') || text.includes('pgrst202') || text.includes('pgrst204')
+  return text.includes('normal_unit_price') || text.includes('is_catalog_managed') || text.includes('save_bazaar_ingredient') || text.includes('set_bazaar_ingredient_active') || text.includes('add_bazaar_ingredient_category') || text.includes('pgrst202') || text.includes('pgrst204')
 }
 
 function savedIngredientRow(data) {
@@ -48,7 +54,7 @@ export default function BazaarIngredients() {
   const { state } = useApp()
   const { profile } = useAuth()
   const lang = state.lang || 'ru'
-  const l = COPY[lang] || COPY.en
+  const l = { ...(COPY[lang] || COPY.en), ...(CATEGORY_COPY[lang] || CATEGORY_COPY.en) }
   const canManage = canEditFeature(profile || state.user, 'ingredients')
   const [ingredients, setIngredients] = useState([])
   const [form, setForm] = useState(emptyIngredient)
@@ -62,6 +68,11 @@ export default function BazaarIngredients() {
   const [notice, setNotice] = useState('')
   const [exportingPdf, setExportingPdf] = useState(false)
   const [pdfFailed, setPdfFailed] = useState(false)
+  const [customCategories, setCustomCategories] = useState([])
+  const [categoryPanelOpen, setCategoryPanelOpen] = useState(false)
+  const [categoryName, setCategoryName] = useState('')
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [categoryError, setCategoryError] = useState('')
 
   const errorMessage = useCallback((requestError, fallback) => {
     if (isMissingMigration(requestError)) return l.migrationMissing
@@ -87,6 +98,12 @@ export default function BazaarIngredients() {
         .order('product_name')
       if (loadError) throw loadError
       setIngredients(data || [])
+      // Saved categories may have no ingredients yet; before migration 214 the table is absent.
+      const { data: categoryRows, error: categoryLoadError } = await supabase
+        .from('bazaar_ingredient_categories')
+        .select('category')
+        .order('category')
+      setCustomCategories(categoryLoadError ? [] : (categoryRows || []).map(row => row.category))
     } catch (loadError) {
       setLoadFailure(loadError)
     } finally {
@@ -105,6 +122,38 @@ export default function BazaarIngredients() {
       return !normalizedQuery || normalizeBazaarProductKey(item.product_name).includes(normalizedQuery)
     })
   }, [ingredients, query, status])
+
+  const allCategories = useMemo(() => bazaarCategoriesFor([...ingredients, ...customCategories]), [customCategories, ingredients])
+
+  async function addCategory(event) {
+    event.preventDefault()
+    const name = categoryName.replace(/\s+/g, ' ').trim()
+    setCategoryError('')
+    if (!name) { setCategoryError(l.categoryRequired); return }
+    const normalizedName = name.toLocaleLowerCase()
+    if (allCategories.some(category => ['uz', 'ru', 'en'].some(code => bazaarCategoryLabel(category.key, code).toLocaleLowerCase() === normalizedName))) {
+      setCategoryError(l.categoryExists)
+      return
+    }
+    setAddingCategory(true)
+    try {
+      // The RPC is idempotent by name, so retrying after a lost response is safe.
+      const { data, error: addError } = await withWriteTimeout(supabase.rpc('add_bazaar_ingredient_category', { p_name: name }))
+      if (addError) throw addError
+      const saved = savedIngredientRow(data)?.category
+      if (saved) {
+        setCustomCategories(current => current.includes(saved) ? current : [...current, saved])
+        setForm(current => ({ ...current, category: saved }))
+      }
+      setCategoryName('')
+      setCategoryPanelOpen(false)
+      setNotice(l.categoryAdded)
+    } catch (addError) {
+      setCategoryError(errorMessage(addError, l.categoryFailed))
+    } finally {
+      setAddingCategory(false)
+    }
+  }
 
   async function downloadPdf() {
     if (exportingPdf || loading || loadFailure || !filtered.length) return
@@ -218,10 +267,39 @@ export default function BazaarIngredients() {
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-50 text-[#ff5a00]"><PackagePlus size={21} /></div>
               <div><h1 className="text-2xl font-black text-[#1F2937]">{l.title}</h1><p className="mt-1 text-sm font-medium text-[#6B7280]">{l.sub}</p></div>
             </div>
-            <button type="button" onClick={downloadPdf} disabled={exportingPdf || loading || !!loadFailure || !filtered.length} title={l.pdfHint} className="ml-auto inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 text-sm font-black text-[#ff5a00] disabled:cursor-not-allowed disabled:opacity-50">
+            <div className="ml-auto flex flex-wrap gap-2">
+            {canManage && (
+              <button type="button" onClick={() => { setCategoryPanelOpen(current => !current); setCategoryError('') }} aria-expanded={categoryPanelOpen} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#E5E7EB] bg-white px-4 text-sm font-black text-[#1F2937] hover:border-orange-200">
+                <Tag size={16} className="text-[#ff5a00]" />{l.addCategory}
+              </button>
+            )}
+            <button type="button" onClick={downloadPdf} disabled={exportingPdf || loading || !!loadFailure || !filtered.length} title={l.pdfHint} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 text-sm font-black text-[#ff5a00] disabled:cursor-not-allowed disabled:opacity-50">
               {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}{exportingPdf ? l.exportingPdf : l.downloadPdf}
             </button>
+            </div>
           </div>
+
+          {canManage && categoryPanelOpen && (
+            <form onSubmit={addCategory} className="mb-5 rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm sm:p-5">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div><h2 className="font-black text-[#1F2937]">{l.addCategory}</h2><p className="mt-1 text-xs font-medium text-[#9CA3AF]">{l.categoryHint}</p></div>
+                <button type="button" onClick={() => setCategoryPanelOpen(false)} aria-label={l.cancel} className="text-[#9CA3AF] hover:text-[#6B7280]"><X size={16} /></button>
+              </div>
+              <fieldset disabled={addingCategory} className="flex flex-col gap-2 sm:flex-row">
+                <input autoFocus value={categoryName} onChange={event => setCategoryName(event.target.value)} maxLength={BAZAAR_CUSTOM_CATEGORY_MAX_LENGTH} placeholder={l.newCategory} aria-invalid={!!categoryError} className={`${INPUT} sm:max-w-sm ${categoryError ? 'border-red-300 bg-red-50' : ''}`} />
+                <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-5 text-sm font-black text-white disabled:opacity-60">{addingCategory ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}{l.addCategoryButton}</button>
+              </fieldset>
+              {categoryError && <p role="alert" className="mt-2 text-xs font-bold text-red-600">{categoryError}</p>}
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">{l.allCategories} · {allCategories.length}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {allCategories.map(category => (
+                    <span key={category.key} className={`rounded-full px-2.5 py-1 text-xs font-bold ${category.custom ? 'bg-orange-50 text-[#ff5a00]' : 'bg-gray-100 text-[#6B7280]'}`}>{bazaarCategoryLabel(category.key, lang)}</span>
+                  ))}
+                </div>
+              </div>
+            </form>
+          )}
 
           {pdfFailed && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{l.pdfFailed}</div>}
           {displayedError && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{displayedError}</div>}
@@ -235,7 +313,7 @@ export default function BazaarIngredients() {
               </div>
               <fieldset disabled={saving} className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.5fr)_minmax(170px,1fr)_140px_minmax(190px,1fr)_auto] xl:items-end">
                 <label className="text-xs font-black text-[#6B7280]">{l.name}<input value={form.product_name} onChange={event => setForm(current => ({ ...current, product_name: event.target.value }))} maxLength={160} className={`${INPUT} mt-1.5`} /></label>
-                <div className="text-xs font-black text-[#6B7280]">{l.category}<div className="mt-1.5"><BazaarCategoryPicker value={form.category} ingredients={ingredients} onChange={category => setForm(current => ({ ...current, category }))} lang={lang} disabled={saving} allowCreate /></div></div>
+                <div className="text-xs font-black text-[#6B7280]">{l.category}<div className="mt-1.5"><BazaarCategoryPicker value={form.category} ingredients={ingredients} extraCategories={customCategories} onChange={category => setForm(current => ({ ...current, category }))} lang={lang} disabled={saving} /></div></div>
                 <label className="text-xs font-black text-[#6B7280]">{l.unit}<select value={form.unit} onChange={event => setForm(current => ({ ...current, unit: event.target.value }))} className={`${INPUT} mt-1.5`}>{BAZAAR_ENTRY_UNITS.map(unit => <option key={unit.key} value={unit.key}>{bazaarUnitLabel(unit.key, lang)}</option>)}</select></label>
                 <label className="text-xs font-black text-[#6B7280]">{l.normalPrice}<input inputMode="numeric" value={formatMoneyInput(form.normal_unit_price)} onChange={event => setForm(current => ({ ...current, normal_unit_price: normalizeMoneyInput(event.target.value) }))} className={`${INPUT} mt-1.5 text-right tabular-nums`} /></label>
                 <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-5 text-sm font-black text-white disabled:opacity-60">{saving ? <Loader2 size={16} className="animate-spin" /> : form.product_key ? <Save size={16} /> : <Plus size={16} />}{saving ? l.saving : l.save}</button>
