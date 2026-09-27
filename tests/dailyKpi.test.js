@@ -6,6 +6,7 @@ import {
   formatKpiRatePercent,
   formatKpiRateInput,
   getEffectiveKpiRule,
+  getKpiAccountLinks,
   getActiveKpiAccounts,
   getKpiRuleEditDate,
   getDefaultKpiHistoryRange,
@@ -238,4 +239,16 @@ test('KPI account choices include only active POS accounts and preserve the sour
   assert.deepEqual(getActiveKpiAccounts(accounts).map(account => account.id), ['malika', 'zilola'])
   assert.deepEqual(accounts, original)
   assert.deepEqual(getActiveKpiAccounts(), [])
+})
+
+test('KPI account links show which employees currently count each POS account', () => {
+  const rules = [
+    { salary_profile_id: 'a', effective_from: '2026-09-01', sales_basis: 'employee_opened_orders', order_opener_profile_id: 'acc-1' },
+    { salary_profile_id: 'b', effective_from: '2026-09-01', sales_basis: 'employee_opened_orders', order_opener_profile_id: 'acc-2' },
+    { salary_profile_id: 'b', effective_from: '2026-09-20', sales_basis: 'restaurant', order_opener_profile_id: null },
+    { salary_profile_id: 'c', effective_from: '2026-10-01', sales_basis: 'employee_opened_orders', order_opener_profile_id: 'acc-1' },
+  ]
+  const links = getKpiAccountLinks(rules, [{ id: 'a' }, { id: 'b' }, { id: 'c' }], '2026-09-28')
+  assert.deepEqual([...links.keys()], ['acc-1'])
+  assert.deepEqual(links.get('acc-1').map(item => item.id), ['a'])
 })

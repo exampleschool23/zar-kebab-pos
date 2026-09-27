@@ -65,6 +65,18 @@ export function getKpiRuleEditDate(effectiveFrom, today) {
     : normalizedToday
 }
 
+// POS account id -> salary profiles whose current own-orders KPI rule counts that account's orders.
+export function getKpiAccountLinks(rules = [], salaryProfiles = [], date) {
+  const links = new Map()
+  for (const salaryProfile of salaryProfiles) {
+    const rule = getEffectiveKpiRule(rules, salaryProfile?.id, date)
+    const accountId = rule?.sales_basis === 'employee_opened_orders' ? rule.order_opener_profile_id : null
+    if (!accountId) continue
+    links.set(accountId, [...(links.get(accountId) || []), salaryProfile])
+  }
+  return links
+}
+
 export function getEffectiveKpiRule(rules = [], salaryProfileId, date) {
   const normalizedDate = String(date || '').slice(0, 10)
   if (!salaryProfileId || !ISO_DATE_PATTERN.test(normalizedDate)) return null

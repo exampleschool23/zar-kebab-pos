@@ -20,6 +20,7 @@ import {
   normalizeKpiStartTime,
   formatKpiStartTime,
   getEffectiveKpiRule,
+  getKpiAccountLinks,
   getActiveKpiAccounts,
   getKpiRuleEditDate,
   removeKpiRulePreservingHistory,
@@ -255,6 +256,8 @@ export default function Salaries() {
       kpiAccountsFailed: "Akkauntlarni yuklab bo‘lmadi.",
       kpiAccountsRetry: "Qayta yuklash",
       kpiAccountUnavailable: "Tanlangan akkaunt faol emas yoki mavjud emas.",
+      kpiAccountLinkedHere: "shu xodimga bog‘langan",
+      kpiAccountLinkedTo: "bog‘langan:",
       kpiRuleTitle: 'Xodim KPI foizi',
       kpiRuleHelp: 'Yangi sana yangi sozlama yaratadi. Hali hisoblanmagan sanani qayta saqlab tuzatish mumkin.',
       kpiRate: 'KPI foizi',
@@ -418,6 +421,8 @@ export default function Salaries() {
       kpiAccountsFailed: "Не удалось загрузить учётные записи.",
       kpiAccountsRetry: "Повторить",
       kpiAccountUnavailable: "Выбранная учётная запись неактивна или недоступна.",
+      kpiAccountLinkedHere: "привязана к этому сотруднику",
+      kpiAccountLinkedTo: "привязана:",
       kpiRuleTitle: 'KPI-процент сотрудника',
       kpiRuleHelp: 'Новая дата создаёт новую настройку. Настройку ещё не рассчитанного дня можно исправить той же датой.',
       kpiRate: 'Процент KPI',
@@ -581,6 +586,8 @@ export default function Salaries() {
       kpiAccountsFailed: "Could not load employee accounts.",
       kpiAccountsRetry: "Retry",
       kpiAccountUnavailable: "Selected account is inactive or unavailable.",
+      kpiAccountLinkedHere: "linked to this employee",
+      kpiAccountLinkedTo: "linked to",
       kpiRuleTitle: 'Employee KPI percentage',
       kpiRuleHelp: 'A new date creates a new setting. An unprocessed date can be corrected by saving the same date.',
       kpiRate: 'KPI percentage',
@@ -907,6 +914,7 @@ export default function Salaries() {
   ), [sortedSalaryProfiles])
   const selectedKpiProfile = activeSalaryProfiles.find(item => item.id === kpiForm.salary_profile_id)
   const selectedKpiRule = getEffectiveKpiRule(kpiRules, kpiForm.salary_profile_id, today)
+  const kpiAccountLinks = useMemo(() => getKpiAccountLinks(kpiRules, activeSalaryProfiles, today), [kpiRules, activeSalaryProfiles, today])
   const kpiPreviewRateBps = parseKpiPercentToBps(kpiForm.rate_percentage)
   const kpiPreviewBonus = calculateDailyKpiBonus(KPI_PREVIEW_BASE_AMOUNT, kpiPreviewRateBps)
   const paymentDeliveryRows = useMemo(() => {
@@ -1951,6 +1959,7 @@ export default function Salaries() {
                 loading={loading}
                 activeSalaryProfiles={activeSalaryProfiles}
                 kpiAccounts={kpiAccounts}
+                kpiAccountLinks={kpiAccountLinks}
                 accountsError={kpiAccountsError}
                 onReloadAccounts={() => loadData({ showLoader: true, refreshTelegram: false })}
                 selectedKpiProfile={selectedKpiProfile}
@@ -2253,6 +2262,7 @@ function DailyKpiSection({
   loading,
   activeSalaryProfiles,
   kpiAccounts,
+  kpiAccountLinks = new Map(),
   accountsError,
   onReloadAccounts,
   selectedKpiProfile,
@@ -2276,6 +2286,13 @@ function DailyKpiSection({
   const employeeLabel = salaryProfile => (
     salaryProfile?.employee_name || salaryProfile?.profile?.full_name || salaryProfile?.profile?.email || '—'
   )
+  const kpiAccountOptionLabel = account => {
+    const name = `${account.full_name || account.email}${account.full_name && account.email ? ` (${account.email})` : ''}`
+    const linked = kpiAccountLinks.get(account.id) || []
+    if (!linked.length) return name
+    if (linked.some(item => item.id === form.salary_profile_id)) return `✓ ${name} — ${labels.kpiAccountLinkedHere}`
+    return `🔗 ${name} — ${labels.kpiAccountLinkedTo} ${linked.map(employeeLabel).join(', ')}`
+  }
   const canRemoveSelectedRule = canRemoveRules
     && selectedKpiProfile
     && selectedRule
@@ -2342,7 +2359,7 @@ function DailyKpiSection({
                     <option value={form.order_opener_profile_id} disabled>{labels.kpiAccountUnavailable}</option>
                   )}
                   {kpiAccounts.map(account => (
-                    <option key={account.id} value={account.id}>{account.full_name || account.email}{account.full_name && account.email ? ` (${account.email})` : ''}</option>
+                    <option key={account.id} value={account.id}>{kpiAccountOptionLabel(account)}</option>
                   ))}
                 </select>
               </Field>
