@@ -96,7 +96,7 @@ npm run build
 - `201`: audited paid-payment splitting; apply before UI. Tests: `tests/paidPaymentSplit.test.js`.
 - `202`: current-day-only order deletion and private KPI cleanup; apply before sender/UI. Tests: `tests/orderDeletion.test.js`.
 
-- `203`: KPI start time; apply before sender/UI. Tests: `tests/timeBasedKpi.test.js`.
+- `203`/`213`: KPI start/opening cutoff; apply before UI. Tests: `tests/timeBasedKpi.test.js`.
 
 - `204`: preserve audit actors on account deletion. Tests: `tests/accountDeletionAudit.test.js`.
 

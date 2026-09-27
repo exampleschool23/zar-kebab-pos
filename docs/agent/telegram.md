@@ -78,7 +78,7 @@
 
 - Deploy after `185`. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages with minute cron retries. Missing messages succeed; errors remain recorded. Old untracked messages stay. Telegram permits deletion within 48h. Test: `tests/orderStatusDelivery.test.js`.
 
-- `197`/`198`: private paid-order estimates snapshot order/daily KPI. `203` filters order/daily cuts by Tashkent start time; Salary events snapshot before/after times. `202` cancels deleted-order queued notices and retracts sent notices, including orphans. Minute `employee-order-kpi` cron retries cleanup; uncertain sends stay held. Apply migrations before sender/UI. Other notices retain historical estimates. Tests: `tests/timeBasedKpi.test.js`.
+- `197`/`198`: private paid-order estimates snapshot order/daily KPI. `203`/`213`: order/daily cuts use opening cutoff on Tashkent payment date; Salary events snapshot before/after times. `202` cancels deleted-order queued notices and retracts sent notices, including orphans. Minute `employee-order-kpi` cron retries cleanup; uncertain sends stay held. Apply migrations before sender/UI. Prior estimates stay frozen. Tests: `tests/timeBasedKpi.test.js`.
 
 - Morning watchdog retries unstarted/failed/skipped Investor albums after meal/KPI finalization, including alerted failures. Recovery needs a saved message ID; never replay sent/pending reports. Save alert ID/chat/error only after confirmed send. Tests: `tests/dailySalaryWatchdog.test.js`.
 

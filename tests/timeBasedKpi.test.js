@@ -53,7 +53,7 @@ test('start time is editable, saved, checked for changes and displayed from snap
   assert.match(read('api/telegram/employee-notification.js'),/previous_start_time, new_start_time/)
 })
 
-test('time-based KPI production SQL keeps payroll and live estimates aligned', async t => {
+for (const openingCutoff of [false, true]) test(`time-based KPI production SQL keeps payroll and live estimates aligned (opening cutoff: ${openingCutoff})`, async t => {
   const db = new PGlite(); t.after(()=>db.close())
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
@@ -92,7 +92,7 @@ test('time-based KPI production SQL keeps payroll and live estimates aligned', a
     await db.query("insert into employee_kpi_rules(salary_profile_id,effective_from,rate_bps,sales_basis) values($1,'2026-09-16',$2,$3)",[id(n),n===1?300:n===2?200:100,n===1?'employee_opened_orders':'restaurant'])
   }
   const order = async (key,opener,amount,paidAt,extra={}) => {
-    const row={id:key,opened_by:opener==null?null:id(100+opener),subtotal:amount,paid_at:paidAt,created_at:'2026-09-01T00:00:00Z',...extra}
+    const row={id:key,opened_by:opener==null?null:id(100+opener),subtotal:amount,paid_at:paidAt,created_at:openingCutoff?paidAt:'2026-09-01T00:00:00Z',...extra}
     const keys=Object.keys(row)
     await db.query(`insert into orders(${keys.join(',')}) values(${keys.map((_,i)=>`$${i+1}`).join(',')})`,Object.values(row))
     if (extra.payment_status !== 'unpaid') await db.query("update orders set payment_status='paid' where id=$1",[key])
@@ -106,6 +106,7 @@ test('time-based KPI production SQL keeps payroll and live estimates aligned', a
   const oldBonuses = (await db.query("select * from employee_salary_bonuses where bonus_date='2026-09-18' order by id")).rows
   const oldNotice = await notice('old-finalized')
   await db.exec(sql('203_kpi_workday_start_time.sql'))
+  if (openingCutoff) await db.exec(sql('213_kpi_order_opening_cutoff.sql'))
   await t.test('migration preserves finalized awards, notices and default full-day rules',async()=>{
     assert.deepEqual((await finalize('2026-09-18')).map(({start_time_snapshot,...r})=>r),historical)
     assert.deepEqual((await db.query("select * from employee_salary_bonuses where bonus_date='2026-09-18' order by id")).rows,oldBonuses)
@@ -137,6 +138,15 @@ test('time-based KPI production SQL keeps payroll and live estimates aligned', a
     for (const invalid of ['24:00','14:00:01','25:00']) await assert.rejects(db.query("update employee_kpi_rules set start_time=$1 where salary_profile_id=$2 and effective_from='2026-09-20'",[invalid,id(2)]))
     await assert.rejects(db.query("update employee_kpi_rules set start_time=null where salary_profile_id=$1 and effective_from='2026-09-20'",[id(2)]),/null/)
   })
+  if (openingCutoff) {
+    await order('arrived-before-shift',1,100000,'2026-09-20T14:10:00+05:00',{created_at:'2026-09-20T13:50:00+05:00'})
+    assert.equal((await notice('arrived-before-shift')).cut,0)
+    assert.equal((await notice('arrived-before-shift')).daily_cut,0)
+    await order('opened-yesterday',1,9000000,'2026-09-20T14:10:00+05:00',{created_at:'2026-09-19T15:00:00+05:00'})
+    await order('unknown-opening',1,9000000,'2026-09-20T14:10:00+05:00',{created_at:null})
+    assert.equal((await notice('opened-yesterday')).cut,0)
+    assert.equal((await notice('unknown-opening')).cut,0)
+  }
   await order('midnight',1,30000,'2026-09-19T19:00:00Z')
   await order('before',1,100000,'2026-09-20T08:59:59.999Z')
   assert.equal((await notice('before')).cut,0)
@@ -157,10 +167,10 @@ test('time-based KPI production SQL keeps payroll and live estimates aligned', a
   await order('ended-check',5,0,'2026-09-20T16:00:00+05:00')
   await order('disabled-check',7,0,'2026-09-20T16:00:00+05:00')
   await order('manager-check',2,0,'2026-09-20T17:00:00+05:00')
-  await t.test('start is inclusive, midnight is exclusive, paid time wins and deleted/ineligible orders are excluded',async()=>{
+  await t.test('start is inclusive, midnight is exclusive, the configured cutoff is enforced and ineligible orders are excluded',async()=>{
     const base=async(start,basis='restaurant',opener=null)=>(await db.query("select employee_kpi_sales_base('2026-09-20',$1,$2,$3) as amount",[basis,opener,start])).rows[0].amount
     assert.equal(await base('14:00'),390017)
-    assert.equal(await base('00:00'),520017)
+    assert.equal(await base('00:00'),openingCutoff?620017:520017)
     assert.equal(await base('23:59'),17)
     assert.equal(await base('14:00','employee_opened_orders',id(101)),110017)
     assert.equal((await notice('last')).daily_cut,3301) // aggregate rounded once
@@ -178,7 +188,7 @@ test('time-based KPI production SQL keeps payroll and live estimates aligned', a
   const results=resultsByEmployee(finalized)
   assert.equal(results.get(id(1)).bonus_amount,3301)
   assert.equal(results.get(id(2)).bonus_amount,7800)
-  assert.equal(results.get(id(3)).bonus_amount,5200)
+  assert.equal(results.get(id(3)).bonus_amount,openingCutoff?6200:5200)
   assert.equal(results.get(id(4)).status,'skipped_absent')
   assert.equal(results.get(id(5)).status,'skipped_ineligible')
   assert.equal(results.get(id(6)).bonus_amount,1100)
@@ -188,7 +198,7 @@ test('time-based KPI production SQL keeps payroll and live estimates aligned', a
   assert.equal(bonus.source_metadata.start_time,'14:00:00')
   assert.equal(bonus.source_metadata.time_zone,'Asia/Tashkent')
   assert.equal(bonus.source_metadata.sales_base_amount,390017)
-  assert.equal((await db.query("select sales_base_amount from employee_daily_kpi_runs where business_date='2026-09-20'")).rows[0].sales_base_amount,520017)
+  assert.equal((await db.query("select sales_base_amount from employee_daily_kpi_runs where business_date='2026-09-20'")).rows[0].sales_base_amount,openingCutoff?620017:520017)
   assert.deepEqual(await finalize('2026-09-20'),finalized)
   await assert.rejects(db.query("delete from orders where id='boundary'"),/Only orders from today/)
   await assert.rejects(db.query("update employee_kpi_rules set start_time='00:00' where id=$1",[results.get(id(2)).rule_id]),/finalized/)
