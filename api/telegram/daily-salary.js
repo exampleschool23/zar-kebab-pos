@@ -566,12 +566,13 @@ export async function loadDailyPayrollGroupSummary(supabase, businessDate, kpiRe
       .eq('payment_status', 'paid')
       .gte('paid_at', `${businessDate}T00:00:00+05:00`)
       .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
-    supabase
+    // Month-to-date easily exceeds PostgREST's 1000-row cap; page it so the average is not truncated.
+    loadSalaryRows(() => supabase
       .from('orders')
-      .select('status, subtotal, service_fee, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount')
+      .select('id, status, subtotal, service_fee, total, loyalty_used_amount, loyalty_redeem_amount, loyalty_discount_amount')
       .eq('payment_status', 'paid')
       .gte('paid_at', `${monthStart}T00:00:00+05:00`)
-      .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`),
+      .lt('paid_at', `${addSalaryDateDays(businessDate, 1)}T00:00:00+05:00`)),
     supabase
       .from('business_settings')
       .select('monthly_rent_uzs, monthly_utilities_uzs')
