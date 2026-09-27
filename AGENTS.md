@@ -65,6 +65,7 @@ The former 58 KB instruction file is preserved at `docs/agent/legacy-context.md`
 - Treat network timeouts on idempotent writes as unknown outcomes and reconcile the durable record before retrying with the same identity.
 - Do not weaken a regression/source-guard test merely to make the suite pass; understand the protected behavior first.
 - Preserve unrelated user changes in a dirty worktree.
+- Supabase/PostgREST caps each select at 1000 rows and truncates silently. Any multi-day or unbounded row read that feeds a total, average, or balance must page (`loadSalaryRows` in `src/lib/salaryData.js`, ordered by `id`) or aggregate server-side in an RPC. Example: the Telegram daily salary report's month-to-date average was understated until its orders query was paged.
 
 ## Git publishing
 

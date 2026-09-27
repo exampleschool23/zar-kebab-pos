@@ -83,3 +83,7 @@
 - Morning watchdog retries unstarted/failed/skipped Investor albums after meal/KPI finalization, including alerted failures. Recovery needs a saved message ID; never replay sent/pending reports. Save alert ID/chat/error only after confirmed send. Tests: `tests/dailySalaryWatchdog.test.js`.
 
 - `210`: see [salary orders](salary-orders.md).
+
+## Daily salary report totals
+
+- `api/telegram/daily-salary.js` month-to-date cafe income must load orders through `loadSalaryRows` (paged by `id`); an unpaged select stops at 1000 rows and understates "Средняя дневная выручка кафе за месяц". The Dashboard's RPC `get_dashboard_monthly_average_income` sums server-side and is the reference value.
