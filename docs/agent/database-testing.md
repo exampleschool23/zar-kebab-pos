@@ -42,7 +42,6 @@
 ## Invariants
 
 - Report reads retry network/502/503/504 errors: 3 attempts, 15s each, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write retries. Tests: `tests/reportReadFetch.test.js`.
-
 - Use atomic RPCs for multi-table writes such as kitchen submission, menu item + protected cost, Tech Cards, Daily Bazaar, and payment corrections.
 - Enforce UI permissions with RLS/RPCs.
 - Preserve order/cost/category/payroll/notification/audit snapshots.
@@ -75,37 +74,22 @@ npm run build
 - Authenticate routes.
 - Vite large-chunk warnings are non-fatal.
 - Preserve unrelated edits.
-
-- Migration `179_game_club_orders.sql` must precede the Game Club frontend release. Extends constraints and permission/settlement functions; preserves history. Never require the reopening function retired by `090`. Tests: `tests/gameClubOrders.test.js`.
-
+- Migration `179_game_club_orders.sql` must precede the Game Club frontend release. Never require the reopening function retired by `090`. Tests: `tests/gameClubOrders.test.js`.
 - Isolated SQL: `scripts/check-game-club-migration.mjs` tests `180` with a PGlite module path.
-
 - Migration `184` requires deletion reasons and snapshots them for Investor alerts. Apply before UI.
-
 - `185`: independent status-message tracking and minute cleanup retries. Apply before the Telegram sender. Tests: `tests/orderStatusDelivery.test.js`.
-
 - `186`–`188`: Ingredients access, writes, snapshot keys, and movement totals. Tests: `tests/ingredientsFeature.test.js`; SQL: `scripts/check-ingredient-movement.mjs`.
 - `189`: ingredient Investor queue and minute dispatch. Tests: `tests/ingredientNotifications.test.js`; SQL: `scripts/check-ingredient-notifications.mjs` (PGlite path). Deploy the sender before applying.
-
 - `190`–`193`: ten-day income and monthly Busy Hours RPCs; apply before UI.
-
 - `195`/`196`: own/all dine-in KPI from `2026-09-16`; apply before UI. History preserved. SQL: `tests/employeeOpenedOrderKpi.test.js` (PGlite).
-
 - `200`: repair KPI creator-label drift; preserve actor checks/history. Tests: `tests/employeeOpenedOrderKpi.test.js`.
-
 - `201`: audited paid-payment splitting; apply before UI. Tests: `tests/paidPaymentSplit.test.js`.
 - `202`: current-day-only order deletion and private KPI cleanup; apply before sender/UI. Tests: `tests/orderDeletion.test.js`.
-
 - `203`/`213`: KPI start/opening cutoff; apply before UI. Tests: `tests/timeBasedKpi.test.js`.
-
 - `204`: preserve audit actors on account deletion. Tests: `tests/accountDeletionAudit.test.js`.
-
 - `205`: Take Away/Delivery/Game Club category schedule settings; apply before UI. Seeds Business lunch for Game Club. Tests: `tests/gameClubCategorySchedule.test.js`.
-
 - `207`–`209`: rate date guard, audits, owner-only DELETE. Apply before UI. Tests: `tests/salaryRateDateWindow.test.js`, `tests/salaryRateHistory.test.js`.
-
 - `210`: see [salary orders](salary-orders.md).
-
 - `211`: profile name realtime; history unchanged. Tests: `tests/activeOrderWaiters.test.js`.
-
 - `212`: atomic bill edits; deploy before UI. See payments guide.
+- `214`: `custom:<name>` ingredient categories; apply before UI.

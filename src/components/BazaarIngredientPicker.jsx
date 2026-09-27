@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Package, Search } from 'lucide-react'
-import { BAZAAR_ENTRY_CATEGORIES, bazaarCategoryLabel, bazaarUnitLabel } from '../lib/bazaar'
+import { bazaarCategoriesFor, bazaarCategoryLabel, bazaarUnitLabel } from '../lib/bazaar'
 import { formatCurrency } from '../lib/formatCurrency'
 
 function pickerLabels(lang) {
@@ -31,7 +31,7 @@ export default function BazaarIngredientPicker({
   const [activeCategory, setActiveCategory] = useState('all')
   const selected = suggestions.find(item => item.key === value) || null
 
-  const sections = useMemo(() => BAZAAR_ENTRY_CATEGORIES
+  const sections = useMemo(() => bazaarCategoriesFor(suggestions)
     .map(category => ({
       key: category.key,
       label: bazaarCategoryLabel(category.key, lang),

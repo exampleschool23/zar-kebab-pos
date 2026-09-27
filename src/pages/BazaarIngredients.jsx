@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Archive, Download, Edit3, Loader2, PackagePlus, Plus, RotateCcw, Save, Search, X } from 'lucide-react'
 import IngredientNavigation from '../components/IngredientNavigation'
+import BazaarCategoryPicker from '../components/BazaarCategoryPicker'
 import AppShell from '../components/AppShell'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useApp } from '../store/AppContext'
@@ -10,7 +11,7 @@ import { canEditFeature } from '../lib/permissions'
 import { formatCurrency } from '../lib/formatCurrency'
 import { formatMoneyInput, normalizeMoneyInput } from '../lib/moneyInput'
 import { withWriteTimeout } from '../lib/writeTimeout'
-import { BAZAAR_ENTRY_CATEGORIES, BAZAAR_ENTRY_UNITS, bazaarCategoryLabel, bazaarUnitLabel, normalizeBazaarProductKey } from '../lib/bazaar'
+import { BAZAAR_ENTRY_UNITS, bazaarCategoryLabel, bazaarUnitLabel, normalizeBazaarProductKey } from '../lib/bazaar'
 import { bazaarIngredientMatches, isBazaarIngredientNetworkError, runBazaarIngredientWriteWithRecovery } from '../lib/bazaarIngredientWrites'
 
 const INPUT = 'h-11 w-full rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#1F2937] outline-none transition-all placeholder:text-[#C3C8D0] focus:border-[#ff5a00] focus:ring-2 focus:ring-[#ff5a00]/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-[#9CA3AF]'
@@ -234,7 +235,7 @@ export default function BazaarIngredients() {
               </div>
               <fieldset disabled={saving} className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.5fr)_minmax(170px,1fr)_140px_minmax(190px,1fr)_auto] xl:items-end">
                 <label className="text-xs font-black text-[#6B7280]">{l.name}<input value={form.product_name} onChange={event => setForm(current => ({ ...current, product_name: event.target.value }))} maxLength={160} className={`${INPUT} mt-1.5`} /></label>
-                <label className="text-xs font-black text-[#6B7280]">{l.category}<select value={form.category} onChange={event => setForm(current => ({ ...current, category: event.target.value }))} className={`${INPUT} mt-1.5`}>{BAZAAR_ENTRY_CATEGORIES.map(category => <option key={category.key} value={category.key}>{bazaarCategoryLabel(category.key, lang)}</option>)}</select></label>
+                <div className="text-xs font-black text-[#6B7280]">{l.category}<div className="mt-1.5"><BazaarCategoryPicker value={form.category} ingredients={ingredients} onChange={category => setForm(current => ({ ...current, category }))} lang={lang} disabled={saving} allowCreate /></div></div>
                 <label className="text-xs font-black text-[#6B7280]">{l.unit}<select value={form.unit} onChange={event => setForm(current => ({ ...current, unit: event.target.value }))} className={`${INPUT} mt-1.5`}>{BAZAAR_ENTRY_UNITS.map(unit => <option key={unit.key} value={unit.key}>{bazaarUnitLabel(unit.key, lang)}</option>)}</select></label>
                 <label className="text-xs font-black text-[#6B7280]">{l.normalPrice}<input inputMode="numeric" value={formatMoneyInput(form.normal_unit_price)} onChange={event => setForm(current => ({ ...current, normal_unit_price: normalizeMoneyInput(event.target.value) }))} className={`${INPUT} mt-1.5 text-right tabular-nums`} /></label>
                 <button type="submit" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#ff5a00] px-5 text-sm font-black text-white disabled:opacity-60">{saving ? <Loader2 size={16} className="animate-spin" /> : form.product_key ? <Save size={16} /> : <Plus size={16} />}{saving ? l.saving : l.save}</button>

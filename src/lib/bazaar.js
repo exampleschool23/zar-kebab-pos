@@ -21,6 +21,42 @@ export const BAZAAR_CATEGORIES = [
 
 export const BAZAAR_ENTRY_CATEGORIES = BAZAAR_CATEGORIES
 
+// Owner-added categories are stored as `custom:<name>` so every reader can label them without a lookup.
+export const BAZAAR_CUSTOM_CATEGORY_PREFIX = 'custom:'
+export const BAZAAR_CUSTOM_CATEGORY_MAX_LENGTH = 60
+
+export function isCustomBazaarCategory(category) {
+  const value = String(category || '')
+  if (!value.startsWith(BAZAAR_CUSTOM_CATEGORY_PREFIX)) return false
+  const name = value.slice(BAZAAR_CUSTOM_CATEGORY_PREFIX.length)
+  return name.trim() === name && name.length > 0 && name.length <= BAZAAR_CUSTOM_CATEGORY_MAX_LENGTH
+}
+
+export function customBazaarCategoryKey(name) {
+  const cleaned = String(name || '').replace(/\s+/g, ' ').trim().slice(0, BAZAAR_CUSTOM_CATEGORY_MAX_LENGTH).trim()
+  return cleaned ? `${BAZAAR_CUSTOM_CATEGORY_PREFIX}${cleaned}` : ''
+}
+
+export function isValidBazaarCategory(category) {
+  return CATEGORY_KEYS.has(category) || isCustomBazaarCategory(category)
+}
+
+// Built-in categories first, then custom categories found on the given rows, alphabetically.
+export function bazaarCategoriesFor(rows = []) {
+  const custom = new Map()
+  for (const row of rows) {
+    const key = typeof row === 'string' ? row : row?.category
+    if (isCustomBazaarCategory(key) && !custom.has(key.toLocaleLowerCase())) custom.set(key.toLocaleLowerCase(), key)
+  }
+  const customDefinitions = [...custom.values()]
+    .sort((left, right) => left.localeCompare(right))
+    .map(key => {
+      const name = key.slice(BAZAAR_CUSTOM_CATEGORY_PREFIX.length)
+      return { key, custom: true, labels: { uz: name, ru: name, en: name } }
+    })
+  return [...BAZAAR_CATEGORIES, ...customDefinitions]
+}
+
 export const BAZAAR_UNITS = [
   { key: 'kg', labels: { uz: 'kg', ru: 'кг', en: 'kg' } },
   { key: 'g', labels: { uz: 'g', ru: 'г', en: 'g' } },
@@ -59,6 +95,7 @@ function definitionLabel(definitions, key, lang) {
 }
 
 export function bazaarCategoryLabel(category, lang = LANGUAGE_FALLBACK) {
+  if (isCustomBazaarCategory(category)) return category.slice(BAZAAR_CUSTOM_CATEGORY_PREFIX.length)
   return definitionLabel(BAZAAR_CATEGORIES, CATEGORY_KEYS.has(category) ? category : 'vegetables', lang)
 }
 
@@ -146,7 +183,7 @@ export function getBazaarDisplayQuantity(quantity, unit) {
 export function normalizeBazaarItem(item = {}, index = 0) {
   const productName = normalizeBazaarText(item.product_name ?? item.productName ?? item.name)
   const productKey = normalizeBazaarProductKey(item.product_key || productName)
-  const category = CATEGORY_KEYS.has(item.category) ? item.category : 'vegetables'
+  const category = isValidBazaarCategory(item.category) ? item.category : 'vegetables'
   const unit = normalizeBazaarUnit(item.unit)
   return {
     ...item,
@@ -289,10 +326,10 @@ export function validateBazaarPurchase(purchase = {}) {
   normalized.items.forEach((item, index) => {
     const rawItem = rawItems[index] || {}
     const rawUnit = normalizeBazaarText(rawItem.unit).toLowerCase()
-    const rawCategory = normalizeBazaarText(rawItem.category).toLowerCase()
+    const rawCategory = isCustomBazaarCategory(rawItem.category) ? rawItem.category : normalizeBazaarText(rawItem.category).toLowerCase()
     const rawQuantity = parseBazaarQuantity(rawItem.quantity)
     if (!item.product_name) errors.push({ code: 'product_name_required', field: 'product_name', index })
-    if (!ENTRY_CATEGORY_KEYS.has(rawCategory)) errors.push({ code: 'category_required', field: 'category', index })
+    if (!ENTRY_CATEGORY_KEYS.has(rawCategory) && !isCustomBazaarCategory(rawCategory)) errors.push({ code: 'category_required', field: 'category', index })
     if (!ENTRY_UNIT_KEYS.has(rawUnit)) errors.push({ code: 'unit_required', field: 'unit', index })
     if (!Number.isFinite(rawQuantity) || rawQuantity <= 0) {
       errors.push({ code: 'quantity_required', field: 'quantity', index })

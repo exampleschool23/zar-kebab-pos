@@ -40,7 +40,8 @@ import { notifyTelegramInvestorExpense } from '../lib/telegramNotifications'
 import { getExpenseEntryMinDate, isExpenseEntryDateAllowed } from '../lib/expenses'
 import {
   BAZAAR_CATEGORIES,
-  BAZAAR_ENTRY_CATEGORIES,
+  bazaarCategoriesFor,
+  isValidBazaarCategory,
   BAZAAR_ENTRY_UNITS,
   BAZAAR_ENTRY_PAYMENT_METHODS,
   BAZAAR_PAYMENT_METHODS,
@@ -332,7 +333,6 @@ function methodIcon(method) {
   return Banknote
 }
 
-const ENTRY_CATEGORY_KEYS = new Set(BAZAAR_ENTRY_CATEGORIES.map(category => category.key))
 
 let lineSequence = 0
 function blankItem(overrides = {}) {
@@ -681,7 +681,7 @@ export default function DailyBazaar() {
         product_key: matched?.key || '',
         product_name: matched?.name || '',
         ...(matched ? {
-          ...(ENTRY_CATEGORY_KEYS.has(matched.category) ? { category: matched.category } : {}),
+          ...(isValidBazaarCategory(matched.category) ? { category: matched.category } : {}),
           unit: matched.unit,
           normal_unit_price: matched.normalUnitPrice,
           line_total: String(calculateBazaarNormalTotal(item.quantity, matched.normalUnitPrice) || ''),
@@ -890,6 +890,7 @@ export default function DailyBazaar() {
               query={query}
               onQuery={setQuery}
               categoryFilter={categoryFilter}
+              categories={bazaarCategoriesFor([...productSuggestions, ...purchases.flatMap(purchase => purchase.bazaar_purchase_items || purchase.items || []), categoryFilter])}
               onCategory={setCategoryFilter}
               paymentFilter={paymentFilter}
               onPayment={setPaymentFilter}
@@ -1004,6 +1005,7 @@ function RangeAndFilters({
   query,
   onQuery,
   categoryFilter,
+  categories = BAZAAR_CATEGORIES,
   onCategory,
   paymentFilter,
   onPayment,
@@ -1046,7 +1048,7 @@ function RangeAndFilters({
             <span className="block text-[9px] font-black uppercase tracking-wider text-[#9CA3AF]">{l.category}</span>
             <select value={categoryFilter} onChange={event => onCategory(event.target.value)} className="mt-0.5 h-6 w-full bg-transparent text-xs font-black text-[#4B5563] outline-none">
               <option value="all">{l.allCategories}</option>
-              {BAZAAR_CATEGORIES.map(category => <option key={category.key} value={category.key}>{bazaarCategoryLabel(category.key, lang)}</option>)}
+              {categories.map(category => <option key={category.key} value={category.key}>{bazaarCategoryLabel(category.key, lang)}</option>)}
             </select>
           </label>
           <label className="rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2 transition-colors focus-within:border-[#ff5a00] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff5a00]/10">
@@ -1203,7 +1205,7 @@ function BazaarEntryForm({
                     </Field>
                     <Field label={l.category} error={lineHasError(index, 'category')}>
                       <select aria-invalid={lineHasError(index, 'category')} value={item.category} disabled className={SELECT}>
-                        {BAZAAR_ENTRY_CATEGORIES.map(category => <option key={category.key} value={category.key}>{bazaarCategoryLabel(category.key, lang)}</option>)}
+                        {bazaarCategoriesFor(suggestions).map(category => <option key={category.key} value={category.key}>{bazaarCategoryLabel(category.key, lang)}</option>)}
                       </select>
                     </Field>
                     <Field label={l.quantity} error={lineHasError(index, 'quantity')}>

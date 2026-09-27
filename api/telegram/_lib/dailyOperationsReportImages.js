@@ -9,7 +9,7 @@ import { formatLongDate, formatTime } from '../../../src/lib/dateFormat.js'
 import { formatCurrency } from '../../../src/lib/formatCurrency.js'
 import { getOrderItemUnitPrice } from '../../../src/lib/priceModes.js'
 import {
-  BAZAAR_CATEGORIES,
+  bazaarCategoriesFor,
   bazaarCategoryLabel,
   bazaarUnitLabel,
   calculateBazaarExpectedTotal,
@@ -122,7 +122,7 @@ export function buildDailyBazaarReportSvg(purchases = [], date = '', language = 
   const difference = calculateBazaarPriceDifference(items)
   const normalPriceItemCount = items.filter(item => getBazaarNormalLineTotal(item) > 0).length
   const hasCompleteNormalPrices = items.length > 0 && normalPriceItemCount === items.length
-  const groups = BAZAAR_CATEGORIES
+  const groups = bazaarCategoriesFor(items)
     .map(category => ({
       ...category,
       items: items.filter(item => item.category === category.key),
