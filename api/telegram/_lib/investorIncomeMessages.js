@@ -183,6 +183,9 @@ export function buildEmployeeLifecycleInvestorMessage(delivery, language = 'ru')
       deactivated: 'Xodim faolsizlantirildi',
       employee: 'Xodim',
       date: 'Sana',
+      salary: 'Asosiy maosh',
+      daily: 'kunlik',
+      monthly: 'oylik',
       actor: 'Amalni bajargan',
     },
     ru: {
@@ -191,6 +194,9 @@ export function buildEmployeeLifecycleInvestorMessage(delivery, language = 'ru')
       deactivated: 'Сотрудник деактивирован',
       employee: 'Сотрудник',
       date: 'Дата',
+      salary: 'Базовая зарплата',
+      daily: 'дневная',
+      monthly: 'месячная',
       actor: 'Изменил(а)',
     },
     en: {
@@ -199,6 +205,9 @@ export function buildEmployeeLifecycleInvestorMessage(delivery, language = 'ru')
       deactivated: 'Employee deactivated',
       employee: 'Employee',
       date: 'Date',
+      salary: 'Base salary',
+      daily: 'daily',
+      monthly: 'monthly',
       actor: 'Changed by',
     },
   }[lang]
@@ -211,6 +220,11 @@ export function buildEmployeeLifecycleInvestorMessage(delivery, language = 'ru')
     `${copy.employee}: <b>${escapeTelegramHtml(delivery?.employee_name || '—')}</b>`,
     `${copy.date}: ${escapeTelegramHtml(formatLongDate(delivery?.effective_date, lang, delivery?.effective_date || '—'))}`,
   ]
+  const salaryAmount = Math.round(Number(delivery?.salary_amount) || 0)
+  if (eventType === 'created' && salaryAmount > 0) {
+    const unit = delivery?.salary_unit === 'daily' ? copy.daily : copy.monthly
+    lines.push(`${copy.salary}: <b>${escapeTelegramHtml(formatCurrency(salaryAmount))}</b> (${unit})`)
+  }
   if (delivery?.actor_name) lines.push(`${copy.actor}: ${escapeTelegramHtml(delivery.actor_name)}`)
   return lines.join('\n')
 }

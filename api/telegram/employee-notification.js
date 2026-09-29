@@ -1729,6 +1729,24 @@ async function notifyInvestorExpense(supabase, user, expenseId) {
   }
 }
 
+// Migration 216 snapshots the starting salary on the event. Events queued
+// before it fall back to the employee's first saved rate.
+async function withStartingSalary(supabase, delivery) {
+  if (delivery?.event_type !== 'created' || Number(delivery?.salary_amount) > 0) return delivery
+  const { data: firstRate, error } = await supabase
+    .from('employee_salary_rates')
+    .select('amount, rate_unit')
+    .eq('salary_profile_id', delivery.salary_profile_id)
+    .order('effective_from', { ascending: true })
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return firstRate
+    ? { ...delivery, salary_amount: firstRate.amount, salary_unit: firstRate.rate_unit }
+    : delivery
+}
+
 async function notifyEmployeeLifecycle(supabase, user, salaryProfileId, lifecycleEventType) {
   const normalizedProfileId = String(salaryProfileId || '').trim()
   const normalizedEventType = String(lifecycleEventType || '').trim()
@@ -1783,9 +1801,10 @@ async function notifyEmployeeLifecycle(supabase, user, salaryProfileId, lifecycl
   if (!target.chatId) return savedEmployeeLifecycleDeliveryResult(claimed.data, false)
 
   try {
+    const delivery = await withStartingSalary(supabase, claimed.data)
     const response = await sendTelegramMessage(
       target.chatId,
-      buildEmployeeLifecycleInvestorMessage(claimed.data, 'ru'),
+      buildEmployeeLifecycleInvestorMessage(delivery, 'ru'),
     )
     const sentAt = new Date().toISOString()
     const { data: sentDelivery, error: updateError } = await supabase

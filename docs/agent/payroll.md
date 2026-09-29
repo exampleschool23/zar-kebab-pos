@@ -34,12 +34,13 @@
 - Undo absence requires confirmation and an exact delete guarded by absence id, salary profile id, and date. Zero affected rows is an error.
 - History deletion retracts tracked employee/Salary/Team Telegram messages first. Failed retraction keeps the source for retry. Deleted bonus/fine/absence/rate events remove delivery records to prevent retries.
 - Deactivation/reactivation work boundaries are inclusive; only intervening dates become absences. Archived `deleted_at` is exclusive after the last working date.
-- Employee creation/activation/deactivation queue immutable Russian Investor events in the database. Salaries and Employees request retry-safe delivery on success.
+- Employee create/activate/deactivate queue immutable Russian Investor events (`216`: created shows salary). Both screens retry delivery safely.
 
 ## KPI
 
 - `195`/`196`: from `2026-09-16`, rules choose own opened orders or all restaurant dine-in sales. Base is paid subtotal + service by Tashkent payment date, ignoring loyalty. Own rules require `order_opener_profile_id` or payroll `profile_id`; restaurant rules need no account. Earlier catch-up uses all sales.
 - `203`/`213`: `start_time`: both bases require `created_at` ≥ cutoff on the Tashkent payment date; paid before midnight. Earlier/null openings excluded. `employee_kpi_sales_base` aligns estimates/finalization; snapshots immutable. Tests: `tests/timeBasedKpi.test.js`, `tests/employeeOpenedOrderKpi.test.js`.
+- `215`: open-table rows inherit the opener; only they earn own KPI.
 - Skip absences and dates outside employment boundaries.
 - Runs/results are immutable; only service-role finalization creates `daily_kpi` bonuses (`200`: creator repair). `202` forbids deleting previous-day orders for everyone; today's deletions reduce own/restaurant bases before finalization.
 - Bonuses accrue into salary. Formula/settlement are immutable; payments record cash expense.
@@ -48,7 +49,7 @@
 - Cards show today’s rule. KPI dropdown lists active POS profiles, saves the opener, and shows retryable load errors.
 - KPI rate/status/basis/account/time changes snapshot before/after values and queue Salary delivery; no-op saves stay silent. No historical backfill.
 - Salary History separates monthly manual Bonuses from KPI bonuses. Salary + bonuses includes salary and both bonus types once each.
-- Effective dates cannot enter already finalized periods. Recovery scans missing older dates in bounded batches.
+- Effective dates cannot enter finalized periods. Recovery scans missing older dates in bounded batches.
 
 ## Notifications
 
@@ -66,7 +67,7 @@
 - Absences and employment boundaries determine attendance; exclude future dates.
 - Cron repairs meal dates independently in bounded batches.
 - Meal rows reduce report remainder without a payment method or cash ledger mutation.
-- Historical backfill is a one-time migration snapshot and is not recalculated after setting changes.
+- Historical backfill is a one-time snapshot, never recalculated.
 
 - `210`: see [salary orders](salary-orders.md).
 
