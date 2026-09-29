@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js'
 import { loadActiveOrderWaiterNames } from './activeOrderWaiters.js'
 import { withWriteTimeout } from './writeTimeout.js'
+import { pickQuickItemOrder } from './cashierBills.js'
 import {
   getOrderPaymentFields,
   normalizeServiceRatePct,
@@ -1154,7 +1155,7 @@ export async function writeToSupabase(action, state, options = {}) {
         .order('created_at', { ascending: true })
       if (ordersError) throw ordersError
 
-      const order = orders?.[0]
+      const order = pickQuickItemOrder(orders || [], { tableId, orderId })
       if (!order) return
 
       const existing = (order.items || []).find(row =>

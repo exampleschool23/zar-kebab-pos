@@ -28,6 +28,7 @@ import {
 import { normalizeMenuQuantity } from '../lib/menuSaleUnits.js'
 import { getLoyaltyCardCashbackPercent } from '../lib/loyalty.js'
 import { isOffPremiseOrderType, orderTypeLabel } from '../lib/orderTypes.js'
+import { pickQuickItemOrder } from '../lib/cashierBills.js'
 
 function orderActorFields(user, fallbackName) {
   const name = user?.name || user?.email || fallbackName
@@ -244,9 +245,7 @@ export function ordersReducer(state, action) {
 
     case 'ADD_QUICK_ITEM_TO_ORDER': {
       const { tableId, orderId, item } = action.payload
-      const activeOrder = state.orders.find(o =>
-        orderId ? o.id === orderId : o.table_id === tableId && o.payment_status !== 'paid'
-      )
+      const activeOrder = pickQuickItemOrder(state.orders, { tableId, orderId })
       if (!activeOrder || !item) return state
 
       const existing = (activeOrder.items || []).find(i =>

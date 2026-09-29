@@ -77,6 +77,13 @@ export function getKpiAccountLinks(rules = [], salaryProfiles = [], date) {
   return links
 }
 
+// Other salary profiles whose own-orders KPI already counts this POS account.
+// One account must credit one employee, otherwise both earn the same orders.
+export function getKpiAccountConflicts(links, accountId, salaryProfileId) {
+  const linked = links instanceof Map ? links.get(accountId) || [] : []
+  return linked.filter(item => item?.id !== salaryProfileId)
+}
+
 export function getEffectiveKpiRule(rules = [], salaryProfileId, date) {
   const normalizedDate = String(date || '').slice(0, 10)
   if (!salaryProfileId || !ISO_DATE_PATTERN.test(normalizedDate)) return null

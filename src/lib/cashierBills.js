@@ -38,3 +38,17 @@ export function getEmptyCashierOrders(orders = [], { tableId, orderId } = {}) {
     Array.isArray(order.items) && getCashierBillableItems(order).length === 0
   )
 }
+
+// Quick items (e.g. disposable dishes) belong to the bill the cashier is looking at,
+// never to the oldest unpaid row. An old leftover shell would otherwise absorb the
+// item and be billed together with a different waiter's table.
+export function pickQuickItemOrder(orders = [], { tableId, orderId } = {}) {
+  if (!tableId && !orderId) return null
+  const candidates = orders.filter(order =>
+    (orderId ? order?.id === orderId : order?.table_id === tableId) &&
+    !isPaidOrder(order) && order.status !== 'cancelled' && order.payment_status !== 'cancelled'
+  )
+  const newestFirst = [...candidates].sort((a, b) =>
+    String(b.created_at || '').localeCompare(String(a.created_at || '')))
+  return newestFirst.find(order => getCashierBillableItems(order).length > 0) || newestFirst[0] || null
+}

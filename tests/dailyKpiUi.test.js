@@ -138,3 +138,9 @@ test('KPI account remains visible but disabled for restaurant sales without a na
   assert.match(section, /selectedKpiProfile && form.is_enabled && form.sales_basis === 'employee_opened_orders'/)
   assert.match(section, /form.sales_basis === 'restaurant' \? labels.kpiAccountNotNeeded : labels.kpiAccountHelp/)
 })
+
+test('saving own-order KPI is blocked when the account already credits another employee', () => {
+  assert.match(salaries, /getKpiAccountConflicts\(kpiAccountLinks, kpiForm\.order_opener_profile_id, salaryProfile\.id\)/)
+  assert.match(salaries, /setKpiRulesError\(`\$\{l\.kpiAccountTaken\}/)
+  assert.equal((salaries.match(/kpiAccountTaken:/g) || []).length, 3)
+})

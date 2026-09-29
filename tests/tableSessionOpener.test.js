@@ -43,6 +43,8 @@ test('only the waiter who opened the table is credited for the table session', a
   `)
   await db.exec(sql('215_table_session_opener.sql'))
   await db.exec(sql('215_table_session_opener.sql'))
+  await db.exec(sql('217_table_session_same_day.sql'))
+  await db.exec(sql('217_table_session_same_day.sql'))
   await db.exec(sql('213_kpi_order_opening_cutoff.sql'))
   await db.exec(`
     create trigger set_order_actor_tracking_fields before insert or update on orders
@@ -55,10 +57,10 @@ test('only the waiter who opened the table is credited for the table session', a
 
   const as = actor => db.query(`select set_config('test.uid', $1, false)`, [actor || ''])
   let clock = 0
-  const submit = async (actor, orderId, tableId, { amount = 0, type = 'dine_in', item = 'new', name } = {}) => {
+  const submit = async (actor, orderId, tableId, { amount = 0, type = 'dine_in', item = 'new', name, at } = {}) => {
     await as(actor)
     const actorName = name || (actor === ASIL ? 'Asil' : 'Shohruz Xamidov')
-    const createdAt = `2026-09-29T14:${String(10 + clock++).padStart(2, '0')}:00+05:00`
+    const createdAt = at || `2026-09-29T14:${String(10 + clock++).padStart(2, '0')}:00+05:00`
     await db.query(
       `insert into orders(id, table_id, waiter_name, opened_by, opened_by_name, order_type, subtotal, created_at)
        values($1,$2,$3,$4,$3,$5,$6,$7)`,
@@ -140,5 +142,13 @@ test('only the waiter who opened the table is credited for the table session', a
     const second = await row('stol8-b')
     assert.equal(second.opened_by, null)
     assert.equal(second.waiter_name, 'Legacy waiter')
+  })
+
+  await t.test('a forgotten order from an earlier day never passes its opener to a new party', async () => {
+    await submit(ASIL, 'stale-t9', 't9', { at: '2026-09-26T13:21:00+05:00' })
+    await submit(SHOHRUZ, 'today-t9', 't9')
+    const today = await row('today-t9')
+    assert.equal(today.opened_by, SHOHRUZ)
+    assert.equal(today.waiter_name, 'Shohruz Xamidov')
   })
 })

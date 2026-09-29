@@ -871,7 +871,7 @@ export default function CashierTables() {
         type: 'ADD_QUICK_ITEM_TO_ORDER',
         payload: {
           tableId: isOffPremiseOrderType(orderType) ? null : order.table_id,
-          orderId: isOffPremiseOrderType(orderType) ? order.id : null,
+          orderId: order.id,
           item,
         },
       })

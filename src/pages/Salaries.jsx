@@ -21,6 +21,7 @@ import {
   formatKpiStartTime,
   getEffectiveKpiRule,
   getKpiAccountLinks,
+  getKpiAccountConflicts,
   getActiveKpiAccounts,
   getKpiRuleEditDate,
   removeKpiRulePreservingHistory,
@@ -250,6 +251,7 @@ export default function Salaries() {
       kpiAccount: "Xodimning kassadagi akkaunti",
       kpiSelectAccount: "Faol xodim akkauntini tanlang",
       kpiAccountRequired: "O‘z buyurtmalari uchun Faol xodim akkauntini tanlang.",
+      kpiAccountTaken: "Bu akkaunt allaqachon boshqa xodimga bog‘langan. Bitta akkaunt faqat bitta xodimga KPI beradi:",
       kpiAccountHelp: "Buyurtmalarni ochadigan faol akkauntni tanlang. Bog‘lanish KPI sozlamasi bilan saqlanadi.",
       kpiAccountNotNeeded: "Zaldagi barcha savdolar uchun akkaunt tanlash shart emas.",
       kpiAccountsEmpty: "Faol xodim akkauntlari topilmadi.",
@@ -415,6 +417,7 @@ export default function Salaries() {
       kpiAccount: "Учётная запись сотрудника",
       kpiSelectAccount: "Выберите активного сотрудника",
       kpiAccountRequired: "Для расчёта по своим заказам выберите учётную запись сотрудника.",
+      kpiAccountTaken: "Эта учётная запись уже привязана к другому сотруднику. Одна запись начисляет KPI только одному сотруднику:",
       kpiAccountHelp: "Выберите активную учётную запись, под которой сотрудник открывает заказы. Привязка сохранится вместе с настройкой KPI.",
       kpiAccountNotNeeded: "Для всех продаж в зале привязка к учётной записи не нужна.",
       kpiAccountsEmpty: "Нет активных учётных записей сотрудников.",
@@ -580,6 +583,7 @@ export default function Salaries() {
       kpiAccount: "Employee POS account",
       kpiSelectAccount: "Select an active employee account",
       kpiAccountRequired: "Select an active employee account for own-order KPI.",
+      kpiAccountTaken: "This account is already linked to another employee. One account earns KPI for one employee only:",
       kpiAccountHelp: "Choose the active account this employee uses to open orders. The link is saved with the KPI setting.",
       kpiAccountNotNeeded: "All restaurant sales do not require an account link.",
       kpiAccountsEmpty: "No active employee accounts found.",
@@ -1124,6 +1128,13 @@ export default function Salaries() {
     if (!canManage || !salaryProfile || !kpiForm.effective_from || kpiForm.effective_from < today || rateBps <= 0) return
     if (kpiForm.is_enabled && kpiForm.sales_basis === 'employee_opened_orders' && !kpiAccounts.some(account => account.id === kpiForm.order_opener_profile_id)) {
       setKpiRulesError(l.kpiAccountRequired)
+      return
+    }
+    const accountConflicts = kpiForm.is_enabled && kpiForm.sales_basis === 'employee_opened_orders'
+      ? getKpiAccountConflicts(kpiAccountLinks, kpiForm.order_opener_profile_id, salaryProfile.id)
+      : []
+    if (accountConflicts.length) {
+      setKpiRulesError(`${l.kpiAccountTaken} ${accountConflicts.map(item => item.employee_name || '—').join(', ')}`)
       return
     }
     const startTime = normalizeKpiStartTime(kpiForm.start_time)

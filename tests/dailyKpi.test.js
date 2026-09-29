@@ -7,6 +7,7 @@ import {
   formatKpiRateInput,
   getEffectiveKpiRule,
   getKpiAccountLinks,
+  getKpiAccountConflicts,
   getActiveKpiAccounts,
   getKpiRuleEditDate,
   getDefaultKpiHistoryRange,
@@ -251,4 +252,16 @@ test('KPI account links show which employees currently count each POS account', 
   const links = getKpiAccountLinks(rules, [{ id: 'a' }, { id: 'b' }, { id: 'c' }], '2026-09-28')
   assert.deepEqual([...links.keys()], ['acc-1'])
   assert.deepEqual(links.get('acc-1').map(item => item.id), ['a'])
+})
+
+test('one POS account cannot credit KPI to two employees', () => {
+  const rules = [
+    { salary_profile_id: 'a', effective_from: '2026-09-16', sales_basis: 'employee_opened_orders', order_opener_profile_id: 'acc-1' },
+    { salary_profile_id: 'c', effective_from: '2026-09-16', sales_basis: 'restaurant' },
+  ]
+  const links = getKpiAccountLinks(rules, [{ id: 'a' }, { id: 'b' }, { id: 'c' }], '2026-09-28')
+  assert.deepEqual(getKpiAccountConflicts(links, 'acc-1', 'b').map(item => item.id), ['a'])
+  assert.deepEqual(getKpiAccountConflicts(links, 'acc-1', 'a'), [])
+  assert.deepEqual(getKpiAccountConflicts(links, 'acc-2', 'b'), [])
+  assert.deepEqual(getKpiAccountConflicts(undefined, 'acc-1', 'b'), [])
 })
