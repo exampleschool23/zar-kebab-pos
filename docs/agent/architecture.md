@@ -41,6 +41,7 @@ Critical invariants:
 
 - Operational state contains every active order regardless of age and only today's paid orders needed for cashier/recent activity.
 - Never load full paid-order history during initial hydration or realtime refresh.
+- Signed-out visitors skip POS hydration and realtime; public pages read only `state.lang`.
 - Dashboard, reports, Accounting, and receipts use their own bounded history loaders.
 - `WaiterTables` refreshes operational tables/orders on mount and browser back-forward restoration without clearing the visible grid.
 - The stable `refreshPOSData` callback renews realtime and preserves current cards while reloading.

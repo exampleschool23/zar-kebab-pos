@@ -443,6 +443,8 @@ test('AppContext recovers Supabase after browser idle or resume', () => {
   assert.match(appContext, /shouldRecoverOnResume\(\{ eventType: event\?\.type, awayMs, realtimeHealthy \}\)/)
   assert.match(appContext, /window\.addEventListener\('blur', markAway\)/)
   assert.match(db, /onSubscribed\(\)/)
+  // Signed-out visitors never load POS data or open the staff realtime channel.
+  assert.match(appContext, /if \(authLoading\) return undefined\n[\s\S]{0,400}if \(!sessionUserId\) \{[\s\S]{0,200}return undefined\n    \}\n\n    let unsubscribe/)
   assert.match(appContext, /connectRealtime\(\)/)
   assert.match(appContext, /unsubscribe\(\)/)
 })

@@ -482,6 +482,15 @@ export function AppProvider({ children }) {
   // Load from Supabase on mount + subscribe to realtime
   useEffect(() => {
     if (authLoading) return undefined
+    // Signed-out pages (public menu, vacancies, login) read only the language.
+    // Loading POS data for every guest cost ~14 requests per visit and
+    // permission-denied errors on staff-only tables. Drop a previous user's data.
+    if (!sessionUserId) {
+      dispatch({ type: 'SET_LOADING' })
+      dispatch({ type: 'SET_ORDERS', payload: [] })
+      dispatch({ type: 'SET_TABLES', payload: [] })
+      return undefined
+    }
 
     let unsubscribe = () => {}
     let mounted = true
