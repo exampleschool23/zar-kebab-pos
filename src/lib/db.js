@@ -712,6 +712,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
   const menuCatalogLoader = options.menuCatalogLoader || (() => loadMenuCatalog(dbClient))
   const debounceMs = options.debounceMs ?? 250
   const onConnectionIssue = options.onConnectionIssue || (() => {})
+  const onSubscribed = options.onSubscribed || (() => {})
 
   let ordersReloadTimer = null
   let ordersReloadInFlight = false
@@ -809,6 +810,7 @@ export function subscribeToRealtime(dispatch, options = {}) {
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
         dispatch({ type: 'SET_CONNECTION_NOTICE', payload: null })
+        onSubscribed()
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         console.warn('[db] realtime channel status:', status)
         onConnectionIssue(status)

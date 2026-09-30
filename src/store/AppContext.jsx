@@ -2,6 +2,7 @@ import { getActiveTableOrders } from '../lib/tableGuestEntry'
 import { useOrderDeletion } from './useOrderDeletion'
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react'
 import { isRecoverableIdleError, loadOperationalTableData, loadPOSData, refreshSupabaseSession, waitForKitchenRoundSubmission, writeToSupabase, subscribeToRealtime } from '../lib/db'
+import { shouldRecoverOnResume } from '../lib/resumeRecovery'
 import { appMetaReducer } from './appMetaReducer'
 import { cartReducer } from './cartReducer'
 import { menuReducer } from './menuReducer'
@@ -489,6 +490,8 @@ export function AppProvider({ children }) {
     let reconnectTimer = null
     let backOnlineTimer = null
     let lastResumeAt = 0
+    let awaySince = null
+    let realtimeHealthy = false
 
     async function restoreSession() {
       const activeSession = await refreshSupabaseSession()
@@ -531,8 +534,13 @@ export function AppProvider({ children }) {
 
     function connectRealtime() {
       unsubscribe()
+      realtimeHealthy = false
       unsubscribe = subscribeToRealtime(dispatch, {
-        onConnectionIssue: () => scheduleIdleRecovery(1000),
+        onSubscribed: () => { realtimeHealthy = true },
+        onConnectionIssue: () => {
+          realtimeHealthy = false
+          scheduleIdleRecovery(1000)
+        },
       })
     }
 
@@ -591,9 +599,19 @@ export function AppProvider({ children }) {
       }, delay)
     }
 
-    function handleResume() {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    function markAway() {
+      if (awaySince === null) awaySince = Date.now()
+    }
+
+    function handleResume(event) {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        markAway()
+        return
+      }
       const now = Date.now()
+      const awayMs = awaySince === null ? 0 : now - awaySince
+      awaySince = null
+      if (!shouldRecoverOnResume({ eventType: event?.type, awayMs, realtimeHealthy })) return
       if (now - lastResumeAt < 5000) return
       lastResumeAt = now
       scheduleIdleRecovery(0)
@@ -634,6 +652,7 @@ export function AppProvider({ children }) {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', handleResume)
       window.addEventListener('focus', handleResume)
+      window.addEventListener('blur', markAway)
     }
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleResume)
@@ -648,6 +667,7 @@ export function AppProvider({ children }) {
       if (typeof window !== 'undefined') {
         window.removeEventListener('online', handleResume)
         window.removeEventListener('focus', handleResume)
+        window.removeEventListener('blur', markAway)
       }
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleResume)

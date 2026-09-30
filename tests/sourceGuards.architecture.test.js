@@ -439,6 +439,10 @@ test('AppContext recovers Supabase after browser idle or resume', () => {
   assert.match(appContext, /window\.addEventListener\('online', handleResume\)/)
   assert.match(appContext, /window\.addEventListener\('focus', handleResume\)/)
   assert.match(appContext, /document\.addEventListener\('visibilitychange', handleResume\)/)
+  // Brief focus switches must not refresh the session and reload all POS data.
+  assert.match(appContext, /shouldRecoverOnResume\(\{ eventType: event\?\.type, awayMs, realtimeHealthy \}\)/)
+  assert.match(appContext, /window\.addEventListener\('blur', markAway\)/)
+  assert.match(db, /onSubscribed\(\)/)
   assert.match(appContext, /connectRealtime\(\)/)
   assert.match(appContext, /unsubscribe\(\)/)
 })
