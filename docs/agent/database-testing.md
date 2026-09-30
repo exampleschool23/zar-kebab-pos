@@ -93,4 +93,4 @@ npm run build
 - `211`: profile name realtime; history unchanged. Tests: `tests/activeOrderWaiters.test.js`.
 - `212`: atomic bill edits; deploy before UI. See payments guide.
 - `214`: `custom:<name>` ingredient categories; apply before UI.
-- `215`–`217`: payroll.md; `218`: architecture.md.
+- `215`–`217`: payroll.md; `218`–`219`: architecture.md.

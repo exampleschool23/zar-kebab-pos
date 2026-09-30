@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { proxiedRestUrl } from './restProxy.js'
 
 const env = import.meta.env || {}
 const supabaseUrl = env.VITE_SUPABASE_URL
@@ -30,7 +31,7 @@ export const supabase = createClient(
       autoRefreshToken: true,
     },
     global: {
-      fetch: (input, init = {}) => fetch(input, {
+      fetch: (input, init = {}) => fetch(isBrowser ? proxiedRestUrl(input, supabaseUrl) : input, {
         ...init,
         cache: 'no-store',
         headers: withNoCacheHeaders(init.headers),

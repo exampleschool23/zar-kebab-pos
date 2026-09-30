@@ -38,6 +38,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/sb/rest/v1/:path*", "destination": "https://bcdbljpwhyawaasimjmk.supabase.co/rest/v1/:path*" },
+    { "source": "/((?!api/|sb/).*)", "destination": "/index.html" }
   ]
 }

@@ -50,12 +50,17 @@ function localApiRoutes() {
 
 export default defineConfig(({ mode }) => {
   loadServerEnv(mode)
+  const supabaseUrl = loadEnv(mode, process.cwd(), '').VITE_SUPABASE_URL
 
   return {
     plugins: [react(), localApiRoutes()],
     server: {
       port: 5173,
       strictPort: true,
+      // Mirrors the vercel.json same-origin REST rewrite (src/lib/restProxy.js).
+      proxy: supabaseUrl ? {
+        '/sb/rest/v1': { target: supabaseUrl, changeOrigin: true, rewrite: path => path.replace(/^\/sb/, '') },
+      } : undefined,
     },
     build: {
       rollupOptions: {
