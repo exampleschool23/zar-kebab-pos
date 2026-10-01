@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Nightly encrypted dump of the Zar Kebab Supabase database to Cloudflare R2.
 # Required env: SUPABASE_DB_URL, AGE_PUBLIC_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,
-# R2_SECRET_ACCESS_KEY, R2_BUCKET. Optional: BACKUP_RETENTION_DAYS (default 30), PG_DUMP
+# R2_SECRET_ACCESS_KEY, R2_BUCKET. Optional: BACKUP_RETENTION_DAYS (default 14), PG_DUMP
 # (path to a pg_dump at least as new as the server; the runner ships an older one first on PATH).
 set -euo pipefail
 
@@ -9,7 +9,7 @@ for name in SUPABASE_DB_URL AGE_PUBLIC_KEY R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SEC
   [ -n "${!name:-}" ] || { echo "Missing required variable: $name" >&2; exit 1; }
 done
 
-retention_days="${BACKUP_RETENTION_DAYS:-30}"
+retention_days="${BACKUP_RETENTION_DAYS:-14}"
 stamp="$(date -u +%Y-%m-%dT%H%M%SZ)"
 key="db-backups/db-${stamp}.dump.age"
 file="$(mktemp)"

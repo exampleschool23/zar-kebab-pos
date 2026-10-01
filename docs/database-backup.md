@@ -3,7 +3,7 @@
 A GitHub Actions workflow (`.github/workflows/db-backup.yml`) dumps the Supabase
 `public` and `auth` schemas every night at 23:17 UTC (04:17 Asia/Tashkent, after late
 service), encrypts the dump with [age](https://github.com/FiloSottile/age), uploads it
-to a private Cloudflare R2 bucket and deletes dumps older than 30 days
+to a private Cloudflare R2 bucket and deletes dumps older than 14 days
 (`BACKUP_RETENTION_DAYS`). The dump covers orders, payments, accounting, payroll,
 catalog history and staff accounts, so restored users can still sign in.
 
