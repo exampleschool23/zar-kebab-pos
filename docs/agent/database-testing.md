@@ -6,6 +6,7 @@
 - Migration/health: `supabase/migrate.js`, `scripts/check-db-health.js`
 - SQL migrations: `supabase/`
 - Source guards: `tests/sourceGuards.*.test.js`
+- Backups: `scripts/db-backup.sh`, `scripts/db-restore.sh`, `docs/database-backup.md`, `tests/dbBackup.test.js`.
 
 - `194`/`206`: nullable display-only employee roles. Apply 206 before new roles. Tests: `tests/employeeJobFunctions.test.js`.
 
@@ -13,7 +14,6 @@
 
 - Use full filenames; keep legacy `073`, `108`, `157` duplicates distinct.
 - `199`: checksum receipts; service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; Setup: README. No bulk legacy replay. Atomic receipts: matching checksums skip, changed checksums fail. Reconcile lost responses.
-- Schema/RPC errors: `npm run db:health`.
 - Migrations:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`
@@ -36,8 +36,8 @@
   - Game Club type, permission and service checks: `179`
   - Game Club per-round Team queue/cron: `180`
   - Daily Team KPI image claims and legacy-delivery suppression: `181`
-- Tech Card cost-sync batching and convergence: `183` (apply to enable faster saves). Tests: `tests/techCardCostSyncMigration.test.js`; SQL: `scripts/check-tech-card-cost-sync.mjs` (pass a PGlite module path).
-- Ingredient name editing with stable catalog keys and unchanged purchase snapshots: `182`.
+- Tech Card cost-sync batching and convergence: `183` (faster saves). Tests: `tests/techCardCostSyncMigration.test.js`; SQL: `scripts/check-tech-card-cost-sync.mjs` (pass a PGlite module path).
+- Ingredient renames with stable catalog keys and unchanged purchase snapshots: `182`.
 
 ## Invariants
 
@@ -50,12 +50,7 @@
 
 ## Checks
 
-```bash
-npm test
-npm run build
-```
-
-`npm run docs:check`; `npm run mcp:benchmark`.
+`npm test`; `npm run build`; `npm run docs:check`; `npm run mcp:benchmark`.
 
 ## Guards
 
@@ -72,8 +67,6 @@ npm run build
 ## Build
 
 - Authenticate routes.
-- Vite large-chunk warnings are non-fatal.
-- Preserve unrelated edits.
 - Migration `179_game_club_orders.sql` must precede the Game Club frontend release. Never require the reopening function retired by `090`. Tests: `tests/gameClubOrders.test.js`.
 - Isolated SQL: `scripts/check-game-club-migration.mjs` tests `180` with a PGlite module path.
 - Migration `184` requires deletion reasons and snapshots them for Investor alerts. Apply before UI.
