@@ -25,6 +25,7 @@ import {
   getRussianMenuCategoryName,
   getRussianMenuItemName,
 } from './_lib/menuAvailabilityMessages.js'
+import { renderDailyUnavailableMenuImage } from './_lib/menuAvailabilityImage.js'
 import { notifyAutomaticKpiBonus } from './employee-notification.js'
 import {
   getInclusiveCalendarDayCount,
@@ -493,6 +494,25 @@ async function markDailyUnavailableMenuDeliverySent(
   throw lastError
 }
 
+// The PNG follows the tracked text snapshot once. The text is already marked sent,
+// so an image failure is recorded on the ledger without resending the text.
+async function sendDailyUnavailableMenuImage(supabase, businessDate, chatId, items) {
+  if (items.length === 0) return
+  try {
+    const photo = await renderDailyUnavailableMenuImage(items, businessDate)
+    await sendTelegramPhoto(chatId, photo, { filename: `unavailable-menu-${businessDate}.png` })
+  } catch (error) {
+    console.error('[telegram/daily-salary] unavailable-menu image was not sent:', error)
+    await supabase
+      .from('daily_unavailable_menu_notification_deliveries')
+      .update({
+        error_message: `Image not sent: ${String(error?.message || error)}`.slice(0, 1000),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('business_date', businessDate)
+  }
+}
+
 async function sendDailyUnavailableMenuNotification(supabase, businessDate) {
   const items = await loadUnavailableMenuItems(supabase)
   const delivery = await claimDailyUnavailableMenuDelivery(supabase, businessDate, items)
@@ -514,6 +534,7 @@ async function sendDailyUnavailableMenuNotification(supabase, businessDate) {
       target,
       telegramMessageId
     )
+    await sendDailyUnavailableMenuImage(supabase, businessDate, target.chatId, items)
     return { businessDate, itemCount: items.length, status: 'sent' }
   } catch (error) {
     if (!telegramMessageId) {

@@ -52,6 +52,7 @@
 
 - Authenticated availability changes, product creation, and archival queue immutable Russian Team events with product/employee snapshots; ordinary edits and restoration send nothing.
 - At 08:00 Tashkent, send the duplicate-safe Russian unavailable-products snapshot and optionally reply to Google reviews; review failures do not block it.
+- Non-empty snapshots then send one PNG (`menuAvailabilityImage.js`); failures go to `error_message`, never resending text.
 - Exclude archived products and archived categories; preserve exact sent snapshots.
 
 ## Investor

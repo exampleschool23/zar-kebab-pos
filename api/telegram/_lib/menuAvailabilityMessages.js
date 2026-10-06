@@ -73,6 +73,23 @@ export function buildMenuArchivedTeamMessage(event) {
   ].join('\n')
 }
 
+export function groupUnavailableMenuItems(items) {
+  const categoryGroups = []
+  const groupsByKey = new Map()
+  for (const item of Array.isArray(items) ? items : []) {
+    const categoryName = getRussianMenuCategoryName(item)
+    const categoryKey = firstText(item?.category_id, categoryName)
+    let group = groupsByKey.get(categoryKey)
+    if (!group) {
+      group = { categoryName, items: [] }
+      groupsByKey.set(categoryKey, group)
+      categoryGroups.push(group)
+    }
+    group.items.push(item)
+  }
+  return categoryGroups
+}
+
 export function buildDailyUnavailableMenuTeamMessage(items, businessDate) {
   const unavailableItems = Array.isArray(items) ? items : []
   const dateLabel = formatLongDate(businessDate, 'ru', businessDate || '—')
@@ -85,20 +102,7 @@ export function buildDailyUnavailableMenuTeamMessage(items, businessDate) {
     return [...header, '✅ Все блюда доступны.'].join('\n')
   }
 
-  const categoryGroups = []
-  const groupsByKey = new Map()
-  for (const item of unavailableItems) {
-    const categoryName = getRussianMenuCategoryName(item)
-    const categoryKey = firstText(item?.category_id, categoryName)
-    let group = groupsByKey.get(categoryKey)
-    if (!group) {
-      group = { categoryName, items: [] }
-      groupsByKey.set(categoryKey, group)
-      categoryGroups.push(group)
-    }
-    group.items.push(item)
-  }
-
+  const categoryGroups = groupUnavailableMenuItems(unavailableItems)
   const groupedLines = []
   let itemNumber = 0
   for (const group of categoryGroups) {

@@ -8,6 +8,7 @@ import {
   buildMenuCreatedTeamMessage,
   buildMenuUnavailableTeamMessage,
 } from '../api/telegram/_lib/menuAvailabilityMessages.js'
+import { buildDailyUnavailableMenuImageSvg } from '../api/telegram/_lib/menuAvailabilityImage.js'
 import { runDbHealthChecks } from '../src/lib/dbHealth.js'
 
 const migration = readFileSync(
@@ -227,6 +228,28 @@ test('database health requires unavailable-product delivery tracking', async () 
   assert.match(failed.hint, /146_menu_available_team_notifications/)
   assert.match(failed.hint, /168_menu_catalog_team_notifications/)
   assert.match(cliHealth, /checkTable\('menu_item_unavailable_notification_deliveries'/)
+})
+
+test('daily unavailable-product image groups, numbers, wraps and escapes every item', () => {
+  const svg = buildDailyUnavailableMenuImageSvg([
+    { category_id: 'grill', category_name_ru: 'Мангал & гриль', name_ru: 'Шашлык <Особый>' },
+    { category_id: 'desserts', category_name_ru: 'Десерты', name_ru: 'Очень длинное название десерта с ягодным соусом и мороженым' },
+  ], '2026-08-26')
+
+  assert.match(svg, /Недоступные блюда/)
+  assert.match(svg, /На 26 августа 2026, 08:00/)
+  assert.match(svg, /МАНГАЛ &amp; ГРИЛЬ/)
+  assert.match(svg, /Шашлык &lt;Особый&gt;/)
+  assert.match(svg, />и мороженым</)
+  assert.match(svg, />2<\/text>/)
+  assert.doesNotMatch(svg, /<Особый>/)
+})
+
+test('daily unavailable-product image follows the tracked text once without resending text', () => {
+  assert.match(dailyCron, /await sendDailyUnavailableMenuImage\(supabase, businessDate, target\.chatId, items\)/)
+  assert.match(dailyCron, /renderDailyUnavailableMenuImage\(items, businessDate\)/)
+  assert.match(dailyCron, /if \(items\.length === 0\) return/)
+  assert.match(dailyCron, /Image not sent:/)
 })
 
 test('08:00 Tashkent cron sends one duplicate-safe active unavailable-product snapshot', () => {
