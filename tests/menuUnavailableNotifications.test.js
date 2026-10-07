@@ -245,11 +245,12 @@ test('daily unavailable-product image groups, numbers, wraps and escapes every i
   assert.doesNotMatch(svg, /<Особый>/)
 })
 
-test('daily unavailable-product image follows the tracked text once without resending text', () => {
-  assert.match(dailyCron, /await sendDailyUnavailableMenuImage\(supabase, businessDate, target\.chatId, items\)/)
-  assert.match(dailyCron, /renderDailyUnavailableMenuImage\(items, businessDate\)/)
-  assert.match(dailyCron, /if \(items\.length === 0\) return/)
-  assert.match(dailyCron, /Image not sent:/)
+test('non-empty daily unavailable-product snapshot is sent as one tracked image without text', () => {
+  const sender = dailyCron.match(/async function sendDailyUnavailableMenuSnapshot[\s\S]*?\n}\n/)?.[0] || ''
+  assert.match(sender, /if \(items\.length === 0\) \{\s*return sendTelegramMessage\(chatId, buildDailyUnavailableMenuTeamMessage\(items, businessDate\)\)/)
+  assert.match(sender, /const photo = await renderDailyUnavailableMenuImage\(items, businessDate\)\s*return sendTelegramPhoto\(chatId, photo/)
+  assert.match(dailyCron, /const response = await sendDailyUnavailableMenuSnapshot\(target\.chatId, items, businessDate\)\s*telegramMessageId = getTelegramMessageId\(response\)/)
+  assert.doesNotMatch(dailyCron, /sendDailyUnavailableMenuImage|Image not sent:/)
 })
 
 test('08:00 Tashkent cron sends one duplicate-safe active unavailable-product snapshot', () => {
