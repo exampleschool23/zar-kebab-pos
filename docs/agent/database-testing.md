@@ -84,6 +84,6 @@
 - `207`–`209`: rate date guard, audits, owner-only DELETE. Apply before UI. Tests: `tests/salaryRateDateWindow.test.js`, `tests/salaryRateHistory.test.js`.
 - `210`: see [salary orders](salary-orders.md).
 - `211`: profile name realtime; history unchanged. Tests: `tests/activeOrderWaiters.test.js`.
-- `212`: atomic bill edits; deploy before UI. See payments guide.
+- `212`/`220`: bill edits (payments); `221`: price-mode guard (ordering)
 - `214`: `custom:<name>` ingredient categories; apply before UI.
 - `215`–`217`: payroll.md; `218`–`219`: architecture.md.

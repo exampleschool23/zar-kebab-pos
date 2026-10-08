@@ -130,3 +130,53 @@ test('atomic bill edits recalculate durable items, roll back failures, protect p
   assert.ok(migration.indexOf("'pos-table:'") < migration.indexOf('delete from public.order_items'))
   assert.ok(migration.indexOf('for update;') < migration.indexOf('delete from public.order_items'))
 })
+
+test('a bill edit that removes the last live item closes the order instead of leaving an open zero shell', async t => {
+  const db = new PGlite()
+  t.after(() => db.close())
+  await db.exec(`
+    create role anon; create role authenticated;
+    create schema auth;
+    create function auth.uid() returns uuid language sql as $$ select '${uuid(99)}'::uuid $$;
+    create function current_staff_can_write(text) returns boolean language sql as $$ select true $$;
+    create table restaurant_tables(id text primary key, status text, updated_at timestamptz);
+    create table orders(id text primary key, table_id text, payment_status text, status text,
+      paid_at timestamptz, order_type text default 'dine_in', subtotal integer default 0,
+      service_rate_pct numeric default 15, service_fee integer default 0, total integer default 0, updated_at timestamptz);
+    create table order_items(id uuid primary key, order_id text references orders(id), sale_unit text default 'piece',
+      price integer, unit_price integer, quantity numeric, status text default 'new',
+      is_counter_item boolean default false, item_type text default 'menu');
+    insert into restaurant_tables values ('t4','occupied',now());
+  `)
+  const settlement = read('supabase/083_atomic_order_payment_settlement.sql')
+  await db.exec(settlement.slice(0, settlement.indexOf('create or replace function public.settle_orders_payment')))
+  await db.exec(read('supabase/212_atomic_bill_item_edits.sql'))
+  const seed = async (order, ...items) => {
+    await db.query("insert into orders(id,table_id,payment_status,status) values ($1,'t4','unpaid','sent_to_kitchen')", [order])
+    for (const item of items) await db.query('insert into order_items(id,order_id,price,quantity) values($1,$2,36000,1)', [uuid(item), order])
+  }
+  const edit = (request, order, item, quantity) => db.query('select update_bill_item_quantity($1::jsonb)', [JSON.stringify({
+    request_id: uuid(request), order_id: order, table_id: 't4', order_item_id: uuid(item), source_item_ids: [], quantity,
+  })])
+  const order = async id => (await db.query('select status, payment_status, total from orders where id=$1', [id])).rows[0]
+
+  // Shells emptied under 212 are backfilled; open bills with live items and fresh orders are untouched.
+  await seed('legacy-shell', 1)
+  await edit(101, 'legacy-shell', 1, 0)
+  await seed('live', 2)
+  await edit(102, 'live', 2, 2)
+  await db.query("insert into orders(id,table_id,payment_status,status) values ('fresh','t4','unpaid','new')")
+  assert.deepEqual(await order('legacy-shell'), { status: 'sent_to_kitchen', payment_status: 'unpaid', total: 0 })
+  await db.exec(read('supabase/220_cancel_emptied_bill_orders.sql'))
+  assert.deepEqual(await order('legacy-shell'), { status: 'cancelled', payment_status: 'cancelled', total: 0 })
+  assert.equal((await order('live')).status, 'sent_to_kitchen')
+  assert.equal((await order('fresh')).status, 'new')
+
+  // Partial removal keeps the bill open; removing the last item closes it.
+  await seed('emptied', 3, 4)
+  await edit(103, 'emptied', 3, 0)
+  assert.deepEqual(await order('emptied'), { status: 'sent_to_kitchen', payment_status: 'unpaid', total: 41400 })
+  await edit(104, 'emptied', 4, 0)
+  assert.deepEqual(await order('emptied'), { status: 'cancelled', payment_status: 'cancelled', total: 0 })
+  await assert.rejects(edit(105, 'live', 2, 0).then(() => edit(106, 'live', 2, 1)), /unavailable|closed/)
+})

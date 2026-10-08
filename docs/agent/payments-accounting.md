@@ -4,7 +4,7 @@
 
 - UI: `src/pages/CashierBill.jsx`, `src/pages/Receipt.jsx`, `src/pages/Expenses.jsx`, `src/pages/AccountingHistory.jsx`, `src/pages/MonthlyEstimate.jsx`, `src/pages/DailyBazaar.jsx`
 - Helpers: `src/lib/analytics.js`, `src/lib/cashierCheckout.js`, `src/lib/billHandoff.js`, `src/lib/accounting.js`, `src/lib/accountingSummary.js`, `src/lib/expenses.js`, `src/lib/monthlyEstimate.js`, `src/lib/bazaar.js`
-- Database: `src/lib/db.js`; migrations `083`, `090`, `097`, `109`, `135`, `201`, `212`
+- Database: `src/lib/db.js`; migrations `083`, `090`, `097`, `109`, `135`, `201`, `212`, `220`
 - Tests: `tests/orderPayment.test.js`, `tests/atomicPaymentSettlement.test.js`, `tests/cashierCheckout.test.js`, `tests/accountingPages.test.js`, `tests/monthlyEstimate.test.js`, `tests/bazaar.test.js`, `tests/sourceGuards.payments-reporting.test.js`, `tests/sourceGuards.accounting-reporting.test.js`
 
 ## Payment math
@@ -18,7 +18,7 @@
 
 ## Bill item edits
 
-- Deploy `212` before UI; reload old clients. `update_bill_item_quantity` atomically locks/edits/recalculates; no legacy fallback. `_billEditRequestId` receipts prevent replay; errors refresh state. Paid items locked; waiter recall required. Empty bills save zero and free tables without other active items. Tests: `tests/atomicBillItemEdits.test.js`.
+- Deploy `212` before UI; reload old clients. `update_bill_item_quantity` atomically locks/edits/recalculates; no legacy fallback. `_billEditRequestId` receipts prevent replay; errors refresh state. Paid items locked; waiter recall required. Emptied bills cancel (`220`), freeing idle tables. Tests: `tests/atomicBillItemEdits.test.js`.
 
 ## Split payments and corrections
 

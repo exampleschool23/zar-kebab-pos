@@ -4,7 +4,7 @@
 
 - Waiter and kitchen UI: `src/pages/WaiterTables.jsx`, `src/pages/WaiterOrder.jsx`, `src/pages/KitchenCheckReceipt.jsx`, `src/components/CartPanel.jsx`
 - State and shared logic: `src/store/cartReducer.js`, `src/store/ordersReducer.js`, `src/lib/kitchenCheck.js`, `src/lib/tableActivity.js`, `src/lib/priceModes.js`
-- Database orchestration: `src/lib/db.js`, kitchen migrations `096`, `127`, and `128`
+- Database orchestration: `src/lib/db.js`, kitchen migrations `096`, `127`, `128`, `221`
 - Focused tests: `tests/operationalFlows.test.js`, `tests/kitchenCheck.test.js`, `tests/kitchenSubmissionRecovery.test.js`, `tests/kitchenSubmissionReducer.test.js`, `tests/priceModes.test.js`, `tests/writeTimeout.test.js`, `tests/sourceGuards.ordering.test.js`
 
 ## Table entry and price mode
@@ -12,7 +12,7 @@
 - Opening a table is a direct compact Regular/Tourist (`R`/`T`) choice followed by Enter table. Do not ask for a PIN or create a Guest session.
 - Opening a table creates no order; sending the cart does.
 - Reserved-table seating clears reservation fields before entering ordering.
-- Active non-empty orders keep their saved price mode locked. Conflicting active modes require staff review.
+- Active non-empty orders keep their saved price mode locked; `221` rejects conflicting rounds (`tests/kitchenPriceModeGuard.test.js`).
 - Empty shells, stale totals without items, and all-cancelled orders must not lock price mode or show an active-order notice.
 - Before a kitchen order exists, a non-empty cart's saved `price_mode` is authoritative.
 - Recalculate plain products and configured variants from immutable `base_price`; never compound Tourist markup.

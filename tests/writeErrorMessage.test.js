@@ -14,6 +14,7 @@ const errors = [
   [{ code: 'POS_KITCHEN_SUBMISSION_USER_CHANGED', kitchenSubmissionUnresolved: true }, 'identity'],
   [{ message: 'order o1 is already paid, completed, cancelled, or unavailable' }, 'closed'],
   [{ message: 'menu item is archived' }, 'unavailable'],
+  [{ message: 'Table price mode conflict: this table already has an open bill in another price mode', code: '23514' }, 'priceMode'],
   [{ code: 'PGRST301' }, 'session'],
   [null, 'unknown'],
   [{ message: 'Internal SQL failure', details: 'private diagnostic', hint: 'English only hint' }, 'unknown'],

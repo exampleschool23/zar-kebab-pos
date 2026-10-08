@@ -14,7 +14,7 @@ import { isOffPremiseOrderType } from '../lib/orderTypes'
 import { DEFAULT_PRICE_MODE, normalizePriceMode, withPriceModeFields } from '../lib/priceModes'
 import { isWriteTimeoutError, withWriteTimeout } from '../lib/writeTimeout'
 import { getKitchenBillBlockError } from '../lib/billHandoff'
-import { formatWriteError } from '../lib/writeErrorMessage'
+import { formatWriteError, writeErrorReason } from '../lib/writeErrorMessage'
 import { useAuth } from '../contexts/AuthContext'
 import { getConfiguredServiceRatePct } from '../lib/serviceRates'
 
@@ -443,6 +443,8 @@ export function AppProvider({ children }) {
               const cartSnapshot = pendingKitchenCartSnapshot(enriched)
               if (cartSnapshot.length > 0) dispatch({ type: 'REPLACE_CART', payload: cartSnapshot })
               clearPendingKitchenSubmission(enriched)
+              // The server saw a newer table state than this device; resync before a retry.
+              if (['closed', 'priceMode'].includes(writeErrorReason(err))) refreshPOSData()
             }
           }
           console.error('[db] write failed:', action.type, err)
