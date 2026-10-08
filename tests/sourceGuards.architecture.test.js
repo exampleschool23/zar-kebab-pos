@@ -145,7 +145,7 @@ test('waiter bill item quantity edits update optimistically', () => {
 
 test('new signed-up users always start as pending guests with repair coverage', () => {
   const auth = readSource('src/contexts/AuthContext.jsx')
-  const migration = readSource('supabase/091_repair_missing_auth_profiles.sql')
+  const migration = readSource('migrations/091_repair_missing_auth_profiles.sql')
 
   assert.match(auth, /data: \{ full_name: normalizedName, role: 'guest' \}/)
   assert.match(migration, /public\.handle_new_user/)
@@ -308,8 +308,8 @@ test('AdminUsers permanently deletes auth accounts while preserving historical o
   const permissions = readSource('src/lib/permissions.js')
   const deleteUserApi = readSource('api/auth/delete-user.js')
   const vite = readSource('vite.config.js')
-  const migration = readSource('supabase/025_owner_delete_profiles.sql')
-  const roleAccessMigration = readSource('supabase/077_four_role_feature_access.sql')
+  const migration = readSource('migrations/025_owner_delete_profiles.sql')
+  const roleAccessMigration = readSource('migrations/077_four_role_feature_access.sql')
 
   assert.match(adminUsers, /deleteProfile/)
   assert.match(adminUsers, /canDeleteTeamMember/)

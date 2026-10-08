@@ -89,7 +89,7 @@ test('Tech Card list items keep only the profit badge', () => {
 })
 
 test('separate Tech Cards access is enforced by the profile constraint and recipe RLS', () => {
-  const migration = source('supabase/140_tech_card_feature_access.sql')
+  const migration = source('migrations/140_tech_card_feature_access.sql')
 
   assert.match(migration, /profiles_feature_access_valid/)
   assert.match(migration, /'bazaar', 'tech_cards', 'team'/)
@@ -100,7 +100,7 @@ test('separate Tech Cards access is enforced by the profile constraint and recip
 })
 
 test('Tech card migration protects recipe prices and saves a whole recipe atomically', () => {
-  const migration = source('supabase/139_menu_item_tech_cards.sql')
+  const migration = source('migrations/139_menu_item_tech_cards.sql')
 
   assert.match(migration, /create table if not exists public\.menu_item_tech_cards/)
   assert.match(migration, /create table if not exists public\.menu_item_tech_card_ingredients/)
@@ -112,7 +112,7 @@ test('Tech card migration protects recipe prices and saves a whole recipe atomic
 })
 
 test('set composition is structured, cycle-safe, and snapshotted onto new order items', () => {
-  const migration = source('supabase/149_tech_card_menu_item_components.sql')
+  const migration = source('migrations/149_tech_card_menu_item_components.sql')
   const page = source('src/pages/TechCards.jsx')
 
   assert.match(migration, /create table if not exists public\.menu_item_tech_card_components/)
@@ -133,7 +133,7 @@ test('set composition is structured, cycle-safe, and snapshotted onto new order 
 })
 
 test('Tech Card components persist selected variants for cost, snapshots, and stock', () => {
-  const migration = source('supabase/154_tech_card_component_variants.sql')
+  const migration = source('migrations/154_tech_card_component_variants.sql')
   const helpers = source('src/lib/techCards.js')
   const page = source('src/pages/TechCards.jsx')
 
@@ -148,7 +148,7 @@ test('Tech Card components persist selected variants for cost, snapshots, and st
 })
 
 test('Tech Card included dishes accept fractional recipe quantities', () => {
-  const migration = source('supabase/159_fractional_tech_card_components.sql')
+  const migration = source('migrations/159_fractional_tech_card_components.sql')
   const helpers = source('src/lib/techCards.js')
   const page = source('src/pages/TechCards.jsx')
 
@@ -174,7 +174,7 @@ test('Tech Card included-item picker is searchable and grouped by menu category'
 
 test('Tech Card ingredients come from the active Bazaar catalog and lock the normal price', () => {
   const page = source('src/pages/TechCards.jsx')
-  const migration = source('supabase/171_tech_card_bazaar_ingredient_catalog_access.sql')
+  const migration = source('migrations/171_tech_card_bazaar_ingredient_catalog_access.sql')
 
   assert.match(page, /from\('bazaar_product_catalog'\)[\s\S]{0,260}eq\('is_catalog_managed', true\)[\s\S]{0,120}eq\('is_active', true\)/)
   assert.match(page, /<BazaarIngredientPicker[\s\S]{0,500}getBazaarIngredientTechCardPatch\(selected\)/)
@@ -199,7 +199,7 @@ test('menu product editor links directly to its tech card', () => {
 })
 
 test('saved tech-card cost replaces and locks the current menu real cost only', () => {
-  const migration = source('supabase/155_tech_card_real_costs.sql')
+  const migration = source('migrations/155_tech_card_real_costs.sql')
   const adminMenu = source('src/pages/AdminMenu.jsx')
   const techCards = source('src/pages/TechCards.jsx')
   const db = source('src/lib/db.js')

@@ -5,15 +5,15 @@ import { readFileSync } from 'node:fs'
 import { loadAccountingAllTimeBalance, loadAccountingPaidOrderSummary } from '../src/lib/accountingSummary.js'
 
 const migration = readFileSync(
-  new URL('../supabase/109_accounting_paid_order_summary.sql', import.meta.url),
+  new URL('../migrations/109_accounting_paid_order_summary.sql', import.meta.url),
   'utf8'
 )
 const immutableSnapshotsMigration = readFileSync(
-  new URL('../supabase/114_freeze_historical_order_prices_and_costs.sql', import.meta.url),
+  new URL('../migrations/114_freeze_historical_order_prices_and_costs.sql', import.meta.url),
   'utf8'
 )
 const allTimeBalanceMigration = readFileSync(
-  new URL('../supabase/177_accounting_all_time_balance.sql', import.meta.url),
+  new URL('../migrations/177_accounting_all_time_balance.sql', import.meta.url),
   'utf8'
 )
 

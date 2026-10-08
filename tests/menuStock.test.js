@@ -3,18 +3,18 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const migration = readFileSync(
-  new URL('../supabase/106_atomic_paid_order_stock_deduction.sql', import.meta.url),
+  new URL('../migrations/106_atomic_paid_order_stock_deduction.sql', import.meta.url),
   'utf8',
 )
 const componentMigration = readFileSync(
-  new URL('../supabase/150_tech_card_component_stock_deduction.sql', import.meta.url),
+  new URL('../migrations/150_tech_card_component_stock_deduction.sql', import.meta.url),
   'utf8',
 )
 const componentQuantityMigration = readFileSync(
-  new URL('../supabase/151_tech_card_component_piece_quantities.sql', import.meta.url),
+  new URL('../migrations/151_tech_card_component_piece_quantities.sql', import.meta.url),
   'utf8',
 )
-const schema = readFileSync(new URL('../supabase/003_pos_schema.sql', import.meta.url), 'utf8')
+const schema = readFileSync(new URL('../migrations/003_pos_schema.sql', import.meta.url), 'utf8')
 const dbHealth = readFileSync(new URL('../src/lib/dbHealth.js', import.meta.url), 'utf8')
 const dbHealthScript = readFileSync(new URL('../scripts/check-db-health.js', import.meta.url), 'utf8')
 

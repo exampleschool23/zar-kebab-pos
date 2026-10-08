@@ -14,7 +14,7 @@ async function fixture(t) {
   t.after(() => fs.rm(root, { recursive: true, force: true }))
   await fs.mkdir(path.join(root, 'src'), { recursive: true })
   await fs.mkdir(path.join(root, 'tests'), { recursive: true })
-  await fs.mkdir(path.join(root, 'supabase'), { recursive: true })
+  await fs.mkdir(path.join(root, 'migrations'), { recursive: true })
   await fs.writeFile(path.join(root, 'src', 'App.jsx'), [
     "import { totalDue } from './money.js'",
     "export function App() {",
@@ -32,7 +32,7 @@ async function fixture(t) {
     '  assert.equal(totalDue(order), 20)',
     '})',
   ].join('\n'))
-  await fs.writeFile(path.join(root, 'supabase', '001.sql'), [
+  await fs.writeFile(path.join(root, 'migrations', '001.sql'), [
     'create table public.orders (id text);',
     'create or replace function public.settle_order(payload jsonb)',
     'returns void language sql as $$ select null; $$;',
@@ -285,7 +285,7 @@ test('indexes complete large components, PL/pgSQL bodies, and multiline protecte
 
   const settlement = await navigator.run({ op: 'find', q: 'settle_orders_payment', limit: 5 })
   const sqlFunction = settlement.rows.find((row) => row[1] === 'sql-function')
-  assert.equal(sqlFunction[2], 'supabase/083_atomic_order_payment_settlement.sql')
+  assert.equal(sqlFunction[2], 'migrations/083_atomic_order_payment_settlement.sql')
   assert.ok(Number(sqlFunction[3].split('-')[1]) >= 500)
 
   const routes = await navigator.run({ op: 'map', q: '/admin/accounting', limit: 20 })
@@ -372,7 +372,7 @@ test('keeps every curated project-map path valid', async () => {
 test('resolves curated task phrases directly to implementation declarations', async () => {
   const navigator = new RepoNavigator(projectRoot)
   const expectations = [
-    ['atomic cashier settlement', 'supabase/083_atomic_order_payment_settlement.sql', 'settle_orders_payment'],
+    ['atomic cashier settlement', 'migrations/083_atomic_order_payment_settlement.sql', 'settle_orders_payment'],
     ['paid order range loading', 'src/lib/orderHistory.js', 'loadPaidOrdersForRange'],
     ['large menu editor', 'src/pages/AdminMenu.jsx', 'AdminMenu'],
     ['sent cart snapshot removal', 'src/lib/analytics.js', 'removeSentCartItems'],

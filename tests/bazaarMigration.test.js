@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const migration = readFileSync(new URL('../supabase/097_daily_bazaar.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/097_daily_bazaar.sql', import.meta.url), 'utf8')
 
 function sqlFunction(name, nextName = '') {
   const start = migration.indexOf(`create or replace function public.${name}`)

@@ -13,7 +13,7 @@ test('auth account deletion preserves the complete immutable accounting audit sn
       create table auth.users (id uuid primary key);
       create table public.profiles (id uuid primary key references auth.users(id) on delete cascade);
     `)
-    const original = read('supabase/084_accounting_record_audit.sql')
+    const original = read('migrations/084_accounting_record_audit.sql')
     await db.exec(original.slice(0, original.indexOf('create or replace function public.capture_accounting_record_audit()')))
     await db.exec(original.slice(original.indexOf('create or replace function public.prevent_accounting_audit_mutation()'), original.indexOf('alter table public.accounting_record_audit enable row level security;')))
     const id = '00000000-0000-0000-0000-000000000001'
@@ -24,7 +24,7 @@ test('auth account deletion preserves the complete immutable accounting audit sn
       values ('expense','expense-1','update','{"amount":100}','{"amount":200}',$1,'Manager')`, [id])
     const before = (await db.query('select * from accounting_record_audit')).rows
     await assert.rejects(db.query('delete from auth.users where id=$1', [id]), /immutable/)
-    await db.exec(read('supabase/204_preserve_audit_actor_on_account_deletion.sql'))
+    await db.exec(read('migrations/204_preserve_audit_actor_on_account_deletion.sql'))
     await db.query('delete from auth.users where id=$1', [id])
     assert.deepEqual((await db.query('select * from profiles')).rows, [])
     assert.deepEqual((await db.query('select * from auth.users')).rows, [])
@@ -32,7 +32,7 @@ test('auth account deletion preserves the complete immutable accounting audit sn
     await assert.rejects(db.exec('update accounting_record_audit set changed_by=null'), /immutable/)
     await assert.rejects(db.exec("update accounting_record_audit set new_record='{}'"), /immutable/)
     await assert.rejects(db.exec('delete from accounting_record_audit'), /immutable/)
-    await db.exec(read('supabase/204_preserve_audit_actor_on_account_deletion.sql'))
+    await db.exec(read('migrations/204_preserve_audit_actor_on_account_deletion.sql'))
   } finally {
     await db.close()
   }

@@ -3,8 +3,8 @@
 ## Entry points
 
 - Database/health: `src/lib/db.js`, `src/lib/dbHealth.js`
-- Migration/health: `supabase/migrate.js`, `scripts/check-db-health.js`
-- SQL migrations: `supabase/`
+- Tools: `migrations/migrate.js`, `scripts/check-db-health.js`
+- SQL migrations: `migrations/`
 - Source guards: `tests/sourceGuards.*.test.js`
 - Backups: `scripts/db-backup.sh`, `scripts/db-restore.sh`, `docs/database-backup.md`, `tests/dbBackup.test.js`.
 
@@ -13,7 +13,7 @@
 ## Workflow
 
 - Use full filenames; keep legacy `073`, `108`, `157` duplicates distinct.
-- `199`: checksum receipts; service-only drift checks. `node supabase/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; Setup: README. No bulk legacy replay. Atomic receipts: matching checksums skip, changed checksums fail. Reconcile lost responses.
+- `199`: checksum receipts; service-only drift checks. `node migrations/migrate.js --status`, `--sql <filename>`, `--apply <filename>`; Setup: README. No bulk legacy replay. Atomic receipts: matching checksums skip, changed checksums fail. Reconcile lost responses.
 - Migrations:
   - settings, payments, kitchen submit, tables/reservations: `011`, `012`, `018`–`020`
   - kitchen idempotency and durable receipts: `096`, `128`

@@ -4,7 +4,7 @@
 
 - UI: `src/components/SalaryOrderPayment.jsx`, `src/pages/CashierBill.jsx`.
 - Balances: `api/telegram/_lib/orderSalaryBalances.js`; tests: `tests/orderSalaryBalances.test.js`.
-- Migration: `supabase/210_order_salary_settlement.sql` (apply before UI/API release).
+- Migration: `migrations/210_order_salary_settlement.sql` (apply before UI/API release).
 - Tests: `tests/orderSalarySettlement.test.js`, `tests/orderStatusDelivery.test.js`.
 - Related guides: payments-accounting, payroll, reporting, telegram.
 

@@ -113,7 +113,7 @@ test('daily Bazaar and ingredient reports render as separate image layouts', () 
 })
 
 test('order item ingredient snapshots are variant-aware immutable and never backfilled', () => {
-  const migration = readFileSync(new URL('../supabase/164_order_item_tech_card_ingredient_snapshots.sql', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../migrations/164_order_item_tech_card_ingredient_snapshots.sql', import.meta.url), 'utf8')
   assert.match(migration, /create table if not exists public\.order_item_tech_card_ingredient_snapshots/)
   assert.match(migration, /revoke all on table public\.order_item_tech_card_ingredient_snapshots from anon, authenticated/)
   assert.match(migration, /quantity_per_portion.*ingredient\.quantity \/ card_portion_count/s)
@@ -125,7 +125,7 @@ test('order item ingredient snapshots are variant-aware immutable and never back
 })
 
 test('legacy ingredient ledger is preserved but daily Investor ingredient sends are disabled', () => {
-  const migration = readFileSync(new URL('../supabase/165_daily_ingredient_consumption_deliveries.sql', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../migrations/165_daily_ingredient_consumption_deliveries.sql', import.meta.url), 'utf8')
   const cron = readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
   assert.match(migration, /daily_ingredient_consumption_deliveries/)
   assert.match(migration, /Historical delivery skipped during migration/)

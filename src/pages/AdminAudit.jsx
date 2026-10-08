@@ -142,7 +142,7 @@ export default function AdminAudit() {
       searchPlaceholder: 'Buyurtma, foydalanuvchi yoki amal...',
       allActions: 'Barcha amallar',
       allStatuses: 'Barcha statuslar',
-      migrationMissing: 'Audit jadvali hali bazada yaratilmagan. Supabase SQL editorida supabase/010_order_payment_audit_and_guards.sql migratsiyasini ishga tushiring.',
+      migrationMissing: 'Audit jadvali hali bazada yaratilmagan. Supabase SQL editorida migrations/010_order_payment_audit_and_guards.sql migratsiyasini ishga tushiring.',
     },
     ru: {
       title: 'Аудит',
@@ -169,7 +169,7 @@ export default function AdminAudit() {
       searchPlaceholder: 'Заказ, пользователь или действие...',
       allActions: 'Все действия',
       allStatuses: 'Все статусы',
-      migrationMissing: 'Таблица аудита ещё не создана в базе. Запустите миграцию supabase/010_order_payment_audit_and_guards.sql в Supabase SQL Editor.',
+      migrationMissing: 'Таблица аудита ещё не создана в базе. Запустите миграцию migrations/010_order_payment_audit_and_guards.sql в Supabase SQL Editor.',
     },
     en: {
       title: 'Audit',
@@ -196,7 +196,7 @@ export default function AdminAudit() {
       searchPlaceholder: 'Order, user, or action...',
       allActions: 'All actions',
       allStatuses: 'All statuses',
-      migrationMissing: 'The audit table has not been created in the database yet. Run supabase/010_order_payment_audit_and_guards.sql in the Supabase SQL Editor.',
+      migrationMissing: 'The audit table has not been created in the database yet. Run migrations/010_order_payment_audit_and_guards.sql in the Supabase SQL Editor.',
     },
   }[lang] || {}
 
@@ -298,7 +298,7 @@ export default function AdminAudit() {
           <p className="mt-2 text-sm">{tableMissing ? l.migrationMissing : error}</p>
           {tableMissing && (
             <p className="mt-2 rounded-xl bg-white/70 px-3 py-2 font-mono text-xs text-red-800">
-              supabase/010_order_payment_audit_and_guards.sql
+              migrations/010_order_payment_audit_and_guards.sql
             </p>
           )}
         </div>

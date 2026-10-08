@@ -20,7 +20,7 @@ test('off-premise order buttons and route require the dedicated user feature', (
 })
 
 test('off-premise submission is permission-checked at the database boundary', () => {
-  const migration = readSource('supabase/138_off_premise_order_access.sql')
+  const migration = readSource('migrations/138_off_premise_order_access.sql')
 
   assert.match(migration, /'off_premise_orders', 'delete_paid_orders'/)
   assert.match(migration, /not \('off_premise_orders' = any\(feature_access\)\)[\s\S]*?'tables' = any\(feature_access\)/)

@@ -7,7 +7,7 @@ import {
   isExpenseEntryDateAllowed,
 } from '../src/lib/expenses.js'
 
-const migration = readFileSync(new URL('../supabase/166_expense_backdate_limit.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/166_expense_backdate_limit.sql', import.meta.url), 'utf8')
 const expensesPage = readFileSync(new URL('../src/pages/Expenses.jsx', import.meta.url), 'utf8')
 const bazaarPage = readFileSync(new URL('../src/pages/DailyBazaar.jsx', import.meta.url), 'utf8')
 

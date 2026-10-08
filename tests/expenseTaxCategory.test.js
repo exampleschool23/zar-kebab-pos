@@ -5,7 +5,7 @@ import test from 'node:test'
 import { MANUAL_EXPENSE_CATEGORIES, expenseCategoryLabel } from '../src/lib/expenses.js'
 
 const migration = fs.readFileSync(
-  new URL('../supabase/137_expense_tax_category.sql', import.meta.url),
+  new URL('../migrations/137_expense_tax_category.sql', import.meta.url),
   'utf8'
 )
 

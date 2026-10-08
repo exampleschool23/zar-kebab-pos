@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 import { buildAbsenceUndoInvestorMessage } from '../api/telegram/_lib/investorIncomeMessages.js'
 
-const migration = readFileSync(new URL('../supabase/148_salary_absence_undo_investor_notifications.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/148_salary_absence_undo_investor_notifications.sql', import.meta.url), 'utf8')
 const endpoint = readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
 const employees = readFileSync(new URL('../src/pages/Employees.jsx', import.meta.url), 'utf8')
 const notifications = readFileSync(new URL('../src/lib/telegramNotifications.js', import.meta.url), 'utf8')

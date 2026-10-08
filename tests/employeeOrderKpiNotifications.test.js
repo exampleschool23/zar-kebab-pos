@@ -28,8 +28,8 @@ test('production payment trigger snapshots only new paid orders and eligible lin
     insert into employee_salary_telegram_links values('00000000-0000-0000-0000-000000000001','private-chat',true);
     insert into orders values('historical',1,'00000000-0000-0000-0000-000000000003','2026-09-16T12:00:00Z','paid','completed','dine_in',300000,45000,340000);
   `)
-  await db.exec(readFileSync(new URL('../supabase/197_employee_order_kpi_notifications.sql',import.meta.url),'utf8'))
-  await db.exec(readFileSync(new URL('../supabase/198_employee_order_kpi_running_total.sql',import.meta.url),'utf8'))
+  await db.exec(readFileSync(new URL('../migrations/197_employee_order_kpi_notifications.sql',import.meta.url),'utf8'))
+  await db.exec(readFileSync(new URL('../migrations/198_employee_order_kpi_running_total.sql',import.meta.url),'utf8'))
   assert.equal((await db.query('select * from employee_order_kpi_notifications')).rows.length,0)
   await db.exec(`insert into orders select 'new',2,opened_by,paid_at,'unpaid',status,order_type,subtotal,service_fee,total from orders where id='historical'; update orders set payment_status='paid' where id='new';`)
   let rows=(await db.query('select * from employee_order_kpi_notifications')).rows

@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs'
 
 import { buildInvestorOrderChangeMessage } from '../api/telegram/_lib/investorIncomeMessages.js'
 
-const migration = readFileSync(new URL('../supabase/175_order_change_investor_notifications.sql', import.meta.url), 'utf8')
-const repairMigration = readFileSync(new URL('../supabase/176_repair_order_change_investor_trigger.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/175_order_change_investor_notifications.sql', import.meta.url), 'utf8')
+const repairMigration = readFileSync(new URL('../migrations/176_repair_order_change_investor_trigger.sql', import.meta.url), 'utf8')
 const endpoint = readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
 const db = readFileSync(new URL('../src/lib/db.js', import.meta.url), 'utf8')
 
@@ -78,7 +78,7 @@ test('deletion reason is included and HTML-escaped in Investor alerts', () => {
 
 test('all deletion entry points share a required reason dialog and database enforcement', () => {
   const hook = readFileSync(new URL('../src/store/useOrderDeletion.jsx', import.meta.url), 'utf8')
-  const sql = readFileSync(new URL('../supabase/184_order_deletion_reason.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../migrations/184_order_deletion_reason.sql', import.meta.url), 'utf8')
   assert.match(hook, /action.type !== 'DELETE_ORDER'/)
   assert.match(hook, /role="dialog" aria-modal="true"/)
   assert.match(hook, /!reason.trim\(\) \|\| busy/)

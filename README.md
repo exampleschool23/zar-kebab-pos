@@ -85,36 +85,36 @@ Telegram webhooks and `npm run bot:telegram` polling cannot be active at the sam
 
 ### Database setup
 
-Run `supabase/017_telegram_integration.sql` in the Supabase SQL editor. It adds:
+Run `migrations/017_telegram_integration.sql` in the Supabase SQL editor. It adds:
 
 - `customers`
 - `telegram_users`
 - Telegram/customer/source fields on `orders`
 
 For private employee salary notifications, also run
-`supabase/107_employee_salary_telegram_notifications.sql`. It adds verified
+`migrations/107_employee_salary_telegram_notifications.sql`. It adds verified
 employee links, expiring one-time tokens, and idempotent delivery history.
-Run `supabase/108_employee_salary_payment_notification_deliveries.sql` and
-`supabase/110_salary_payment_group_notifications.sql` to audit private
+Run `migrations/108_employee_salary_payment_notification_deliveries.sql` and
+`migrations/110_salary_payment_group_notifications.sql` to audit private
 employee delivery and salary-group delivery independently.
-Run `supabase/111_salary_group_event_notifications.sql` to configure the
+Run `migrations/111_salary_group_event_notifications.sql` to configure the
 salary-events group and track duplicate-safe bonus, fine, and absence delivery.
-Run `supabase/112_salary_event_employee_notifications.sql` to track private
+Run `migrations/112_salary_event_employee_notifications.sql` to track private
 employee delivery for bonus, fine, and absence notifications independently
 from the salary-group delivery. Migration `129` intentionally marks the private
 automatic-KPI event destination as combined with the daily salary summary.
-Run `supabase/113_salary_notification_attempt_tracking.sql` so every saved
+Run `migrations/113_salary_notification_attempt_tracking.sql` so every saved
 payment, bonus, fine, or absence immediately creates a delivery-status row,
 even when a stale browser or failed request never reaches Telegram. The
 Salaries page combines those records under Salary notification status, five
 at a time, and allows unsent records to be retried. Run
-`supabase/116_salary_rate_change_telegram_notifications.sql` to add the same
+`migrations/116_salary_rate_change_telegram_notifications.sql` to add the same
 tracked private/group delivery for genuine salary-rate changes; an employee's
 first salary rate is intentionally treated as setup rather than a change. Run
-`supabase/119_salary_event_team_notifications.sql` to queue and audit the third
+`migrations/119_salary_event_team_notifications.sql` to queue and audit the third
 ZarKebab Team destination for new bonuses, fines, and absences. Historical
 events are not replayed when that migration is installed. Run
-`supabase/129_daily_kpi_bonuses.sql` to add effective-dated employee KPI rates,
+`migrations/129_daily_kpi_bonuses.sql` to add effective-dated employee KPI rates,
 immutable daily calculation snapshots, automatic paid bonuses, and their
 database-first Telegram delivery queue. Automatic KPI bonuses do not send a
 second private receipt: the employee sees Salary and Bonus together in the
@@ -213,15 +213,15 @@ Run `npm run db:health` with `SUPABASE_SERVICE_ROLE_KEY` to check schema,
 recent function definitions, required triggers and cron schedules, and tracked checksums.
 The key stays server-side. Ordinary permission responses are not missing migrations.
 
-Use `node supabase/migrate.js --help`. The runner requires exact filenames,
+Use `node migrations/migrate.js --help`. The runner requires exact filenames,
 including both distinct files for historical duplicate prefixes 073, 108 and 157.
 Do not rename old migrations or replay the directory: it includes historical
 cleanup and one-time data operations. New duplicate numbers are rejected.
 
 For an existing database, initialize receipts once using
-`node supabase/migrate.js --sql 199_migration_tracking.sql` and execute the output
+`node migrations/migrate.js --sql 199_migration_tracking.sql` and execute the output
 in its SQL Editor. Then export only reviewed repairs, for example:
-`node supabase/migrate.js --sql 182_rename_bazaar_ingredients.sql`.
+`node migrations/migrate.js --sql 182_rename_bazaar_ingredients.sql`.
 Each exported script commits its SHA-256 receipt with the schema change.
 `--apply` executes the same SQL through the Management API using
 `SUPABASE_PROJECT_REF` and `SUPABASE_TOKEN`; `--status` is read-only.

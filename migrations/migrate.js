@@ -4,7 +4,7 @@ import { migrationFiles, migrationStatus, trackedMigrationSql } from '../scripts
 async function main() {
   const [mode = '--help', ...names] = process.argv.slice(2)
   if (mode === '--help') {
-    console.log('Usage: node supabase/migrate.js --status | --sql <full-filename>... | --apply <full-filename>...\nApply 199_migration_tracking.sql once to initialize tracking. SQL export needs no credentials.\nAPI commands require SUPABASE_PROJECT_REF and SUPABASE_TOKEN. No automatic legacy replay or baseline.')
+    console.log('Usage: node migrations/migrate.js --status | --sql <full-filename>... | --apply <full-filename>...\nApply 199_migration_tracking.sql once to initialize tracking. SQL export needs no credentials.\nAPI commands require SUPABASE_PROJECT_REF and SUPABASE_TOKEN. No automatic legacy replay or baseline.')
     return
   }
   const files = migrationFiles()

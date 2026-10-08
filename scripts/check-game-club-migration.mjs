@@ -23,7 +23,7 @@ try {
     insert into orders values('gc', 'game_club', 'regular'), ('ta', 'take_away', 'regular');
     insert into order_kitchen_rounds values('gc', 'historical', array[]::uuid[], now());
   `)
-  const migration = readFileSync(new URL('../supabase/180_game_club_team_notifications.sql', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../migrations/180_game_club_team_notifications.sql', import.meta.url), 'utf8')
   await db.exec(migration)
   await db.exec(migration) // Safe to reapply, no historical backfill.
   assert.equal((await db.query('select count(*)::int as count from game_club_team_notifications')).rows[0].count, 0)

@@ -61,7 +61,7 @@ test('payment and profit calculations multiply per-kilogram price and cost by de
 })
 
 test('weight migration stores decimal quantities and keeps payment RPC calculations decimal-safe', () => {
-  const sql = readFileSync(new URL('../supabase/105_menu_items_sold_by_weight.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../migrations/105_menu_items_sold_by_weight.sql', import.meta.url), 'utf8')
   assert.match(sql, /add column if not exists sale_unit text not null default 'piece'/)
   assert.match(sql, /alter column quantity type numeric\(12,3\)/)
   assert.match(sql, /quantity numeric,/)

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const { PGlite } = await import(process.argv[2] || '@electric-sql/pglite')
-const read = name => readFileSync(new URL(`../supabase/${name}`, import.meta.url), 'utf8')
+const read = name => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')
 const variant = read('156_variant_tech_cards.sql')
 const prior = read('155_tech_card_real_costs.sql')
 const migration = read('183_batch_tech_card_cost_sync.sql')

@@ -23,7 +23,7 @@ test('database rejects backdated rates and changes to old rates using Tashkent m
     create or replace function pg_catalog.now() returns timestamptz language sql stable as
       $$select '2026-09-22T19:01:00Z'::timestamptz$$;
   `)
-  await db.exec(readFileSync(new URL('../supabase/207_salary_rate_date_window.sql', import.meta.url), 'utf8'))
+  await db.exec(readFileSync(new URL('../migrations/207_salary_rate_date_window.sql', import.meta.url), 'utf8'))
   await db.exec("insert into employee_salary_rates values (2, '2026-09-20', 200), (3, '2026-09-24', 300)")
   for (const query of [
     "insert into employee_salary_rates values (4, '2026-09-19', 400)",

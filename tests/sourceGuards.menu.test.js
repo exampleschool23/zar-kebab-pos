@@ -316,8 +316,8 @@ test('cashier-only menu items are hidden from customer menus but available to ca
   const cashierBill = readSource('src/pages/CashierBill.jsx')
   const cashierTables = readSource('src/pages/CashierTables.jsx')
   const menuItems = readSource('src/lib/menuItems.js')
-  const publicSql = readSource('supabase/009_guest_public_menu.sql')
-  const migration = readSource('supabase/052_cashier_only_menu_items.sql')
+  const publicSql = readSource('migrations/009_guest_public_menu.sql')
+  const migration = readSource('migrations/052_cashier_only_menu_items.sql')
   const health = readSource('scripts/check-db-health.js')
 
   assert.match(menuItems, /function isCashierOnlyItem/)
@@ -356,7 +356,7 @@ test('public-hidden menu items stay available to waiter table ordering', () => {
   const publicMenu = readSource('src/pages/PublicMenu.jsx')
   const telegram = readSource('src/pages/TelegramMiniApp.jsx')
   const menuItems = readSource('src/lib/menuItems.js')
-  const migration = readSource('supabase/079_menu_item_public_hidden.sql')
+  const migration = readSource('migrations/079_menu_item_public_hidden.sql')
   const health = readSource('scripts/check-db-health.js')
 
   assert.match(menuItems, /function isPublicHiddenMenuItem/)
@@ -380,8 +380,8 @@ test('hidden menu categories are hidden from customer-facing menus only', () => 
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
   const telegram = readSource('src/pages/TelegramMiniApp.jsx')
   const menuItems = readSource('src/lib/menuItems.js')
-  const schema = readSource('supabase/003_pos_schema.sql')
-  const migration = readSource('supabase/053_hidden_menu_categories.sql')
+  const schema = readSource('migrations/003_pos_schema.sql')
+  const migration = readSource('migrations/053_hidden_menu_categories.sql')
   const health = readSource('scripts/check-db-health.js')
 
   assert.match(menuItems, /function isHiddenMenuCategory/)
@@ -414,7 +414,7 @@ test('waiter-hidden menu categories are hidden from waiter table ordering only',
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
   const telegram = readSource('src/pages/TelegramMiniApp.jsx')
   const menuItems = readSource('src/lib/menuItems.js')
-  const migration = readSource('supabase/080_menu_category_waiter_hidden.sql')
+  const migration = readSource('migrations/080_menu_category_waiter_hidden.sql')
   const health = readSource('scripts/check-db-health.js')
 
   assert.match(menuItems, /function isWaiterHiddenMenuCategory/)
@@ -438,8 +438,8 @@ test('selected categories can be hidden only from Tourist-priced menus', () => {
   const publicMenu = readSource('src/pages/PublicMenu.jsx')
   const guestCart = readSource('src/lib/guestCart.js')
   const menuItems = readSource('src/lib/menuItems.js')
-  const schema = readSource('supabase/003_pos_schema.sql')
-  const migration = readSource('supabase/133_menu_category_tourist_visibility.sql')
+  const schema = readSource('migrations/003_pos_schema.sql')
+  const migration = readSource('migrations/133_menu_category_tourist_visibility.sql')
   const health = readSource('src/lib/dbHealth.js')
 
   assert.match(menuItems, /function isTouristHiddenMenuCategory/)
@@ -459,7 +459,7 @@ test('menu item availability controls waiter visibility without a redundant wait
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
   const telegram = readSource('src/pages/TelegramMiniApp.jsx')
   const menuItems = readSource('src/lib/menuItems.js')
-  const migration = readSource('supabase/082_menu_visibility_windows.sql')
+  const migration = readSource('migrations/082_menu_visibility_windows.sql')
   const health = readSource('scripts/check-db-health.js')
 
   assert.match(menuItems, /function isWithinMenuTimeWindow/)
@@ -491,7 +491,7 @@ test('selected staff can bypass category schedules only in waiter ordering', () 
   const telegram = readSource('src/pages/TelegramMiniApp.jsx')
   const menuItems = readSource('src/lib/menuItems.js')
   const db = readSource('src/lib/db.js')
-  const migration = readSource('supabase/132_menu_category_user_schedule_overrides.sql')
+  const migration = readSource('migrations/132_menu_category_user_schedule_overrides.sql')
   const health = readSource('scripts/check-db-health.js')
 
   assert.match(migration, /create table if not exists public\.menu_category_user_schedule_overrides/)
@@ -520,7 +520,7 @@ test('availability affects only waiter visibility while public-hidden remains cu
   const productCards = readSource('src/components/MenuProductCards.jsx')
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
   const cartPanel = readSource('src/components/CartPanel.jsx')
-  const migration = readSource('supabase/118_show_unavailable_menu_items.sql')
+  const migration = readSource('migrations/118_show_unavailable_menu_items.sql')
 
   assert.doesNotMatch(functionBody(menuItems, 'isCustomerMenuItem'), /item\?\.available/)
   assert.match(functionBody(menuItems, 'isWaiterMenuItem'), /isMenuItemOrderable\(item\)/)
@@ -600,7 +600,7 @@ test('meal availability changes require Manage Menu access in the UI and databas
   const source = readSource('src/pages/AdminMenu.jsx')
   const permissions = readSource('src/lib/permissions.js')
   const db = readSource('src/lib/db.js')
-  const migration = readSource('supabase/122_menu_item_availability_manage_menu_access.sql')
+  const migration = readSource('migrations/122_menu_item_availability_manage_menu_access.sql')
   const adminMenu = functionBody(source, 'AdminMenu')
   const ownerOnlyField = functionBody(source, 'OwnerOnlyMenuItemCheckbox')
   const itemCard = functionBody(source, 'SortableItemCard')
@@ -637,7 +637,7 @@ test('meal availability changes require Manage Menu access in the UI and databas
 test('public menu hiding is owner-only in the product editor and database', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const permissions = readSource('src/lib/permissions.js')
-  const migration = readSource('supabase/121_owner_only_menu_item_public_visibility.sql')
+  const migration = readSource('migrations/121_owner_only_menu_item_public_visibility.sql')
   const adminMenu = functionBody(source, 'AdminMenu')
   const ownerOnlyField = functionBody(source, 'OwnerOnlyMenuItemCheckbox')
 
@@ -662,7 +662,7 @@ test('public menu hiding is owner-only in the product editor and database', () =
 test('menu catalog archival is owner-only in the UI and database', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const permissions = readSource('src/lib/permissions.js')
-  const migration = readSource('supabase/167_owner_only_menu_catalog_archival.sql')
+  const migration = readSource('migrations/167_owner_only_menu_catalog_archival.sql')
   const adminMenu = functionBody(source, 'AdminMenu')
   const itemCard = functionBody(source, 'SortableItemCard')
   const itemRow = functionBody(source, 'SortableItemRow')
@@ -713,8 +713,8 @@ test('menu management uses one logical feature access without a duplicate edit t
   const imageAuth = readSource('api/menu-image/_lib/auth.js')
   const imageUpload = readSource('api/menu-image/upload.js')
   const imageDelete = readSource('api/menu-image/delete.js')
-  const logicalMigration = readSource('supabase/092_logical_feature_access.sql')
-  const readOnlyMenuMigration = readSource('supabase/095_read_only_menu_catalog_access.sql')
+  const logicalMigration = readSource('migrations/092_logical_feature_access.sql')
+  const readOnlyMenuMigration = readSource('migrations/095_read_only_menu_catalog_access.sql')
 
   assert.doesNotMatch(permissions, /key: 'edit_menu_items'/)
   assert.match(permissions, /key: 'menu',[\s\S]*kind: 'action'/)
@@ -755,8 +755,8 @@ test('menu management uses one logical feature access without a duplicate edit t
 
 test('menu and category writes surface Supabase errors', () => {
   const db = readSource('src/lib/db.js')
-  const atomicMenuCreation = readSource('supabase/102_atomic_menu_item_cost_creation.sql')
-  const mediaGalleryMigration = readSource('supabase/103_menu_item_media_gallery.sql')
+  const atomicMenuCreation = readSource('migrations/102_atomic_menu_item_cost_creation.sql')
+  const mediaGalleryMigration = readSource('migrations/103_menu_item_media_gallery.sql')
 
   assert.match(db, /case 'ADD_MENU_ITEM': \{[\s\S]*getRequiredMenuItemCost\(costPrice \?\? _costPriceAlias\)/)
   assert.match(db, /case 'ADD_MENU_ITEM': \{[\s\S]*supabase\.rpc\('create_menu_item_with_media_and_cost'/)
@@ -788,7 +788,7 @@ test('menu item titles and descriptions are trimmed in the editor, app writes, a
   const adminMenu = readSource('src/pages/AdminMenu.jsx')
   const db = readSource('src/lib/db.js')
   const i18n = readSource('src/lib/i18n.js')
-  const migration = readSource('supabase/104_trim_menu_item_text.sql')
+  const migration = readSource('migrations/104_trim_menu_item_text.sql')
 
   assert.match(adminMenu, /function trimF\(key\)/)
   assert.match(adminMenu, /onBlur=\{trimF\('name_uz'\)\}/)
@@ -811,7 +811,7 @@ test('menu item deletion is soft-delete only so history analytics keep lookup co
   const adminMenu = readSource('src/pages/AdminMenu.jsx')
   const cartPanel = readSource('src/components/CartPanel.jsx')
   const menuItems = readSource('src/lib/menuItems.js')
-  const migration = readSource('supabase/078_menu_item_safe_delete.sql')
+  const migration = readSource('migrations/078_menu_item_safe_delete.sql')
   const health = readSource('scripts/check-db-health.js')
   const archiveCase = db.slice(
     db.indexOf("case 'DELETE_MENU_ITEM':"),
@@ -866,7 +866,7 @@ test('category deletion archives report context and hard catalog deletes are blo
   const appContext = readSource('src/store/AppContext.jsx')
   const adminMenu = readSource('src/pages/AdminMenu.jsx')
   const menuItems = readSource('src/lib/menuItems.js')
-  const migration = readSource('supabase/115_archive_menu_catalog_deletions.sql')
+  const migration = readSource('migrations/115_archive_menu_catalog_deletions.sql')
 
   assert.match(db, /case 'DELETE_CATEGORY': \{[\s\S]*\.from\('menu_categories'\)\.update\(\{[\s\S]*deleted_at: deletedAt/)
   assert.doesNotMatch(db, /case 'DELETE_CATEGORY': \{[\s\S]{0,500}\.delete\(\)/)

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 
-const sql = name => readFileSync(new URL(`../supabase/${name}`, import.meta.url), 'utf8')
+const sql = name => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')
 
 const INVOKERS = {
   invoke_game_club_team_notifications: 'game-club-orders',

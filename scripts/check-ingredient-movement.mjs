@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const { PGlite } = await import(process.argv[2] || '@electric-sql/pglite')
 const db = new PGlite()
-const read = file => readFileSync(new URL(`../supabase/${file}`, import.meta.url), 'utf8')
+const read = file => readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8')
 const extract = (source, name) => {
   const start = source.indexOf(`create or replace function public.${name}(`)
   assert.ok(start >= 0)

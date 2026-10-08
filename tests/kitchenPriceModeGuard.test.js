@@ -30,7 +30,7 @@ test('kitchen submission rejects rounds that conflict with an open bill price mo
       insert into order_kitchen_rounds values (payload #>> '{order,id}', payload ->> 'kitchen_round_id');
     end $$;
   `)
-  await db.exec(read('supabase/221_kitchen_price_mode_guard.sql'))
+  await db.exec(read('migrations/221_kitchen_price_mode_guard.sql'))
 
   let n = 0
   const submit = (orderId, mode, { round = `r${++n}`, itemMode = mode, table = 't3', orderType = 'dine_in' } = {}) =>

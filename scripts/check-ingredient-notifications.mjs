@@ -21,7 +21,7 @@ try {
     create table bazaar_product_catalog(product_key text primary key, product_name text, category text, unit text, normal_unit_price int, is_active boolean, is_catalog_managed boolean, updated_at timestamptz);
     insert into bazaar_product_catalog values('legacy','Legacy','groceries','kg',100,true,true,now());
   `)
-  const sql = readFileSync(new URL('../supabase/189_ingredient_investor_notifications.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../migrations/189_ingredient_investor_notifications.sql', import.meta.url), 'utf8')
   await db.exec(sql)
   await db.exec(sql)
   assert.equal(await scalar('select count(*)::int as value from ingredient_investor_notifications'), 0)

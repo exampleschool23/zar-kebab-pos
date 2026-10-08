@@ -6,7 +6,7 @@ import { buildInvestorExpenseGroupMessage } from '../api/telegram/_lib/investorI
 import { runDbHealthChecks } from '../src/lib/dbHealth.js'
 
 const migration = readFileSync(
-  new URL('../supabase/144_expense_investor_group_notifications.sql', import.meta.url),
+  new URL('../migrations/144_expense_investor_group_notifications.sql', import.meta.url),
   'utf8'
 )
 const endpoint = readFileSync(

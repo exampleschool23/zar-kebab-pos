@@ -5,7 +5,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { getPaymentSplitAmounts, applyPaymentSplit } from '../src/lib/paidPaymentSplit.js'
 import { getOrderPaymentBreakdown, groupOrdersBySession } from '../src/lib/analytics.js'
 
-const sql = name => readFileSync(new URL(`../supabase/${name}`, import.meta.url), 'utf8')
+const sql = name => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')
 const id = n => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
 
 test('split validation preserves integer totals and rejects empty, zero, overpaid and fractional inputs', () => {

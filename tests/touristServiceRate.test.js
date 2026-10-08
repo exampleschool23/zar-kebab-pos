@@ -195,7 +195,7 @@ test('reapplying the same price mode does not replace an active order snapshot',
 })
 
 test('tourist service migration backfills 20 without rewriting existing Regular rates', () => {
-  const migration = readFileSync(new URL('../supabase/130_tourist_service_rate.sql', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../migrations/130_tourist_service_rate.sql', import.meta.url), 'utf8')
   assert.match(migration, /tourist_service_rate_pct integer/)
   assert.match(migration, /tourist_service_rate_pct set default 20/)
   assert.match(migration, /set tourist_service_rate_pct = 20/)

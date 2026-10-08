@@ -5,7 +5,7 @@ import fs from 'node:fs'
 import { getOrderItemCategoryId } from '../src/lib/analytics.js'
 
 const migration = fs.readFileSync(
-  new URL('../supabase/147_financial_report_history_snapshots.sql', import.meta.url),
+  new URL('../migrations/147_financial_report_history_snapshots.sql', import.meta.url),
   'utf8'
 )
 const reports = fs.readFileSync(new URL('../src/pages/Reports.jsx', import.meta.url), 'utf8')

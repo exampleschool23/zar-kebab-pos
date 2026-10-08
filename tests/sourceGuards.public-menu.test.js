@@ -210,8 +210,8 @@ test('menu item discounts use old_price for display and public deals', () => {
   const productCards = readSource('src/components/MenuProductCards.jsx')
   const telegram = readSource('src/pages/TelegramMiniApp.jsx')
   const dbHealth = readSource('src/lib/dbHealth.js')
-  const schema = readSource('supabase/003_pos_schema.sql')
-  const migration = readSource('supabase/036_menu_item_old_price.sql')
+  const schema = readSource('migrations/003_pos_schema.sql')
+  const migration = readSource('migrations/036_menu_item_old_price.sql')
 
   assert.match(adminMenu, /old_price: ''/)
   assert.match(adminMenu, /old_price: Math\.max\(0, Math\.round\(numberFromMoneyInput\(form\.old_price\)\)\)/)
@@ -236,11 +236,11 @@ test('menu costs stay private, snapshot onto sold items, and drive profit output
   const telegramApi = readSource('api/telegram/order-status.js')
   const telegramMessage = readSource('api/telegram/_lib/orderStatusMessages.js')
   const profit = readSource('src/lib/profit.js')
-  const migration = readSource('supabase/098_menu_item_costs_and_profit.sql')
-  const variantMigration = readSource('supabase/100_menu_variant_costs_and_accounting_profit.sql')
-  const accountingSummaryMigration = readSource('supabase/114_freeze_historical_order_prices_and_costs.sql')
-  const atomicCreationMigration = readSource('supabase/102_atomic_menu_item_cost_creation.sql')
-  const mediaGalleryMigration = readSource('supabase/103_menu_item_media_gallery.sql')
+  const migration = readSource('migrations/098_menu_item_costs_and_profit.sql')
+  const variantMigration = readSource('migrations/100_menu_variant_costs_and_accounting_profit.sql')
+  const accountingSummaryMigration = readSource('migrations/114_freeze_historical_order_prices_and_costs.sql')
+  const atomicCreationMigration = readSource('migrations/102_atomic_menu_item_cost_creation.sql')
+  const mediaGalleryMigration = readSource('migrations/103_menu_item_media_gallery.sql')
   const dbHealth = readSource('src/lib/dbHealth.js')
   const cliHealth = readSource('scripts/check-db-health.js')
 
@@ -357,9 +357,9 @@ test('menu items expose generated immutable external provider ids', () => {
   const db = readSource('src/lib/db.js')
   const reducer = readSource('src/store/menuReducer.js')
   const dbHealth = readSource('src/lib/dbHealth.js')
-  const schema = readSource('supabase/003_pos_schema.sql')
-  const migration = readSource('supabase/037_menu_item_external_id.sql')
-  const immutableMigration = readSource('supabase/038_generate_immutable_menu_item_external_ids.sql')
+  const schema = readSource('migrations/003_pos_schema.sql')
+  const migration = readSource('migrations/037_menu_item_external_id.sql')
+  const immutableMigration = readSource('migrations/038_generate_immutable_menu_item_external_ids.sql')
 
   assert.match(adminMenu, /external_id: ''/)
   assert.match(adminMenu, /generateMenuExternalId\(\)/)
@@ -379,8 +379,8 @@ test('menu items expose generated immutable external provider ids', () => {
 })
 
 test('starter cafe menu expansion seeds polished categories and items', () => {
-  const migration = readSource('supabase/030_starter_cafe_menu_expansion.sql')
-  const repairMigration = readSource('supabase/031_fix_starter_menu_image_urls.sql')
+  const migration = readSource('migrations/030_starter_cafe_menu_expansion.sql')
+  const repairMigration = readSource('migrations/031_fix_starter_menu_image_urls.sql')
 
   for (const category of ['combos', 'sides', 'desserts']) {
     assert.match(migration, new RegExp(`'${category}'`))
@@ -410,7 +410,7 @@ test('starter cafe menu expansion seeds polished categories and items', () => {
 })
 
 test('Qurutoba parent name stays neutral because portions are required variants', () => {
-  const migration = readSource('supabase/086_fix_qurutoba_parent_name.sql')
+  const migration = readSource('migrations/086_fix_qurutoba_parent_name.sql')
 
   assert.match(migration, /external_id = 'MI-1C334BBA79'/)
   assert.match(migration, /set[\s\S]*name_en = 'Qurutoba'\s+where/)
@@ -427,11 +427,11 @@ test('ImageLoadShimmer keeps slow menu images loading after timeout', () => {
 })
 
 test('menu items support and display nutrition values', () => {
-  const schema = readSource('supabase/003_pos_schema.sql')
-  const migration = readSource('supabase/032_menu_item_kcal.sql')
-  const gramsMigration = readSource('supabase/033_menu_item_grams.sql')
-  const millilitresMigration = readSource('supabase/034_menu_item_millilitres.sql')
-  const stockMigration = readSource('supabase/050_menu_item_stock_count.sql')
+  const schema = readSource('migrations/003_pos_schema.sql')
+  const migration = readSource('migrations/032_menu_item_kcal.sql')
+  const gramsMigration = readSource('migrations/033_menu_item_grams.sql')
+  const millilitresMigration = readSource('migrations/034_menu_item_millilitres.sql')
+  const stockMigration = readSource('migrations/050_menu_item_stock_count.sql')
   const dbHealth = readSource('src/lib/dbHealth.js')
   const adminMenu = readSource('src/pages/AdminMenu.jsx')
   const categoryScroller = readSource('src/components/MenuCategoryScroller.jsx')
@@ -486,9 +486,9 @@ test('menu items support and display nutrition values', () => {
 })
 
 test('menu items support required option variants with parent product ids', () => {
-  const schema = readSource('supabase/003_pos_schema.sql')
-  const optionMigration = readSource('supabase/071_menu_item_option_groups.sql')
-  const selectedOptionsMigration = readSource('supabase/072_order_item_selected_options.sql')
+  const schema = readSource('migrations/003_pos_schema.sql')
+  const optionMigration = readSource('migrations/071_menu_item_option_groups.sql')
+  const selectedOptionsMigration = readSource('migrations/072_order_item_selected_options.sql')
   const dbHealth = readSource('src/lib/dbHealth.js')
   const dbHealthScript = readSource('scripts/check-db-health.js')
   const adminMenu = readSource('src/pages/AdminMenu.jsx')
@@ -500,7 +500,7 @@ test('menu items support required option variants with parent product ids', () =
   const cashierTables = readSource('src/pages/CashierTables.jsx')
   const kitchenCheckReceipt = readSource('src/pages/KitchenCheckReceipt.jsx')
   const db = readSource('src/lib/db.js')
-  const rpc = readSource('supabase/070_price_modes.sql')
+  const rpc = readSource('migrations/070_price_modes.sql')
 
   assert.match(schema, /option_groups\s+jsonb\s+not null default '\[\]'::jsonb/)
   assert.match(schema, /selected_options jsonb\s+not null default '\{\}'::jsonb/)

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const migration = readFileSync(
-  new URL('../supabase/135_reconcile_cashier_quick_items_before_payment.sql', import.meta.url),
+  new URL('../migrations/135_reconcile_cashier_quick_items_before_payment.sql', import.meta.url),
   'utf8'
 )
 

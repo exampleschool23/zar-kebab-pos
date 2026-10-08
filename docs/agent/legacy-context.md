@@ -14,7 +14,7 @@ Core stack:
 - Supabase reads/writes/realtime in `src/lib/db.js`
 - Payment, service, reporting, and cart math in `src/lib/analytics.js`
 - Dashboard analytics in `src/lib/dashboardAnalytics.js`
-- SQL migrations in `supabase/`
+- SQL migrations in `migrations/`
 - Node test runner tests in `tests/`
 
 ## Local Commands
@@ -413,145 +413,145 @@ These bugs were recently fixed and are now protected by tests:
 
 Run migrations in order. Important recent files:
 
-- `supabase/011_business_settings.sql`
+- `migrations/011_business_settings.sql`
   Adds `business_settings`, including `service_rate_pct`. Required for admin settings and live service-rate changes.
 
-- `supabase/012_split_order_payments.sql`
+- `migrations/012_split_order_payments.sql`
   Adds `order_payments`. Without it, split payment reporting falls back and logs warnings.
 
-- `supabase/018_submit_order_to_kitchen_rpc.sql`
+- `migrations/018_submit_order_to_kitchen_rpc.sql`
   Adds `submit_order_to_kitchen(payload jsonb)`. This atomically upserts the order/items/table status and rejects late inserts into already paid orders.
 
-- `supabase/019_table_management.sql`
+- `migrations/019_table_management.sql`
   Adds `table_zones` and table management fields on `restaurant_tables`: `zone_id`, `zone_name`, `capacity`, `sort_order`, `is_active`, and `updated_at`. Disabled tables remain in reports/history but are hidden from waiter ordering.
 
-- `supabase/020_table_reservations.sql`
+- `migrations/020_table_reservations.sql`
   Adds reserved table state and reservation details: `reserved_for_name`, `reserved_for_phone`, `reserved_at`, `reserved_until`, and `reservation_notes`. Seating/sending an order for a reserved table clears reservation details and moves the table to `occupied`.
 
-- `supabase/096_idempotent_kitchen_submissions.sql`
+- `migrations/096_idempotent_kitchen_submissions.sql`
   Makes repeated submissions of the same `kitchen_round_id` a no-op after acquiring the same advisory lock used by payment settlement. This prevents uncertain network retries from duplicating items or totals.
 
-- `supabase/097_daily_bazaar.sql`
+- `migrations/097_daily_bazaar.sql`
   Adds structured daily bazaar purchases/items, an enduring product suggestion catalog, the separate `bazaar` feature permission, historical `products_bazaar` expense backfill, immutable audit snapshots, and idempotent atomic save/delete RPCs that keep exactly one Accounting expense in sync.
 
-- `supabase/098_menu_item_costs_and_profit.sql`
+- `migrations/098_menu_item_costs_and_profit.sql`
   Adds protected per-item cost values, immutable order-item cost snapshots, and access policies that keep costs out of public, Telegram-menu, waiter, and cashier catalog reads.
 
-- `supabase/099_employee_salary_fines.sql`
+- `migrations/099_employee_salary_fines.sql`
   Adds reasoned employee salary fines, expenses-feature read/write policies, and immutable accounting audit coverage. Apply it before using the Jarima / Штраф / Fine payroll action.
 
-- `supabase/100_menu_variant_costs_and_accounting_profit.sql`
+- `migrations/100_menu_variant_costs_and_accounting_profit.sql`
   Adds protected per-variant real costs, snapshots selected variant costs on future sales, and lets Accounting-authorized staff read protected costs for net-profit reporting.
 
-- `supabase/101_atomic_telegram_orders.sql`
+- `migrations/101_atomic_telegram_orders.sql`
   Historical migration that added the service-role-only `create_telegram_order(payload jsonb)` RPC. The customer-ordering API that used it has since been retired; keep the migration file for deployment history.
 
-- `supabase/105_menu_items_sold_by_weight.sql`
+- `migrations/105_menu_items_sold_by_weight.sql`
   Adds per-item or per-kilogram menu sale units, decimal order quantities, historical unit snapshots, and decimal-safe kitchen, Telegram, payment, and owner-reopen calculations.
 
-- `supabase/102_atomic_menu_item_cost_creation.sql`
+- `migrations/102_atomic_menu_item_cost_creation.sql`
   Requires a positive real cost for new products and atomically inserts `menu_items` plus `menu_item_costs`. Authenticated direct menu-item inserts are disabled so product creation cannot bypass the protected cost.
 
-- `supabase/103_menu_item_media_gallery.sql`
+- `migrations/103_menu_item_media_gallery.sql`
   Adds `menu_items.media_urls` and `create_menu_item_with_media_and_cost(payload jsonb)` so a new product's cover/gallery and protected cost are created atomically.
 
-- `supabase/104_trim_menu_item_text.sql`
+- `migrations/104_trim_menu_item_text.sql`
   Backfills and continuously trims leading/trailing whitespace from all localized menu-item names and descriptions.
 
-- `supabase/106_atomic_paid_order_stock_deduction.sql`
+- `migrations/106_atomic_paid_order_stock_deduction.sql`
   Deducts non-cancelled piece and selected-variant shelf stock in the same transaction that marks an order paid, with an order-level marker that makes payment retries idempotent.
 
-- `supabase/107_employee_salary_telegram_notifications.sql`
+- `migrations/107_employee_salary_telegram_notifications.sql`
   Adds verified employee-to-Telegram links, expiring one-time invite tokens, notification preferences, and duplicate-safe daily salary delivery history.
 
-- `supabase/109_accounting_paid_order_summary.sql`
+- `migrations/109_accounting_paid_order_summary.sql`
   Adds the lightweight, Accounting-authorized paid-order aggregate so the overview can calculate revenue, loyalty, net profit, and method balances without downloading complete orders.
 
-- `supabase/110_salary_payment_group_notifications.sql`
+- `migrations/110_salary_payment_group_notifications.sql`
   Adds independent Telegram group delivery status, message ids, timestamps, and errors to each salary-payment notification record.
 
-- `supabase/111_salary_group_event_notifications.sql`
+- `migrations/111_salary_group_event_notifications.sql`
   Stores the dedicated salary-events Telegram target and adds duplicate-safe delivery history for bonus, fine, and absence group notifications.
 
-- `supabase/112_salary_event_employee_notifications.sql`
+- `migrations/112_salary_event_employee_notifications.sql`
   Adds private employee-delivery status fields for bonus, fine, and absence notifications.
 
-- `supabase/113_salary_notification_attempt_tracking.sql`
+- `migrations/113_salary_notification_attempt_tracking.sql`
   Queues delivery tracking at salary-operation insert time, backfills missing post-configuration attempts, and adds the explicit `not_attempted` status.
 
-- `supabase/114_freeze_historical_order_prices_and_costs.sql`
+- `migrations/114_freeze_historical_order_prices_and_costs.sql`
   Permanently backfills missing sold-item costs, makes future cost snapshots non-null, and removes current-menu cost fallbacks from the Accounting summary.
 
-- `supabase/115_archive_menu_catalog_deletions.sql`
+- `migrations/115_archive_menu_catalog_deletions.sql`
   Archives removed categories and blocks physical product/category deletion so historical report context cannot disappear.
 
-- `supabase/116_salary_rate_change_telegram_notifications.sql`
+- `migrations/116_salary_rate_change_telegram_notifications.sql`
   Adds database-first, duplicate-safe private employee and salary-group delivery tracking for genuine salary-rate changes without announcing an employee's initial rate.
 
-- `supabase/117_owner_change_individual_payment_methods.sql`
+- `migrations/117_owner_change_individual_payment_methods.sql`
   Lets owners correct each non-loyalty payment method independently on a completed check while preserving amounts and recalculating the order-level method summary.
 
-- `supabase/118_show_unavailable_menu_items.sql`
+- `migrations/118_show_unavailable_menu_items.sql`
   Keeps active unavailable meals visible in customer menu data while retaining public-hidden, cashier-only, schedule, category, and archive filters.
 
-- `supabase/119_salary_event_team_notifications.sql`
+- `migrations/119_salary_event_team_notifications.sql`
   Adds database-first, independently retryable ZarKebab Team delivery tracking for new bonus, fine, and absence events without replaying historical operations.
 
-- `supabase/120_owner_only_menu_item_availability.sql`
+- `migrations/120_owner_only_menu_item_availability.sql`
   Historical owner-only availability guard, superseded by migration `122`.
 
-- `supabase/121_owner_only_menu_item_public_visibility.sql`
+- `migrations/121_owner_only_menu_item_public_visibility.sql`
   Restricts top-level product hiding from the public menu to active owners while preserving other Menu edits for authorized admins.
 
-- `supabase/122_menu_item_availability_manage_menu_access.sql`
+- `migrations/122_menu_item_availability_manage_menu_access.sql`
   Lets every user with Manage Menu access create unavailable products and change availability while leaving public-menu hiding owner-only.
 
-- `supabase/123_menu_item_estimated_prep_time.sql`
+- `migrations/123_menu_item_estimated_prep_time.sql`
   Adds the per-product preparation estimate, defaults existing products to 15 minutes, validates the 1–180 minute range, and extends atomic media-aware product creation to save it.
 
-- `supabase/124_cleanup_deleted_salary_notification_deliveries.sql`
+- `migrations/124_cleanup_deleted_salary_notification_deliveries.sql`
   Removes polymorphic Telegram delivery rows when their bonus, fine, absence, or salary-rate source is deleted.
 
-- `supabase/125_audit_salary_absence.sql`
+- `migrations/125_audit_salary_absence.sql`
   Adds immutable Accounting audit coverage for absence creation, editing, and deletion.
 
-- `supabase/126_business_settings_monthly_utilities.sql`
+- `migrations/126_business_settings_monthly_utilities.sql`
   Adds the monthly utilities plan used by the Accounting monthly estimate.
 
-- `supabase/127_reject_archived_order_items.sql`
+- `migrations/127_reject_archived_order_items.sql`
   Rejects new order-item rows and quantity increases that reference archived or missing menu products while preserving historical status updates and quantity reductions.
 
-- `supabase/128_durable_kitchen_round_receipts.sql`
+- `migrations/128_durable_kitchen_round_receipts.sql`
   Persists immutable order/round/item receipts in the same transaction as kitchen submission, records inserts and deletes during rollout, exposes a protocol-version health marker, and makes every exact retry a no-op even after mutable order rows are paid, cancelled, or deleted.
 
-- `supabase/129_daily_kpi_bonuses.sql`
+- `migrations/129_daily_kpi_bonuses.sql`
   Adds effective-dated employee KPI percentages, immutable date/result snapshots, atomic immediate bonus generation from paid dine-in subtotal plus service, combined private daily salary delivery, and independent Salary-group/Team KPI tracking.
 
-- `supabase/130_tourist_service_rate.sql`
+- `migrations/130_tourist_service_rate.sql`
   Adds the separate Tourist dine-in service setting with a 20% default/backfill, keeps the Regular setting independent, and preserves historical order-rate snapshots.
 
-- `supabase/139_menu_item_tech_cards.sql`
+- `migrations/139_menu_item_tech_cards.sql`
   Adds protected per-product recipes, ordered ingredient quantities/prices, batch yield, portion calculations, and the atomic `save_menu_item_tech_card(payload jsonb)` RPC.
 
-- `supabase/140_tech_card_feature_access.sql`
+- `migrations/140_tech_card_feature_access.sql`
   Adds the independent `tech_cards` page permission, enforces it on protected recipe reads, and keeps recipe writes additionally gated by Manage Menu.
 
-- `supabase/142_menu_unavailable_team_notifications.sql`
+- `migrations/142_menu_unavailable_team_notifications.sql`
   Queues duplicate-safe ZarKebab Team delivery tracking for each menu-product transition to unavailable, including immutable Russian product and staff-name snapshots.
 
-- `supabase/143_daily_unavailable_menu_team_notifications.sql`
+- `migrations/143_daily_unavailable_menu_team_notifications.sql`
   Stores one duplicate-safe unavailable-menu snapshot delivery per Tashkent date for the 08:00 ZarKebab Team cron.
 
-- `supabase/144_expense_investor_group_notifications.sql`
+- `migrations/144_expense_investor_group_notifications.sql`
   Queues immutable, duplicate-safe ZarKebab Investor delivery tracking for each newly inserted cash expense without replaying historical expenses.
 
-- `supabase/145_daily_unavailable_menu_categories.sql`
+- `migrations/145_daily_unavailable_menu_categories.sql`
   Adds Russian category snapshots to future 08:00 unavailable-menu deliveries so the Team report can group products by category without rewriting sent history.
 
-- `supabase/146_menu_available_team_notifications.sql`
+- `migrations/146_menu_available_team_notifications.sql`
   Extends the immediate menu-availability ledger and trigger to queue duplicate-safe Team messages for both available and unavailable transitions without replaying historical events.
 
-- `supabase/147_financial_report_history_snapshots.sql`
+- `migrations/147_financial_report_history_snapshots.sql`
   Freezes daily employee-meal expenses and sold-item categories, prevents KPI rules from entering finalized periods, and exposes bounded recovery of missing KPI and employee-meal dates.
 
 If the app logs missing `business_settings` or `order_payments`, applying only `018` is not enough.
@@ -586,7 +586,7 @@ Main UI files:
 - `src/store/AppContext.jsx`
 - `src/store/ordersReducer.js`
 - `src/lib/db.js`
-- `supabase/018_submit_order_to_kitchen_rpc.sql`
+- `migrations/018_submit_order_to_kitchen_rpc.sql`
 
 Expected behavior:
 - Tap Send to Kitchen once.
@@ -603,7 +603,7 @@ Expected behavior:
 Main files:
 - `src/pages/DailyBazaar.jsx`
 - `src/lib/bazaar.js`
-- `supabase/097_daily_bazaar.sql`
+- `migrations/097_daily_bazaar.sql`
 
 Expected behavior:
 - One bazaar receipt contains one or more product lines with product, category, quantity, unit, and exact paid amount.
@@ -625,7 +625,7 @@ Main files:
 - `src/pages/Salaries.jsx`
 - `src/pages/Employees.jsx`
 - `src/lib/expenses.js`
-- `supabase/099_employee_salary_fines.sql`
+- `migrations/099_employee_salary_fines.sql`
 
 Expected behavior:
 - Payment, bonus, and fine remain distinct salary transaction types.
@@ -643,7 +643,7 @@ Main files:
 - `src/components/MenuMedia.jsx`
 - `src/lib/menuMedia.js`
 - `api/menu-image/`
-- `supabase/103_menu_item_media_gallery.sql`
+- `migrations/103_menu_item_media_gallery.sql`
 
 Expected behavior:
 - A menu product can contain several images, animated GIFs, MP4 videos, or WebM videos.

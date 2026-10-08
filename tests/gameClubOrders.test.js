@@ -81,7 +81,7 @@ test('Telegram text and financial image report Game Club revenue and a separate 
 })
 
 test('Game Club migration expands storage, permission checks and settlement without rewriting history', () => {
-  const sql = readFileSync(new URL('../supabase/179_game_club_orders.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../migrations/179_game_club_orders.sql', import.meta.url), 'utf8')
   assert.match(sql, /orders add constraint orders_order_type_check/)
   assert.match(sql, /order_items add constraint order_items_order_type_check/)
   for (const signature of ['submit_order_to_kitchen(jsonb)', 'settle_orders_payment_strict(jsonb)']) assert.ok(sql.includes(signature))
@@ -90,8 +90,8 @@ test('Game Club migration expands storage, permission checks and settlement with
 })
 
 test('Game Club migration does not depend on the reopening function retired by migration 090', () => {
-  const retirement = readFileSync(new URL('../supabase/090_owner_change_completed_order_payment_method.sql', import.meta.url), 'utf8')
-  const sql = readFileSync(new URL('../supabase/179_game_club_orders.sql', import.meta.url), 'utf8')
+  const retirement = readFileSync(new URL('../migrations/090_owner_change_completed_order_payment_method.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../migrations/179_game_club_orders.sql', import.meta.url), 'utf8')
   assert.match(retirement, /drop function if exists public\.reopen_paid_orders_owner\(text\[\]\)/)
   const targets = [...sql.matchAll(/'public\.([a-z_]+\([^']*\))'/g)].map(match => match[1])
   assert.deepEqual(targets, ['submit_order_to_kitchen(jsonb)', 'settle_orders_payment_strict(jsonb)'])

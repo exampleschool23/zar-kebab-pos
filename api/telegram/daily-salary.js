@@ -1134,7 +1134,7 @@ export default async function handler(req, res) {
           kpiRuns.push({
             businessDate,
             status: 'unavailable',
-            error: 'Run supabase/129_daily_kpi_bonuses.sql and supabase/147_financial_report_history_snapshots.sql',
+            error: 'Run migrations/129_daily_kpi_bonuses.sql and migrations/147_financial_report_history_snapshots.sql',
           })
           break
         }

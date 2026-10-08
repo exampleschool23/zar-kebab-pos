@@ -45,7 +45,7 @@ test('salary rate audit migration captures inserts, changes and deletes in immut
     create table employee_salary_rates(id text, salary_profile_id uuid, amount int, effective_from date);
   `)
   for (const name of ['084_accounting_record_audit.sql', '208_salary_rate_audit.sql']) {
-    await db.exec(readFileSync(new URL(`../supabase/${name}`, import.meta.url), 'utf8'))
+    await db.exec(readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8'))
   }
   await db.exec(`insert into employee_salary_rates values ('rate','00000000-0000-0000-0000-000000000002',100,'2026-09-23');
     update employee_salary_rates set amount=200;
@@ -82,7 +82,7 @@ test('database permits only owners to delete rates even with a broad legacy writ
     create policy legacy_write on public.employee_salary_rates for all to authenticated using (true) with check (true);
     insert into public.employee_salary_rates values (1, 100);
   `)
-  await db.exec(readFileSync(new URL('../supabase/209_owner_only_salary_rate_deletion.sql', import.meta.url), 'utf8'))
+  await db.exec(readFileSync(new URL('../migrations/209_owner_only_salary_rate_deletion.sql', import.meta.url), 'utf8'))
   await db.exec('set role authenticated')
   for (const role of ['admin', 'manager', 'cashier', 'waiter', 'kitchen']) {
     await db.query("select set_config('test.staff_role', $1, false)", [role])

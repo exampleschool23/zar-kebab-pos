@@ -17,7 +17,7 @@ test('submit order writes have a finite timeout before the cart can stay loading
   const appContext = readSource('src/store/AppContext.jsx')
   const cartPanel = readSource('src/components/CartPanel.jsx')
   const db = readSource('src/lib/db.js')
-  const idempotencyMigration = readSource('supabase/096_idempotent_kitchen_submissions.sql')
+  const idempotencyMigration = readSource('migrations/096_idempotent_kitchen_submissions.sql')
   const timeout = readSource('src/lib/writeTimeout.js')
 
   assert.match(timeout, /export const POS_WRITE_TIMEOUT_MS = \d+/)
@@ -117,7 +117,7 @@ test('AppContext delegates state changes to domain reducers', () => {
 })
 
 test('kitchen submit RPC migration protects paid orders from late item inserts', () => {
-  const source = readSource('supabase/018_submit_order_to_kitchen_rpc.sql')
+  const source = readSource('migrations/018_submit_order_to_kitchen_rpc.sql')
 
   assert.match(source, /payment_status <> 'paid'/)
   assert.match(source, /raise exception 'order % is already paid or unavailable'/)
@@ -425,7 +425,7 @@ test('delivery order type is wired through POS surfaces and reports', () => {
   const reports = readSource('src/pages/Reports.jsx')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
   const waiterOrder = readSource('src/pages/WaiterOrder.jsx')
-  const migration = readSource('supabase/045_delivery_order_type.sql')
+  const migration = readSource('migrations/045_delivery_order_type.sql')
 
   assert.match(orderTypes, /delivery: \{ uz: 'Yetkazib berish', ru: 'Доставка', en: 'Delivery' \}/)
   assert.match(cartPanel, /key: 'delivery'/)
@@ -673,7 +673,7 @@ test('WaiterOrder prints cook checks by submitted order round', () => {
   const reducer = readSource('src/store/ordersReducer.js')
   const db = readSource('src/lib/db.js')
   const health = readSource('scripts/check-db-health.js')
-  const migration = readSource('supabase/044_kitchen_check_round_metadata.sql')
+  const migration = readSource('migrations/044_kitchen_check_round_metadata.sql')
   const panel = functionBody(source, 'OrderActionPanel')
 
   assert.match(source, /getKitchenCheckGroups/)
@@ -727,7 +727,7 @@ test('cancelled kitchen items stay excluded from billing and operational totals'
   const ordersReducer = readSource('src/store/ordersReducer.js')
   const db = readSource('src/lib/db.js')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
-  const migration = readSource('supabase/023_order_item_cancel_status.sql')
+  const migration = readSource('migrations/023_order_item_cancel_status.sql')
 
   assert.match(analytics, /function isCancelledOrderItem/)
   assert.match(analytics, /billableItems = sourceItems\.filter\(item => !isCancelledOrderItem\(item\)\)/)
@@ -789,7 +789,7 @@ test('AdminTables removes activity badges and supports persisted drag ordering',
 })
 
 test('table management migration and health check include required columns', () => {
-  const migration = readSource('supabase/019_table_management.sql')
+  const migration = readSource('migrations/019_table_management.sql')
   const health = readSource('scripts/check-db-health.js')
 
   assert.match(migration, /create table if not exists public\.table_zones/)
@@ -801,7 +801,7 @@ test('table management migration and health check include required columns', () 
 })
 
 test('table reservation migration and UI are wired', () => {
-  const migration = readSource('supabase/020_table_reservations.sql')
+  const migration = readSource('migrations/020_table_reservations.sql')
   const adminTables = readSource('src/pages/AdminTables.jsx')
   const waiterTables = readSource('src/pages/WaiterTables.jsx')
 

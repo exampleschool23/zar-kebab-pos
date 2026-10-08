@@ -60,8 +60,8 @@ test('ingredients page adds categories in a separate panel and only picks them i
 test('migration 214 accepts custom categories in constraints and both catalog RPCs', async t => {
   const db = new PGlite()
   t.after(() => db.close())
-  const bazaar = read('supabase/097_daily_bazaar.sql')
-  const rename = read('supabase/182_rename_bazaar_ingredients.sql')
+  const bazaar = read('migrations/097_daily_bazaar.sql')
+  const rename = read('migrations/182_rename_bazaar_ingredients.sql')
   const builtins = `'meat', 'poultry', 'vegetables', 'fruit', 'dairy', 'grocery', 'spices', 'beverages', 'bakery', 'packaging', 'cleaning', 'charcoal'`
 
   await db.exec(`
@@ -83,7 +83,7 @@ test('migration 214 accepts custom categories in constraints and both catalog RP
   await db.exec(functionSource(rename, 'save_bazaar_ingredient'))
   await db.exec(functionSource(bazaar, 'save_bazaar_purchase'))
 
-  const migration = read('supabase/214_custom_ingredient_categories.sql')
+  const migration = read('migrations/214_custom_ingredient_categories.sql')
   await db.exec(migration)
   await db.exec(migration)
 

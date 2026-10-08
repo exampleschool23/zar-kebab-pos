@@ -46,9 +46,9 @@ test('atomic bill edits recalculate durable items, roll back failures, protect p
     insert into restaurant_tables values ('t4','needs_bill',now());
   `)
   // Include the actual item/checkout serialization guard used by production.
-  const settlement = read('supabase/083_atomic_order_payment_settlement.sql')
+  const settlement = read('migrations/083_atomic_order_payment_settlement.sql')
   await db.exec(settlement.slice(0, settlement.indexOf('create or replace function public.settle_orders_payment')))
-  const migration = read('supabase/212_atomic_bill_item_edits.sql')
+  const migration = read('migrations/212_atomic_bill_item_edits.sql')
   await db.exec(migration)
   const seed = async (order, item, overrides = '') => {
     await db.query("insert into orders(id,table_id,payment_status,status) values ($1,'t4','unpaid','sent_to_kitchen')", [order])
@@ -148,9 +148,9 @@ test('a bill edit that removes the last live item closes the order instead of le
       is_counter_item boolean default false, item_type text default 'menu');
     insert into restaurant_tables values ('t4','occupied',now());
   `)
-  const settlement = read('supabase/083_atomic_order_payment_settlement.sql')
+  const settlement = read('migrations/083_atomic_order_payment_settlement.sql')
   await db.exec(settlement.slice(0, settlement.indexOf('create or replace function public.settle_orders_payment')))
-  await db.exec(read('supabase/212_atomic_bill_item_edits.sql'))
+  await db.exec(read('migrations/212_atomic_bill_item_edits.sql'))
   const seed = async (order, ...items) => {
     await db.query("insert into orders(id,table_id,payment_status,status) values ($1,'t4','unpaid','sent_to_kitchen')", [order])
     for (const item of items) await db.query('insert into order_items(id,order_id,price,quantity) values($1,$2,36000,1)', [uuid(item), order])
@@ -167,7 +167,7 @@ test('a bill edit that removes the last live item closes the order instead of le
   await edit(102, 'live', 2, 2)
   await db.query("insert into orders(id,table_id,payment_status,status) values ('fresh','t4','unpaid','new')")
   assert.deepEqual(await order('legacy-shell'), { status: 'sent_to_kitchen', payment_status: 'unpaid', total: 0 })
-  await db.exec(read('supabase/220_cancel_emptied_bill_orders.sql'))
+  await db.exec(read('migrations/220_cancel_emptied_bill_orders.sql'))
   assert.deepEqual(await order('legacy-shell'), { status: 'cancelled', payment_status: 'cancelled', total: 0 })
   assert.equal((await order('live')).status, 'sent_to_kitchen')
   assert.equal((await order('fresh')).status, 'new')

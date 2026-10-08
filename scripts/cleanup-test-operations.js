@@ -192,7 +192,7 @@ async function localPreview(supabase, cutoff) {
     sampleOrders: matchedOrders
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
       .slice(0, 20),
-    note: 'Install supabase/040_cleanup_preserve_real_operations.sql before applying. Loyalty transactions are intentionally preserved to avoid corrupting wallet balances.',
+    note: 'Install migrations/040_cleanup_preserve_real_operations.sql before applying. Loyalty transactions are intentionally preserved to avoid corrupting wallet balances.',
   }
 }
 
@@ -221,7 +221,7 @@ const { data, error } = await supabase.rpc('cleanup_preserve_real_operations', {
 
 if (error && isMissingRpc(error)) {
   if (args.apply) {
-    console.error('cleanup_preserve_real_operations RPC is not installed. Run supabase/040_cleanup_preserve_real_operations.sql in Supabase SQL Editor first, then rerun with --apply.')
+    console.error('cleanup_preserve_real_operations RPC is not installed. Run migrations/040_cleanup_preserve_real_operations.sql in Supabase SQL Editor first, then rerun with --apply.')
     process.exit(1)
   }
   report = await localPreview(supabase, args.cutoff)

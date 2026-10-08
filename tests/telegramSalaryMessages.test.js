@@ -814,11 +814,11 @@ test('salary payment notifications persist delivery status and employee confirma
   const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
   const webhook = fs.readFileSync(new URL('../api/telegram/webhook.js', import.meta.url), 'utf8')
   const salariesPage = fs.readFileSync(new URL('../src/pages/Salaries.jsx', import.meta.url), 'utf8')
-  const migration = fs.readFileSync(new URL('../supabase/108_employee_salary_payment_notification_deliveries.sql', import.meta.url), 'utf8')
-  const groupMigration = fs.readFileSync(new URL('../supabase/110_salary_payment_group_notifications.sql', import.meta.url), 'utf8')
-  const groupEventMigration = fs.readFileSync(new URL('../supabase/111_salary_group_event_notifications.sql', import.meta.url), 'utf8')
-  const employeeEventMigration = fs.readFileSync(new URL('../supabase/112_salary_event_employee_notifications.sql', import.meta.url), 'utf8')
-  const attemptTrackingMigration = fs.readFileSync(new URL('../supabase/113_salary_notification_attempt_tracking.sql', import.meta.url), 'utf8')
+  const migration = fs.readFileSync(new URL('../migrations/108_employee_salary_payment_notification_deliveries.sql', import.meta.url), 'utf8')
+  const groupMigration = fs.readFileSync(new URL('../migrations/110_salary_payment_group_notifications.sql', import.meta.url), 'utf8')
+  const groupEventMigration = fs.readFileSync(new URL('../migrations/111_salary_group_event_notifications.sql', import.meta.url), 'utf8')
+  const employeeEventMigration = fs.readFileSync(new URL('../migrations/112_salary_event_employee_notifications.sql', import.meta.url), 'utf8')
+  const attemptTrackingMigration = fs.readFileSync(new URL('../migrations/113_salary_notification_attempt_tracking.sql', import.meta.url), 'utf8')
 
   assert.match(endpoint, /employee_salary_payment_notification_deliveries/)
   assert.match(endpoint, /salary_payment_confirm:\$\{deliveryId\}/)
@@ -876,7 +876,7 @@ test('salary payment notifications persist delivery status and employee confirma
 })
 
 test('salary rate delivery tracking queues genuine changes but skips an employee initial rate', () => {
-  const migration = fs.readFileSync(new URL('../supabase/116_salary_rate_change_telegram_notifications.sql', import.meta.url), 'utf8')
+  const migration = fs.readFileSync(new URL('../migrations/116_salary_rate_change_telegram_notifications.sql', import.meta.url), 'utf8')
 
   assert.match(migration, /drop constraint if exists\s+employee_salary_group_notification_deliveries_event_type_check/i)
   assert.match(migration, /check\s*\(event_type in \([^)]*'rate'[^)]*\)\)/i)
@@ -1010,7 +1010,7 @@ test('current employee status uses the Tashkent calendar date', () => {
 
 test('daily salary cron runs at 01:00 Tashkent and reports the completed day', () => {
   const supabaseCron = fs.readFileSync(
-    new URL('../supabase/152_supabase_daily_report_cron.sql', import.meta.url),
+    new URL('../migrations/152_supabase_daily_report_cron.sql', import.meta.url),
     'utf8'
   )
   const dailySalaryEndpoint = fs.readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')

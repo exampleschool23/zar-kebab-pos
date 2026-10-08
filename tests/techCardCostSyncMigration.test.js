@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-const migration = readFileSync(new URL('../supabase/183_batch_tech_card_cost_sync.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/183_batch_tech_card_cost_sync.sql', import.meta.url), 'utf8')
 
 test('cost sync consumes deferred dirty events and stops when costs converge', () => {
   assert.match(migration, /current_setting\('app.tech_card_costs_dirty', true\) = 'on'/)

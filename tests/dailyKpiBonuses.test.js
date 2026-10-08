@@ -7,7 +7,7 @@ import {
 import { buildDailySalaryMessage } from '../api/telegram/_lib/salaryMessages.js'
 
 const migration = fs.readFileSync(
-  new URL('../supabase/129_daily_kpi_bonuses.sql', import.meta.url),
+  new URL('../migrations/129_daily_kpi_bonuses.sql', import.meta.url),
   'utf8'
 )
 const dailyCron = fs.readFileSync(
@@ -23,27 +23,27 @@ const salariesPage = fs.readFileSync(
   'utf8'
 )
 const payrollGroupMigration = fs.readFileSync(
-  new URL('../supabase/134_daily_payroll_group_notifications.sql', import.meta.url),
+  new URL('../migrations/134_daily_payroll_group_notifications.sql', import.meta.url),
   'utf8'
 )
 const skipAutomaticKpiGroupMigration = fs.readFileSync(
-  new URL('../supabase/136_skip_automatic_kpi_salary_group.sql', import.meta.url),
+  new URL('../migrations/136_skip_automatic_kpi_salary_group.sql', import.meta.url),
   'utf8'
 )
 const financialHistoryMigration = fs.readFileSync(
-  new URL('../supabase/147_financial_report_history_snapshots.sql', import.meta.url),
+  new URL('../migrations/147_financial_report_history_snapshots.sql', import.meta.url),
   'utf8'
 )
 const salaryBonusAccrualMigration = fs.readFileSync(
-  new URL('../supabase/169_salary_bonus_accrual.sql', import.meta.url),
+  new URL('../migrations/169_salary_bonus_accrual.sql', import.meta.url),
   'utf8'
 )
 const kpiRuleGroupNotificationMigration = fs.readFileSync(
-  new URL('../supabase/170_kpi_rule_group_notifications.sql', import.meta.url),
+  new URL('../migrations/170_kpi_rule_group_notifications.sql', import.meta.url),
   'utf8'
 )
 const kpiTeamQueueRepairMigration = fs.readFileSync(
-  new URL('../supabase/172_repair_daily_kpi_team_delivery_queue.sql', import.meta.url),
+  new URL('../migrations/172_repair_daily_kpi_team_delivery_queue.sql', import.meta.url),
   'utf8'
 )
 

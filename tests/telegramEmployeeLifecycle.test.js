@@ -6,7 +6,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { buildEmployeeLifecycleInvestorMessage } from '../api/telegram/_lib/investorIncomeMessages.js'
 
 const migration = fs.readFileSync(
-  new URL('../supabase/178_employee_lifecycle_investor_notifications.sql', import.meta.url),
+  new URL('../migrations/178_employee_lifecycle_investor_notifications.sql', import.meta.url),
   'utf8',
 )
 const endpoint = fs.readFileSync(new URL('../api/telegram/employee-notification.js', import.meta.url), 'utf8')
@@ -104,7 +104,7 @@ test('the first salary rate is snapshotted once onto the unsent created event', 
   `)
   await db.exec(migration)
   const snapshotMigration = fs.readFileSync(
-    new URL('../supabase/216_employee_created_salary_snapshot.sql', import.meta.url),
+    new URL('../migrations/216_employee_created_salary_snapshot.sql', import.meta.url),
     'utf8',
   )
   await db.exec(snapshotMigration)

@@ -90,7 +90,7 @@ test('Team target honors configured disable and never falls back to completed-or
 })
 
 test('database snapshots complete new rounds at commit, with actor identity and no protected payloads or backfill', () => {
-  const sql = readFileSync(new URL('../supabase/180_game_club_team_notifications.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../migrations/180_game_club_team_notifications.sql', import.meta.url), 'utf8')
   assert.match(sql, /after insert on public.order_kitchen_rounds deferrable initially deferred/)
   assert.match(sql, /saved_order.order_type is distinct from 'game_club'/)
   assert.match(sql, /where id = auth.uid\(\)/)

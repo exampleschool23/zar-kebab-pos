@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { canDeleteOrderToday, canChangeCompletedOrderPaymentMethod } from '../src/lib/permissions.js'
 
-const sql = name => readFileSync(new URL(`../supabase/${name}`, import.meta.url), 'utf8')
+const sql = name => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')
 const now = new Date('2026-09-18T19:00:00Z') // September 19 in Tashkent
 
 test('delete permission requires today for every role, including owners, using the payment date', () => {

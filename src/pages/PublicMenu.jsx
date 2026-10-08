@@ -484,7 +484,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
       if (menuLoadSeqRef.current !== seq) return
       setVisibilityNow(now)
       if (data.source === 'direct' && data.categories.length === 0 && data.items.length === 0 && data.rpcError) {
-        throw new Error('Public menu SQL has not been applied yet. Run supabase/009_guest_public_menu.sql.')
+        throw new Error('Public menu SQL has not been applied yet. Run migrations/009_guest_public_menu.sql.')
       }
       setCategories(data.categories)
       setItems(data.items)

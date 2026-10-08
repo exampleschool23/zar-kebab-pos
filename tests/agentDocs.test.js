@@ -46,7 +46,7 @@ test('exact project paths named by agent guides exist', async () => {
 
   for (const guideName of guideNames) {
     const contents = await read(guideName)
-    const projectPaths = [...contents.matchAll(/`((?:src|api|tests|mcp|scripts|supabase)\/[^`]+)`/g)]
+    const projectPaths = [...contents.matchAll(/`((?:src|api|tests|mcp|scripts|migrations)\/[^`]+)`/g)]
       .map(match => match[1])
       .filter(relativePath => !relativePath.includes('*'))
     for (const relativePath of projectPaths) {
@@ -57,7 +57,7 @@ test('exact project paths named by agent guides exist', async () => {
 })
 
 test('database guide names the newest migration family', async () => {
-  const migrationNames = (await fs.readdir(path.join(root, 'supabase')))
+  const migrationNames = (await fs.readdir(path.join(root, 'migrations')))
     .filter(name => /^\d{3}_.+\.sql$/.test(name))
   const latest = Math.max(...migrationNames.map(name => Number(name.slice(0, 3))))
   const guide = await read('docs/agent/database-testing.md')
@@ -67,7 +67,7 @@ test('database guide names the newest migration family', async () => {
 
 test('Tech Card guide preserves base and variant recipe identity', async () => {
   const guide = await read('docs/agent/menu-tech-cards.md')
-  const migration = await read('supabase/156_variant_tech_cards.sql')
+  const migration = await read('migrations/156_variant_tech_cards.sql')
 
   assert.match(migration, /primary key \(menu_item_id, variant_option_id\)/)
   assert.match(guide, /one protected base recipe and one recipe per eligible variant/i)

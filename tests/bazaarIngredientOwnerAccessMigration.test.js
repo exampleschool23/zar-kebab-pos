@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const migration = readFileSync(new URL('../supabase/162_owner_only_bazaar_ingredient_management.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/162_owner_only_bazaar_ingredient_management.sql', import.meta.url), 'utf8')
 
 test('only an active owner with Bazaar access may manage ingredients', () => {
   assert.match(migration, /profile\.status::text = 'active'/)

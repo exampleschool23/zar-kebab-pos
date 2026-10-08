@@ -10,9 +10,9 @@ const navigator = new RepoNavigator(root)
 const cases = [
   {
     task: 'atomic cashier settlement', markerQuery: 'settle_orders_payment',
-    expected: { path: 'supabase/083_atomic_order_payment_settlement.sql', kind: 'sql-function', label: 'settle_orders_payment' },
+    expected: { path: 'migrations/083_atomic_order_payment_settlement.sql', kind: 'sql-function', label: 'settle_orders_payment' },
     needles: ['pg_advisory_xact_lock', 'for update'],
-    baseline: ['src/lib/db.js', 'src/lib/analytics.js', 'src/pages/CashierBill.jsx', 'supabase/083_atomic_order_payment_settlement.sql', 'tests/atomicPaymentSettlement.test.js'],
+    baseline: ['src/lib/db.js', 'src/lib/analytics.js', 'src/pages/CashierBill.jsx', 'migrations/083_atomic_order_payment_settlement.sql', 'tests/atomicPaymentSettlement.test.js'],
   },
   {
     task: 'paid order range loading', markerQuery: 'loadPaidOrdersForRange',
@@ -48,7 +48,7 @@ const cases = [
     task: 'variant tech card payload', markerQuery: 'buildTechCardPayload',
     expected: { path: 'src/lib/techCards.js', kind: 'function', label: 'buildTechCardPayload' },
     needles: ['variant_option_id', 'selected_options'],
-    baseline: ['src/lib/techCards.js', 'src/pages/TechCards.jsx', 'supabase/156_variant_tech_cards.sql', 'tests/techCards.test.js'],
+    baseline: ['src/lib/techCards.js', 'src/pages/TechCards.jsx', 'migrations/156_variant_tech_cards.sql', 'tests/techCards.test.js'],
   },
   {
     task: 'daily bazaar idempotent retry', markerQuery: 'getBazaarSubmissionAttempt',

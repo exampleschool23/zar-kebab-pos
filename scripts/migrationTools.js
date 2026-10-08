@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
 
-export const migrationDirectory = new URL('../supabase/', import.meta.url)
+export const migrationDirectory = new URL('../migrations/', import.meta.url)
 export function migrationFiles(directory = migrationDirectory) {
   const names = readdirSync(directory).filter(name => /^\d{3}_[a-z0-9_]+\.sql$/.test(name)).sort()
   const legacyDuplicates = new Set(['073_business_settings_monthly_rent.sql', '073_feature_access_pos_policies.sql', '108_add_breakfast_menu.sql', '108_employee_salary_payment_notification_deliveries.sql', '157_dashboard_monthly_income_snapshots.sql', '157_salary_payment_employee_chat_tracking.sql'])

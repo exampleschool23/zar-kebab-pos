@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { bazaarIngredientMatches, runBazaarIngredientWriteWithRecovery } from '../src/lib/bazaarIngredientWrites.js'
 
-const migration = readFileSync(new URL('../supabase/182_rename_bazaar_ingredients.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/182_rename_bazaar_ingredients.sql', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../src/pages/BazaarIngredients.jsx', import.meta.url), 'utf8')
 
 test('owners can rename an ingredient without changing its key or historical rows', () => {
@@ -35,7 +35,7 @@ test('an uncertain rename reconciles the new name under the original key', async
 })
 
 test('purchase saves use the supplied stable key for lines and catalog usage', () => {
-  const original = readFileSync(new URL('../supabase/097_daily_bazaar.sql', import.meta.url), 'utf8')
+  const original = readFileSync(new URL('../migrations/097_daily_bazaar.sql', import.meta.url), 'utf8')
   const expression = 'public.normalize_bazaar_product_key(product_name_value)'
   assert.equal(original.split(expression).length - 1, 2)
   assert.match(migration, /item_value ->> ''product_key''/)

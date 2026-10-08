@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const migration = readFileSync(new URL('../supabase/163_daily_bazaar_price_variance_snapshots.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/163_daily_bazaar_price_variance_snapshots.sql', import.meta.url), 'utf8')
 
 test('Bazaar lines snapshot normal price and signed variance', () => {
   assert.match(migration, /add column if not exists normal_unit_price integer not null default 0/)

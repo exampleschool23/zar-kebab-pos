@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const migration = readFileSync(new URL('../supabase/161_reset_daily_bazaar_ingredient_catalog.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/161_reset_daily_bazaar_ingredient_catalog.sql', import.meta.url), 'utf8')
 
 test('catalog reset hides imported suggestions without deleting Bazaar history', () => {
   assert.match(migration, /add column if not exists is_catalog_managed boolean not null default false/)

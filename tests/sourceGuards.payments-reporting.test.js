@@ -25,9 +25,9 @@ test('delete-paid-orders editors can change completed-order payment methods indi
   const permissions = readSource('src/lib/permissions.js')
   const appContext = readSource('src/store/AppContext.jsx')
   const db = readSource('src/lib/db.js')
-  const migration = readSource('supabase/090_owner_change_completed_order_payment_method.sql')
-  const individualMigration = readSource('supabase/117_owner_change_individual_payment_methods.sql')
-  const featureAccessMigration = readSource('supabase/173_paid_order_edit_feature_access.sql')
+  const migration = readSource('migrations/090_owner_change_completed_order_payment_method.sql')
+  const individualMigration = readSource('migrations/117_owner_change_individual_payment_methods.sql')
+  const featureAccessMigration = readSource('migrations/173_paid_order_edit_feature_access.sql')
 
   assert.match(permissions, /function canChangeCompletedOrderPaymentMethod/)
   assert.match(permissions, /function canChangeCompletedOrderPaymentMethod[\s\S]*canDeletePaidOrders\(profileOrRole\)/)
@@ -207,7 +207,7 @@ test('active cashback calculation uses card type resolver instead of hardcoded d
   const analytics = readSource('src/lib/analytics.js')
   const loyalty = readSource('src/lib/loyalty.js')
   const db = readSource('src/lib/db.js')
-  const paymentMigration = readSource('supabase/083_atomic_order_payment_settlement.sql')
+  const paymentMigration = readSource('migrations/083_atomic_order_payment_settlement.sql')
   const cashier = readSource('src/pages/CashierBill.jsx')
   const reducer = readSource('src/store/ordersReducer.js')
 
@@ -260,18 +260,18 @@ test('CashierBill keeps counter items in main content above loyalty and out of p
 })
 
 test('loyalty cashback wallet migration and admin route are wired', () => {
-  const migration = readSource('supabase/022_loyalty_cashback_wallet.sql')
-  const specialCardMigration = readSource('supabase/061_loyalty_special_card.sql')
-  const platinumCardMigration = readSource('supabase/065_loyalty_platinum_card.sql')
-  const adminCreateMigration = readSource('supabase/041_admin_create_loyalty_cards.sql')
-  const deleteTransactionMigration = readSource('supabase/042_delete_loyalty_transaction.sql')
-  const removeCardMigration = readSource('supabase/051_remove_loyalty_cards_preserve_history.sql')
-  const roleAccessMigration = readSource('supabase/077_four_role_feature_access.sql')
+  const migration = readSource('migrations/022_loyalty_cashback_wallet.sql')
+  const specialCardMigration = readSource('migrations/061_loyalty_special_card.sql')
+  const platinumCardMigration = readSource('migrations/065_loyalty_platinum_card.sql')
+  const adminCreateMigration = readSource('migrations/041_admin_create_loyalty_cards.sql')
+  const deleteTransactionMigration = readSource('migrations/042_delete_loyalty_transaction.sql')
+  const removeCardMigration = readSource('migrations/051_remove_loyalty_cards_preserve_history.sql')
+  const roleAccessMigration = readSource('migrations/077_four_role_feature_access.sql')
   const app = readSource('src/App.jsx')
   const admin = readSource('src/pages/AdminLoyalty.jsx')
   const loyalty = readSource('src/lib/loyalty.js')
   const db = readSource('src/lib/db.js')
-  const paymentMigration = readSource('supabase/083_atomic_order_payment_settlement.sql')
+  const paymentMigration = readSource('migrations/083_atomic_order_payment_settlement.sql')
 
   assert.match(migration, /create table if not exists public\.loyalty_cards/)
   assert.match(migration, /create table if not exists public\.loyalty_transactions/)
@@ -442,7 +442,7 @@ test('AdminSettings exposes monthly rent as a UZS billing setting', () => {
   const settings = readSource('src/pages/AdminSettings.jsx')
   const defaults = readSource('src/store/reducerHelpers.js')
   const db = readSource('src/lib/db.js')
-  const migration = readSource('supabase/073_business_settings_monthly_rent.sql')
+  const migration = readSource('migrations/073_business_settings_monthly_rent.sql')
   const health = readSource('scripts/check-db-health.js')
   const dbHealth = readSource('src/lib/dbHealth.js')
 
@@ -463,7 +463,7 @@ test('AdminSettings exposes monthly utilities as a UZS billing setting', () => {
   const settings = readSource('src/pages/AdminSettings.jsx')
   const defaults = readSource('src/store/reducerHelpers.js')
   const db = readSource('src/lib/db.js')
-  const migration = readSource('supabase/126_business_settings_monthly_utilities.sql')
+  const migration = readSource('migrations/126_business_settings_monthly_utilities.sql')
   const health = readSource('scripts/check-db-health.js')
   const dbHealth = readSource('src/lib/dbHealth.js')
 
@@ -484,8 +484,8 @@ test('AdminSettings persists the average daily employee meal and forecasts prese
   const settings = readSource('src/pages/AdminSettings.jsx')
   const defaults = readSource('src/store/reducerHelpers.js')
   const db = readSource('src/lib/db.js')
-  const migration = readSource('supabase/141_average_daily_employee_meal.sql')
-  const financialHistoryMigration = readSource('supabase/147_financial_report_history_snapshots.sql')
+  const migration = readSource('migrations/141_average_daily_employee_meal.sql')
+  const financialHistoryMigration = readSource('migrations/147_financial_report_history_snapshots.sql')
   const health = readSource('scripts/check-db-health.js')
   const dbHealth = readSource('src/lib/dbHealth.js')
   const monthlyEstimate = readSource('src/pages/MonthlyEstimate.jsx')
@@ -624,7 +624,7 @@ test('cashier payment waits for one atomic database settlement before local succ
   const cashier = readSource('src/pages/CashierBill.jsx')
   const appContext = readSource('src/store/AppContext.jsx')
   const db = readSource('src/lib/db.js')
-  const paymentMigration = readSource('supabase/083_atomic_order_payment_settlement.sql')
+  const paymentMigration = readSource('migrations/083_atomic_order_payment_settlement.sql')
 
   assert.match(cashier, /const \[isProcessingPayment, setProcessingPayment\]/)
   assert.match(cashier, /async function handlePaid\(\)/)
@@ -653,7 +653,7 @@ test('cashier payment waits for one atomic database settlement before local succ
 })
 
 test('table payment atomically skips empty unpaid order shells', () => {
-  const migration = readSource('supabase/087_skip_empty_order_shells_on_payment.sql')
+  const migration = readSource('migrations/087_skip_empty_order_shells_on_payment.sql')
 
   assert.match(migration, /rename to settle_orders_payment_strict/)
   assert.match(migration, /target_table_id is not null/)
@@ -688,11 +688,11 @@ test('paid order deletion is routed through feature-gated RPC and wired to cashi
   const appContext = readSource('src/store/AppContext.jsx')
   const reducer = readSource('src/store/ordersReducer.js')
   const db = readSource('src/lib/db.js')
-  const migration = readSource('supabase/043_owner_delete_orders.sql')
-  const loyaltyCleanupMigration = readSource('supabase/046_owner_delete_orders_loyalty_cleanup.sql')
-  const reservationResetMigration = readSource('supabase/047_fix_owner_delete_order_reservation_reset.sql')
-  const featureAccessMigration = readSource('supabase/066_delete_paid_orders_feature_access.sql')
-  const moveBackFeatureMigration = readSource('supabase/067_move_back_to_table_feature_access.sql')
+  const migration = readSource('migrations/043_owner_delete_orders.sql')
+  const loyaltyCleanupMigration = readSource('migrations/046_owner_delete_orders_loyalty_cleanup.sql')
+  const reservationResetMigration = readSource('migrations/047_fix_owner_delete_order_reservation_reset.sql')
+  const featureAccessMigration = readSource('migrations/066_delete_paid_orders_feature_access.sql')
+  const moveBackFeatureMigration = readSource('migrations/067_move_back_to_table_feature_access.sql')
   const permissions = readSource('src/lib/permissions.js')
   const dashboard = readSource('src/pages/AdminDashboard.jsx')
   const cashier = readSource('src/pages/CashierBill.jsx')
@@ -752,7 +752,7 @@ test('paid order deletion is routed through feature-gated RPC and wired to cashi
 
 test('owner and admin Cashier access includes moving bills back to tables', () => {
   const permissions = readSource('src/lib/permissions.js')
-  const migration = readSource('supabase/094_admin_cashier_recall_access.sql')
+  const migration = readSource('migrations/094_admin_cashier_recall_access.sql')
   const cashierTables = readSource('src/pages/CashierTables.jsx')
 
   assert.match(permissions, /function canMoveBackToTable[\s\S]*canEditFeature\(profileOrRole, 'cashier'\)/)

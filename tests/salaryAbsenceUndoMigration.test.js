@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const migration = readFileSync(
-  new URL('../supabase/125_audit_salary_absence.sql', import.meta.url),
+  new URL('../migrations/125_audit_salary_absence.sql', import.meta.url),
   'utf8'
 )
 const cleanupMigration = readFileSync(
-  new URL('../supabase/124_cleanup_deleted_salary_notification_deliveries.sql', import.meta.url),
+  new URL('../migrations/124_cleanup_deleted_salary_notification_deliveries.sql', import.meta.url),
   'utf8'
 )
 

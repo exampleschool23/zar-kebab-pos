@@ -10,11 +10,11 @@ import {
 } from '../src/lib/monthlyIncome.js'
 
 const migration = fs.readFileSync(
-  new URL('../supabase/157_dashboard_monthly_income_snapshots.sql', import.meta.url),
+  new URL('../migrations/157_dashboard_monthly_income_snapshots.sql', import.meta.url),
   'utf8'
 )
 const completedDayMigration = fs.readFileSync(
-  new URL('../supabase/174_dashboard_monthly_income_completed_days.sql', import.meta.url),
+  new URL('../migrations/174_dashboard_monthly_income_completed_days.sql', import.meta.url),
   'utf8'
 )
 const loader = fs.readFileSync(new URL('../src/lib/monthlyIncome.js', import.meta.url), 'utf8')
@@ -23,7 +23,7 @@ const settings = fs.readFileSync(new URL('../src/pages/AdminSettings.jsx', impor
 const db = fs.readFileSync(new URL('../src/lib/db.js', import.meta.url), 'utf8')
 const defaults = fs.readFileSync(new URL('../src/store/reducerHelpers.js', import.meta.url), 'utf8')
 const breakEvenMigration = fs.readFileSync(
-  new URL('../supabase/158_business_settings_daily_break_even_income.sql', import.meta.url),
+  new URL('../migrations/158_business_settings_daily_break_even_income.sql', import.meta.url),
   'utf8'
 )
 

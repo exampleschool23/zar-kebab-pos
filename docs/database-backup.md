@@ -41,5 +41,5 @@ into the live database overwrites it; do that only in a real disaster.
 - GitHub pauses scheduled workflows after 60 days without repository activity.
 - Menu images live in R2, not in the database dump; back that bucket up separately if
   needed. Supabase cron jobs, extensions and Vault secrets are not in `public`/`auth`
-  and must be re-created from `supabase/` migrations and README setup after a restore.
+  and must be re-created from `migrations/` migrations and README setup after a restore.
 - Rotating the age key does not re-encrypt old dumps; keep old private keys.

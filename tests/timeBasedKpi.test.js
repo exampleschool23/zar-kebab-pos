@@ -6,7 +6,7 @@ import { normalizeKpiStartTime, formatKpiStartTime, removeKpiRulePreservingHisto
 import { buildEmployeeOrderKpiMessage } from '../api/telegram/_lib/employeeOrderKpiNotifications.js'
 import { buildKpiRuleGroupMessage } from '../api/telegram/_lib/paymentMessages.js'
 
-const sql = name => readFileSync(new URL(`../supabase/${name}`, import.meta.url), 'utf8')
+const sql = name => readFileSync(new URL(`../migrations/${name}`, import.meta.url), 'utf8')
 const id = n => `00000000-0000-0000-0000-${String(n).padStart(12,'0')}`
 
 test('KPI start time accepts minute precision and formats Tashkent consistently', () => {

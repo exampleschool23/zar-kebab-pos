@@ -58,7 +58,7 @@ test('salary retraction covers private, Salary-group, and Team delivery message 
 
 test('payment delivery snapshots the exact employee chat used by the sent message', () => {
   const migration = readFileSync(
-    new URL('../supabase/157_salary_payment_employee_chat_tracking.sql', import.meta.url),
+    new URL('../migrations/157_salary_payment_employee_chat_tracking.sql', import.meta.url),
     'utf8'
   )
   const dbHealth = readFileSync(new URL('../src/lib/dbHealth.js', import.meta.url), 'utf8')

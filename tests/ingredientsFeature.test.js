@@ -27,7 +27,7 @@ test('Ingredients owns its route and drawer entry, with a legacy redirect', () =
 })
 
 test('movement is a permission-checked aggregate and keeps raw recipe snapshots private', () => {
-  const sql = read('supabase/186_ingredients_feature_and_movement.sql')
+  const sql = read('migrations/186_ingredients_feature_and_movement.sql')
   assert.match(sql, /current_staff_can_access\('ingredients'\) is not true/)
   assert.match(sql, /p\.role::text in \('owner', 'admin'\)/)
   assert.match(sql, /p\.status::text = 'active'/)
@@ -67,7 +67,7 @@ test('language changes cannot restart ingredient data loaders', () => {
 })
 
 test('movement is restricted to explicitly added ingredients at the database boundary', () => {
-  const sql = read('supabase/188_managed_ingredient_movement.sql')
+  const sql = read('migrations/188_managed_ingredient_movement.sql')
   assert.match(sql, /from movements m join public\.bazaar_product_catalog c\s+on c\.product_key = m\.product_key and c\.is_catalog_managed is true/)
   assert.doesNotMatch(sql, /left join public\.bazaar_product_catalog|update public\.|delete from public\./i)
   assert.doesNotMatch(sql, /c\.is_active/)

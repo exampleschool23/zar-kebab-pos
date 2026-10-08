@@ -622,7 +622,7 @@ test('DB guard – MARK_ORDER_PAID delegates legacy/null matching to the atomic 
   const caseEnd = dbSource.indexOf("case 'CHANGE_PAID_ORDER_PAYMENT_METHOD':", caseStart)
   const caseSource = dbSource.slice(caseStart, caseEnd)
   const migrationSource = readFileSync(
-    new URL('../supabase/083_atomic_order_payment_settlement.sql', import.meta.url),
+    new URL('../migrations/083_atomic_order_payment_settlement.sql', import.meta.url),
     'utf8'
   )
 
@@ -663,7 +663,7 @@ test('DB guard – atomic settlement resets a table only when no unpaid order re
   const caseEnd = dbSource.lastIndexOf('break\n    }') + 10
   const caseSource = dbSource.slice(caseStart, caseEnd)
   const migrationSource = readFileSync(
-    new URL('../supabase/083_atomic_order_payment_settlement.sql', import.meta.url),
+    new URL('../migrations/083_atomic_order_payment_settlement.sql', import.meta.url),
     'utf8'
   )
 

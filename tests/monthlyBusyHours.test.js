@@ -15,7 +15,7 @@ test('monthly busy-hours loader returns compact two-hour buckets', async () => {
 })
 
 test('monthly busy-hours RPC is bounded, permission checked, and uses creation time', () => {
-  const sql = fs.readFileSync(new URL('../supabase/193_dashboard_busy_hours_created_at.sql', import.meta.url), 'utf8')
+  const sql = fs.readFileSync(new URL('../migrations/193_dashboard_busy_hours_created_at.sql', import.meta.url), 'utf8')
   assert.match(sql, /current_staff_can_access\('dashboard'\)/)
   assert.match(sql, /generate_series\(0, 22, 2\)/)
   assert.match(sql, /"order"\.created_at >= v_from/)

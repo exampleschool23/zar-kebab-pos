@@ -12,23 +12,23 @@ import { buildDailyUnavailableMenuImageSvg } from '../api/telegram/_lib/menuAvai
 import { runDbHealthChecks } from '../src/lib/dbHealth.js'
 
 const migration = readFileSync(
-  new URL('../supabase/142_menu_unavailable_team_notifications.sql', import.meta.url),
+  new URL('../migrations/142_menu_unavailable_team_notifications.sql', import.meta.url),
   'utf8'
 )
 const dailyMigration = readFileSync(
-  new URL('../supabase/143_daily_unavailable_menu_team_notifications.sql', import.meta.url),
+  new URL('../migrations/143_daily_unavailable_menu_team_notifications.sql', import.meta.url),
   'utf8'
 )
 const dailyCategoryMigration = readFileSync(
-  new URL('../supabase/145_daily_unavailable_menu_categories.sql', import.meta.url),
+  new URL('../migrations/145_daily_unavailable_menu_categories.sql', import.meta.url),
   'utf8'
 )
 const availableMigration = readFileSync(
-  new URL('../supabase/146_menu_available_team_notifications.sql', import.meta.url),
+  new URL('../migrations/146_menu_available_team_notifications.sql', import.meta.url),
   'utf8'
 )
 const catalogMigration = readFileSync(
-  new URL('../supabase/168_menu_catalog_team_notifications.sql', import.meta.url),
+  new URL('../migrations/168_menu_catalog_team_notifications.sql', import.meta.url),
   'utf8'
 )
 const endpoint = readFileSync(

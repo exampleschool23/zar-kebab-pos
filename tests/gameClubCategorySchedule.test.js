@@ -50,7 +50,7 @@ test('migration enables existing localized Business lunch categories and preserv
     insert into menu_categories (id, name_en, name_ru, name_uz) values
       ('en', ' Business lunch ', null, null), ('ru', null, 'Бизнес-ланч', null),
       ('uz', null, null, 'Biznes lanch'), ('other', 'Dinner', null, null);`)
-    await db.exec(readFileSync(new URL('../supabase/205_game_club_category_schedule.sql', import.meta.url), 'utf8'))
+    await db.exec(readFileSync(new URL('../migrations/205_game_club_category_schedule.sql', import.meta.url), 'utf8'))
     const { rows } = await db.query('select id, always_visible_game_club, always_visible_take_away, always_visible_delivery, visible_until_time from menu_categories order by id')
     assert.deepEqual(rows.map(row => [row.id, row.always_visible_game_club]), [['en', true], ['other', false], ['ru', true], ['uz', true]])
     assert.ok(rows.every(row => row.visible_until_time === '15:00:00'))

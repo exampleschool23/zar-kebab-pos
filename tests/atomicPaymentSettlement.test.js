@@ -5,11 +5,11 @@ import { buildAtomicPaymentPayload } from '../src/lib/db.js'
 
 const dbSource = readFileSync(new URL('../src/lib/db.js', import.meta.url), 'utf8')
 const migration = readFileSync(
-  new URL('../supabase/083_atomic_order_payment_settlement.sql', import.meta.url),
+  new URL('../migrations/083_atomic_order_payment_settlement.sql', import.meta.url),
   'utf8'
 )
 const loyaltyAmbiguityFixMigration = readFileSync(
-  new URL('../supabase/088_fix_loyalty_payment_card_number_ambiguity.sql', import.meta.url),
+  new URL('../migrations/088_fix_loyalty_payment_card_number_ambiguity.sql', import.meta.url),
   'utf8'
 )
 

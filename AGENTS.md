@@ -13,7 +13,7 @@ Core locations:
 - Domain reducers: `src/store/`
 - Supabase reads, writes, and realtime: `src/lib/db.js`
 - Payment and service math: `src/lib/analytics.js`
-- SQL migrations: `supabase/`
+- SQL migrations: `migrations/`
 - Tests: `tests/`
 
 Run from the repository root:

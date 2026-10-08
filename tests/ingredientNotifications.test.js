@@ -82,7 +82,7 @@ test('ingredient dispatch uses the existing cron-authenticated endpoint', () => 
   const endpoint = readFileSync(new URL('../api/telegram/daily-salary.js', import.meta.url), 'utf8')
   assert.equal((endpoint.match(/await drainIngredientNotifications\(supabase\)/g) || []).length, 1)
   assert.ok(endpoint.indexOf('requireCronSecret(req)', endpoint.indexOf('export default')) < endpoint.indexOf("cronTask === 'ingredient-events'"))
-  const sql = readFileSync(new URL('../supabase/189_ingredient_investor_notifications.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../migrations/189_ingredient_investor_notifications.sql', import.meta.url), 'utf8')
   assert.match(sql, /revoke all on public.ingredient_investor_notifications from public, anon, authenticated/)
   assert.match(sql, /before_value = after_value then return new/)
   assert.match(sql, /auth.uid\(\) is null or new.is_catalog_managed is not true/)

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 
-const migration = readFileSync(new URL('../supabase/218_single_minute_queue_cron.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../migrations/218_single_minute_queue_cron.sql', import.meta.url), 'utf8')
 
 async function setup(t, { failing } = {}) {
   const db = new PGlite(); t.after(() => db.close())
