@@ -54,7 +54,7 @@ The former 58 KB instruction file is preserved at `docs/agent/legacy-context.md`
 
 ## Universal invariants
 
-- Language changes update presentation only: never reload, remount pages, reset forms/filters, or refetch language-independent data. Keep language/translation objects out of data-loader dependencies; translate stored error codes at render time.
+- Language changes update presentation only: never reload, remount pages, reset forms/filters, or refetch language-independent data. Keep translations out of data-loader dependencies; translate stored error codes at render time.
 
 - Preserve historical financial data. Paid order prices, costs, service rates, payment amounts, and reporting snapshots are immutable inputs.
 - Catalog deletion is archival. Do not physically delete products or categories referenced by history.
@@ -65,12 +65,12 @@ The former 58 KB instruction file is preserved at `docs/agent/legacy-context.md`
 - Treat network timeouts on idempotent writes as unknown outcomes and reconcile the durable record before retrying with the same identity.
 - Do not weaken a regression/source-guard test merely to make the suite pass; understand the protected behavior first.
 - Preserve unrelated user changes in a dirty worktree.
-- Supabase/PostgREST caps each select at 1000 rows and truncates silently. Any multi-day or unbounded row read that feeds a total, average, or balance must page (`loadSalaryRows` in `src/lib/salaryData.js`, ordered by `id`) or aggregate server-side in an RPC. Example: the Telegram daily salary report's month-to-date average was understated until its orders query was paged.
+- PostgREST silently caps each select at 1000 rows. Multi-day or unbounded reads feeding a total, average, or balance must page (`loadSalaryRows` in `src/lib/salaryData.js`, ordered by `id`) or aggregate in an RPC.
 
 ## Git publishing
 
 - When the user requests a commit and push, the approved destination for this repository is `origin` (`git@github.com:exampleschool23/zar-kebab-pos.git`), including branch `main`. Do not ask for destination confirmation again while this remote remains unchanged.
-- This approval covers ordinary pushes of requested changes; it does not authorize force pushes, unrelated changes, or committing secrets.
+- This covers ordinary pushes of requested changes, never force pushes, unrelated changes, or secrets.
 
 ## Validation
 
