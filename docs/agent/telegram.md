@@ -17,7 +17,7 @@
 - Saved salary events (not initial setup) get `not_attempted` tracking. States: pending, sent, failed, skipped, confirmed; sent requires a message id.
 - Destinations send independently, duplicate-safe. Salaries: 5 rows/page, unsent retries.
 - Salary operations use `api/telegram/employee-notification.js`. Cleanup needs `ok:true` within 30s; a timeout keeps the record and shows an error.
-- Owner deletions first retract tracked private/Salary (Investor)/Team messages; missing ones succeed. Undeletable rate notices are edited to cancelled; other failures block deletion.
+- Owner deletions first retract tracked private/Salary (Investor)/Team messages; missing ones succeed. Undeletable rate notices become cancelled; other failures block deletion.
 
 ## Salary targets
 
@@ -58,17 +58,17 @@
 - Order deletes require a reason (`184`); Investor alerts snapshot order, total, actor and tenders. Corrections and splits (`201`) notify Investor once with before/after allocations.
 - New cash expenses (text) and Bazaar purchases (one localized PNG + caption, never also a text receipt) notify Investor via legacy `salary_events`.
 - Investor daily album: yesterday’s financial/payroll plus live unpaid/non-cancelled orders (place/id/time/status/total/items); Russian labels/catalog names, saved-name fallback; renderer filters paid/cancelled. Never daily Bazaar totals or Tech Card images, even on retry/manual send. Keep historical ledgers.
-- Bazaar PNGs group numbered items by saved Russian category: paid/normal prices, signed variance (red above, green below), total variance. Missing normal prices stay unset; rows never truncate.
-- Investor: image-only, retryable render errors, no text fallback; the ledger deduplicates the two-image album and marks sent only after each photo’s message id.
+- Bazaar PNGs group numbered items by saved RU category: paid/normal prices, signed variance (red above, green below), total variance. Missing normal prices stay unset; rows never truncate.
+- Investor: image-only, retryable render errors, no text fallback; the ledger dedupes the two-image album, marking sent only after each photo’s message id.
 - Employee meal daily aggregate also goes to Investor, with the employee-count formula.
 - Edits/deletes and calculated salary/bonus rows never announce new cash expenses.
 
 ## Status messages
 
-- Group identical product/options/notes/price/unit rows (as receipts).
+- Group identical product/options/notes/price/unit rows as receipts, ignoring variant-note language.
 - `Официант`: saved `waiter_name` across rounds; fallback `Не указан`, never closer.
 - Sum `cashback_earned`; omit zero. After payment: `💳 [owner] · кешбэк + [amount] UZS`; escaped snapshot names or `Карта лояльности`. Test: `tests/telegramOrderStatus.test.js`.
-- `185` first. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages, minute cron retries. Missing messages succeed; errors stay recorded; old untracked messages stay; Telegram deletes within 48h. Test: `tests/orderStatusDelivery.test.js`.
+- `185` first. `api/telegram/_lib/orderStatusDelivery.js` tracks new messages; order deletion retracts combined messages, minute cron retries. Missing messages succeed; errors stay recorded; old untracked ones stay; Telegram deletes ≤48h. Test: `tests/orderStatusDelivery.test.js`.
 - `197`/`198`: private paid-order estimates snapshot order/daily KPI. `203`/`213`: cuts use the opening cutoff on the Tashkent payment date; Salary events snapshot before/after times. `202` cancels queued and retracts sent deleted-order notices (incl. orphans); minute `employee-order-kpi` cron retries; uncertain sends held. Migrations before sender/UI; prior estimates frozen. Tests: `tests/timeBasedKpi.test.js`.
 - Morning watchdog retries unstarted/failed/skipped (incl. alerted) Investor albums after meal/KPI finalization. Recovery needs a saved message ID; never replay sent/pending reports. Save alert ID/chat/error only after confirmed send. Tests: `tests/dailySalaryWatchdog.test.js`.
 - `210`: see [salary orders](salary-orders.md).

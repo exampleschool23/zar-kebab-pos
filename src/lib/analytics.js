@@ -547,47 +547,68 @@ export function getOrderItemProductId(item) {
   return item?.menu_item_id ?? item?.menuItemId ?? item?.product_id ?? item?.productId ?? null
 }
 
-export function getOrderItemOptionsKey(item) {
-  const optionFields = [
-    'variant_id',
-    'variantId',
-    'size_id',
-    'sizeId',
-    'modifiers',
-    'selected_modifiers',
-    'selectedModifiers',
-    'options',
-    'selected_options',
-    'selectedOptions',
-    'extras',
-    'selected_extras',
-    'selectedExtras',
-    'notes',
-    'order_type',
-    'orderType',
-    'service_type',
-    'serviceType',
-    'dining_type',
-    'diningType',
-    'fulfillment_type',
-    'fulfillmentType',
-    'is_takeaway',
-    'isTakeAway',
-    'item_type',
-    'itemType',
-    'is_counter_item',
-    'isCounterItem',
-    'price_mode',
-    'priceMode',
-    'base_price',
-    'basePrice',
-    'unit_price',
-    'unitPrice',
-  ]
+// Each entry lists a canonical grouping field followed by its aliases, so a
+// cart row (camelCase) and a stored row (snake_case) produce the same key.
+const ORDER_ITEM_OPTION_FIELDS = [
+  ['variant_id', 'variantId'],
+  ['size_id', 'sizeId'],
+  ['modifiers', 'selected_modifiers', 'selectedModifiers'],
+  ['options'],
+  ['selected_options', 'selectedOptions'],
+  ['extras', 'selected_extras', 'selectedExtras'],
+  ['notes'],
+  ['order_type', 'orderType'],
+  ['service_type', 'serviceType'],
+  ['dining_type', 'diningType'],
+  ['fulfillment_type', 'fulfillmentType'],
+  ['is_takeaway', 'isTakeAway'],
+  ['item_type', 'itemType'],
+  ['is_counter_item', 'isCounterItem'],
+  ['price_mode', 'priceMode'],
+  ['base_price', 'basePrice'],
+  ['unit_price', 'unitPrice'],
+]
 
+function isEmptyGroupingValue(value) {
+  if (value == null) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (Array.isArray(value)) return value.length === 0
+  if (typeof value === 'object') return Object.values(value).every(isEmptyGroupingValue)
+  return false
+}
+
+function countSelectedOptions(item) {
+  const selected = item?.selected_options ?? item?.selectedOptions
+  if (!selected || typeof selected !== 'object' || Array.isArray(selected)) return 0
+  return Object.values(selected).filter(value => !isEmptyGroupingValue(value)).length
+}
+
+// Variant choices are written into notes as "<localized group title>: <localized label>"
+// lines ahead of the manual note. The language depends on the waiter's UI, so a
+// second round sent in another language must not split an identical dish. When
+// selected_options carries the choice, those leading lines are redundant.
+export function getOrderItemGroupingNotes(item) {
+  const lines = String(item?.notes || '')
+    .split('\n')
+    .map(line => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  let generatedLines = countSelectedOptions(item)
+  while (generatedLines > 0 && lines.length > 0 && lines[0].includes(':')) {
+    lines.shift()
+    generatedLines -= 1
+  }
+  return lines
+    .map(line => line.replace(/^(?:Variants|Варианты|Variantlar)\s*:\s*/i, 'variants:'))
+    .join('\n')
+}
+
+export function getOrderItemOptionsKey(item) {
   const selected = {}
-  optionFields.forEach(field => {
-    if (item?.[field] != null) selected[field] = item[field]
+  ORDER_ITEM_OPTION_FIELDS.forEach(([field, ...aliases]) => {
+    let value = [field, ...aliases].map(name => item?.[name]).find(candidate => candidate != null)
+    if (field === 'notes') value = getOrderItemGroupingNotes(item)
+    if (field === 'price_mode') value = normalizePriceMode(value)
+    if (!isEmptyGroupingValue(value)) selected[field] = value
   })
   return stableStringify(selected)
 }
