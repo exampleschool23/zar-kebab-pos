@@ -67,9 +67,10 @@ export function buildMenuArchivedTeamMessage(event) {
   const actorName = firstText(event?.actor_name, 'Неизвестный сотрудник')
 
   return [
-    '🗑 <b>Блюдо удалено из меню</b>',
+    '🗄 <b>Блюдо перемещено в архив</b>',
     `🍽 <b>Блюдо:</b> ${escapeTelegramHtml(itemName)}`,
-    `👤 <b>Удалил(а):</b> ${escapeTelegramHtml(actorName)}`,
+    `👤 <b>Архивировал(а):</b> ${escapeTelegramHtml(actorName)}`,
+    'ℹ️ Блюдо не удалено: его можно восстановить в разделе «Архив» меню.',
   ].join('\n')
 }
 

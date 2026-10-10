@@ -81,7 +81,7 @@
     },
     {
       "name": "large menu editor",
-      "aliases": ["admin menu editing", "menu product editor", "menu deletion", "Manage Menu catalog archival"],
+      "aliases": ["admin menu editing", "menu product editor", "menu deletion", "Manage Menu catalog archival", "menu archive tab", "restore archived menu item"],
       "path": "src/pages/AdminMenu.jsx",
       "symbol": "AdminMenu"
     },

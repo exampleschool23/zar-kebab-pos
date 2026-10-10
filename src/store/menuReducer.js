@@ -72,6 +72,14 @@ export function menuReducer(state, action) {
       }
     }
 
+    case 'RESTORE_MENU_ITEM':
+      return {
+        ...state,
+        menuItems: state.menuItems.map(i =>
+          i.id === action.payload ? { ...i, ...(action.meta?.restored || {}), deleted_at: null } : i
+        ),
+      }
+
     case 'REORDER_MENU_ITEM': {
       if (Array.isArray(action.payload?.updates)) {
         return { ...state, menuItems: applySortUpdates(state.menuItems, action.payload.updates) }
@@ -140,6 +148,14 @@ export function menuReducer(state, action) {
         ),
       }
     }
+
+    case 'RESTORE_CATEGORY':
+      return {
+        ...state,
+        categories: state.categories.map(category =>
+          category.id === action.payload ? { ...category, ...(action.meta?.restored || {}), deleted_at: null } : category
+        ),
+      }
 
     case 'REORDER_CATEGORY': {
       if (Array.isArray(action.payload?.updates)) {

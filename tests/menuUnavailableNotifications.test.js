@@ -108,8 +108,10 @@ test('created and archived product Team messages are Russian and identify the ac
 
   assert.match(created, /Добавлено новое блюдо/)
   assert.match(created, /Добавил\(а\):<\/b> Анна &amp; Али/)
-  assert.match(archived, /Блюдо удалено из меню/)
-  assert.match(archived, /Удалил\(а\):<\/b> Анна &amp; Али/)
+  assert.match(archived, /Блюдо перемещено в архив/)
+  assert.match(archived, /Архивировал\(а\):<\/b> Анна &amp; Али/)
+  assert.match(archived, /можно восстановить/)
+  assert.doesNotMatch(archived, /удалено из меню/)
   assert.match(created, /Шашлык &lt;Особый&gt;/)
   assert.match(archived, /Шашлык &lt;Особый&gt;/)
 })

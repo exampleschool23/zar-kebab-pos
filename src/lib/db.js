@@ -1589,6 +1589,18 @@ export async function writeToSupabase(action, state, options = {}) {
       break
     }
 
+    case 'RESTORE_MENU_ITEM': {
+      const { data, error } = await supabase
+        .from('menu_items')
+        .update({ deleted_at: null })
+        .eq('id', action.payload)
+        .select('id, deleted_at, available, show_in_cashier_quick_items')
+      if (error) throw error
+      if (!data?.length) throw new Error('Menu item was not restored. Refresh permissions and try again.')
+      action.meta = { ...(action.meta || {}), restored: data[0] }
+      break
+    }
+
     case 'REORDER_MENU_ITEM': {
       if (Array.isArray(action.payload?.updates)) {
         const updates = action.payload.updates.filter(update => update?.id && Number.isFinite(Number(update.sort_order)))
@@ -1681,6 +1693,20 @@ export async function writeToSupabase(action, state, options = {}) {
       }).eq('id', action.payload)
       if (error) throw error
       action.meta = { ...(action.meta || {}), deleted_at: deletedAt }
+      break
+    }
+
+    case 'RESTORE_CATEGORY': {
+      // Archival hid the category everywhere; it stays hidden after restore so
+      // staff choose its visibility again instead of it reappearing publicly.
+      const { data, error } = await supabase
+        .from('menu_categories')
+        .update({ deleted_at: null })
+        .eq('id', action.payload)
+        .select('id, deleted_at, hidden, waiter_hidden, tourist_hidden')
+      if (error) throw error
+      if (!data?.length) throw new Error('Category was not restored. Refresh permissions and try again.')
+      action.meta = { ...(action.meta || {}), restored: data[0] }
       break
     }
 

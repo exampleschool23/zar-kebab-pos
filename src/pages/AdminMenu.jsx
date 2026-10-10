@@ -16,6 +16,7 @@ import { useApp } from '../store/AppContext'
 import { useAuth } from '../contexts/AuthContext'
 import { t, getItemName, getCategoryName } from '../lib/i18n'
 import { formatCurrency } from '../lib/formatCurrency'
+import { formatLongDateTime } from '../lib/dateFormat'
 import { DEFAULT_MENU_PREP_MINUTES, menuPrepTimeLabel, normalizeMenuPrepMinutes } from '../lib/menuPrepTime'
 import { gramsLabel, kcalLabel, millilitresLabel } from '../lib/nutrition'
 import { getMenuPricing } from '../lib/menuPricing'
@@ -27,12 +28,14 @@ import {
   isActiveMenuCategory,
   isActiveMenuItem,
   isCashierQuickItem,
+  isDeletedMenuCategory,
+  isDeletedMenuItem,
   isPublicHiddenMenuItem,
 } from '../lib/menuItems'
 import {
   Plus, Edit2, Trash2, Archive, X, UtensilsCrossed,
   Search, LayoutGrid, List, Tag, FolderOpen, GripVertical,
-  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock, Users, Clock3, ClipboardList,
+  ImagePlus, Loader2, Bold, ArrowLeft, Eye, EyeOff, Lock, Users, Clock3, ClipboardList, RotateCcw,
 } from 'lucide-react'
 import { OperationalError, OperationalLoading } from '../components/OperationalState'
 import { useAppDataStatus } from '../store/appHooks'
@@ -856,6 +859,51 @@ function VisibilityToggleButton({ visible, pending, onClick, lang, kind = 'item'
 }
 
 // ── Sortable grid card ────────────────────────────────────────────────────────
+
+function archiveLabels(lang) {
+  if (lang === 'ru') return {
+    tab: 'Архив',
+    title: 'Архив меню',
+    sub: 'Архивные позиции скрыты везде, но не удалены. История заказов сохраняется, их можно восстановить в любой момент.',
+    categories: 'Категории',
+    items: 'Блюда',
+    empty: 'В архиве пусто.',
+    search: 'Поиск в архиве…',
+    restore: 'Восстановить',
+    archivedAt: 'В архиве с',
+    categoryArchived: 'Сначала восстановите категорию',
+    itemRestored: 'Блюдо восстановлено и снова в меню.',
+    categoryRestored: 'Категория восстановлена. Она пока скрыта — включите видимость во вкладке «Категории».',
+  }
+  if (lang === 'uz') return {
+    tab: 'Arxiv',
+    title: 'Menyu arxivi',
+    sub: 'Arxivdagi elementlar hamma joyda yashirilgan, lekin o‘chirilmagan. Buyurtmalar tarixi saqlanadi, ularni istalgan vaqtda tiklash mumkin.',
+    categories: 'Kategoriyalar',
+    items: 'Taomlar',
+    empty: 'Arxiv bo‘sh.',
+    search: 'Arxivdan qidirish…',
+    restore: 'Tiklash',
+    archivedAt: 'Arxivlangan',
+    categoryArchived: 'Avval kategoriyani tiklang',
+    itemRestored: 'Taom tiklandi va yana menyuda.',
+    categoryRestored: 'Kategoriya tiklandi. U hozircha yashirin — «Kategoriyalar» bo‘limida ko‘rinishni yoqing.',
+  }
+  return {
+    tab: 'Archive',
+    title: 'Menu archive',
+    sub: 'Archived entries are hidden everywhere but not deleted. Order history is kept and they can be restored at any time.',
+    categories: 'Categories',
+    items: 'Items',
+    empty: 'The archive is empty.',
+    search: 'Search archive…',
+    restore: 'Restore',
+    archivedAt: 'Archived',
+    categoryArchived: 'Restore its category first',
+    itemRestored: 'Item restored and back on the menu.',
+    categoryRestored: 'Category restored. It is still hidden — turn its visibility on in the Categories tab.',
+  }
+}
 
 function SortableItemCard({ item, lang, onEdit, onDelete, onToggleVisibility, categories, visibilityPending, canChangeAvailability = false, canDelete = false, isDragging: _isDragging, readOnly = false }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
@@ -1684,7 +1732,7 @@ export default function AdminMenu() {
   const isCategoryEditorPage = !!categoryId
   const isMenuEditorPage = isProductEditorPage || isCategoryEditorPage
 
-  const [tab,        setTab]        = useState(searchParams.get('tab') === 'categories' ? 'categories' : 'items')
+  const [tab,        setTab]        = useState(['categories', 'archive'].includes(searchParams.get('tab')) ? searchParams.get('tab') : 'items')
   const [itemModal,  setItemModal]  = useState(null)
   const [catModal,   setCatModal]   = useState(null)
   const [form,       setForm]       = useState(blankItem)
@@ -1696,8 +1744,11 @@ export default function AdminMenu() {
   const [activeId,   setActiveId]   = useState(null) // drag overlay
   const [savingItemId, setSavingItemId] = useState('')
   const [deleteItemCandidate, setDeleteItemCandidate] = useState(null)
+  const [deleteCategoryCandidate, setDeleteCategoryCandidate] = useState(null)
   const [deleteItemError, setDeleteItemError] = useState('')
   const [savingCatId, setSavingCatId] = useState('')
+  const [restoringId, setRestoringId] = useState('')
+  const [archiveSearch, setArchiveSearch] = useState('')
   const [savingItemForm, setSavingItemForm] = useState(false)
   const [savingCatForm, setSavingCatForm] = useState(false)
   const [originalItemFormFingerprint, setOriginalItemFormFingerprint] = useState('')
@@ -1735,8 +1786,13 @@ export default function AdminMenu() {
     && !!trimMenuItemTextValue(catForm.name_uz)
     && isCatFormDirty
 
+  // One archive dialog serves both products and categories.
+  const archiveCandidate = deleteItemCandidate || deleteCategoryCandidate
+  const archiveCandidateIsCategory = !deleteItemCandidate && !!deleteCategoryCandidate
+  const archivePending = !!archiveCandidate && (archiveCandidateIsCategory ? savingCatId : savingItemId) === archiveCandidate.id
+
   useEffect(() => {
-    if (!deleteItemCandidate || !canDeleteMenuCatalog) return undefined
+    if (!archiveCandidate || !canDeleteMenuCatalog) return undefined
     const previousFocus = document.activeElement
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -1747,7 +1803,7 @@ export default function AdminMenu() {
       document.body.style.overflow = previousOverflow
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
     }
-  }, [canDeleteMenuCatalog, deleteItemCandidate?.id])
+  }, [canDeleteMenuCatalog, archiveCandidate?.id])
 
   useEffect(() => {
     if (!isCategoryEditorPage || !isOwner) return undefined
@@ -1784,7 +1840,7 @@ export default function AdminMenu() {
   function handleDeleteDialogKeyDown(event) {
     if (event.key === 'Escape') {
       event.preventDefault()
-      if (savingItemId !== deleteItemCandidate?.id) closeDeleteItemDialog()
+      if (!archivePending) closeDeleteItemDialog()
       return
     }
     if (event.key !== 'Tab') return
@@ -1821,6 +1877,20 @@ export default function AdminMenu() {
     state.menuItems
       .filter(isActiveMenuItem)
       .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999)),
+    [state.menuItems]
+  )
+
+  const archivedCategories = useMemo(() =>
+    state.categories
+      .filter(c => c.id !== 'all' && isDeletedMenuCategory(c))
+      .sort((a, b) => String(b.deleted_at || '').localeCompare(String(a.deleted_at || ''))),
+    [state.categories]
+  )
+
+  const archivedItems = useMemo(() =>
+    state.menuItems
+      .filter(isDeletedMenuItem)
+      .sort((a, b) => String(b.deleted_at || '').localeCompare(String(a.deleted_at || ''))),
     [state.menuItems]
   )
 
@@ -2165,6 +2235,25 @@ export default function AdminMenu() {
     }
   }
 
+  async function restoreArchived(type, id) {
+    if (!canDeleteMenuCatalog || restoringId || !id) return
+    setRestoringId(id)
+    setMenuNotice(null)
+    try {
+      const result = await dispatch({ type, payload: id })
+      if (result?.error) {
+        setMenuNotice({ tone: 'error', message: result.error.message || saveFailedLabel(lang) })
+        return
+      }
+      const labels = archiveLabels(lang)
+      setMenuNotice({ tone: 'success', message: type === 'RESTORE_CATEGORY' ? labels.categoryRestored : labels.itemRestored })
+    } catch (error) {
+      setMenuNotice({ tone: 'error', message: error?.message || saveFailedLabel(lang) })
+    } finally {
+      setRestoringId('')
+    }
+  }
+
   function requestDeleteItem(item) {
     if (!canDeleteMenuCatalog || savingItemId || !item?.id) return
     setDeleteItemError('')
@@ -2172,8 +2261,9 @@ export default function AdminMenu() {
   }
 
   function closeDeleteItemDialog() {
-    if (savingItemId === deleteItemCandidate?.id) return
+    if (archivePending) return
     setDeleteItemCandidate(null)
+    setDeleteCategoryCandidate(null)
     setDeleteItemError('')
   }
 
@@ -2268,8 +2358,35 @@ export default function AdminMenu() {
   }
   function deleteCat(id) {
     if (!canDeleteMenuCatalog) return
-    if (id === 'all') return
-    if (window.confirm('Delete category?')) dispatch({ type: 'DELETE_CATEGORY', payload: id })
+    if (id === 'all' || savingCatId) return
+    const category = realSortedCats.find(cat => cat.id === id)
+    if (!category) return
+    setDeleteItemError('')
+    setDeleteCategoryCandidate(category)
+  }
+
+  async function archiveCategory(id) {
+    if (!canDeleteMenuCatalog || savingCatId) return
+    setSavingCatId(id)
+    setMenuNotice(null)
+    setDeleteItemError('')
+    try {
+      const result = await dispatch({ type: 'DELETE_CATEGORY', payload: id })
+      if (result?.error) {
+        const message = result.error.message || saveFailedLabel(lang)
+        setMenuNotice({ tone: 'error', message })
+        setDeleteItemError(message)
+        return
+      }
+      setDeleteCategoryCandidate(null)
+      setDeleteItemError('')
+    } catch (error) {
+      const message = error?.message || saveFailedLabel(lang)
+      setMenuNotice({ tone: 'error', message })
+      setDeleteItemError(message)
+    } finally {
+      setSavingCatId('')
+    }
   }
 
   function setF(key)  { return e => setForm(f => ({ ...f, [key]: e.target.value })) }
@@ -2916,6 +3033,7 @@ export default function AdminMenu() {
                 ['items', t(lang, 'menuItems')],
                 ['categories', t(lang, 'categories')],
                 ['quick_items', lang === 'uz' ? 'Tezkor mahsulotlar' : lang === 'ru' ? 'Быстрые товары' : 'Quick Items'],
+                ['archive', `${archiveLabels(lang).tab}${archivedItems.length + archivedCategories.length ? ` (${archivedItems.length + archivedCategories.length})` : ''}`],
               ].map(([key, label]) => (
                 <button
                   key={key}
@@ -2933,7 +3051,7 @@ export default function AdminMenu() {
 
         <div className="mx-auto w-full max-w-[1180px] px-4 py-5">
           {menuNotice && (
-            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            <div className={`mb-4 rounded-xl border px-4 py-3 text-sm font-bold ${menuNotice.tone === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
               {menuNotice.error ? formatWriteError(menuNotice.error, lang, menuNotice.actionType) : menuNotice.message}
             </div>
           )}
@@ -3488,16 +3606,107 @@ export default function AdminMenu() {
               )}
             </>
           )}
+
+          {/* ══ Archive tab ═════════════════════════════════════════════════ */}
+          {tab === 'archive' && (() => {
+            const labels = archiveLabels(lang)
+            const q = archiveSearch.trim().toLowerCase()
+            const cats = archivedCategories.filter(cat => !q || getCategoryName(cat, lang).toLowerCase().includes(q))
+            const items = archivedItems.filter(item => !q || getItemName(item, lang).toLowerCase().includes(q) || String(item.external_id || '').toLowerCase().includes(q))
+            const restoreButton = (type, id, disabledReason = '') => canDeleteMenuCatalog && (
+              disabledReason
+                ? <span className="text-xs font-bold text-gray-400">{disabledReason}</span>
+                : (
+                  <button
+                    type="button"
+                    disabled={!!restoringId}
+                    onClick={() => restoreArchived(type, id)}
+                    className="inline-flex h-9 flex-shrink-0 items-center gap-1.5 rounded-xl border border-green-200 px-3 text-xs font-black text-green-700 transition hover:bg-green-50 disabled:opacity-50"
+                  >
+                    {restoringId === id ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                    {labels.restore}
+                  </button>
+                )
+            )
+            return (
+              <>
+                <div className="mb-5 rounded-[28px] border border-[#E5E7EB] bg-white p-4 shadow-sm">
+                  <h2 className="text-lg font-black text-[#1F2937]">{labels.title}</h2>
+                  <p className="mt-1 text-sm text-gray-500">{labels.sub}</p>
+                  <div className="relative mt-3">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      value={archiveSearch}
+                      onChange={e => setArchiveSearch(e.target.value)}
+                      placeholder={labels.search}
+                      className="h-11 w-full rounded-xl border border-[#E5E7EB] pl-9 pr-3 text-sm outline-none focus:border-[#ff5a00]"
+                    />
+                  </div>
+                </div>
+                {!cats.length && !items.length ? (
+                  <div className="rounded-[28px] border border-dashed border-[#E5E7EB] bg-white px-4 py-12 text-center text-sm font-bold text-gray-400">
+                    {labels.empty}
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {cats.length > 0 && (
+                      <section className="overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white shadow-sm">
+                        <h3 className="border-b border-gray-50 px-5 py-3 text-sm font-black text-gray-700">{labels.categories} ({cats.length})</h3>
+                        {cats.map(cat => (
+                          <div key={cat.id} className="flex flex-wrap items-center gap-3 border-b border-gray-50 px-5 py-3 last:border-0">
+                            <FolderOpen size={20} className="flex-shrink-0 text-gray-400" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-bold text-gray-900">{getCategoryName(cat, lang)}</p>
+                              <p className="text-xs text-gray-400">{labels.archivedAt} {formatLongDateTime(cat.deleted_at, lang)}</p>
+                            </div>
+                            {restoreButton('RESTORE_CATEGORY', cat.id)}
+                          </div>
+                        ))}
+                      </section>
+                    )}
+                    {items.length > 0 && (
+                      <section className="overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white shadow-sm">
+                        <h3 className="border-b border-gray-50 px-5 py-3 text-sm font-black text-gray-700">{labels.items} ({items.length})</h3>
+                        {items.map(item => {
+                          const cat = state.categories.find(c => c.id === item.category_id)
+                          const categoryArchived = !!cat && isDeletedMenuCategory(cat)
+                          return (
+                            <div key={item.id} className="flex flex-wrap items-center gap-3 border-b border-gray-50 px-5 py-3 last:border-0">
+                              <SafeMenuImage
+                                src={item.image_url}
+                                alt={getItemName(item, lang)}
+                                className="h-12 w-12 flex-shrink-0 rounded-xl object-cover object-center opacity-70 grayscale"
+                                fallbackClassName="h-12 w-12 flex-shrink-0 rounded-xl"
+                                iconSize={18}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-bold text-gray-900">{getItemName(item, lang)}</p>
+                                <p className="text-xs text-gray-400">
+                                  {[cat && getCategoryName(cat, lang), formatCurrency(item.price), `${labels.archivedAt} ${formatLongDateTime(item.deleted_at, lang)}`].filter(Boolean).join(' · ')}
+                                </p>
+                              </div>
+                              {restoreButton('RESTORE_MENU_ITEM', item.id, categoryArchived ? labels.categoryArchived : '')}
+                            </div>
+                          )
+                        })}
+                      </section>
+                    )}
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       </div>
 
-      {canDeleteMenuCatalog && deleteItemCandidate && (
+      {canDeleteMenuCatalog && archiveCandidate && (
+
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6">
           <button
             type="button"
             aria-label={lang === 'uz' ? 'Yopish' : lang === 'ru' ? 'Закрыть' : 'Close'}
             onClick={closeDeleteItemDialog}
-            disabled={savingItemId === deleteItemCandidate.id}
+            disabled={archivePending}
             className="absolute inset-0 h-full w-full cursor-default bg-slate-950/55 backdrop-blur-sm disabled:cursor-wait"
           />
           <div
@@ -3506,7 +3715,7 @@ export default function AdminMenu() {
             aria-modal="true"
             aria-labelledby="delete-menu-item-title"
             aria-describedby="delete-menu-item-description"
-            aria-busy={savingItemId === deleteItemCandidate.id}
+            aria-busy={archivePending}
             onKeyDown={handleDeleteDialogKeyDown}
             tabIndex={-1}
             className="relative max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-[24px] border border-white/70 bg-white p-5 shadow-2xl"
@@ -3515,17 +3724,25 @@ export default function AdminMenu() {
               <Archive size={22} />
             </div>
             <h2 id="delete-menu-item-title" className="mt-4 text-xl font-black text-[#1F2937]">
-              {lang === 'uz' ? 'Mahsulotni arxivlaysizmi?' : lang === 'ru' ? 'Архивировать товар?' : 'Archive item?'}
+              {archiveCandidateIsCategory
+                ? (lang === 'uz' ? 'Kategoriyani arxivlaysizmi?' : lang === 'ru' ? 'Архивировать категорию?' : 'Archive category?')
+                : (lang === 'uz' ? 'Mahsulotni arxivlaysizmi?' : lang === 'ru' ? 'Архивировать товар?' : 'Archive item?')}
             </h2>
             <p className="mt-2 break-words text-sm font-semibold leading-6 text-[#6B7280]">
-              {getItemName(deleteItemCandidate, lang)}
+              {archiveCandidateIsCategory ? getCategoryName(archiveCandidate, lang) : getItemName(archiveCandidate, lang)}
             </p>
             <p id="delete-menu-item-description" className="mt-2 text-xs leading-5 text-[#9CA3AF]">
-              {lang === 'uz'
-                ? 'Mahsulot menyudan arxivlanadi. Oldingi buyurtmalar tarixi saqlanadi.'
-                : lang === 'ru'
-                  ? 'Товар будет архивирован из меню. История прошлых заказов сохранится.'
-                  : 'The item will be archived from the menu. Previous order history will remain.'}
+              {archiveCandidateIsCategory
+                ? (lang === 'uz'
+                  ? 'Kategoriya va undagi taomlar menyudan yashiriladi. Hech narsa o‘chirilmaydi: «Arxiv» bo‘limidan tiklash mumkin.'
+                  : lang === 'ru'
+                    ? 'Категория и её блюда скроются из меню. Ничего не удаляется: восстановить можно во вкладке «Архив».'
+                    : 'The category and its items will be hidden from the menu. Nothing is deleted: restore it from the Archive tab.')
+                : (lang === 'uz'
+                  ? 'Mahsulot menyudan arxivlanadi. Oldingi buyurtmalar tarixi saqlanadi.'
+                  : lang === 'ru'
+                    ? 'Товар будет архивирован из меню. История прошлых заказов сохранится.'
+                    : 'The item will be archived from the menu. Previous order history will remain.')}
             </p>
             {deleteItemError && (
               <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold leading-5 text-red-700">
@@ -3537,21 +3754,21 @@ export default function AdminMenu() {
                 ref={deleteCancelButtonRef}
                 type="button"
                 onClick={closeDeleteItemDialog}
-                disabled={savingItemId === deleteItemCandidate.id}
+                disabled={archivePending}
                 className="h-12 flex-1 rounded-xl border border-[#E5E7EB] bg-white text-sm font-black text-[#6B7280] disabled:opacity-50"
               >
                 {lang === 'uz' ? 'Bekor qilish' : lang === 'ru' ? 'Отмена' : 'Cancel'}
               </button>
               <button
                 type="button"
-                onClick={() => deleteItem(deleteItemCandidate.id)}
-                disabled={savingItemId === deleteItemCandidate.id}
+                onClick={() => (archiveCandidateIsCategory ? archiveCategory(archiveCandidate.id) : deleteItem(archiveCandidate.id))}
+                disabled={archivePending}
                 className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 text-sm font-black text-white shadow-lg shadow-red-100 disabled:opacity-50"
               >
-                {savingItemId === deleteItemCandidate.id
+                {archivePending
                   ? <Loader2 size={16} className="animate-spin" />
                   : <Archive size={16} />}
-                {savingItemId === deleteItemCandidate.id
+                {archivePending
                   ? (lang === 'uz' ? 'Arxivlanmoqda…' : lang === 'ru' ? 'Архивирование…' : 'Archiving…')
                   : (lang === 'uz' ? 'Arxivlash' : lang === 'ru' ? 'В архив' : 'Archive')}
               </button>
