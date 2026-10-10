@@ -72,6 +72,7 @@ const PUBLIC_MENU_SEO = {
 const PUBLIC_SITE_COPY = {
   uz: {
     menu: 'Menyu',
+    corporateSets: 'Korporativ setlar',
     promotions: 'Aksiyalar',
     vacancies: 'Ish o‘rinlari',
     contacts: 'Aloqa',
@@ -83,6 +84,7 @@ const PUBLIC_SITE_COPY = {
   },
   ru: {
     menu: 'Меню',
+    corporateSets: 'Корпоративные сеты',
     promotions: 'Акции',
     vacancies: 'Вакансии',
     contacts: 'Контакты',
@@ -94,6 +96,7 @@ const PUBLIC_SITE_COPY = {
   },
   en: {
     menu: 'Menu',
+    corporateSets: 'Corporate sets',
     promotions: 'Promotions',
     vacancies: 'Vacancies',
     contacts: 'Contacts',
@@ -203,7 +206,7 @@ function PublicContactButtons({ className = '' }) {
   )
 }
 
-function PublicMenuFooter({ copy, lang, onOpenVacancies }) {
+function PublicMenuFooter({ copy, lang, onOpenMenu, onOpenCorporateSets, onOpenVacancies }) {
   const year = new Date().getFullYear()
   return (
     <footer id="public-menu-contacts" className="scroll-mt-28 border-t border-[#E5E7EB] bg-[#FAFAF9] px-4 py-9 sm:px-6 sm:py-12">
@@ -216,8 +219,9 @@ function PublicMenuFooter({ copy, lang, onOpenVacancies }) {
           <div>
             <h2 className="text-sm font-black text-[#1F2937]">{copy.company}</h2>
             <nav className="mt-4 flex flex-col items-start gap-3 text-sm font-semibold text-[#64748B]">
-              <a href="#public-menu-content" onClick={event => navigateToPublicSection(event, 'public-menu-content')} className="hover:text-[#ff5a00]">{copy.menu}</a>
-              <a href="#public-menu-deals" onClick={event => navigateToPublicSection(event, 'public-menu-deals')} className="hover:text-[#ff5a00]">{copy.promotions}</a>
+              <a href="/menu" onClick={onOpenMenu} className="hover:text-[#ff5a00]">{copy.menu}</a>
+              <a href="/corporate-sets" onClick={onOpenCorporateSets} className="hover:text-[#ff5a00]">{copy.corporateSets}</a>
+              <a href="/menu#public-menu-deals" onClick={event => navigateToPublicSection(event, 'public-menu-deals')} className="hover:text-[#ff5a00]">{copy.promotions}</a>
               <a href="/vacancies" onClick={onOpenVacancies} className="hover:text-[#ff5a00]">{copy.vacancies}</a>
             </nav>
           </div>
@@ -426,7 +430,7 @@ async function loadPublicMenuData(now = new Date()) {
   }
 }
 
-export default function PublicMenu({ premium = false, searchMode = false }) {
+export default function PublicMenu({ premium = false, searchMode = false, corporateSets = false }) {
   const { itemId } = useParams()
   const navigate = useNavigate()
   const { state } = useApp()
@@ -446,7 +450,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
   const [menuCurrency, setMenuCurrency] = useState(() => premium ? 'USD' : getDefaultMenuCurrency())
   const [currencyRates, setCurrencyRates] = useState({ UZS: 1 })
   const [visibilityNow, setVisibilityNow] = useState(() => new Date())
-  const menuBasePath = premium ? '/premium-menu' : '/menu'
+  const menuBasePath = premium ? '/premium-menu' : corporateSets ? '/corporate-sets' : '/menu'
   const lang = premium ? premiumLang : appLang
   const seo = PUBLIC_MENU_SEO[lang] || PUBLIC_MENU_SEO.ru
   const siteCopy = PUBLIC_SITE_COPY[lang] || PUBLIC_SITE_COPY.en
@@ -458,20 +462,29 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
   useEffect(() => {
     if (premium) return
 
-    document.title = seo.title
+    const pageTitle = corporateSets ? `${siteCopy.corporateSets} — Zar Kebab` : seo.title
+    document.title = pageTitle
     const description = document.querySelector('meta[name="description"]')
     description?.setAttribute('content', seo.description)
 
-    document.querySelector('meta[property="og:title"]')?.setAttribute('content', seo.title)
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', pageTitle)
     document.querySelector('meta[property="og:description"]')?.setAttribute('content', seo.description)
     document.querySelector('meta[property="og:locale"]')?.setAttribute('content', seo.locale)
-    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', seo.title)
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', pageTitle)
     document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', seo.description)
     document.documentElement.lang = lang
 
     const canonical = document.querySelector('link[rel="canonical"]')
-    canonical?.setAttribute('href', 'https://www.zarkebab.uz/')
-  }, [lang, premium, seo.description, seo.locale, seo.title])
+    canonical?.setAttribute('href', corporateSets ? 'https://www.zarkebab.uz/corporate-sets' : 'https://www.zarkebab.uz/')
+  }, [corporateSets, lang, premium, seo.description, seo.locale, seo.title, siteCopy.corporateSets])
+
+  // Links such as /menu#public-menu-deals arrive before the menu renders.
+  useEffect(() => {
+    if (loading) return
+    const sectionId = window.location.hash.slice(1)
+    if (!sectionId) return
+    requestAnimationFrame(() => document.getElementById(sectionId)?.scrollIntoView({ block: 'start' }))
+  }, [loading])
 
   const refreshPublicMenu = useCallback(async ({ showLoading = false } = {}) => {
     const seq = menuLoadSeqRef.current + 1
@@ -561,6 +574,12 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
     () => premium ? categories.filter(category => !isTouristHiddenMenuCategory(category)) : categories,
     [categories, premium]
   )
+  // Corporate sets live on their own page; the main public menu omits them.
+  const listedCategories = useMemo(() => {
+    if (corporateSets) return displayCategories.filter(category => category.id === CORPORATE_SETS_CATEGORY_ID)
+    if (premium) return displayCategories
+    return displayCategories.filter(category => category.id !== CORPORATE_SETS_CATEGORY_ID)
+  }, [corporateSets, displayCategories, premium])
   const displayItems = useMemo(() => {
     const categoryIds = new Set(displayCategories.map(category => category.id))
     const visibleItems = items.filter(item => !item.category_id || categoryIds.has(item.category_id))
@@ -588,9 +607,9 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
     return counts
   }, [displayItems])
   const categoryCards = useMemo(
-    () => [{ id: 'all' }, ...displayCategories.filter(category => (itemCounts[category.id] || 0) > 0)
+    () => [{ id: 'all' }, ...listedCategories.filter(category => (itemCounts[category.id] || 0) > 0)
       .sort((a, b) => Number(b.id === CORPORATE_SETS_CATEGORY_ID) - Number(a.id === CORPORATE_SETS_CATEGORY_ID))],
-    [displayCategories, itemCounts]
+    [listedCategories, itemCounts]
   )
 
   const searchResults = useMemo(() => {
@@ -603,7 +622,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
   }, [displayItems, searchCategoryId, searchQuery])
 
   const groupedSections = useMemo(() => {
-    const sections = displayCategories
+    const sections = listedCategories
       .map(cat => ({
         cat,
         items: displayItems.filter(item => item.category_id === cat.id),
@@ -612,7 +631,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
 
     const categoryIds = new Set(displayCategories.map(cat => cat.id))
     const uncategorized = displayItems.filter(item => !categoryIds.has(item.category_id))
-    if (uncategorized.length > 0) {
+    if (!corporateSets && uncategorized.length > 0) {
       sections.push({
         cat: { id: 'uncategorized', name_uz: 'Boshqa', name_ru: 'Другое', name_en: 'Other' },
         items: uncategorized,
@@ -620,12 +639,16 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
     }
 
     return sections
-  }, [displayCategories, displayItems])
+  }, [corporateSets, displayCategories, displayItems, listedCategories])
 
-  const dealItems = useMemo(() =>
-    displayItems.filter(item => getMenuPricing(item).discounted),
-    [displayItems]
-  )
+  const dealItems = useMemo(() => {
+    if (corporateSets) return []
+    const listedIds = new Set(listedCategories.map(cat => cat.id))
+    const categoryIds = new Set(displayCategories.map(cat => cat.id))
+    return displayItems.filter(item =>
+      (listedIds.has(item.category_id) || !categoryIds.has(item.category_id)) && getMenuPricing(item).discounted
+    )
+  }, [corporateSets, displayCategories, displayItems, listedCategories])
   const priceFormatter = useMemo(
     () => amount => formatMenuCurrency(amount, menuCurrency, currencyRates),
     [menuCurrency, currencyRates]
@@ -717,6 +740,24 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
     setMobileSearchOpen(false)
   }
 
+  function openCorporateSets(event) {
+    event.preventDefault()
+    if (corporateSets) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    navigateWithTransition('/corporate-sets')
+  }
+
+  function openMenuHome(event) {
+    if (!corporateSets) {
+      navigateToPublicSection(event, 'public-menu-content')
+      return
+    }
+    event.preventDefault()
+    navigateWithTransition('/menu')
+  }
+
   function openVacancies(event) {
     event.preventDefault()
     navigateWithTransition('/vacancies')
@@ -793,8 +834,9 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
                 </button>
                 {!premium && (
                   <nav className="hidden items-center gap-5 lg:flex" aria-label={siteCopy.company}>
-                    <a href="#public-menu-content" onClick={event => navigateToPublicSection(event, 'public-menu-content')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.menu}</a>
-                    <a href="#public-menu-deals" onClick={event => navigateToPublicSection(event, 'public-menu-deals')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.promotions}</a>
+                    <a href="/menu" onClick={openMenuHome} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.menu}</a>
+                    <a href="/corporate-sets" onClick={openCorporateSets} aria-current={corporateSets ? 'page' : undefined} className={`text-sm font-black transition-colors hover:text-[#ff5a00] ${corporateSets ? 'text-[#ff5a00]' : 'text-[#1F2937]'}`}>{siteCopy.corporateSets}</a>
+                    <a href="/menu#public-menu-deals" onClick={event => navigateToPublicSection(event, 'public-menu-deals')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.promotions}</a>
                     <a href="/vacancies" onClick={openVacancies} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.vacancies}</a>
                     <a href="#public-menu-contacts" onClick={event => navigateToPublicSection(event, 'public-menu-contacts')} className="text-sm font-black text-[#1F2937] transition-colors hover:text-[#ff5a00]">{siteCopy.contacts}</a>
                   </nav>
@@ -835,7 +877,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
       </div>
 
       <main id="public-menu-content" className="mx-auto max-w-[1280px] scroll-mt-28 px-3 pb-5 pt-3 sm:px-6 sm:pt-5">
-        <div data-nosnippet="">
+        {!corporateSets && <div data-nosnippet="">
           <MenuCategoryScroller
             categories={categoryCards}
             activeCategoryId={activeCategory}
@@ -851,7 +893,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
             collapsedSurfaceClass="bg-white/95"
             collapsedClassName="z-50 px-3 sm:left-1/2 sm:right-auto sm:w-full sm:max-w-[1280px] sm:-translate-x-1/2 sm:px-4"
           />
-        </div>
+        </div>}
 
         {loading ? (
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
@@ -938,7 +980,7 @@ export default function PublicMenu({ premium = false, searchMode = false }) {
           )
         )}
       </main>
-      {!premium && <PublicMenuFooter copy={siteCopy} lang={lang} onOpenVacancies={openVacancies} />}
+      {!premium && <PublicMenuFooter copy={siteCopy} lang={lang} onOpenMenu={openMenuHome} onOpenCorporateSets={openCorporateSets} onOpenVacancies={openVacancies} />}
       {showDetailOverlay && (
         <div className="fixed inset-0 z-[80] bg-white">
           <MenuProductDetailPage

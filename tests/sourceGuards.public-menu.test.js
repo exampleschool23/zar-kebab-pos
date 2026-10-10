@@ -27,7 +27,7 @@ test('PublicMenu supports direct product links and copyable item URLs', () => {
   assert.match(publicMenu, /useParams/)
   assert.match(publicMenu, /findMenuItemByLinkKey\(displayItems, itemId\)/)
   assert.match(publicMenu, /navigate\(getMenuItemPublicPath\(item, menuBasePath\)\)/)
-  assert.match(publicMenu, /premium \? '\/premium-menu' : '\/menu'/)
+  assert.match(publicMenu, /premium \? '\/premium-menu' : corporateSets \? '\/corporate-sets' : '\/menu'/)
   assert.match(publicMenu, /const showDetailOverlay = Boolean\(detailItem\)/)
   assert.match(publicMenu, /showDetailOverlay && \(/)
   assert.match(publicMenu, /fixed inset-0 z-\[80\]/)
@@ -50,7 +50,7 @@ test('Premium public menu uses tourist pricing without duplicating menu items', 
   const publicMenu = readSource('src/pages/PublicMenu.jsx')
 
   assert.match(app, /path="\/premium-menu"/)
-  assert.match(publicMenu, /export default function PublicMenu\(\{ premium = false, searchMode = false \}\)/)
+  assert.match(publicMenu, /export default function PublicMenu\(\{ premium = false, searchMode = false, corporateSets = false \}\)/)
   assert.match(publicMenu, /const \[premiumLang, setPremiumLang\] = useState\('en'\)/)
   assert.match(publicMenu, /useState\(\(\) => premium \? 'USD' : getDefaultMenuCurrency\(\)\)/)
   assert.match(publicMenu, /const lang = premium \? premiumLang : appLang/)
@@ -161,7 +161,7 @@ test('PublicMenu enables tappable fixed collapsed categories', () => {
   assert.doesNotMatch(source, /className="hidden sm:flex sm:max-w-\[420px\]"/)
   assert.doesNotMatch(source, /floatingMaxWidth=\{720\}/)
   assert.doesNotMatch(source, /variant="overlay"/)
-  assert.match(source, /displayCategories\.filter\(category => \(itemCounts\[category\.id\] \|\| 0\) > 0\)/)
+  assert.match(source, /listedCategories\.filter\(category => \(itemCounts\[category\.id\] \|\| 0\) > 0\)/)
   assert.doesNotMatch(source, /px-4 py-5 sm:px-6/)
   assert.doesNotMatch(source, /className="mb-7 mt-3 rounded-\[28px\]/)
 })
@@ -582,4 +582,15 @@ test('menu items support required option variants with parent product ids', () =
   assert.match(source, /compactMobile \? 'max-sm:hidden' : ''/)
   assert.match(source, /const compactViewport = compactMobile && window.innerWidth < 640/)
   assert.match(source, /const stickyBarOffset = !compactViewport && collapsed/)
+})
+
+test('corporate sets have their own public page and stay out of the main menu', () => {
+  const publicMenu = readSource('src/pages/PublicMenu.jsx')
+  const app = readSource('src/App.jsx')
+
+  assert.match(app, /path="\/corporate-sets"[^\n]*<PublicMenu corporateSets \/>/)
+  assert.match(app, /path="\/corporate-sets\/item\/:itemId"[^\n]*<PublicMenu corporateSets \/>/)
+  assert.match(publicMenu, /if \(corporateSets\) return displayCategories\.filter\(category => category\.id === CORPORATE_SETS_CATEGORY_ID\)/)
+  assert.match(publicMenu, /return displayCategories\.filter\(category => category\.id !== CORPORATE_SETS_CATEGORY_ID\)/)
+  assert.match(publicMenu, /\{siteCopy\.corporateSets\}<\/a>\s*<a href="\/menu#public-menu-deals"[^\n]*\{siteCopy\.promotions\}/)
 })
