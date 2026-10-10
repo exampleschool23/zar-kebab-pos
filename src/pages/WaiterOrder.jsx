@@ -605,7 +605,7 @@ export default function WaiterOrder() {
   const navigate            = useNavigate()
   const location            = useLocation()
   const [searchParams]      = useSearchParams()
-  const requestedPriceMode  = normalizePriceMode(searchParams.get('priceMode'))
+  const requestedPriceMode  = normalizePriceMode(location.state?.priceMode)
   const { state, dispatch, pendingKitchenSubmission } = useApp()
   const { loaded, loadError } = useAppDataStatus()
   const { profile, signOut } = useAuth()

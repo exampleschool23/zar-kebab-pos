@@ -726,7 +726,8 @@ export default function WaiterTables() {
       }
       dispatch({ type: 'SET_TABLE', payload: table.id })
       dispatch({ type: 'CLEAR_CART' })
-      navigate(`/waiter/order/${encodeURIComponent(table.id)}?priceMode=${encodeURIComponent(selectedPriceMode)}`)
+      // Price mode travels in history state, not the URL, so guests never see it in the address bar.
+      navigate(`/waiter/order/${encodeURIComponent(table.id)}`, { state: { priceMode: selectedPriceMode } })
     } catch {
       setGuestEntryError(lang === 'uz'
         ? 'Stolni ochib bo‘lmadi. Qayta urinib ko‘ring.'

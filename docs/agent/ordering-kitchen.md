@@ -11,6 +11,7 @@
 
 - Opening a table is a direct compact Regular/Tourist (`R`/`T`) choice followed by Enter table. Do not ask for a PIN or create a Guest session.
 - Opening a table creates no order; sending the cart does.
+- The chosen price mode is passed in router history state, never in the URL: guests can read the tablet's address bar (`tests/guestAutoSubmit.test.js`).
 - Reserved-table seating clears reservation fields before entering ordering.
 - Active non-empty orders keep their saved price mode locked; `221` rejects conflicting rounds (`tests/kitchenPriceModeGuard.test.js`).
 - Empty shells, stale totals without items, and all-cancelled orders must not lock price mode or show an active-order notice.
