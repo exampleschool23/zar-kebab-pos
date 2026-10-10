@@ -13,6 +13,7 @@ const COPY = {
     unavailable: 'An item is no longer available. Remove unavailable items from the cart and try again.',
     mismatch: 'The payment amount no longer matches the bill. Refresh the bill, check the amounts, then try again.',
     priceMode: 'This table already has an open bill in the other Regular/Tourist mode. The table has been refreshed and your cart kept. Check the table mode and send again.',
+    image: 'Add at least one product photo before creating it. Your other details are still here.',
   },
   ru: {
     save: 'Не удалось сохранить изменения', payment: 'Не удалось провести оплату', kitchen: 'Не удалось отправить заказ',
@@ -27,6 +28,7 @@ const COPY = {
     unavailable: 'Одно из блюд больше недоступно. Удалите недоступные блюда из корзины и попробуйте снова.',
     mismatch: 'Сумма оплаты больше не совпадает со счётом. Обновите счёт, проверьте суммы и попробуйте снова.',
     priceMode: 'У этого стола уже есть открытый счёт в другом режиме цен (обычный или турист). Стол обновлён, корзина сохранена. Проверьте режим стола и отправьте снова.',
+    image: 'Добавьте хотя бы одно фото товара перед созданием. Остальные данные сохранены в форме.',
   },
   uz: {
     save: 'O‘zgarishlarni saqlab bo‘lmadi', payment: 'To‘lovni amalga oshirib bo‘lmadi', kitchen: 'Buyurtmani yuborib bo‘lmadi',
@@ -41,6 +43,7 @@ const COPY = {
     unavailable: 'Taomlardan biri endi mavjud emas. Mavjud bo‘lmagan taomlarni savatchadan olib tashlang va qayta urinib ko‘ring.',
     mismatch: 'To‘lov summasi hisobga mos kelmayapti. Hisobni yangilang, summalarni tekshiring va qayta urinib ko‘ring.',
     priceMode: 'Bu stolda boshqa narx rejimidagi (oddiy yoki turist) ochiq hisob bor. Stol yangilandi, savatcha saqlandi. Stol rejimini tekshirib, qayta yuboring.',
+    image: 'Mahsulot yaratishdan oldin kamida bitta rasm qo‘shing. Boshqa ma’lumotlar shaklda saqlangan.',
   },
 }
 
@@ -51,6 +54,7 @@ export function writeErrorReason(error) {
   if (error?.code === 'POS_BILL_WITH_CASHIER' || /Cashier access is required to move a bill back to its table/i.test(message)) return 'bill'
   if (/Payment amount mismatch/i.test(message)) return 'mismatch'
   if (/Table price mode conflict/i.test(message)) return 'priceMode'
+  if (/menu_item_image_required/i.test(message)) return 'image'
   if (/already paid|already closed|paid, completed, cancelled/i.test(message)) return 'closed'
   if (/unavailable.*menu|menu.*unavailable|archived|no longer available/i.test(message)) return 'unavailable'
   if (error?.code === '42501' || /permission denied|write access is required|row-level security/i.test(message)) return 'permission'

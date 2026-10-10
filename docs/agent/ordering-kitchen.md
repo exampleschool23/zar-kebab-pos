@@ -21,9 +21,9 @@
 
 ## Cart and waiter availability
 
-- Mobile staff ordering defaults to a compact two-column product grid below 640px, with a locally saved compact/large card switch. Mobile categories use one sticky chip row. Guest tablet mode keeps cards. Both views share price, variant, and cart handlers; details retain descriptions and nutrition.
+- Below 640px staff ordering defaults to a compact two-column grid with a saved compact/large switch. Mobile categories use one sticky chip row. Guest tablet mode keeps cards. Both views share price, variant, and cart handlers; details retain descriptions and nutrition.
 
-- Product cards show the available variant price range for the current audience; detail prices follow selected options using `src/lib/menuPricing.js`, matching the base price passed to the cart. Coverage: `tests/menuPricing.test.js`.
+- Cards show the audience's variant price range; detail prices follow selected options via `src/lib/menuPricing.js`, matching the cart base price. Coverage: `tests/menuPricing.test.js`.
 - Configured-option additions start at quantity one and increment only the matching `cart_item_key`.
 - Reject unavailable or archived products at add, increment, detail submit, kitchen submit, and the database boundary.
 - `stock_count` is inventory, not an availability flag.
@@ -41,7 +41,7 @@
 - Durable round receipts survive later payment, cancellation, or row deletion and are the idempotency boundary. A retry must never resurrect an old round.
 - The database must reject late inserts into paid orders and stale archived/unavailable products.
 
-- Fresh waiter submissions to an order already marked `needs_bill` require cashier recall first; retain the cart and explain the required action. Cashier-authorized users remain allowed. Never block reconciliation of an uncertain existing round on this preflight. Coverage: `tests/billHandoff.test.js`.
+- Fresh waiter submissions to an order already marked `needs_bill` require cashier recall first; retain the cart and explain the required action. Cashier-authorized users remain allowed. Never let this preflight block reconciling an uncertain round. Coverage: `tests/billHandoff.test.js`.
 - Shared write and cart submission errors use `src/lib/writeErrorMessage.js` for actionable Uzbek/Russian/English messages at render time; raw diagnostics stay in console logs. Coverage: `tests/writeErrorMessage.test.js`.
 
 ## Kitchen checks and printing
@@ -67,6 +67,6 @@
 
 - Migration `180` queues each new Game Club round at commit, with only that round’s items and the actual submitting actor. Team delivery runs independently of the browser.
 
-- Staff category schedules can be bypassed per order type via `always_visible_take_away`, `always_visible_delivery`, and `always_visible_game_club`. Manage Menu exposes independent schedule checkboxes. Migration `205_game_club_category_schedule.sql` seeds Business lunch for Game Club only. Guest/public menus, item schedules, hidden/archive flags, and unavailable meals retain their rules. Tests: `tests/gameClubCategorySchedule.test.js`.
+- Staff category schedules can be bypassed per order type via `always_visible_take_away`, `always_visible_delivery`, and `always_visible_game_club`. Manage Menu has a checkbox for each; migration `205` seeds Game Club Business lunch. Guest/public menus, item schedules, hidden/archive flags, and unavailability keep their rules. Tests: `tests/gameClubCategorySchedule.test.js`.
 
 - Custom calendars: `src/components/CalendarPicker.jsx`; ISO values/bounds preserved. Tests: `tests/calendarPicker.test.js`.

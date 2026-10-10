@@ -41,7 +41,7 @@
 
 ## Invariants
 
-- Report reads retry network/502/503/504 errors: 3 attempts, 15s each, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write retries. Tests: `tests/reportReadFetch.test.js`.
+- Report reads retry network/502/503/504: 3×15s, 500/1000ms backoff; only table GET/HEAD and pending-date RPCs. No write retries. Tests: `tests/reportReadFetch.test.js`.
 - Use atomic RPCs for multi-table writes such as kitchen submission, menu item + protected cost, Tech Cards, Daily Bazaar, and payment corrections.
 - Enforce UI permissions with RLS/RPCs.
 - Preserve order/cost/category/payroll/notification/audit snapshots.
@@ -80,10 +80,10 @@
 - `202`: current-day-only order deletion and private KPI cleanup; apply before sender/UI. Tests: `tests/orderDeletion.test.js`.
 - `203`/`213`: KPI start/opening cutoff; apply before UI. Tests: `tests/timeBasedKpi.test.js`.
 - `204`: preserve audit actors on account deletion. Tests: `tests/accountDeletionAudit.test.js`.
-- `205`: Take Away/Delivery/Game Club category schedule settings; apply before UI. Seeds Business lunch for Game Club. Tests: `tests/gameClubCategorySchedule.test.js`.
+- `205`: Take Away/Delivery/Game Club category schedules; apply before UI. Seeds Game Club Business lunch. Tests: `tests/gameClubCategorySchedule.test.js`.
 - `207`–`209`: rate date guard, audits, owner-only DELETE. Apply before UI. Tests: `tests/salaryRateDateWindow.test.js`, `tests/salaryRateHistory.test.js`.
 - `210`: see [salary orders](salary-orders.md).
 - `211`: profile name realtime; history unchanged. Tests: `tests/activeOrderWaiters.test.js`.
-- `212`/`220`: bill edits (payments); `221`: price-mode guard (ordering)
+- `212`/`220`: bill edits (payments); `221`: price-mode guard (ordering); `222`: insert image guard (menu)
 - `214`: `custom:<name>` ingredient categories; apply before UI.
 - `215`–`217`: payroll.md; `218`–`219`: architecture.md.

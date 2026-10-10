@@ -57,3 +57,8 @@ export function getMenuItemMediaUrls(item) {
 export function getMenuItemPrimaryMediaUrl(item) {
   return getMenuItemMediaUrls(item)[0] || ''
 }
+
+// New products must carry at least one still image (photo or GIF), not only video.
+export function hasMenuItemImage(values = []) {
+  return normalizeMenuMediaUrls(values).some(url => !isMenuVideoUrl(url))
+}

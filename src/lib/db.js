@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { hasMenuItemImage } from './menuMedia.js'
 import { loadActiveOrderWaiterNames } from './activeOrderWaiters.js'
 import { withWriteTimeout } from './writeTimeout.js'
 import { pickQuickItemOrder } from './cashierBills.js'
@@ -1505,6 +1506,9 @@ export async function writeToSupabase(action, state, options = {}) {
       const requiredCost = getRequiredMenuItemCost(costPrice ?? _costPriceAlias)
       if (requiredCost === null) {
         throw new Error('Real cost must be greater than zero for every new product.')
+      }
+      if (!hasMenuItemImage([fields.image_url, ...(fields.media_urls || [])])) {
+        throw new Error('menu_item_image_required')
       }
       const normalizedVariantCosts = normalizeVariantCosts(variantCosts ?? _variantCostsAlias)
       const normalizedFields = trimMenuItemTextFields(fields)

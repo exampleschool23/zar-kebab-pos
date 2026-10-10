@@ -51,6 +51,7 @@ import { getRequiredMenuItemCost, hasRequiredMenuItemCost, isTechCardMenuItemCos
 import { isTechCardEligibleMenuItem } from '../lib/techCards'
 import {
   getMenuItemMediaUrls,
+  hasMenuItemImage,
   isMenuVideoUrl,
   MENU_IMAGE_ACCEPT,
   MENU_IMAGE_MIME_TYPES,
@@ -476,7 +477,7 @@ function ImageUploadField({ label, value, onChange, onUploadComplete, lang, type
   )
 }
 
-function MediaGalleryField({ label, values, onChange, onUploadComplete, lang, entityId }) {
+function MediaGalleryField({ label, values, onChange, onUploadComplete, lang, entityId, required = false }) {
   const fileRef = useRef(null)
   const [urlDraft, setUrlDraft] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -533,9 +534,11 @@ function MediaGalleryField({ label, values, onChange, onUploadComplete, lang, en
     onChange([url, ...mediaUrls.filter(value => value !== url)])
   }
 
+  const missingRequiredImage = required && !hasMenuItemImage(mediaUrls)
+
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold text-gray-500">{label}</label>
+      <label className={`mb-1.5 block text-xs font-semibold ${missingRequiredImage ? 'text-red-700' : 'text-gray-500'}`}>{label}{required ? ' *' : ''}</label>
       <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
@@ -631,6 +634,15 @@ function MediaGalleryField({ label, values, onChange, onUploadComplete, lang, en
         </div>
       )}
       <p className="mt-1.5 text-[11px] font-semibold text-gray-400">{t(lang, 'mediaHelp')}</p>
+      {required && (
+        <p className={`mt-1.5 text-[11px] font-bold ${missingRequiredImage ? 'text-red-600' : 'text-emerald-700'}`}>
+          * {lang === 'uz'
+            ? 'Yangi mahsulot uchun kamida bitta rasm majburiy.'
+            : lang === 'ru'
+              ? 'Для нового товара нужно хотя бы одно фото.'
+              : 'At least one photo is required for every new product.'}
+        </p>
+      )}
       {error && <p className="mt-1.5 text-xs font-semibold text-red-600">{error}</p>}
     </div>
   )
@@ -1706,12 +1718,14 @@ export default function AdminMenu() {
   const isItemFormDirty = itemModal === 'new'
     || (itemModal === 'edit' && !!originalItemFormFingerprint && currentItemFormFingerprint !== originalItemFormFingerprint)
   const hasValidNewItemCost = itemModal !== 'new' || hasRequiredMenuItemCost(form.cost_price)
+  const hasRequiredNewItemImage = itemModal !== 'new' || hasMenuItemImage(form.media_urls)
   const canSaveItemForm = !savingItemForm
     && canEditMenu
     && !!trimMenuItemTextValue(form.name_uz)
     && !!form.price
     && !!form.category_id
     && hasValidNewItemCost
+    && hasRequiredNewItemImage
     && isItemFormDirty
   const currentCatFormFingerprint = useMemo(() => getCategoryFormFingerprint(catForm), [catForm])
   const isCatFormDirty = catModal === 'new'
@@ -2032,6 +2046,10 @@ export default function AdminMenu() {
             ? 'Укажите реальную себестоимость нового товара.'
             : 'Enter the real cost for the new product.',
       })
+      return
+    }
+    if (itemModal === 'new' && !hasMenuItemImage(form.media_urls)) {
+      setMenuNotice({ error: new Error('menu_item_image_required'), actionType: 'ADD_MENU_ITEM' })
       return
     }
     setSavingItemForm(true)
@@ -2809,6 +2827,7 @@ export default function AdminMenu() {
                       onUploadComplete={upload => handleTrackedUpload(uploadedItemImageUrlsRef, upload)}
                       lang={lang}
                       entityId={form.id}
+                      required={itemModal === 'new'}
                     />
                     <SaleUnitField value={form.sale_unit} onChange={setF('sale_unit')} lang={lang} />
                     <div className="grid grid-cols-2 gap-3">
@@ -3613,6 +3632,7 @@ export default function AdminMenu() {
               onUploadComplete={upload => handleTrackedUpload(uploadedItemImageUrlsRef, upload)}
               lang={lang}
               entityId={form.id}
+              required={itemModal === 'new'}
             />
             <Field label={t(lang, 'sortOrder')} type="number" value={form.sort_order} onChange={setF('sort_order')} placeholder="1" />
             <Field

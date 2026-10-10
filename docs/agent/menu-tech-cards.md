@@ -45,9 +45,9 @@
 ## Media and text
 
 - `media_urls[0]` is the cover and stays synchronized with `image_url`.
-- Gallery supports images, GIF, MP4, WebM. Cards/Telegram use the cover; customer/waiter details show the gallery.
+- Gallery: images, GIF, MP4, WebM. New products need a still image; `222` rejects empty `image_url`. Cards/Telegram use the cover; details show the gallery.
 - Delete old R2 media after save; clean temporary uploads on cancel/removal.
-- Upload error rendering belongs inside `ImageUploadField`; `SortableItemCard` must not access that state.
+- Upload errors render inside `ImageUploadField`, not `SortableItemCard`.
 - Trim localized text at editor/write/display/database boundaries; preserve internal spaces and description line breaks.
 - `estimated_prep_minutes` is a localized current-catalog expectation from 1–180 minutes (default 15), not a historical order promise.
 - Owner-only Archive buttons use a retryable in-app dialog.
