@@ -4,6 +4,11 @@
 
 begin;
 
+-- Take both catalog locks up front in one statement so live menu reads cannot
+-- interleave between trigger drops and deadlock; fail fast instead of queuing.
+set local lock_timeout = '5s';
+lock table public.menu_categories, public.menu_items in access exclusive mode;
+
 drop trigger if exists trg_owner_only_menu_item_archival_insert on public.menu_items;
 drop trigger if exists trg_owner_only_menu_item_archival_update on public.menu_items;
 drop trigger if exists trg_owner_only_menu_category_archival_insert on public.menu_categories;
