@@ -659,16 +659,16 @@ test('public menu hiding is owner-only in the product editor and database', () =
   assert.match(migration, /using errcode = '42501'/)
 })
 
-test('menu catalog archival is owner-only in the UI and database', () => {
+test('menu catalog archival follows Manage Menu in the UI and database', () => {
   const source = readSource('src/pages/AdminMenu.jsx')
   const permissions = readSource('src/lib/permissions.js')
-  const migration = readSource('migrations/167_owner_only_menu_catalog_archival.sql')
+  const migration = readSource('migrations/223_manage_menu_catalog_archival.sql')
   const adminMenu = functionBody(source, 'AdminMenu')
   const itemCard = functionBody(source, 'SortableItemCard')
   const itemRow = functionBody(source, 'SortableItemRow')
   const categoryRow = functionBody(source, 'SortableCatRow')
 
-  assert.match(permissions, /function canDeleteMenuCatalog\(profileOrRole\)[\s\S]*normalizeRole\(profileOrRole\?\.role \|\| profileOrRole\) === 'owner'[\s\S]*canEditMenu\(profileOrRole\)/)
+  assert.match(permissions, /function canDeleteMenuCatalog\(profileOrRole\) \{\n  return canEditMenu\(profileOrRole\)\n\}/)
   assert.match(source, /canDeleteMenuCatalog as canDeleteMenuCatalogForProfile/)
   assert.match(adminMenu, /const canDeleteMenuCatalog = canDeleteMenuCatalogForProfile\(profile \|\| \{ role: state\.user\?\.role \}\)/)
   assert.equal((source.match(/canDelete=\{canDeleteMenuCatalog\}/g) || []).length, 8)
@@ -682,8 +682,10 @@ test('menu catalog archival is owner-only in the UI and database', () => {
 
   assert.match(migration, /security definer/)
   assert.match(migration, /auth\.uid\(\) is null/)
-  assert.match(migration, /new\.deleted_at is not null and not public\.is_owner\(\)/)
-  assert.match(migration, /old\.deleted_at is distinct from new\.deleted_at and not public\.is_owner\(\)/)
+  assert.match(migration, /drop function if exists public\.enforce_owner_only_menu_catalog_archival\(\)/)
+  assert.match(migration, /new\.deleted_at is not null and not public\.current_staff_can_write\('menu'\)/)
+  assert.match(migration, /old\.deleted_at is distinct from new\.deleted_at and not public\.current_staff_can_write\('menu'\)/)
+  assert.doesNotMatch(migration, /is_owner\(\)/)
   assert.match(migration, /using errcode = '42501'/)
   assert.match(migration, /before insert on public\.menu_items/)
   assert.match(migration, /before insert on public\.menu_categories/)

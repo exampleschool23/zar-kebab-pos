@@ -205,8 +205,7 @@ export function canChangeMenuItemPublicVisibility(profileOrRole) {
 }
 
 export function canDeleteMenuCatalog(profileOrRole) {
-  return normalizeRole(profileOrRole?.role || profileOrRole) === 'owner'
-    && canEditMenu(profileOrRole)
+  return canEditMenu(profileOrRole)
 }
 
 export function canMoveBackToTable(profileOrRole) {

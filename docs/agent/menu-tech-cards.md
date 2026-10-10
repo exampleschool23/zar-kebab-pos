@@ -4,7 +4,7 @@
 
 - Pages: `src/pages/AdminMenu.jsx`, `src/pages/TechCards.jsx`, `src/pages/PublicMenu.jsx`, `src/pages/TelegramMiniApp.jsx`
 - Helpers: `src/lib/menuItems.js`, `src/lib/menuPricing.js`, `src/lib/menuMedia.js`, `src/lib/menuItemCosts.js`, `src/lib/techCards.js`
-- Database: `src/lib/db.js`, migrations `139`, `149`–`151`, and `154`–`156`
+- Database: `src/lib/db.js`, migrations `139`, `149`–`151`, `154`–`156`, and `223`
 - Focused tests: `tests/menuItems.test.js`, `tests/menuArchiveSafety.test.js`, `tests/menuStock.test.js`, `tests/menuMedia.test.js`, `tests/techCards.test.js`, `tests/techCardsFeature.test.js`, `tests/sourceGuards.menu.test.js`, `tests/sourceGuards.public-menu.test.js`
 
 ## Visibility
@@ -16,7 +16,7 @@
 - Manage Menu may create unavailable products and change availability; database enforced.
 - `cashier_only`, schedules, category visibility, option visibility, and `deleted_at` are separate controls.
 - `deleted_at` is the archive boundary. Archived products/categories never reappear because of availability behavior.
-- Archival requires owner + Manage Menu; admins retain ordinary editing.
+- Archival/restoration requires Manage Menu (any role); see `223`.
 - `stock_count` is shelf inventory and never determines menu visibility or orderability.
 
 ## Product costs and history
@@ -26,7 +26,7 @@
 - Protected current costs live in `menu_item_costs`; variant costs live in `variant_costs`. Public options contain names and selling prices only.
 - `order_items.cost_price` is a sale-time database snapshot. Runtime reporting must never fall back to today's menu cost for missing historical coverage.
 - Later price/cost edits affect future order items only. Never rewrite paid revenue, profit, reports, or saved order-item costs.
-- Owner deletion is archival; physical catalog deletion is rejected to preserve reports.
+- Catalog deletion is archival; physical catalog deletion is rejected to preserve reports.
 - Profit margin `(selling price - cost) / selling price` is a live preview only.
 
 ## Availability notifications
@@ -50,7 +50,7 @@
 - Upload errors render inside `ImageUploadField`, not `SortableItemCard`.
 - Trim localized text at editor/write/display/database boundaries; preserve internal spaces and description line breaks.
 - `estimated_prep_minutes` is a localized current-catalog expectation from 1–180 minutes (default 15), not a historical order promise.
-- Owner-only Archive buttons use a retryable in-app dialog.
+- Manage Menu Archive buttons use a retryable in-app dialog.
 
 ## Tech Cards
 
